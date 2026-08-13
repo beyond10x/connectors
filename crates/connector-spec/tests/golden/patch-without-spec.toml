@@ -1,0 +1,16 @@
+# Patches with nothing to apply to.
+id = "vendor"
+base_url = "https://services.vendor.com"
+
+[[operations]]
+id = "vendor.agent.list"
+method = "GET"
+direction = "read"
+path = "/api/v2/agents"
+risk = "low"
+idempotency = "idempotent"
+auth = []
+
+[[patch.operations]]
+select = "getAgent"
+rename = "vendor.agent.get"

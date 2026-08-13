@@ -1,0 +1,11 @@
+# An operation with no path.
+id = "zendesk"
+base_url = "https://acme.zendesk.com"
+
+[[operations]]
+id = "zendesk.ticket.show"
+method = "GET"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = []
