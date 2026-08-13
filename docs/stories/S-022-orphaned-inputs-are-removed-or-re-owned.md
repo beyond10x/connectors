@@ -2,7 +2,7 @@
 id: S-022
 title: "Orphaned inputs are removed or re-owned"
 pillar: Catalog
-status: backlog
+status: in-progress
 priority:
 design:
 epic: post-m1
@@ -61,7 +61,10 @@ origin backing a shipped connector is that rule with a hole in it.
       vendored document and a deleted migration ratchet are decisions, not cleanup noise.
 
 ## Progress
-- (not started)
+- Anthropic's provider was already hand-curated and contained no `[[spec]]` ingest. Its operations
+  and auth declarations cite vendor documentation directly, so the unknown-origin excerpt was an
+  unused file rather than an input to the shipped catalog. The excerpt and its false source-index
+  entry were deleted; no catalog artifact changed.
 
 ## Notes
 
