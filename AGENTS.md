@@ -14,6 +14,18 @@ Design documents are a numbered series (`docs/design/NN-title.md`). New design w
 number; earlier documents are amended with dated notes, not silently rewritten. Nouns come from
 the domain model and are not renamed casually (vision principle 10).
 
+## Dispatching work
+
+**Implementation over planning, dispatched wide.** Progress is judged by working code landing, not
+by how well work is specified — a wave in which half the merged stories are `docs/design/*.md` reads
+as stalling. Front-load design into as few stories as possible and fan the code stories out in
+parallel, up to five at once. When a wave is narrow, say plainly what caps it: if the dependency
+graph rather than caution, name the blocked stories and what unblocks each.
+
+**Deferred by Timo on 2026-08-13:** a family-level architecture review across the `architecture`,
+`connectors` and `substrate` repositories — how everything connects — postponed until `substrate`'s
+documents are finished. Pick it up when Timo says substrate is done.
+
 ## Commits
 
 - This repository is private. Its visibility must not change without Timo's explicit approval.
