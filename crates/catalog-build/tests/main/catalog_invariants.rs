@@ -700,6 +700,61 @@ fn spec_backed_coverage_holds_in_both_directions() {
     );
 }
 
+/// Anthropic is the first shipped connector whose complete machine-readable source is authored in
+/// this repository because the vendor publishes HTML reference pages rather than OpenAPI bytes.
+/// Keep that exception honest: both source documents participate, every shipped operation points
+/// back to one of them, and no Claude/Claude Code credential-acquisition authority leaks into the
+/// API connector.
+#[test]
+fn repository_authored_anthropic_sources_reproduce_only_the_api_connector() {
+    let workspace = Workspace::new(repo_root());
+    let provider = catalog_build::discovery::discover(&workspace, Some("anthropic"))
+        .expect("discover Anthropic")
+        .into_iter()
+        .next()
+        .expect("Anthropic is shipped");
+    let inputs = catalog_build::seam::ProviderInputs::read(&provider).expect("read Anthropic");
+    let loaded = catalog_build::seam::load_full(&inputs).expect("compile authored Anthropic specs");
+
+    assert_eq!(
+        loaded.ingested.len(),
+        2,
+        "Models and Admin are separate source documents"
+    );
+    assert_eq!(loaded.connector.operations.len(), 11);
+    assert_eq!(loaded.connector.provenance.operation_specs.len(), 11);
+    assert_eq!(
+        loaded
+            .connector
+            .auth
+            .iter()
+            .map(|method| method.name.as_str())
+            .collect::<Vec<_>>(),
+        ["anthropic.api_key", "anthropic.admin_key"],
+        "harness or undocumented OAuth authority must not enter the API connector"
+    );
+    assert!(
+        loaded
+            .connector
+            .services
+            .iter()
+            .all(|service| { service.name == "models" || service.name == "admin" }),
+        "only documented API surfaces may become connector services"
+    );
+
+    for input in &inputs.specs {
+        if !input.path.starts_with("specs/anthropic/") {
+            continue;
+        }
+        assert!(input
+            .document
+            .contains("x-b10x-origin: repository-authored"));
+        assert!(input.document.contains("x-b10x-source-reference:"));
+        assert!(!input.document.contains("claude.ai/oauth"));
+        assert!(!input.document.contains("platform.claude.com/v1/oauth"));
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // 8. Orphans
 // ---------------------------------------------------------------------------------------------

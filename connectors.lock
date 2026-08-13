@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 1
-sha256 = "43a7f05fa502a70a96fbba9164c2dace3a5ab67893d9d6a3c92234ea1be5591d"
+sha256 = "d9ad84d3a3b2329a24d8f3f7b01f0a46c2021b549fcf3c1d002e0c827a3646bd"
 
 [[provider]]
 id = "airtable"
@@ -29,11 +29,23 @@ ir_sha256 = "bc7091a04423b9ed39bf083d8c4d541eca0d5971052e91081fb718d7f719b453"
 [[provider]]
 id = "anthropic"
 generator = "flux-connectors 0.26.0"
-toml_sha256 = "8847f33972313e8380451c51ee280878d468b024deed018ebf97940604375b29"
-ir_sha256 = "31427a3d76670495281cb704ae58186f79f7426f486941d11d372b38d3c4186c"
+toml_sha256 = "dcd98c1422ae649fd38c90970f846cba905bf67d6b5f5513866559983eae98c2"
+ir_sha256 = "0ea582c732f0f960e8bf9288c476a99536ceaa97a7f54f7ead5f11ea23c1a0bd"
+
+[[provider.specs]]
+path = "specs/anthropic/models-2023-06-01.openapi.yaml"
+service = "models"
+upstream_version = "2023-06-01"
+sha256 = "38e054bae8e051a58493b6978bcab5a64b15c0544588218fa789646d01b431df"
+
+[[provider.specs]]
+path = "specs/anthropic/admin-2023-06-01.openapi.yaml"
+service = "admin"
+upstream_version = "2023-06-01"
+sha256 = "8280d48e48dd33a3c5f9d899dbc03d4154e23928c4aa9b304ceceda3791ad718"
 
 [provider.artifacts]
-"catalog/anthropic.catalog.json" = "d07b4c28d3368c1b9df900b4740e81da091fb6185c70e5cb22ee599e46136c58"
+"catalog/anthropic.catalog.json" = "5f603968d693a0ebe388af32810053eaa6b8f98ff99c452cc113deab49962855"
 
 [[provider]]
 id = "asana"

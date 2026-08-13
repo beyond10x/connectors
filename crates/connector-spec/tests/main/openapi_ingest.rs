@@ -39,41 +39,68 @@ fn zendesk() -> Ingested {
 }
 
 fn anthropic() -> Ingested {
-    ingest_fixture("anthropic/2023-06-01-excerpt.yaml")
+    ingest_fixture("anthropic/models-2023-06-01.openapi.yaml")
 }
 
 /// The repository-authored spec is pinned and cannot masquerade as vendor-published bytes.
 #[test]
 fn the_anthropic_spec_has_authored_provenance() {
     let directory = specs_dir();
-    let bytes = std::fs::read(directory.join("anthropic/2023-06-01-excerpt.yaml"))
-        .expect("read the Anthropic spec");
+    let spec_paths = [
+        "anthropic/models-2023-06-01.openapi.yaml",
+        "anthropic/admin-2023-06-01.openapi.yaml",
+    ];
     let provenance = std::fs::read_to_string(directory.join("anthropic.provenance.toml"))
         .expect("read spec provenance")
         .parse::<toml::Table>()
         .expect("spec provenance is TOML");
-    let spec = provenance
+    let specs = provenance
         .get("spec")
         .and_then(toml::Value::as_array)
-        .and_then(|specs| specs.first())
-        .and_then(toml::Value::as_table)
-        .expect("provenance declares one spec");
-
+        .expect("provenance declares specs");
+    assert_eq!(specs.len(), spec_paths.len());
+    let mut files = std::fs::read_dir(directory.join("anthropic"))
+        .expect("read Anthropic source directory")
+        .map(|entry| {
+            format!(
+                "anthropic/{}",
+                entry
+                    .expect("read Anthropic source entry")
+                    .file_name()
+                    .to_string_lossy()
+            )
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    let mut declared = spec_paths.to_vec();
+    declared.sort();
     assert_eq!(
-        spec.get("origin").and_then(toml::Value::as_str),
-        Some("repository-authored")
+        files, declared,
+        "source files and provenance must cover each other"
     );
-    assert_eq!(
-        spec.get("sha256").and_then(toml::Value::as_str),
-        Some(connector_spec::sha256_hex(&bytes).as_str()),
-        "the authored spec moved without its provenance pin"
-    );
-    assert!(
-        spec.get("references")
-            .and_then(toml::Value::as_array)
-            .is_some_and(|references| references.len() >= 3),
-        "the authored spec must cite the official API, version, and model references"
-    );
+    for (entry, relative) in specs.iter().zip(spec_paths) {
+        let spec = entry.as_table().expect("spec provenance is a table");
+        let bytes = std::fs::read(directory.join(relative)).expect("read authored spec");
+        assert_eq!(
+            spec.get("origin").and_then(toml::Value::as_str),
+            Some("repository-authored")
+        );
+        assert_eq!(
+            spec.get("coverage").and_then(toml::Value::as_str),
+            Some("exact-shipped-surface")
+        );
+        assert_eq!(
+            spec.get("sha256").and_then(toml::Value::as_str),
+            Some(connector_spec::sha256_hex(&bytes).as_str()),
+            "the authored spec moved without its provenance pin"
+        );
+        assert!(
+            spec.get("references")
+                .and_then(toml::Value::as_array)
+                .is_some_and(|references| references.len() >= 4),
+            "each authored spec must cite auth, version and endpoint references"
+        );
+    }
 }
 
 fn operation<'a>(ingested: &'a Ingested, id: &str) -> &'a SpecOperation {
@@ -112,14 +139,14 @@ fn both_openapi_3_0_and_3_1_documents_ingest() {
 #[test]
 fn a_yaml_document_ingests_including_its_integer_response_keys() {
     let anthropic = anthropic();
-    let messages = operation(&anthropic, "messages_post");
-    let response = messages
+    let models = operation(&anthropic, "models_list");
+    let response = models
         .response_schema
         .as_ref()
         .expect("`responses: {200: …}` is an integer key in YAML and must still be found");
     assert_eq!(
         response
-            .pointer("/properties/id/type")
+            .pointer("/properties/data/items/properties/id/type")
             .and_then(|t| t.as_str()),
         Some("string"),
         "{response}"
