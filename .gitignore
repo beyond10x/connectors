@@ -5,3 +5,12 @@
 /target/
 node_modules/
 .DS_Store
+
+# Generated site output (design 02 §1: "sources; generated output not committed twice").
+# The predecessor committed both `web/public/catalog.json` and the `web/public/v1/**` core
+# projection; a build rewrites them from `catalog/` and `specs/flux/core-v1.json`, so committing
+# them stores the same facts twice and makes every catalogue change a two-place diff.
+/web/public/catalog.json
+/web/public/v1/
+/web/.vitepress/dist/
+/web/.vitepress/cache/

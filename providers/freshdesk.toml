@@ -1,0 +1,711 @@
+# Freshdesk — hand-authored, no vendor spec.
+#
+# Transcribed from `docs/designs/provider-operation-inventory.md` §4, which derives the operation
+# set from action-proxy's `freshdesk` collection (649 lines of YAML). action-proxy is mined for
+# endpoint facts only; it is the problem statement, not the template. Freshdesk publishes no
+# machine-readable description we know of (§1.2), so this file stays hand-authored and its drift is
+# undetectable by machine (§6.7).
+#
+# Source defects in the collection are corrected here rather than reproduced — each correction is
+# marked `§6.4` and is one of the rows in that table.
+
+id = "freshdesk"
+vendor = "Freshdesk"
+
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/com.freshdesk.api/<credential>` — and until it was
+# declared `Credentials::reference` refused with `NoCredentialAddress`, so this connector could not
+# authenticate at all.
+#
+# Derived from `freshdesk.com`, the vendor's own primary domain, in reverse-DNS form, with the
+# trailing `api` label the already-shipped authorities carry (`com.slack.api`, `com.vercel.api`,
+# `io.fly.api`).
+#
+# It is also `docs/designs/global-addressing.md`'s own worked example — the design writes
+# `com.freshdesk.api:v2` throughout — so this spelling was fixed before the story was filed.
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "com.freshdesk.api"
+
+# The vendor's own spelling, and it is already in `base_url` above: `/api/v2`. Recorded here so a
+# `gid` renders (`com.freshdesk.api:v2`) — a credential path needs only the authority and
+# deliberately carries no version, so a token survives the vendor's next one.
+api_version = "v2"
+
+# Every Freshdesk account lives on its own domain, recorded by the inventory as operator config in
+# `FRESHDESK_DOMAIN`, e.g. `my-company.freshdesk.com` (§4.1). The `/api/v2` prefix is part of the
+# base URL, so operation paths below are collection-relative.
+#
+# `{domain}` is bound by the `[[config]]` field at the end of this file. Unlike zendesk, freshdesk
+# templates the *whole host* rather than one label, so the field's format is `hostname`.
+base_url = "https://{domain}/api/v2"
+
+description = "Freshdesk ticketing: list, read, create and update tickets and the contacts they belong to"
+
+# The "Test connection" operation. Its description already said so — *"Verify credentials with a
+# bounded contact read"* — in a field only a model reads.
+verify = "freshdesk-test"
+
+# ---------------------------------------------------------------------------------------------
+# Credentials — DELIBERATELY ABSENT. Read this before adding one.
+# ---------------------------------------------------------------------------------------------
+#
+# Freshdesk authenticates with `Authorization: Basic base64(<api_key>:X)` — the **secret occupies
+# the username position** and the password is the literal constant `X` (§4.1,
+# `freshdesk.yml:48-50`, `template.yml:15-20`). That shape is **not expressible** with today's
+# schema, and every way of forcing it is worse than leaving it out:
+#
+#   - `scheme = "basic"` composes `base64(<user_env><user_suffix>:<env>)`. Putting
+#     `FRESHDESK_API_KEY` in `user_env` would declare the API key as **non-secret config** —
+#     `AuthMethod::user_env` is documented as "config rather than a gated secret" — which removes it
+#     from flux's secret gating and from the redactor's `add_secret` registration. That is a
+#     security regression, not a cosmetic mismatch (§6.2).
+#   - `user_suffix` is the wrong half: it appends a literal to the *user*, and Freshdesk needs a
+#     literal in the *password*. There is no `password_literal`, and no field says which half is
+#     secret.
+#   - `scheme = "header"` with `name = "Authorization"` would send the raw key with no `Basic ` and
+#     no base64 — wrong on the wire, and it sends the credential anyway.
+#
+# So this connector declares **no credential and no `default_auth`**, which means its operations
+# inherit "unauthenticated". That is wrong, and it is wrong in the fail-closed direction: every
+# request 401s visibly instead of routing a live API key through a non-secret path. Nothing here is
+# executable until the gap closes.
+#
+# The fix is C-16's to make, and §6.2 recommends option (1): let a Basic method declare **which
+# position holds the secret**, the other position taking a literal constant. When that lands, add:
+#
+#     [[auth]]
+#     name = "freshdesk.api_key"
+#     scheme = "basic"
+#     env = ["FRESHDESK_API_KEY"]      # still the secret, still gated
+#     <the field that says the secret is the user half, password literal "X">
+#
+# and set `default_auth = [{ credentials = ["freshdesk.api_key"] }]`. The constant `X` is not a
+# credential and must never be stored in an environment variable pretending to be one.
+#
+# WHAT THIS CONNECTOR IS, AS A STATE (C-235) — decided, not inherited.
+#
+# It is `no-credential` — *withheld* — and **not** `no-credential-required`. Declaring nothing here
+# is the right thing to do and it is not the same statement as `auth = []` on an operation, which
+# would say the vendor needs nothing. Freshdesk's vendor needs a great deal; this repository is what
+# will not carry it.
+#
+# The distinction used to stop at the embedded catalogue, so `connectors-api` served freshdesk as
+# `no-credential-required` — "nothing to supply" — which reads to an operator as *ready to use* and
+# was wrong on every call. It now carries the reason, so the honest answer reaches the page:
+# nothing to supply, nothing to do, and the calls are refused until C-16 lands. **Do not** add
+# `auth = []` to these operations to make a check go green; that would state the opposite of what
+# the block above spent forty lines establishing.
+
+# ---------------------------------------------------------------------------------------------
+# Operations — 9 of 16 (inventory §4.2). Selection is ticket-centric, plus the contact operations
+# that make ticket work possible and one verification op. Excluded: `tickets.outbound_email` (sends
+# mail as a side effect), the two agent-directory operations, and the four
+# `babelforce.integration.*` forwarders, which are action-proxy's own capability contract rather
+# than Freshdesk operations at all.
+#
+# Op ids are hyphen-separated — flux-lang admits alphanumerics, `_` and `-` only (C-8).
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# RESPONSE SHAPES (C-126) — read from `developers.freshdesk.com/api/`, which is a single reference
+# page covering every resource below.
+#
+# **`status` and `priority` are numbers, and that is the whole reason these schemas are worth
+# declaring.** Freshdesk's own attribute tables type both as `number` and give the mappings:
+#
+#   status    2 Open · 3 Pending · 4 Resolved · 5 Closed          (no 1; default 2)
+#   priority  1 Low · 2 Medium · 3 High · 4 Urgent                (default 1)
+#   source    1 Email · 2 Portal · 3 Phone · 7 Chat · 9 Feedback widget · 10 Outbound email
+#
+# A flow that gates on "resolved" is comparing against `4`, not against a string, and zendesk's
+# sibling connector in this same repository answers the same question with `"solved"`. Publishing the
+# enum next to the field is what stops a consumer carrying one vendor's vocabulary into the other's.
+# The values are enumerated with `enum` where the vendor enumerates them, which also makes the
+# mapping machine-readable rather than prose.
+#
+# **There is no envelope anywhere.** A single-resource read returns the bare object and a list returns
+# a bare JSON **array** — the top level is not an object at all, which is a shape nothing else in this
+# fleet ships and which a consumer expecting `{"tickets": …}` would read as empty.
+#
+# Two documented facts constrain what is declared, and both are recorded rather than smoothed over:
+#
+# 1. **A list response is not a get response.** The reference notes that for accounts created after
+#    2018-11-30 `description` is omitted from list responses unless `include` is passed, and its own
+#    list examples also omit `tags` and `attachments`. So the list schemas below declare the fields
+#    the list examples actually show, not the single-read field set.
+# 2. **Freshdesk documents almost no success status codes.** Only the blanket "POST requests will
+#    contain the Location Header … HTTP 201 Created" and DELETE's 204. Nothing here claims a code the
+#    vendor does not state.
+#
+# `custom_fields` is an **object** keyed by field name here — the opposite of zendesk's array of
+# `{id, value}` pairs. Two vendors, two shapes, one word; that is exactly what a published schema is
+# for.
+#
+# As everywhere in this repository: this is what Freshdesk *sends*, not what a caller of the emitted
+# `op` receives. `http.request` returns one flat string today (C-127,
+# `docs/designs/member-io-schemas.md` §2).
+# ---------------------------------------------------------------------------------------------
+
+[[services]]
+# C-153. `default` is the reserved implicit service, and a provider with one API surface
+# declares no services at all — so this entry exists for exactly one reason: a tag attaches
+# to a service, and there is no other service here to attach it to. It carries `tags` and
+# nothing else, which is what keeps `default` implicit and this file emitting the same
+# `freshdesk.flux` it emitted before.
+name = "default"
+tags = ["support"]
+
+[[operations]]
+id = "freshdesk-test"
+method = "GET"
+direction = "read"
+path = "/contacts"
+description = "Verify credentials with a bounded contact read"
+risk = "low"
+idempotency = "idempotent"
+
+# Ours, not the source's: `yml:522-528` is an unbounded `GET /contacts`. Bounding a liveness check
+# to one record is a deliberate addition (§4.2).
+[[operations.params.query]]
+name = "per_page"
+description = "Records to fetch; one is enough to prove the credential works"
+required = false
+schema = { type = "integer", minimum = 1, default = 1 }
+
+# A bare array — this operation is `GET /contacts` with a bound, so it answers with the contact list
+# and there is no top-level object at all. That is the fact worth publishing on a verification
+# operation: a caller proving liveness checks that the call succeeded, and must not expect a body it
+# can key into.
+[operations.response_schema]
+type = "array"
+description = "The contacts, as a bare JSON array. With `per_page = 1` it holds one element; an empty array is still a successful credential check, because an account may genuinely have no contacts"
+items = { type = "object", properties = { id = { type = "integer" }, name = { type = "string" }, email = { type = "string", format = "email" }, active = { type = "boolean" } } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-ticket-list"
+method = "GET"
+direction = "read"
+path = "/tickets"
+description = "List and filter tickets"
+risk = "low"
+idempotency = "idempotent"
+
+# Every parameter of this operation is **renamed on the wire** (inventory §4.2 op 2, which records
+# both columns). `name` is what a caller and a model see; `wire` is Freshdesk's own spelling, and it
+# is what travels in the query string (C-29). Before `wire` existed the IR carried one name per
+# parameter, so the caller-facing name was dropped and this comment was the only record of it.
+[[operations.params.query]]
+name = "req_id"
+wire = "requester_id"
+description = "Filter by requester"
+required = false
+schema = { type = "string" }
+
+[[operations.params.query]]
+name = "req_email"
+wire = "email"
+description = "Filter by requester email"
+required = false
+schema = { type = "string", format = "email" }
+
+# The one parameter the source does not rename, so it declares no `wire`.
+[[operations.params.query]]
+name = "company_id"
+description = "Filter by company id"
+required = false
+schema = { type = "string" }
+
+# §6.4: the source marks this `required: true` (`yml:69-74`). That is an action-proxy UI constraint;
+# Freshdesk's `GET /tickets` does not require `updated_since`. Recorded optional.
+[[operations.params.query]]
+name = "updated"
+wire = "updated_since"
+description = "Only tickets updated at or after this date"
+required = false
+schema = { type = "string", format = "date-time" }
+
+# A bare array of tickets, and a **narrower** field set than `freshdesk-ticket-get` returns — see
+# point 1 of the block comment above. `description`, `tags` and `attachments` are absent from the
+# vendor's list examples and are documented as needing `include`, which this operation does not send,
+# so they are not declared here: a consumer that read `description` off a listing would find nothing
+# and could not tell a missing field from an empty one.
+[operations.response_schema]
+type = "array"
+description = "The matching tickets, as a bare JSON array with no envelope. The ticket bodies (`description`, `description_text`) are NOT included in a listing — read one ticket with `freshdesk-ticket-get` to get its text"
+items = { type = "object", properties = { id = { type = "integer" }, subject = { type = "string" }, status = { type = "integer", enum = [2, 3, 4, 5], description = "2 Open, 3 Pending, 4 Resolved, 5 Closed" }, priority = { type = "integer", enum = [1, 2, 3, 4], description = "1 Low, 2 Medium, 3 High, 4 Urgent" }, type = { type = "string", description = "The ticket type, e.g. `Question` or `Incident`. Null when unset" }, source = { type = "integer", enum = [1, 2, 3, 7, 9, 10], description = "How the ticket arrived: 1 Email, 2 Portal, 3 Phone, 7 Chat, 9 Feedback widget, 10 Outbound email" }, requester_id = { type = "integer", description = "The contact who asked" }, responder_id = { type = "integer", description = "The agent it is assigned to; null when unassigned" }, group_id = { type = "integer" }, company_id = { type = "integer" }, spam = { type = "boolean" }, is_escalated = { type = "boolean" }, fr_escalated = { type = "boolean", description = "True when the first-response SLA was breached" }, due_by = { type = "string", format = "date-time" }, fr_due_by = { type = "string", format = "date-time", description = "When a first response is due" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-ticket-get"
+method = "GET"
+direction = "read"
+path = "/tickets/{id}"
+description = "View one ticket"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "id"
+description = "The ticket id"
+required = true
+schema = { type = "string" }
+
+# The full ticket, flat, from the reference's "View a Ticket" example — and the field a consumer
+# usually wants is `description_text` rather than `description`: the latter is HTML, and handing it to
+# a model as if it were the customer's message means handing over the markup too.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer" }, subject = { type = "string" }, description = { type = "string", description = "The requester's opening message as **HTML**" }, description_text = { type = "string", description = "The same message as plain text. This is the one to summarize or quote" }, structured_description = { type = "object", description = "The message again, as `{description_contents: [{type, data: {content}}]}` — Freshdesk's block form" }, status = { type = "integer", enum = [2, 3, 4, 5], description = "2 Open, 3 Pending, 4 Resolved, 5 Closed" }, priority = { type = "integer", enum = [1, 2, 3, 4], description = "1 Low, 2 Medium, 3 High, 4 Urgent" }, type = { type = "string", description = "The ticket type, e.g. `Question` or `Incident`. Null when unset" }, source = { type = "integer", enum = [1, 2, 3, 7, 9, 10], description = "1 Email, 2 Portal, 3 Phone, 7 Chat, 9 Feedback widget, 10 Outbound email" }, requester_id = { type = "integer" }, responder_id = { type = "integer", description = "The assigned agent; null when unassigned" }, group_id = { type = "integer" }, company_id = { type = "integer" }, product_id = { type = "integer" }, email_config_id = { type = "integer" }, spam = { type = "boolean" }, is_escalated = { type = "boolean" }, fr_escalated = { type = "boolean" }, tags = { type = "array", items = { type = "string" } }, cc_emails = { type = "array", items = { type = "string", format = "email" } }, fwd_emails = { type = "array", items = { type = "string", format = "email" } }, reply_cc_emails = { type = "array", items = { type = "string", format = "email" } }, custom_fields = { type = "object", description = "The account's own ticket fields, keyed by field name — an object, unlike zendesk's array of `{id, value}` pairs" }, attachments = { type = "array", items = { type = "object" } }, due_by = { type = "string", format = "date-time" }, fr_due_by = { type = "string", format = "date-time" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-ticket-create"
+method = "POST"
+direction = "write"
+path = "/tickets"
+description = "Create a ticket. The requester must be identified either by requester_id, or by phone together with name — Freshdesk states this only in prose and its required flags do not capture it"
+risk = "medium"
+idempotency = "non_idempotent"
+
+# SCHEMA GAP: that requester constraint is an OR precondition ((phone AND name) OR requester_id,
+# `yml:104-106`, §6.4). `Quirks` carries pagination, rate limits and error envelopes — there is no
+# precondition field — so it survives only in the description above. The source's `required: true`
+# on `phone` is *not* reproduced: it would refuse a perfectly legal create-by-requester_id.
+#
+# The source's defaults are action-proxy call-context interpolations (`{consumer.number}`,
+# `{call.from}`) — babelforce telephony variables that mean nothing outside action-proxy. They are
+# dropped (§4.2 note ²); a Flux flow supplies real values.
+[[operations.params.body]]
+name = "phone"
+description = "Requester phone number. Supply with name, or supply requester_id instead"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "name"
+description = "Requester name. Supply with phone, or supply requester_id instead"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "requester_id"
+description = "Requester id. Supply this, or supply phone together with name"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "subject"
+description = "Ticket subject"
+required = true
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "description"
+description = "Ticket description; HTML or long text"
+required = true
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "status"
+description = "Ticket status: 2 open, 3 pending, 4 resolved, 5 closed"
+required = true
+schema = { type = "integer", enum = [2, 3, 4, 5], default = 2 }
+
+[[operations.params.body]]
+name = "priority"
+description = "Ticket priority: 1 low, 2 medium, 3 high, 4 urgent"
+required = true
+schema = { type = "integer", enum = [1, 2, 3, 4], default = 2 }
+
+[[operations.params.body]]
+name = "source"
+description = "Channel the ticket came in on"
+required = false
+schema = { type = "integer", enum = [1, 2, 3, 7, 8, 9, 10], default = 3 }
+
+[[operations.params.body]]
+name = "responder_id"
+description = "Responding agent id"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "type"
+description = "Query type"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "email_config_id"
+description = "Email config used for this ticket"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "group_id"
+description = "Group the ticket is assigned to"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "product_id"
+description = "Associated product"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "tags"
+description = "Ticket tags"
+required = false
+schema = { type = "array", items = { type = "string" } }
+
+[[operations.params.body]]
+name = "cc_emails"
+description = "Addresses to copy on the ticket"
+required = false
+schema = { type = "array", items = { type = "string", format = "email" } }
+
+[[operations.params.body]]
+name = "custom_fields"
+description = "Custom ticket field data"
+required = false
+schema = { type = "object", additionalProperties = { type = ["string", "integer"] } }
+
+# The created ticket, flat, with `HTTP 201 Created` — the one success code Freshdesk documents, and it
+# documents it for every POST at once rather than per endpoint ("POST requests will contain the
+# Location Header in the response").
+#
+# `id` is why this schema matters: it is the only route to the new ticket's id, and every following
+# call in a flow — note, update, get — addresses the ticket by it. `status` and `priority` come back
+# as the numbers Freshdesk defaulted them to (2 Open, 1 Low) when the create did not set them, which
+# is a caller's confirmation of a default it never stated.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer", description = "The new ticket's id — the only place it is returned, and what every later call addresses" }, subject = { type = "string" }, description = { type = "string", description = "The opening message as HTML" }, description_text = { type = "string", description = "The opening message as plain text" }, status = { type = "integer", enum = [2, 3, 4, 5], description = "2 Open, 3 Pending, 4 Resolved, 5 Closed. Defaults to 2 when the create did not set it" }, priority = { type = "integer", enum = [1, 2, 3, 4], description = "1 Low, 2 Medium, 3 High, 4 Urgent. Defaults to 1" }, type = { type = "string" }, source = { type = "integer", enum = [1, 2, 3, 7, 9, 10], description = "1 Email, 2 Portal, 3 Phone, 7 Chat, 9 Feedback widget, 10 Outbound email" }, requester_id = { type = "integer", description = "Set even when the ticket was created by phone and name — Freshdesk resolves or creates the contact and reports which one it used" }, responder_id = { type = "integer" }, group_id = { type = "integer" }, company_id = { type = "integer" }, product_id = { type = "integer" }, spam = { type = "boolean" }, is_escalated = { type = "boolean" }, fr_escalated = { type = "boolean" }, tags = { type = "array", items = { type = "string" } }, cc_emails = { type = "array", items = { type = "string", format = "email" } }, due_by = { type = "string", format = "date-time" }, fr_due_by = { type = "string", format = "date-time" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-ticket-update"
+method = "PUT"
+direction = "write"
+path = "/tickets/{id}"
+description = "Update a ticket's fields"
+risk = "medium"
+idempotency = "non_idempotent"
+
+# §6.4: the source does **not** mark `id` required (`yml:218-223`), defaulting it to a call-context
+# variable instead. Omitted, that produces `PUT /tickets/` — a silent mis-request. Recorded
+# required.
+[[operations.params.path]]
+name = "id"
+description = "Id of the ticket to update"
+required = true
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "subject"
+description = "Ticket subject"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "description"
+description = "Ticket description"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "status"
+description = "Ticket status: 2 open, 3 pending, 4 resolved, 5 closed"
+required = false
+schema = { type = "integer", enum = [2, 3, 4, 5] }
+
+[[operations.params.body]]
+name = "priority"
+description = "Ticket priority: 1 low, 2 medium, 3 high, 4 urgent"
+required = false
+schema = { type = "integer", enum = [1, 2, 3, 4] }
+
+[[operations.params.body]]
+name = "requester_id"
+description = "Requester id"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "responder_id"
+description = "Responding agent id"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "name"
+description = "Requester name"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "phone"
+description = "Requester phone"
+required = false
+schema = { type = "string" }
+
+# Updatable but not settable at create — an artifact of the source collection, not of the API
+# (§4.2). Recorded as found rather than invented on the create side.
+[[operations.params.body]]
+name = "email"
+description = "Requester email"
+required = false
+schema = { type = "string", format = "email" }
+
+[[operations.params.body]]
+name = "type"
+description = "Query type"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "email_config_id"
+description = "Email config used for this ticket"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "group_id"
+description = "Group the ticket is assigned to"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "product_id"
+description = "Associated product"
+required = false
+schema = { type = "integer" }
+
+[[operations.params.body]]
+name = "tags"
+description = "Ticket tags"
+required = false
+schema = { type = "array", items = { type = "string" } }
+
+[[operations.params.body]]
+name = "custom_fields"
+description = "Custom ticket field data"
+required = false
+schema = { type = "object", additionalProperties = { type = ["string", "integer"] } }
+
+# The updated ticket, flat — the whole resource, not a diff of what changed. So the response is how a
+# caller confirms an update took: read back the field it set. Freshdesk documents no success status
+# code for a `PUT`, and none is claimed here.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer" }, subject = { type = "string" }, description = { type = "string", description = "The opening message as HTML — unchanged by an update, which never edits the first message" }, description_text = { type = "string", description = "The opening message as plain text" }, status = { type = "integer", enum = [2, 3, 4, 5], description = "2 Open, 3 Pending, 4 Resolved, 5 Closed — the value **after** this update" }, priority = { type = "integer", enum = [1, 2, 3, 4], description = "1 Low, 2 Medium, 3 High, 4 Urgent" }, type = { type = "string" }, source = { type = "integer", enum = [1, 2, 3, 7, 9, 10] }, requester_id = { type = "integer" }, responder_id = { type = "integer" }, group_id = { type = "integer" }, product_id = { type = "integer" }, spam = { type = "boolean" }, is_escalated = { type = "boolean" }, fr_escalated = { type = "boolean" }, tags = { type = "array", description = "The ticket's tag set after the update. Freshdesk documents no additive form of this field — unlike zendesk's `additional_tags` — so read it back rather than assuming earlier tags survived", items = { type = "string" } }, attachments = { type = "array", items = { type = "object" } }, due_by = { type = "string", format = "date-time" }, fr_due_by = { type = "string", format = "date-time" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time", description = "Moves on every accepted update, so it is the cheapest confirmation that the call changed something" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-ticket-note-add"
+method = "POST"
+direction = "write"
+path = "/tickets/{id}/notes"
+description = "Add a note to a ticket; the note is private unless explicitly made public"
+risk = "medium"
+idempotency = "non_idempotent"
+
+# §6.4: not marked required by the source (`yml:312`), same silent mis-request as above.
+[[operations.params.path]]
+name = "id"
+description = "Id of the ticket"
+required = true
+schema = { type = "integer" }
+
+# The source describes this parameter as "Requester ID" — a copy-paste error (`yml:318`, §6.4).
+# Described correctly here.
+[[operations.params.body]]
+name = "body"
+description = "Note body"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# The same safety posture as Zendesk's `public: false`: a note defaults to hidden from end users,
+# and a generated op that inherited `false` would publish internal notes (§4.2).
+[[operations.params.body]]
+name = "private"
+description = "Whether the note is hidden from end users"
+required = false
+schema = { type = "boolean", default = true }
+
+[[operations.params.body]]
+name = "incoming"
+description = "Set true when the note originates from an external system"
+required = false
+schema = { type = "boolean", default = true }
+
+[[operations.params.body]]
+name = "notify_emails"
+description = "Addresses to notify about the note"
+required = false
+schema = { type = "array", items = { type = "string", format = "email" } }
+
+# The created note (Freshdesk calls it a conversation), flat, with the blanket `201 Created`.
+#
+# **`notify_emails` goes in and `notified_to` comes back.** The request field and the response field
+# have different names for the same list, which is documented and is precisely the asymmetry a
+# consumer cannot infer: reading `notify_emails` off this response yields nothing.
+#
+# `private` is the field to check rather than trust. It defaults to `true` — the safety posture this
+# operation's parameter comment describes — and reading it back is how a flow confirms it did not just
+# publish an internal note to the requester.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer", description = "The note's own id, distinct from the ticket's" }, ticket_id = { type = "integer", description = "The ticket the note was added to" }, body = { type = "string", description = "The note as HTML" }, body_text = { type = "string", description = "The note as plain text" }, structured_body = { type = "object", description = "The note again, as `{body_contents: [{type, data: {content}}]}`" }, private = { type = "boolean", description = "True for a note only agents can see. Defaults to true — read it back before assuming a note was published" }, incoming = { type = "boolean", description = "True when the note represents something the customer sent in rather than an agent's own note" }, user_id = { type = "integer", description = "Who the note is attributed to" }, support_email = { type = "string", description = "The support address involved, or null" }, notified_to = { type = "array", description = "Who was notified — the response's name for the request's `notify_emails`", items = { type = "string", format = "email" } }, attachments = { type = "array", items = { type = "object" } }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-contact-list"
+method = "GET"
+direction = "read"
+path = "/contacts"
+description = "List and filter contacts, e.g. to resolve a caller before filing a ticket"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.query]]
+name = "phone"
+description = "Filter by phone"
+required = false
+schema = { type = "string" }
+
+[[operations.params.query]]
+name = "email"
+description = "Filter by email"
+required = false
+schema = { type = "string", format = "email" }
+
+[[operations.params.query]]
+name = "mobile"
+description = "Filter by mobile number"
+required = false
+schema = { type = "string" }
+
+[[operations.params.query]]
+name = "company_id"
+description = "Filter by company id"
+required = false
+schema = { type = "string" }
+
+[[operations.params.query]]
+name = "state"
+description = "Filter by contact state"
+required = false
+schema = { type = "string", enum = ["blocked", "deleted", "unverified", "verified"] }
+
+# A bare array of contacts. `id` is what this operation exists to produce — the `requester_id` a
+# following `freshdesk-ticket-create` sends — which is why an empty array is the interesting outcome:
+# it means the caller was not found and a ticket must be created by phone and name instead.
+#
+# `other_companies` is deliberately declared without an item schema. Freshdesk's own examples
+# disagree with each other about it: the list example shows bare company ids (`[4, 9, 10]`) while the
+# single-contact and create examples show objects (`{company_id, view_all_tickets}`). Recording one of
+# the two as *the* shape would be a coin toss published as a contract.
+[operations.response_schema]
+type = "array"
+description = "The matching contacts, as a bare JSON array with no envelope. Empty when nothing matched — which is a successful call, and the signal that the caller is not a known contact"
+items = { type = "object", properties = { id = { type = "integer", description = "The contact id — this is the `requester_id` a ticket create takes" }, name = { type = "string" }, email = { type = "string", format = "email", description = "The primary address; further ones are in `other_emails`" }, phone = { type = "string" }, mobile = { type = "string" }, company_id = { type = "integer" }, active = { type = "boolean" }, deleted = { type = "boolean" }, contact_type = { type = "string" }, job_title = { type = "string" }, language = { type = "string" }, time_zone = { type = "string" }, twitter_id = { type = "string" }, other_emails = { type = "array", items = { type = "string", format = "email" } }, other_companies = { type = "array", description = "Freshdesk's own examples disagree about this member: bare company ids in a listing, `{company_id, view_all_tickets}` objects on a single read. No item schema is declared rather than guessing which" }, tags = { type = "array", items = { type = "string" } }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-contact-get"
+method = "GET"
+direction = "read"
+path = "/contacts/{id}"
+description = "Get one contact"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "id"
+description = "The contact id"
+required = true
+schema = { type = "string" }
+
+# One contact, flat. Personal data about a named individual, said here because `risk` cannot say it:
+# `Risk` grades what a call *changes*, so a read of a person's name, email, phone and mobile grades
+# `low` on the same scale as reading a ticket count. Read it only when the task needs it.
+#
+# `avatar` and `devices` appear on a single read and not in a listing, so they are declared here and
+# not there.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer" }, name = { type = "string" }, email = { type = "string", format = "email" }, phone = { type = "string" }, mobile = { type = "string" }, address = { type = "string" }, description = { type = "string" }, company_id = { type = "integer" }, view_all_tickets = { type = "boolean", description = "True when this contact can see every ticket of their company, not only their own" }, active = { type = "boolean" }, contact_type = { type = "string" }, job_title = { type = "string" }, language = { type = "string" }, time_zone = { type = "string" }, twitter_id = { type = "string" }, other_emails = { type = "array", items = { type = "string", format = "email" } }, other_companies = { type = "array", description = "On a single read Freshdesk's example shows `{company_id, view_all_tickets}` objects; its listing example shows bare ids. No item schema is declared rather than picking one", items = { type = "object" } }, custom_fields = { type = "object", description = "The account's own contact fields, keyed by field name" }, tags = { type = "array", items = { type = "string" } }, avatar = { type = "object", description = "The contact's picture — `{avatar_url, content_type, id, name, size}` — or null" }, devices = { type = "array", description = "Known devices, each `{device_type, device_make, device_model, app_version, os, os_version}`", items = { type = "object" } }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "freshdesk-contact-create"
+method = "POST"
+direction = "write"
+path = "/contacts"
+description = "Create a contact"
+risk = "medium"
+idempotency = "non_idempotent"
+
+[[operations.params.body]]
+name = "name"
+description = "Contact name"
+required = true
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "email"
+description = "Contact email"
+required = false
+schema = { type = "string", format = "email" }
+
+[[operations.params.body]]
+name = "phone"
+description = "Contact phone number"
+required = false
+schema = { type = "string" }
+
+# The created contact, flat, with the blanket `201 Created`. `id` is the point: it is the
+# `requester_id` a following ticket create sends, and there is no other way to learn it.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "integer", description = "The new contact's id — the `requester_id` for a following `freshdesk-ticket-create`" }, name = { type = "string" }, email = { type = "string", format = "email" }, phone = { type = "string" }, mobile = { type = "string" }, address = { type = "string" }, company_id = { type = "integer" }, view_all_tickets = { type = "boolean" }, active = { type = "boolean", description = "Whether the contact has an active portal account. Freshdesk's own create example returns `false`, so do not treat a create as producing an active contact" }, deleted = { type = "boolean" }, contact_type = { type = "string" }, job_title = { type = "string" }, language = { type = "string" }, time_zone = { type = "string" }, twitter_id = { type = "string" }, other_emails = { type = "array", items = { type = "string", format = "email" } }, tags = { type = "array", items = { type = "string" } }, avatar = { type = "object", description = "Null on a contact created through the API" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+# Configuration
+#
+# One field, and its absence of a companion is the point: this connector declares no credential at
+# all (see the header), so there is nothing to ask for beyond the host. A form generated from this
+# is a single input, and the connector then fails closed with a 401 — which is honest, and visible,
+# rather than a form that collects a key nothing would gate.
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "domain"
+label = "Freshdesk domain"
+help = "Your full Freshdesk host, as it appears in the address bar — `acme.freshdesk.com`, including the `.freshdesk.com` part"
+example = "acme.freshdesk.com"
+# `hostname`, not `subdomain`: freshdesk templates the whole host, so a user who typed only `acme`
+# would produce `https://acme/api/v2`. The format is what lets a form catch that before a request.
+format = "hostname"
+docs_url = "https://support.freshdesk.com/en/support/solutions/articles/50000004820"
+binds = "endpoint.domain"

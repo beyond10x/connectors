@@ -1,0 +1,532 @@
+# Intercom REST API — hand-authored, curated to the surface this pipeline can express honestly.
+#
+# WHY THIS IS NOT A `[spec]` POINTER. Intercom publishes a versioned OpenAPI description of the REST
+# API — one document per API version, mirrored in `intercom/Intercom-OpenAPI` and rendered on
+# developers.intercom.com. Nothing is vendored under `specs/` for it because ingest (C-4) and the
+# overlay (C-6) do not exist yet, and because a version-per-document spec needs the version pin this
+# repository cannot yet declare (see the next section). When C-14's fetch and C-4's ingest land, this
+# file becomes `[spec]` plus a `[[patch.operations]]` selection, and **the five operations below are
+# the selection to reproduce**, by method and path:
+#
+#   GET  /contacts/{id}                 POST /contacts
+#   GET  /conversations/{id}            POST /conversations/{id}/reply
+#   POST /contacts/{id}/notes
+#
+# Until then drift is undetectable by machine, exactly as for zendesk, freshdesk, github, openai and
+# slack (`docs/designs/provider-operation-inventory.md` §6.7).
+#
+# ---------------------------------------------------------------------------------------------
+# KNOWN LIMITATION: the API version is not pinned, and cannot be until C-55.
+# ---------------------------------------------------------------------------------------------
+#
+# Intercom versions its API through an `Intercom-Version` request header. **That header is optional**:
+# when it is absent, Intercom serves the version the workspace is pinned to. So the five operations
+# below are well-formed exactly as emitted, and this is a *limitation* rather than a gap that blocks
+# the connector — the reason Intercom is in this fleet at all, while Notion and Anthropic, which
+# **require** a constant version header, were excluded from it entirely.
+#
+# What is lost is version pinning. The connector's contract is whatever version the operator's
+# workspace happens to be on, and an Intercom-side default change moves it without this repository
+# noticing. Naming the version explicitly is what a client uses to protect itself from that.
+#
+# It is not declared, and **it must not be declared as a caller-supplied header with a default**.
+# `params.header` is documented as "Request headers the caller supplies" and is emitted as exactly
+# that; pinning such a param with a JSON Schema `const` — the trick that works for a constant *body*
+# field, `ticket.safe_update` in `providers/zendesk.toml` — does nothing here, because
+# `crates/connector-flux/src/op.rs` filters `constant(...)` out of the declared parameter list for
+# `body` params only. A `const`-pinned header therefore emits as
+#
+#   op intercom-contact-get(contact_id: String, intercom_version: String) -> Any
+#     …
+#     $response = http.request({ headers: { intercom-version: $intercom_version }, … })
+#
+# — a required argument every caller must pass and any caller may set to anything, with the `const`
+# dropped. That is a caller-overridable parameter wearing a constant's clothes (C-52's finding), so
+# C-73 declares nothing rather than smuggling it in. [C-55](../docs/stories/C-55-constant-request-headers.md)
+# is the story that closes it; when it lands, this section becomes an `Intercom-Version` declaration
+# and `crates/connector-flux/tests/intercom_connector.rs` is the test to change deliberately.
+#
+# The same undeclarable-constant-header gap covers `Accept: application/json`, which Intercom
+# documents and also defaults to. The one constant header the pipeline does send,
+# `content-type: application/json`, is hard-coded in the emitter (`JSON_MEDIA_TYPE`).
+#
+# ---------------------------------------------------------------------------------------------
+# WHY THERE IS NOT A SINGLE QUERY PARAMETER, and which operations that costs.
+# ---------------------------------------------------------------------------------------------
+#
+# Nothing in this pipeline percent-encodes a query value: the emitter interpolates it verbatim into a
+# `fmt` template and flux registers no URL-encoding op (C-30 is unimplemented,
+# `crates/connector-flux/src/op.rs`). `zendesk-ticket-search` is the standing demonstration and
+# AGENTS.md lists it under *Intentional gaps* — a value carrying `&` does not filter, it injects a
+# parameter. So every Intercom endpoint whose arguments travel in the query string is **deliberately
+# excluded pending C-30**:
+#
+# - `GET /conversations` and `GET /contacts`, and every `per_page` / `starting_after` page of them.
+#   `starting_after` is an opaque base64-ish cursor, which is precisely the unencodable shape.
+# - `?display_as=plaintext` on the conversation read below. Intercom's default rendering is returned
+#   instead; a caller that needs plaintext cannot ask for it here.
+# - Cursor pagination as a quirk, for the same reason: `Pagination::Cursor.cursor_param` is defined as
+#   *"The query parameter carrying the cursor"*, so declaring it would be declaring a query parameter.
+#
+# The path surface, by contrast, is genuinely safe rather than merely untested. An Intercom contact id
+# is a 24-character lowercase hexadecimal string (`63a0979a5eeebeb3d8ba5be3`) and a conversation id is
+# a decimal string; neither charset contains a character that can change the shape of the request.
+# That asymmetry is the whole selection principle for this connector, and
+# `crates/connector-flux/tests/intercom_connector.rs` asserts the absence — on the IR *and* on the
+# emitted URL — so it stays a property of the connector rather than of this comment.
+#
+# ---------------------------------------------------------------------------------------------
+# WHY EVERY BODY FIELD IS REQUIRED, and which fields that costs.
+# ---------------------------------------------------------------------------------------------
+#
+# `body_tree` inserts every declared body field unconditionally (`crates/connector-flux/src/op.rs`),
+# so an *optional* field the caller omits is not absent from the payload — it is sent as an explicit
+# `{"field": null}` (C-56). On Intercom that is not a harmless difference: its contact and conversation
+# payloads are full of nullable attributes, and a `null` reads as "clear this" where an absent key
+# reads as "leave it alone". Rather than ship five operations with a latent null, every field below is
+# `required = true`, and what that leaves out is recorded here:
+#
+# - contact create: `external_id`, `phone`, `name`, `avatar`, `signed_up_at`, `last_seen_at`,
+#   `owner_id`, `unsubscribed_from_emails`, `custom_attributes`. The operation therefore creates
+#   **email-identified** contacts only; `external_id`, the identifier a system-of-record integration
+#   would use, is the most consequential of these.
+# - conversation reply: `attachment_urls`, `created_at`.
+# - note create: nothing Intercom documents as optional is wanted here except `admin_id`, which is
+#   declared required instead of dropped — see the operation.
+#
+# When C-56 lands these become optional declarations, which is the change that makes this connector
+# useful rather than merely correct.
+#
+# ---------------------------------------------------------------------------------------------
+# SCHEMA GAP: an error envelope cannot say "there is a list of errors".
+# ---------------------------------------------------------------------------------------------
+#
+# Intercom answers a failure with `{"type": "error.list", "request_id": …, "errors": [{"code": …,
+# "message": …}]}` — a *list*. `ErrorEnvelope` carries one `message_pointer` and one optional
+# `code_pointer` (`crates/connector-spec/src/ir.rs`), so the pointers below name `/errors/0` and the
+# fact that a second error may follow it has nowhere to live. A caller reading only the first message
+# of a multi-error validation failure sees part of the reason its request was rejected.
+#
+# Declaring the first element is still strictly better than declaring nothing: the location is
+# machine-readable for C-12 rather than lost in prose. Closing it needs the envelope to admit a
+# collection pointer.
+#
+# `request_id` is the other casualty — Intercom's support process asks for it, and there is no field
+# for "the vendor's correlation id lives here" either.
+#
+# No `[quirks.rate_limit]` is declared: Intercom's limit varies by plan and by API version, and a
+# published bound that is wrong is a wrong contract a consumer would plan against (the same reasoning
+# that made slack's `limit` maximum exactly the vendor's documented 999). It is left undeclared rather
+# than guessed.
+#
+# ---------------------------------------------------------------------------------------------
+# THE REGIONAL HOSTS ARE SELECTABLE — the gap this file recorded from the day it shipped is closed.
+# ---------------------------------------------------------------------------------------------
+#
+# A workspace hosted in the EU or Australia is served from `api.eu.intercom.io` or
+# `api.au.intercom.io`; the paths and payloads are identical, only the authority differs. This file
+# used to carry a `SCHEMA GAP:` note here saying so, because `base_url` was a plain string and
+# nothing in the IR could declare "this part is chosen by the operator, out of exactly these three".
+# US-only shipped, and an EU workspace needed a second connector.
+#
+# C-225 added `choices` to `[[config]]`, and the note is gone rather than left describing a gap that
+# closed. The `host` field near the bottom of this file enumerates all three hosts with a label each,
+# so:
+#
+# - **the egress claim is still closed, and still auditable.** It moved from one literal host to one
+#   of three enumerated ones — which is a set a reviewer can read off the declaration, not a
+#   widened `*.intercom.io`. `uploads.intercom.io` and the app hosts remain unreachable;
+# - **a wrong region is refused where it is entered.** Before, an EU workspace's token against the
+#   US host returned `401` on every call, indistinguishable from a bad token;
+# - **it is a required value now.** An operator who previously needed nothing beyond a token must
+#   pick a region — see the field's own comment for why that is the honest trade.
+
+id = "intercom"
+vendor = "Intercom"
+
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/com.intercom.api/<credential>` — and until it was
+# declared `Credentials::reference` refused with `NoCredentialAddress`, so this connector could not
+# authenticate at all.
+#
+# Derived from `intercom.com`, the vendor's own primary domain, in reverse-DNS form, with the
+# trailing `api` label the already-shipped authorities carry (`com.slack.api`, `com.vercel.api`,
+# `io.fly.api`).
+#
+# Intercom serves the same API from `api.intercom.io`, `api.eu.intercom.io` and
+# `api.au.intercom.io`, and the `host` field below binds the choice between them. Those are three
+# *hosts* for one API, and one API is one authority — the authority does not vary by region, which
+# is why a workspace changing region would not change where its credential is stored.
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "com.intercom.api"
+
+# **No `api_version`: this vendor puts no version segment in the URL at all.** Every operation path
+# below is unversioned (`/contacts`) — Intercom versions by the `Intercom-Version` header instead,
+# so there is nothing the file itself spells and nothing to record without asserting a vendor fact
+# from outside it. A `pid` and a credential path render without one; only a `gid` needs both halves.
+
+# **One `{host}`, chosen from three** (C-225). Unlike zendesk's `{subdomain}` this is not a tenant
+# label an operator invents — it is a region Intercom assigned the workspace, and the `host` field
+# below enumerates every value it may take. `http_hosts` derives from this URL
+# (`crates/connector-cli/src/catalog.rs`, `host_of`), so what a consumer reads is the template; the
+# closed set is what bounds it, and `uploads.intercom.io` and the `*.intercom.io` app hosts are in
+# neither. The manifest's real `http_hosts` field lands in C-10.
+base_url = "https://{host}"
+
+description = "Intercom contacts and conversations: read and create contacts, read a conversation, reply to it, and note it"
+
+# Every operation authenticates the same way. Intercom's OAuth apps and a workspace's own access token
+# both present identically as `Authorization: Bearer <token>`, so which one an operator holds is
+# configuration rather than connector shape; what differs is the scopes it carries, which is not
+# something this file can assert.
+default_auth = [{ credentials = ["intercom.access_token"] }]
+
+# ---------------------------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "intercom.access_token"
+scheme = "bearer"
+# The sole secret. Gated and registered with flux's redactor by the host; never read here, and never
+# present in a generated artifact — only this variable's name is.
+#
+# No `[auth.oauth2]` block: Intercom mints the token at install time (an OAuth app) or in the
+# developer hub (a workspace access token), and flux is handed an already-minted value through the
+# environment rather than running a grant — the same provenance babelforce's and slack's bearers have.
+env = ["INTERCOM_ACCESS_TOKEN"]
+description = "Intercom access token sent as a bearer — an OAuth app token or a workspace access token"
+
+# ---------------------------------------------------------------------------------------------
+# Operations — 5, addressed by path parameters and request bodies only
+#
+# Curated to what a support flow executes at runtime: find the person, create them if they are new,
+# read the conversation, answer it, and record what happened for the next teammate. Everything
+# administrative — teams, admins, tags, segments, data attributes, data export — and every listing and
+# search endpoint is excluded, the latter for the encoding reason above. That is the same selection
+# principle babelforce's 9-of-163 follows (`docs/designs/provider-operation-inventory.md` §5.2).
+#
+# Op ids are hyphen-separated, not dotted: flux-lang's `is_valid_decl_name` admits ASCII
+# alphanumerics, `_` and `-` only, so `op intercom.contact.get` is undeclarable (C-8, C-23).
+# ---------------------------------------------------------------------------------------------
+
+[[services]]
+# C-153. `default` is the reserved implicit service, and a provider with one API surface
+# declares no services at all — so this entry exists for exactly one reason: a tag attaches
+# to a service, and there is no other service here to attach it to. It carries `tags` and
+# nothing else, which is what keeps `default` implicit and this file emitting the same
+# `intercom.flux` it emitted before.
+name = "default"
+tags = ["support"]
+
+[[operations]]
+id = "intercom-contact-get"
+method = "GET"
+direction = "read"
+path = "/contacts/{contact_id}"
+description = "Get one Intercom contact by id — its role, email, name, custom attributes, tags and the companies it belongs to"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "contact_id"
+description = "The contact's Intercom id — a 24-character lowercase hexadecimal string such as `63a0979a5eeebeb3d8ba5be3`, not its email or your own external id"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# ---------------------------------------------------------------------------------------------
+# RESPONSE SHAPES (C-126) — from the REST reference at
+# `developers.intercom.com/docs/references/rest-api/api.intercom.io/…` (contacts/showcontact,
+# contacts/createcontact, conversations/retrieveconversation, conversations/replyconversation,
+# notes/createnote), whose schemas are generated from Intercom's own document.
+#
+# Three vendor-wide facts shape every schema below, and each one is a mistake waiting to be made:
+#
+# 1. **Every timestamp is a Unix integer**, not an ISO string. `created_at` is an integer;
+#    `last_seen_at`, `signed_up_at` and `waiting_since` are integer-or-null. A consumer that rendered
+#    one as a date string gets `1674589321`.
+# 2. **`tags`, `companies` and `notes` are OBJECTS, not arrays.** Each is a paginated wrapper —
+#    `{type, data, url, total_count, has_more}` — so the list is one level down at `.data`, and it is
+#    truncated. Reading `contact.tags[0]` finds nothing; reading `contact.tags.data[0]` finds the first
+#    of possibly many more than were returned.
+# 3. **Every POST here answers `200`, not `201`.** Contact create, conversation reply and note create
+#    all document `200` as their only success code. Nothing in this file claims a 201.
+#
+# `type` is pinned with `const` where the vendor documents a fixed discriminator, because that is the
+# member a polymorphic consumer switches on.
+# ---------------------------------------------------------------------------------------------
+
+# The contact, at the top level with no envelope.
+#
+# **This is personal data about a named individual** — email, phone, name, location and the IP-derived
+# fields Intercom keeps. Said here because `risk` cannot say it: `Risk` grades what a call *changes*,
+# so a read of a person's contact record grades `low` on the same scale as reading a conversation's
+# state. The same gap `providers/stripe.toml` records for its customer read.
+[operations.response_schema]
+type = "object"
+required = ["type", "id"]
+properties = { type = { const = "contact" }, id = { type = "string", description = "The 24-character Intercom id, which is what this operation takes" }, workspace_id = { type = "string", description = "The workspace the contact belongs to — Intercom's app id" }, external_id = { type = "string", description = "Your own id for this person, or null. Intercom's identity model treats this and `email` as the two identifiers" }, role = { type = "string", description = "`user` for an identified person or `lead` for an unidentified visitor. A lead can be merged into a user later, which changes the id a flow should hold" }, email = { type = "string", format = "email" }, phone = { type = "string", description = "Null unless set" }, name = { type = "string", description = "Null unless set" }, avatar = { type = "object", description = "`{type, image_url}` or null — an object, not a URL string" }, owner_id = { type = "integer", description = "The admin who owns the contact, or null" }, created_at = { type = "integer", description = "Unix seconds — an integer, not an ISO string" }, updated_at = { type = "integer", description = "Unix seconds" }, signed_up_at = { type = "integer", description = "Unix seconds, or null for a contact that never signed up" }, last_seen_at = { type = "integer", description = "Unix seconds of the last time Intercom saw this person, or null. This is the field that says whether a contact is live" }, last_replied_at = { type = "integer", description = "Unix seconds, or null" }, last_contacted_at = { type = "integer", description = "Unix seconds, or null" }, unsubscribed_from_emails = { type = "boolean", description = "TRUE MEANS DO NOT EMAIL THIS PERSON. Check it before a flow sends anything" }, has_hard_bounced = { type = "boolean", description = "Their address bounced permanently; mail to it will not arrive" }, marked_email_as_spam = { type = "boolean" }, custom_attributes = { type = "object", description = "The workspace's own attributes, keyed by name. Which keys exist is per workspace, so none is declared" }, tags = { type = "object", description = "A PAGINATED WRAPPER, not an array: `{type, data, url, total_count, has_more}`. The tags are at `.data`, and `has_more` true means there are more than were returned" }, companies = { type = "object", description = "The same wrapper shape — companies at `.data`" }, notes = { type = "object", description = "The same wrapper shape — notes at `.data`" }, location = { type = "object", description = "Intercom's IP-derived guess: `{type, country, region, city}`" }, social_profiles = { type = "object", description = "The same wrapper shape" } }
+
+[operations.quirks.error_envelope]
+# See the header comment: this names the *first* error of a list, which is all the model can hold.
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "intercom-contact-create"
+method = "POST"
+direction = "write"
+path = "/contacts"
+description = "Create an email-identified Intercom contact. A contact created here is visible to every teammate in the workspace and is counted against its contact quota; creating one twice creates two contacts unless the workspace deduplicates on email"
+# Creates a record in the workspace that teammates read, but nothing is delivered to a person and no
+# end user sees it. That is the tier between a read and a customer-visible write.
+risk = "medium"
+# Intercom publishes no idempotency key on this endpoint, so a replay creates a second contact.
+# `conditional` would be a claim with nothing behind it.
+idempotency = "non_idempotent"
+
+# The body is flat — Intercom takes these at the root of the JSON object — so no `wire` path is needed.
+# Contrast zendesk, whose every write field declares one.
+#
+# `role` is required by Intercom and is left caller-supplied rather than pinned to `user`, because the
+# choice changes what the record *is*: a `lead` is an unidentified visitor Intercom may merge away on
+# sign-up, a `user` is an identified person. A connector that decided this silently would be deciding
+# how the workspace's contact model is populated.
+[[operations.params.body]]
+name = "role"
+description = "`user` for an identified person or `lead` for an unidentified visitor. A lead is merged into a user if that person later signs up"
+required = true
+schema = { type = "string", enum = ["user", "lead"] }
+
+# Intercom requires a `user` to be identifiable, and `email` is the identifier this connector
+# declares. `external_id` and `phone` — the other two — are optional body fields and are excluded
+# pending C-56; see the header comment.
+[[operations.params.body]]
+name = "email"
+description = "The contact's email address, which is how this operation identifies them. Intercom does not verify it"
+required = true
+schema = { type = "string", format = "email", minLength = 1 }
+
+# The created contact — the same shape the read returns, and with `200` rather than `201`: Intercom
+# documents `200` and `401` as this endpoint's only responses.
+#
+# `id` is the point. This operation's own description warns that creating twice creates two contacts,
+# and the returned `id` is the only thing that distinguishes them; it is also what a following
+# `intercom-contact-note-create` addresses.
+[operations.response_schema]
+type = "object"
+required = ["type", "id"]
+properties = { type = { const = "contact" }, id = { type = "string", description = "The new contact's id — the only handle on the record this call created, and what a following note addresses" }, workspace_id = { type = "string" }, external_id = { type = "string" }, role = { type = "string", description = "Echoes back `user` or `lead` as sent" }, email = { type = "string", format = "email" }, phone = { type = "string" }, name = { type = "string" }, avatar = { type = "object", description = "`{type, image_url}` or null" }, created_at = { type = "integer", description = "Unix seconds — an integer, not an ISO string" }, updated_at = { type = "integer", description = "Unix seconds" }, signed_up_at = { type = "integer", description = "Null on a contact created this way" }, last_seen_at = { type = "integer", description = "Null until Intercom sees the person" }, unsubscribed_from_emails = { type = "boolean" }, custom_attributes = { type = "object" }, tags = { type = "object", description = "The paginated wrapper shape, empty on a new contact" }, companies = { type = "object", description = "The paginated wrapper shape" }, notes = { type = "object", description = "The paginated wrapper shape" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "intercom-conversation-get"
+method = "GET"
+direction = "read"
+path = "/conversations/{conversation_id}"
+description = "Get one conversation by id, with its state, the contacts on it and its message parts in Intercom's default rendering"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "conversation_id"
+description = "The conversation's Intercom id — a decimal string such as `123`, as it appears in the inbox URL"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# The conversation. **`state` and `open` are two answers to overlapping questions and a flow needs
+# both**: `state` is `open`, `closed` or `snoozed`, while `open` is a boolean that is true for a
+# snoozed conversation too — a snoozed conversation is still open, it is merely hidden until
+# `snoozed_until`. Branching on `open` alone treats a snoozed conversation as live; branching on
+# `state == "open"` alone treats it as handled. Neither is right on its own, and no consumer could
+# infer that from either member's name.
+#
+# `conversation_parts` is where the messages are, one level down at `.conversation_parts` and then
+# `.conversation_parts` again — Intercom's own nesting, and the reason this schema names it explicitly.
+[operations.response_schema]
+type = "object"
+required = ["type", "id", "state"]
+properties = { type = { const = "conversation" }, id = { type = "string", description = "The conversation id, a decimal string" }, title = { type = "string", description = "The subject, or null — most conversations have none" }, state = { type = "string", enum = ["open", "closed", "snoozed"], description = "The inbox state. `snoozed` is a *kind of open*: see `open` beside it" }, open = { type = "boolean", description = "True while the conversation is unresolved — **including while it is snoozed**. Use with `state` rather than instead of it" }, read = { type = "boolean", description = "Whether a teammate has read it" }, priority = { type = "string", description = "`priority` or `not_priority` — Intercom's own two-valued flag, not a severity scale" }, created_at = { type = "integer", description = "Unix seconds" }, updated_at = { type = "integer", description = "Unix seconds" }, waiting_since = { type = "integer", description = "Unix seconds since the customer has been waiting for a reply, or null when they are not. This is the SLA-relevant field" }, snoozed_until = { type = "integer", description = "Unix seconds when a snoozed conversation reopens, or null" }, source = { type = "object", description = "How it started: `{type, id, delivered_as, subject, body, author, attachments}` — the first message, and `author` is who sent it" }, contacts = { type = "object", description = "The customers on the conversation, as `{type, contacts: […]}` — a wrapper, not an array" }, teammates = { type = "object", description = "The admins on it, same wrapper shape, or null" }, admin_assignee_id = { type = "integer", description = "The assigned admin, or null when unassigned" }, team_assignee_id = { type = "integer", description = "The assigned team, or null" }, tags = { type = "object", description = "The paginated wrapper shape — tags at `.data`" }, conversation_rating = { type = "object", description = "The customer's rating of the conversation, or null: `{rating, remark, created_at, contact, teammate}`" }, statistics = { type = "object", description = "Timing aggregates — first response time, last close time and so on — or null" }, conversation_parts = { type = "object", description = "THE MESSAGES, nested twice: `{type, conversation_parts: […], total_count}`. Each part carries `part_type` (`comment`, `note`, `assignment`, `close`), `body` as HTML, `author` and `created_at`. Only a page of them is returned — check `total_count`" }, custom_attributes = { type = "object" }, ai_agent_participated = { type = "boolean", description = "Whether Intercom's own AI agent replied in this conversation, which is worth knowing before a second automation replies too" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+# The customer-visible write. `risk = "high"` — "a write a reviewer would want to see first" — and the
+# difference from the `medium` above is not cosmetic: a `comment` reply is **delivered to the end
+# user**, by email or as an in-app message, attributed to the admin the caller names, and cannot be
+# un-sent. flux's approval gate reads this field, so `medium` here would mean an agent writing to a
+# customer under a named teammate's identity without a human seeing it first.
+#
+# `message_type` is required and has no default, deliberately. Intercom's `note` — an internal
+# comment visible only to teammates — differs from `comment` by this one value, and a connector that
+# defaulted it would be choosing between "teammates see this" and "the customer sees this" on the
+# caller's behalf. That is the same footgun `providers/zendesk.toml` defends against with
+# `public = false`, except that here the safe value cannot be a default at all: an optional body field
+# would travel as an explicit `null` (C-56), which is neither of the two values Intercom accepts. So
+# the caller states it, every time.
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "intercom-conversation-reply"
+method = "POST"
+direction = "write"
+path = "/conversations/{conversation_id}/reply"
+description = "Reply to a conversation as an admin. With message_type `comment` the reply is delivered to the end user by email or in-app message and cannot be un-sent; with `note` it is an internal comment only teammates see"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "conversation_id"
+description = "The conversation to reply to"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "message_type"
+description = "`comment` to reply to the end user, who receives it by email or in-app message, or `note` for an internal comment only teammates see. There is no default: state which audience you mean"
+required = true
+schema = { type = "string", enum = ["comment", "note"] }
+
+# A *constant* this connector always sends, not a caller-supplied parameter — pinned with a JSON
+# Schema `const`, which already means "this value and no other", so codegen sends it and keeps it out
+# of the op signature (the `ticket.safe_update` mechanism in `providers/zendesk.toml`).
+#
+# It is pinned rather than declared because Intercom's `type` selects *which further field is
+# required*: `admin` requires `admin_id`, `user` requires one of `intercom_user_id`, `user_id` or
+# `email`. The schema has no way to express "required when another field takes this value", so a
+# caller-supplied `type` would let a model send `user` and produce a request with no identifier at
+# all. Replying as a user is a different operation, and this connector does not declare it.
+[[operations.params.body]]
+name = "type"
+description = "Constant `admin` — not caller-supplied. It is what makes admin_id the required author field; a user reply needs a different identifier and is not this operation"
+required = true
+schema = { type = "string", const = "admin" }
+
+[[operations.params.body]]
+name = "admin_id"
+description = "The id of the admin the reply is attributed to. The customer sees this teammate's name and avatar, so it must be an admin the operator is entitled to write as"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "body"
+description = "The reply text as HTML; must not be blank. Intercom renders it in the customer's inbox or messenger"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# **THE WHOLE CONVERSATION COMES BACK, NOT THE REPLY.** Intercom answers a reply with the conversation
+# object — the same shape `intercom-conversation-get` returns — at `200`, not `201`. So there is no
+# top-level id for the message that was just sent: it is the last entry inside
+# `conversation_parts.conversation_parts`, and a consumer that expected `{type: "conversation_part",
+# id: …}` finds a conversation instead.
+#
+# That is worth stating precisely because of what this operation does: a `comment` reply reaches a real
+# customer and cannot be un-sent, so "did my reply land, and as which audience" is a question someone
+# will ask of this response. The answer is in the last conversation part's `part_type` — `comment` or
+# `note` — not at the top level.
+[operations.response_schema]
+type = "object"
+required = ["type", "id", "state"]
+properties = { type = { const = "conversation" }, id = { type = "string", description = "The conversation's id, unchanged by the reply" }, state = { type = "string", enum = ["open", "closed", "snoozed"], description = "The state after the reply. An admin comment on a closed conversation reopens it" }, open = { type = "boolean", description = "True while unresolved, including while snoozed" }, read = { type = "boolean" }, priority = { type = "string" }, created_at = { type = "integer", description = "Unix seconds — of the conversation, not of this reply" }, updated_at = { type = "integer", description = "Unix seconds, moved by this reply" }, waiting_since = { type = "integer", description = "Null after an admin reply, since the customer is no longer waiting" }, snoozed_until = { type = "integer" }, source = { type = "object", description = "The conversation's first message, not this reply" }, contacts = { type = "object", description = "`{type, contacts: […]}` — who the reply went to, when `message_type` was `comment`" }, admin_assignee_id = { type = "integer" }, team_assignee_id = { type = "integer" }, conversation_parts = { type = "object", description = "WHERE THE SENT REPLY IS: `{type, conversation_parts: […], total_count}`, and the reply is the last entry. Its `part_type` is `comment` (delivered to the customer) or `note` (internal), which is the only confirmation of which audience was written to" }, statistics = { type = "object" }, tags = { type = "object" }, custom_attributes = { type = "object" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "intercom-contact-note-create"
+method = "POST"
+direction = "write"
+path = "/contacts/{contact_id}/notes"
+description = "Add an internal note to a contact, visible to teammates in the workspace and never to the contact. Adding the same note twice adds two notes"
+# An internal write: it changes what teammates read and nothing is delivered to the customer, so it
+# sits with contact create rather than with the reply above.
+risk = "medium"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "contact_id"
+description = "The contact to note"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "body"
+description = "The note text as HTML; must not be blank"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# Intercom documents `admin_id` as optional here and creates an unauthored note without it.
+# **Declared required rather than dropped**, for two reasons that point the same way: an optional
+# field would travel as an explicit `null` (C-56, see the header comment), and an unauthored note is
+# the worse contract anyway — a note in a customer's timeline with no teammate against it is a note
+# nobody can follow up. The cost is stated plainly: this operation is stricter than the vendor, and a
+# caller with no admin to attribute cannot use it until C-56 makes the field optional.
+[[operations.params.body]]
+name = "admin_id"
+description = "The id of the admin the note is attributed to. Intercom treats this as optional; this operation requires it so every note has an author"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# The created note, at `200` — Intercom documents `200` and `404` here, and no `201`.
+#
+# `contact` is the member to check: it is nullable in the vendor's schema, so a note can come back
+# attached to nothing identifiable. And `author` is the confirmation that the required `admin_id`
+# above did what it exists for — an unauthored note is the contract this operation deliberately
+# refuses to produce.
+[operations.response_schema]
+type = "object"
+required = ["type", "id"]
+properties = { type = { const = "note" }, id = { type = "string", description = "The note's own id" }, created_at = { type = "integer", description = "Unix seconds — an integer, e.g. 1674589321" }, body = { type = "string", description = "The note as stored, HTML" }, author = { type = "object", description = "The admin it is attributed to: `{type, id, name, email, job_title, away_mode_enabled}`. This is what the required `admin_id` produced" }, contact = { type = "object", description = "The contact it was attached to, as `{type, id}` — **nullable** in Intercom's schema, so confirm it rather than assuming the note landed on a person" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+# Configuration — what a product asks a human for before any of the above can run.
+#
+# One field: the workspace's region host. Connection level, derived from what it binds — a region is
+# a property of one workspace, not of whoever runs the product, and two tenants of one deployment
+# may sit in two of them.
+#
+# **This is a required value where none was required before, and it is a deliberate trade.** Until
+# now this connector shipped US-only with a literal `api.intercom.io`: an EU or AU workspace could
+# not be connected at all, and the only remedy this file recorded was "a second connector". Asking
+# every operator one question they can answer from their own login URL is strictly better than
+# serving one region and failing the other two as `401`.
+#
+# `format = "hostname"` stays alongside the set: it is the shape each choice is validated against at
+# load, and the input a renderer falls back to. Shape and membership answer different questions.
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "host"
+label = "Intercom region"
+help = "Which region this Intercom workspace is hosted in. Pick United States, European Union or Australia — Intercom assigns the region when the workspace is created and it does not change. If you are not sure, look at the URL you use Intercom at: app.intercom.com is the US region, app.eu.intercom.com the EU one and app.au.intercom.com the Australian one. A token issued for one region returns 401 against another, exactly as a revoked token would"
+example = "api.intercom.io"
+format = "hostname"
+# Intercom's own order — the US host is the one the vendor documents first and the one this
+# connector shipped with. A label per value: an operator knows their workspace is in the EU, and
+# does not know that `api.eu.intercom.io` is what that means.
+choices = [
+  { value = "api.intercom.io", label = "United States" },
+  { value = "api.eu.intercom.io", label = "European Union" },
+  { value = "api.au.intercom.io", label = "Australia" },
+]
+docs_url = "https://developers.intercom.com/docs/references/rest-api/api.intercom.io/"
+binds = "endpoint.host"
