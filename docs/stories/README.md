@@ -30,6 +30,7 @@ children as each milestone is designed.
 | [S-002](S-002-effects-are-read-never-derived.md) | Per-operation effects are read from the document, never derived | ready (2) | Catalog | catalog, catalog-build, domain |
 | [S-003](S-003-the-lockfile-gets-a-verifier.md) | `connectors catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
+| [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
 | [S-004](S-004-adopt-token-response-metadata.md) | An OAuth token response can carry declared metadata into the connection, not the credential store | backlog | Catalog | catalog, connector-spec, service |
 | [S-005](S-005-header-name-rate-limit-retry.md) | A rate limit the vendor discloses at runtime can be declared by header name | backlog | Catalog | catalog, connector-spec |
 | [S-006](S-006-per-service-verification-probes.md) | A service declares how a credential is verified, and what a failure means | backlog | Catalog | catalog, connector-spec, service |
@@ -46,7 +47,7 @@ children as each milestone is designed.
 
 | Epic | Stories | What it is |
 |---|---|---|
-| `catalog-day-one` | S-001, S-002, S-003, S-015 | Architecture §2's day-one changes to the migrating catalog. S-001, S-002 and S-015 all change the document schema, the lowering, and every committed document — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
+| `catalog-day-one` | S-001, S-002, S-003, S-015, S-016 | Architecture §2's day-one changes to the migrating catalog. S-001, S-002 and S-015 all change the document schema, the lowering, and every committed document — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014 | Design constraints ported from the predecessors and the research rather than re-derived — the egress aperture (X-143), the webhook routing grammar, the personal-posture OAuth custody question, and auth-as-tool-result. |
