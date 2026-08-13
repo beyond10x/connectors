@@ -44,7 +44,7 @@ pub enum Command {
     Build,
     /// Show what a rebuild would change, without writing.
     Diff,
-    /// Recompute every hash in `connectors.lock` and refuse on drift. Not yet implemented.
+    /// Recompute every hash in `connectors.lock` and refuse on drift.
     Check,
     /// Write the provider TOML that references a vendored document, to stdout.
     Scaffold,

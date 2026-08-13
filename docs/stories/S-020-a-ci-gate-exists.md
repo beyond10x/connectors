@@ -7,7 +7,7 @@ priority: 6
 design:
 epic: post-m1
 areas: [ci, catalog-build, web]
-note: "The repository now gates governance and the landed Rust surface on pinned stable and MSRV toolchains. S-003 still owns catalog check; S-018 and this story still own the web arm before S-020 can close"
+note: "The repository now gates governance, Rust, catalogue rebuild/diff/check and MSRV. S-018 and this story still own the web arm before S-020 can close"
 ---
 
 # A CI gate exists, and it runs what the repository claims it runs
@@ -22,8 +22,8 @@ unchecked acceptance items below name the remaining web and verifier arms.
 ## What M1 left
 
 - The first gate now covers repository links, story-index consistency, the Rust workspace, generated
-  catalogue drift, and the declared MSRV. The web suite and independent lock verifier remain named
-  open arms rather than present-tense claims.
+  catalogue drift, the independent lock verifier, and the declared MSRV. The web suite remains the
+  one absent arm rather than a present-tense claim.
 - **`cargo metadata --locked --offline` needs a fetched registry.** The MSRV fence and the no-network
   fence both shell out to it, and a partially-fetched registry has already broken it once
   (`zerocopy-derive`). A fence that fails for an environmental reason is indistinguishable, at the
@@ -38,7 +38,7 @@ unchecked acceptance items below name the remaining web and verifier arms.
 - [x] `.github/workflows/ci.yml` exists, triggers on pull request and on push to the default branch,
       and runs the Rust gate: `cargo build --workspace`, `cargo test --workspace --no-fail-fast`,
       `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`.
-- [ ] The **catalogue** is gated, not just the code: `catalog build` → `diff` must report everything
+- [x] The **catalogue** is gated, not just the code: `catalog build` → `diff` must report everything
       up to date → `catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)). A drifted
       artifact fails CI instead of reaching a reviewer, which is what makes review-equals-execution
       mechanical.
@@ -65,10 +65,12 @@ unchecked acceptance items below name the remaining web and verifier arms.
 
 ## Progress
 - Landed the pinned Rust 1.97.0 and MSRV 1.87.0 jobs, link/story governance checks, locked prefetch,
-  build, tests, clippy, format, catalogue rebuild, and drift rejection.
-- Still open by design: S-003's `catalog check`, S-018's repaired web build/tests, and recorded
-  failing-first evidence for each complete arm. Stable release remains gated by architecture ADR
-  0020 while private forge enforcement is unavailable.
+  build, tests, clippy, format, catalogue rebuild, drift rejection, and S-003's independent offline
+  lock/input/artifact verification. The verifier's seeded artifact mutation supplies the catalogue
+  arm's failing-first evidence.
+- Still open by design: S-018's repaired web build/tests and recorded failing-first evidence for the
+  other complete arms. Stable release remains gated by architecture ADR 0020 while private forge
+  enforcement is unavailable.
 
 ## Notes
 

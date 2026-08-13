@@ -20,9 +20,10 @@ Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 **M1 has landed.** The catalog builds here: `catalog build` compiles `providers/` plus the vendored
 spec cache into `catalog/`, the pack, `connectors.lock` and the site projection, and the one-time
 byte-differential against the predecessor's pack passed byte-exact. What M1 left open is the `post-m1`
-epic below — there is no CI at all, the web explorer is written against a site JSON the projection no
-longer emits, coverage lost a direction in the test consolidation, three inputs are orphaned, and the
-predecessor's generator identity is still stamped into every artifact.
+epic below — Rust/governance/catalog CI now exists, but its web and remaining failing-first arms are
+open; the web explorer is written against a site JSON the projection no longer emits, coverage lost a
+direction in the test consolidation, three inputs are orphaned, and the predecessor's generator
+identity is still stamped into every artifact.
 
 The platform families are unstarted; nothing should be scaffolded ahead of the build order in
 [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
@@ -35,7 +36,7 @@ will spawn children as each milestone is designed.
 |---|---|---|---|---|
 | [S-001](S-001-the-document-carries-the-callers-contract.md) | The document carries the caller's contract, so nothing at runtime parses source | done | Catalog | catalog, catalog-build, connector-resolve |
 | [S-002](S-002-effects-are-read-never-derived.md) | Per-operation effects are read from the document, never derived | blocked | Catalog | catalog, catalog-build, domain |
-| [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
+| [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` verifies every addressable hash and refuses unverifiable claims | done | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
 | [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | in-progress (6) | Catalog | ci, catalog-build, web |
@@ -71,7 +72,7 @@ will spawn children as each milestone is designed.
 |---|---|---|
 | `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one changes to the migrating catalog plus the accepted beyond-HTTP fact shape. S-001, S-002, S-015 and S-023 all change the document schema, lowering, and committed documents — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
-| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open: no CI at all (S-020), a web explorer written against a site JSON that no longer exists (S-018), the predecessor's generator identity still stamped into every artifact (S-019), the coverage direction the test consolidation dropped (S-021), and three orphaned inputs (S-022). Two of them are ordering constraints on other work: S-019 rides the schema wave, S-022 lands before S-016's check. |
+| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open: Rust/governance/catalog CI exists, while its web and remaining failing-first arms remain open (S-020); a web explorer is written against a site JSON that no longer exists (S-018), the predecessor's generator identity is still stamped into every artifact (S-019), the coverage direction the test consolidation dropped (S-021), and three inputs are orphaned (S-022). Two of them are ordering constraints on other work: S-019 rides the schema wave, S-022 lands before S-016's check. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
