@@ -66,16 +66,25 @@ fn repo_root() -> PathBuf {
 }
 
 /// A whole-catalogue plan over the committed tree. Writes nothing.
+///
+/// Computed **once** per process and handed out as a clone: a plan re-ingests 21 MB of vendored
+/// specs, and every invariant below wanting its own plan made that the suite's entire cost. The
+/// tests only read the plan, so one computation serves all — except
+/// [`two_plans_over_the_same_inputs_are_byte_identical`], whose whole point is two independent
+/// computations and which calls [`pipeline::plan`] directly.
 fn full_plan() -> (Workspace, Plan) {
-    let workspace = Workspace::new(repo_root());
-    let plan = pipeline::plan(&workspace, None).expect("the committed catalogue compiles");
-    // A plan over an empty tree would satisfy almost everything below while asserting nothing.
-    assert!(
-        plan.providers.len() >= 55,
-        "the committed catalogue is 55 providers; the plan covers {}",
-        plan.providers.len()
-    );
-    (workspace, plan)
+    static FULL: std::sync::LazyLock<(Workspace, Plan)> = std::sync::LazyLock::new(|| {
+        let workspace = Workspace::new(repo_root());
+        let plan = pipeline::plan(&workspace, None).expect("the committed catalogue compiles");
+        // A plan over an empty tree would satisfy almost everything below while asserting nothing.
+        assert!(
+            plan.providers.len() >= 55,
+            "the committed catalogue is 55 providers; the plan covers {}",
+            plan.providers.len()
+        );
+        (workspace, plan)
+    });
+    FULL.clone()
 }
 
 /// The planned bytes of one artifact, by repository-relative path.
