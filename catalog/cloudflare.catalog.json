@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Cloudflare API Token, sent as a bearer token, scoped to Zone:Read, DNS:Edit and Cache Purge on the zones this connector should reach",
@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Cloudflare zones and DNS: list zones, list and manage DNS records for a zone, and purge a zone's cache",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -69,19 +69,28 @@
       "credential_requirement": "declared",
       "description": "List the zones (domains) this API token can see, with each zone's id, name, status and assigned Cloudflare name servers. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note). The zone `id` returned here is the value an operator pins as this connection's `zone_id`; every other operation in this connector is already scoped to that one zone and does not take it as an argument",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "cloudflare-zone-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/zones"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -183,24 +192,33 @@
       "credential_requirement": "declared",
       "description": "List the DNS records in a zone: each record's id, type, name, content, TTL and whether it is proxied through Cloudflare. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note)",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "zone_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "cloudflare-dns-record-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/zones/{zone_id}/dns_records"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -340,14 +358,24 @@
       "credential_requirement": "declared",
       "description": "Create a DNS record in a zone. Cloudflare does not deduplicate: creating the same name/type/content pair twice makes two records, so this is not idempotent. The created record, with its assigned id, is in the response",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "zone_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "cloudflare-dns-record-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The DNS record type",
@@ -390,12 +418,8 @@
           "symbol": "content"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -417,6 +441,9 @@
         "method": "POST",
         "url": "{base}/zones/{zone_id}/dns_records"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -508,14 +535,24 @@
       "credential_requirement": "declared",
       "description": "Delete one DNS record. There is no API route back: Cloudflare's dashboard \"recently deleted\" surface is a retention-window UI feature, not an endpoint, so a flux run cannot undo this. Responds with just the deleted record's id",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "zone_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "cloudflare-dns-record-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The record's id, 32 lowercase hex characters, as returned by cloudflare-dns-record-list or cloudflare-dns-record-create",
@@ -529,16 +566,15 @@
           "symbol": "dns_record_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/zones/{zone_id}/dns_records/{dns_record_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -599,20 +635,26 @@
       "credential_requirement": "declared",
       "description": "Purge every cached asset for a zone, immediately, for every visitor worldwide. There is no partial or selective purge in this connector (see its header note) — every call empties the whole zone's edge cache. Repeating it changes nothing further, but each call can spike load on the origin as the cache refills, so it should not be called more often than a real cache-affecting change warrants",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "zone_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "cloudflare-cache-purge",
       "idempotency": "conditional",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "repeatability_condition": "`purge_everything` names a target state rather than applying a delta, so a repeat leaves the zone exactly where the first call left it — purging an already-empty edge cache is a no-op. Conditional rather than idempotent because the cache refills from origin between calls, so a stored result must never be served in place of running it",
       "request": {
         "body": {
@@ -627,6 +669,9 @@
         "method": "POST",
         "url": "{base}/zones/{zone_id}/purge_cache"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -671,8 +716,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v4",

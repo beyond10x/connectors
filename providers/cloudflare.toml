@@ -247,6 +247,12 @@ name = "default"
 tags = ["infrastructure"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "cloudflare-zone-list"
 method = "GET"
 direction = "read"
@@ -260,13 +266,19 @@ type = "object"
 required = ["success", "result"]
 properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "array", items = { type = "object", properties = { id = { type = "string", description = "The zone's id, 32 lowercase hex characters — pass this as `zone_id` to every other operation", pattern = "^[0-9a-f]{32}$" }, name = { type = "string", description = "The registrable domain, e.g. example.com" }, status = { type = "string", description = "active, pending, initializing, moved, deleted, deactivated, or read only" }, paused = { type = "boolean", description = "True when Cloudflare is bypassed for this zone" }, type = { type = "string", description = "full (Cloudflare is authoritative) or partial (CNAME setup)" }, name_servers = { type = "array", items = { type = "string" }, description = "The Cloudflare name servers this zone's registrar should point at" } } } }, result_info = { type = "object", description = "Pagination totals for this response: page, per_page, count and total_count", properties = { page = { type = "integer" }, per_page = { type = "integer" }, count = { type = "integer" }, total_count = { type = "integer" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "cloudflare-dns-record-list"
 method = "GET"
 direction = "read"
@@ -280,13 +292,19 @@ type = "object"
 required = ["success", "result"]
 properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "array", items = { type = "object", properties = { id = { type = "string", description = "The record's id, 32 lowercase hex characters", pattern = "^[0-9a-f]{32}$" }, zone_id = { type = "string" }, name = { type = "string", description = "The DNS name, e.g. www.example.com or example.com for the apex" }, type = { type = "string", description = "A, AAAA, CNAME, TXT, MX, NS, SRV or CAA, among others" }, content = { type = "string", description = "The record's value; its shape depends on `type` — an IP for A/AAAA, a hostname for CNAME, arbitrary text for TXT" }, proxiable = { type = "boolean", description = "Whether Cloudflare can proxy this record's type" }, proxied = { type = "boolean", description = "Whether Cloudflare currently proxies traffic for it, hiding the origin IP" }, ttl = { type = "integer", description = "Time to live in seconds; 1 means \"automatic\"" }, locked = { type = "boolean" }, comment = { type = "string", description = "An operator-set note, empty string when none" }, tags = { type = "array", items = { type = "string" } }, created_on = { type = "string", format = "date-time" }, modified_on = { type = "string", format = "date-time" } } } }, result_info = { type = "object", properties = { page = { type = "integer" }, per_page = { type = "integer" }, count = { type = "integer" }, total_count = { type = "integer" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "cloudflare-dns-record-create"
 method = "POST"
 direction = "write"
@@ -323,13 +341,19 @@ type = "object"
 required = ["success", "result"]
 properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", properties = { id = { type = "string", pattern = "^[0-9a-f]{32}$" }, zone_id = { type = "string" }, name = { type = "string" }, type = { type = "string" }, content = { type = "string" }, proxiable = { type = "boolean" }, proxied = { type = "boolean" }, ttl = { type = "integer" }, created_on = { type = "string", format = "date-time" }, modified_on = { type = "string", format = "date-time" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "cloudflare-dns-record-delete"
 method = "DELETE"
 direction = "write"
@@ -354,13 +378,19 @@ type = "object"
 required = ["success", "result"]
 properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", required = ["id"], properties = { id = { type = "string", description = "The deleted record's id", pattern = "^[0-9a-f]{32}$" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "cloudflare-cache-purge"
 method = "POST"
 direction = "write"
@@ -391,6 +421,6 @@ type = "object"
 required = ["success", "result"]
 properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", required = ["id"], properties = { id = { type = "string", description = "The purged zone's id, echoed back", pattern = "^[0-9a-f]{32}$" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"

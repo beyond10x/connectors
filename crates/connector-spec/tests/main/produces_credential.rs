@@ -64,6 +64,12 @@ path = "/oauth/token"
 description = "Exchange client credentials for an access token."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [operations.produces_credential]
 secret = "{secret}"
@@ -373,6 +379,12 @@ path = "/oauth/token"
 description = "Exchange client credentials for an access token."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 credential_response = ["/access_token"]
 
 [operations.produces_credential]

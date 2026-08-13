@@ -206,6 +206,12 @@ name = "default"
 tags = ["storage"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-user-me"
 method = "POST"
 direction = "read"
@@ -220,7 +226,7 @@ idempotency = "idempotent"
 type = "object"
 properties = { account_id = { type = "string", description = "The account's unique, opaque id" }, name = { type = "object", description = "{given_name, surname, familiar_name, display_name, abbreviated_name}" }, email = { type = "string" }, email_verified = { type = "boolean" }, disabled = { type = "boolean" }, country = { type = "string", description = "ISO 3166-1 alpha-2 country code, if known" }, account_type = { type = "object", description = "{\".tag\": \"basic\" | \"pro\" | \"business\"}" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # Dropbox's non-2xx body is `{"error_summary": "path/not_found/...", "error": {".tag": "...", ...}}`.
 # `error_summary` is itself the machine-readable, slash-delimited error code as well as the
 # human-readable one — the same value serves both — so there is no separate `code_pointer` to name;
@@ -232,6 +238,12 @@ message_pointer = "/error_summary"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-folder-list"
 method = "POST"
 direction = "write"
@@ -250,12 +262,18 @@ schema = { type = "string", default = "" }
 type = "object"
 properties = { entries = { type = "array", description = "This page's items, each {\".tag\": \"file\"|\"folder\"|\"deleted\", name, path_lower, path_display, id}", items = { type = "object" } }, cursor = { type = "string", description = "The cursor for continuing to the next page. This connector cannot fetch it — list_folder/continue is not shipped" }, has_more = { type = "boolean", description = "True when the folder holds more entries than this page returned. This connector cannot fetch them; see cursor" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error_summary"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-metadata-get"
 method = "POST"
 direction = "write"
@@ -274,12 +292,18 @@ schema = { type = "string", minLength = 1 }
 type = "object"
 properties = { ".tag" = { type = "string", description = "\"file\", \"folder\" or \"deleted\" — which fields below apply depends on this" }, name = { type = "string" }, path_lower = { type = "string" }, path_display = { type = "string" }, id = { type = "string", description = "An opaque id stable across moves and renames" }, client_modified = { type = "string", format = "date-time", description = "File only: the modification time the uploading client claimed, not verified by Dropbox" }, server_modified = { type = "string", format = "date-time", description = "File only: when Dropbox's server last saw this content change" }, rev = { type = "string", description = "File only: an opaque revision id" }, size = { type = "integer", description = "File only: size in bytes" }, content_hash = { type = "string", description = "File only: Dropbox's own content hash, for verifying a download performed some other way" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error_summary"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-search"
 method = "POST"
 direction = "write"
@@ -298,7 +322,7 @@ schema = { type = "string", minLength = 1 }
 type = "object"
 properties = { matches = { type = "array", description = "The matching files and folders, each {metadata: {...}, match_type: {\".tag\": \"filename\"|\"content\"|\"both\"}}", items = { type = "object" } }, has_more = { type = "boolean", description = "True when more matches exist than this page returned. This connector cannot fetch them — no continuation cursor is shipped" }, cursor = { type = "string", description = "The cursor for the next page, present only when has_more is true. Unusable here, for the reason given on has_more" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error_summary"
 
 # ---------------------------------------------------------------------------------------------
@@ -306,6 +330,12 @@ message_pointer = "/error_summary"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-folder-create"
 method = "POST"
 direction = "write"
@@ -330,12 +360,18 @@ schema = { type = "string", minLength = 1 }
 type = "object"
 properties = { metadata = { type = "object", description = "The created folder's metadata: {name, path_lower, path_display, id}", properties = { name = { type = "string" }, path_lower = { type = "string" }, path_display = { type = "string" }, id = { type = "string", description = "The created folder's id — what a later call addresses it by" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error_summary"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "dropbox-temporary-link-get"
 method = "POST"
 direction = "write"
@@ -360,5 +396,5 @@ schema = { type = "string", minLength = 1 }
 type = "object"
 properties = { metadata = { type = "object", description = "The linked file's metadata, the same shape dropbox-metadata-get returns for a file" }, link = { type = "string", description = "The temporary download URL, valid for approximately four hours from this call" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error_summary"

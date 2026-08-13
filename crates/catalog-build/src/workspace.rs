@@ -49,7 +49,7 @@ pub const PACK_FILE: &str = "catalog.pack";
 /// `~/.flux/flows`, and a JSON document a website fetches is not that.
 ///
 /// It is VitePress's `public/` directory (C-44), which is served verbatim at the site root — so the
-/// explorer fetches `/flux-connectors/catalog.json` with no copy step and no build plumbing between
+/// explorer fetches `/connectors/catalog.json` with no copy step and no build plumbing between
 /// the Rust pipeline and the Node one. A sibling directory at the repository root was the original
 /// choice; it meant two top-level directories for one website, and a copy step that could ship a
 /// stale document. This pipeline still owns the file; the site merely reads it.
@@ -65,7 +65,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    /// Treat `root` as a flux-connectors repository.
+    /// Treat `root` as a connectors repository.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
     }
@@ -131,7 +131,7 @@ impl Workspace {
     ///
     /// At the repository root rather than under `connectors/`, and the name is
     /// [`connector_spec::LOCKFILE_NAME`] rather than a literal here, so the writer and
-    /// `flux-connectors check` (C-14) cannot disagree about which file they mean. The root is where
+    /// `connectors check` (C-14) cannot disagree about which file they mean. The root is where
     /// a reader looks for a lockfile — it is a property of the repository, not of one directory of
     /// artifacts — and it is the same place `Cargo.lock` sits.
     ///

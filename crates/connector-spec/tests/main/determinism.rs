@@ -1,13 +1,13 @@
 //! Determinism tests for the connector IR.
 //!
-//! `connectors.lock` (C-7) hashes the serialized IR and `flux-connectors check` fails on a
+//! `connectors.lock` (C-7) hashes the serialized IR and `connectors check` fails on a
 //! mismatch, so a single leaked iteration order would turn into phantom drift on every build for
 //! every provider. These tests are the guard: they assert that the encoding is a pure function of
 //! the IR's *value*, not of the order any collection happened to be built in.
 
 use connector_spec::{
     AuthMethod, AuthRequirement, AuthScheme, Connector, HttpMethod, Idempotency, Operation,
-    OperationDirection, Param, ParamSet, Provenance, Quirks, Risk, DEFAULT_SERVICE,
+    OperationDirection, Param, ParamSet, Provenance, Risk, DEFAULT_SERVICE,
 };
 use serde_json::json;
 
@@ -29,7 +29,6 @@ fn connector(reversed: bool) -> Connector {
     Connector {
         id: "b".into(),
         authority: None,
-        runtime: connector_spec::Runtime::Http,
         api_version: None,
         services: Vec::new(),
         vendor: "Babelforce".into(),
@@ -65,6 +64,15 @@ fn connector(reversed: bool) -> Connector {
             description: "List calls".into(),
             risk: Risk::Low,
             idempotency: Idempotency::Idempotent,
+            effects: vec![
+                connector_spec::HostEffect::Read,
+                connector_spec::HostEffect::Network,
+            ],
+            interaction_shape: connector_spec::InteractionShape::Unary,
+            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+            placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+            implementation_form: connector_spec::ImplementationForm::BuiltIn,
+            required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
             semantic_effects: Vec::new(),
             repeatable_because: None,
             expose: true,
@@ -82,7 +90,11 @@ fn connector(reversed: bool) -> Connector {
             response_schema: Some(schema),
             credential_response: Vec::new(),
             produces_credential: None,
-            quirks: Quirks::default(),
+            pagination: None,
+
+            rate_limit: None,
+
+            error_envelope: None,
         }],
         events: Vec::new(),
         channels: Vec::new(),

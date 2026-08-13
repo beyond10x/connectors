@@ -226,6 +226,12 @@ name = "default"
 tags = ["marketing"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-account-list"
 method = "GET"
 direction = "read"
@@ -261,6 +267,12 @@ properties = { data = { type = "array", description = "Always exactly one accoun
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-profile-list"
 method = "GET"
 direction = "read"
@@ -281,6 +293,12 @@ properties = { data = { type = "array", description = "One entry per profile, fi
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-profile-get"
 method = "GET"
 direction = "read"
@@ -320,6 +338,12 @@ properties = { data = { type = "object", required = [
 # `wire` (C-29). Without those paths the fields would be emitted at the body root, where Klaviyo
 # answers `400` naming them as unexpected.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-profile-create"
 method = "POST"
 direction = "write"
@@ -406,6 +430,12 @@ properties = { data = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-list-list"
 method = "GET"
 direction = "read"
@@ -452,6 +482,12 @@ properties = { data = { type = "array", description = "One entry per list, first
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "klaviyo-event-create"
 method = "POST"
 direction = "write"

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Bitbucket Cloud Access Token, sent as a bearer token. A Workspace Access Token is valid for exactly one workspace, which is the same boundary this connector's pinned `workspace` describes; scope it to repository:read plus pullrequest:write for the writes below",
@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Bitbucket Cloud repositories and pull requests for one pinned workspace: list the workspace's repositories, read one, list and read its open pull requests, open a pull request, comment on one, and approve one",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -69,23 +69,32 @@
       "credential_requirement": "declared",
       "description": "List the repositories in this connection's workspace, with each one's slug, name, description, main branch and privacy. Takes no argument at all: the workspace is pinned when the connection is made, so this reads exactly the workspace the operator chose and no other. Returns Bitbucket's first page only; this connector declares no page or filter parameters, and the response's `next` field carries the URL of the following page. The `slug` returned here is what every other operation in this connector takes as `repo_slug`. Also this connector's `verify`: a bounded read that runs unattended and needs nothing beyond the token and the pinned workspace",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-repository-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/repositories/{workspace}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "next": {
@@ -218,14 +227,23 @@
       "credential_requirement": "declared",
       "description": "Read one repository in this connection's workspace by its slug, with its main branch, privacy, project and size. Use it to confirm a repository exists and to learn its default branch before opening a pull request against it",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-repository-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug` — the part after the workspace in a Bitbucket URL. Not the `workspace/slug` pair Bitbucket calls a full name",
@@ -239,15 +257,15 @@
           "symbol": "repo_slug"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_on": {
@@ -356,14 +374,23 @@
       "credential_requirement": "declared",
       "description": "List the open pull requests on one repository in this connection's workspace, newest activity first. Returns OPEN pull requests only — that is Bitbucket's default and this connector declares no `state` parameter to change it (see its header note), so merged and declined pull requests are not returned. Returns Bitbucket's first page only; the response's `next` field carries the URL of the following page. Each value's `id` is what bitbucket-pull-request-get, -comment and -approve take",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-pull-request-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug`",
@@ -377,15 +404,15 @@
           "symbol": "repo_slug"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "next": {
@@ -517,14 +544,23 @@
       "credential_requirement": "declared",
       "description": "Read one pull request by its number, including its description, its source and destination branches, its current state and who is participating. Reads a merged or declined pull request too, unlike bitbucket-pull-request-list",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-pull-request-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug`",
@@ -549,15 +585,15 @@
           "symbol": "pull_request_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "author": {
@@ -718,14 +754,23 @@
       "credential_requirement": "declared",
       "description": "Open a pull request from one branch to another in a repository of this connection's workspace. Both branches must already exist and be pushed. Bitbucket does not deduplicate: opening the same source-to-destination pull request twice creates two of them, and notifies the repository's watchers twice. The created pull request, with its assigned `id`, is in the response",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-pull-request-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug`",
@@ -774,11 +819,8 @@
           "wire": "destination.branch.name"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -808,6 +850,9 @@
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "author": {
@@ -913,14 +958,23 @@
       "credential_requirement": "declared",
       "description": "Add a top-level comment to a pull request. The comment is attributed to the account the token belongs to and notifies everyone participating; Bitbucket sends no un-notification, so a comment posted in error can be deleted but not un-seen. This posts a general comment on the pull request, never an inline comment on a line of the diff",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-pull-request-comment",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug`",
@@ -957,11 +1011,8 @@
           "wire": "content.raw"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -979,6 +1030,9 @@
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/comments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "content": {
@@ -1059,14 +1113,23 @@
       "credential_requirement": "declared",
       "description": "Approve a pull request as the account this connection's token belongs to. This records a review that a human may not have performed, and in a repository with an approval merge check it can release a merge that gate was configured to hold — treat it as an assertion about a review, not as a bookmark. Bitbucket answers a repeat approval with 409 rather than approving twice. Sends no body: the approver is the token's own account",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "workspace": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "bitbucket-pull-request-approve",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository's URL segment, from bitbucket-repository-list's `slug`",
@@ -1091,15 +1154,15 @@
           "symbol": "pull_request_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/approve"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "approved": {
@@ -1134,8 +1197,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2.0",

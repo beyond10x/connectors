@@ -162,6 +162,12 @@ name = "default"
 tags = ["crm"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "salesforce-whoami"
 method = "GET"
 direction = "read"
@@ -183,6 +189,12 @@ properties = { sub = { type = "string", format = "uri", description = "The OIDC 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "salesforce-record-get"
 method = "GET"
 direction = "read"
@@ -217,6 +229,12 @@ properties = { attributes = { type = "object", required = ["type", "url"], prope
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "salesforce-record-create"
 method = "POST"
 direction = "write"
@@ -253,6 +271,12 @@ properties = { id = { type = "string", description = "The new record's 18-charac
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "salesforce-record-update"
 method = "PATCH"
 direction = "write"
@@ -293,6 +317,12 @@ body_schema = { type = "object", description = "The fields to change, as a JSON 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "salesforce-sobject-describe"
 method = "GET"
 direction = "read"

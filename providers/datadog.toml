@@ -145,6 +145,12 @@ name = "default"
 tags = ["observability"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "datadog-monitor-list"
 method = "GET"
 direction = "read"
@@ -170,6 +176,12 @@ items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "datadog-monitor-get"
 method = "GET"
 direction = "read"
@@ -204,6 +216,12 @@ properties = { id = { type = "integer", description = "Datadog's numeric id for 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "datadog-incident-list"
 method = "GET"
 direction = "read"
@@ -215,6 +233,12 @@ idempotency = "idempotent"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "datadog-incident-get"
 method = "GET"
 direction = "read"

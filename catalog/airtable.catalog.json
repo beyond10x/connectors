@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Airtable access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Airtable records: read, create, update and delete a record in a base's table",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -54,9 +54,19 @@
       "credential_requirement": "declared",
       "description": "Read one record from a table — its cell values are under `fields` in the response, keyed by column name. Returns every column the token can see, in Airtable's default JSON cell format: narrowing or reformatting them needs the `fields[]` and `cellFormat` query parameters this connector cannot encode",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "airtable-record-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The base's id, the `app…` segment in the base's URL in Airtable",
@@ -95,16 +105,15 @@
           "wire": "recordId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "createdTime": {
@@ -162,9 +171,19 @@
       "credential_requirement": "declared",
       "description": "Create one record in a table. Cell values are supplied under `fields`, keyed by column name, and must already be in the exact JSON form each column expects — Airtable's `typecast` coercion cannot be requested yet (see the connector's notes). The created record, with its `rec…` id, is in the response",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "airtable-record-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The base's id, the `app…` segment in the base's URL in Airtable",
@@ -203,12 +222,8 @@
           "wire": "fields"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -224,6 +239,9 @@
         "method": "POST",
         "url": "{base}/v0/{base_id}/{table_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "createdTime": {
@@ -285,9 +303,19 @@
       "credential_requirement": "declared",
       "description": "Update one record's cell values. The write is sparse: only the columns named in `fields` change and every other column of the record is left exactly as it was. Values must already be in the form each column expects — `typecast` coercion cannot be requested yet. The updated record is in the response",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "airtable-record-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The base's id, the `app…` segment in the base's URL in Airtable",
@@ -338,12 +366,8 @@
           "wire": "fields"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -359,6 +383,9 @@
         "method": "PATCH",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "createdTime": {
@@ -418,9 +445,19 @@
       "credential_requirement": "declared",
       "description": "Delete one record and every cell value in it. There is no API route back: Airtable's trash and revision history are UI features on a retention window, not endpoints, so a flux run cannot undo this. Responds `{\"id\": …, \"deleted\": true}`",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "airtable-record-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The base's id, the `app…` segment in the base's URL in Airtable",
@@ -459,16 +496,15 @@
           "wire": "recordId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "deleted": {
@@ -492,8 +528,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v0",

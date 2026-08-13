@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Figma personal access token, sent as the whole value of X-Figma-Token. Grants read access to whatever files, projects and comments the token's account can see",
@@ -37,7 +37,7 @@
     ]
   ],
   "description": "Figma REST API: read a file, specific nodes, rendered images, a project's files and a file's comments — a read-only design surface",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -56,18 +56,27 @@
       "credential_requirement": "declared",
       "description": "Get the authenticated user's id, email, display handle and avatar URL. Used to verify a token works before running anything else",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-user-me",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "email": {
@@ -120,9 +129,18 @@
       "credential_requirement": "declared",
       "description": "Get a Figma file's document tree, components and styles by file key. Does not include comments or rendered images",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-file-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file key from a Figma file URL — the segment after `/file/` or `/design/` and before the file's slug, e.g. `3xZfChRmL9Ykq4Qp2NHwR8` in `figma.com/design/3xZfChRmL9Ykq4Qp2NHwR8/My-File`",
@@ -136,15 +154,15 @@
           "symbol": "file_key"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/files/{file_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "components": {
@@ -224,9 +242,18 @@
       "credential_requirement": "declared",
       "description": "Get one or more specific nodes from a file by id, without walking the whole document tree. Use this to read a particular frame or layer instead of downloading the entire file",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-file-nodes-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file key — see figma-file-get",
@@ -251,11 +278,8 @@
           "symbol": "ids"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -268,6 +292,9 @@
         ],
         "url": "{base}/v1/files/{file_key}/nodes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "err": {
@@ -323,9 +350,18 @@
       "credential_requirement": "declared",
       "description": "Render one or more nodes to images and return download URLs for them. The URLs point at short-lived storage and expire — Figma does not guarantee they stay valid, so fetch or store the image promptly rather than caching the URL itself",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-image-render-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file key — see figma-file-get",
@@ -350,11 +386,8 @@
           "symbol": "ids"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -367,6 +400,9 @@
         ],
         "url": "{base}/v1/images/{file_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "err": {
@@ -410,9 +446,18 @@
       "credential_requirement": "declared",
       "description": "List the files in a project: each file's key, name, thumbnail and last-modified time",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-project-files-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's numeric id, from a Figma project URL or from a team's project listing",
@@ -427,15 +472,15 @@
           "symbol": "project_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/projects/{project_id}/files"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "files": {
@@ -503,9 +548,18 @@
       "credential_requirement": "declared",
       "description": "List a file's comments: who wrote each one, when, its text, what it is attached to, and whether it has been resolved",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/err"
+      },
       "expose": true,
       "id": "figma-file-comments-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file key — see figma-file-get",
@@ -519,15 +573,15 @@
           "symbol": "file_key"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/err"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/files/{file_key}/comments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "comments": {
@@ -589,8 +643,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

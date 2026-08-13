@@ -74,6 +74,12 @@ tags = ["ai"]
 description = "Read-only Admin API: organization, members, workspaces, API keys and invites"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "models"
 select = "models_list"
 rename = "anthropic-models-list"
@@ -81,17 +87,30 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 omit.query = ["after_id", "before_id", "limit"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "models"
 select = "model_get"
 rename = "anthropic-model-get"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "organization_get"
 rename = "anthropic-organization-get"
@@ -99,9 +118,15 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "organization_members_list"
 rename = "anthropic-organization-members-list"
@@ -110,9 +135,15 @@ risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
 omit.query = ["after_id", "before_id", "email", "limit"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "organization_member_get"
 rename = "anthropic-organization-member-get"
@@ -120,9 +151,15 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "workspaces_list"
 rename = "anthropic-workspaces-list"
@@ -131,9 +168,15 @@ risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
 omit.query = ["after_id", "before_id", "limit", "include_archived"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "workspace_get"
 rename = "anthropic-workspace-get"
@@ -141,9 +184,15 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "workspace_members_list"
 rename = "anthropic-workspace-members-list"
@@ -152,9 +201,15 @@ risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
 omit.query = ["after_id", "before_id", "limit"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "workspace_member_get"
 rename = "anthropic-workspace-member-get"
@@ -162,9 +217,15 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "api_keys_list"
 rename = "anthropic-api-keys-list"
@@ -173,9 +234,15 @@ risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
 omit.query = ["after_id", "before_id", "limit", "status", "workspace_id", "created_by_user_id"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "admin"
 select = "invites_list"
 rename = "anthropic-invites-list"
@@ -184,4 +251,4 @@ risk = "low"
 idempotency = "idempotent"
 auth = [{ credentials = ["anthropic.admin_key"] }]
 omit.query = ["after_id", "before_id", "limit", "status"]
-quirks = { error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" } }
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }

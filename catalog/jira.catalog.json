@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Atlassian API token; the user half is the account email that minted it",
@@ -66,7 +66,7 @@
     ]
   ],
   "description": "Jira Cloud issue tracking: read and create issues, comment on them, and drive workflow transitions",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -91,6 +91,10 @@
       "credential_requirement": "declared",
       "description": "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -99,6 +103,8 @@
       "expose": true,
       "id": "jira-issue-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
@@ -113,10 +119,15 @@
           "wire": "issueIdOrKey"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "changelog": {
@@ -191,6 +202,10 @@
       "credential_requirement": "declared",
       "description": "Create a Jira issue in a project. Visible to everyone with access to the project and notifies its watchers. Only project, summary and issue type are set: a description cannot be sent yet (see the connector's notes), so file the detail as a comment afterwards. Returns the new issue's id, key and self URL",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -199,6 +214,8 @@
       "expose": true,
       "id": "jira-issue-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Key of the project to file the issue in, e.g. `PROJ`",
@@ -237,6 +254,8 @@
           "wire": "fields.issuetype.name"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -264,6 +283,9 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -320,6 +342,10 @@
       "credential_requirement": "declared",
       "description": "Read the comments on a Jira issue, oldest first. Returns Jira's first default-sized page only: paging needs the `startAt` and `maxResults` query parameters this connector cannot encode, so an issue with a long discussion is truncated. Comment bodies are wiki markup",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -328,6 +354,8 @@
       "expose": true,
       "id": "jira-issue-comment-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
@@ -342,10 +370,15 @@
           "wire": "issueIdOrKey"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}/comment"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "comments": {
@@ -445,6 +478,10 @@
       "credential_requirement": "declared",
       "description": "Add a comment to a Jira issue. The comment is visible to everyone who can see the issue — including customers on a service-management portal — and notifies its watchers; restricting it to a project role or group is not supported yet. The body is Jira wiki markup (`*bold*`, `{code}`), not Markdown and not rich content",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -453,6 +490,8 @@
       "expose": true,
       "id": "jira-issue-comment-add",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
@@ -478,6 +517,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -493,6 +534,9 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue/{issue_key}/comment"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "author": {
@@ -564,6 +608,10 @@
       "credential_requirement": "declared",
       "description": "List the workflow transitions available on a Jira issue right now, with the id and target status of each. Call this before `jira-issue-transition`: transition ids are per-workflow, not global, and only the transitions valid from the issue's current status are returned",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -572,6 +620,8 @@
       "expose": true,
       "id": "jira-issue-transitions-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
@@ -586,10 +636,15 @@
           "wire": "issueIdOrKey"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}/transitions"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "expand": {
@@ -678,6 +733,10 @@
       "credential_requirement": "declared",
       "description": "Move a Jira issue through a workflow transition — the way an issue is closed, reopened or advanced. Get the transition id from `jira-issue-transitions-list` first; ids are per-workflow and only transitions valid from the current status are accepted. The status change is visible on every board showing the issue, notifies watchers, and may fire project automation. Answers `204` with an empty body on success",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "site": [
           "host"
@@ -686,6 +745,8 @@
       "expose": true,
       "id": "jira-issue-transition",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
@@ -712,6 +773,8 @@
           "wire": "transition.id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -729,13 +792,15 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue/{issue_key}/transitions"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2",

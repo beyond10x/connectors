@@ -145,7 +145,20 @@ fn the_schema_marks_the_mandatory_keys_required() {
         // No default for direction or the request/policy fields, for the same reason.
         (
             "operation",
-            &["id", "method", "direction", "path", "risk", "idempotency"],
+            &[
+                "id",
+                "method",
+                "direction",
+                "path",
+                "risk",
+                "idempotency",
+                "effects",
+                "interaction_shape",
+                "protocol_driver",
+                "placement_requirement",
+                "implementation_form",
+                "required_capabilities",
+            ],
         ),
         ("param", &["name", "schema"]),
         ("authRequirement", &["credentials"]),
@@ -267,6 +280,12 @@ direction = "read"
 path = "/v1/things"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[graphs]]
 name = "acme-thing-flow"

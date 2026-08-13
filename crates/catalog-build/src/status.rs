@@ -1,6 +1,6 @@
 //! Whether a generated operation currently works, and if not, why — derived from the IR (C-42).
 //!
-//! This is the field the public catalogue exists for. `codewandler/flux-connectors` is honest about
+//! This is the field the public catalogue exists for. `codewandler/connectors` is honest about
 //! what does not work, but that honesty currently lives in prose: a README section, an `AGENTS.md`
 //! list, and a dozen story files. None of it is machine-readable, so a site rendering
 //! `site/catalog.json` would publish `zendesk-ticket-search` as though it worked. The design's own
@@ -378,8 +378,7 @@ fn declares_no_credential_is_needed(operation: &Operation) -> bool {
 mod tests {
     use super::*;
     use connector_spec::{
-        AuthMethod, AuthRequirement, HttpMethod, Idempotency, Operation, Param, ParamSet, Quirks,
-        Risk,
+        AuthMethod, AuthRequirement, HttpMethod, Idempotency, Operation, Param, ParamSet, Risk,
     };
     use serde_json::json;
 
@@ -401,6 +400,15 @@ mod tests {
             description: "Do a thing".to_string(),
             risk: Risk::Low,
             idempotency: Idempotency::Idempotent,
+            effects: vec![
+                connector_spec::HostEffect::Read,
+                connector_spec::HostEffect::Network,
+            ],
+            interaction_shape: connector_spec::InteractionShape::Unary,
+            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+            placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+            implementation_form: connector_spec::ImplementationForm::BuiltIn,
+            required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
             semantic_effects: Vec::new(),
             repeatable_because: None,
             expose: true,
@@ -409,7 +417,11 @@ mod tests {
             response_schema: None,
             credential_response: Vec::new(),
             produces_credential: None,
-            quirks: Quirks::default(),
+            pagination: None,
+
+            rate_limit: None,
+
+            error_envelope: None,
         }
     }
 
@@ -419,7 +431,6 @@ mod tests {
         Connector {
             id: "acme".to_string(),
             authority: None,
-            runtime: connector_spec::Runtime::Http,
             api_version: None,
             services: Vec::new(),
             vendor: "Acme".to_string(),

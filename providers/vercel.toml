@@ -156,6 +156,12 @@ name = "default"
 tags = ["infrastructure", "developer-tools"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "vercel-projects-list"
 method = "GET"
 direction = "read"
@@ -173,6 +179,12 @@ idempotency = "idempotent"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "vercel-project-get"
 method = "GET"
 direction = "read"
@@ -195,6 +207,12 @@ properties = { id = { type = "string", description = "The project's own id (prj_
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "vercel-deployments-list"
 method = "GET"
 direction = "read"
@@ -217,6 +235,12 @@ properties = { deployments = { type = "array", items = { type = "object", requir
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "vercel-deployment-get"
 method = "GET"
 direction = "read"
@@ -243,6 +267,12 @@ properties = { id = { type = "string", description = "The deployment's unique id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "vercel-deployment-cancel"
 method = "PATCH"
 direction = "write"

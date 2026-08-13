@@ -172,6 +172,12 @@ name = "default"
 tags = ["forms"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "typeform-user-me"
 method = "GET"
 direction = "read"
@@ -185,7 +191,7 @@ type = "object"
 required = ["account_id"]
 properties = { account_id = { type = "string", description = "The account's own opaque id" }, alias = { type = "string", description = "The account's display alias, shown in Typeform's own UI" }, email = { type = "string", description = "The account owner's own email — never a form respondent's" }, language = { type = "string", description = "The account's interface language, as an IETF language tag, e.g. \"en\"" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # Observed as `{"code": "...", "description": "..."}` on a Typeform error response (e.g.
 # `{"code":"NOT_FOUND","description":"Endpoint not found"}`, reported on Typeform's own community
 # forum) and consistent with the vendor's troubleshooting page, which documents that "all error
@@ -198,6 +204,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "typeform-form-list"
 method = "GET"
 direction = "read"
@@ -235,13 +247,19 @@ type = "object"
 required = ["items", "total_items", "page_count"]
 properties = { items = { type = "array", description = "This page's forms", items = { type = "object", required = ["id", "title"], properties = { id = { type = "string", description = "The form's own id — pass this as `form_id` to every other operation below" }, title = { type = "string" }, last_updated_at = { type = "string", format = "date-time" }, settings = { type = "object", description = "At least `{is_public}`; the vendor's own resource carries more form-level settings this curated connector does not enumerate further", properties = { is_public = { type = "boolean" } } }, self = { type = "object", properties = { href = { type = "string" } } } } } }, total_items = { type = "integer", description = "Total forms in the account, which may exceed `items.length` on one page" }, page_count = { type = "integer" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/description"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "typeform-form-get"
 method = "GET"
 direction = "read"
@@ -261,7 +279,7 @@ type = "object"
 required = ["id", "title"]
 properties = { id = { type = "string" }, title = { type = "string" }, language = { type = "string", description = "IETF language tag, e.g. \"en\"" }, type = { type = "string", description = "The form's rendering type, e.g. \"quiz\" or \"form\"" }, settings = { type = "object", description = "Form-level settings (visibility, language, progress bar, meta tags among others); read through rather than assumed — this curated connector does not enumerate every key" }, theme = { type = "object", properties = { href = { type = "string" } } }, workspace = { type = "object", properties = { href = { type = "string" } } }, welcome_screens = { type = "array", items = { type = "object" } }, thankyou_screens = { type = "array", items = { type = "object" } }, fields = { type = "array", description = "One entry per question. Each carries at least an id, a ref, a title and a type; some carry nested `properties` and `validations` this curated connector does not enumerate further — read them through rather than assuming a shape", items = { type = "object", required = ["id", "type"], properties = { id = { type = "string" }, ref = { type = "string", description = "The field's own stable reference, distinct from its id — what an answer in a response names this question by" }, title = { type = "string", description = "The question text the form's own author wrote" }, type = { type = "string", description = "e.g. \"short_text\", \"multiple_choice\", \"email\", \"number\", \"date\", \"file_upload\"" } } } }, hidden = { type = "array", description = "The variable names of hidden fields this form accepts via URL parameter — the field names only, declared by the form's own author; never a respondent's value", items = { type = "string" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/description"
 code_pointer = "/code"
 
@@ -272,6 +290,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "typeform-response-list"
 method = "GET"
 direction = "read"
@@ -344,7 +368,7 @@ type = "object"
 required = ["items", "total_items", "page_count"]
 properties = { total_items = { type = "integer" }, page_count = { type = "integer" }, items = { type = "array", description = "This page's responses, in the order `sort` (or the default) puts them", items = { type = "object", required = ["response_id", "token"], properties = { landing_id = { type = "string", description = "Identifies the browsing session that landed on the form — distinct from the response itself" }, token = { type = "string", pattern = "^[0-9a-f]{32}$", description = "This response's own opaque id: 32 lowercase hex characters. Pass it as `before` or `after` to page around it" }, response_id = { type = "string", description = "The same value as `token`, under Typeform's other name for it" }, response_type = { type = "string", enum = ["started", "partial", "completed"] }, landed_at = { type = "string", format = "date-time" }, submitted_at = { type = "string", format = "date-time", description = "Present once submitted; absent on a still-open partial response" }, metadata = { type = "object", description = "The submission's own browsing context — browser, platform, referer and network id. Not respondent-authored content" }, hidden = { type = "object", description = "Hidden-field values this response's session was launched with, keyed by the form's own hidden-field variable names (see typeform-form-get's `hidden`). Shape and content depend entirely on the form's own configuration — commonly an email address, a customer id or similar, so this connector never enumerates or exemplifies a value here" }, calculated = { type = "object", description = "Computed values Typeform's scoring feature attaches", properties = { score = { type = "integer" } } }, answers = { type = "array", description = "One entry per answered question: at minimum `{field: {id, ref, type}, type}` plus exactly one value key named after `type` (text, choice, choices, email, number, boolean, date, url, file_url or payment). The value itself is whatever the respondent typed or selected and is never enumerated or exemplified here", items = { type = "object" } } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/description"
 code_pointer = "/code"
 
@@ -353,6 +377,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "typeform-response-delete"
 method = "DELETE"
 direction = "write"
@@ -389,7 +419,7 @@ schema = { type = "string", pattern = "^[0-9a-f]{32}(,[0-9a-f]{32})*$" }
 # would describe a document that may not exist rather than say nothing, the same choice
 # `providers/zoom.toml`'s `zoom-meeting-delete` makes for its own undocumented `204`.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/description"
 code_pointer = "/code"
 

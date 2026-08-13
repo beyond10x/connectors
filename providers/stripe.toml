@@ -158,6 +158,12 @@ fetched_at = "2026-08-02T11:12:55Z"
 sha256 = "3b3d858f1a02a2ac0116cc10a296a7d374fe7c9d8b4a68a5419712e0bb3fbf41"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetCountrySpecs"
 direction = "read"
 rename = "stripe-country-spec-list"
@@ -167,6 +173,12 @@ idempotency = "idempotent"
 omit.query = ["ending_before", "expand", "starting_after"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetEvents"
 direction = "read"
 rename = "stripe-event-list"
@@ -184,6 +196,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetExchangeRates"
 direction = "read"
 rename = "stripe-exchange-rate-list"
@@ -193,6 +211,12 @@ idempotency = "idempotent"
 omit.query = ["ending_before", "expand", "starting_after"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetBillingMeters"
 direction = "read"
 rename = "stripe-billing-meter-list"
@@ -274,6 +298,12 @@ name = "default"
 tags = ["payments"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-balance-get"
 method = "GET"
 direction = "read"
@@ -287,7 +317,7 @@ type = "object"
 required = ["object", "available", "pending"]
 properties = { object = { const = "balance" }, livemode = { type = "boolean", description = "False for a test-mode key. The clearest signal available of which mode this connection is in" }, available = { type = "array", description = "Funds available to pay out now, one entry per currency, each `{amount, currency}` with `amount` in the currency's smallest unit", items = { type = "object" } }, pending = { type = "array", description = "Funds not yet available, same shape as `available`", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
@@ -297,6 +327,12 @@ code_pointer = "/error/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-customer-get"
 method = "GET"
 direction = "read"
@@ -320,13 +356,19 @@ type = "object"
 required = ["id", "object"]
 properties = { id = { type = "string" }, object = { const = "customer" }, email = { type = "string" }, name = { type = "string" }, currency = { type = "string" }, deleted = { type = "boolean", description = "Present and true only for a deleted customer, which is returned rather than 404'd" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-charge-get"
 method = "GET"
 direction = "read"
@@ -350,13 +392,19 @@ properties = { id = { type = "string" }, object = { const = "charge" }, amount =
   "failed",
 ] }, failure_message = { type = "string", description = "Why the charge failed, in prose a human can read. Absent on a successful charge" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-payment-intent-get"
 method = "GET"
 direction = "read"
@@ -388,13 +436,19 @@ properties = { id = { type = "string" }, object = { const = "payment_intent" }, 
   "manual",
 ] }, latest_charge = { type = "string", description = "The id of the charge this intent produced, which is what `stripe-charge-refund-create` refunds" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-refund-get"
 method = "GET"
 direction = "read"
@@ -420,7 +474,7 @@ properties = { id = { type = "string" }, object = { const = "refund" }, amount =
   "canceled",
 ] } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
@@ -472,6 +526,12 @@ code_pointer = "/error/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-payment-intent-capture"
 method = "POST"
 direction = "write"
@@ -500,13 +560,19 @@ type = "object"
 required = ["id", "object", "status"]
 properties = { id = { type = "string" }, object = { const = "payment_intent" }, amount = { type = "integer" }, amount_received = { type = "integer", description = "What was actually taken. Equals `amount` after a full capture" }, currency = { type = "string" }, status = { type = "string", description = "`succeeded` after a successful capture" }, latest_charge = { type = "string" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-payment-intent-cancel"
 method = "POST"
 direction = "write"
@@ -537,7 +603,7 @@ type = "object"
 required = ["id", "object", "status"]
 properties = { id = { type = "string" }, object = { const = "payment_intent" }, status = { const = "canceled" }, cancellation_reason = { type = "string" }, canceled_at = { type = "integer", description = "Unix timestamp" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
@@ -558,6 +624,12 @@ code_pointer = "/error/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "stripe-charge-refund-create"
 method = "POST"
 direction = "write"
@@ -586,7 +658,7 @@ type = "object"
 required = ["id", "object", "amount", "currency", "status"]
 properties = { id = { type = "string" }, object = { const = "refund" }, amount = { type = "integer", description = "What was refunded, in the currency's smallest unit" }, currency = { type = "string" }, charge = { type = "string" }, status = { type = "string", description = "`pending` is the normal answer — the money has not reached the customer's bank yet. `failed` means it came back and the customer was not paid" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 

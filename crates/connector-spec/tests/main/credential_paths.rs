@@ -579,6 +579,12 @@ path = "/ping"
 description = "Ping"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
     let no_authority = provider::load("providers/acme.toml", NO_AUTHORITY)
         .expect("the fixture loads")

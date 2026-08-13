@@ -196,6 +196,12 @@ name = "default"
 tags = ["incident-response"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-incident-list"
 method = "GET"
 direction = "read"
@@ -230,6 +236,12 @@ properties = { incidents = { type = "array", description = "This page's incident
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-incident-get"
 method = "GET"
 direction = "read"
@@ -254,6 +266,12 @@ properties = { incident = { type = "object", required = ["id", "type", "status"]
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-service-list"
 method = "GET"
 direction = "read"
@@ -283,6 +301,12 @@ properties = { services = { type = "array", description = "This page's services"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-oncall-list"
 method = "GET"
 direction = "read"
@@ -341,6 +365,12 @@ properties = { oncalls = { type = "array", description = "This page's on-call en
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-incident-acknowledge"
 method = "PUT"
 direction = "write"
@@ -393,6 +423,12 @@ properties = { incident = { type = "object", required = ["id", "status"], descri
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "pagerduty-incident-resolve"
 method = "PUT"
 direction = "write"

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Intercom access token sent as a bearer — an OAuth app token or a workspace access token",
@@ -51,7 +51,7 @@
     ]
   ],
   "description": "Intercom contacts and conversations: read and create contacts, read a conversation, reply to it, and note it",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -76,14 +76,24 @@
       "credential_requirement": "declared",
       "description": "Get one Intercom contact by id — its role, email, name, custom attributes, tags and the companies it belongs to",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "intercom-contact-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact's Intercom id — a 24-character lowercase hexadecimal string such as `63a0979a5eeebeb3d8ba5be3`, not its email or your own external id",
@@ -97,16 +107,15 @@
           "symbol": "contact_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/contacts/{contact_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "avatar": {
@@ -245,14 +254,24 @@
       "credential_requirement": "declared",
       "description": "Create an email-identified Intercom contact. A contact created here is visible to every teammate in the workspace and is counted against its contact quota; creating one twice creates two contacts unless the workspace deduplicates on email",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "intercom-contact-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "`user` for an identified person or `lead` for an unidentified visitor. A lead is merged into a user if that person later signs up",
@@ -281,12 +300,8 @@
           "symbol": "email"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -305,6 +320,9 @@
         "method": "POST",
         "url": "{base}/contacts"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "avatar": {
@@ -406,14 +424,24 @@
       "credential_requirement": "declared",
       "description": "Get one conversation by id, with its state, the contacts on it and its message parts in Intercom's default rendering",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "intercom-conversation-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation's Intercom id — a decimal string such as `123`, as it appears in the inbox URL",
@@ -427,16 +455,15 @@
           "symbol": "conversation_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/conversations/{conversation_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "admin_assignee_id": {
@@ -577,14 +604,24 @@
       "credential_requirement": "declared",
       "description": "Reply to a conversation as an admin. With message_type `comment` the reply is delivered to the end user by email or in-app message and cannot be un-sent; with `note` it is an internal comment only teammates see",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "intercom-conversation-reply",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation to reply to",
@@ -634,12 +671,8 @@
           "symbol": "body"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -662,6 +695,9 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/reply"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "admin_assignee_id": {
@@ -775,14 +811,24 @@
       "credential_requirement": "declared",
       "description": "Add an internal note to a contact, visible to teammates in the workspace and never to the contact. Adding the same note twice adds two notes",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errors/0/code",
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "intercom-contact-note-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact to note",
@@ -818,12 +864,8 @@
           "symbol": "admin_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errors/0/code",
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -842,6 +884,9 @@
         "method": "POST",
         "url": "{base}/contacts/{contact_id}/notes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "author": {
@@ -879,8 +924,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://{host}",

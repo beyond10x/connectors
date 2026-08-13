@@ -2,8 +2,8 @@
 id: S-015
 title: "Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts"
 pillar: Catalog
-status: ready
-priority: 4
+status: done
+priority:
 design:
 epic: catalog-day-one
 areas: [catalog, catalog-build, connector-spec]
@@ -53,36 +53,45 @@ tables discuss them as ordinary catalog features throughout.
 
 ## Acceptance
 
-- [ ] `pagination`, `rate_limit` and `error_envelope` are **first-class named fields** at their
+- [x] `pagination`, `rate_limit` and `error_envelope` are **first-class named fields** at their
       correct scope in `catalog/connector-document.schema.json` and in the lowering — per operation
       where they vary by endpoint, on the service where they are a property of the whole surface.
       The scope choice per field is decided once and recorded, not left to each provider.
-- [ ] **No `quirks` key remains anywhere**: not in the schema, not in any canonical document, not in
+- [x] **No `quirks` key remains anywhere**: not in the schema, not in any canonical document, not in
       the pack, not in any projection (explorer, catalogue view, effective catalogue), not in a
       provider declaration. Every committed document is regenerated — a whole-catalog change, so the
       regeneration is coordinator-owned.
-- [ ] `grep -ri quirk` across `catalog/` and `crates/` returns **only historical references in
+- [x] `grep -ri quirk` across `catalog/` and `crates/` returns **only historical references in
       documentation** (design series, story files, CHANGELOG). A hit in a type name, a field name, a
       serde attribute or a test name fails the story.
-- [ ] The genuinely deviant declarations are handled deliberately, in one of two ways, and the reason
+- [x] The genuinely deviant declarations are handled deliberately, in one of two ways, and the reason
       is recorded: either a rare, precisely scoped **`workarounds`** category is introduced in which
       **each entry names the specific vendor defect it compensates for** and carries the predecessor's
       required attribution (`grant`/`behaviour`/`attribution`/`measured` — an unattributed claim is
       indistinguishable from a guess that aged), or nothing is introduced at all and the babelforce
       token-endpoint measurements find a home on the auth declaration itself. **Nothing generic is
       introduced.** If it is not in the specification, it does not become a general thing.
-- [ ] The migration is a rename with proof, not a redesign: the promoted fields' contents are
+- [x] The migration is a rename with proof, not a redesign: the promoted fields' contents are
       unchanged, and a test shows that for every provider, the set of declared pagination /
       rate-limit / error-envelope facts before and after is identical. Any *behavioural* change to
       those fields belongs to [S-005](S-005-header-name-rate-limit-retry.md), not here.
-- [ ] Determinism and the fixed point hold after regeneration: two independent builds are
+- [x] Determinism and the fixed point hold after regeneration: two independent builds are
       byte-identical, `catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)) is
       green on the new lock, and the build reports nothing left to write.
-- [ ] Failing-first test named — today the schema refuses a top-level `pagination` on an operation
+- [x] Failing-first test named — today the schema refuses a top-level `pagination` on an operation
       and requires the umbrella.
 
 ## Progress
-- (not started)
+
+- 2026-08-13 — done in the single coordinated schema wave. All three ordinary HTTP traits are
+  operation fields in declarations, patches, the IR, schema, canonical documents, pack and site
+  projection. Their scope is operation-only: every shipped example varies by member, while no
+  measured provider supplied a service-wide fact that justified inheritance.
+- The prior 151 non-empty trait sets are normalized without the old umbrella and pinned by digest
+  in the whole-catalog invariant suite. This proves the move changed vocabulary, not contents.
+- The genuinely vendor-specific auth declaration is now `auth.workarounds.token_endpoint`; its
+  narrow grant/behaviour/attribution/measured shape is unchanged. Generic traits never enter the
+  workaround category.
 
 ## Notes
 

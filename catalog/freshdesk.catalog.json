@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "authority": "com.freshdesk.api",
   "config": [
     {
@@ -19,7 +19,7 @@
   ],
   "connector": "freshdesk",
   "description": "Freshdesk ticketing: list, read, create and update tickets and the contacts they belong to",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [],
@@ -40,6 +40,10 @@
       "credential_requirement": "no-credential",
       "description": "Verify credentials with a bounded contact read",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -48,6 +52,8 @@
       "expose": true,
       "id": "freshdesk-test",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Records to fetch; one is enough to prove the credential works",
@@ -62,6 +68,8 @@
           "symbol": "per_page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -74,6 +82,9 @@
         ],
         "url": "{base}/contacts"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The contacts, as a bare JSON array. With `per_page = 1` it holds one element; an empty array is still a successful credential check, because an account may genuinely have no contacts",
         "items": {
@@ -131,6 +142,10 @@
       "credential_requirement": "no-credential",
       "description": "List and filter tickets",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -139,6 +154,8 @@
       "expose": true,
       "id": "freshdesk-ticket-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Filter by requester",
@@ -186,6 +203,8 @@
           "wire": "updated_since"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -216,6 +235,9 @@
         ],
         "url": "{base}/tickets"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The matching tickets, as a bare JSON array with no envelope. The ticket bodies (`description`, `description_text`) are NOT included in a listing — read one ticket with `freshdesk-ticket-get` to get its text",
         "items": {
@@ -331,6 +353,10 @@
       "credential_requirement": "no-credential",
       "description": "View one ticket",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -339,6 +365,8 @@
       "expose": true,
       "id": "freshdesk-ticket-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ticket id",
@@ -351,10 +379,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/tickets/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "attachments": {
@@ -585,6 +618,10 @@
       "credential_requirement": "no-credential",
       "description": "Create a ticket. The requester must be identified either by requester_id, or by phone together with name — Freshdesk states this only in prose and its required flags do not capture it",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -593,6 +630,8 @@
       "expose": true,
       "id": "freshdesk-ticket-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Requester phone number. Supply with name, or supply requester_id instead",
@@ -792,6 +831,8 @@
           "symbol": "custom_fields"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -852,6 +893,9 @@
         "method": "POST",
         "url": "{base}/tickets"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "cc_emails": {
@@ -1048,6 +1092,10 @@
       "credential_requirement": "no-credential",
       "description": "Update a ticket's fields",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -1056,6 +1104,8 @@
       "expose": true,
       "id": "freshdesk-ticket-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Id of the ticket to update",
@@ -1240,6 +1290,8 @@
           "symbol": "custom_fields"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -1297,6 +1349,9 @@
         "method": "PUT",
         "url": "{base}/tickets/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "attachments": {
@@ -1446,6 +1501,10 @@
       "credential_requirement": "no-credential",
       "description": "Add a note to a ticket; the note is private unless explicitly made public",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -1454,6 +1513,8 @@
       "expose": true,
       "id": "freshdesk-ticket-note-add",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Id of the ticket",
@@ -1513,6 +1574,8 @@
           "symbol": "notify_emails"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -1537,6 +1600,9 @@
         "method": "POST",
         "url": "{base}/tickets/{id}/notes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "attachments": {
@@ -1642,6 +1708,10 @@
       "credential_requirement": "no-credential",
       "description": "List and filter contacts, e.g. to resolve a caller before filing a ticket",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -1650,6 +1720,8 @@
       "expose": true,
       "id": "freshdesk-contact-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Filter by phone",
@@ -1709,6 +1781,8 @@
           "symbol": "state"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1745,6 +1819,9 @@
         ],
         "url": "{base}/contacts"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The matching contacts, as a bare JSON array with no envelope. Empty when nothing matched — which is a successful call, and the signal that the caller is not a known contact",
         "items": {
@@ -1844,6 +1921,10 @@
       "credential_requirement": "no-credential",
       "description": "Get one contact",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -1852,6 +1933,8 @@
       "expose": true,
       "id": "freshdesk-contact-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact id",
@@ -1864,10 +1947,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/contacts/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "active": {
@@ -1997,6 +2085,10 @@
       "credential_requirement": "no-credential",
       "description": "Create a contact",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "domain": [
           "host"
@@ -2005,6 +2097,8 @@
       "expose": true,
       "id": "freshdesk-contact-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Contact name",
@@ -2038,6 +2132,8 @@
           "symbol": "phone"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -2059,6 +2155,9 @@
         "method": "POST",
         "url": "{base}/contacts"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "active": {
@@ -2145,8 +2244,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

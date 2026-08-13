@@ -21,8 +21,9 @@ Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 spec cache into `catalog/`, the pack, `connectors.lock` and the site projection, and the one-time
 byte-differential against the predecessor's pack passed byte-exact. S-022 then closed the orphaned
 input debt and made Anthropic's shipped API/Admin connector reproducible from explicitly
-repository-authored specs. What M1 still left open is tracked by the remaining `post-m1` stories:
-web and coverage gates plus the predecessor identity stamped into generated artifacts.
+repository-authored specs. The coordinated catalog wave then retired the predecessor artifact
+identity and `quirks` vocabulary, declared host effects, and added the five independent beyond-HTTP
+axes. What M1 still left open is tracked by the remaining `post-m1` stories: web and coverage gates.
 
 The platform families are unstarted; nothing should be scaffolded ahead of the build order in
 [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
@@ -36,12 +37,12 @@ will spawn children as each milestone is designed.
 | [S-001](S-001-the-document-carries-the-callers-contract.md) | The document carries the caller's contract, so nothing at runtime parses source | done | Catalog | catalog, catalog-build, connector-resolve |
 | [S-002](S-002-effects-are-read-never-derived.md) | Per-operation effects are read from the document, never derived | blocked | Catalog | catalog, catalog-build, domain |
 | [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` verifies every addressable hash and refuses unverifiable claims | done | Catalog | catalog-build, connector-spec |
-| [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
+| [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | done | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
 | [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | in-progress (6) | Catalog | ci, catalog-build, web |
 | [S-018](S-018-the-explorer-works-against-the-new-site-json.md) | The web explorer works against the site JSON M1 actually emits | ready (7) | Catalog | web, catalog-build |
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
-| [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | backlog | Catalog | catalog, catalog-build, connector-resolve, web |
+| [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | done | Catalog | catalog, catalog-build, connector-resolve, web |
 | [S-021](S-021-coverage-regains-its-second-direction.md) | Coverage regains its second direction: every gap between declared and published has a reason | backlog | Catalog | catalog-build, providers |
 | [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | done | Catalog | specs, migration, web |
 | [S-004](S-004-adopt-token-response-metadata.md) | An OAuth token response can carry declared metadata into the connection, not the credential store | backlog | Catalog | catalog, connector-spec, service |
@@ -55,7 +56,7 @@ will spawn children as each milestone is designed.
 | [S-012](S-012-declarative-webhook-routing-grammar.md) | Webhook verification and attribution are declared as data, not as a per-provider script | backlog | Catalog | catalog, connector-spec, service |
 | [S-013](S-013-connect-session-oauth-custody-in-personal-posture.md) | Decide the connect-session ↔ OAuth-callback custody chain in personal posture | backlog | Platform | domain, service, catalog |
 | [S-014](S-014-auth-as-tool-result.md) | Not-connected is a next step: the response carries a connect URL | backlog | Platform | protocol, service, server |
-| [S-023](S-023-beyond-http-facts-enter-the-document.md) | Beyond-HTTP facts enter the connector document orthogonally | backlog | Catalog | catalog, catalog-build, connector-spec, connector-resolve |
+| [S-023](S-023-beyond-http-facts-enter-the-document.md) | Beyond-HTTP facts enter the connector document orthogonally | done | Catalog | catalog, catalog-build, connector-spec, connector-resolve |
 | [S-024](S-024-one-zero-io-plan-seam-selects-a-closed-driver.md) | One zero-IO plan seam selects a closed built-in driver | backlog | Platform | domain, service, server, connector-resolve |
 | [S-025](S-025-satellite-federation-has-a-threat-modeled-contract.md) | Satellite federation has a threat-modeled contract | backlog | Platform | domain, protocol, service, server |
 | [S-026](S-026-one-real-non-http-driver-proves-the-model.md) | One real non-HTTP driver proves the five-axis model | backlog | Platform | catalog, domain, service, server |
@@ -69,9 +70,9 @@ will spawn children as each milestone is designed.
 
 | Epic | Stories | What it is |
 |---|---|---|
-| `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one changes to the migrating catalog plus the accepted beyond-HTTP fact shape. S-001, S-002, S-015 and S-023 all change the document schema, lowering, and committed documents — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
+| `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one catalog changes plus the accepted beyond-HTTP fact shape. S-001, S-003, S-015 and S-023 are done; S-002's declaration half landed in the coordinated wave and only its M2 grant-admission half remains blocked. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
-| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open. S-022 closed the orphaned inputs; Rust/governance/catalog CI exists while its web and remaining failing-first arms remain open (S-020), the explorer still needs its new site JSON (S-018), the predecessor identity awaits the coordinated schema wave (S-019), and reverse coverage remains S-021. |
+| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open. S-019 and S-022 are done; Rust/governance/catalog CI exists while its web and remaining failing-first arms remain open (S-020), the explorer still needs its new site JSON (S-018), and reverse coverage remains S-021. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
@@ -83,8 +84,8 @@ will spawn children as each milestone is designed.
 
 - **M1 never had a milestone story**, and now does not need one: the copy-and-extract half shipped
   (catalog dirs, family crates, `catalog-build` minus the emitters, the byte-differential), and what
-  it left open is filed as the `post-m1` epic. Its day-one *changes* — S-001, S-002, S-003, S-015 —
-  and S-023 — are still open work.
+  it left open is filed as the `post-m1` epic. Its day-one changes are now done except S-002's
+  intentionally deferred M2 grant-admission half.
 - **The predecessor's later migration waves 2–6** (slack/jira/confluence/opsgenie; the observability set behind
   declared destinations; aws/huggingface's new credential schemes; kubernetes/docker/sql/websearch;
   the final plugin-host deletion) are unfiled here; S-010 covers wave 1 only.

@@ -1,7 +1,7 @@
 //! `connectors.lock` — the record that makes drift *detectable* rather than absorbed.
 //!
 //! One entry per provider, each holding the hashes and versions of everything that produced that
-//! provider's artifacts. `flux-connectors check` (C-14) recomputes every one of them and exits
+//! provider's artifacts. `connectors check` (C-14) recomputes every one of them and exits
 //! non-zero on a mismatch, which is the whole answer to action-proxy's third failure: hand-written
 //! config silently drifting away from the API it describes.
 //!
@@ -190,7 +190,7 @@ impl Lockfile {
         let mut lockfile: Self = toml::from_str(source).map_err(Box::new)?;
         if lockfile.version != LOCKFILE_VERSION {
             return Err(crate::Error::Invalid(format!(
-                "{LOCKFILE_NAME} declares format version {}, but this build of flux-connectors \
+                "{LOCKFILE_NAME} declares format version {}, but this build of connectors \
                  writes version {LOCKFILE_VERSION}",
                 lockfile.version
             )));
@@ -242,7 +242,7 @@ pub struct LockPack {
 pub struct LockEntry {
     /// The provider id — [`Connector::id`], which is also the artifact file stem.
     pub id: String,
-    /// The generator that produced the artifacts, e.g. `flux-connectors 0.1.0`.
+    /// The generator that produced the artifacts, e.g. `connectors 0.1.0`.
     ///
     /// Recorded per provider rather than once per file: a regeneration that touches one provider
     /// must be able to say so, and a stale row is then visible next to a fresh one instead of being

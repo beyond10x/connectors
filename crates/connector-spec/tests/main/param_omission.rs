@@ -94,6 +94,12 @@ direction = \"read\"
 rename = \"babelforce-call-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ";
 
 /// The curated 14, in the document's own order — the set `providers/babelforce.toml` hand-authored.
@@ -154,6 +160,12 @@ direction = \"read\"
 rename = \"babelforce-call-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.query = [
   \"parentId\", \"from\", \"to\", \"domain\", \"source\", \"anonymous\",
   \"filters.sessionId\", \"filters.conversationId\", \"filters.id\", \"filters.parentId\",
@@ -185,6 +197,12 @@ direction = \"read\"
 rename = \"babelforce-call-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.query = [\"filters.q\"]
 ",
     ));
@@ -217,6 +235,12 @@ direction = \"read\"
 rename = \"babelforce-agent-export\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.query = [\"format\"]
 ",
     ));
@@ -237,6 +261,12 @@ direction = \"write\"
 rename = \"babelforce-action-execute\"
 risk = \"high\"
 idempotency = \"non_idempotent\"
+effects = [\"write\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.path = [\"actionType\"]
 ",
     ));
@@ -258,6 +288,12 @@ direction = \"read\"
 rename = \"babelforce-call-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.query = [\"filters.callerNumber\"]
 ",
     ));
@@ -278,6 +314,12 @@ direction = \"read\"
 rename = \"babelforce-call-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.header = [\"page\"]
 ",
     ));
@@ -303,6 +345,12 @@ direction = \"read\"
 rename = \"babelforce-agent-export\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 omit.query = [\"format\"]
 
 [[patch.operations.params]]

@@ -49,6 +49,12 @@ path = "/v1/models"
 description = "List models."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations]]
 id = "acme-chat-completion"
@@ -59,6 +65,12 @@ path = "/v1/chat"
 description = "Create a chat completion."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[events]]
 name = "model.changed"

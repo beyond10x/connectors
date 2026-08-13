@@ -290,7 +290,7 @@ scopes = ["*"]
 # be an endpoint no declared grant reaches.
 #
 # `client_credentials` appears in that same `grant_type` enum and in **no** flow, so it is not a grant
-# this connector allows either. Its measured behaviour is still recorded below, because a quirk records
+# this connector allows either. Its measured behaviour is still recorded below, because a workaround records
 # what the endpoint *does*, not what the connector permits.
 #
 # What is left is the pair a host can actually run from what an operator already has — a babelforce
@@ -299,7 +299,7 @@ scopes = ["*"]
 grants = ["password", "refresh_token"]
 
 # ---------------------------------------------------------------------------------------------
-# Token-endpoint quirks — C-440, measured 2026-08-02
+# Token-endpoint workarounds — C-440, measured 2026-08-02
 # ---------------------------------------------------------------------------------------------
 #
 # **Declarations, not behaviour.** Nothing reads these yet; they exist so that what was measured is
@@ -323,33 +323,33 @@ grants = ["password", "refresh_token"]
 # `X-Auth-Access-Id` question above it has an answer attached. Beyond the request-side `expires_in` and
 # `account_id` below, the token response carries `expire_time` (absolute UTC milliseconds) beside the
 # standard `expires_in`, `GET /oauth/tokeninfo` exists, and `link` is a fifth `grant_type`. None of the
-# five vendored documents declares any of them. A quirk that becomes spec should stop being a quirk.
+# five vendored documents declares any of them. A workaround that becomes spec should stop being a workaround.
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "client_credentials"
 behaviour = "`expires_in` is read from the request and defaults to `-1`, which the service reads as *never expires*. An unattended caller that omits it therefore gets a non-expiring token rather than a short-lived one."
 attribution = "babelforce's own `AuthController.token()`, read against `specs/babelforce/auth-2026-06-25.openapi.yaml`, which declares no request-side `expires_in`. Recorded from the owner's measurement in flux-exchange's credential-acquisition epic (C-440)."
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "password"
 behaviour = "`expires_in` is read from the request when present, and the service default applies when it is absent."
 attribution = "babelforce's own `AuthController.token()`, read against `specs/babelforce/auth-2026-06-25.openapi.yaml`, which declares no request-side `expires_in`. Recorded from the owner's measurement in flux-exchange's credential-acquisition epic (C-440)."
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "refresh_token"
 behaviour = "`expires_in` is read from the request and passed into the refresh. Separately, `account_id` on the request **switches the account** the new token belongs to — nothing in RFC 6749 makes a refresh change whose token it is, so a host that rotates a credential without pinning `account_id` can silently move it to another account."
 attribution = "babelforce's own `AuthController.token()`, read against `specs/babelforce/auth-2026-06-25.openapi.yaml`, which declares neither a request-side `expires_in` nor `account_id`. Recorded from the owner's measurement in flux-exchange's credential-acquisition epic (C-440)."
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "link"
 behaviour = "A fifth `grant_type` that no vendored document declares at all. `expires_in` is read from the request and then clamped to **at most 60 seconds**, so a lifetime asked for here is a ceiling rather than a request."
 attribution = "babelforce's own `AuthController.token()`, read against `specs/babelforce/auth-2026-06-25.openapi.yaml:211-220`, whose `grant_type` enum names four grants and not this one. Recorded from the owner's measurement in flux-exchange's credential-acquisition epic (C-440)."
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "authorization_code"
 behaviour = "`expires_in` is **not read**. Only `access_type` is, defaulting to `offline`. This row is a measurement and not a gap: the one grant that ignores the field is the fact a reader most needs, because it is the one where asking for a lifetime silently does nothing."
 attribution = "babelforce's own `AuthController.token()`, read against `specs/babelforce/auth-2026-06-25.openapi.yaml`, which declares no request-side `expires_in`. Recorded from the owner's measurement in flux-exchange's credential-acquisition epic (C-440)."
@@ -876,12 +876,24 @@ updateSessionVariables = "babelforce-session-update"
 # ---------------------------------------------------------------------------------------------
 
 [[patch.select]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 path_prefix = "/api/v2"
 methods = ["GET"]
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 path_prefix = "/api/v2"
 methods = ["POST", "PUT", "PATCH"]
@@ -890,6 +902,12 @@ idempotency = "non_idempotent"
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 path_prefix = "/api/v2"
 methods = ["DELETE"]
@@ -977,18 +995,36 @@ expose = false
 # prefixes back to `/api/v2/user` and delete the matching `ALLOWED` entry in the same commit.
 # ---------------------------------------------------------------------------------------------
 [[patch.select]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "user"
 path_prefix = "/api/v2/user/accounts"
 methods = ["GET"]
 expose = false
 
 [[patch.select]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "user"
 path_prefix = "/api/v2/user/me"
 methods = ["GET"]
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "user"
 path_prefix = "/api/v2/user"
 methods = ["POST"]
@@ -1002,12 +1038,24 @@ expose = false
 # stating that prefix says what is wanted rather than listing what is not — and a future `/api/v1`
 # receiver is excluded by the same line, without anyone remembering to exclude it.
 [[patch.select]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-automation"
 path_prefix = "/api/v3"
 methods = ["GET"]
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-automation"
 path_prefix = "/api/v3"
 methods = ["POST", "PUT", "PATCH"]
@@ -1016,6 +1064,12 @@ idempotency = "non_idempotent"
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-automation"
 path_prefix = "/api/v3"
 methods = ["DELETE"]
@@ -1024,12 +1078,24 @@ idempotency = "non_idempotent"
 expose = false
 
 [[patch.select]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-schedule"
 path_prefix = "/api/v3"
 methods = ["GET"]
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-schedule"
 path_prefix = "/api/v3"
 methods = ["POST"]
@@ -1038,6 +1104,12 @@ idempotency = "non_idempotent"
 expose = false
 
 [[patch.select]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "task-schedule"
 path_prefix = "/api/v3"
 methods = ["DELETE"]
@@ -1089,6 +1161,12 @@ expose = false
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listAgents"
 risk = "low"
@@ -1115,10 +1193,10 @@ position = "query"
 schema = { type = "string" }
 
 # Not in any spec, so stated here. The manager document paginates uniformly on `page`/`max`;
-# attaching that per operation is a repetition C-415's per-service quirks are meant to end, and
-# widening to 391 operations makes the case for a service-level `quirks` block considerably louder —
+# attaching that per operation is a repetition C-415's per-service workarounds are meant to end, and
+# widening to 391 operations makes the case for a service-level `workarounds` block considerably louder —
 # it is stated on two operations here and would be true of well over a hundred.
-[patch.operations.quirks.pagination]
+[patch.operations.pagination]
 page = { page_param = "page", size_param = "max", page_size = 100, max_pages = 20 }
 
 # ---------------------------------------------------------------------------------------------
@@ -1127,6 +1205,12 @@ page = { page_param = "page", size_param = "max", page_size = 100, max_pages = 2
 # document supplies all 11 with better descriptions than the transcription had, plus a twelfth
 # (`tags`) the transcription predates.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "getAgent"
 risk = "low"
@@ -1136,6 +1220,12 @@ expose = true
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "updateAgentStatus"
 # `medium`/`idempotent`, against the manager write selector's `high`/`non_idempotent`. Setting an
@@ -1145,7 +1235,7 @@ idempotency = "non_idempotent"
 expose = true
 # SCHEMA GAP, still open: `UpdateAgentStatusRequest` declares every property optional
 # (`manager-2026-07-10.openapi.yaml:25810-25820`), so an empty PUT is schema-valid and does nothing.
-# That is the same class of problem as Zendesk's empty update, and `Quirks` still has no precondition
+# That is the same class of problem as Zendesk's empty update, and `Workarounds` still has no precondition
 # field to record it in — so the constraint lives in this sentence.
 #
 # **The body shape changed with the front-end, and the document's is the correct one.** The
@@ -1161,6 +1251,12 @@ description = "Update an agent's status. Supply at least one of `enabled` or `pr
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listReportingCalls"
 risk = "low"
@@ -1232,7 +1328,7 @@ omit.query = [
   "filters.anonymous",
 ]
 
-[patch.operations.quirks.pagination]
+[patch.operations.pagination]
 page = { page_param = "page", size_param = "max", page_size = 100, max_pages = 20 }
 
 [[patch.operations.params]]
@@ -1268,6 +1364,12 @@ schema = { type = "string", enum = ["unknown", "hangup", "passive-hangup", "syst
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "getCall"
 risk = "low"
@@ -1277,6 +1379,12 @@ expose = true
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "hangupCall"
 # The only destructive operation in the exposed set, and the only one that affects a live caller.
@@ -1290,6 +1398,12 @@ expose = true
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "setCallSessionVariables"
 risk = "medium"
@@ -1336,12 +1450,18 @@ expose = true
 # `body_schema` — the flat map, which is what shipped before this conversion — is the conservative
 # choice and costs three lines. Nothing else in this file depends on it.
 #
-# The `app.` key prefix rule is unenforceable from either schema and remains a C-12 quirk candidate.
+# The `app.` key prefix rule is unenforceable from either schema and remains a C-12 workaround candidate.
 description = "Set session variables on a live call. Pass them as the `variables` map; babelforce applies only keys beginning `app.` and silently ignores the rest, and states that rule only in prose"
 
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "getSessionVariables"
 risk = "low"
@@ -1351,6 +1471,12 @@ expose = true
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "updateSessionVariables"
 risk = "medium"
@@ -1372,6 +1498,12 @@ description = "Update the user-scoped variables of a session. The body is the va
 # expose the operations; they narrow only the ambiguous query parameters the vendor documents as
 # string-or-array.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listAllSimpleReportingCalls"
 
@@ -1406,6 +1538,12 @@ position = "query"
 schema = { type = "string", format = "uuid" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listDashboards"
 
@@ -1415,6 +1553,12 @@ position = "query"
 schema = { type = "string", format = "uuid" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listLiveLogs"
 
@@ -1424,6 +1568,12 @@ position = "query"
 schema = { type = "string" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "listUsers"
 
@@ -1444,6 +1594,12 @@ schema = { type = "string" }
 # The `user` one moves rather than the manager one because it is the more specific of the two: it
 # reads the signed-in user, not an arbitrary user by id, and `-me-` says so.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "user"
 select = "getUser"
 rename = "babelforce-user-me-get"
@@ -1451,6 +1607,12 @@ rename = "babelforce-user-me-get"
 # `GET` describes the transport spelling, not the vendor-state effect. This endpoint flushes queued
 # dialer tasks and is therefore an explicit write despite matching the broad manager GET selector.
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "manager"
 select = "flushDialer"
 risk = "high"

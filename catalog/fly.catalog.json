@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Fly access token, preferably scoped to the app or organization this connection manages",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Fly.io Machines: discover regions and inspect, create, start, stop, restart or delete Machines",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -40,19 +40,28 @@
       "credential_requirement": "declared",
       "description": "List Fly's available regions and identify the nearest one; also verifies the configured access token",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-regions-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/platform/regions"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "nearest": {
@@ -94,9 +103,19 @@
       "credential_requirement": "declared",
       "description": "List every Machine in one Fly app, without optional state filters or lease details",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machines-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app name whose Machines to list",
@@ -110,16 +129,15 @@
           "symbol": "app_name"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "properties": {
@@ -174,9 +192,19 @@
       "credential_requirement": "declared",
       "description": "Get one Fly Machine's current configuration, state, region, addresses and recent events",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -201,16 +229,15 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines/{machine_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "config": {
@@ -271,9 +298,19 @@
       "credential_requirement": "declared",
       "description": "List the recorded lifecycle events for one Fly Machine; this is history, not a durable event subscription",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-events-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -298,16 +335,15 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/events"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "properties": {
@@ -362,9 +398,19 @@
       "credential_requirement": "declared",
       "description": "Create and launch a Fly Machine from one image using Fly's generated name and region placement; this begins billable compute",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app in which to create the Machine",
@@ -390,12 +436,8 @@
           "wire": "config.image"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -413,6 +455,9 @@
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "config": {
@@ -467,9 +512,19 @@
       "credential_requirement": "declared",
       "description": "Start a stopped Fly Machine, restoring service and beginning billable compute",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-start",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -494,16 +549,15 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/start"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "machines"
@@ -535,9 +589,19 @@
       "credential_requirement": "declared",
       "description": "Stop a running Fly Machine using the API's default signal and timeout, interrupting its service",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-stop",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -562,16 +626,15 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/stop"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "machines"
@@ -603,9 +666,19 @@
       "credential_requirement": "declared",
       "description": "Restart a Fly Machine using the API's default signal and timeout, causing a service interruption",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-restart",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -630,16 +703,15 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/restart"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "machines"
@@ -671,9 +743,19 @@
       "credential_requirement": "declared",
       "description": "Permanently delete a stopped Fly Machine. Forced deletion is intentionally unavailable, so a running Machine is refused instead of killed implicitly",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "fly-machine-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Fly app containing the Machine",
@@ -698,23 +780,21 @@
           "symbol": "machine_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/status",
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/apps/{app_name}/machines/{machine_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "machines"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

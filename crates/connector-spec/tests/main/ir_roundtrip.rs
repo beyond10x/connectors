@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 
 use connector_spec::{
     AuthMethod, AuthRequirement, AuthScheme, BodyEncoding, Connector, HttpMethod, Idempotency,
-    OAuth2Spec, OAuthGrant, Operation, OperationDirection, Param, ParamSet, Provenance, Quirks,
-    Risk, DEFAULT_SERVICE,
+    OAuth2Spec, OAuthGrant, Operation, OperationDirection, Param, ParamSet, Provenance, Risk,
+    DEFAULT_SERVICE,
 };
 use serde_json::json;
 
@@ -70,6 +70,15 @@ fn op(id: &str, auth: Option<Vec<AuthRequirement>>) -> Operation {
         description: "List calls".into(),
         risk: Risk::Low,
         idempotency: Idempotency::Idempotent,
+        effects: vec![
+            connector_spec::HostEffect::Read,
+            connector_spec::HostEffect::Network,
+        ],
+        interaction_shape: connector_spec::InteractionShape::Unary,
+        protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+        placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+        implementation_form: connector_spec::ImplementationForm::BuiltIn,
+        required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
         semantic_effects: Vec::new(),
         repeatable_because: None,
         expose: true,
@@ -78,7 +87,11 @@ fn op(id: &str, auth: Option<Vec<AuthRequirement>>) -> Operation {
         response_schema: None,
         credential_response: Vec::new(),
         produces_credential: None,
-        quirks: Quirks::default(),
+        pagination: None,
+
+        rate_limit: None,
+
+        error_envelope: None,
     }
 }
 
@@ -86,7 +99,6 @@ fn babelforce() -> Connector {
     Connector {
         id: "babelforce".into(),
         authority: None,
-        runtime: connector_spec::Runtime::Http,
         api_version: None,
         services: Vec::new(),
         vendor: "Babelforce".into(),
@@ -201,7 +213,7 @@ fn unset_and_explicit_empty_auth_differ_on_the_wire() {
 }
 
 /// The auth scheme vocabulary is `flux_plugin_protocol::AuthScheme`'s, verbatim. This crate cannot
-/// depend on that crate (flux-connectors depends on `flux-lang` from crates.io and nothing else of
+/// depend on that crate (connectors depends on `flux-lang` from crates.io and nothing else of
 /// flux's), so the wire form is pinned here instead: if either side drifts, this fails.
 #[test]
 fn auth_scheme_matches_the_flux_plugin_protocol_vocabulary() {
@@ -404,7 +416,7 @@ fn body_encoding_is_closed_and_its_default_is_invisible() {
     assert_eq!(decoded.params.body_encoding, BodyEncoding::Form);
 }
 
-/// **Landing `expose` must not move a single existing `ir_sha256`** (C-413).
+/// **Default exposure remains elided from the schema-2 operation encoding** (C-413).
 ///
 /// `Operation::expose` defaults to `true` and carries `skip_serializing_if`, and its doc comment
 /// claims that keeps every operation that says nothing hashing exactly as it did before the field
@@ -418,7 +430,7 @@ fn body_encoding_is_closed_and_its_default_is_invisible() {
 /// substring. A field that elided its key while perturbing anything else in the encoding would still
 /// have moved every hash, and a `contains` check would have shrugged.
 #[test]
-fn an_exposed_operation_serializes_exactly_as_it_did_before_the_field_existed() {
+fn an_exposed_operation_omits_only_the_default_exposure_field() {
     let operation = op("acme.thing.list", None);
     assert!(
         operation.expose,
@@ -434,12 +446,18 @@ fn an_exposed_operation_serializes_exactly_as_it_did_before_the_field_existed() 
         "description": "List calls",
         "risk": "low",
         "idempotency": "idempotent",
+        "effects": ["read", "network"],
+        "interaction_shape": "unary",
+        "protocol_driver": "http_v1",
+        "placement_requirement": "connectors_deployment",
+        "implementation_form": "built_in",
+        "required_capabilities": ["public_network"],
     });
     assert_eq!(
         serde_json::to_value(&operation).unwrap(),
         expected,
-        "an operation silent on `expose` must encode exactly as it did before the field existed, \
-         or landing C-413 moved every `ir_sha256` in the repository"
+        "the coordinated schema wave adds its reviewed execution facts, while a default `expose` \
+         remains absent from the hash domain"
     );
 
     // The converse, so the assertion above cannot be satisfied by dropping the field entirely.
@@ -506,6 +524,12 @@ path = "/api/generate"
 description = "Generate a completion"
 risk = "low"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 auth = []
 
 [[operations.params.body]]
@@ -586,9 +610,9 @@ fn credentials_resolve_to_declared_auth_methods() {
     assert!(connector.auth_method("nope").is_none());
 }
 
-/// Quirks and provenance are part of the IR contract and round-trip like everything else.
+/// Ordinary HTTP traits and provenance round-trip like everything else.
 #[test]
-fn quirks_and_provenance_round_trip() {
+fn operation_traits_and_provenance_round_trip() {
     use connector_spec::{ErrorEnvelope, Pagination, RateLimit};
 
     let mut connector = babelforce();
@@ -614,26 +638,26 @@ fn quirks_and_provenance_round_trip() {
         .into(),
         toml_sha256: Some("b".repeat(64)),
     };
-    connector.operations[1].quirks = Quirks {
-        pagination: Some(Pagination::Cursor {
-            cursor_param: "cursor".into(),
-            next_cursor_pointer: "/meta/next_cursor".into(),
-            max_pages: 20,
-        }),
-        rate_limit: Some(RateLimit {
-            requests: 100,
-            per_seconds: 60,
-            bucket: Some("babelforce.calls".into()),
-        }),
-        error_envelope: Some(ErrorEnvelope {
-            message_pointer: "/error/message".into(),
-            code_pointer: Some("/error/code".into()),
-        }),
-    };
+    connector.operations[1].pagination = Some(Pagination::Cursor {
+        cursor_param: "cursor".into(),
+        next_cursor_pointer: "/meta/next_cursor".into(),
+        max_pages: 20,
+    });
+    connector.operations[1].rate_limit = Some(RateLimit {
+        requests: 100,
+        per_seconds: 60,
+        bucket: Some("babelforce.calls".into()),
+    });
+    connector.operations[1].error_envelope = Some(ErrorEnvelope {
+        message_pointer: "/error/message".into(),
+        code_pointer: Some("/error/code".into()),
+    });
 
     let encoded = serde_json::to_string(&connector).expect("serialize");
     let decoded: Connector = serde_json::from_str(&encoded).expect("deserialize");
     assert_eq!(connector, decoded);
-    assert!(!decoded.operations[1].quirks.is_empty());
-    assert!(decoded.operations[0].quirks.is_empty());
+    assert!(decoded.operations[1].pagination.is_some());
+    assert!(decoded.operations[1].rate_limit.is_some());
+    assert!(decoded.operations[1].error_envelope.is_some());
+    assert!(decoded.operations[0].pagination.is_none());
 }

@@ -211,6 +211,12 @@ name = "default"
 tags = ["project-management"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-board-list"
 method = "GET"
 direction = "read"
@@ -231,6 +237,12 @@ items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-board-get"
 method = "GET"
 direction = "read"
@@ -259,6 +271,12 @@ properties = { id = { type = "string", description = "The board's id" }, name = 
 # needs — a list's `id`, to pass to trello-list-cards — is named in the description instead, where it
 # is a claim about a call rather than a schema nobody can rely on.
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-board-lists"
 method = "GET"
 direction = "read"
@@ -282,6 +300,12 @@ schema = { type = "string", minLength = 1 }
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-list-cards"
 method = "GET"
 direction = "read"
@@ -323,6 +347,12 @@ items = { type = "object", required = [
 # with a JSON request body instead" — and the header comment says why this connector takes the
 # body form every time.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-card-create"
 method = "POST"
 direction = "write"
@@ -367,6 +397,12 @@ properties = { id = { type = "string", description = "The created card's id — 
 # and the description says so — an operation whose one argument is a boolean must state what the
 # other value does, or a model will discover it by trying.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "trello-card-archive"
 method = "PUT"
 direction = "write"

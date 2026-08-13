@@ -107,6 +107,12 @@ sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 # are published request bytes rather than because a string would be unsafe — C-30 closed that. An
 # upstream rename still fails closed.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "issues/list-for-repo"
 direction = "read"
 rename = "github-issue-list"
@@ -128,6 +134,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "pulls/list-files"
 direction = "read"
 rename = "github-pull-files-list"
@@ -136,6 +148,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "actions/list-workflow-runs-for-repo"
 direction = "read"
 rename = "github-workflow-run-list"
@@ -154,6 +172,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "repos/list-commits"
 direction = "read"
 rename = "github-commit-list"
@@ -182,6 +206,12 @@ omit.query = ["sha", "path", "author", "committer", "since", "until"]
 # ---------------------------------------------------------------------------------------------
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "users/get-authenticated"
 direction = "read"
 rename = "github-user-get"
@@ -190,6 +220,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "orgs/list-for-authenticated-user"
 direction = "read"
 rename = "github-org-list"
@@ -198,6 +234,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "repos/list-for-org"
 direction = "read"
 rename = "github-org-repo-list"
@@ -206,6 +248,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "repos/list-for-authenticated-user"
 direction = "read"
 rename = "github-user-repo-list"
@@ -431,6 +479,12 @@ description = "GitHub's OAuth2 authorize and token endpoints, served by github.c
 base_url = "https://github.com"
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "github-repo-get"
 method = "GET"
@@ -491,6 +545,12 @@ properties = { id = { type = "integer", description = "The repository's global i
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "github-issue-get"
 method = "GET"
@@ -543,6 +603,12 @@ properties = { id = { type = "integer", description = "The issue's global id. Fo
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "github-pull-get"
 method = "GET"
@@ -607,6 +673,12 @@ properties = { id = { type = "integer", description = "The pull request's own id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "github-issue-create"
 method = "POST"
@@ -675,6 +747,12 @@ properties = { id = { type = "integer", description = "The new issue's global id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "github-issue-comment-add"
 method = "POST"

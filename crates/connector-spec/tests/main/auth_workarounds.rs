@@ -1,8 +1,8 @@
-//! **Quirks on the authentication surface** — C-440's third declaration.
+//! **Workarounds on the authentication surface** — C-440's third declaration.
 //!
-//! This repository already carries the word and its discipline: `quirks.pagination` and
-//! `quirks.rate_limit` are *declarations, not behaviour*, reaching the IR and the loader and no
-//! artifact. What C-440 adds is not a new kind of statement but a new **scope** — today `Quirks`
+//! This repository already carries the word and its discipline: `workarounds.pagination` and
+//! `workarounds.rate_limit` are *declarations, not behaviour*, reaching the IR and the loader and no
+//! artifact. What C-440 adds is not a new kind of statement but a new **scope** — today `Workarounds`
 //! hangs off an operation, and a token endpoint is not one. An authentication endpoint is never a
 //! connector operation (`AGENTS.md` § Authentication contract), so a measured departure of a token
 //! endpoint from its own document has nowhere to go until `[[auth]]` can hold it.
@@ -19,13 +19,13 @@
 //!
 //! One field, five behaviours, one vendor. A general `requested_ttl` would be a hard cap here,
 //! ignored there, and the difference between an hour and forever somewhere else, while inviting the
-//! other fifty-four providers to be assumed to honour something none of them declares. So a quirk
+//! other fifty-four providers to be assumed to honour something none of them declares. So a workaround
 //! records **what was measured, on which grant, by whom, and when** — and a host that wants to act
 //! on one has to have read it.
 //!
 //! # Attribution is not decoration
 //!
-//! Every quirk here is asserted against a vendor's *implementation* and contradicted by that
+//! Every workaround here is asserted against a vendor's *implementation* and contradicted by that
 //! vendor's own *document*. A reader a year from now needs to know which of the two this repository
 //! checked and when, or the declaration is indistinguishable from a guess that aged. That is why
 //! `attribution` and `measured` are required rather than optional, and why the loader refuses a
@@ -51,7 +51,7 @@ description = "A provider that exists to be checked."
 
 /// The OAuth2 credential every case below builds on, with `extra` spliced in after its grant block.
 ///
-/// The grant block is not scenery: a token-endpoint quirk describes an endpoint, and a credential
+/// The grant block is not scenery: a token-endpoint workaround describes an endpoint, and a credential
 /// with no `[auth.oauth2]` declares no token endpoint for it to be about. The `hazard` is not
 /// scenery either — the loader refuses a `password` grant that does not declare one, which is
 /// `auth_hazard.rs`'s subject rather than this file's.
@@ -83,17 +83,23 @@ path = "/v1/things"
 description = "List the things."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
 /// Two measured departures of one token endpoint from its own document.
-const QUIRKS: &str = r#"
-[[auth.quirks.token_endpoint]]
+const WORKAROUNDS: &str = r#"
+[[auth.workarounds.token_endpoint]]
 grant = "client_credentials"
 behaviour = "`expires_in` is read from the request and defaults to -1, which means never expires."
 attribution = "the vendor's own token controller, read beside the document that omits it"
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "refresh_token"
 behaviour = "`account_id` on the request switches the account the new token belongs to."
 attribution = "the vendor's own token controller, read beside the document that omits it"
@@ -122,17 +128,17 @@ fn published_auth(connector: &Connector) -> String {
     serde_json::to_string_pretty(&connector.auth).expect("the connector's auth surface serializes")
 }
 
-/// **A quirk declared on one connector's auth surface does not reach another's.**
+/// **A workaround declared on one connector's auth surface does not reach another's.**
 ///
-/// The failure this refuses is not hypothetical in shape: a quirk is vendor-specific by
+/// The failure this refuses is not hypothetical in shape: a workaround is vendor-specific by
 /// construction — a 60-second clamp, an account switch on refresh — and a host that read one
 /// connector's measured departure while talking to a different vendor would be acting on a fact
 /// about somebody else's server. `providers/gitlab.toml` is the real neighbour here: it is the other
 /// shipped connector declaring `[auth.oauth2]`, so it is the one a leak would land on first.
 #[test]
-fn a_quirk_declared_on_one_connectors_auth_surface_does_not_reach_another() {
-    let declaring = load(&provider(&format!("{}{READ}", credential(QUIRKS))))
-        .expect("a connector declaring auth quirks must load");
+fn a_workaround_declared_on_one_connectors_auth_surface_does_not_reach_another() {
+    let declaring = load(&provider(&format!("{}{READ}", credential(WORKAROUNDS))))
+        .expect("a connector declaring auth workarounds must load");
     let silent = load(&provider(&format!("{}{READ}", credential(""))))
         .expect("a connector declaring none must load");
     let shipped = shipped_provider::load("gitlab").connector;
@@ -147,7 +153,7 @@ fn a_quirk_declared_on_one_connectors_auth_surface_does_not_reach_another() {
         let published = published_auth(connector);
         assert!(
             !published.contains("token_endpoint"),
-            "{id} declares no auth quirks and must carry none: {published}"
+            "{id} declares no auth workarounds and must carry none: {published}"
         );
         assert!(
             !published.contains("account_id"),
@@ -156,13 +162,13 @@ fn a_quirk_declared_on_one_connectors_auth_surface_does_not_reach_another() {
     }
 }
 
-/// A quirk on one credential does not reach a **sibling credential in the same connector**.
+/// A workaround on one credential does not reach a **sibling credential in the same connector**.
 ///
 /// The nearer miss, and the one a per-connector store would get wrong. GitLab already ships two
 /// credentials on one connector — a personal access token and an OAuth token — and only one of them
 /// has a token endpoint at all.
 #[test]
-fn a_quirk_does_not_reach_a_sibling_credential_in_the_same_connector() {
+fn a_workaround_does_not_reach_a_sibling_credential_in_the_same_connector() {
     let source = provider(&format!(
         r#"
 {}
@@ -174,32 +180,32 @@ env = ["ACME_API_KEY"]
 [[default_auth]]
 credentials = ["acme.access_token"]
 "#,
-        credential(QUIRKS)
+        credential(WORKAROUNDS)
     ));
 
-    let connector = load(&source).expect("two credentials, one declaring quirks, must load");
+    let connector = load(&source).expect("two credentials, one declaring workarounds, must load");
     let published =
         serde_json::to_string_pretty(&connector.auth[1]).expect("the sibling serializes");
 
     assert!(
         !published.contains("token_endpoint"),
-        "the sibling credential declares no token endpoint and must carry no quirk about one: \
+        "the sibling credential declares no token endpoint and must carry no workaround about one: \
          {published}"
     );
 }
 
-/// **A quirk with no attribution is refused**, naming the credential and the grant.
+/// **A workaround with no attribution is refused**, naming the credential and the grant.
 ///
-/// An unattributed quirk is the cost this story was written to avoid paying twice:
+/// An unattributed workaround is the cost this story was written to avoid paying twice:
 /// `providers/babelforce.toml` already carries one open question to the vendor's API owners that
 /// nobody can now answer, because whoever raised it did not record what they had read.
 #[test]
-fn a_quirk_without_attribution_is_refused() {
+fn a_workaround_without_attribution_is_refused() {
     let source = provider(&format!(
         "{}{READ}",
         credential(
             r#"
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "client_credentials"
 behaviour = "`expires_in` is read from the request and defaults to -1."
 attribution = ""
@@ -225,12 +231,12 @@ measured = "2026-08-02"
 /// lets a reader decide whether the measurement predates the vendor release they are debugging. The
 /// field is a date or it is not a measurement.
 #[test]
-fn a_quirk_measured_on_a_non_date_is_refused() {
+fn a_workaround_measured_on_a_non_date_is_refused() {
     let source = provider(&format!(
         "{}{READ}",
         credential(
             r#"
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "client_credentials"
 behaviour = "`expires_in` is read from the request and defaults to -1."
 attribution = "the vendor's own token controller"
@@ -246,13 +252,13 @@ measured = "recently"
     );
 }
 
-/// **A token-endpoint quirk on a credential with no grant is refused.**
+/// **A token-endpoint workaround on a credential with no grant is refused.**
 ///
 /// The same rule `oauth.redirect_uri` already carries: a declaration about an endpoint the
-/// connector never declared is one nothing will ever read, and a quirk nobody reads is worse than
+/// connector never declared is one nothing will ever read, and a workaround nobody reads is worse than
 /// none because it reads as a fact somebody checked.
 #[test]
-fn a_token_endpoint_quirk_without_a_grant_is_refused() {
+fn a_token_endpoint_workaround_without_a_grant_is_refused() {
     let source = provider(&format!(
         r#"
 [[auth]]
@@ -260,7 +266,7 @@ name = "acme.access_token"
 scheme = "bearer"
 env = ["ACME_ACCESS_TOKEN"]
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "client_credentials"
 behaviour = "`expires_in` is read from the request and defaults to -1."
 attribution = "the vendor's own token controller"
@@ -277,18 +283,18 @@ measured = "2026-08-02"
 
 /// **Two measurements of one grant are refused**, because they are two answers to one question.
 #[test]
-fn two_quirks_for_one_grant_are_refused() {
+fn two_workarounds_for_one_grant_are_refused() {
     let source = provider(&format!(
         "{}{READ}",
         credential(
             r#"
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "password"
 behaviour = "`expires_in` is read when present."
 attribution = "the vendor's own token controller"
 measured = "2026-08-02"
 
-[[auth.quirks.token_endpoint]]
+[[auth.workarounds.token_endpoint]]
 grant = "password"
 behaviour = "`expires_in` is ignored."
 attribution = "the vendor's own token controller"

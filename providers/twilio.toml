@@ -87,6 +87,12 @@ sha256 = "2ab609f9daeddae92f339c6c8d646dae9058f8f11baa53fab12e98fd3f37700d"
 # toggles, whose renderings cannot add a query pair. Omit dates, categories, statuses, SIDs and the
 # opaque PageToken. AccountSid is operator-pinned by the existing `account_sid` config field below.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListRecording"
 direction = "read"
 rename = "twilio-recording-list"
@@ -104,6 +110,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "FetchRecording"
 direction = "read"
 rename = "twilio-recording-get"
@@ -113,6 +125,12 @@ idempotency = "idempotent"
 omit.path = ["AccountSid"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListUsageRecord"
 direction = "read"
 rename = "twilio-usage-record-list"
@@ -123,6 +141,12 @@ omit.path = ["AccountSid"]
 omit.query = ["Category", "StartDate", "EndDate", "PageToken"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListConference"
 direction = "read"
 rename = "twilio-conference-list"
@@ -238,6 +262,12 @@ name = "default"
 tags = ["telephony", "messaging"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "twilio-account-get"
 method = "GET"
 direction = "read"
@@ -268,6 +298,12 @@ properties = { sid = { type = "string", description = "The account's own SID —
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "twilio-message-list"
 method = "GET"
 direction = "read"
@@ -309,7 +345,7 @@ description = "Messages per page; Twilio caps this at 1000"
 required = false
 schema = { type = "integer", minimum = 1, maximum = 1000, default = 50 }
 
-[operations.quirks.pagination]
+[operations.pagination]
 page = { page_param = "Page", size_param = "PageSize", page_size = 50, max_pages = 10 }
 
 # developer reference: twilio.com/docs/messaging/api/message-resource
@@ -321,6 +357,12 @@ properties = { messages = { type = "array", description = "This page's messages,
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "twilio-message-get"
 method = "GET"
 direction = "read"
@@ -351,6 +393,12 @@ properties = { sid = { type = "string" }, account_sid = { type = "string" }, mes
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "twilio-call-list"
 method = "GET"
 direction = "read"
@@ -390,7 +438,7 @@ description = "Calls per page; Twilio caps this at 1000"
 required = false
 schema = { type = "integer", minimum = 1, maximum = 1000, default = 50 }
 
-[operations.quirks.pagination]
+[operations.pagination]
 page = { page_param = "Page", size_param = "PageSize", page_size = 50, max_pages = 10 }
 
 # developer reference: twilio.com/docs/voice/api/call-resource
@@ -402,6 +450,12 @@ properties = { calls = { type = "array", items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "twilio-call-get"
 method = "GET"
 direction = "read"

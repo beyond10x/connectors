@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "ClickUp personal API token, sent as the raw value of the Authorization header with no scheme word. Grant access to the workspaces, spaces and lists the operations below need to read or write",
@@ -37,7 +37,7 @@
     ]
   ],
   "description": "ClickUp: list workspaces and a space's folders, and read, list, create and update tasks in a list",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -56,13 +56,24 @@
       "credential_requirement": "declared",
       "description": "List the workspaces (called \"teams\" in ClickUp's API) the token can see. Takes no parameters; used as the verify read to prove a token resolves, and as the source of the workspace-level context a space id is nested under",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-team-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/team"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "teams": {
@@ -135,9 +146,15 @@
       "credential_requirement": "declared",
       "description": "List a space's folders. Each folder's own lists are nested inline in the response — read a folder's `lists` field for the list ids clickup-list-task-list and clickup-task-create take, rather than looking for a separate folder-to-list operation",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-space-folder-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The space's id, visible in ClickUp's UI URL (app.clickup.com/{team_id}/v/o/s/{space_id}) — this connector has no operation that lists a workspace's spaces, the same way providers/gitlab.toml expects a project's numeric id from its URL rather than from a lookup",
@@ -161,6 +178,8 @@
           "symbol": "archived"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -173,6 +192,9 @@
         ],
         "url": "{base}/space/{space_id}/folder"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "folders": {
@@ -265,9 +287,15 @@
       "credential_requirement": "declared",
       "description": "List tasks in a list, most recently created first by default",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-list-task-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The list's id — from clickup-space-folder-list's `folders[].lists[].id`, or from ClickUp's own UI URL",
@@ -338,6 +366,8 @@
           "symbol": "include_closed"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -374,6 +404,9 @@
         ],
         "url": "{base}/list/{list_id}/task"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "last_page": {
@@ -502,9 +535,15 @@
       "credential_requirement": "declared",
       "description": "Get one task by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-task-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The task's id, from clickup-list-task-list or ClickUp's own UI URL",
@@ -528,6 +567,8 @@
           "symbol": "include_subtasks"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -540,6 +581,9 @@
         ],
         "url": "{base}/task/{task_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignees": {
@@ -642,9 +686,15 @@
       "credential_requirement": "declared",
       "description": "Create a task in a list. Created with `notify_all` left at its default (false), so nobody is emailed by this call",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-task-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The list's id to create the task in — from clickup-space-folder-list's `folders[].lists[].id`, or from ClickUp's own UI URL",
@@ -715,6 +765,8 @@
           "symbol": "due_date"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -742,6 +794,9 @@
         "method": "POST",
         "url": "{base}/list/{list_id}/task"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "creator": {
@@ -825,9 +880,15 @@
       "credential_requirement": "declared",
       "description": "Update a task's plain fields (name, description, status, priority, due date). Every field below is optional and ClickUp's update is sparse: an omitted field is left unchanged. Reassigning or rewatching the task is not supported by this operation — ClickUp takes those as {add, rem} deltas naming specific people, which this connector does not declare",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "clickup-task-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The task's id to update",
@@ -898,6 +959,8 @@
           "symbol": "due_date"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -925,6 +988,9 @@
         "method": "PUT",
         "url": "{base}/task/{task_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "date_updated": {
@@ -960,8 +1026,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

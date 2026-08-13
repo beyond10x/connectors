@@ -135,6 +135,12 @@ name = "default"
 tags = ["scheduling"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "calendly-user-me"
 method = "GET"
 direction = "read"
@@ -151,6 +157,12 @@ properties = { resource = { type = "object", required = ["uri", "name"], propert
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "calendly-event-type-list"
 method = "GET"
 direction = "read"
@@ -183,6 +195,12 @@ properties = { collection = { type = "array", description = "The user's event ty
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "calendly-scheduled-event-list"
 method = "GET"
 direction = "read"
@@ -219,6 +237,12 @@ properties = { collection = { type = "array", items = { type = "object", require
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "calendly-scheduled-event-get"
 method = "GET"
 direction = "read"
@@ -242,13 +266,19 @@ type = "object"
 required = ["resource"]
 properties = { resource = { type = "object", required = ["uri", "name", "status", "start_time", "end_time"], properties = { uri = { type = "string" }, name = { type = "string", description = "The event type's name at the time of booking" }, status = { type = "string", description = "`active` or `canceled`" }, start_time = { type = "string", format = "date-time" }, end_time = { type = "string", format = "date-time" }, event_type = { type = "string", description = "URI of the event type this booking was made against" }, location = { description = "Conferencing or physical-location details; shape varies by kind and is not enumerated here — see calendly-scheduled-event-list's response_schema comment" }, invitees_counter = { type = "object", properties = { active = { type = "integer" }, total = { type = "integer" }, limit = { type = "integer" } } }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/title"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "calendly-invitee-list"
 method = "GET"
 direction = "read"
@@ -283,7 +313,7 @@ type = "object"
 required = ["collection"]
 properties = { collection = { type = "array", description = "The event's invitees — personal data", items = { type = "object", required = ["uri", "email", "status"], properties = { uri = { type = "string" }, email = { type = "string", description = "The invitee's own email address — personal data, never an example value" }, name = { type = "string", description = "The invitee's own name — personal data, never an example value" }, status = { type = "string", description = "`active` or `canceled`" }, questions_and_answers = { type = "array", description = "The invitee's free-text answers to the event type's custom booking questions — personal data, shape not enumerated further" }, timezone = { type = "string", description = "IANA timezone name the invitee booked in" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } } } }, pagination = { type = "object", description = "Cursor pagination; see calendly-event-type-list's response_schema comment for why no cursor parameter is declared" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/title"
 

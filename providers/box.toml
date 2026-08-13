@@ -184,6 +184,12 @@ name = "default"
 tags = ["storage"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-user-me"
 method = "GET"
 direction = "read"
@@ -196,13 +202,19 @@ idempotency = "idempotent"
 type = "object"
 properties = { type = { const = "user" }, id = { type = "string", description = "The user's id" }, name = { type = "string" }, login = { type = "string", description = "The user's email address" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-folder-get"
 method = "GET"
 direction = "read"
@@ -221,13 +233,19 @@ schema = { type = "string", pattern = "^[0-9]+$", default = "0" }
 type = "object"
 properties = { type = { const = "folder" }, id = { type = "string" }, name = { type = "string" }, description = { type = "string" }, size = { type = "integer", description = "Total size in bytes of the folder's contents" }, created_at = { type = "string", format = "date-time" }, modified_at = { type = "string", format = "date-time" }, parent = { type = "object", description = "The parent folder's mini representation, `{type: \"folder\", id, name}` — absent (`null`) for the root folder, which has no parent" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-folder-items-list"
 method = "GET"
 direction = "read"
@@ -246,13 +264,19 @@ schema = { type = "string", pattern = "^[0-9]+$", default = "0" }
 type = "object"
 properties = { total_count = { type = "integer", description = "How many items the folder holds in total. This connector cannot fetch beyond the first page (C-30), so a value larger than entries.length means more exist" }, entries = { type = "array", description = "This page's items, each `{type: \"file\"|\"folder\", id, name}`", items = { type = "object" } }, offset = { type = "integer" }, limit = { type = "integer" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-file-get"
 method = "GET"
 direction = "read"
@@ -271,7 +295,7 @@ schema = { type = "string", pattern = "^[0-9]+$" }
 type = "object"
 properties = { type = { const = "file" }, id = { type = "string" }, name = { type = "string" }, size = { type = "integer", description = "Size in bytes" }, created_at = { type = "string", format = "date-time" }, modified_at = { type = "string", format = "date-time" }, sha1 = { type = "string", description = "SHA-1 hash of the file's content, for verifying a download performed some other way" }, parent = { type = "object", description = "The parent folder's mini representation, `{type: \"folder\", id, name}`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
@@ -280,6 +304,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-folder-create"
 method = "POST"
 direction = "write"
@@ -314,13 +344,19 @@ schema = { type = "string", pattern = "^[0-9]+$", default = "0" }
 type = "object"
 properties = { type = { const = "folder" }, id = { type = "string", description = "The created folder's id — what a later call addresses it by" }, name = { type = "string" }, created_at = { type = "string", format = "date-time" }, parent = { type = "object" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "box-file-copy"
 method = "POST"
 direction = "write"
@@ -351,6 +387,6 @@ schema = { type = "string", pattern = "^[0-9]+$", default = "0" }
 type = "object"
 properties = { type = { const = "file" }, id = { type = "string", description = "The new copy's id, distinct from the source file's id" }, name = { type = "string" }, size = { type = "integer" }, parent = { type = "object" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"

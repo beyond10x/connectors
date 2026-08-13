@@ -24,8 +24,8 @@ mod auth_archetypes;
 mod auth_hazard;
 #[path = "main/auth_prefix.rs"]
 mod auth_prefix;
-#[path = "main/auth_quirks.rs"]
-mod auth_quirks;
+#[path = "main/auth_workarounds.rs"]
+mod auth_workarounds;
 #[path = "main/channel_bindings.rs"]
 mod channel_bindings;
 #[path = "main/config_choices.rs"]
@@ -42,6 +42,8 @@ mod credential_response;
 mod credential_subject;
 #[path = "main/determinism.rs"]
 mod determinism;
+#[path = "main/execution_facts.rs"]
+mod execution_facts;
 #[path = "main/graphs.rs"]
 mod graphs;
 #[path = "main/ir_roundtrip.rs"]
@@ -76,8 +78,6 @@ mod provider_toml_errors;
 mod repeatability_condition_elision;
 #[path = "main/response_schema_coverage.rs"]
 mod response_schema_coverage;
-#[path = "main/runtime_vocabulary.rs"]
-mod runtime_vocabulary;
 #[path = "main/semantic_effects.rs"]
 mod semantic_effects;
 #[path = "main/service_partition.rs"]

@@ -586,7 +586,7 @@ export function operationHref(operation: Operation): string {
 export type PathResolver = (path: string) => string
 
 /** The injection key a host provides its own {@link PathResolver} under. */
-export const PATH_RESOLVER = 'flux-connectors:path-resolver'
+export const PATH_RESOLVER = 'b10x-connectors:path-resolver'
 
 /** The default resolver: a host that says nothing leaves the path exactly as the catalogue gave it. */
 export const identityPath: PathResolver = (path) => path

@@ -672,6 +672,12 @@ mod tests {
                  description = \"Fetch one thing.\"\n\
                  risk = \"low\"\n\
                  idempotency = \"idempotent\"\n\
+                 effects = [\"read\", \"network\"]\n\
+                 interaction_shape = \"unary\"\n\
+                 protocol_driver = \"http_v1\"\n\
+                 placement_requirement = \"connectors_deployment\"\n\
+                 implementation_form = \"built_in\"\n\
+                 required_capabilities = [\"public_network\"]\n\
                  \n\
                  [[operations.params.path]]\n\
                  name = \"thing_id\"\n\

@@ -135,6 +135,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     ));
 
@@ -165,6 +171,12 @@ direction = \"read\"
 path = \"/api/v2/users/me\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations]]
 select = \"listTickets\"
@@ -172,6 +184,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     ));
 
@@ -211,6 +229,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
 
@@ -253,6 +277,12 @@ direction = \"read\"
 path = \"/api/v2/users/me\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ";
     let pure = provider::load("providers/zendesk.toml", hand_authored)
         .expect("a hand-authored file needs no cache");
@@ -271,6 +301,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     ));
     assert!(rendered.contains("showticket"), "{rendered}");
@@ -297,6 +333,12 @@ direction = \"write\"
 rename = \"zendesk-upload\"
 risk = \"medium\"
 idempotency = \"non_idempotent\"
+effects = [\"write\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     ));
     assert!(rendered.contains("fixtureMultipartUpload"), "{rendered}");
@@ -344,6 +386,12 @@ select = \"listTickets\"
 direction = \"read\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     ));
     assert!(rendered.contains("listTickets"), "{rendered}");
@@ -363,6 +411,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-list\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations.params]]
 name = \"page_size\"
@@ -387,6 +441,12 @@ rename = \"zendesk-ticket-list\"
 description = \"List tickets, newest first.\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations.params]]
 name = \"page\"
@@ -427,6 +487,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 auth = [{ credentials = [\"zendesk.api_token\"] }]
 ",
     ));
@@ -456,6 +522,12 @@ direction = \"read\"
 path = \"/api/v2/users/me\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ";
     let loaded = provider::load_with_spec("providers/zendesk.toml", definition, &cache())
         .expect("a hand-authored file loads whatever sits in the cache beside it");
@@ -513,6 +585,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
         ),
         &[
@@ -620,6 +698,12 @@ direction = \"write\"
 rename = \"zendesk-ticket-create\"
 risk = \"medium\"
 idempotency = \"non_idempotent\"
+effects = [\"write\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations]]
 select = \"showTicket\"
@@ -627,6 +711,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
     assert_eq!(load(&definition), load(&definition));
@@ -764,6 +854,12 @@ direction = "read"
 rename = "acme-manager-user-get"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.operations]]
 service = "user"
@@ -772,6 +868,12 @@ direction = "read"
 rename = "acme-user-me-get"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
 /// **An unknown key inside a spec block still gets serde's error, in either spelling.**
@@ -818,6 +920,12 @@ direction = \"read\"
 rename = \"zendesk-ticket-show\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
     let array = table.replace("[spec]\n", "[[spec]]\n");
@@ -893,6 +1001,12 @@ direction = \"read\"
 rename = \"acme-user-get\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
     assert!(rendered.contains("getUser"), "{rendered}");
@@ -916,6 +1030,12 @@ direction = \"read\"
 rename = \"acme-user-get\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
     assert!(rendered.contains("task-automation"), "{rendered}");
@@ -935,6 +1055,12 @@ direction = \"read\"
 rename = \"acme-manager-user-get\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations]]
 service = \"manager\"
@@ -943,6 +1069,12 @@ direction = \"read\"
 rename = \"acme-manager-user-fetch\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 ",
     );
     assert!(rendered.contains("more than once"), "{rendered}");
@@ -999,6 +1131,12 @@ direction = \"read\"
 rename = \"acme-manager-user-get\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 
 [[patch.operations]]
 service = \"user\"
@@ -1007,6 +1145,12 @@ direction = \"read\"
 rename = \"acme-user-me-get\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 auth = []
 "
         ),

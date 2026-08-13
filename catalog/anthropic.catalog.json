@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Anthropic API key, sent as x-api-key",
@@ -62,7 +62,7 @@
     ]
   ],
   "description": "Anthropic platform: the model catalogue and a curated read-only Admin API surface",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -81,15 +81,21 @@
       "credential_requirement": "declared",
       "description": "List the models available to this API key, most recently released first. Unpaginated — this connector cannot request a further page",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-models-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -97,6 +103,9 @@
         "method": "GET",
         "url": "{base}/v1/models"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -170,9 +179,19 @@
       "credential_requirement": "declared",
       "description": "Retrieve one model by id, or resolve an alias to the model id it currently points at",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-model-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The model id or alias, e.g. `claude-opus-4-6` or `claude-3-5-sonnet-20241022`",
@@ -186,12 +205,8 @@
           "symbol": "model_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -199,6 +214,9 @@
         "method": "GET",
         "url": "{base}/v1/models/{model_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "capabilities": {
@@ -255,15 +273,21 @@
       "credential_requirement": "declared",
       "description": "Get the organization this Admin API key belongs to. Takes no parameters; useful for confirming which organization a key resolves to",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-organization-get",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -271,6 +295,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -311,15 +338,21 @@
       "credential_requirement": "declared",
       "description": "List the people in this organization, with each member's name, email address, organization role and the date they joined. Returns personal data about real individuals. Unpaginated — this connector cannot request a further page, so on an organization larger than one page this is a sample and not a roster",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-organization-members-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -327,6 +360,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/users"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -411,9 +447,19 @@
       "credential_requirement": "declared",
       "description": "Retrieve one organization member by user id, returning their name, email address, organization role and join date. Returns personal data about a real individual",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-organization-member-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The member's user id, as returned in `id` by anthropic-organization-members-list or in `user_id` by anthropic-workspace-members-list",
@@ -427,12 +473,8 @@
           "symbol": "user_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -440,6 +482,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/users/{user_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "added_at": {
@@ -494,15 +539,21 @@
       "credential_requirement": "declared",
       "description": "List the organization's workspaces. Unpaginated and excludes archived workspaces by default — this connector cannot request a further page or ask for archived ones",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-workspaces-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -510,6 +561,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -583,9 +637,19 @@
       "credential_requirement": "declared",
       "description": "Retrieve one workspace by id, including its name, creation date, whether it is archived, and its data-residency configuration. Unlike anthropic-workspaces-list this reaches an archived workspace, since the id is given rather than filtered for",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-workspace-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The workspace id, as returned in `id` by anthropic-workspaces-list",
@@ -599,12 +663,8 @@
           "symbol": "workspace_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -612,6 +672,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived_at": {
@@ -700,9 +763,19 @@
       "credential_requirement": "declared",
       "description": "List who belongs to one workspace and the role each holds in it. Returns the user ids of real individuals; resolve one to a name and email with anthropic-organization-member-get. Unpaginated — this connector cannot request a further page, so on a workspace larger than one page this is a sample and not a roster",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-workspace-members-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The workspace id, as returned in `id` by anthropic-workspaces-list",
@@ -716,12 +789,8 @@
           "symbol": "workspace_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -729,6 +798,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}/members"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -808,9 +880,19 @@
       "credential_requirement": "declared",
       "description": "Retrieve one person's membership of one workspace, and the role they hold in it. This is the direct answer to whether a given user is in a given workspace; it returns the user id of a real individual",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-workspace-member-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The workspace id, as returned in `id` by anthropic-workspaces-list",
@@ -835,12 +917,8 @@
           "symbol": "user_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -848,6 +926,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}/members/{user_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "type": {
@@ -893,15 +974,21 @@
       "credential_requirement": "declared",
       "description": "List the organization's API keys, with each key's name, status and a redacted hint — never the key itself. Unpaginated and unfiltered",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-api-keys-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -909,6 +996,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/api_keys"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -980,15 +1070,21 @@
       "credential_requirement": "declared",
       "description": "List the organization's invites, with the email address invited, the role offered, and whether the invite is still pending. Returns personal data — an email address for a real person. Unpaginated and unfiltered by status, so a `pending` invite must be selected from the returned entries rather than asked for",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/type",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "anthropic-invites-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/type",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "anthropic-version": "2023-06-01"
@@ -996,6 +1092,9 @@
         "method": "GET",
         "url": "{base}/v1/organizations/invites"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -1076,8 +1175,7 @@
       "service": "admin"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

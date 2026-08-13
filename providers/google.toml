@@ -279,6 +279,12 @@ description = "Google OAuth2 access token sent as a bearer; short-lived, and ref
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-gmail-message-get"
 service = "gmail"
 method = "GET"
@@ -343,13 +349,19 @@ type = "object"
 required = ["id", "threadId"]
 properties = { id = { type = "string", description = "The message's id — what this operation takes" }, threadId = { type = "string", description = "The conversation it belongs to. Several messages share one" }, labelIds = { type = "array", description = "The labels applied, as ids: `INBOX`, `UNREAD`, `SENT`, `IMPORTANT`, `CATEGORY_PERSONAL`, plus any user label's opaque id. `UNREAD`'s presence is how read-state is expressed — there is no `read` boolean", items = { type = "string" } }, snippet = { type = "string", description = "A short plain-text extract of the body — the only text in this response that needs no decoding, and it is truncated" }, historyId = { type = "string", description = "The mailbox history id at which this message was last changed. **A string**, despite being an integer value" }, internalDate = { type = "string", description = "When Gmail received it, as **epoch milliseconds in a string** — not an ISO timestamp, and not seconds. The RFC 2822 `Date` header inside `payload` may differ from it" }, sizeEstimate = { type = "integer", description = "Approximate size in bytes" }, payload = { type = "object", description = "THE MESSAGE ITSELF, as a MIME tree: `{partId, mimeType, filename, headers, body, parts}`. `headers` is an **array** of `{name, value}` — so `Subject` and `From` are found by searching it, not by keying into it — and each `body.data` is **base64url-encoded**. A multipart message's text is in `parts`, not in the top-level `body`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-gmail-message-send"
 service = "gmail"
 method = "POST"
@@ -401,13 +413,19 @@ type = "object"
 required = ["id"]
 properties = { id = { type = "string", description = "The sent message's id — the only handle on a mail that cannot be recalled, and what `google-gmail-message-get` reads back" }, threadId = { type = "string", description = "The thread it landed in. Equal to `id` for a new conversation" }, labelIds = { type = "array", description = "Typically `[\"SENT\"]`. Google documents the response as \"an instance of Message\" without stating which members are populated on a send, so treat anything beyond `id` and `threadId` as possibly absent", items = { type = "string" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-gmail-labels-list"
 service = "gmail"
 method = "GET"
@@ -437,13 +455,19 @@ type = "object"
 required = ["labels"]
 properties = { labels = { type = "array", description = "Every label in the mailbox, in one unpaginated response — there is no `nextPageToken` on this method. Only the five members below are returned by a *list*; the per-label message counts belong to a `labels.get`", items = { type = "object", required = ["id", "name"], properties = { id = { type = "string", description = "The label id — `INBOX`, `SENT`, `UNREAD` and the other system labels are ids in their own right; a user label's id is opaque (`Label_12`). This is what appears in a message's `labelIds`" }, name = { type = "string", description = "The display name. A nested label's name carries its path, e.g. `Clients/Acme`" }, type = { type = "string", enum = ["system", "user"], description = "`system` labels cannot be renamed or deleted" }, messageListVisibility = { type = "string", enum = ["show", "hide"] }, labelListVisibility = { type = "string", enum = ["labelShow", "labelShowIfUnread", "labelHide"] } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-calendar-event-get"
 service = "calendar"
 method = "GET"
@@ -485,13 +509,19 @@ type = "object"
 required = ["id", "status"]
 properties = { kind = { const = "calendar#event" }, etag = { type = "string", description = "The resource's ETag, as a quoted string" }, id = { type = "string", description = "The event id — what this operation takes" }, status = { type = "string", enum = ["confirmed", "tentative", "cancelled"], description = "**A cancelled event is still returned here**, with `cancelled`. Check this before treating the event as live" }, htmlLink = { type = "string", format = "uri", description = "The event's page in Google Calendar — the link to give a human" }, created = { type = "string", format = "date-time" }, updated = { type = "string", format = "date-time" }, summary = { type = "string", description = "The title. Absent on an event created without one, which Calendar renders as \"(No title)\"" }, description = { type = "string" }, location = { type = "string", description = "Free text, not a structured address" }, start = { type = "object", description = "WHEN IT STARTS, as an object: `dateTime` (RFC 3339) for a timed event **or** `date` (`yyyy-mm-dd`) for an all-day event — never both — plus an optional IANA `timeZone`. Reading `start.dateTime` unconditionally misses every all-day event" }, end = { type = "object", description = "Same shape, and **exclusive**: an all-day event on the 30th has `end.date` of the 31st. For a recurring event this describes the first instance" }, recurringEventId = { type = "string", description = "Present on an instance of a recurring event: the id of the series it belongs to" }, organizer = { type = "object", description = "`{email, displayName, self}` — who owns the event. `self` is true when it is the token's own calendar" }, creator = { type = "object", description = "Same shape; the creator need not still be the organizer" }, attendees = { type = "array", description = "Each `{email, displayName, organizer, self, optional, responseStatus}`, where `responseStatus` is `needsAction`, `declined`, `tentative` or `accepted` — this is how attendance is read. Absent entirely on an event with no attendees, such as every event `google-calendar-event-insert` creates. Personal data: it is a list of named people's addresses", items = { type = "object" } }, hangoutLink = { type = "string", format = "uri", description = "The Google Meet join link, when the event has a conference. **Anyone holding it can join the meeting**, so treat it as sensitive rather than as an ordinary URL" }, conferenceData = { type = "object", description = "The conference in full: `entryPoints` with join URLs and dial-in numbers, plus a `conferenceId`. Contains the same joinable links as `hangoutLink`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-calendar-event-insert"
 service = "calendar"
 method = "POST"
@@ -561,13 +591,19 @@ type = "object"
 required = ["id", "status"]
 properties = { kind = { const = "calendar#event" }, etag = { type = "string" }, id = { type = "string", description = "The new event's id — the only handle on it, and what `google-calendar-event-get` reads back" }, status = { type = "string", enum = ["confirmed", "tentative", "cancelled"], description = "`confirmed` on a freshly created event" }, htmlLink = { type = "string", format = "uri", description = "The event's page in Google Calendar — the link to give a human" }, created = { type = "string", format = "date-time" }, updated = { type = "string", format = "date-time" }, summary = { type = "string", description = "Echoes the title that was sent" }, start = { type = "object", description = "`{dateTime, timeZone}` as created. Calendar resolves the offset that was sent into its own representation, so this may not be the literal string that was sent" }, end = { type = "object", description = "Same shape, and exclusive" }, organizer = { type = "object", description = "`{email, displayName, self}` — the calendar the event was created on" }, creator = { type = "object", description = "The token's own account" }, attendees = { type = "array", description = "ABSENT on every event this operation creates: no attendee can be declared yet (C-56), so nobody was invited and nobody was notified", items = { type = "object" } }, iCalUID = { type = "string", description = "The RFC 5545 UID, which is what identifies this event across calendars — distinct from `id`" }, sequence = { type = "integer", description = "The iCalendar revision number, `0` on creation" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-calendar-calendar-get"
 service = "calendar"
 method = "GET"
@@ -596,13 +632,19 @@ type = "object"
 required = ["id", "summary"]
 properties = { kind = { const = "calendar#calendar" }, etag = { type = "string" }, id = { type = "string", description = "The calendar's address, e.g. `you@example.com` or `team@group.calendar.google.com`. Asking for `primary` resolves to this" }, summary = { type = "string", description = "The calendar's title" }, description = { type = "string" }, location = { type = "string", description = "Free-text geographic location of the calendar" }, timeZone = { type = "string", description = "The calendar's own IANA time zone, e.g. `Europe/Berlin`. **This is what an event's offset should be computed from** — `google-calendar-event-insert` cannot send a `timeZone`, so the caller has to apply the right offset itself" }, conferenceProperties = { type = "object", description = "`{allowedConferenceSolutionTypes}` — which conferencing this calendar permits (`hangoutsMeet`, `eventHangout`, `eventNamedHangout`)" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-drive-file-get"
 service = "drive"
 method = "GET"
@@ -644,13 +686,19 @@ schema = { type = "string", pattern = "^[A-Za-z0-9_-]+$", minLength = 1 }
 # Closing this properly means C-30 plus an explicit `fields` value on the operation, at which point the
 # response schema is derivable rather than guessed — because the caller states it.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "google-drive-file-update"
 service = "drive"
 method = "PATCH"
@@ -697,6 +745,6 @@ schema = { type = "string", minLength = 1 }
 # Read the file back with `google-drive-file-get` — whose default projection is also undocumented,
 # which is the honest state of this service until C-30 makes `fields` sendable.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/status"

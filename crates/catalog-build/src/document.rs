@@ -4,9 +4,9 @@
 //! the reviewed artifact traced to `predecessor:docs/designs/catalog-artifact.md` (provenance only).
 //! It carries the complete published surface — provider and services metadata, every operation
 //! with an explicit **request template**, the full auth surface including the complete OAuth2
-//! declaration and its token-endpoint quirks, configuration, verify, events, channel bindings —
+//! declaration and its token-endpoint workarounds, configuration, verify, events, channel bindings —
 //! and it is the first artifact the four surfaces the op grammar cannot say ever reach:
-//! service `roles`, `quirks.pagination`, `quirks.rate_limit` and the structural `error_envelope`.
+//! service `roles`, `workarounds.pagination`, `workarounds.rate_limit` and the structural `error_envelope`.
 //!
 //! # The template vocabulary is closed and total
 //!
@@ -48,9 +48,11 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use connector_spec::{
-    AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector, HttpMethod,
-    Idempotency, ManualSetup, OAuthGrant, OAuthRedirect, Operation, OperationDirection, Param,
-    Risk, Role, SemanticEffect, Service, SocketConnectSpec, Subscription, Tag, TokenEndpointQuirk,
+    AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector, ErrorEnvelope,
+    HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape, ManualSetup,
+    OAuthGrant, OAuthRedirect, Operation, OperationDirection, Pagination, Param,
+    PlacementRequirement, ProtocolDriver, RateLimit, RequiredCapability, Risk, Role,
+    SemanticEffect, Service, SocketConnectSpec, Subscription, Tag, TokenEndpointWorkaround,
     VerificationScheme, FREE_FORM_BODY,
 };
 
@@ -59,12 +61,12 @@ use crate::seam;
 /// The document's wire-contract version. Additive evolution does not bump it; anything a consumer
 /// must act on does, and is refused by older readers — the `site.rs` rule, restated for the
 /// canonical artifact.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// The schema's `$id`, and the `$schema` every document names — the same repository-addressed form
 /// `schema/provider-toml.schema.json` uses.
 pub const SCHEMA_ID: &str =
-    "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json";
+    "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json";
 
 // ---------------------------------------------------------------------------------------------
 // The wire shape. Declaration order here does NOT survive into the text: `render` round-trips
@@ -87,8 +89,6 @@ struct Document<'a> {
     vendor: &'a str,
     #[serde(skip_serializing_if = "str::is_empty")]
     description: &'a str,
-    /// Never skipped, for the manifest's reason: a host must not infer `http` from an absence.
-    runtime: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     authority: Option<&'a str>,
     /// The bounded read a settings page invokes — an operation id.
@@ -154,8 +154,8 @@ struct DocAuth<'a> {
     oauth2: Option<DocOAuth2<'a>>,
     /// The measured token-endpoint departures (C-440) — their first structured artifact beyond
     /// the TOML manifest.
-    #[serde(skip_serializing_if = "<[TokenEndpointQuirk]>::is_empty")]
-    token_endpoint_quirks: &'a [TokenEndpointQuirk],
+    #[serde(skip_serializing_if = "<[TokenEndpointWorkaround]>::is_empty")]
+    token_endpoint_workarounds: &'a [TokenEndpointWorkaround],
 }
 
 /// The placement scheme, flattened to `{kind, name, prefix}` so a consumer needs no discriminated
@@ -240,10 +240,17 @@ struct DocOperation<'a> {
     description: &'a str,
     risk: &'a Risk,
     idempotency: &'a Idempotency,
+    /// Required and explicit: consumers read host effects and never derive them.
+    effects: &'a [HostEffect],
     #[serde(skip_serializing_if = "Option::is_none")]
     repeatability_condition: Option<&'a str>,
     /// Explicit even when empty: "none declared" is an answer, not an absence.
     semantic_effects: &'a [SemanticEffect],
+    interaction_shape: &'a InteractionShape,
+    protocol_driver: &'a ProtocolDriver,
+    placement_requirement: &'a PlacementRequirement,
+    implementation_form: &'a ImplementationForm,
+    required_capabilities: &'a [RequiredCapability],
     expose: bool,
     /// The **effective** requirement — the inheritance rule already resolved, so a consumer never
     /// re-implements it.
@@ -274,7 +281,11 @@ struct DocOperation<'a> {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     endpoint: BTreeMap<String, BTreeSet<&'static str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    quirks: Option<DocQuirks<'a>>,
+    pagination: Option<&'a Pagination>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rate_limit: Option<&'a RateLimit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_envelope: Option<&'a ErrorEnvelope>,
 }
 
 /// **The request template** — the data equivalent of the emitted Flux body.
@@ -362,16 +373,6 @@ struct DocParam<'a> {
     description: &'a str,
     required: bool,
     schema: &'a Value,
-}
-
-#[derive(Serialize)]
-struct DocQuirks<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pagination: Option<&'a connector_spec::Pagination>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rate_limit: Option<&'a connector_spec::RateLimit>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error_envelope: Option<&'a connector_spec::ErrorEnvelope>,
 }
 
 #[derive(Serialize)]
@@ -586,7 +587,6 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
         connector: &connector.id,
         vendor: &connector.vendor,
         description: &connector.description,
-        runtime: connector.runtime.word(),
         authority: connector.authority.as_deref(),
         verify: connector.verify.as_deref(),
         services,
@@ -675,7 +675,7 @@ fn doc_auth<'a>(connector: &Connector, method: &'a AuthMethod) -> Result<DocAuth
         subject: method.subject.word(),
         hazard: method.hazard.as_ref().map(|hazard| hazard.word()),
         oauth2,
-        token_endpoint_quirks: &method.quirks.token_endpoint,
+        token_endpoint_workarounds: &method.workarounds.token_endpoint,
     })
 }
 
@@ -802,12 +802,6 @@ fn doc_operation<'a>(
     let request = request_template(operation, &pins)?;
     let endpoint = endpoint_slots(connector, operation, &pins)?;
 
-    let quirks = (!operation.quirks.is_empty()).then_some(DocQuirks {
-        pagination: operation.quirks.pagination.as_ref(),
-        rate_limit: operation.quirks.rate_limit.as_ref(),
-        error_envelope: operation.quirks.error_envelope.as_ref(),
-    });
-
     Ok(DocOperation {
         id: &operation.id,
         service: &operation.service,
@@ -815,8 +809,14 @@ fn doc_operation<'a>(
         description: &operation.description,
         risk: &operation.risk,
         idempotency: &operation.idempotency,
+        effects: &operation.effects,
         repeatability_condition: operation.repeatability_condition(),
         semantic_effects: &operation.semantic_effects,
+        interaction_shape: &operation.interaction_shape,
+        protocol_driver: &operation.protocol_driver,
+        placement_requirement: &operation.placement_requirement,
+        implementation_form: &operation.implementation_form,
+        required_capabilities: &operation.required_capabilities,
         expose: operation.expose,
         auth: requirements(connector.effective_auth(operation)),
         credential_requirement: credential_requirement(connector, operation),
@@ -836,7 +836,9 @@ fn doc_operation<'a>(
         // handle, never the secret (C-136/C-430).
         response_schema: operation.effective_response_schema(),
         endpoint,
-        quirks,
+        pagination: operation.pagination.as_ref(),
+        rate_limit: operation.rate_limit.as_ref(),
+        error_envelope: operation.error_envelope.as_ref(),
     })
 }
 
@@ -1544,7 +1546,7 @@ pub fn schema() -> &'static Value {
         json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": SCHEMA_ID,
-            "title": "flux-connectors canonical catalog document",
+            "title": "connectors canonical catalog document",
             "description": "One canonical, deterministic catalog document per provider (Decision 0022, C-536): the complete published connector surface, including an explicit request template per operation. The template vocabulary is closed and total — literal values, `{var}` interpolation over caller parameters and endpoint slots, and `$param` splices — and the oauth2 object deliberately has no field for a registration value: the client identifier and secret are per-deployment, published only as operator-level configuration requirements through the `binds` grammar.",
             "type": "object",
             "properties": {
@@ -1554,7 +1556,6 @@ pub fn schema() -> &'static Value {
                 "connector": { "type": "string", "minLength": 1 },
                 "vendor": { "type": "string" },
                 "description": { "type": "string" },
-                "runtime": { "enum": ["http", "socket", "process", "container", "plugin", "remote"] },
                 "authority": { "type": "string", "minLength": 1 },
                 "verify": { "type": "string", "minLength": 1 },
                 "services": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/service" } },
@@ -1565,7 +1566,7 @@ pub fn schema() -> &'static Value {
                 "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
                 "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }
             },
-            "required": ["$schema", "schema_version", "generator", "connector", "runtime", "services", "operations"],
+            "required": ["$schema", "schema_version", "generator", "connector", "services", "operations"],
             "additionalProperties": false,
             "$defs": {
                 "json_schema": {
@@ -1604,7 +1605,7 @@ pub fn schema() -> &'static Value {
                         "subject": { "enum": ["unstated", "app", "user"] },
                         "hazard": { "type": "string" },
                         "oauth2": { "$ref": "#/$defs/oauth2" },
-                        "token_endpoint_quirks": { "type": "array", "items": { "$ref": "#/$defs/token_endpoint_quirk" } }
+                        "token_endpoint_workarounds": { "type": "array", "items": { "$ref": "#/$defs/token_endpoint_workaround" } }
                     },
                     "required": ["name", "scheme", "subject"],
                     "additionalProperties": false
@@ -1642,7 +1643,7 @@ pub fn schema() -> &'static Value {
                     },
                     "additionalProperties": false
                 },
-                "token_endpoint_quirk": {
+                "token_endpoint_workaround": {
                     "type": "object",
                     "properties": {
                         "grant": { "type": "string" },
@@ -1696,8 +1697,14 @@ pub fn schema() -> &'static Value {
                         "description": { "type": "string" },
                         "risk": { "enum": ["low", "medium", "high", "destructive"] },
                         "idempotency": { "enum": ["idempotent", "non_idempotent", "conditional"] },
+                        "effects": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["read", "write", "network", "process", "browser", "filesystem", "local_system"] } },
                         "repeatability_condition": { "type": "string" },
                         "semantic_effects": { "type": "array", "items": { "type": "string" } },
+                        "interaction_shape": { "enum": ["unary", "stream", "subscription", "leased_session", "session_establishment"] },
+                        "protocol_driver": { "enum": ["http_v1"] },
+                        "placement_requirement": { "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"] },
+                        "implementation_form": { "enum": ["built_in"] },
+                        "required_capabilities": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"] } },
                         "contract": { "$ref": "#/$defs/contract" },
                         "expose": { "type": "boolean" },
                         "auth": { "$ref": "#/$defs/requirements" },
@@ -1717,9 +1724,11 @@ pub fn schema() -> &'static Value {
                                 "items": { "enum": ["origin", "host", "path", "query", "header"] }
                             }
                         },
-                        "quirks": { "$ref": "#/$defs/quirks" }
+                        "pagination": { "$ref": "#/$defs/pagination" },
+                        "rate_limit": { "$ref": "#/$defs/rate_limit" },
+                        "error_envelope": { "$ref": "#/$defs/error_envelope" }
                     },
-                    "required": ["id", "service", "direction", "risk", "idempotency", "semantic_effects", "contract", "expose", "auth", "credential_requirement", "request"],
+                    "required": ["id", "service", "direction", "risk", "idempotency", "effects", "semantic_effects", "interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities", "contract", "expose", "auth", "credential_requirement", "request"],
                     "additionalProperties": false
                 },
                 "contract": {
@@ -1844,10 +1853,7 @@ pub fn schema() -> &'static Value {
                     "required": ["name", "position", "symbol", "required", "schema"],
                     "additionalProperties": false
                 },
-                "quirks": {
-                    "type": "object",
-                    "properties": {
-                        "pagination": {
+                "pagination": {
                             "oneOf": [
                                 {
                                     "type": "object",
@@ -1885,8 +1891,8 @@ pub fn schema() -> &'static Value {
                                     "additionalProperties": false
                                 }
                             ]
-                        },
-                        "rate_limit": {
+                },
+                "rate_limit": {
                             "type": "object",
                             "properties": {
                                 "requests": { "type": "integer" },
@@ -1895,8 +1901,8 @@ pub fn schema() -> &'static Value {
                             },
                             "required": ["requests", "per_seconds"],
                             "additionalProperties": false
-                        },
-                        "error_envelope": {
+                },
+                "error_envelope": {
                             "type": "object",
                             "properties": {
                                 "message_pointer": { "type": "string" },
@@ -1904,9 +1910,6 @@ pub fn schema() -> &'static Value {
                             },
                             "required": ["message_pointer"],
                             "additionalProperties": false
-                        }
-                    },
-                    "additionalProperties": false
                 },
                 "event": {
                     "type": "object",
@@ -2025,6 +2028,12 @@ path = "/graphql"
 description = "The C-110 shape: a pinned query document whose braces are vendor syntax"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.body]]
 name = "query"
@@ -2054,6 +2063,12 @@ path = "/things"
 description = "Get things"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [operations.params.const_headers]
 "X-Weird" = "{templated}"
@@ -2081,6 +2096,12 @@ path = "/things"
 description = "Get things"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[auth]]
 name = "acme.oauth_token"
@@ -2116,6 +2137,12 @@ path = "/things"
 description = "Get things"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
         );
         connector.graphs.push(connector_spec::Graph {
@@ -2153,6 +2180,12 @@ path = "/messages"
 description = "Send a message"
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [operations.params]
 body_encoding = "form"
@@ -2205,6 +2238,12 @@ path = "/things/{thing_id}"
 description = "Get one thing"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "thing_id"

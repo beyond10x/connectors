@@ -113,6 +113,12 @@ sha256 = "338adeada0fc0e95bf1cea37320698e5a283fab9f48f496c28ab3bbac9ad0f88"
 
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListAuditsForTicket"
 service = "default"
 rename = "zendesk-ticket-audit-list"
@@ -133,6 +139,12 @@ omit.query = [
 # `support_type_scope` and event `include` values are free-form strings; query interpolation does
 # not percent-encode them, so each is omitted explicitly and an upstream rename fails closed.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "IncrementalTicketExportTime"
 service = "default"
 rename = "zendesk-incremental-ticket-list"
@@ -142,6 +154,12 @@ idempotency = "idempotent"
 omit.query = ["support_type_scope"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "IncrementalUserExportTime"
 service = "default"
 rename = "zendesk-incremental-user-list"
@@ -150,6 +168,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "IncrementalOrganizationExport"
 service = "default"
 rename = "zendesk-incremental-organization-list"
@@ -158,6 +182,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "IncrementalTicketEvents"
 service = "default"
 rename = "zendesk-incremental-ticket-event-list"
@@ -170,6 +200,12 @@ omit.query = ["include", "support_type_scope"]
 # the path and remain withheld until that segment can be encoded safely; multipart record
 # attachments remain withheld until C-426.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListCustomObjects"
 service = "default"
 rename = "zendesk-custom-object-list"
@@ -182,6 +218,12 @@ idempotency = "idempotent"
 # interpolation, ambiguous paging dialects, or filters whose safe wire encoding Flux cannot yet
 # express. The pinned response envelopes are carried as documented without inventing required fields.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListRecentTickets"
 service = "default"
 rename = "zendesk-ticket-recent-list"
@@ -190,6 +232,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListTicketsFromView"
 service = "default"
 rename = "zendesk-view-ticket-list"
@@ -209,6 +257,12 @@ required = true
 schema = { type = "string", enum = ["incoming", "my", "my_groups"] }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ShowUser"
 service = "default"
 rename = "zendesk-user-show"
@@ -218,6 +272,12 @@ idempotency = "idempotent"
 omit.query = ["include"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ShowOrganization"
 service = "default"
 rename = "zendesk-organization-show"
@@ -227,6 +287,12 @@ idempotency = "idempotent"
 omit.query = ["include", "include_boundary_indicators", "include_item_cursors"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListGroups"
 service = "default"
 rename = "zendesk-group-list"
@@ -244,6 +310,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListTicketFields"
 service = "default"
 rename = "zendesk-ticket-field-list"
@@ -260,6 +332,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListTicketForms"
 service = "default"
 rename = "zendesk-ticket-form-list"
@@ -281,6 +359,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListCustomStatuses"
 service = "default"
 rename = "zendesk-custom-status-list"
@@ -295,6 +379,12 @@ omit.query = ["status_categories", "active", "default"]
 # source contract. In particular, the three former ticket-update/comment/tag aliases were all the
 # same `UpdateTicket` request and are now one honest operation.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ShowCurrentUser"
 service = "default"
 rename = "zendesk-test"
@@ -303,6 +393,12 @@ idempotency = "idempotent"
 omit.query = ["include"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListSearchResults"
 service = "default"
 rename = "zendesk-ticket-search"
@@ -311,6 +407,12 @@ idempotency = "idempotent"
 omit.query = ["sort_by", "sort_order", "include"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ShowTicket"
 service = "default"
 rename = "zendesk-ticket-show"
@@ -319,6 +421,12 @@ idempotency = "idempotent"
 omit.query = ["include", "reduced_payload_size", "remove_duplicate_fields"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListTicketComments"
 service = "default"
 rename = "zendesk-ticket-comment-list"
@@ -327,6 +435,12 @@ idempotency = "idempotent"
 omit.query = ["include", "sort_order", "page"]
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "UpdateTicket"
 service = "default"
 rename = "zendesk-ticket-update"
@@ -351,6 +465,12 @@ fetched_at = "2026-08-02T08:47:26Z"
 sha256 = "49d74afb9e1538ca8fb08f3dd2ac48c6f6f7af575845eb4ca2adff72bdc33525"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListCategoriesNoLocale"
 service = "help-center"
 rename = "zendesk-help-center-category-list"
@@ -360,6 +480,12 @@ idempotency = "idempotent"
 omit.query = ["sort_by", "sort_order"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListSectionsNoLocale"
 service = "help-center"
 rename = "zendesk-help-center-section-list"
@@ -369,6 +495,12 @@ idempotency = "idempotent"
 omit.query = ["sort_by", "sort_order"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListArticlesNoLocale"
 service = "help-center"
 rename = "zendesk-help-center-article-list"
@@ -378,6 +510,12 @@ idempotency = "idempotent"
 omit.query = ["sort_by", "sort_order", "label_names"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ShowArticleNoLocale"
 service = "help-center"
 rename = "zendesk-help-center-article-get"
@@ -386,6 +524,12 @@ risk = "low"
 idempotency = "idempotent"
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListTranslations"
 service = "help-center"
 rename = "zendesk-help-center-translation-list"
@@ -395,6 +539,12 @@ idempotency = "idempotent"
 omit.query = ["locales", "outdated", "draft"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListArticlesIncremental"
 service = "help-center"
 rename = "zendesk-help-center-article-incremental-list"
@@ -404,6 +554,12 @@ idempotency = "idempotent"
 omit.query = ["sort_by", "sort_order", "label_names"]
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "CreateArticleBySection"
 service = "help-center"
 rename = "zendesk-help-center-article-create"
@@ -437,6 +593,12 @@ fetched_at = "2026-08-02T08:47:26Z"
 sha256 = "cde5a1f4d54038bb4d52df965f0eb7824c2074be2a5a36835dfc20c82f121da6"
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "CreateConversation"
 service = "messaging"
 rename = "zendesk-messaging-conversation-create"
@@ -457,6 +619,12 @@ required = true
 schema = { type = "string", const = "sdkGroup" }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetConversation"
 service = "messaging"
 rename = "zendesk-messaging-conversation-get"
@@ -467,6 +635,12 @@ auth = [{ credentials = ["zendesk.messaging_key"] }]
 omit.path = ["appId"]
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "UpdateConversation"
 service = "messaging"
 rename = "zendesk-messaging-conversation-update"
@@ -487,6 +661,12 @@ required = true
 schema = { type = "string", minLength = 1, maxLength = 100 }
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListParticipants"
 service = "messaging"
 rename = "zendesk-messaging-participant-list"
@@ -502,6 +682,12 @@ omit.query = ["page"]
 # first occurrence and bounds the repeated continuation with JSON Schema `true`, so the request and
 # every non-recursive response member now come directly from the pinned first-party document.
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "PostMessage"
 service = "messaging"
 rename = "zendesk-messaging-message-create"
@@ -512,6 +698,12 @@ omit.path = ["appId"]
 omit.body = ["destination", "metadata", "override", "schema"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "ListMessages"
 service = "messaging"
 rename = "zendesk-messaging-message-list"
@@ -522,6 +714,12 @@ omit.path = ["appId"]
 omit.query = ["page"]
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "CreateUser"
 service = "messaging"
 rename = "zendesk-messaging-user-create"
@@ -540,6 +738,12 @@ position = "body"
 required = true
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "GetUser"
 service = "messaging"
 rename = "zendesk-messaging-user-get"
@@ -551,6 +755,12 @@ omit.path = ["appId"]
 omit.query = ["brandId"]
 
 [[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "UpdateUser"
 service = "messaging"
 rename = "zendesk-messaging-user-update"

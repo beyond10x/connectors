@@ -6,7 +6,7 @@
 
 [package]
 name = "catalog-reader"
-description = "Dependency-free reader for the flux-connectors catalog pack: every connector's canonical document in one embedded, versioned, digest-checked file."
+description = "Dependency-free reader for the connectors catalog pack: every connector's canonical document in one embedded, versioned, digest-checked file."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

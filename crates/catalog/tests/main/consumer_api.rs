@@ -9,7 +9,7 @@
 //! Two deliberate properties of how it is written:
 //!
 //! - **Closed enums are matched exhaustively, with no wildcard arm.** `Placement`, `Acquisition`,
-//!   `OAuthGrant`, `Subject`, `AuthHazard`, `Approval`, `Runtime` and `CredentialRequirement` are
+//!   `OAuthGrant`, `Subject`, `AuthHazard`, `Approval` and `CredentialRequirement` are
 //!   documented as closed so a consumer's exhaustive match is told when the set grows; this file
 //!   *is* that consumer, so a new variant fails here first, in-repo.
 //! - **Assertions are about shape, not the catalogue's contents.** What ships is
@@ -20,7 +20,7 @@ use catalog::{
     Acquisition, Approval, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
     ConfigField, Credential, CredentialRequirement, Event, Idempotency, OAuth2, OAuthGrant,
     OAuthRedirect, Operation, OperationDirection, OperationKey, Pair, Placement, Provider,
-    ProviderKey, Risk, Runtime, Selector, SocketConnect, Subject,
+    ProviderKey, Risk, Selector, SocketConnect, Subject,
 };
 
 /// The lookups, and every field of [`Operation`].
@@ -76,7 +76,6 @@ fn the_lookup_surface_and_every_operation_field_are_reachable() {
         vendor,
         description: pdesc,
         authority,
-        runtime,
         base_url,
         auth,
         operations,
@@ -89,7 +88,6 @@ fn the_lookup_surface_and_every_operation_field_are_reachable() {
     } = *provider;
     let _: (&str, &str, &str, &str) = (pid, vendor, pdesc, base_url);
     let _: Option<&str> = authority;
-    let _: Runtime = runtime;
     let _: (&[Credential], &[Operation]) = (auth, operations);
     let _: (&[ConfigField], &[Event], &[Channel]) = (config, events, channels);
     let _: (Option<&str>, &[ConfigChoices]) = (verify, config_choices);
@@ -149,12 +147,6 @@ fn the_closed_vocabularies_match_exhaustively() {
         };
         reviewed && !hazardous
     }
-    fn admit(runtime: Runtime) -> bool {
-        match runtime {
-            Runtime::Http | Runtime::Remote => true,
-            Runtime::Socket | Runtime::Process | Runtime::Container | Runtime::Plugin => false,
-        }
-    }
     fn transport(channel: &Channel) -> &'static str {
         match channel.transport {
             ChannelTransport::Webhook => "webhook",
@@ -199,7 +191,6 @@ fn the_closed_vocabularies_match_exhaustively() {
 
     for provider in catalog::providers() {
         assert!(!activation(Approval::default()).is_empty());
-        let _ = admit(provider.runtime);
         for credential in provider.auth {
             let _ = place(credential.place);
             let _ = acquire(credential.acquire);

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "PagerDuty REST API access key, sent as the Authorization header after the literal `Token token=`. A read-only key satisfies the four read operations; the two incident writes need a full-access key",
@@ -38,7 +38,7 @@
     ]
   ],
   "description": "PagerDuty incident response: read incidents, services and who is on call, and acknowledge or resolve an incident",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -67,9 +67,15 @@
       "credential_requirement": "declared",
       "description": "List the incidents this key can see, across every service it has access to. Returns one page; read `more` to learn whether another page exists, and page by adding `limit` to `offset`. No status, service, team or time filter is offered by this connector — see pagerduty-incident-get to inspect one incident in full",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-incident-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Maximum number of incidents to return in this page. PagerDuty caps this at 100",
@@ -95,6 +101,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.pagerduty+json;version=2"
@@ -116,6 +124,9 @@
         ],
         "url": "{base}/incidents"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "incidents": {
@@ -285,9 +296,15 @@
       "credential_requirement": "declared",
       "description": "Fetch one incident in full, including its current status, urgency, service, assignments and acknowledgements. Read this before acknowledging or resolving, because PagerDuty refuses a status change that does not follow from the incident's current status",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-incident-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's own id, from pagerduty-incident-list's `id` field. Not the `incident_number` PagerDuty's web UI displays",
@@ -301,6 +318,8 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.pagerduty+json;version=2"
@@ -308,6 +327,9 @@
         "method": "GET",
         "url": "{base}/incidents/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "incident": {
@@ -460,9 +482,15 @@
       "credential_requirement": "declared",
       "description": "List the services this key can see. A service is what incidents are opened against and what an escalation policy is attached to, so this is how to discover the ids and names behind an incident's `service` reference. Also this connector's connection test",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-service-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Maximum number of services to return in this page. PagerDuty caps this at 100",
@@ -488,6 +516,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.pagerduty+json;version=2"
@@ -509,6 +539,9 @@
         ],
         "url": "{base}/services"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "limit": {
@@ -643,9 +676,15 @@
       "credential_requirement": "declared",
       "description": "List who is currently on call, as one entry per escalation policy, escalation level and user. An entry with no `schedule` is a user attached directly to an escalation level rather than through a rotation. Time filtering is not offered by this connector, so this answers `who is on call now`",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-oncall-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Maximum number of on-call entries to return in this page. PagerDuty caps this at 100",
@@ -671,6 +710,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.pagerduty+json;version=2"
@@ -692,6 +733,9 @@
         ],
         "url": "{base}/oncalls"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "limit": {
@@ -780,9 +824,15 @@
       "credential_requirement": "declared",
       "description": "Acknowledge one incident, on behalf of a named PagerDuty user. This stops the escalation clock and tells the rotation that somebody is working the incident; it does not close it. PagerDuty refuses the change if the incident is already resolved, and answers that as data rather than as a failure",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-incident-acknowledge",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's own id, from pagerduty-incident-list's `id` field",
@@ -809,6 +859,8 @@
           "wire": "From"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -829,6 +881,9 @@
         "method": "PUT",
         "url": "{base}/incidents/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "incident": {
@@ -927,9 +982,15 @@
       "credential_requirement": "declared",
       "description": "Resolve one incident, on behalf of a named PagerDuty user. This closes it: it leaves the open-incident view and notifications stop. If the underlying condition is still live, the next alert opens a brand-new incident rather than reopening this one, so resolve only what is actually fixed",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "pagerduty-incident-resolve",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's own id, from pagerduty-incident-list's `id` field",
@@ -956,6 +1017,8 @@
           "wire": "From"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -976,6 +1039,9 @@
         "method": "PUT",
         "url": "{base}/incidents/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "incident": {
@@ -1045,8 +1111,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.pagerduty.com",

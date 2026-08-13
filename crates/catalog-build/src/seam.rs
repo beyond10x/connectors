@@ -33,17 +33,11 @@ pub use connector_spec::Connector;
 
 /// The generator identity stamped into every artifact.
 ///
-/// **`flux-connectors`, deliberately, and the version with it.** This string is embedded in every
-/// canonical document and in every `connectors.lock` row, so it is an *input* to the one-time
-/// migration differential design 02 §7 item 6 requires: our documents and pack, byte-identical to
-/// the predecessor's at the same inputs. Renaming it rewrites all 55 documents and the pack digest,
-/// which is a reviewed catalogue change and not a side effect of standing up a workspace. It moves
-/// when the differential is retired, in a story whose diff is the whole catalogue.
-///
-/// It is also part of the hash domain `connectors.lock` records: a generator change must invalidate
-/// generated output, or a stale artifact survives a codegen fix.
+/// The b10x/connectors product identity and workspace version. It remains part of the lock
+/// hash domain, so a generator change invalidates generated output rather than preserving stale
+/// artifacts. The predecessor differential has passed; its identity is no longer an input.
 pub fn generator() -> String {
-    format!("flux-connectors {}", env!("CARGO_PKG_VERSION"))
+    format!("connectors {}", env!("CARGO_PKG_VERSION"))
 }
 
 /// One provider's committed inputs, already read into memory.
@@ -307,6 +301,12 @@ path = "/v2/tickets/{ticket_id}"
 description = "Fetch one Acme ticket."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "ticket_id"
@@ -342,6 +342,12 @@ path = "/objects/{key}"
 description = "Fetch one object."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "key"
@@ -357,6 +363,12 @@ path = "/model/{model_id}/invoke"
 description = "Invoke a model."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "model_id"
@@ -432,6 +444,12 @@ path = "/objects/{key}"
 description = "Fetch one object."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "key"
@@ -447,6 +465,12 @@ path = "/model/{model_id}/invoke"
 description = "Invoke a model."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "model_id"
@@ -492,6 +516,12 @@ select = "showTicket"
 rename = "acme-ticket-show"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
     /// The vendored document `SPEC_BACKED` points at: two operations, one of which is selected.

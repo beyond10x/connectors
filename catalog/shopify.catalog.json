@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Shopify Admin API access token, sent as the whole value of X-Shopify-Access-Token, with read_orders, read_products, write_products, read_customers and read_inventory scopes",
@@ -51,7 +51,7 @@
     ]
   ],
   "description": "Shopify Admin REST API: read orders, products, customers and inventory levels, and update a product",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -76,14 +76,23 @@
       "credential_requirement": "declared",
       "description": "Get one order by id, with its line items, totals, fulfilment and financial status, and the customer and addresses attached to it. The response carries personal data: the customer's name, email, phone and shipping address",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "shop": [
           "host"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/errors"
+      },
       "expose": true,
       "id": "shopify-order-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The order's numeric id — not its `#1001` order name",
@@ -98,15 +107,15 @@
           "symbol": "order_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/admin/api/2024-10/orders/{order_id}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "order": {
@@ -236,14 +245,23 @@
       "credential_requirement": "declared",
       "description": "Get one product by id, with its title, description, status, vendor, options, variants and images",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "shop": [
           "host"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/errors"
+      },
       "expose": true,
       "id": "shopify-product-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The product's numeric id — not its URL handle",
@@ -258,15 +276,15 @@
           "symbol": "product_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/admin/api/2024-10/products/{product_id}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "product": {
@@ -378,14 +396,23 @@
       "credential_requirement": "declared",
       "description": "Rename a product. The new title is live on the public storefront as soon as this returns, on every sales channel the product is published to. Shopify applies only the fields sent, so nothing else about the product changes",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "shop": [
           "host"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/errors"
+      },
       "expose": true,
       "id": "shopify-product-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The numeric id of the product to update",
@@ -412,11 +439,8 @@
           "wire": "product.title"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -434,6 +458,9 @@
         "method": "PUT",
         "url": "{base}/admin/api/2024-10/products/{product_id}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "product": {
@@ -537,14 +564,23 @@
       "credential_requirement": "declared",
       "description": "Get one customer by id: name, email, phone, default address, marketing consent state and order count. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "shop": [
           "host"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/errors"
+      },
       "expose": true,
       "id": "shopify-customer-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The customer's numeric id",
@@ -559,15 +595,15 @@
           "symbol": "customer_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/admin/api/2024-10/customers/{customer_id}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "customer": {
@@ -674,14 +710,23 @@
       "credential_requirement": "declared",
       "description": "List the inventory levels held at one location — the available quantity per inventory item. Returns the first page only, so a location stocking more items than one page holds is reported incompletely",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "shop": [
           "host"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/errors"
+      },
       "expose": true,
       "id": "shopify-inventory-level-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The numeric id of the location whose stock to list",
@@ -696,15 +741,15 @@
           "symbol": "location_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/admin/api/2024-10/locations/{location_id}/inventory_levels.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "inventory_levels": {
@@ -743,8 +788,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2024-10",

@@ -23,6 +23,12 @@ method = "GET"
 path = "/api/v2/tickets/{ticket_id}.json"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 authh = []
 "#;
 
@@ -33,6 +39,12 @@ method = "GET"
 path = "/api/v2/tickets/{ticket_id}.json"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
 /// A credential whose `env` key is misspelled.
@@ -108,7 +120,7 @@ env = ["ZENDESK_API_TOKEN"]
     );
 }
 
-/// Strictness has to reach nested tables too — a typo inside `[operations.quirks]` or
+/// Strictness has to reach nested tables too — a typo inside `[operations.operation traits]` or
 /// `[[operations.params.query]]` is exactly as silent as one at the top level.
 #[test]
 fn typoed_keys_are_rejected_at_every_nesting_depth() {
@@ -135,6 +147,12 @@ direction = "read"
 path = "/x"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.query]]
 name = "page"
@@ -143,7 +161,7 @@ schema = { type = "integer" }
 "#,
             "requiredd",
         ),
-        // Inside quirks.
+        // Inside operation traits.
         (
             r#"
 id = "z"
@@ -156,8 +174,14 @@ direction = "read"
 path = "/x"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
-[operations.quirks.rate_limit]
+[operations.rate_limit]
 requests = 100
 per_secondss = 60
 "#,
@@ -197,6 +221,12 @@ direction = "read"
 path = "/api/v2/tickets/{ticket_id}.json"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
     let connector: Connector = toml::from_str(source).expect("a valid provider TOML must load");

@@ -189,6 +189,12 @@ name = "default"
 tags = ["messaging"]
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "slack-chat-post-message"
 method = "POST"
 direction = "write"
@@ -238,13 +244,19 @@ type = "object"
 required = ["ok"]
 properties = { ok = { type = "boolean", description = "False on failure, with HTTP still 200. Branch on this before reading anything else — it is the only member present in both outcomes" }, error = { type = "string", description = "Present only when `ok` is false: Slack's machine-readable failure code, such as `channel_not_found`, `not_in_channel` or `msg_too_long`" }, channel = { type = "string", description = "The channel the message landed in, always as an id (`C0123ABCDEF`) even when the request named it" }, ts = { type = "string", description = "The posted message's timestamp id, e.g. `1503435956.000247`. This is what addresses the message afterwards — `slack-reactions-add`'s `timestamp`, and `thread_ts` to reply under it" }, message = { type = "object", description = "The message as Slack stored it: `text`, `type`, `subtype`, `ts`, `bot_id`, `username`, and `attachments` when there are any" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # See the header comment: this says *where* the error is, and cannot say that it arrives with a 200.
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "slack-conversations-history"
 method = "POST"
 direction = "write"
@@ -299,12 +311,18 @@ type = "object"
 required = ["ok"]
 properties = { ok = { type = "boolean", description = "False on failure, with HTTP still 200. Branch on this first" }, error = { type = "string", description = "Present only when `ok` is false: `channel_not_found`, `not_in_channel` or `invalid_arguments`" }, messages = { type = "array", description = "The messages, newest first. Each carries at least `type`, `ts` and `text`; a user message also carries `user`, and a bot or system message carries a `subtype` instead", items = { type = "object" } }, has_more = { type = "boolean", description = "True when the channel holds older messages than this page returned. This connector cannot page — see the header comment on the missing cursor — so a true here means the caller is seeing a window, not the history" }, pin_count = { type = "integer" }, response_metadata = { type = "object", description = "Carries `next_cursor`, the cursor for the following page. It cannot be sent back by this connector (C-30)" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "slack-users-info"
 method = "POST"
 direction = "write"
@@ -339,12 +357,18 @@ type = "object"
 required = ["ok"]
 properties = { ok = { type = "boolean", description = "False on failure, with HTTP still 200. Branch on this first" }, error = { type = "string", description = "Present only when `ok` is false: typically `user_not_found`" }, user = { type = "object", description = "The user: `id`, `team_id`, `name`, `real_name`, `deleted`, `tz`, `tz_label`, `tz_offset`, `is_bot`, `is_admin`, `is_owner`, `updated`, and `profile` — which holds the display name, status and, with `users:read.email`, the email address" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "slack-reactions-add"
 method = "POST"
 direction = "write"
@@ -388,7 +412,7 @@ type = "object"
 required = ["ok"]
 properties = { ok = { type = "boolean", description = "True when the reaction was added. There is no other member on success — Slack returns no id for a reaction" }, error = { type = "string", description = "Present only when `ok` is false, with HTTP still 200: `already_reacted`, `message_not_found`, `invalid_name`, `channel_not_found` or `thread_locked`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------

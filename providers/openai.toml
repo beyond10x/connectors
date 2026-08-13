@@ -58,6 +58,12 @@ sha256 = "bf253f99bca25941f6b7a5ce0c4a0634b89677502067bfbadb82727690c596a6"
 # Query interpolation still has no percent-encoder. Keep only integer limits, whose decimal
 # rendering cannot add a query pair; omit cursors, ordering, expansion and streaming controls.
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "getResponse"
 direction = "read"
 rename = "openai-response-get"
@@ -67,6 +73,12 @@ idempotency = "idempotent"
 omit.query = ["include", "stream", "starting_after", "include_obfuscation"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "listInputItems"
 direction = "read"
 rename = "openai-response-input-item-list"
@@ -76,6 +88,12 @@ idempotency = "idempotent"
 omit.query = ["order", "after", "include"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "listFiles"
 direction = "read"
 rename = "openai-file-list"
@@ -85,6 +103,12 @@ idempotency = "idempotent"
 omit.query = ["purpose", "order", "after"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "listBatches"
 direction = "read"
 rename = "openai-batch-list"
@@ -146,6 +170,12 @@ name = "default"
 tags = ["ai"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openai-models-list"
 method = "GET"
 direction = "read"
@@ -181,6 +211,12 @@ properties = { object = { const = "list" }, data = { type = "array", description
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openai-model-get"
 method = "GET"
 direction = "read"
@@ -255,6 +291,12 @@ properties = { id = { type = "string", description = "The model id, echoed back"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openai-chat-completion"
 method = "POST"
 direction = "write"
@@ -317,6 +359,12 @@ properties = { id = { type = "string", description = "The completion's id, `chat
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openai-embeddings-create"
 method = "POST"
 direction = "write"

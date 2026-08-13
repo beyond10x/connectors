@@ -204,6 +204,12 @@ name = "default"
 tags = ["observability"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-application-list"
 method = "GET"
 direction = "read"
@@ -223,6 +229,12 @@ properties = { applications = { type = "array", description = "Every application
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-application-get"
 method = "GET"
 direction = "read"
@@ -251,6 +263,12 @@ properties = { application = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-alert-policy-list"
 method = "GET"
 direction = "read"
@@ -274,6 +292,12 @@ properties = { policies = { type = "array", items = { type = "object", required 
 # caller that assumes everything returned is live will report resolved incidents as current — and
 # the field that settles it, `closed_at`, is right there in the response.
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-alert-violation-list"
 method = "GET"
 direction = "read"
@@ -298,6 +322,12 @@ properties = { violations = { type = "array", description = "Violations in the d
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-deployment-list"
 method = "GET"
 direction = "read"
@@ -336,6 +366,12 @@ properties = { deployments = { type = "array", items = { type = "object", requir
 # name — the shape `providers/pagerduty.toml` (`incident.status`) and `providers/asana.toml`
 # (`data.name`) already ship.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "newrelic-deployment-create"
 method = "POST"
 direction = "write"

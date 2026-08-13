@@ -9,7 +9,7 @@
 
 use connector_spec::{
     Connector, Gid, HttpMethod, Idempotency, Oip, Operation, OperationDirection, ParamSet, Pid,
-    Provenance, Quirks, Risk, Service, DEFAULT_SERVICE,
+    Provenance, Risk, Service, DEFAULT_SERVICE,
 };
 
 /// A tiny deterministic generator. Numerical Recipes' LCG constants; the values only have to be
@@ -40,6 +40,15 @@ fn operation(id: &str, service: &str) -> Operation {
         description: String::new(),
         risk: Risk::Low,
         idempotency: Idempotency::Idempotent,
+        effects: vec![
+            connector_spec::HostEffect::Read,
+            connector_spec::HostEffect::Network,
+        ],
+        interaction_shape: connector_spec::InteractionShape::Unary,
+        protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+        placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+        implementation_form: connector_spec::ImplementationForm::BuiltIn,
+        required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
         semantic_effects: Vec::new(),
         repeatable_because: None,
         expose: true,
@@ -48,7 +57,11 @@ fn operation(id: &str, service: &str) -> Operation {
         response_schema: None,
         credential_response: Vec::new(),
         produces_credential: None,
-        quirks: Quirks::default(),
+        pagination: None,
+
+        rate_limit: None,
+
+        error_envelope: None,
     }
 }
 
@@ -56,7 +69,6 @@ fn connector(services: Vec<Service>, operations: Vec<Operation>) -> Connector {
     Connector {
         id: "acme".to_owned(),
         authority: Some("com.acme".to_owned()),
-        runtime: connector_spec::Runtime::Http,
         api_version: Some("v1".to_owned()),
         services,
         vendor: "Acme".to_owned(),
@@ -284,7 +296,11 @@ fn a_provider_file_that_loads_publishes_only_round_tripping_addresses() {
                      [[services]]\nname = {service:?}\n\n\
                      [[operations]]\nid = \"acme-thing-get\"\nservice = {service:?}\n\
                      method = \"GET\"\ndirection = \"read\"\npath = \"/v1/things\"\nrisk = \"low\"\n\
-                     idempotency = \"idempotent\"\n"
+                     idempotency = \"idempotent\"\neffects = [\"read\", \"network\"]\n\
+                     interaction_shape = \"unary\"\nprotocol_driver = \"http_v1\"\n\
+                     placement_requirement = \"connectors_deployment\"\n\
+                     implementation_form = \"built_in\"\n\
+                     required_capabilities = [\"public_network\"]\n"
                 );
 
                 match connector_spec::provider::load("providers/fuzz.toml", &source) {

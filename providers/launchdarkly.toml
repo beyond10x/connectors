@@ -136,6 +136,12 @@ name = "default"
 tags = ["developer-tools"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "launchdarkly-project-list"
 method = "GET"
 direction = "read"
@@ -164,6 +170,12 @@ properties = { items = { type = "array", description = "The account's projects",
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "launchdarkly-environment-list"
 method = "GET"
 direction = "read"
@@ -198,6 +210,12 @@ properties = { items = { type = "array", description = "The project's environmen
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "launchdarkly-flag-list"
 method = "GET"
 direction = "read"
@@ -240,6 +258,12 @@ properties = { items = { type = "array", description = "The project's feature fl
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "launchdarkly-flag-get"
 method = "GET"
 direction = "read"
@@ -278,6 +302,12 @@ properties = { key = { type = "string" }, name = { type = "string" }, kind = { t
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "launchdarkly-flag-toggle"
 method = "PATCH"
 direction = "write"

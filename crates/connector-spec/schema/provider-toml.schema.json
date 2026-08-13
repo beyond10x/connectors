@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/codewandler/flux-connectors/schema/provider-toml.schema.json",
-  "title": "flux-connectors provider definition",
+  "$id": "https://github.com/b10x/connectors/blob/main/crates/connector-spec/schema/provider-toml.schema.json",
+  "title": "connectors provider definition",
   "description": "The format of `providers/<name>.toml`. TOML has a JSON-shaped data model, so this one schema describes both the file an author writes and the JSON the connector IR encodes to.\n\nThe file plays two roles and this schema serves both: a complete hand-authored connector (write `[[operations]]` inline, omit `[spec]`), or a pointer at a vendored vendor spec plus a patch set that selects and corrects operations from it (write `[spec]` and `[[patch.operations]]`). Both produce the same IR.\n\nEvery object here is closed: an unrecognised key is an error, never a silently ignored one. That is not a style preference — a mistyped `authh` on an operation would otherwise mean `auth` is unset, and unset means the operation inherits the connector's default credentials.\n\nNo credential value appears in a provider file, ever. `env` and `user_env` name environment variables; they never hold their contents.",
   "$ref": "#/$defs/provider",
   "$defs": {
@@ -18,11 +18,6 @@
         "authority": {
           "type": "string",
           "description": "The reverse-DNS authority this provider publishes under, e.g. `com.amazonaws`. The leading component of every service address (`com.amazonaws/s3:2006-03-01`). Optional: a provider that declares none simply has no rendered address yet."
-        },
-        "runtime": {
-          "enum": ["http", "socket", "process", "container", "plugin", "remote"],
-          "default": "http",
-          "description": "HOW this connector executes — flux's runtime axis. `http` is a guarded request, `socket` a guarded dial, `process` a guarded argv-only spawn, `container` a spawn inside docker or kubernetes, `plugin` the flux plugin protocol over stdio, and `remote` delegation to another substrate.\n\nOmit it and the connector is `http`, which is every connector this repository generates. The set is closed and an unrecognised word is refused at load rather than defaulted: a hosted deployment serving more than one tenant refuses a locally-executing runtime — process, container and raw-socket execution consume the host's own identity and network position — and a typo that quietly became `http` is exactly how a `process` connector would end up served by one.\n\nThe runtime is declared by the connector and never chosen by a caller. A caller who can pick the runtime is a caller who can pick an effect."
         },
         "api_version": {
           "type": "string",
@@ -863,6 +858,23 @@
           "$ref": "#/$defs/idempotency",
           "description": "The idempotency every matched operation carries, under the same silence rule as `risk`; an unstated read takes `idempotent`. Stating `conditional` here does not make `repeatable_because` bulk: every matched write still owes a stated condition per operation, which no selector can supply, so the build refuses by name."
         },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hostEffect" },
+          "description": "Explicit host-resource effects shared by the reviewed selection. Required after exact-operation resolution; never inferred."
+        },
+        "interaction_shape": { "$ref": "#/$defs/interactionShape" },
+        "protocol_driver": { "$ref": "#/$defs/protocolDriver" },
+        "placement_requirement": { "$ref": "#/$defs/placementRequirement" },
+        "implementation_form": { "$ref": "#/$defs/implementationForm" },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/requiredCapability" }
+        },
         "expose": {
           "type": "boolean",
           "description": "Whether every matched operation reaches a model as a tool. Omit it for the field's own default, which is exposed. Declaring the inverse per operation is 388 lines for a full-coverage babelforce, which is why this key exists.",
@@ -916,6 +928,32 @@
       "description": "A non-deprecated flux_spec::FlowEffect tag. Unknown values are refused; `pure` is part of the shared vocabulary but invalid on an HTTP connector operation."
     },
 
+    "hostEffect": {
+      "enum": ["read", "write", "network", "process", "browser", "filesystem", "local_system"],
+      "description": "A declared host-resource consequence, independent of semantic effects and never inferred."
+    },
+
+    "interactionShape": {
+      "enum": ["unary", "stream", "subscription", "leased_session", "session_establishment"]
+    },
+
+    "protocolDriver": {
+      "enum": ["http_v1"]
+    },
+
+    "placementRequirement": {
+      "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"],
+      "description": "A requirement, not a deployment-selected destination."
+    },
+
+    "implementationForm": {
+      "enum": ["built_in"]
+    },
+
+    "requiredCapability": {
+      "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"]
+    },
+
     "operationPatch": {
       "type": "object",
       "title": "Operation selection and corrections",
@@ -962,15 +1000,30 @@
           "items": { "$ref": "#/$defs/semanticEffect" },
           "description": "What this operation means to Flux policy, stated by the author who reviewed it. Distinct from the host-resource effects and never inferred from a vendor document or selector."
         },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hostEffect" }
+        },
+        "interaction_shape": { "$ref": "#/$defs/interactionShape" },
+        "protocol_driver": { "$ref": "#/$defs/protocolDriver" },
+        "placement_requirement": { "$ref": "#/$defs/placementRequirement" },
+        "implementation_form": { "$ref": "#/$defs/implementationForm" },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/requiredCapability" }
+        },
         "auth": {
           "type": "array",
           "description": "Replaces the auth ingest extracted. An empty list means the operation needs no auth. This is the only place a deprecated vendor credential may be removed — ingest must keep seeing it, or drift-check stops reporting on it.",
           "items": { "$ref": "#/$defs/authRequirement" }
         },
-        "quirks": {
-          "$ref": "#/$defs/quirks",
-          "description": "Pagination, rate limits and error envelopes to attach. None of these appear in any spec."
-        },
+        "pagination": { "$ref": "#/$defs/pagination" },
+        "rate_limit": { "$ref": "#/$defs/rateLimit" },
+        "error_envelope": { "$ref": "#/$defs/errorEnvelope" },
         "params": {
           "type": "array",
           "description": "Parameter-level corrections: a wrong type, a false `required`, a missing description.",
@@ -1100,9 +1153,9 @@
           ],
           "description": "A named weakness in HOW this credential is obtained, so a host refuses it by declared property rather than by connector name. A CLOSED set: an unrecognised spelling is refused at the loader, because a free-form string makes the consuming filter a string match, and a near-miss spelling then reads as `no hazard declared` and is admitted by the very deployment that refused the thing it names. `resource_owner_secret_shared` is the OAuth 2.0 resource owner password credentials grant — RFC 9700 §2.4 says it MUST NOT be used, RFC 6749 §4.3 makes discarding the password a MUST for the client, CWE-522 is the nearest weakness entry, and OAuth 2.1 drops the grant. A hazard is a KIND, not a level: it does not belong on `risk`, which is an ordered damage claim, because a password grant that buys a read-only token is low risk AND hazardous. Declaring the `password` grant without a hazard is refused."
         },
-        "quirks": {
-          "$ref": "#/$defs/authQuirks",
-          "description": "What this credential's authentication surface does that its own document does not say."
+        "workarounds": {
+          "$ref": "#/$defs/authWorkarounds",
+          "description": "Measured, attributed departures of this credential's authentication surface from its own document."
         }
       }
     },
@@ -1207,21 +1260,21 @@
       }
     },
 
-    "authQuirks": {
+    "authWorkarounds": {
       "type": "object",
-      "title": "Authentication-surface quirks",
-      "description": "Measured departures of a connector's AUTHENTICATION surface from what its own documents declare. The sibling of an operation's `quirks`, one scope up: an authentication endpoint is never a connector operation, so a token endpoint's quirks have nowhere else to live. Declarations, not behaviour — nothing acts on them.",
+      "title": "Authentication-surface workarounds",
+      "description": "Measured departures of a connector's authentication surface from what its own documents declare. Each entry retains attribution; ordinary API traits never enter this category.",
       "additionalProperties": false,
       "properties": {
         "token_endpoint": {
           "type": "array",
-          "description": "Measured behaviours of the credential's token endpoint, at most one per vendor `grant_type`. Deliberately prose and not a knob: one vendor's endpoint reads the same undeclared request field differently for every grant — defaulting it to `never expires` on one, clamping it to 60 seconds on another, ignoring it on a third — so a general field would be a promise every other connector was then assumed to keep. Requires an `[auth.oauth2]` block, since a credential declaring no grant has no token endpoint for a quirk to be about.",
-          "items": { "$ref": "#/$defs/tokenEndpointQuirk" }
+          "description": "Measured behaviours of the credential's token endpoint, at most one per vendor `grant_type`. Deliberately prose and not a knob. Requires an `[auth.oauth2]` block, since a credential declaring no grant has no token endpoint to measure.",
+          "items": { "$ref": "#/$defs/tokenEndpointWorkaround" }
         }
       }
     },
 
-    "tokenEndpointQuirk": {
+    "tokenEndpointWorkaround": {
       "type": "object",
       "title": "One measured token-endpoint behaviour",
       "description": "Asserted against a vendor's implementation and contradicted by that vendor's own document, which is why the provenance fields are required rather than optional: a reader a year from now has to know which of the two was checked, and when.",
@@ -1238,7 +1291,7 @@
         },
         "attribution": {
           "type": "string",
-          "description": "What was read, and by whom — enough for a reader to repeat the measurement or date it. An unattributed quirk is indistinguishable from a guess that aged."
+          "description": "What was read, and by whom — enough for a reader to repeat the measurement or date it. An unattributed workaround is indistinguishable from a guess that aged."
         },
         "measured": {
           "type": "string",
@@ -1288,7 +1341,7 @@
       "title": "One operation",
       "description": "A single HTTP call, and everything a Flux `op` declaration needs to wrap it.",
       "additionalProperties": false,
-      "required": ["id", "method", "direction", "path", "risk", "idempotency"],
+      "required": ["id", "method", "direction", "path", "risk", "idempotency", "effects", "interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities"],
       "properties": {
         "id": {
           "type": "string",
@@ -1328,6 +1381,23 @@
           "items": { "$ref": "#/$defs/semanticEffect" },
           "description": "What executing this operation means to Flux policy. Distinct from the host-resource effects emitted in Flux; omitted means no semantic consequence is declared."
         },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hostEffect" },
+          "description": "Declared host-resource consequences. Required and never inferred."
+        },
+        "interaction_shape": { "$ref": "#/$defs/interactionShape" },
+        "protocol_driver": { "$ref": "#/$defs/protocolDriver" },
+        "placement_requirement": { "$ref": "#/$defs/placementRequirement" },
+        "implementation_form": { "$ref": "#/$defs/implementationForm" },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/requiredCapability" }
+        },
         "repeatable_because": {
           "type": "string",
           "minLength": 24,
@@ -1361,10 +1431,9 @@
           "$ref": "#/$defs/producedCredential",
           "description": "This operation's purpose is to MINT a credential — a login. The secret is diverted from the vendor's response straight into the host's credential store and the caller receives the handle `{ \"credential\": \"tenants/<tenant>/<authority>/…\" }`; the secret is absent from the operation's output entirely. Refused at load if the declared `response_schema` still describes the secret's own location, if no secret field is named, if the operation declares `idempotency = \"idempotent\"` (minting is a write and some vendors invalidate the previous token), if the named credential is not declared in `[[auth]]`, if the connector declares no `authority`, or if two operations mint the same credential."
         },
-        "quirks": {
-          "$ref": "#/$defs/quirks",
-          "description": "The ways this endpoint departs from what its spec implies."
-        }
+        "pagination": { "$ref": "#/$defs/pagination" },
+        "rate_limit": { "$ref": "#/$defs/rateLimit" },
+        "error_envelope": { "$ref": "#/$defs/errorEnvelope" }
       }
     },
 
@@ -1456,91 +1525,37 @@
       }
     },
 
-    "quirks": {
-      "type": "object",
-      "title": "Departures from the spec",
-      "description": "Declarations, not behaviour — codegen compiles them into real Flux control flow: rate limits into `throttle`, pagination into a bounded loop.",
-      "additionalProperties": false,
-      "properties": {
-        "pagination": {
-          "$ref": "#/$defs/pagination",
-          "description": "How the endpoint paginates, if it does."
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/rateLimit",
-          "description": "The endpoint's published rate limit."
-        },
-        "error_envelope": {
-          "$ref": "#/$defs/errorEnvelope",
-          "description": "Where the vendor hides the real error inside a non-2xx body."
-        }
-      }
-    },
-
     "pagination": {
+      "type": "object",
       "title": "Pagination style",
       "description": "`max_pages` is mandatory on every variant because flux's analyzer rejects unbounded loops.",
-      "oneOf": [
-        {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
           "type": "object",
-          "title": "Page-number pagination",
-          "description": "`?page=2&per_page=100`.",
           "additionalProperties": false,
-          "required": ["page"],
+          "required": ["page_param", "max_pages"],
           "properties": {
-            "page": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["page_param", "max_pages"],
-              "properties": {
-                "page_param": {
-                  "type": "string",
-                  "description": "The query parameter carrying the page number."
-                },
-                "size_param": {
-                  "type": "string",
-                  "description": "The query parameter carrying the page size, when the vendor allows one."
-                },
-                "page_size": {
-                  "type": "integer",
-                  "description": "The page size to request."
-                },
-                "max_pages": {
-                  "type": "integer",
-                  "description": "The hard cap on pages fetched."
-                }
-              }
-            }
+            "page_param": { "type": "string" },
+            "size_param": { "type": "string" },
+            "page_size": { "type": "integer" },
+            "max_pages": { "type": "integer" }
           }
         },
-        {
+        "cursor": {
           "type": "object",
-          "title": "Cursor pagination",
-          "description": "The response carries the cursor for the next request.",
           "additionalProperties": false,
-          "required": ["cursor"],
+          "required": ["cursor_param", "next_cursor_pointer", "max_pages"],
           "properties": {
-            "cursor": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["cursor_param", "next_cursor_pointer", "max_pages"],
-              "properties": {
-                "cursor_param": {
-                  "type": "string",
-                  "description": "The query parameter carrying the cursor."
-                },
-                "next_cursor_pointer": {
-                  "type": "string",
-                  "description": "A JSON Pointer (RFC 6901) into the response body locating the next cursor."
-                },
-                "max_pages": {
-                  "type": "integer",
-                  "description": "The hard cap on pages fetched."
-                }
-              }
-            }
+            "cursor_param": { "type": "string" },
+            "next_cursor_pointer": { "type": "string" },
+            "max_pages": { "type": "integer" }
           }
         }
+      },
+      "oneOf": [
+        { "required": ["page"] },
+        { "required": ["cursor"] }
       ]
     },
 

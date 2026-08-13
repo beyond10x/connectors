@@ -32,9 +32,9 @@
             "user"
           ]
         },
-        "token_endpoint_quirks": {
+        "token_endpoint_workarounds": {
           "items": {
-            "$ref": "#/$defs/token_endpoint_quirk"
+            "$ref": "#/$defs/token_endpoint_workaround"
           },
           "type": "array"
         },
@@ -379,6 +379,21 @@
       ],
       "type": "object"
     },
+    "error_envelope": {
+      "additionalProperties": false,
+      "properties": {
+        "code_pointer": {
+          "type": "string"
+        },
+        "message_pointer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_pointer"
+      ],
+      "type": "object"
+    },
     "event": {
       "additionalProperties": false,
       "properties": {
@@ -512,6 +527,22 @@
             "write"
           ]
         },
+        "effects": {
+          "items": {
+            "enum": [
+              "read",
+              "write",
+              "network",
+              "process",
+              "browser",
+              "filesystem",
+              "local_system"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
         "endpoint": {
           "additionalProperties": {
             "items": {
@@ -528,6 +559,9 @@
           },
           "type": "object"
         },
+        "error_envelope": {
+          "$ref": "#/$defs/error_envelope"
+        },
         "expose": {
           "type": "boolean"
         },
@@ -542,23 +576,68 @@
             "conditional"
           ]
         },
+        "implementation_form": {
+          "enum": [
+            "built_in"
+          ]
+        },
+        "interaction_shape": {
+          "enum": [
+            "unary",
+            "stream",
+            "subscription",
+            "leased_session",
+            "session_establishment"
+          ]
+        },
+        "pagination": {
+          "$ref": "#/$defs/pagination"
+        },
         "params": {
           "items": {
             "$ref": "#/$defs/param"
           },
           "type": "array"
         },
+        "placement_requirement": {
+          "enum": [
+            "connectors_deployment",
+            "substrate_workload",
+            "federated_satellite"
+          ]
+        },
         "produces_credential": {
           "$ref": "#/$defs/produces_credential"
         },
-        "quirks": {
-          "$ref": "#/$defs/quirks"
+        "protocol_driver": {
+          "enum": [
+            "http_v1"
+          ]
+        },
+        "rate_limit": {
+          "$ref": "#/$defs/rate_limit"
         },
         "repeatability_condition": {
           "type": "string"
         },
         "request": {
           "$ref": "#/$defs/request"
+        },
+        "required_capabilities": {
+          "items": {
+            "enum": [
+              "public_network",
+              "private_network",
+              "unix_socket",
+              "file_secret",
+              "process",
+              "container",
+              "device"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
         },
         "response_schema": {
           "$ref": "#/$defs/json_schema"
@@ -588,7 +667,13 @@
         "direction",
         "risk",
         "idempotency",
+        "effects",
         "semantic_effects",
+        "interaction_shape",
+        "protocol_driver",
+        "placement_requirement",
+        "implementation_form",
+        "required_capabilities",
         "contract",
         "expose",
         "auth",
@@ -596,6 +681,70 @@
         "request"
       ],
       "type": "object"
+    },
+    "pagination": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "page": {
+              "additionalProperties": false,
+              "properties": {
+                "max_pages": {
+                  "type": "integer"
+                },
+                "page_param": {
+                  "type": "string"
+                },
+                "page_size": {
+                  "type": "integer"
+                },
+                "size_param": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "page_param",
+                "max_pages"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "page"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "additionalProperties": false,
+              "properties": {
+                "cursor_param": {
+                  "type": "string"
+                },
+                "max_pages": {
+                  "type": "integer"
+                },
+                "next_cursor_pointer": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "cursor_param",
+                "next_cursor_pointer",
+                "max_pages"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cursor"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "param": {
       "additionalProperties": false,
@@ -672,108 +821,23 @@
       ],
       "type": "object"
     },
-    "quirks": {
+    "rate_limit": {
       "additionalProperties": false,
       "properties": {
-        "error_envelope": {
-          "additionalProperties": false,
-          "properties": {
-            "code_pointer": {
-              "type": "string"
-            },
-            "message_pointer": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "message_pointer"
-          ],
-          "type": "object"
+        "bucket": {
+          "type": "string"
         },
-        "pagination": {
-          "oneOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "page": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "max_pages": {
-                      "type": "integer"
-                    },
-                    "page_param": {
-                      "type": "string"
-                    },
-                    "page_size": {
-                      "type": "integer"
-                    },
-                    "size_param": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "page_param",
-                    "max_pages"
-                  ],
-                  "type": "object"
-                }
-              },
-              "required": [
-                "page"
-              ],
-              "type": "object"
-            },
-            {
-              "additionalProperties": false,
-              "properties": {
-                "cursor": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "cursor_param": {
-                      "type": "string"
-                    },
-                    "max_pages": {
-                      "type": "integer"
-                    },
-                    "next_cursor_pointer": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "cursor_param",
-                    "next_cursor_pointer",
-                    "max_pages"
-                  ],
-                  "type": "object"
-                }
-              },
-              "required": [
-                "cursor"
-              ],
-              "type": "object"
-            }
-          ]
+        "per_seconds": {
+          "type": "integer"
         },
-        "rate_limit": {
-          "additionalProperties": false,
-          "properties": {
-            "bucket": {
-              "type": "string"
-            },
-            "per_seconds": {
-              "type": "integer"
-            },
-            "requests": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "requests",
-            "per_seconds"
-          ],
-          "type": "object"
+        "requests": {
+          "type": "integer"
         }
       },
+      "required": [
+        "requests",
+        "per_seconds"
+      ],
       "type": "object"
     },
     "request": {
@@ -928,7 +992,7 @@
       ],
       "type": "object"
     },
-    "token_endpoint_quirk": {
+    "token_endpoint_workaround": {
       "additionalProperties": false,
       "properties": {
         "attribution": {
@@ -964,13 +1028,13 @@
       ]
     }
   },
-  "$id": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$id": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One canonical, deterministic catalog document per provider (Decision 0022, C-536): the complete published connector surface, including an explicit request template per operation. The template vocabulary is closed and total — literal values, `{var}` interpolation over caller parameters and endpoint slots, and `$param` splices — and the oauth2 object deliberately has no field for a registration value: the client identifier and secret are per-deployment, published only as operator-level configuration requirements through the `binds` grammar.",
   "properties": {
     "$schema": {
-      "const": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json"
+      "const": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json"
     },
     "auth": {
       "items": {
@@ -1020,18 +1084,8 @@
       },
       "type": "array"
     },
-    "runtime": {
-      "enum": [
-        "http",
-        "socket",
-        "process",
-        "container",
-        "plugin",
-        "remote"
-      ]
-    },
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "services": {
       "items": {
@@ -1053,10 +1107,9 @@
     "schema_version",
     "generator",
     "connector",
-    "runtime",
     "services",
     "operations"
   ],
-  "title": "flux-connectors canonical catalog document",
+  "title": "connectors canonical catalog document",
   "type": "object"
 }

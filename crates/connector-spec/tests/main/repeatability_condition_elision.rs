@@ -35,6 +35,12 @@ path = "/v1/things"
 description = "List things."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
 /// An operation stating no condition must not mention the field in its hash domain.
@@ -65,6 +71,12 @@ path = "/cache/purge"
 description = "Empty the cache."
 risk = "high"
 idempotency = "conditional"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 repeatable_because = "purging an already-purged cache is a no-op"
 "#,
     )

@@ -1,6 +1,6 @@
 //! The catalog pack, and the reader that serves it — dependency-free on purpose (C-537).
 //!
-//! The pack is one file compiled by `flux-connectors build` from the canonical per-provider
+//! The pack is one file compiled by `connectors build` from the canonical per-provider
 //! documents (`catalog/<name>.catalog.json`, C-536): every provider's complete published surface,
 //! concatenated behind an offset index, fronted by a versioned header and a content digest. This
 //! crate embeds that file and answers the four catalogue questions over it —
@@ -17,7 +17,7 @@
 //! # The format (container version 1)
 //!
 //! ```text
-//! flux-connectors-catalog-pack 1                    ← magic + container format version
+//! connectors-catalog-pack 1                    ← magic + container format version
 //! digest sha256 <64 lowercase hex>                  ← over every byte after this line
 //! schema <n>                                        ← the documents' schema_version
 //! providers <n>
@@ -64,10 +64,10 @@ pub const FORMAT_VERSION: u32 = 1;
 
 /// The canonical-document schema version this reader serves. A pack carrying a different one is
 /// refused before any record is served — see [`Error::UnsupportedSchema`].
-pub const SUPPORTED_SCHEMA: u32 = 1;
+pub const SUPPORTED_SCHEMA: u32 = 2;
 
 /// The magic word every pack opens with.
-const MAGIC: &str = "flux-connectors-catalog-pack";
+const MAGIC: &str = "connectors-catalog-pack";
 
 /// The pack this crate was built with: the compiled catalogue of the same repository state.
 static EMBEDDED: &[u8] = include_bytes!("../catalog.pack");

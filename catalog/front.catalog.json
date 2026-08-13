@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Front API token sent as a bearer",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Front shared inbox: read and reply to conversations, and tag them",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -61,9 +61,19 @@
       "credential_requirement": "declared",
       "description": "List one conversation, confirming the token resolves and carries at least read access. Takes no parameters other than the page bound",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-verify",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Records to fetch; one is enough to prove the credential works",
@@ -79,12 +89,8 @@
           "symbol": "limit"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -97,6 +103,9 @@
         ],
         "url": "{base}/conversations"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "_results": {
@@ -136,9 +145,19 @@
       "credential_requirement": "declared",
       "description": "List the company's conversations in reverse chronological order (most recently updated first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Front's structured search filter (`q`) is not accepted here: it is a bracket-notation object this pipeline cannot encode as a query string",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-conversation-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Max conversations to return in this one page, up to Front's own cap of 100. Does not change how many pages exist, only how large this one is",
@@ -154,12 +173,8 @@
           "symbol": "limit"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -172,6 +187,9 @@
         ],
         "url": "{base}/conversations"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "_pagination": {
@@ -242,9 +260,19 @@
       "credential_requirement": "declared",
       "description": "Get one conversation's metadata: subject, status, assignee, recipient and tags. Does not return its messages — use front-conversation-message-list for those",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-conversation-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation's id, an opaque string prefixed `cnv_` (e.g. `cnv_55c8c149`) that a model must not invent — discover it from front-conversation-list or front-verify",
@@ -258,16 +286,15 @@
           "symbol": "conversation_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/conversations/{conversation_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignee": {
@@ -363,9 +390,19 @@
       "credential_requirement": "declared",
       "description": "List the messages in a conversation in reverse chronological order (newest first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Each message's `body`/`text` is the actual correspondence exchanged on this conversation",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-conversation-message-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation's id, an opaque string prefixed `cnv_` (e.g. `cnv_55c8c149`) that a model must not invent — discover it from front-conversation-list or front-verify",
@@ -392,12 +429,8 @@
           "symbol": "limit"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -410,6 +443,9 @@
         ],
         "url": "{base}/conversations/{conversation_id}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "_pagination": {
@@ -518,9 +554,19 @@
       "credential_requirement": "declared",
       "description": "Reply to a conversation, using its own existing recipients, channel and sender identity — this connector cannot override any of those (see providers/front.toml's header comment). Front queues delivery: the response is an acknowledgement, not the sent message, and is not visible to the recipient until Front actually delivers it",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-conversation-reply",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation's id, an opaque string prefixed `cnv_` (e.g. `cnv_55c8c149`) that a model must not invent — discover it from front-conversation-list or front-verify",
@@ -545,12 +591,8 @@
           "symbol": "body"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -566,6 +608,9 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "An acknowledgement that Front accepted the reply for delivery, not the sent message itself",
         "properties": {
@@ -613,9 +658,19 @@
       "credential_requirement": "declared",
       "description": "Apply one or more existing tags to a conversation. Applying a tag the conversation already carries changes nothing — Front does not duplicate it. Answers 204 with an empty body on success",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/_error/status",
+        "message_pointer": "/_error/message"
+      },
       "expose": true,
       "id": "front-conversation-tag-add",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The conversation's id, an opaque string prefixed `cnv_` (e.g. `cnv_55c8c149`) that a model must not invent — discover it from front-conversation-list or front-verify",
@@ -644,12 +699,8 @@
           "symbol": "tag_ids"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/_error/status",
-          "message_pointer": "/_error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -665,13 +716,15 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/tags"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "medium",
       "semantic_effects": [],
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api2.frontapp.com",

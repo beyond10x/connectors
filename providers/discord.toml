@@ -248,6 +248,12 @@ name = "default"
 tags = ["messaging"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-current-user"
 method = "GET"
 direction = "read"
@@ -269,6 +275,12 @@ properties = { id = { type = "string", pattern = "^[0-9]+$", description = "The 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-guild-list"
 method = "GET"
 direction = "read"
@@ -288,6 +300,12 @@ items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-guild-get"
 method = "GET"
 direction = "read"
@@ -310,6 +328,12 @@ properties = { id = { type = "string", pattern = "^[0-9]+$", description = "The 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-guild-channels"
 method = "GET"
 direction = "read"
@@ -345,6 +369,12 @@ items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-channel-messages"
 method = "GET"
 direction = "read"
@@ -393,6 +423,12 @@ items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "discord-message-create"
 method = "POST"
 direction = "write"

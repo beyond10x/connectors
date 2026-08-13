@@ -191,6 +191,12 @@ name = "default"
 tags = ["e-signature"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-verify"
 method = "GET"
 direction = "read"
@@ -205,13 +211,19 @@ required = ["folders"]
 description = "DocuSign's own folder structure, not envelope data"
 properties = { folders = { type = "array", description = "Each folder's id and name, standard (Draft, Sent Items, Inbox, ...) and custom", items = { type = "object", required = ["folderId", "name"], properties = { folderId = { type = "string" }, name = { type = "string" }, uri = { type = "string", description = "This folder's own resource path" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-envelope-list"
 method = "GET"
 direction = "read"
@@ -233,13 +245,19 @@ type = "object"
 required = ["envelopes"]
 properties = { envelopes = { type = "array", description = "Each envelope's own status summary — no recipient or document detail; see docusign-envelope-recipients-get for who is on it", items = { type = "object", required = ["envelopeId", "status"], properties = { envelopeId = { type = "string" }, status = { type = "string", description = "e.g. sent, delivered, completed, declined, voided, created" }, emailSubject = { type = "string" }, sentDateTime = { type = "string", format = "date-time" }, completedDateTime = { type = "string", format = "date-time" }, statusChangedDateTime = { type = "string", format = "date-time" } } } }, resultSetSize = { type = "string", description = "A COUNT, RETURNED AS A STRING — DocuSign's own convention, not this connector's" }, totalSetSize = { type = "string", description = "Same convention as resultSetSize" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-envelope-get"
 method = "GET"
 direction = "read"
@@ -259,13 +277,19 @@ type = "object"
 required = ["envelopeId", "status"]
 properties = { envelopeId = { type = "string" }, status = { type = "string", description = "e.g. sent, delivered, completed, declined, voided, created" }, emailSubject = { type = "string" }, sentDateTime = { type = "string", format = "date-time" }, completedDateTime = { type = "string", format = "date-time" }, statusChangedDateTime = { type = "string", format = "date-time" }, voidedReason = { type = "string", description = "Present only once the envelope has been voided" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-envelope-recipients-get"
 method = "GET"
 direction = "read"
@@ -285,13 +309,19 @@ type = "object"
 description = "Every recipient list here carries personal data: name and email identify a real person DocuSign is asking to sign, view or receive a copy. No example value is given anywhere in this connector for either field"
 properties = { signers = { type = "array", description = "Recipients asked to sign", items = { type = "object", required = ["recipientId", "email", "name", "status"], properties = { recipientId = { type = "string" }, name = { type = "string", description = "Personal data — the signer's own name" }, email = { type = "string", description = "Personal data — the signer's own email address" }, status = { type = "string", description = "e.g. created, sent, delivered, completed, declined, autoresponded" }, routingOrder = { type = "string", description = "A COUNT, RETURNED AS A STRING — DocuSign's own convention" }, signedDateTime = { type = "string", format = "date-time" }, deliveredDateTime = { type = "string", format = "date-time" }, declinedReason = { type = "string" } } } }, agents = { type = "array", description = "Recipients who may view and forward the envelope without signing. Same personal-data shape as signers", items = { type = "object" } }, carbonCopies = { type = "array", description = "Recipients who receive a copy once the envelope completes. Same personal-data shape as signers", items = { type = "object" } }, recipientCount = { type = "string", description = "A COUNT, RETURNED AS A STRING — DocuSign's own convention" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-envelope-create-from-template"
 method = "POST"
 direction = "write"
@@ -325,13 +355,19 @@ type = "object"
 required = ["envelopeId", "status"]
 properties = { envelopeId = { type = "string", description = "The new envelope's id — what docusign-envelope-get, docusign-envelope-recipients-get and docusign-envelope-void address it by" }, status = { type = "string", description = "Echoes the status just set: sent or created" }, statusDateTime = { type = "string", format = "date-time" }, uri = { type = "string", description = "This envelope's own resource path" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "docusign-envelope-void"
 method = "PUT"
 direction = "write"
@@ -374,7 +410,7 @@ type = "object"
 required = ["envelopeId", "status"]
 properties = { envelopeId = { type = "string" }, status = { type = "string", description = "voided on success" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/errorCode"
 

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Contentful Content Delivery API (CDA) access token, sent as a bearer. Read-only: published content in one space only, and only the Delivery API accepts it",
@@ -116,7 +116,7 @@
     ]
   ],
   "description": "Contentful headless CMS: read published content from the Content Delivery API, and create and publish entries through the Content Management API — two different hosts and two different tokens for one vendor",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -141,6 +141,10 @@
       "credential_requirement": "declared",
       "description": "Get one published entry by id, with its fields resolved to one locale",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "environment_id": [
           "path"
@@ -152,6 +156,8 @@
       "expose": true,
       "id": "contentful-entry-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The entry's id, from contentful-entries-list or the Contentful web app",
@@ -165,10 +171,15 @@
           "symbol": "entry_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/entries/{entry_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "fields": {
@@ -229,6 +240,10 @@
       "credential_requirement": "declared",
       "description": "List published entries in this space and environment, most recently updated first. This connector's `verify` — a bounded read that runs unattended: space and environment are already resolved from configuration, and `limit`/`skip` are optional, so no required argument is ever needed",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "environment_id": [
           "path"
@@ -240,6 +255,8 @@
       "expose": true,
       "id": "contentful-entries-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Maximum entries to return. Contentful defaults to 100 and caps at 1000",
@@ -265,6 +282,8 @@
           "symbol": "skip"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -283,6 +302,9 @@
         ],
         "url": "{base}/entries"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -341,6 +363,10 @@
       "credential_requirement": "declared",
       "description": "Get one published asset (an uploaded file, e.g. an image) by id, with its metadata resolved to one locale",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "environment_id": [
           "path"
@@ -352,6 +378,8 @@
       "expose": true,
       "id": "contentful-asset-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The asset's id, from an entry's own field links or the Contentful web app",
@@ -365,10 +393,15 @@
           "symbol": "asset_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/assets/{asset_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "fields": {
@@ -427,6 +460,10 @@
       "credential_requirement": "declared",
       "description": "Create a new entry from a content type's field values. Contentful assigns the entry's id. The entry is created as a draft — it is not visible through the Delivery API until contentful-entry-publish publishes it",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "environment_id": [
           "path"
@@ -438,6 +475,8 @@
       "expose": true,
       "id": "contentful-entry-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the content type this entry is an instance of. Required by Contentful on every create; there is no default",
@@ -462,6 +501,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -478,6 +519,9 @@
         "method": "POST",
         "url": "{base}/entries"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "fields": {
@@ -542,6 +586,10 @@
       "credential_requirement": "declared",
       "description": "Publish a draft entry, making it visible through the Delivery API. Sends no body",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "environment_id": [
           "path"
@@ -553,6 +601,8 @@
       "expose": true,
       "id": "contentful-entry-publish",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The entry's id, from contentful-entry-create or a prior read",
@@ -578,6 +628,8 @@
           "wire": "X-Contentful-Version"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "X-Contentful-Version": {
@@ -587,6 +639,9 @@
         "method": "PUT",
         "url": "{base}/entries/{entry_id}/published"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "fields": {
@@ -627,8 +682,7 @@
       "service": "management"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://cdn.contentful.com/spaces/{space_id}/environments/{environment_id}",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Trello API key, identifying the Power-Up registration a call is made through. Travels as the `key` query parameter on every request, always together with the token; neither authenticates a call alone",
@@ -63,7 +63,7 @@
     ]
   ],
   "description": "Trello boards and cards: list the boards a token can see, read a board and its lists, read a list's cards, create a card, and archive one. Authenticates every request with an API key and a token together, both in the query string",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -83,13 +83,24 @@
       "credential_requirement": "declared",
       "description": "List every board the token's own member can see, newest activity first. Takes no argument — `me` resolves to whoever the token belongs to. Also this connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the credential pair",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "trello-board-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/members/me/boards"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "properties": {
@@ -187,9 +198,15 @@
       "credential_requirement": "declared",
       "description": "Get one board by id, with its settings and current state",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "trello-board-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The board's id, from trello-board-list's `id` — or the short id in a board's own URL, which Trello accepts here too",
@@ -203,10 +220,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/boards/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "closed": {
@@ -301,9 +323,15 @@
       "credential_requirement": "declared",
       "description": "List the open lists (columns) on a board, left to right. Each carries the `id` trello-list-cards and trello-card-create take",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "trello-board-lists",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The board's id, from trello-board-list's `id`",
@@ -317,10 +345,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/boards/{id}/lists"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
@@ -349,9 +382,15 @@
       "credential_requirement": "declared",
       "description": "List the open cards in one list, in board order. Archived cards are not returned",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "trello-list-cards",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The list's id, from trello-board-lists",
@@ -365,10 +404,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/lists/{id}/cards"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "properties": {
@@ -503,9 +547,15 @@
       "credential_requirement": "declared",
       "description": "Create a card at the bottom of a list. The card is created unassigned, with no due date and no labels; Trello notifies whoever watches the list",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "trello-card-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The list to create the card in, from trello-board-lists. The only field Trello requires",
@@ -541,6 +591,8 @@
           "wire": "desc"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -562,6 +614,9 @@
         "method": "POST",
         "url": "{base}/cards"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "badges": {
@@ -674,9 +729,15 @@
       "credential_requirement": "declared",
       "description": "Archive a card, or restore an archived one. Archiving is reversible and destroys nothing: the card leaves its list and stays readable in the board's archive",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "trello-card-archive",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The card's id, from trello-list-cards or from trello-card-create's response",
@@ -700,6 +761,8 @@
           "symbol": "closed"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -715,6 +778,9 @@
         "method": "PUT",
         "url": "{base}/cards/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "badges": {
@@ -797,8 +863,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "1",

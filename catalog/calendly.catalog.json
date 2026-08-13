@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Calendly access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Calendly scheduling: read the authenticated user, event types, scheduled events and their invitees",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,13 +55,24 @@
       "credential_requirement": "declared",
       "description": "Get the authenticated user: their own resource URI, name, scheduling slug, account email and current organization. The URI in the response is the value later operations expect as their `user` query parameter",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "calendly-user-me",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/users/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "resource": {
@@ -141,9 +152,15 @@
       "credential_requirement": "declared",
       "description": "List event types owned by a user — the bookable meeting templates (name, duration, scheduling link). Takes the user's own URI, not a bare id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "calendly-event-type-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full URI of the Calendly user to list event types for, e.g. `https://api.calendly.com/users/{uuid}` — the `uri` field from calendly-user-me's response. Pass the whole URI unchanged, never just its trailing id",
@@ -171,6 +188,8 @@
           "symbol": "count"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -189,6 +208,9 @@
         ],
         "url": "{base}/event_types"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "collection": {
@@ -280,9 +302,15 @@
       "credential_requirement": "declared",
       "description": "List a user's scheduled events (past and upcoming bookings). Takes the user's own URI, not a bare id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "calendly-scheduled-event-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full URI of the Calendly user to list scheduled events for, e.g. `https://api.calendly.com/users/{uuid}` — the `uri` field from calendly-user-me's response. Pass the whole URI unchanged, never just its trailing id",
@@ -324,6 +352,8 @@
           "symbol": "count"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -348,6 +378,9 @@
         ],
         "url": "{base}/scheduled_events"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "collection": {
@@ -451,9 +484,19 @@
       "credential_requirement": "declared",
       "description": "Get one scheduled event by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/title",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "calendly-scheduled-event-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The event's bare UUID — the last path segment of its own `uri`, e.g. the tail of `https://api.calendly.com/scheduled_events/{uuid}`. Pass only the UUID here, never the full URI",
@@ -469,16 +512,15 @@
           "symbol": "uuid"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/title",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/scheduled_events/{uuid}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "resource": {
@@ -582,9 +624,19 @@
       "credential_requirement": "declared",
       "description": "List a scheduled event's invitees. Each invitee is personal data about a named third party — their name, email and any answers they gave to the event type's custom questions. Read it only for what the calling flow needs and do not persist or repeat it beyond that",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/title",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "calendly-invitee-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The event's bare UUID — the last path segment of its own `uri`. Pass only the UUID here, never the full URI",
@@ -627,12 +679,8 @@
           "symbol": "count"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/title",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -651,6 +699,9 @@
         ],
         "url": "{base}/scheduled_events/{uuid}/invitees"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "collection": {
@@ -713,8 +764,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.calendly.com",

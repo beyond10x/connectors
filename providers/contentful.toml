@@ -238,6 +238,12 @@ binds = "credential.contentful.management_token"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "contentful-entry-get"
 service = "delivery"
 method = "GET"
@@ -261,6 +267,12 @@ properties = { sys = { type = "object", description = "Envelope metadata: at lea
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "contentful-entries-list"
 service = "delivery"
 method = "GET"
@@ -290,6 +302,12 @@ properties = { sys = { type = "object", description = "The envelope's own type m
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "contentful-asset-get"
 service = "delivery"
 method = "GET"
@@ -315,6 +333,12 @@ properties = { sys = { type = "object", description = "Envelope metadata: at lea
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "contentful-entry-create"
 service = "management"
 method = "POST"
@@ -345,6 +369,12 @@ properties = { sys = { type = "object", description = "At least `id` (the new en
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "contentful-entry-publish"
 service = "management"
 method = "PUT"

@@ -292,12 +292,31 @@ path_prefix = "/v1"
 methods = ["GET"]
 risk = "high"
 idempotency = "non_idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.select]]
 path_prefix = "/v1"
 methods = ["POST"]
 risk = "high"
 idempotency = "non_idempotent"
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+
+[[patch.operations]]
+select = "flushWidgets"
+effects = ["write", "network"]
+
+[[patch.operations]]
+select = "lookupWidgets"
+effects = ["read", "network"]
 "#;
 
 /// Direction survives the part the lowering-only test cannot reach: ingest and selector
@@ -377,6 +396,12 @@ fn a_selector_matches_by_service_path_prefix_and_method() {
 service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
 
@@ -490,6 +515,12 @@ path_prefix = "/api/v2/agents"
 methods = ["GET"]
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 expose = false
 
 [[patch.operations]]
@@ -530,6 +561,12 @@ fn an_exact_deferral_withholds_one_selector_match() {
 service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.operations]]
 service = "manager"
@@ -612,12 +649,26 @@ service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
 risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.select]]
 service = "manager"
 path_prefix = "/api/v2/agents/{id}"
 methods = ["GET"]
 risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert_eq!(
@@ -661,9 +712,28 @@ fn identical_inputs_produce_identical_ir() {
 [[patch.select]]
 service = "manager"
 path_prefix = "/api/v2/agents"
-methods = ["GET", "DELETE"]
+methods = ["GET"]
 risk = "destructive"
 idempotency = "non_idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+
+[[patch.select]]
+service = "manager"
+path_prefix = "/api/v2/agents"
+methods = ["DELETE"]
+risk = "destructive"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     );
     assert_eq!(load(&definition), load(&definition));
@@ -695,6 +765,13 @@ listThings = "read"
 
 [[patch.select]]
 path_prefix = "/v1"
+methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
     let connector = load_from(pointer, &document);
     assert_eq!(
@@ -748,6 +825,12 @@ fn the_naming_rule_derives_the_declared_spelling() {
 service = "manager"
 path_prefix = "/api/v2/calls/reporting"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert_eq!(
@@ -777,6 +860,12 @@ getAgent = "babelforce-agent-get"
 service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.operations]]
 service = "manager"
@@ -830,11 +919,23 @@ fn two_operation_ids_deriving_one_op_id_refuse() {
 service = "manager"
 path_prefix = "/api/v2/users/{id}"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.select]]
 service = "user"
 path_prefix = "/api/v2/user/me"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(
@@ -900,6 +1001,12 @@ path_prefix = "/api/v3"
 methods = ["GET"]
 risk = "high"
 idempotency = "non_idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.select]]
 service = "task-automation"
@@ -907,6 +1014,12 @@ path_prefix = "/api/v3"
 methods = ["POST", "PUT", "PATCH", "DELETE"]
 risk = "high"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     let mut published = ids(&connector);
@@ -965,6 +1078,12 @@ path_prefix = "/api/v2/agents"
 methods = ["DELETE"]
 risk = "destructive"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(!connector.operations.is_empty());
@@ -1011,6 +1130,12 @@ fn a_read_may_go_unstated() {
 service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(!connector.operations.is_empty());
@@ -1037,6 +1162,12 @@ path_prefix = "/api/v2/agents"
 methods = ["DELETE"]
 risk = "destructive"
 idempotency = "conditional"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(
@@ -1060,6 +1191,12 @@ path_prefix = "/api/v2/agents"
 methods = ["DELETE"]
 risk = "high"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[patch.operations]]
 service = "manager"
@@ -1092,6 +1229,12 @@ service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
 expose = false
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(!connector.operations.is_empty());
@@ -1113,6 +1256,12 @@ fn exposure_still_defaults_to_exposed() {
 service = "manager"
 path_prefix = "/api/v2/agents"
 methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
     ));
     assert!(connector
@@ -1246,8 +1395,9 @@ fn the_canonical_surface_is_selected_and_the_file_stays_reviewable() {
 
     // **The size claim, measured.** Direction is intentionally one reviewed value per stable
     // operation identity; it therefore scales with the surface and is not selector boilerplate.
-    // Count the remaining declarations, where one `[[patch.operations]]` block per operation would
-    // still be north of 1,600 lines.
+    // Count the remaining declarations, including the six explicit execution facts each reviewed
+    // selector now owes. One `[[patch.operations]]` block per operation would still be north of
+    // 3,800 lines once those facts were repeated 388 times.
     let declarations = definition
         .lines()
         .map(str::trim)
@@ -1255,7 +1405,7 @@ fn the_canonical_surface_is_selected_and_the_file_stays_reviewable() {
         .filter(|line| !line.ends_with("= \"read\"") && !line.ends_with("= \"write\""))
         .count();
     assert!(
-        declarations < 400,
+        declarations < 550,
         "selecting {REACHABLE} operations took {declarations} declaration lines; the point of a \
          selector is that this number does not scale with the operation count"
     );

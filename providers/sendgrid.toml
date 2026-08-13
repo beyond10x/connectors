@@ -167,6 +167,12 @@ name = "default"
 tags = ["email"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sendgrid-template-list"
 method = "GET"
 direction = "read"
@@ -195,6 +201,12 @@ properties = { result = { type = "array", description = "The matching templates"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sendgrid-template-get"
 method = "GET"
 direction = "read"
@@ -217,6 +229,12 @@ properties = { id = { type = "string" }, name = { type = "string" }, generation 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sendgrid-suppression-bounce-list"
 method = "GET"
 direction = "read"
@@ -247,6 +265,12 @@ items = { type = "object", required = ["email", "created", "reason", "status"], 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sendgrid-email-validate"
 method = "POST"
 direction = "write"
@@ -277,7 +301,7 @@ type = "object"
 required = ["result"]
 properties = { result = { type = "object", required = ["email", "verdict"], properties = { email = { type = "string", description = "Echoes the checked address — the caller's own input, never an example value" }, verdict = { type = "string", enum = ["Valid", "Risky", "Invalid"] }, score = { type = "number", description = "A confidence score between 0 and 1" }, local = { type = "string", description = "The local part of the address (before the `@`)" }, host = { type = "string", description = "The domain part of the address (after the `@`)" }, suggestion = { description = "A suggested correction, when SendGrid has one, otherwise null" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 
 # ---------------------------------------------------------------------------------------------

@@ -1,18 +1,16 @@
-# codewandler-connector-resolve
+# connector-resolve
 
-Derives a connector's HTTP **request plan** from the flux-connectors catalog document — no engine,
+Derives a connector's HTTP **request plan** from the connectors catalog document — no engine,
 no transport, no socket.
+
+Part of [b10x/connectors](https://github.com/b10x/connectors). It is an internal,
+pre-v1 crate in this private workspace, not a published predecessor package.
 
 Each operation in the catalogue publishes a closed, total request template: a method, a URL, headers,
 a structured query and a body, with `{slot}` interpolation over the tenant's connection settings and
 `{"$param": …}` splices over the caller's arguments. This crate evaluates one, checks every
 configuration value against the position it lands on, places the credentials it is handed, and hands
 back the result as data.
-
-```toml
-[dependencies]
-codewandler-connector-resolve = "0.26"
-```
 
 The library name is `connector_resolve`:
 
@@ -49,8 +47,7 @@ the origin or escape its path segment, a caller value that leaves a `{placeholde
 URL, a credential whose header the template already sets, an inbound signing secret. A partly
 evaluated request is not a degraded request — it is a different call, and the vendor answers it.
 
-For the flux `Tool` pack built on top of this — registry installation, credential resolution,
-approval gating and dispatch — use
-[`codewandler-connector-pack`](https://crates.io/crates/codewandler-connector-pack).
+Admission, transport and harness integration are deliberately outside this crate. Those layers
+consume the request plan; they do not change how it is composed.
 
 License: MIT OR Apache-2.0.

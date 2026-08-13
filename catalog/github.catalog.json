@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "GitHub token sent as a bearer — a GitHub App installation token, a fine-grained PAT, or a classic PAT",
@@ -86,7 +86,7 @@
     ]
   ],
   "description": "GitHub REST API: discover the authenticated user, their organisations and reachable repositories; read repositories, commits, issues, pull requests and Actions workflow runs; and write issues and issue comments",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -118,9 +118,15 @@
       "credential_requirement": "declared",
       "description": "Get one repository's metadata, including its default branch, visibility and permissions",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-repo-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository owner — a user or organisation login",
@@ -145,6 +151,8 @@
           "symbol": "repo"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -152,6 +160,9 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -267,9 +278,15 @@
       "credential_requirement": "declared",
       "description": "Get one issue by number. GitHub treats a pull request as an issue, so a PR number returns that PR's issue view; use github-pull-get for its merge and review state",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-issue-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository owner — a user or organisation login",
@@ -306,6 +323,8 @@
           "symbol": "issue_number"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -313,6 +332,9 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}/issues/{issue_number}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignees": {
@@ -442,9 +464,15 @@
       "credential_requirement": "declared",
       "description": "Get one pull request by number, with its merge state, head and base refs and review counts",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-pull-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository owner — a user or organisation login",
@@ -481,6 +509,8 @@
           "symbol": "pull_number"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -488,6 +518,9 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}/pulls/{pull_number}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "additions": {
@@ -629,9 +662,15 @@
       "credential_requirement": "declared",
       "description": "Open a new issue on a repository. The issue is immediately visible to everyone who can see the repository and notifies its subscribers",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "github-issue-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository owner — a user or organisation login",
@@ -705,6 +744,8 @@
           "symbol": "assignees"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -730,6 +771,9 @@
         "method": "POST",
         "url": "{base}/repos/{owner}/{repo}/issues"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignees": {
@@ -838,9 +882,15 @@
       "credential_requirement": "declared",
       "description": "Add a comment to an issue or pull request. The comment is public to everyone who can see the repository and notifies its participants; GitHub has no private or internal comment here",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "github-issue-comment-add",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The repository owner — a user or organisation login",
@@ -888,6 +938,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -904,6 +956,9 @@
         "method": "POST",
         "url": "{base}/repos/{owner}/{repo}/issues/{issue_number}/comments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "author_association": {
@@ -1000,9 +1055,15 @@
       "credential_requirement": "declared",
       "description": "List a repository's issues and pull requests with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-issue-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The account owner of the repository. The name is not case sensitive.",
@@ -1047,6 +1108,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -1068,6 +1131,9 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/issues"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Issues are a great way to keep track of tasks, enhancements, and bugs for your projects.",
@@ -3760,9 +3826,15 @@
       "credential_requirement": "declared",
       "description": "List the files changed by one pull request with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-pull-files-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The account owner of the repository. The name is not case sensitive.",
@@ -3817,6 +3889,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -3838,6 +3912,9 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/pulls/{pull_number}/files"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Diff Entry",
@@ -3947,9 +4024,15 @@
       "credential_requirement": "declared",
       "description": "List a repository's GitHub Actions workflow runs with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-workflow-run-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The account owner of the repository. The name is not case sensitive.",
@@ -3994,6 +4077,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -4015,6 +4100,9 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/actions/runs"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "total_count": {
@@ -5991,9 +6079,15 @@
       "credential_requirement": "declared",
       "description": "List commits in a repository with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-commit-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The account owner of the repository. The name is not case sensitive.",
@@ -6038,6 +6132,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -6059,6 +6155,9 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/commits"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Commit",
@@ -6566,9 +6665,17 @@
       "credential_requirement": "declared",
       "description": "Get the authenticated user — the identity the configured token acts as",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-user-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -6576,6 +6683,9 @@
         "method": "GET",
         "url": "{base}/user"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "discriminator": {
           "mapping": {
@@ -7043,9 +7153,15 @@
       "credential_requirement": "declared",
       "description": "List the organisations the authenticated user belongs to, with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-org-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -7070,6 +7186,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -7091,6 +7209,9 @@
         ],
         "url": "{base}/user/orgs"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A GitHub organization.",
@@ -7205,9 +7326,15 @@
       "credential_requirement": "declared",
       "description": "List an organisation's repositories, filtered by type and ordered, with bounded integer pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-org-repo-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The organization name. The name is not case sensitive.",
@@ -7292,6 +7419,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -7331,6 +7460,9 @@
         ],
         "url": "{base}/orgs/{org}/repos"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Minimal Repository",
@@ -8069,9 +8201,15 @@
       "credential_requirement": "declared",
       "description": "List the repositories the authenticated user can access, filtered by visibility, affiliation and type",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "github-user-repo-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Limit results to repositories with the specified visibility.",
@@ -8172,6 +8310,8 @@
           "symbol": "page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Accept": "application/vnd.github+json"
@@ -8223,6 +8363,9 @@
         ],
         "url": "{base}/user/repos"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A repository on GitHub.",
@@ -8878,8 +9021,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.github.com",

@@ -110,6 +110,128 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
         .collect()
 }
 
+/// S-015 is a vocabulary migration, not a behavioural edit. The digest is the pre-migration
+/// inventory of all 151 non-empty operation trait sets, normalized without the old umbrella key.
+#[test]
+fn promoted_operation_traits_equal_the_pre_migration_inventory() {
+    let (workspace, plan) = full_plan();
+    let mut facts = Vec::new();
+    for (provider, document) in documents(&workspace, &plan) {
+        for operation in document["operations"].as_array().expect("operations") {
+            if operation.get("pagination").is_none()
+                && operation.get("rate_limit").is_none()
+                && operation.get("error_envelope").is_none()
+            {
+                continue;
+            }
+            facts.push(serde_json::json!({
+                "provider": provider.clone(),
+                "id": operation["id"],
+                "pagination": operation.get("pagination").cloned().unwrap_or(Value::Null),
+                "rate_limit": operation.get("rate_limit").cloned().unwrap_or(Value::Null),
+                "error_envelope": operation.get("error_envelope").cloned().unwrap_or(Value::Null),
+            }));
+        }
+    }
+    facts.sort_by_key(|fact| {
+        format!(
+            "{}\0{}",
+            fact["provider"].as_str().unwrap(),
+            fact["id"].as_str().unwrap()
+        )
+    });
+    assert_eq!(facts.len(), 151);
+    let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
+    assert_eq!(
+        digest,
+        "ca7de6c5f45fbd87f078b82d2505f8045c4d5bad5a5c1278ce88fc9ac8c5d2d5"
+    );
+}
+
+/// S-023 records an owner-local, reproducible mapping for substrate without reading a sibling
+/// checkout or pretending the two repositories use the same vocabulary. This is deliberately the
+/// five-axis fixture, not S-031's later full provider projection.
+#[test]
+fn substrate_axis_projection_is_pinned_total_and_non_mechanical() {
+    let root = repo_root();
+    let fixture: Value = serde_json::from_slice(
+        &std::fs::read(root.join("fixtures/substrate-wire-0.1.0-axis-projection.json"))
+            .expect("the connectors-owned substrate projection fixture exists"),
+    )
+    .expect("the substrate projection fixture is JSON");
+
+    assert_eq!(fixture["source"]["repository"], "b10x/substrate");
+    assert_eq!(fixture["source"]["bundle"], "substrate-wire");
+    assert_eq!(fixture["source"]["version"], "0.1.0");
+    assert_eq!(
+        fixture["source"]["bundle_manifest_sha256"],
+        "f71e1305367ec75c14f8f0db45a8bd750e4d0c6c0cdda1ef642b5f1ada5da9fa"
+    );
+
+    let schema = std::fs::read(root.join("catalog/connector-document.schema.json"))
+        .expect("the committed connector schema exists");
+    assert_eq!(fixture["target"]["schema_version"], 2);
+    assert_eq!(
+        fixture["target"]["schema_sha256"],
+        connector_spec::sha256_hex(&schema)
+    );
+
+    let source = fixture["source_operation_facts"]
+        .as_array()
+        .expect("source operation facts are an array");
+    let overlays = fixture["operation_overlays"]
+        .as_array()
+        .expect("operation overlays are an array");
+    assert_eq!(
+        source.len(),
+        12,
+        "substrate-wire 0.1.0 has twelve operations"
+    );
+    assert_eq!(overlays.len(), source.len());
+
+    let source_ids: BTreeSet<_> = source
+        .iter()
+        .map(|operation| operation["id"].as_str().expect("source id"))
+        .collect();
+    let overlay_ids: BTreeSet<_> = overlays
+        .iter()
+        .map(|operation| operation["source_id"].as_str().expect("overlay source id"))
+        .collect();
+    assert_eq!(source_ids.len(), source.len(), "source ids must be unique");
+    assert_eq!(
+        source_ids, overlay_ids,
+        "each source operation has exactly one overlay"
+    );
+
+    let effect_mapping = fixture["closed_mappings"]["source_effects"]
+        .as_object()
+        .expect("source effects use an explicit mapping");
+    let target_host_effects = ["filesystem", "network", "process"];
+    let mut renamed_effect = false;
+    for operation in source {
+        for effect in operation["effects"].as_array().expect("source effects") {
+            let effect = effect.as_str().expect("source effect name");
+            let mapping = effect_mapping
+                .get(effect)
+                .unwrap_or_else(|| panic!("source effect `{effect}` must be explicitly mapped"));
+            assert_eq!(mapping["retention"], "substrate_capability_requirement");
+            assert_eq!(mapping["semantic_effect"], false);
+            let target = mapping["target_host_effect"]
+                .as_str()
+                .expect("target host effect is named");
+            assert!(
+                target_host_effects.contains(&target),
+                "mapped host effect `{target}` is in connectors' closed vocabulary"
+            );
+            renamed_effect |= target != effect;
+        }
+    }
+    assert!(
+        renamed_effect,
+        "the explicit projection must not pretend the two effect vocabularies are identical"
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // 1. Determinism
 // ---------------------------------------------------------------------------------------------
@@ -360,7 +482,7 @@ fn the_lockfile_agrees_with_every_input_and_every_artifact() {
             "the lockfile's `toml_sha256` for `{provider}` is not the file on disk"
         );
         assert!(
-            entry.generator.starts_with("flux-connectors "),
+            entry.generator.starts_with("connectors "),
             "`{provider}`'s row records generator `{}`",
             entry.generator
         );

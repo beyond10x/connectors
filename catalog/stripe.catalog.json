@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Stripe secret key sent as a bearer. A live key moves real money; a test key does not. A restricted key limited to Charges, PaymentIntents, Refunds, Customers and Balance is sufficient",
@@ -232,7 +232,7 @@
       "service": "default"
     }
   ],
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -251,19 +251,28 @@
       "credential_requirement": "declared",
       "description": "Get the account's current balance — what is available to pay out and what is still pending, per currency. Takes no parameters, and reports the balance of whichever mode the key belongs to: a test key returns the test balance",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-balance-get",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/balance"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "available": {
@@ -322,9 +331,19 @@
       "credential_requirement": "declared",
       "description": "Get one customer by id: name, email, phone, billing address, default payment method and account balance. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires. A deleted customer is returned with `deleted: true` and almost no other fields",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-customer-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The customer's id, `cus_` followed by an opaque identifier — not their email address and not a merchant-side reference",
@@ -339,16 +358,15 @@
           "symbol": "customer"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/customers/{customer}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "currency": {
@@ -404,9 +422,19 @@
       "credential_requirement": "declared",
       "description": "Get one charge by id: amount, currency, whether it was captured, whether it was refunded and how much of it, the card's last four digits and brand, and the failure or decline reason if it did not succeed. `amount` is in the currency's smallest unit — 1000 is ten dollars, and also ten thousand yen",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-charge-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The charge's id, `ch_` followed by an opaque identifier. A payment intent id (`pi_…`) does not address this endpoint — read it with `stripe-payment-intent-get` instead",
@@ -421,16 +449,15 @@
           "symbol": "charge"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/charges/{charge}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "amount": {
@@ -509,9 +536,19 @@
       "credential_requirement": "declared",
       "description": "Get one payment intent by id — the modern shape of a payment, covering the whole lifecycle from creation to capture. Its `status` is what says where the payment stands; `requires_capture` means the money is authorized but not yet taken",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-payment-intent-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The payment intent's id, `pi_` followed by an opaque identifier. The client secret (`pi_…_secret_…`) is a different value and must never be sent here",
@@ -526,16 +563,15 @@
           "symbol": "payment_intent"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/payment_intents/{payment_intent}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "amount": {
@@ -616,9 +652,19 @@
       "credential_requirement": "declared",
       "description": "Get one refund by id: its amount, the charge it belongs to, its reason and its status. A refund that reports `pending` has not reached the customer's bank yet, and one that reports `failed` means the money came back — the customer was not paid",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-refund-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The refund's id, `re_` followed by an opaque identifier",
@@ -633,16 +679,15 @@
           "symbol": "refund"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/refunds/{refund}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "amount": {
@@ -714,9 +759,19 @@
       "credential_requirement": "declared",
       "description": "Capture an authorized payment intent, charging the customer the **full** authorized amount. Only a payment intent in `requires_capture` can be captured; a partial capture needs an `amount` this connector cannot send. Stripe answers 402 with an `error.code` such as `card_declined` when the capture is refused, and that arrives as data rather than as a failure",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-payment-intent-capture",
       "idempotency": "conditional",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the payment intent to capture, `pi_` followed by an opaque identifier. It must be in `requires_capture` — check with `stripe-payment-intent-get` first",
@@ -744,12 +799,8 @@
           "wire": "Idempotency-Key"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "repeatability_condition": "the connector requires an `Idempotency-Key` header on every call, and Stripe replays a keyed POST from its own cache for 24 hours rather than re-executing it, so a retried capture captures once and returns the first result",
       "request": {
         "headers": {
@@ -760,6 +811,9 @@
         "method": "POST",
         "url": "{base}/v1/payment_intents/{payment_intent}/capture"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "amount": {
@@ -826,9 +880,19 @@
       "credential_requirement": "declared",
       "description": "Cancel a payment intent, releasing any authorization hold on the customer's card. This cannot be undone — a canceled intent is final, and collecting the payment afterwards means creating a new one. An intent that has already succeeded cannot be canceled; refund it instead",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-payment-intent-cancel",
       "idempotency": "conditional",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the payment intent to cancel, `pi_` followed by an opaque identifier",
@@ -856,12 +920,8 @@
           "wire": "Idempotency-Key"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "repeatability_condition": "the connector requires an `Idempotency-Key` header on every call, and Stripe replays a keyed POST from its own cache for 24 hours rather than re-executing it, so a retried cancel cancels once rather than racing a second attempt",
       "request": {
         "headers": {
@@ -872,6 +932,9 @@
         "method": "POST",
         "url": "{base}/v1/payment_intents/{payment_intent}/cancel"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "canceled_at": {
@@ -929,9 +992,19 @@
       "credential_requirement": "declared",
       "description": "Refund a charge **in full** and irreversibly: the entire un-refunded amount goes back to the customer's original payment method, usually within five to ten business days. A partial refund needs an `amount` this connector cannot send. Stripe's fee on the original charge is not returned. There is no way to undo a refund — collecting the money again means charging the customer again",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/code",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "stripe-charge-refund-create",
       "idempotency": "conditional",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the charge to refund, `ch_` followed by an opaque identifier. A payment intent's charge is its `latest_charge`, which `stripe-payment-intent-get` reports",
@@ -959,12 +1032,8 @@
           "wire": "Idempotency-Key"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/code",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "repeatability_condition": "the connector requires an `Idempotency-Key` header on every call, and Stripe replays a keyed POST from its own cache for 24 hours rather than re-executing it, so a retried refund refunds once — without the key a retry would move money twice",
       "request": {
         "headers": {
@@ -975,6 +1044,9 @@
         "method": "POST",
         "url": "{base}/v1/charges/{charge}/refunds"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "amount": {
@@ -1036,9 +1108,15 @@
       "credential_requirement": "declared",
       "description": "List country-specific requirements, supported currencies and payment capabilities without changing an account",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "stripe-country-spec-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 10.",
@@ -1051,6 +1129,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1063,6 +1143,9 @@
         ],
         "url": "{base}/v1/country_specs"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "",
         "properties": {
@@ -1270,9 +1353,15 @@
       "credential_requirement": "declared",
       "description": "List Stripe account events for operational visibility without replaying or changing an event",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "stripe-event-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 10.",
@@ -1285,6 +1374,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1297,6 +1388,9 @@
         ],
         "url": "{base}/v1/events"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "",
         "properties": {
@@ -1474,9 +1568,15 @@
       "credential_requirement": "declared",
       "description": "List current Stripe exchange rates without creating a conversion or moving funds",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "stripe-exchange-rate-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and total number of supported payout currencies, and the default is the max.",
@@ -1489,6 +1589,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1501,6 +1603,9 @@
         ],
         "url": "{base}/v1/exchange_rates"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "",
         "properties": {
@@ -1597,9 +1702,15 @@
       "credential_requirement": "declared",
       "description": "List usage-billing meter definitions without creating, changing or deactivating one",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "stripe-billing-meter-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 10.",
@@ -1612,6 +1723,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1624,6 +1737,9 @@
         ],
         "url": "{base}/v1/billing/meters"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "",
         "properties": {
@@ -1821,8 +1937,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

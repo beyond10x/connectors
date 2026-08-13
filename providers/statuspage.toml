@@ -228,6 +228,12 @@ name = "default"
 tags = ["incident-response"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "statuspage-incident-list"
 method = "GET"
 direction = "read"
@@ -241,7 +247,7 @@ type = "array"
 description = "The page's incidents, most recent first. Statuspage returns a bare JSON array here, not an object wrapping one"
 items = { type = "object", required = ["id", "name", "status"], properties = { id = { type = "string", description = "The incident's own id — what statuspage-incident-get and statuspage-incident-update address it by" }, name = { type = "string", description = "The incident's title, as shown on the public page" }, status = { type = "string", description = "investigating, identified, monitoring or resolved for a realtime incident; scheduled, in_progress, verifying or completed for a scheduled maintenance, which this connector does not create or update" }, impact = { type = "string", description = "none, maintenance, minor, major or critical — Statuspage's own calculation from the affected components unless an override was set" }, shortlink = { type = "string", description = "The public short URL for this incident" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, monitoring_at = { type = "string", format = "date-time", description = "When the incident moved to monitoring; null until it does" }, resolved_at = { type = "string", format = "date-time", description = "When the incident was resolved; null until it is" }, page_id = { type = "string", description = "The page this incident belongs to — the same id this connection is configured with" }, incident_updates = { type = "array", description = "Every update posted to this incident, most recent first. Each update's body is what subscribers received", items = { type = "object", properties = { id = { type = "string" }, status = { type = "string" }, body = { type = "string", description = "The publicly visible message this update posted" }, created_at = { type = "string", format = "date-time" }, display_at = { type = "string", format = "date-time" } } } }, components = { type = "array", description = "The components this incident affects, in the shape statuspage-component-list returns", items = { type = "object" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # Statuspage answers a failure with `{"error": …}`. The value is a string for an authentication or
 # authorization failure and an array of strings for a validation failure, so the pointer names where
 # the message is rather than claiming a single scalar shape; no `code_pointer`, because Statuspage
@@ -251,6 +257,12 @@ message_pointer = "/error"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "statuspage-incident-get"
 method = "GET"
 direction = "read"
@@ -270,7 +282,7 @@ type = "object"
 required = ["id", "name", "status"]
 properties = { id = { type = "string" }, name = { type = "string", description = "The incident's title, as shown on the public page" }, status = { type = "string", description = "investigating, identified, monitoring or resolved for a realtime incident" }, impact = { type = "string", description = "none, maintenance, minor, major or critical" }, shortlink = { type = "string", description = "The public short URL for this incident" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, monitoring_at = { type = "string", format = "date-time" }, resolved_at = { type = "string", format = "date-time" }, page_id = { type = "string" }, incident_updates = { type = "array", description = "Every update posted to this incident, most recent first. Each update's body is what subscribers received", items = { type = "object", properties = { id = { type = "string" }, status = { type = "string" }, body = { type = "string", description = "The publicly visible message this update posted" }, created_at = { type = "string", format = "date-time" }, display_at = { type = "string", format = "date-time" } } } }, components = { type = "array", description = "The components this incident affects", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
@@ -281,6 +293,12 @@ message_pointer = "/error"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "statuspage-incident-create"
 method = "POST"
 direction = "write"
@@ -330,7 +348,7 @@ type = "object"
 required = ["id", "name", "status"]
 properties = { id = { type = "string", description = "The new incident's id — what statuspage-incident-get and statuspage-incident-update address it by" }, name = { type = "string" }, status = { type = "string", description = "Echoes the status just set" }, impact = { type = "string", description = "Statuspage's own calculation for the new incident" }, shortlink = { type = "string", description = "The public short URL for this incident — already live" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, page_id = { type = "string" }, incident_updates = { type = "array", description = "The one update this call posted", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
@@ -340,6 +358,12 @@ message_pointer = "/error"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "statuspage-incident-update"
 method = "PATCH"
 direction = "write"
@@ -383,7 +407,7 @@ type = "object"
 required = ["id", "name", "status"]
 properties = { id = { type = "string" }, name = { type = "string", description = "Unchanged — this operation cannot rename an incident" }, status = { type = "string", description = "Echoes the status just set" }, impact = { type = "string" }, shortlink = { type = "string" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, monitoring_at = { type = "string", format = "date-time" }, resolved_at = { type = "string", format = "date-time", description = "Set once the status reaches resolved" }, page_id = { type = "string" }, incident_updates = { type = "array", description = "Every update on the incident including the one this call just posted, most recent first", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------
@@ -391,6 +415,12 @@ message_pointer = "/error"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "statuspage-component-list"
 method = "GET"
 direction = "read"
@@ -404,7 +434,7 @@ type = "array"
 description = "The page's components, in the page's own display order. Statuspage returns a bare JSON array here, not an object wrapping one"
 items = { type = "object", required = ["id", "name", "status"], properties = { id = { type = "string", description = "The component's own id" }, name = { type = "string", description = "The component's name as shown on the public page" }, status = { type = "string", description = "operational, under_maintenance, degraded_performance, partial_outage or major_outage" }, description = { type = "string", description = "The component's own description, shown on the public page" }, position = { type = "integer", description = "Display order within the page or the component group" }, group = { type = "boolean", description = "Whether this entry is a component *group* rather than a component" }, group_id = { type = "string", description = "The id of the group this component belongs to; null when it is ungrouped or is itself a group" }, showcase = { type = "boolean", description = "Whether the component is shown on the public page at all" }, only_show_if_degraded = { type = "boolean", description = "Whether the component is hidden from the public page while it is operational" }, page_id = { type = "string" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, start_date = { type = "string", description = "The date this component's uptime history begins, as YYYY-MM-DD" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 
 # ---------------------------------------------------------------------------------------------

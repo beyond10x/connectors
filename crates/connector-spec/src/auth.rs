@@ -52,7 +52,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 /// the *same* injection logic the plugin host uses — so inventing a second vocabulary here would
 /// mean translating between two spellings of one idea forever (see `predecessor:docs/designs/auth-seam.md`).
 ///
-/// It is a mirror rather than a re-export because flux-connectors depends on `flux-lang` from
+/// It is a mirror rather than a re-export because connectors depends on `flux-lang` from
 /// crates.io and on nothing else of flux's; `flux-plugin-protocol` is not a dependency of this
 /// workspace. The wire form is therefore pinned by test (`tests/ir_roundtrip.rs`,
 /// `auth_scheme_matches_the_flux_plugin_protocol_vocabulary`) so drift on either side is caught.
@@ -326,7 +326,7 @@ fn is_false(value: &bool) -> bool {
 /// allow-list entry, reads as *no hazard declared*, and is admitted by the very deployment that
 /// refused the thing it names. So an unrecognised spelling is a loader refusal — serde's own
 /// `unknown variant` message, which names the rejected value and the accepted one, exactly as
-/// [`Runtime`](crate::Runtime) already does. The cost is that a new hazard is a deliberate edit
+/// [`Role`](crate::Role) already does. The cost is that a new hazard is a deliberate edit
 /// here, and that cost is the point.
 ///
 /// # This is a *kind*. [`Risk`](crate::Risk) is a *level*
@@ -388,9 +388,9 @@ impl AuthHazard {
 
 /// **What a connector's authentication surface does that its own document does not say** (C-440).
 ///
-/// The word and its discipline are already here — `quirks.pagination` and `quirks.rate_limit` are
+/// The word and its discipline are already here — `workarounds.pagination` and `workarounds.rate_limit` are
 /// declarations rather than behaviour, and reach the IR and the loader and no artifact. What is new
-/// is the **scope**: [`Quirks`](crate::Quirks) hangs off an operation, and an authentication
+/// is the **scope**: [`Workarounds`](crate::Workarounds) hangs off an operation, and an authentication
 /// endpoint is never an operation, so a token endpoint's measured departures had nowhere to live.
 ///
 /// Kept deliberately narrow. Owner-decided 2026-08-02: *if it is not in the specification, it does
@@ -403,14 +403,14 @@ impl AuthHazard {
 /// declares.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AuthQuirks {
+pub struct AuthWorkarounds {
     /// Measured behaviours of the credential's token endpoint, at most one per vendor `grant_type`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub token_endpoint: Vec<TokenEndpointQuirk>,
+    pub token_endpoint: Vec<TokenEndpointWorkaround>,
 }
 
-impl AuthQuirks {
-    /// Whether the credential declares no quirk at all — the case every shipped connector but one
+impl AuthWorkarounds {
+    /// Whether the credential declares no workaround at all — the case every shipped connector but one
     /// is in, and what `skip_serializing_if` keys on so no published manifest moved.
     pub fn is_empty(&self) -> bool {
         self.token_endpoint.is_empty()
@@ -420,26 +420,26 @@ impl AuthQuirks {
 /// One measured departure of a token endpoint from the document that describes it.
 ///
 /// Every field is required, and [`attribution`](Self::attribution) and [`measured`](Self::measured)
-/// are why. A quirk is asserted against a vendor's *implementation* and contradicted by that
+/// are why. A workaround is asserted against a vendor's *implementation* and contradicted by that
 /// vendor's own *document*; a reader a year from now needs to know which of the two this repository
 /// checked and when, or the declaration is indistinguishable from a guess that aged.
 /// `providers/babelforce.toml` already carries one unattributed open question to a vendor's API
 /// owners that nobody can now answer, which is what an unattributed claim costs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TokenEndpointQuirk {
+pub struct TokenEndpointWorkaround {
     /// The vendor's own `grant_type` word this measurement is about.
     ///
     /// A string rather than an [`OAuthGrant`], and deliberately. `OAuthGrant` mirrors flux's
     /// vocabulary field for field, and a vendor's undeclared grant is precisely the thing that
     /// vocabulary does not have a variant for — babelforce serves a fifth, `link`, that appears in
-    /// no document and in no specification. A quirk that could only name grants the specification
+    /// no document and in no specification. A workaround that could only name grants the specification
     /// already knows would be unable to record the ones worth recording.
     pub grant: String,
     /// What was measured, in prose.
     ///
     /// Prose rather than a field, because a field is a promise every other connector is then assumed
-    /// to keep. See [`AuthQuirks`] for the ruling this follows.
+    /// to keep. See [`AuthWorkarounds`] for the ruling this follows.
     pub behaviour: String,
     /// What was read, and by whom — enough for a reader to repeat the measurement or date it.
     pub attribution: String,
@@ -525,9 +525,9 @@ pub struct AuthMethod {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hazard: Option<AuthHazard>,
     /// What this credential's authentication surface does that its own document does not say — see
-    /// [`AuthQuirks`].
-    #[serde(default, skip_serializing_if = "AuthQuirks::is_empty")]
-    pub quirks: AuthQuirks,
+    /// [`AuthWorkarounds`].
+    #[serde(default, skip_serializing_if = "AuthWorkarounds::is_empty")]
+    pub workarounds: AuthWorkarounds,
 }
 
 impl AuthMethod {

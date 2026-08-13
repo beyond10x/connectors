@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Box access token sent as a bearer — an OAuth2 access token or a Developer Console token",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Box: browse folder contents, read file and folder metadata, create folders, and copy files",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,19 +55,28 @@
       "credential_requirement": "declared",
       "description": "Get the user this access token authenticates as, confirming the token resolves and naming the account it belongs to. Takes no parameters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-user-me",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/2.0/users/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -114,9 +123,19 @@
       "credential_requirement": "declared",
       "description": "Get one folder's metadata: name, size, timestamps and parent. Does not return its contents — use box-folder-items-list for that",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-folder-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The folder's id, an opaque numeric string — except the account's root folder, whose id is always the literal string \"0\". There is no other name or alias for the root; passing \"root\" or an empty string is a 404",
@@ -131,16 +150,15 @@
           "symbol": "folder_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/2.0/folders/{folder_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_at": {
@@ -201,9 +219,19 @@
       "credential_requirement": "declared",
       "description": "List the files and folders directly inside a folder, first page only (Box's own default page size). Each entry is a mini item representation — its type, id and name — not the full metadata box-file-get or box-folder-get returns",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-folder-items-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The folder's id, an opaque numeric string — except the account's root folder, whose id is always the literal string \"0\". Listing the root folder is how a first call discovers what is in the account at all",
@@ -218,16 +246,15 @@
           "symbol": "folder_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/2.0/folders/{folder_id}/items"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "entries": {
@@ -277,9 +304,19 @@
       "credential_requirement": "declared",
       "description": "Get one file's metadata: name, size, timestamps and parent folder. This does NOT return the file's content — Box serves file content from a signed, time-limited URL reached only through a 302 redirect this connector does not follow, so file content is out of scope entirely",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-file-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file's id, an opaque numeric string assigned by Box on upload. Found in a folder listing's entries or in the file's Box URL",
@@ -293,16 +330,15 @@
           "symbol": "file_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/2.0/files/{file_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_at": {
@@ -368,9 +404,19 @@
       "credential_requirement": "declared",
       "description": "Create a new, empty folder as a child of an existing folder. Naming a folder that already exists under the same parent answers 409 conflict rather than creating a duplicate",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-folder-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The new folder's name, unique among its parent's immediate children",
@@ -397,12 +443,8 @@
           "wire": "parent.id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -423,6 +465,9 @@
         "method": "POST",
         "url": "{base}/2.0/folders"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_at": {
@@ -476,9 +521,19 @@
       "credential_requirement": "declared",
       "description": "Copy an existing file into a different folder, keeping its original name. Each call creates a new, independent file — copying the same file twice produces two copies, not one",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "box-file-copy",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the file to copy, an opaque numeric string",
@@ -505,12 +560,8 @@
           "wire": "parent.id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -528,6 +579,9 @@
         "method": "POST",
         "url": "{base}/2.0/files/{file_id}/copy"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -554,8 +608,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2.0",

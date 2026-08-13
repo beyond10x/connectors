@@ -60,9 +60,10 @@ use crate::inbound::{
 use crate::lock::sha256_hex;
 use crate::{
     response_location_exists, AuthHazard, AuthMethod, AuthRequirement, AuthScheme, Connector,
-    HttpMethod, Idempotency, JsonSchema, OAuthGrant, Operation, OperationDirection,
-    OperationSpecSource, Param, ParamSet, Provenance, Quirks, Risk, Role, Runtime, SemanticEffect,
-    Service, Tag, DEFAULT_SERVICE, MIN_REPEATABILITY_CONDITION,
+    ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape,
+    JsonSchema, OAuthGrant, Operation, OperationDirection, OperationSpecSource, Pagination, Param,
+    ParamSet, PlacementRequirement, ProtocolDriver, Provenance, RateLimit, RequiredCapability,
+    Risk, Role, SemanticEffect, Service, Tag, DEFAULT_SERVICE, MIN_REPEATABILITY_CONDITION,
 };
 
 /// The documented JSON Schema for `providers/<name>.toml`.
@@ -100,7 +101,7 @@ pub struct LoadedProvider {
     /// document declares including the ones no patch selected, plus the servers it names and every
     /// [`Diagnostic`](crate::openapi::Diagnostic) it earned. That is what makes "ingest makes
     /// everything *available* to patch" inspectable rather than merely claimed — and it is what a
-    /// future `flux-connectors check` reads to tell an author which operations they could have
+    /// future `connectors check` reads to tell an author which operations they could have
     /// selected.
     ///
     /// **One entry per document, never one merged whole.** Merging is exactly what this story
@@ -390,6 +391,24 @@ pub struct OperationSelector {
     /// thing this field must not become.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency: Option<Idempotency>,
+    /// Host-resource consequences shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effects: Option<Vec<HostEffect>>,
+    /// Lifecycle shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction_shape: Option<InteractionShape>,
+    /// Closed protocol implementation shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_driver: Option<ProtocolDriver>,
+    /// Placement requirement shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placement_requirement: Option<PlacementRequirement>,
+    /// Implementation form shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implementation_form: Option<ImplementationForm>,
+    /// Required capabilities shared by the reviewed selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_capabilities: Option<Vec<RequiredCapability>>,
     /// Whether every matched operation reaches a model as a tool — C-413's [`Operation::expose`],
     /// declared for a set.
     ///
@@ -671,6 +690,19 @@ pub struct OperationPatch {
     /// Overrides idempotency. As with `risk`, specs do not publish it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency: Option<Idempotency>,
+    /// Exact host-resource consequences. Overrides a selector declaration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effects: Option<Vec<HostEffect>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction_shape: Option<InteractionShape>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_driver: Option<ProtocolDriver>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placement_requirement: Option<PlacementRequirement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implementation_form: Option<ImplementationForm>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_capabilities: Option<Vec<RequiredCapability>>,
     /// Semantic consequences stated by the author who reviewed this operation. A vendor document
     /// cannot infer business meaning, and selectors cannot state one value for a heterogeneous set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -684,9 +716,15 @@ pub struct OperationPatch {
     /// the overlay is the only place it may be removed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<Vec<AuthRequirement>>,
-    /// Quirks to attach — pagination, rate limits, error envelopes. Not in any spec.
+    /// Pagination to attach when the vendor document does not state it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quirks: Option<Quirks>,
+    pub pagination: Option<Pagination>,
+    /// Published rate limit to attach when the vendor document does not state it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit: Option<RateLimit>,
+    /// Structured vendor error envelope to attach when the vendor document does not state it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_envelope: Option<ErrorEnvelope>,
     /// Parameter-level corrections: a wrong type, a false `required`, a missing description.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub params: Vec<ParamPatch>,
@@ -841,13 +879,6 @@ struct ProviderFile {
     id: String,
     #[serde(default)]
     authority: Option<String>,
-    /// **How the connector executes** — C-405. Absent means [`Runtime::Http`], and an unrecognised
-    /// word is refused *here*, by `serde`, exactly as an unknown [`Role`](crate::Role) is: the enum
-    /// is closed, so the error quotes what was written and lists every runtime that exists. There is
-    /// no arm in [`validate`] for it, and there must not be one — a runtime that fell back to `http`
-    /// on a typo is how a `process` connector ends up served by a multi-tenant host.
-    #[serde(default)]
-    runtime: Runtime,
     #[serde(default)]
     api_version: Option<String>,
     #[serde(default)]
@@ -1455,8 +1486,14 @@ fn publish(
             if block.auth.is_some() {
                 incompatible.push("auth");
             }
-            if block.quirks.is_some() {
-                incompatible.push("quirks");
+            if block.pagination.is_some() {
+                incompatible.push("pagination");
+            }
+            if block.rate_limit.is_some() {
+                incompatible.push("rate_limit");
+            }
+            if block.error_envelope.is_some() {
+                incompatible.push("error_envelope");
             }
             if !block.params.is_empty() {
                 incompatible.push("params");
@@ -1639,6 +1676,12 @@ fn operation_source(
 struct Stated {
     risk: Option<(Risk, String)>,
     idempotency: Option<(Idempotency, String)>,
+    effects: Option<(Vec<HostEffect>, String)>,
+    interaction_shape: Option<(InteractionShape, String)>,
+    protocol_driver: Option<(ProtocolDriver, String)>,
+    placement_requirement: Option<(PlacementRequirement, String)>,
+    implementation_form: Option<(ImplementationForm, String)>,
+    required_capabilities: Option<(Vec<RequiredCapability>, String)>,
     expose: Option<(bool, String)>,
 }
 
@@ -1662,6 +1705,12 @@ impl Stated {
     const EMPTY: Self = Self {
         risk: None,
         idempotency: None,
+        effects: None,
+        interaction_shape: None,
+        protocol_driver: None,
+        placement_requirement: None,
+        implementation_form: None,
+        required_capabilities: None,
         expose: None,
     };
 
@@ -1691,6 +1740,54 @@ impl Stated {
             operation_id,
             problems,
         );
+        agree_debug(
+            &mut self.effects,
+            selector.effects.as_ref(),
+            "effects",
+            subject,
+            operation_id,
+            problems,
+        );
+        agree_debug(
+            &mut self.interaction_shape,
+            selector.interaction_shape.as_ref(),
+            "interaction_shape",
+            subject,
+            operation_id,
+            problems,
+        );
+        agree_debug(
+            &mut self.protocol_driver,
+            selector.protocol_driver.as_ref(),
+            "protocol_driver",
+            subject,
+            operation_id,
+            problems,
+        );
+        agree_debug(
+            &mut self.placement_requirement,
+            selector.placement_requirement.as_ref(),
+            "placement_requirement",
+            subject,
+            operation_id,
+            problems,
+        );
+        agree_debug(
+            &mut self.implementation_form,
+            selector.implementation_form.as_ref(),
+            "implementation_form",
+            subject,
+            operation_id,
+            problems,
+        );
+        agree_debug(
+            &mut self.required_capabilities,
+            selector.required_capabilities.as_ref(),
+            "required_capabilities",
+            subject,
+            operation_id,
+            problems,
+        );
         agree(
             &mut self.expose,
             selector.expose,
@@ -1701,6 +1798,48 @@ impl Stated {
             problems,
         );
     }
+}
+
+fn agree_debug<T: PartialEq + Clone + std::fmt::Debug>(
+    held: &mut Option<(T, String)>,
+    stated: Option<&T>,
+    field: &str,
+    subject: &str,
+    operation_id: &str,
+    problems: &mut Vec<String>,
+) {
+    let Some(value) = stated else {
+        return;
+    };
+    match held {
+        Some((existing, first)) if existing != value => problems.push(format!(
+            "two selectors match {operation_id:?} and disagree about `{field}`: {first} states \
+             {existing:?} and {subject} states {value:?}. Overlapping selectors are legal only \
+             while they agree"
+        )),
+        Some(_) => {}
+        None => *held = Some((value.clone(), subject.to_owned())),
+    }
+}
+
+fn required_declaration<T: Clone>(
+    exact: Option<&T>,
+    selected: Option<&(T, String)>,
+    field: &str,
+    operation_id: &str,
+    problems: &mut Vec<String>,
+) -> Option<T> {
+    exact
+        .cloned()
+        .or_else(|| selected.map(|(value, _)| value.clone()))
+        .or_else(|| {
+            problems.push(format!(
+            "{operation_id:?} states no `{field}` on its exact `[[patch.operations]]` block or \
+             reviewed `[[patch.select]]`; this fact is required and is never inferred from \
+             direction, method, host, risk, or driver"
+        ));
+            None
+        })
 }
 
 /// Merge one field of one selector's statement into what is already held for an operation.
@@ -1936,6 +2075,49 @@ fn compose(
         }
     };
 
+    let effects = required_declaration(
+        patch.and_then(|patch| patch.effects.as_ref()),
+        stated.effects.as_ref(),
+        "effects",
+        select,
+        problems,
+    )?;
+    let interaction_shape = required_declaration(
+        patch.and_then(|patch| patch.interaction_shape.as_ref()),
+        stated.interaction_shape.as_ref(),
+        "interaction_shape",
+        select,
+        problems,
+    )?;
+    let protocol_driver = required_declaration(
+        patch.and_then(|patch| patch.protocol_driver.as_ref()),
+        stated.protocol_driver.as_ref(),
+        "protocol_driver",
+        select,
+        problems,
+    )?;
+    let placement_requirement = required_declaration(
+        patch.and_then(|patch| patch.placement_requirement.as_ref()),
+        stated.placement_requirement.as_ref(),
+        "placement_requirement",
+        select,
+        problems,
+    )?;
+    let implementation_form = required_declaration(
+        patch.and_then(|patch| patch.implementation_form.as_ref()),
+        stated.implementation_form.as_ref(),
+        "implementation_form",
+        select,
+        problems,
+    )?;
+    let required_capabilities = required_declaration(
+        patch.and_then(|patch| patch.required_capabilities.as_ref()),
+        stated.required_capabilities.as_ref(),
+        "required_capabilities",
+        select,
+        problems,
+    )?;
+
     let mut params = spec.params.clone();
     if let Some(patch) = patch {
         for correction in &patch.params {
@@ -1975,9 +2157,15 @@ fn compose(
             .unwrap_or_else(|| spec.description.clone()),
         risk,
         idempotency,
+        effects,
         semantic_effects: patch
             .and_then(|patch| patch.semantic_effects.clone())
             .unwrap_or_default(),
+        interaction_shape,
+        protocol_driver,
+        placement_requirement,
+        implementation_form,
+        required_capabilities,
         // **Never stated in bulk.** A selector may declare `idempotency = "conditional"`, and each
         // matched write then still owes the condition C-186 requires — which arrives here as `None`
         // and is refused, by name, by `validate_repeatability_condition`. One sentence about 54
@@ -2000,9 +2188,9 @@ fn compose(
         // the declaration belongs beside the reviewer who read the vendor's own documentation, in a
         // `[[operations]]` block.
         produces_credential: None,
-        quirks: patch
-            .and_then(|patch| patch.quirks.clone())
-            .unwrap_or_default(),
+        pagination: patch.and_then(|patch| patch.pagination.clone()),
+        rate_limit: patch.and_then(|patch| patch.rate_limit.clone()),
+        error_envelope: patch.and_then(|patch| patch.error_envelope.clone()),
         // **The block, then the selector, then the field's own default** — which is exposed, so a
         // connector nobody said anything about behaves exactly as it did before C-413. `exposed()`
         // rather than a bare `true` so the spec route and the file route take one default from one
@@ -2276,7 +2464,6 @@ fn assemble(
         connector: Connector {
             id: file.id,
             authority: file.authority,
-            runtime: file.runtime,
             api_version: file.api_version,
             services: file.services,
             vendor: file.vendor,
@@ -5186,17 +5373,17 @@ fn validate_one_credential_hazard(method: &AuthMethod, problems: &mut Vec<String
     ));
 }
 
-/// **Every auth quirk names a grant, says what was measured, and says who measured it when**
+/// **Every auth workaround names a grant, says what was measured, and says who measured it when**
 /// (C-440).
 ///
-/// A quirk is asserted against a vendor's implementation and contradicted by that vendor's own
+/// A workaround is asserted against a vendor's implementation and contradicted by that vendor's own
 /// document, so the two provenance fields are what separate it from a guess that aged. They are
 /// checked rather than trusted because the cost of an unattributed one is already on the record:
 /// `providers/babelforce.toml` carries an open question to a vendor's API owners that nobody can now
 /// answer, because whoever raised it did not write down what they had read.
-fn validate_one_credential_quirks(method: &AuthMethod, problems: &mut Vec<String>) {
+fn validate_one_credential_workarounds(method: &AuthMethod, problems: &mut Vec<String>) {
     let name = method.name.as_str();
-    if method.quirks.is_empty() {
+    if method.workarounds.is_empty() {
         return;
     }
 
@@ -5204,26 +5391,26 @@ fn validate_one_credential_quirks(method: &AuthMethod, problems: &mut Vec<String
     // an `oauth.redirect_uri` binding already carries.
     if method.oauth2.is_none() {
         problems.push(format!(
-            "credential {name:?} declares a `quirks.token_endpoint` measurement and no \
-             `[auth.oauth2]` block. A token-endpoint quirk describes an endpoint the host reaches to \
+            "credential {name:?} declares a `workarounds.token_endpoint` measurement and no \
+             `[auth.oauth2]` block. A token-endpoint workaround describes an endpoint the host reaches to \
              run a grant, and a credential declaring no grant has no such endpoint, so nothing would \
              ever read it"
         ));
     }
 
     let mut seen: Vec<&str> = Vec::new();
-    for quirk in &method.quirks.token_endpoint {
-        let grant = quirk.grant.trim();
+    for workaround in &method.workarounds.token_endpoint {
+        let grant = workaround.grant.trim();
         if grant.is_empty() {
             problems.push(format!(
-                "credential {name:?} declares a `quirks.token_endpoint` measurement with an empty \
+                "credential {name:?} declares a `workarounds.token_endpoint` measurement with an empty \
                  `grant`. The vendor's own `grant_type` word is what says which of the endpoint's \
                  behaviours was measured; one endpoint answers differently per grant, which is the \
                  whole reason these are recorded one at a time"
             ));
         } else if seen.contains(&grant) {
             problems.push(format!(
-                "credential {name:?} declares two `quirks.token_endpoint` measurements for grant \
+                "credential {name:?} declares two `workarounds.token_endpoint` measurements for grant \
                  {grant:?}. That is two answers to one question, and nothing downstream could say \
                  which was measured last — record one, and supersede it in place when the vendor \
                  changes"
@@ -5232,26 +5419,26 @@ fn validate_one_credential_quirks(method: &AuthMethod, problems: &mut Vec<String
         seen.push(grant);
 
         for (field, value) in [
-            ("behaviour", quirk.behaviour.as_str()),
-            ("attribution", quirk.attribution.as_str()),
+            ("behaviour", workaround.behaviour.as_str()),
+            ("attribution", workaround.attribution.as_str()),
         ] {
             if value.trim().is_empty() {
                 problems.push(format!(
-                    "credential {name:?}'s `quirks.token_endpoint` measurement for grant \
-                     {grant:?} declares an empty `{field}`. A quirk contradicts the vendor's own \
+                    "credential {name:?}'s `workarounds.token_endpoint` measurement for grant \
+                     {grant:?} declares an empty `{field}`. A workaround contradicts the vendor's own \
                      document, so a reader a year from now needs to know what was measured and \
                      against what — an unattributed one is indistinguishable from a guess"
                 ));
             }
         }
 
-        if !is_iso_date(&quirk.measured) {
+        if !is_iso_date(&workaround.measured) {
             problems.push(format!(
-                "credential {name:?}'s `quirks.token_endpoint` measurement for grant {grant:?} \
-                 declares `measured = {:?}`, which is not a date. It must be `YYYY-MM-DD`: a quirk \
+                "credential {name:?}'s `workarounds.token_endpoint` measurement for grant {grant:?} \
+                 declares `measured = {:?}`, which is not a date. It must be `YYYY-MM-DD`: a workaround \
                  is a timestamped claim about a vendor's running implementation, and \"recently\" \
                  does not let a reader decide whether it predates the release they are debugging",
-                quirk.measured
+                workaround.measured
             ));
         }
     }
@@ -5330,7 +5517,7 @@ fn validate_credentials(connector: &Connector, problems: &mut Vec<String>) {
         validate_one_credential_acquisition(connector, method, problems);
         validate_one_credential_token_endpoint(connector, method, problems);
         validate_one_credential_hazard(method, problems);
-        validate_one_credential_quirks(method, problems);
+        validate_one_credential_workarounds(method, problems);
         for key in method.env.iter().chain(&method.user_env) {
             if key.trim().is_empty() {
                 problems.push(format!("credential {name:?} lists an empty env-var key"));
@@ -5568,6 +5755,53 @@ fn validate_operations(connector: &Connector, problems: &mut Vec<String>) {
         seen.push(id);
 
         validate_operation_service(connector, operation, problems);
+
+        if operation.effects.is_empty() {
+            problems.push(format!(
+                "operation {id:?} declares no `effects`; host-resource consequences are required \
+                 facts and are never inferred from direction, method, host, risk, or driver"
+            ));
+        }
+        let directional = match operation.direction {
+            OperationDirection::Read => HostEffect::Read,
+            OperationDirection::Write => HostEffect::Write,
+        };
+        let opposite = match operation.direction {
+            OperationDirection::Read => HostEffect::Write,
+            OperationDirection::Write => HostEffect::Read,
+        };
+        if !operation.effects.contains(&directional) || operation.effects.contains(&opposite) {
+            problems.push(format!(
+                "operation {id:?} declares direction {:?} but effects {:?}; the matching host \
+                 effect is explicit and the opposite one is refused",
+                operation.direction.word(),
+                operation.effects
+            ));
+        }
+        for pair in operation.effects.windows(2) {
+            if pair[0] >= pair[1] {
+                problems.push(format!(
+                    "operation {id:?} has unsorted or duplicate `effects`; declare the closed \
+                     vocabulary once each in stable order"
+                ));
+                break;
+            }
+        }
+        if operation.required_capabilities.is_empty() {
+            problems.push(format!(
+                "operation {id:?} declares no `required_capabilities`; absence cannot prove that \
+                 a deployment can serve it"
+            ));
+        }
+        for pair in operation.required_capabilities.windows(2) {
+            if pair[0] >= pair[1] {
+                problems.push(format!(
+                    "operation {id:?} has unsorted or duplicate `required_capabilities`; declare \
+                     the closed vocabulary once each in stable order"
+                ));
+                break;
+            }
+        }
 
         if operation.path.trim().is_empty() {
             problems.push(format!("operation {id:?} has an empty `path`"));
@@ -6302,8 +6536,11 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("authMethod", probe::<AuthMethod>()),
         ("oauth2", probe::<crate::OAuth2Spec>()),
         ("oauthRedirect", probe::<crate::OAuthRedirect>()),
-        ("authQuirks", probe::<crate::AuthQuirks>()),
-        ("tokenEndpointQuirk", probe::<crate::TokenEndpointQuirk>()),
+        ("authWorkarounds", probe::<crate::AuthWorkarounds>()),
+        (
+            "tokenEndpointWorkaround",
+            probe::<crate::TokenEndpointWorkaround>(),
+        ),
         ("authRequirement", probe::<AuthRequirement>()),
         ("operation", probe::<Operation>()),
         ("producedCredential", probe::<crate::ProducedCredential>()),
@@ -6325,7 +6562,7 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("reply", probe::<Reply>()),
         ("paramSet", probe::<ParamSet>()),
         ("param", probe::<Param>()),
-        ("quirks", probe::<Quirks>()),
+        ("pagination", probe::<Pagination>()),
         ("rateLimit", probe::<crate::RateLimit>()),
         ("errorEnvelope", probe::<crate::ErrorEnvelope>()),
         ("provenance", probe::<Provenance>()),

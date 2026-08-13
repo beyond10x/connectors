@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Zoom server-to-server OAuth access token, sent as a bearer. Minted outside flux and supplied through the environment; it expires within the hour and nothing here can refresh it",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Zoom meeting administration: cancel a meeting, and read a user. Reading and creating a meeting are withheld — both return the host's ZAK token in `start_url` (C-430)",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -46,9 +46,19 @@
       "credential_requirement": "declared",
       "description": "Cancel a meeting. It is gone — Zoom offers no undelete, and the meeting id, its join URL and any registrations go with it. Whether Zoom emails the host or the registrants about the cancellation is left to Zoom's own default; this operation cannot ask for either",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "zoom-meeting-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The numeric id of the meeting to cancel. A meeting UUID is not accepted: a Zoom UUID is base64 that can carry `/` and would have to be double URL-encoded, and nothing in this pipeline encodes a path",
@@ -63,16 +73,15 @@
           "symbol": "meeting_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/v2/meetings/{meeting_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -100,9 +109,19 @@
       "credential_requirement": "declared",
       "description": "Get one user — their id, email, name, timezone, licence type and personal meeting id. This is how `me` is resolved to the id a meeting is created under",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "zoom-user-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "`me` for the token's own user, a Zoom user id, or the user's email address",
@@ -117,16 +136,15 @@
           "symbol": "user_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v2/users/{user_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_id": {
@@ -243,8 +261,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

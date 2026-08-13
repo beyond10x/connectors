@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Vercel access token sent as a bearer",
@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Vercel: list and inspect projects and deployments, and cancel an in-progress deployment",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -69,6 +69,10 @@
       "credential_requirement": "declared",
       "description": "List the projects of the team this connector is installed for. The team is pinned at install time and is not a parameter, so every call returns that team's projects and no other account's",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "teamId": [
           "query"
@@ -77,6 +81,10 @@
       "expose": true,
       "id": "vercel-projects-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -87,6 +95,9 @@
         ],
         "url": "{base}/v10/projects"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
@@ -114,6 +125,10 @@
       "credential_requirement": "declared",
       "description": "Get one project of the team this connector is installed for, by its id or name. A project belonging to any other account is a 404 here: the team is pinned at install time and is not a parameter",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "teamId": [
           "query"
@@ -122,6 +137,8 @@
       "expose": true,
       "id": "vercel-project-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's id (prj_…) or its name",
@@ -135,6 +152,8 @@
           "symbol": "idOrName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -145,6 +164,9 @@
         ],
         "url": "{base}/v9/projects/{idOrName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "accountId": {
@@ -206,6 +228,10 @@
       "credential_requirement": "declared",
       "description": "List the deployments of the team this connector is installed for, newest first, optionally filtered to one project. The team is pinned at install time and is not a parameter, so every call returns that team's deployments and no other account's",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "teamId": [
           "query"
@@ -214,6 +240,8 @@
       "expose": true,
       "id": "vercel-deployments-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Filter to deployments of one project, by its id or name",
@@ -227,6 +255,8 @@
           "symbol": "projectId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -243,6 +273,9 @@
         ],
         "url": "{base}/v7/deployments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "deployments": {
@@ -373,6 +406,10 @@
       "credential_requirement": "declared",
       "description": "Get one deployment of the team this connector is installed for, by its id or its unique hostname. A deployment belonging to any other account fails here: the team is pinned at install time and is not a parameter",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "teamId": [
           "query"
@@ -381,6 +418,8 @@
       "expose": true,
       "id": "vercel-deployment-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The deployment's id (dpl_…) or its unique hostname",
@@ -394,6 +433,8 @@
           "symbol": "idOrUrl"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -404,6 +445,9 @@
         ],
         "url": "{base}/v13/deployments/{idOrUrl}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -468,6 +512,10 @@
       "credential_requirement": "declared",
       "description": "Cancel a deployment of the team this connector is installed for, stopping it before it completes; refused with 400 if it already finished (READY, ERROR or CANCELED). The team is pinned at install time and is not a parameter, so this cannot reach a deployment of another account",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "teamId": [
           "query"
@@ -476,6 +524,8 @@
       "expose": true,
       "id": "vercel-deployment-cancel",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The deployment's id (dpl_…) to cancel",
@@ -489,6 +539,8 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "PATCH",
         "query": [
@@ -499,6 +551,9 @@
         ],
         "url": "{base}/v12/deployments/{id}/cancel"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -529,8 +584,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.vercel.com",

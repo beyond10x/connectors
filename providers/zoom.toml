@@ -281,6 +281,12 @@ name = "default"
 tags = ["video-conferencing", "scheduling"]
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "zoom-meeting-delete"
 method = "DELETE"
 direction = "write"
@@ -313,13 +319,19 @@ schema = { type = "integer", format = "int64", minimum = 1 }
 # an empty JSON document where in fact none arrives. A cancellation is confirmed by the status code, or
 # by `zoom-meeting-get` answering `3001 Meeting does not exist` afterwards.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "zoom-user-get"
 method = "GET"
 direction = "read"
@@ -356,6 +368,6 @@ type = "object"
 required = ["id"]
 properties = { id = { type = "string", description = "The user's Zoom id — what `me` resolves to, and the `user_id` a meeting is created under" }, email = { type = "string", format = "email", description = "Personal data" }, first_name = { type = "string" }, last_name = { type = "string" }, display_name = { type = "string" }, type = { type = "integer", enum = [1, 2, 4], description = "THE LICENCE, AS AN INTEGER: 1 Basic, 2 Licensed, 4 Unassigned without Meetings Basic. A Basic user's group meetings are time-capped, so this is what to check before scheduling one" }, status = { type = "string", enum = ["pending", "active", "inactive"], description = "`pending` means the person has never activated the account — a meeting created for them still exists, but they cannot host it" }, verified = { type = "integer", enum = [0, 1], description = "AN INTEGER, not a boolean: 1 verified, 0 not. The `verified` inside a `phone_numbers` entry *is* a boolean" }, timezone = { type = "string", description = "IANA name, e.g. `Europe/Berlin`. A meeting created without an explicit timezone uses this one" }, pmi = { type = "integer", format = "int64", description = "The personal meeting id — a standing meeting room. Reusing it means every past participant can rejoin" }, use_pmi = { type = "boolean", description = "Whether new meetings default to the PMI rather than a fresh id" }, dept = { type = "string" }, job_title = { type = "string" }, company = { type = "string" }, language = { type = "string" }, role_name = { type = "string", description = "The Zoom role, e.g. `Owner`, `Admin`, `Member`" }, role_id = { type = "string" }, account_id = { type = "string" }, personal_meeting_url = { type = "string", description = "The join URL for the PMI. A participant link, not a host link — contrast `start_url` on a meeting" }, phone_numbers = { type = "array", description = "Each `{code, country, label, number, verified}`, where `label` is `Mobile`, `Office`, `Home` or `Fax` and `verified` here IS a boolean. Personal data. The flat `phone_number`/`phone_country` members are deprecated and are not declared", items = { type = "object" } }, created_at = { type = "string", format = "date-time", description = "ISO 8601, not Unix seconds. For a `pending` user Zoom's docs warn this reflects the time of the API call rather than account creation" }, last_login_time = { type = "string", format = "date-time", description = "ISO 8601, or absent for a user who never signed in" }, last_client_version = { type = "string" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"

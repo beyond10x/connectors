@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Asterisk ARI Basic authentication password, paired with the deployment's ARI username",
@@ -9238,7 +9238,7 @@
       "wire_value": "CallClaimed"
     }
   ],
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -9257,6 +9257,10 @@
       "credential_requirement": "declared",
       "description": "List all applications.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9265,10 +9269,17 @@
       "expose": true,
       "id": "asterisk-ari-applications-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/applications"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Details of a Stasis application",
@@ -9356,6 +9367,10 @@
       "credential_requirement": "declared",
       "description": "Response pong message.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9364,10 +9379,17 @@
       "expose": true,
       "id": "asterisk-ari-asterisk-ping",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/asterisk/ping"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Asterisk ping information",
         "properties": {
@@ -9412,6 +9434,10 @@
       "credential_requirement": "declared",
       "description": "List all active bridges in Asterisk.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9420,10 +9446,17 @@
       "expose": true,
       "id": "asterisk-ari-bridges-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/bridges"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "The merging of media from one or more channels.\n\nEveryone on the bridge receives the same audio.",
@@ -9533,6 +9566,10 @@
       "credential_requirement": "declared",
       "description": "Create a new bridge.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9541,6 +9578,8 @@
       "expose": true,
       "id": "asterisk-ari-bridges-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Comma separated list of bridge type attributes (mixing, holding, dtmf_events, proxy_media, video_sfu, video_single, sdp_label).",
@@ -9583,6 +9622,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -9618,6 +9659,9 @@
         ],
         "url": "{base}/bridges"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The merging of media from one or more channels.\n\nEveryone on the bridge receives the same audio.",
         "properties": {
@@ -9714,6 +9758,10 @@
       "credential_requirement": "declared",
       "description": "Shut down a bridge.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9722,6 +9770,8 @@
       "expose": true,
       "id": "asterisk-ari-bridges-destroy",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -9734,10 +9784,15 @@
           "symbol": "bridgeId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/bridges/{bridgeId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -9759,6 +9814,10 @@
       "credential_requirement": "declared",
       "description": "List all active channels in Asterisk.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9767,10 +9826,17 @@
       "expose": true,
       "id": "asterisk-ari-channels-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/channels"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A specific communication connection between Asterisk and an Endpoint.",
@@ -9988,6 +10054,10 @@
       "credential_requirement": "declared",
       "description": "Create a new channel (originate).",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -9996,6 +10066,8 @@
       "expose": true,
       "id": "asterisk-ari-channels-originate",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Endpoint to call.",
@@ -10141,6 +10213,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -10236,6 +10310,9 @@
         ],
         "url": "{base}/channels"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -10408,6 +10485,10 @@
       "credential_requirement": "declared",
       "description": "Delete (i.e. hangup) a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10416,6 +10497,8 @@
       "expose": true,
       "id": "asterisk-ari-channels-hangup",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -10463,6 +10546,8 @@
           "symbol": "reason"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "query": [
@@ -10481,6 +10566,9 @@
         ],
         "url": "{base}/channels/{channelId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -10502,6 +10590,10 @@
       "credential_requirement": "declared",
       "description": "List all ARI controlled device states.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10510,10 +10602,17 @@
       "expose": true,
       "id": "asterisk-ari-device-states-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/deviceStates"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Represents the state of a device.",
@@ -10567,6 +10666,10 @@
       "credential_requirement": "declared",
       "description": "List all endpoints.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10575,10 +10678,17 @@
       "expose": true,
       "id": "asterisk-ari-endpoints-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/endpoints"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "An external device that may offer/accept calls to/from Asterisk.\n\nUnlike most resources, which have a single unique identifier, an endpoint is uniquely identified by the technology/resource pair.",
@@ -10638,6 +10748,10 @@
       "credential_requirement": "declared",
       "description": "List all mailboxes.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10646,10 +10760,17 @@
       "expose": true,
       "id": "asterisk-ari-mailboxes-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/mailboxes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Represents the state of a mailbox.",
@@ -10705,6 +10826,10 @@
       "credential_requirement": "declared",
       "description": "Get a playback's details.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10713,6 +10838,8 @@
       "expose": true,
       "id": "asterisk-ari-playbacks-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Playback's id",
@@ -10725,10 +10852,15 @@
           "symbol": "playbackId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/playbacks/{playbackId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Object representing the playback of media to a channel",
         "properties": {
@@ -10799,6 +10931,10 @@
       "credential_requirement": "declared",
       "description": "Stop a playback.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10807,6 +10943,8 @@
       "expose": true,
       "id": "asterisk-ari-playbacks-stop",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Playback's id",
@@ -10819,10 +10957,15 @@
           "symbol": "playbackId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/playbacks/{playbackId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -10844,6 +10987,10 @@
       "credential_requirement": "declared",
       "description": "List recordings that are complete.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10852,10 +10999,17 @@
       "expose": true,
       "id": "asterisk-ari-recordings-list-stored",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/recordings/stored"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A past recording that may be played back.",
@@ -10906,6 +11060,10 @@
       "credential_requirement": "declared",
       "description": "List all sounds.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -10914,6 +11072,8 @@
       "expose": true,
       "id": "asterisk-ari-sounds-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Lookup sound for a specific language.",
@@ -10936,6 +11096,8 @@
           "symbol": "format"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -10954,6 +11116,9 @@
         ],
         "url": "{base}/sounds"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A media file that may be played back.",
@@ -11022,6 +11187,10 @@
       "credential_requirement": "declared",
       "description": "Get details of an application.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11030,6 +11199,8 @@
       "expose": false,
       "id": "asterisk-ari-applications-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Application's name",
@@ -11042,10 +11213,15 @@
           "symbol": "applicationName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/applications/{applicationName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Details of a Stasis application",
         "properties": {
@@ -11138,6 +11314,10 @@
       "credential_requirement": "declared",
       "description": "Filter application events types.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11146,6 +11326,8 @@
       "expose": false,
       "id": "asterisk-ari-applications-filter",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Application's name",
@@ -11168,6 +11350,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -11181,6 +11365,9 @@
         "method": "PUT",
         "url": "{base}/applications/{applicationName}/eventFilter"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Details of a Stasis application",
         "properties": {
@@ -11279,6 +11466,10 @@
       "credential_requirement": "declared",
       "description": "Retrieve a dynamic configuration object.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11287,6 +11478,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-get-object",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The configuration class containing dynamic configuration objects.",
@@ -11319,10 +11512,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/asterisk/config/dynamic/{configClass}/{objectType}/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A key/value pair that makes up part of a configuration object.",
@@ -11381,6 +11579,10 @@
       "credential_requirement": "declared",
       "description": "Create or update a dynamic configuration object.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11389,6 +11591,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-update-object",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The configuration class containing dynamic configuration objects.",
@@ -11431,6 +11635,8 @@
           "symbol": "fields"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -11446,6 +11652,9 @@
         "method": "PUT",
         "url": "{base}/asterisk/config/dynamic/{configClass}/{objectType}/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "A key/value pair that makes up part of a configuration object.",
@@ -11502,6 +11711,10 @@
       "credential_requirement": "declared",
       "description": "Delete a dynamic configuration object.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11510,6 +11723,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-delete-object",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The configuration class containing dynamic configuration objects.",
@@ -11542,10 +11757,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/asterisk/config/dynamic/{configClass}/{objectType}/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -11567,6 +11787,10 @@
       "credential_requirement": "declared",
       "description": "Gets Asterisk log channel information.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11575,10 +11799,17 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-list-log-channels",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/asterisk/logging"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Details of an Asterisk log channel",
@@ -11641,6 +11872,10 @@
       "credential_requirement": "declared",
       "description": "Adds a log channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11649,6 +11884,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-add-log",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The log channel to add",
@@ -11671,6 +11908,8 @@
           "symbol": "configuration"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -11683,6 +11922,9 @@
         ],
         "url": "{base}/asterisk/logging/{logChannelName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -11710,6 +11952,10 @@
       "credential_requirement": "declared",
       "description": "Deletes a log channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11718,6 +11964,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-delete-log",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Log channels name",
@@ -11730,10 +11978,15 @@
           "symbol": "logChannelName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/asterisk/logging/{logChannelName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -11761,6 +12014,10 @@
       "credential_requirement": "declared",
       "description": "Rotates a log channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11769,6 +12026,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-rotate-log",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Log channel's name",
@@ -11781,10 +12040,15 @@
           "symbol": "logChannelName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "PUT",
         "url": "{base}/asterisk/logging/{logChannelName}/rotate"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -11806,6 +12070,10 @@
       "credential_requirement": "declared",
       "description": "List Asterisk modules.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11814,10 +12082,17 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-list-modules",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/asterisk/modules"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "Details of an Asterisk module",
@@ -11882,6 +12157,10 @@
       "credential_requirement": "declared",
       "description": "Get Asterisk module information.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11890,6 +12169,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-get-module",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Module's name",
@@ -11902,10 +12183,15 @@
           "symbol": "moduleName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/asterisk/modules/{moduleName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Details of an Asterisk module",
         "properties": {
@@ -11967,6 +12253,10 @@
       "credential_requirement": "declared",
       "description": "Load an Asterisk module.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -11975,6 +12265,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-load-module",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Module's name",
@@ -11987,10 +12279,15 @@
           "symbol": "moduleName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/asterisk/modules/{moduleName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -12018,6 +12315,10 @@
       "credential_requirement": "declared",
       "description": "Reload an Asterisk module.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12026,6 +12327,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-reload-module",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Module's name",
@@ -12038,10 +12341,15 @@
           "symbol": "moduleName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "PUT",
         "url": "{base}/asterisk/modules/{moduleName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -12069,6 +12377,10 @@
       "credential_requirement": "declared",
       "description": "Unload an Asterisk module.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12077,6 +12389,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-unload-module",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Module's name",
@@ -12089,10 +12403,15 @@
           "symbol": "moduleName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/asterisk/modules/{moduleName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -12120,6 +12439,10 @@
       "credential_requirement": "declared",
       "description": "Get the value of a global variable.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12128,6 +12451,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-get-global-var",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The variable to get",
@@ -12140,6 +12465,8 @@
           "symbol": "variable"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -12152,6 +12479,9 @@
         ],
         "url": "{base}/asterisk/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The value of a channel variable",
         "properties": {
@@ -12196,6 +12526,10 @@
       "credential_requirement": "declared",
       "description": "Set the value of a global variable.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12204,6 +12538,8 @@
       "expose": false,
       "id": "asterisk-ari-asterisk-set-global-var",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The variable to set",
@@ -12226,6 +12562,8 @@
           "symbol": "value"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -12244,6 +12582,9 @@
         ],
         "url": "{base}/asterisk/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -12271,6 +12612,10 @@
       "credential_requirement": "declared",
       "description": "Get bridge details.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12279,6 +12624,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -12291,10 +12638,15 @@
           "symbol": "bridgeId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/bridges/{bridgeId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The merging of media from one or more channels.\n\nEveryone on the bridge receives the same audio.",
         "properties": {
@@ -12401,6 +12753,10 @@
       "credential_requirement": "declared",
       "description": "Create a new bridge.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12409,6 +12765,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-create-with-id",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Unique ID to give to the bridge being created.",
@@ -12451,6 +12809,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -12480,6 +12840,9 @@
         ],
         "url": "{base}/bridges/{bridgeId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The merging of media from one or more channels.\n\nEveryone on the bridge receives the same audio.",
         "properties": {
@@ -12580,6 +12943,10 @@
       "credential_requirement": "declared",
       "description": "Play music on hold to a bridge or change the MOH class that is playing.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12588,6 +12955,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-start-moh",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -12610,6 +12979,8 @@
           "symbol": "mohClass"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -12622,6 +12993,9 @@
         ],
         "url": "{base}/bridges/{bridgeId}/moh"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -12649,6 +13023,10 @@
       "credential_requirement": "declared",
       "description": "Stop playing music on hold to a bridge.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12657,6 +13035,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-stop-moh",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -12669,10 +13049,15 @@
           "symbol": "bridgeId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/bridges/{bridgeId}/moh"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -12732,6 +13117,10 @@
       "credential_requirement": "declared",
       "description": "Start a recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12740,6 +13129,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-record",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -12852,6 +13243,8 @@
           "symbol": "terminateOn"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -12906,6 +13299,9 @@
         ],
         "url": "{base}/bridges/{bridgeId}/record"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A recording that is in progress",
         "properties": {
@@ -12991,6 +13387,10 @@
       "credential_requirement": "declared",
       "description": "Get the value of a bridge variable or function.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -12999,6 +13399,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-get-bridge-var",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -13021,6 +13423,8 @@
           "symbol": "variable"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -13033,6 +13437,9 @@
         ],
         "url": "{base}/bridges/{bridgeId}/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The value of a channel variable",
         "properties": {
@@ -13085,6 +13492,10 @@
       "credential_requirement": "declared",
       "description": "Set the value of a bridge variable or function.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13093,6 +13504,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-set-bridge-var",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -13136,6 +13549,8 @@
           "symbol": "report_events"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -13160,6 +13575,9 @@
         ],
         "url": "{base}/bridges/{bridgeId}/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -13189,6 +13607,10 @@
       "credential_requirement": "declared",
       "description": "Set the values of multiple bridge variables or functions.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13197,6 +13619,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-set-bridge-vars",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -13219,6 +13643,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -13234,6 +13660,9 @@
         "method": "POST",
         "url": "{base}/bridges/{bridgeId}/variables"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -13261,6 +13690,10 @@
       "credential_requirement": "declared",
       "description": "Removes any explicit video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants. When no explicit video source is set, talk detection will be used to determine the active video stream.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13269,6 +13702,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-clear-video-source",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -13281,10 +13716,15 @@
           "symbol": "bridgeId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/bridges/{bridgeId}/videoSource"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -13316,6 +13756,10 @@
       "credential_requirement": "declared",
       "description": "Set a channel as the video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13324,6 +13768,8 @@
       "expose": false,
       "id": "asterisk-ari-bridges-set-video-source",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Bridge's id",
@@ -13346,10 +13792,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/bridges/{bridgeId}/videoSource/{channelId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -13403,6 +13854,10 @@
       "credential_requirement": "declared",
       "description": "Create channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13411,6 +13866,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Endpoint for channel communication",
@@ -13493,6 +13950,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -13552,6 +14011,9 @@
         ],
         "url": "{base}/channels/create"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -13754,6 +14216,10 @@
       "credential_requirement": "declared",
       "description": "Start an External Media session.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -13762,6 +14228,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-external-media",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The unique id to assign the channel on creation.",
@@ -13895,6 +14363,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -13972,6 +14442,9 @@
         ],
         "url": "{base}/channels/externalMedia"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -14136,6 +14609,10 @@
       "credential_requirement": "declared",
       "description": "Channel details.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -14144,6 +14621,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -14156,10 +14635,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/channels/{channelId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -14374,6 +14858,10 @@
       "credential_requirement": "declared",
       "description": "Create a new channel (originate with id).",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -14382,6 +14870,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-originate-with-id",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The unique id to assign the channel on creation.",
@@ -14527,6 +15017,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -14616,6 +15108,9 @@
         ],
         "url": "{base}/channels/{channelId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -14780,6 +15275,10 @@
       "credential_requirement": "declared",
       "description": "Answer a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -14788,6 +15287,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-answer",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -14800,10 +15301,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/channels/{channelId}/answer"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -14847,6 +15353,10 @@
       "credential_requirement": "declared",
       "description": "Exit application; continue execution in the dialplan.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -14855,6 +15365,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-continue-in-dialplan",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -14908,6 +15420,8 @@
           "symbol": "label"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -14938,6 +15452,9 @@
         ],
         "url": "{base}/channels/{channelId}/continue"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -14973,6 +15490,10 @@
       "credential_requirement": "declared",
       "description": "Dial a created channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -14981,6 +15502,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-dial",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15016,6 +15539,8 @@
           "symbol": "timeout"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15034,6 +15559,9 @@
         ],
         "url": "{base}/channels/{channelId}/dial"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15081,6 +15609,10 @@
       "credential_requirement": "declared",
       "description": "Send provided DTMF to a given channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15089,6 +15621,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-send-dtmf",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15159,6 +15693,8 @@
           "symbol": "after"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15195,6 +15731,9 @@
         ],
         "url": "{base}/channels/{channelId}/dtmf"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15222,6 +15761,10 @@
       "credential_requirement": "declared",
       "description": "Hold a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15230,6 +15773,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-hold",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15242,10 +15787,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/channels/{channelId}/hold"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15273,6 +15823,10 @@
       "credential_requirement": "declared",
       "description": "Remove a channel from hold.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15281,6 +15835,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-unhold",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15293,10 +15849,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/channels/{channelId}/hold"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -15328,6 +15889,10 @@
       "credential_requirement": "declared",
       "description": "Play music on hold to a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15336,6 +15901,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-start-moh",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15358,6 +15925,8 @@
           "symbol": "mohClass"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15370,6 +15939,9 @@
         ],
         "url": "{base}/channels/{channelId}/moh"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15397,6 +15969,10 @@
       "credential_requirement": "declared",
       "description": "Stop playing music on hold to a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15405,6 +15981,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-stop-moh",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15417,10 +15995,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/channels/{channelId}/moh"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -15456,6 +16039,10 @@
       "credential_requirement": "declared",
       "description": "Move the channel from one Stasis application to another.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15464,6 +16051,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-move",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15496,6 +16085,8 @@
           "symbol": "appArgs"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15514,6 +16105,9 @@
         ],
         "url": "{base}/channels/{channelId}/move"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15545,6 +16139,10 @@
       "credential_requirement": "declared",
       "description": "Mute a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15553,6 +16151,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-mute",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15581,6 +16181,8 @@
           "symbol": "direction"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15593,6 +16195,9 @@
         ],
         "url": "{base}/channels/{channelId}/mute"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15624,6 +16229,10 @@
       "credential_requirement": "declared",
       "description": "Unmute a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15632,6 +16241,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-unmute",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15660,6 +16271,8 @@
           "symbol": "direction"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "query": [
@@ -15672,6 +16285,9 @@
         ],
         "url": "{base}/channels/{channelId}/mute"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -15699,6 +16315,10 @@
       "credential_requirement": "declared",
       "description": "Indicate progress on a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15707,6 +16327,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-progress",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15719,10 +16341,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/channels/{channelId}/progress"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -15778,6 +16405,10 @@
       "credential_requirement": "declared",
       "description": "Start a recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -15786,6 +16417,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-record",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -15888,6 +16521,8 @@
           "symbol": "terminateOn"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -15936,6 +16571,9 @@
         ],
         "url": "{base}/channels/{channelId}/record"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A recording that is in progress",
         "properties": {
@@ -16021,6 +16659,10 @@
       "credential_requirement": "declared",
       "description": "Redirect the channel to a different location.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16029,6 +16671,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-redirect",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16051,6 +16695,8 @@
           "symbol": "endpoint"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -16063,6 +16709,9 @@
         ],
         "url": "{base}/channels/{channelId}/redirect"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -16090,6 +16739,10 @@
       "credential_requirement": "declared",
       "description": "Indicate ringing to a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16098,6 +16751,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-ring",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16110,10 +16765,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/channels/{channelId}/ring"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -16141,6 +16801,10 @@
       "credential_requirement": "declared",
       "description": "Stop ringing indication on a channel if locally generated.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16149,6 +16813,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-ring-stop",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16161,10 +16827,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/channels/{channelId}/ring"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -16192,6 +16863,10 @@
       "credential_requirement": "declared",
       "description": "RTP stats on a channel.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16200,6 +16875,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-rtpstatistics",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16212,10 +16889,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/channels/{channelId}/rtp_statistics"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A statistics of a RTP.",
         "properties": {
@@ -16419,6 +17101,10 @@
       "credential_requirement": "declared",
       "description": "Play silence to a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16427,6 +17113,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-start-silence",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16439,10 +17127,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/channels/{channelId}/silence"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -16470,6 +17163,10 @@
       "credential_requirement": "declared",
       "description": "Stop playing silence to a channel.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16478,6 +17175,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-stop-silence",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16490,10 +17189,15 @@
           "symbol": "channelId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/channels/{channelId}/silence"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -16541,6 +17245,10 @@
       "credential_requirement": "declared",
       "description": "Start snooping.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16549,6 +17257,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-snoop-channel",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16625,6 +17335,8 @@
           "symbol": "snoopId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -16661,6 +17373,9 @@
         ],
         "url": "{base}/channels/{channelId}/snoop"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -16845,6 +17560,10 @@
       "credential_requirement": "declared",
       "description": "Start snooping.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -16853,6 +17572,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-snoop-channel-with-id",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -16929,6 +17650,8 @@
           "symbol": "appArgs"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -16959,6 +17682,9 @@
         ],
         "url": "{base}/channels/{channelId}/snoop/{snoopId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A specific communication connection between Asterisk and an Endpoint.",
         "properties": {
@@ -17127,6 +17853,10 @@
       "credential_requirement": "declared",
       "description": "Inform the channel about the progress of the attended/blind transfer.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17135,6 +17865,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-transfer_progress",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -17157,6 +17889,8 @@
           "symbol": "states"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -17169,6 +17903,9 @@
         ],
         "url": "{base}/channels/{channelId}/transfer_progress"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17200,6 +17937,10 @@
       "credential_requirement": "declared",
       "description": "Get the value of a channel variable or function.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17208,6 +17949,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-get-channel-var",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -17230,6 +17973,8 @@
           "symbol": "variable"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -17242,6 +17987,9 @@
         ],
         "url": "{base}/channels/{channelId}/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The value of a channel variable",
         "properties": {
@@ -17294,6 +18042,10 @@
       "credential_requirement": "declared",
       "description": "Set the value of a channel variable or function.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17302,6 +18054,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-set-channel-var",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -17345,6 +18099,8 @@
           "symbol": "report_events"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -17369,6 +18125,9 @@
         ],
         "url": "{base}/channels/{channelId}/variable"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17398,6 +18157,10 @@
       "credential_requirement": "declared",
       "description": "Set the values of multiple channel variables or functions.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17406,6 +18169,8 @@
       "expose": false,
       "id": "asterisk-ari-channels-set-channel-vars",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Channel's id",
@@ -17428,6 +18193,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -17443,6 +18210,9 @@
         "method": "POST",
         "url": "{base}/channels/{channelId}/variables"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17470,6 +18240,10 @@
       "credential_requirement": "declared",
       "description": "Retrieve the current state of a device.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17478,6 +18252,8 @@
       "expose": false,
       "id": "asterisk-ari-device-states-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the device",
@@ -17490,10 +18266,15 @@
           "symbol": "deviceName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/deviceStates/{deviceName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Represents the state of a device.",
         "properties": {
@@ -17554,6 +18335,10 @@
       "credential_requirement": "declared",
       "description": "Change the state of a device controlled by ARI. (Note - implicitly creates the device state).",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17562,6 +18347,8 @@
       "expose": false,
       "id": "asterisk-ari-device-states-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the device",
@@ -17594,6 +18381,8 @@
           "symbol": "deviceState"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "PUT",
         "query": [
@@ -17606,6 +18395,9 @@
         ],
         "url": "{base}/deviceStates/{deviceName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17633,6 +18425,10 @@
       "credential_requirement": "declared",
       "description": "Destroy a device-state controlled by ARI.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17641,6 +18437,8 @@
       "expose": false,
       "id": "asterisk-ari-device-states-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the device",
@@ -17653,10 +18451,15 @@
           "symbol": "deviceName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/deviceStates/{deviceName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -17698,6 +18501,10 @@
       "credential_requirement": "declared",
       "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17706,6 +18513,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-refer",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The endpoint resource or technology specific URI that should be referred to somewhere. Valid resource is pjsip.",
@@ -17759,6 +18568,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -17800,6 +18611,9 @@
         ],
         "url": "{base}/endpoints/refer"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17837,6 +18651,10 @@
       "credential_requirement": "declared",
       "description": "Send a message to some technology URI or endpoint.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17845,6 +18663,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-send-message",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The endpoint resource or technology specific URI to send the message to. Valid resources are pjsip, and xmpp.",
@@ -17887,6 +18707,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -17922,6 +18744,9 @@
         ],
         "url": "{base}/endpoints/sendMessage"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -17949,6 +18774,10 @@
       "credential_requirement": "declared",
       "description": "List available endoints for a given endpoint technology.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -17957,6 +18786,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-list-by-tech",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Technology of the endpoints (pjsip,iax2,...)",
@@ -17969,10 +18800,15 @@
           "symbol": "tech"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/endpoints/{tech}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "description": "An external device that may offer/accept calls to/from Asterisk.\n\nUnlike most resources, which have a single unique identifier, an endpoint is uniquely identified by the technology/resource pair.",
@@ -18042,6 +18878,10 @@
       "credential_requirement": "declared",
       "description": "Details for an endpoint.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18050,6 +18890,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Technology of the endpoint",
@@ -18072,10 +18914,15 @@
           "symbol": "resource"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/endpoints/{tech}/{resource}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "An external device that may offer/accept calls to/from Asterisk.\n\nUnlike most resources, which have a single unique identifier, an endpoint is uniquely identified by the technology/resource pair.",
         "properties": {
@@ -18156,6 +19003,10 @@
       "credential_requirement": "declared",
       "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18164,6 +19015,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-refer-to-endpoint",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Technology of the endpoint",
@@ -18227,6 +19080,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -18262,6 +19117,9 @@
         ],
         "url": "{base}/endpoints/{tech}/{resource}/refer"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -18303,6 +19161,10 @@
       "credential_requirement": "declared",
       "description": "Send a message to some endpoint in a technology.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18311,6 +19173,8 @@
       "expose": false,
       "id": "asterisk-ari-endpoints-send-message-to-endpoint",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Technology of the endpoint",
@@ -18363,6 +19227,8 @@
           "symbol": "variables"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -18392,6 +19258,9 @@
         ],
         "url": "{base}/endpoints/{tech}/{resource}/sendMessage"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -18423,6 +19292,10 @@
       "credential_requirement": "declared",
       "description": "Claim a broadcast channel for this application.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18431,6 +19304,8 @@
       "expose": false,
       "id": "asterisk-ari-events-claim-channel",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the channel to claim",
@@ -18453,6 +19328,8 @@
           "symbol": "application"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -18471,6 +19348,9 @@
         ],
         "url": "{base}/events/claim"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -18498,6 +19378,10 @@
       "credential_requirement": "declared",
       "description": "Retrieve the current state of a mailbox.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18506,6 +19390,8 @@
       "expose": false,
       "id": "asterisk-ari-mailboxes-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the mailbox",
@@ -18518,10 +19404,15 @@
           "symbol": "mailboxName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/mailboxes/{mailboxName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Represents the state of a mailbox.",
         "properties": {
@@ -18582,6 +19473,10 @@
       "credential_requirement": "declared",
       "description": "Change the state of a mailbox. (Note - implicitly creates the mailbox).",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18590,6 +19485,8 @@
       "expose": false,
       "id": "asterisk-ari-mailboxes-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the mailbox",
@@ -18624,6 +19521,8 @@
           "symbol": "newMessages"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "PUT",
         "query": [
@@ -18642,6 +19541,9 @@
         ],
         "url": "{base}/mailboxes/{mailboxName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -18669,6 +19571,10 @@
       "credential_requirement": "declared",
       "description": "Destroy a mailbox.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18677,6 +19583,8 @@
       "expose": false,
       "id": "asterisk-ari-mailboxes-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Name of the mailbox",
@@ -18689,10 +19597,15 @@
           "symbol": "mailboxName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/mailboxes/{mailboxName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -18724,6 +19637,10 @@
       "credential_requirement": "declared",
       "description": "Control a playback.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18732,6 +19649,8 @@
       "expose": false,
       "id": "asterisk-ari-playbacks-control",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Playback's id",
@@ -18761,6 +19680,8 @@
           "symbol": "operation"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -18773,6 +19694,9 @@
         ],
         "url": "{base}/playbacks/{playbackId}/control"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -18800,6 +19724,10 @@
       "credential_requirement": "declared",
       "description": "List live recordings.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18808,6 +19736,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-get-live",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -18820,10 +19750,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/recordings/live/{recordingName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A recording that is in progress",
         "properties": {
@@ -18905,6 +19840,10 @@
       "credential_requirement": "declared",
       "description": "Stop a live recording and discard it.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18913,6 +19852,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-cancel",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -18925,10 +19866,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/recordings/live/{recordingName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -18956,6 +19902,10 @@
       "credential_requirement": "declared",
       "description": "Mute a live recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -18964,6 +19914,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-mute",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -18976,10 +19928,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/recordings/live/{recordingName}/mute"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -19007,6 +19964,10 @@
       "credential_requirement": "declared",
       "description": "Unmute a live recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19015,6 +19976,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-unmute",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19027,10 +19990,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/recordings/live/{recordingName}/mute"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -19058,6 +20026,10 @@
       "credential_requirement": "declared",
       "description": "Pause a live recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19066,6 +20038,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-pause",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19078,10 +20052,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/recordings/live/{recordingName}/pause"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -19109,6 +20088,10 @@
       "credential_requirement": "declared",
       "description": "Unpause a live recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19117,6 +20100,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-unpause",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19129,10 +20114,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/recordings/live/{recordingName}/pause"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -19160,6 +20150,10 @@
       "credential_requirement": "declared",
       "description": "Stop a live recording and store it.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19168,6 +20162,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-stop",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19180,10 +20176,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/recordings/live/{recordingName}/stop"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -19211,6 +20212,10 @@
       "credential_requirement": "declared",
       "description": "Get a stored recording's details.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19219,6 +20224,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-get-stored",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19231,10 +20238,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/recordings/stored/{recordingName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A past recording that may be played back.",
         "properties": {
@@ -19278,6 +20290,10 @@
       "credential_requirement": "declared",
       "description": "Delete a stored recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19286,6 +20302,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-delete-stored",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19298,10 +20316,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "url": "{base}/recordings/stored/{recordingName}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
@@ -19333,6 +20356,10 @@
       "credential_requirement": "declared",
       "description": "Copy a stored recording.",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19341,6 +20368,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-copy-stored",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording to copy",
@@ -19363,6 +20392,8 @@
           "symbol": "destinationRecordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "query": [
@@ -19375,6 +20406,9 @@
         ],
         "url": "{base}/recordings/stored/{recordingName}/copy"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A past recording that may be played back.",
         "properties": {
@@ -19418,6 +20452,10 @@
       "credential_requirement": "declared",
       "description": "Get the file associated with the stored recording.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19426,6 +20464,8 @@
       "expose": false,
       "id": "asterisk-ari-recordings-get-stored-file",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The name of the recording",
@@ -19438,10 +20478,15 @@
           "symbol": "recordingName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/recordings/stored/{recordingName}/file"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
@@ -19469,6 +20514,10 @@
       "credential_requirement": "declared",
       "description": "Get a sound's details.",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "host": [
           "host"
@@ -19477,6 +20526,8 @@
       "expose": false,
       "id": "asterisk-ari-sounds-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Sound's id",
@@ -19489,10 +20540,15 @@
           "symbol": "soundId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/sounds/{soundId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A media file that may be played back.",
         "properties": {
@@ -19536,8 +20592,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "22.10.1",

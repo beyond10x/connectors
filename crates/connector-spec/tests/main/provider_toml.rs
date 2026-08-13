@@ -33,6 +33,12 @@ path = "/api/v2/users/me.json"
 description = "Verify credentials by fetching the authenticated user"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations]]
 id = "zendesk.ticket.show"
@@ -42,6 +48,12 @@ path = "/api/v2/tickets/{ticket_id}.json"
 description = "Show one ticket"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "ticket_id"
@@ -57,6 +69,12 @@ path = "/api/v2/search.json"
 description = "Search tickets with Zendesk search syntax"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.query]]
 name = "query"
@@ -68,7 +86,7 @@ name = "per_page"
 required = false
 schema = { type = "integer", minimum = 1, maximum = 100 }
 
-[operations.quirks.rate_limit]
+[operations.rate_limit]
 requests = 700
 per_seconds = 60
 bucket = "zendesk.search"
@@ -81,6 +99,12 @@ path = "/status.json"
 description = "Public status endpoint — no credential at all"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 auth = []
 "#;
 
@@ -179,8 +203,14 @@ rename = "babelforce.agent.list"
 description = "List and filter agents"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
-[patch.operations.quirks.pagination]
+[patch.operations.pagination]
 page = {{ page_param = "page", size_param = "max", page_size = 100, max_pages = 20 }}
 
 [[patch.operations]]
@@ -190,6 +220,12 @@ rename = "babelforce.call.hangup"
 description = "Hang up a live call"
 risk = "destructive"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 # The spec's root `security` offers the deprecated X-Auth-Access-Id / X-Auth-Access-Token pair as
 # an alternative. Ingest must keep seeing it; the overlay is the only place it may be removed.
 auth = [{{ credentials = ["babelforce.access_token"] }}]
@@ -237,12 +273,11 @@ fn a_hand_authored_file_produces_a_complete_connector() {
         "a numeric bound must not degrade into a string on the way through the loader"
     );
 
-    // Quirks authored inline reach the IR, which is what C-12 compiles into Flux control flow.
+    // Traits authored inline reach the IR, which is what C-12 compiles into Flux control flow.
     let search = connector
         .operation("zendesk.ticket.search")
         .expect("declared operation");
     let rate_limit = search
-        .quirks
         .rate_limit
         .as_ref()
         .expect("the rate limit must survive");
@@ -398,10 +433,7 @@ fn a_spec_pointer_file_produces_the_patch_set() {
     assert_eq!(agents.rename.as_deref(), Some("babelforce.agent.list"));
     assert_eq!(agents.risk, Some(Risk::Low));
     assert!(
-        agents
-            .quirks
-            .as_ref()
-            .is_some_and(|q| q.pagination.is_some()),
+        agents.pagination.is_some(),
         "pagination is declared in the patch because no spec publishes it"
     );
 
@@ -441,7 +473,10 @@ fn unstated_patch_overrides_stay_distinguishable_from_stated_ones() {
     assert!(agents.params.is_empty());
 
     let hangup = &loaded.patch.operations[1];
-    assert_eq!(hangup.quirks, None, "no quirks were stated for this one");
+    assert_eq!(
+        hangup.pagination, None,
+        "no pagination was stated for this one"
+    );
 }
 
 /// A file may carry both roles at once: a spec to ingest *and* an operation the vendor document
@@ -457,6 +492,12 @@ direction = \"read\"
 path = \"/health\"
 risk = \"low\"
 idempotency = \"idempotent\"
+effects = [\"read\", \"network\"]
+interaction_shape = \"unary\"
+protocol_driver = \"http_v1\"
+placement_requirement = \"connectors_deployment\"
+implementation_form = \"built_in\"
+required_capabilities = [\"public_network\"]
 auth = []
 ",
         spec_pointer()
@@ -506,6 +547,12 @@ direction = "read"
 path = "/api/v2/calls/reporting"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#;
 
     let one_way = provider::load(
