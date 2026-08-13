@@ -28,7 +28,7 @@ children as each milestone is designed.
 |---|---|---|---|---|
 | [S-001](S-001-the-document-carries-the-callers-contract.md) | The document carries the caller's contract, so nothing at runtime parses source | ready (1) | Catalog | catalog, catalog-build, connector-resolve |
 | [S-002](S-002-effects-are-read-never-derived.md) | Per-operation effects are read from the document, never derived | ready (2) | Catalog | catalog, catalog-build, domain |
-| [S-003](S-003-the-lockfile-gets-a-verifier.md) | `connectors catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
+| [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |

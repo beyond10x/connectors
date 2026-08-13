@@ -11,7 +11,7 @@ note: "builds on S-016. The vendored reference corpus is a source-reference data
 
 ## Goal
 
-`connectors sources mint <vendor>` turns the vendored competitor catalogs into a lookup instead
+`catalog sources mint <vendor>` turns the vendored competitor catalogs into a lookup instead
 of a hunt: it consults the locally vendored reference artifacts — Nango `providers.yaml`,
 Airbyte declarative connectors, Apideck's connector API, and a vendored spec directory
 (APIs.guru or equivalent) — and proposes a ready-to-review `[[source]]` entry plus the

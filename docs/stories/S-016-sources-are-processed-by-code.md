@@ -14,7 +14,7 @@ note: "SOURCES.toml must never be prose + a manual runbook. At 8 ingest provider
 
 `SOURCES.toml` — the single index of everything this repository derives from (vendored vendor
 specs, mined reference artifacts, the predecessor import) — is a **machine-processed manifest**.
-A `connectors sources` verb family owns it end to end: schema validation, checksum verification,
+A `catalog sources` verb family owns it end to end: schema validation, checksum verification,
 orphan detection, drift probing, and refresh execution. No human or agent ever fetches an
 upstream or compares a checksum by hand; the whole refresh discipline collapses to
 *refresh → build → review the canonical-document diff*.
@@ -26,15 +26,15 @@ upstream or compares a checksum by hand; the whole refresh discipline collapses 
   `upstream` (an exact fetchable location, not a repo homepage), the fetch method (native, or a
   declared legacy script under `scripts/`), the declared scrub, pins (`sha256`, retrieval date,
   or a pointer to the per-vendor detail record), and `consumers`.
-- `connectors sources check` — validates the index schema; verifies **every** recorded checksum
+- `catalog sources check` — validates the index schema; verifies **every** recorded checksum
   against the bytes on disk; detects orphans in both directions (an entry whose files are
   missing, a vendored file no entry covers); exits non-zero on any drift. It runs inside the
   catalog invariant suite, so a drifted pin or an unindexed source fails the build.
-- `connectors sources refresh <id> | --all` — fetches per the entry (invoking the declared
+- `catalog sources refresh <id> | --all` — fetches per the entry (invoking the declared
   legacy `scripts/vendor-*.sh` where one exists), applies the declared scrub, recomputes
   checksums, and rewrites the pins in the index and the detail record. Nothing under `specs/`
   is ever hand-edited.
-- `connectors sources diff <id>` — fetches upstream to a scratch location and reports whether
+- `catalog sources diff <id>` — fetches upstream to a scratch location and reports whether
   the pinned bytes drifted, **mutating nothing**: the cheap "did upstream change?" probe that
   cadence automation (selfdirect-bot) can run and act on only when the answer is yes.
 - Scale is a stated requirement: check/refresh/diff over hundreds of entries with zero

@@ -1,6 +1,6 @@
 ---
 id: S-003
-title: "`connectors catalog check` recomputes every hash and exits non-zero on drift"
+title: "`catalog check` recomputes every hash and exits non-zero on drift"
 pillar: Catalog
 status: ready
 priority: 3
@@ -10,7 +10,7 @@ areas: [catalog-build, connector-spec]
 note: "the predecessor's lockfile has a writer (C-189) and no verifier (C-14, never built), so provenance is computed, committed, and never checked. Architecture §2 day-one change 2. Review-equals-execution is a claim until something recomputes it in CI"
 ---
 
-# `connectors catalog check` recomputes every hash and exits non-zero on drift
+# `catalog check` recomputes every hash and exits non-zero on drift
 
 ## Goal
 
@@ -31,7 +31,7 @@ is the whole design.
 
 ## Acceptance
 
-- [ ] `connectors catalog check` recomputes **every** hash in `connectors.lock` — each provider's
+- [ ] `catalog check` recomputes **every** hash in `connectors.lock` — each provider's
       declaration bytes, each vendored spec document, each emitted artifact by repository-relative
       path — and **exits non-zero** on any mismatch, naming the provider and which input moved.
 - [ ] `check` performs **no network IO**, so CI runs it offline and hermetically. Upstream drift

@@ -76,7 +76,7 @@ tables discuss them as ordinary catalog features throughout.
       rate-limit / error-envelope facts before and after is identical. Any *behavioural* change to
       those fields belongs to [S-005](S-005-header-name-rate-limit-retry.md), not here.
 - [ ] Determinism and the fixed point hold after regeneration: two independent builds are
-      byte-identical, `connectors catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)) is
+      byte-identical, `catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)) is
       green on the new lock, and the build reports nothing left to write.
 - [ ] Failing-first test named — today the schema refuses a top-level `pagination` on an operation
       and requires the umbrella.
