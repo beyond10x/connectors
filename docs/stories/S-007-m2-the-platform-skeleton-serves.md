@@ -57,6 +57,11 @@ vocabulary) are cheapest to make unrepresentable now.
 
 - Exit criterion, verbatim from architecture §9: *"`connectors serve` healthy in both postures;
   routes fence green."*
+- **[S-002](S-002-effects-are-read-never-derived.md)'s grant-admission half is anchored here**
+  (decision of 2026-08-13, recorded in S-002's Progress): when `crates/domain` exists, grant
+  admission reads the document's declared effects, the no-derivation fence lands, and S-002's
+  failing-first admission test stops being vacuous. Whoever designs M2's children should spawn
+  that work as one of them.
 - The predecessor's two-crate split (host/server) was right; its failure mode was god modules — a
   10.7k-line route file is a **named anti-goal**. The four-crate split exists to move the pressure
   points out of the transport crate; if a module here starts to grow, that is the signal this

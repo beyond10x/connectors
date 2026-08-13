@@ -93,7 +93,10 @@ tables discuss them as ordinary catalog features throughout.
   [S-001](S-001-the-document-carries-the-callers-contract.md) and
   [S-002](S-002-effects-are-read-never-derived.md) — all three change the document schema, the
   lowering, and every committed document, so they are one implementor's work or a strict sequence,
-  never parallel authors.
+  never parallel authors. Status 2026-08-13: S-001 is **done** (its wave regenerated everything);
+  **S-002's schema/declaration half rides THIS story's wave** — whoever picks this up implements
+  both document changes in one strictly-sequenced pass and regenerates once (S-002's Progress
+  entry records the decision and the inheritance question to settle).
 - Read before starting: `crates/connector-spec/src/ir.rs` (`Quirks`, `Operation::quirks`),
   `crates/connector-spec/src/auth.rs` (`AuthQuirks`, `TokenEndpointQuirk` and the owner decision of
   2026-08-02 recorded in its doc comment), and flux-connectors C-12 (*quirks as control flow*) — the
