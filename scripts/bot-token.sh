@@ -8,17 +8,21 @@
 # display with the bot identity; commits created via the GraphQL
 # createCommitOnBranch API are additionally signature-verified by GitHub.
 #
-# Env:
-#   SELFDIRECT_BOT_APP_ID  numeric GitHub App id
-#   SELFDIRECT_BOT_KEY     path to the app's private key PEM (keep it 0600,
-#                          outside every git working tree)
+# Works with zero configuration. Env overrides (optional):
+#   SELFDIRECT_BOT_APP_ID  GitHub App id        (default: 4575767)
+#   SELFDIRECT_BOT_KEY     private key PEM path (default: newest
+#                          ~/selfdirect/selfdirect-bot.*.private-key.pem;
+#                          keep it 0600, outside every git working tree)
 #   SELFDIRECT_BOT_ORG     installation account (default: selfdirect)
 set -euo pipefail
 
-app_id="${SELFDIRECT_BOT_APP_ID:?SELFDIRECT_BOT_APP_ID is not set}"
-key="${SELFDIRECT_BOT_KEY:?SELFDIRECT_BOT_KEY is not set}"
+app_id="${SELFDIRECT_BOT_APP_ID:-4575767}"
+key="${SELFDIRECT_BOT_KEY:-}"
 org="${SELFDIRECT_BOT_ORG:-selfdirect}"
-[ -r "$key" ] || { echo "key not readable: $key" >&2; exit 1; }
+if [ -z "$key" ]; then
+  key="$(ls -t "$HOME"/selfdirect/selfdirect-bot.*.private-key.pem 2>/dev/null | head -1)"
+fi
+[ -n "$key" ] && [ -r "$key" ] || { echo "no readable bot key (looked for ~/selfdirect/selfdirect-bot.*.private-key.pem; override with SELFDIRECT_BOT_KEY)" >&2; exit 1; }
 
 b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 

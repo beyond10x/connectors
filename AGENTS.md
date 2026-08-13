@@ -28,12 +28,8 @@ Humans push as humans. Automation authenticates as the org-owned GitHub App **se
 (App ID `4575767`; permissions: contents, pull_requests, metadata, deployments — nothing more).
 No PATs, no machine accounts, no long-lived credentials.
 
-Environment expected by the scripts:
-
-```bash
-export SELFDIRECT_BOT_APP_ID=4575767
-export SELFDIRECT_BOT_KEY=~/selfdirect/selfdirect-bot.2026-08-12.private-key.pem
-```
+The scripts work with zero configuration (defaults: App ID baked in, key found at
+`~/selfdirect/selfdirect-bot.*.private-key.pem`; `SELFDIRECT_BOT_*` env vars override).
 
 Three paved paths, in order of everyday-ness:
 
