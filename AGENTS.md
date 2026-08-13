@@ -151,8 +151,23 @@ The agent instruction is therefore short:
 
 ## Boundaries
 
-- Nothing here builds yet; do not scaffold crates ahead of the build order in
-  [02-architecture.md §9](docs/design/02-architecture.md).
+- **M1 has landed: the catalog builds here.** `cargo build --workspace` and
+  `cargo test --workspace` are green, and `catalog build` compiles `providers/` plus the vendored
+  spec cache into `catalog/`, the pack, `connectors.lock` and the site projection. Do not scaffold
+  crates ahead of the remaining build order in
+  [02-architecture.md §9](docs/design/02-architecture.md) — the platform family (`domain`,
+  `protocol`, `service`, `server`) is M2's, and the user-facing `connectors` binary arrives with it.
+  `catalog` is the repository-maintenance CLI and is never a release artifact.
+- **No `codewandler-flux-*` crate may enter this workspace**, in any dependency kind — not as a
+  dependency, not as a dev-dependency, not behind an off-by-default feature.
+  `crates/catalog-build/tests/main/engine_free.rs` asserts it three ways.
+- **Argv is parsed with clap's derive API.** Hand-rolled argument parsing is banned, for every
+  binary now and later.
+- **Provider testing is one consolidated file**, `crates/catalog-build/tests/main/catalog_invariants.rs`,
+  which iterates the whole catalogue. Do not add a per-provider test file: a rule about connectors
+  is stated once and parameterised, so the next connector is covered the moment it exists. The
+  workspace fences (dependency, engine-free, no-network, MSRV) stay separate — each is an argument
+  about the workspace, not about the catalogue.
 - The predecessor repositories (`~/projects/flux-connectors`, `~/projects/flux-exchange`) are
   read-only reference: mine them, copy from them per the architecture's inventory, never edit
   them from here. Cross-product decisions live in `~/projects/flux-roadmap/decisions/`
