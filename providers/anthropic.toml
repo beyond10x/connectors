@@ -1,0 +1,913 @@
+# Anthropic — hand-authored, management surface and model catalogue only.
+#
+# ---------------------------------------------------------------------------------------------
+# THE CHARTER BOUNDARY, FIRST: NO INFERENCE OPERATION IN THIS FILE.
+# ---------------------------------------------------------------------------------------------
+#
+# `docs/vision.md`'s non-goals exclude "replacing flux's native model providers" — a generated
+# connector is a pipeline test fixture and a convenience surface, not the inference path. flux
+# already ships a native `anthropic` provider (`flux-providers`), and `POST /v1/messages` is that
+# provider's job, not this file's: duplicating it here would be a second, worse implementation of a
+# solved problem (the case laid out in full in
+# [C-123](../docs/stories/C-123-decide-connector-inference.md), still open as a charter decision and
+# deliberately not pre-empted by this connector). So what ships below is exactly what
+# `docs/stories/C-122-provider-anthropic.md` scopes: the model catalogue (which flux's pool
+# consumes live, see `llm_catalogue` below) and a curated slice of the Admin API. Nothing here ever
+# sends or receives a message.
+#
+# ---------------------------------------------------------------------------------------------
+# `anthropic-version` IS DECLARED BELOW IN `const_headers`, AND EVERY REQUEST NEEDS IT.
+# ---------------------------------------------------------------------------------------------
+#
+# Every Anthropic endpoint — the Models API and the Admin API alike — requires an
+# `anthropic-version` header stating the dated API version the request is written against; there is
+# no default and no unversioned alias. This is the same shape `providers/notion.toml` documents for
+# `Notion-Version`, and the same mechanism: `const_headers`, which C-55 added after measuring that
+# the only other header field this schema had, `params.header`, is documented as *caller-supplied*
+# and cannot pin a vendor constant (pinning one with a JSON Schema `const` silently drops the
+# constraint at emission — C-55's own finding). `crates/connector-flux/tests/anthropic_connector.rs`
+# asserts the literal reaches every emitted operation and appears in no signature, so this stays a
+# property of the connector rather than of this comment.
+#
+# An inline table deliberately — a `[const_headers]` section header would scope every provider
+# scalar after it into that table and the loader would reject the file. `providers/github.toml` and
+# `providers/notion.toml` both record the same trap against the same fix.
+#
+# `2023-06-01` is the version every operation below is written against; it has been Anthropic's
+# current version since (per Anthropic's own docs) no dated version has superseded it. Changing it
+# is a deliberate migration of this whole file, not a refresh.
+#
+# `content-type: application/json` remains hard-coded in the emitter and is still not declarable
+# (C-144); it does not arise here regardless, since every operation below is a parameterless or
+# path/query-only GET and carries no body.
+#
+# ---------------------------------------------------------------------------------------------
+# TWO CREDENTIALS, BOTH `x-api-key`, AND WHY THEY ARE NOT ONE.
+# ---------------------------------------------------------------------------------------------
+#
+# Anthropic authenticates with a custom header, `x-api-key: <secret>` — never `Authorization:
+# Bearer` — so every credential below uses `scheme = { header = { name = "x-api-key" } }`
+# (`crates/connector-spec/src/auth.rs`'s `Header` variant, mirroring
+# `flux_plugin_protocol::AuthScheme`).
+#
+# The *value* differs by surface, though, and this file keeps that honest rather than smuggling one
+# key into two jobs. A regular API key (`sk-ant-api03-…`) authenticates the Models API and is what
+# most operators already hold. The Admin API — organization info, workspaces, API keys — accepts
+# only an **Admin API key** (`sk-ant-admin…`, provisionable solely by an organization member with
+# the admin role) or an `org:admin` OAuth bearer token; Anthropic's own Admin API reference states
+# this explicitly ("The Admin API requires special access"). This connector models the API-key half
+# of that only — OAuth acquisition is the host's business at flux's `$auth` seam, never this file's
+# (see the authentication contract in AGENTS.md) — so `anthropic.admin_key` is declared as a second,
+# separate credential rather than folded into `anthropic.api_key`. Conflating them would mean an
+# operator who only ever uses the model catalogue is asked for an organization-admin secret they may
+# not be entitled to provision, and a provider that reused one field for two different security
+# boundaries is exactly the kind of silent widening this repository's auth model exists to prevent.
+#
+# `default_auth` names the regular key; each Admin operation below overrides `auth` to name the
+# admin key instead (`Operation::auth`, "OMIT the key to inherit `default_auth`… write a non-empty
+# list to name the mechanisms that authorize it" — the schema's own wording).
+#
+# ---------------------------------------------------------------------------------------------
+# NOT EXECUTABLE YET, for the same reason as every other provider in this repository.
+#
+# flux's `http.request` takes `{"$secret": "ENV"}` as a *whole-value* replacement, so it cannot
+# produce a custom-header credential either (`docs/designs/auth-seam.md`). The `$auth` seam has to
+# land in flux first; the generated Flux below carries no credential at all, deliberately, exactly
+# as OpenAI's and OpenRouter's do.
+# ---------------------------------------------------------------------------------------------
+#
+# WHY THERE IS NOT A SINGLE QUERY PARAMETER, and which fields that costs.
+#
+# Nothing in this pipeline percent-encodes a query value: the emitter interpolates it verbatim into
+# a `fmt` template and flux registers no encoding op (C-30, `crates/connector-flux/src/op.rs`).
+# `zendesk-ticket-search` is the standing demonstration AGENTS.md lists under *Intentional gaps*. So
+# every optional cursor-pagination parameter Anthropic documents — `after_id`, `before_id`, `limit`
+# on the models list, and `after_id`/`before_id`/`limit`/`include_archived` on the workspaces list,
+# and the same trio plus `status`/`workspace_id`/`created_by_user_id` on the API-keys list, and the
+# same trio again (plus `email`) on the organization-members, workspace-members and invites lists
+# C-441 adds — is excluded outright. Every operation below therefore returns Anthropic's first,
+# unpaginated page (20 items by default), which is a correct answer to "what does this account
+# have" and not a broken answer to "give me page 2". Each list says so in its own `description`,
+# because a caller who believes an unpaginated page is the whole organization draws a *wrong*
+# conclusion rather than an incomplete one — the failure this convention exists to prevent.
+#
+# The path-shaped parameters are left alone for the same charset reason `providers/openai.toml`
+# records for `GET /v1/models/{model}`. Anthropic's model ids are drawn from `[A-Za-z0-9.-]`
+# (`claude-opus-4-6`, `claude-3-5-sonnet-20241022`); the `user_id` and `workspace_id` C-441 adds are
+# vendor-minted opaque handles of the form `user_01WCz1Fkm…` and `wrkspc_01JwQvzr7…`, drawn from
+# `[A-Za-z0-9_]`. Every character of either is already a valid URL path character, so nothing about
+# an id can change the shape of the request. Note what that argument does and does not rest on: it
+# is a fact about what Anthropic *mints*, not a constraint this connector can enforce, and it is the
+# same standing exposure `status.rs` deliberately does not flag because C-30 scopes its refusal to
+# query values. A caller passing a hand-built id is outside what either the vendor or this file
+# describes.
+#
+# WHY THE SELECTION IS READ-ONLY.
+#
+# Nothing below is a POST, PATCH or DELETE. Two constraints were measured earlier in this wave, and
+# **both have since closed** — so the read-only scope now rests on the shape decision below, not on a
+# missing primitive. `BodyNode` could not build an array when this was written; C-185 landed the
+# indexed `wire` path, so it can. C-186 closed the `idempotency = "idempotent"` refusal on POST and
+# PATCH. Neither gap was ever exercised here (there is no body to build and no write to mis-declare),
+# which is why closing them changes nothing about this file — but the sentence that cited them as
+# *reasons* would now be false, and a stale premise is how a withheld surface gets reopened on an
+# argument nobody re-checked.
+#
+# **What C-185 did not close, and what a write here would hit first:** `connector-pack`'s evaluator
+# has no `Node::List` arm, so the first operation that emits an array body refuses at
+# `crates/connector-pack/src/request.rs:1330` with "its body computes a list, which this pack does not
+# evaluate". That is C-452, and it is the real gate on a mutating surface here. The Admin API's mutating surface (creating invites, updating member roles,
+# archiving workspaces, rotating API-key status) is real and useful, but each one needs a decision
+# about request/response shape this story does not need to make to satisfy its Goal, so it is left
+# out rather than guessed at — the standing rule this repository applies everywhere a shape is
+# unclear. C-441 widened the *read* surface and left that sentence standing unchanged: one of the
+# two constraints it cites has since closed (C-186, idempotent POST/PATCH) and one has not (C-185,
+# a request body cannot contain an array), and neither is what decides the question, because a read
+# has no body to build either way.
+#
+# ---------------------------------------------------------------------------------------------
+# PERSONAL DATA: THE ADMIN API NAMES REAL PEOPLE.
+# ---------------------------------------------------------------------------------------------
+#
+# `anthropic-organization-members-list`, `anthropic-organization-member-get`,
+# `anthropic-workspace-members-list`, `anthropic-workspace-member-get` and
+# `anthropic-invites-list` return the names, email addresses and stable user ids of actual
+# individuals in an organization. That is a different kind of field from an API key's
+# `partial_key_hint` or a workspace's `display_color`, and this file marks it as one.
+#
+# Every field whose value identifies or contacts a person carries, in its own `description`, the
+# sentence `providers/bitbucket.toml` and `providers/discord.toml` already use:
+#
+#   Identifies a named person — read it for what the calling flow needs and do not persist it
+#   beyond that
+#
+# A `description` in this repository is the text a **model** receives as its tool contract, not UI
+# copy (AGENTS.md § Configuration contract), so this is an instruction to the thing that will
+# actually handle the value — which is the only place it can do any work.
+#
+# A user's `id` carries the sentence beside their `email` and `name`, deliberately: it is the handle
+# that addresses one person and resolves to both of the others through
+# `anthropic-organization-member-get`. `providers/discord.toml` marks a bare `owner_id` on exactly
+# that reasoning. `workspace_id`, `role`, `workspace_role` and `type` do not carry it — they
+# describe the membership, not the member.
+#
+# **No example person appears anywhere in this file.** Anthropic's own Admin API reference prints a
+# specimen name and address in every response sample; neither is reproduced here, in prose or in a
+# schema. That is `providers/docusign.toml`'s rule and its reason: a placeholder gets copied, and a
+# field whose entire content is personal data earns no illustration. No field exists here whose only
+# purpose is to surface an address more conveniently, either.
+#
+# `crates/connector-spec/tests/anthropic_admin_surface.rs` holds all of the above — the marked
+# locations by JSON Pointer, and the absence of an invented person — so it is a property of the
+# connector rather than of this comment.
+
+id = "anthropic"
+vendor = "Anthropic"
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/com.anthropic.api/<credential>`.
+#
+# Derived from `anthropic.com`, the vendor's own primary domain, with the trailing `api` label every
+# other single-product vendor here carries.
+#
+# **This was bare `com.anthropic` first, and normalising it was a correction C-92's review forced.**
+# It was the one authority in the catalogue that fitted neither branch of the rule
+# `providers/jira.toml` states: not `<vendor>.api` like the thirty-odd single-product connectors,
+# and not `<vendor>.<product>` like `com.atlassian.jira` or `com.microsoft.graph`. It read as a
+# third convention where there are only two.
+#
+# It was free to change because **it was never published**: it landed after the `v0.5.0` tag, and
+# `git show v0.5.0:providers/anthropic.toml` does not resolve — this file did not exist at the only
+# release cut so far. The two authorities that *are* published, and therefore genuinely immutable,
+# are `com.slack.api` and `io.fly.api`; both already carry the `.api` label this now matches.
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "com.anthropic.api"
+
+# The vendor's own spelling, taken from the operations below — every one of their paths begins
+# `/v1/`. Its absence is why the old comment here advertised a `gid` of
+# `com.anthropic/models:2023-06-01` that never rendered: a `gid` needs both halves, and only the
+# authority was declared.
+#
+# `v1` rather than `2023-06-01`, and the choice is worth stating because this vendor versions along
+# **two** axes. The dated one is the `anthropic-version` request header, declared as a
+# `const_headers` entry below; it is a header value, not a path segment, and it is already carried
+# where it belongs. The address takes the same kind of version every other connector here takes —
+# the one in the URL — so `com.anthropic.api/models:v1` reads consistently across the catalogue.
+api_version = "v1"
+
+# One tenant-independent host for every surface below — the Models API and the Admin API are both
+# served from it. `http_hosts` derives from this single value and is therefore exactly
+# `api.anthropic.com`, never widened.
+base_url = "https://api.anthropic.com"
+
+# C-55: the vendor-constant header, distributed by the loader onto every operation below.
+const_headers = { "anthropic-version" = "2023-06-01" }
+
+description = "Anthropic platform: the live model catalogue, and organization info, members, workspaces, workspace members, API keys and outstanding invites from the Admin API — all read-only"
+
+# The Models API default. Admin operations override this individually — see the header comment.
+#
+# Two alternatives, not a pair (C-555): a deployment provisions one Console-minted API key, or a
+# signed-in user completes the Console OAuth2 grant and acts as themselves. A list of requirements is
+# an OR — within one entry the credentials are an AND — so this says both are valid and chooses
+# neither. That is the host's decision, and it is why `subject` exists.
+default_auth = [
+    { credentials = ["anthropic.api_key"] },
+    { credentials = ["anthropic.console_oauth"] },
+]
+
+# The "Test connection" button: a parameterless, unpaginated GET that needs only the regular API
+# key, so pressing it never asks an operator for organization-admin access they may not hold.
+verify = "anthropic-models-list"
+
+# ---------------------------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "anthropic.api_key"
+scheme = { header = { name = "x-api-key" } }
+# The sole secret for the Models API — `x-api-key: <ANTHROPIC_API_KEY>`. Gated and registered with
+# flux's redactor by the host; never read here. No `user_env`, no `user_suffix`, no `[auth.oauth2]`:
+# the key is minted in the Anthropic Console and supplied through the environment, so flux runs no
+# grant for it.
+env = ["ANTHROPIC_API_KEY"]
+description = "Anthropic API key, sent as x-api-key"
+
+[[auth]]
+name = "anthropic.admin_key"
+scheme = { header = { name = "x-api-key" } }
+# A second, distinct secret for the Admin API only — see the header comment for why this is not the
+# same credential as `anthropic.api_key`. Provisionable only by an organization member with the
+# admin role, in the Anthropic Console.
+env = ["ANTHROPIC_ADMIN_KEY"]
+description = "Anthropic Admin API key (starts sk-ant-admin), sent as x-api-key. Required only for the Admin API operations below — organization, members, workspaces, workspace members, API keys and invites — the model catalogue uses the regular API key"
+
+# ---------------------------------------------------------------------------------------------
+# THE CONSOLE OAUTH2 ACQUISITION (C-555) — two delegated credentials, mirroring the two keys above.
+# ---------------------------------------------------------------------------------------------
+#
+# **Which of Anthropic's two OAuth systems this is, because they are easy to conflate.** Anthropic
+# runs two distinct browser OAuth flows:
+#
+#   1. The **Console** flow, which `ant auth login` performs — Anthropic's own documentation calls it
+#      "a browser-based OAuth flow against the Claude Console"
+#      (https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication, read 2026-08-12).
+#      It issues `sk-ant-oat01-…` tokens that authenticate the Claude API, and it is the flow that
+#      authorizes **this connector's operations**: the Models API and the Admin API. Authorize and
+#      token are both on the Console origin, so one `endpoint` expresses it — the two credentials
+#      declared immediately below.
+#   2. The **subscription** flow (Claude Pro/Max sign-in), whose authorize leg is on `claude.ai`
+#      while its token leg is on `platform.claude.com`. It is a two-host flow, declared further down
+#      as `anthropic.subscription_oauth` using C-556's `token_endpoint`, and it authorizes inference
+#      that this connector does not model — see its own section for what it is for.
+#
+# **Two credentials rather than one, and the reason is privilege.** The Admin API needs the
+# `org:admin` scope; the model catalogue does not. Collapsing both surfaces onto one OAuth
+# credential would make every deployment that merely wants the model catalogue request
+# organization-admin access — the exact escalation this file already refuses one line at a time
+# (`verify` is pinned to `anthropic-models-list` precisely "so pressing it never asks an operator for
+# organization-admin access they may not hold"). So the OAuth pair mirrors the key pair: one
+# workspace-scoped credential for `models`, one org-admin credential for `admin`.
+#
+# **`subject = "user"` on both, and that is the substantive difference from the keys above.** Both
+# API keys are Console-minted, organization-provisioned secrets. An OAuth token is issued to the
+# person who completed the grant and is bounded by *their* permissions, so it is not the same
+# credential wearing a different hat and must not share a name or an address with one.
+#
+# **One wrinkle a host must handle and this file cannot declare.** An Anthropic OAuth token travels
+# as `Authorization: Bearer <token>` *plus* an `anthropic-beta: oauth-2025-04-20` header, whereas the
+# API keys above travel as `x-api-key`. `scheme = "bearer"` carries the first half; the second is a
+# per-credential constant header, and `const_headers` is connector-wide, so there is nowhere here to
+# put it. Recorded rather than faked: a host running this grant adds that header itself.
+
+[[auth]]
+name = "anthropic.console_oauth"
+scheme = "bearer"
+subject = "user"
+description = "Anthropic Console OAuth2 access token (sk-ant-oat01-), obtained on behalf of a signed-in user and sent as a bearer. Workspace-scoped: enough for the model catalogue, and deliberately not enough for the Admin API"
+
+[auth.oauth2]
+# Both paths resolve against the one `login` service above — this flow is single-host, which is what
+# makes it declarable today.
+endpoint = "login"
+authorize_path = "/oauth/authorize"
+token_path = "/v1/oauth/token"
+# **No `scopes`, and that is a declaration rather than an omission.** Anthropic's CLI documentation
+# states the default plainly: "By default, `ant auth login` requests a workspace-scoped token", and
+# names a scope (`org:admin`) only for the Admin API. There is no published scope word for the
+# ordinary workspace-scoped token, so requesting none is what this flow actually does; inventing a
+# scope name here would be a string the authorize endpoint has never seen.
+grants = ["authorization_code", "refresh_token"]
+# **A public PKCE client, so no operator client secret** (C-556). Anthropic's Console OAuth
+# authenticates the token exchange with PKCE alone — its CLI profile exposes `client_id` as a
+# writable key and no client secret at all. Marking it public is what exempts it from the
+# operator-secret requirement `auth_archetypes.rs` otherwise enforces on an `authorization_code`
+# grant, and it is the honest description: there is no secret for an operator to supply.
+public_client = true
+
+[[auth.quirks.token_endpoint]]
+# **The endpoints above are measured, not published — and this is the surface for exactly that.**
+grant = "authorization_code"
+behaviour = "Anthropic documents that this flow exists and what it is for, but publishes no authorize or token URL for it on any page under platform.claude.com/docs or code.claude.com/docs. Both values above are therefore measured rather than quoted. The token endpoint additionally MOVED: `console.anthropic.com/v1/oauth/token` now returns 404, and the live endpoint is `platform.claude.com/v1/oauth/token`, following the console.anthropic.com to platform.claude.com rename. A host that hard-codes the legacy console host from an older integration will 404 on fresh logins while token *refresh* keeps working, which is how the migration usually presents."
+attribution = "Anthropic's own CLI docs (https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication) describe the flow as \"a browser-based OAuth flow against the Claude Console\" and publish no URLs. The URLs come from third-party implementations of the same flow — github.com/querymt/anthropic-auth records the Console authorize endpoint as `console.anthropic.com/oauth/authorize` (pre-rename) alongside the subscription flow's `claude.ai/oauth/authorize` — and from the live-host check recorded in NousResearch/hermes-agent#49821, where the console token host 404s and the platform host answers. Not confirmed against a vendor specification, because none is published."
+measured = "2026-08-12"
+
+[[auth]]
+name = "anthropic.console_oauth_admin"
+scheme = "bearer"
+subject = "user"
+description = "Anthropic Console OAuth2 access token carrying the org:admin scope, sent as a bearer. Required for the Admin API operations; issued only to an organization member holding the admin, owner or primary-owner role"
+
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/oauth/authorize"
+token_path = "/v1/oauth/token"
+# `org:admin` is the one scope Anthropic names for this surface, and it is quoted rather than
+# guessed: "To manage the resources documented on the Admin API page, request the `org:admin` scope
+# under a dedicated profile", and "The `org:admin` scope is granted only to organization members with
+# the admin, owner, or primary owner role. The issued token has organization-wide access, and any
+# workspace binding on the profile does not constrain it."
+# (https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication, read 2026-08-12.)
+#
+# That last sentence is why this is a separate credential and not an extra scope on the one above:
+# the resulting token is organization-wide by construction, so it cannot be the credential the model
+# catalogue asks for.
+scopes = ["org:admin"]
+grants = ["authorization_code", "refresh_token"]
+# Public PKCE client, same as `anthropic.console_oauth` — the org:admin scope changes what the token
+# can do, not how the client authenticates the exchange.
+public_client = true
+
+[[auth.quirks.token_endpoint]]
+grant = "authorization_code"
+behaviour = "Same measured endpoints as `anthropic.console_oauth` — Anthropic publishes no authorize or token URL for the Console flow, and the token host moved from console.anthropic.com to platform.claude.com. Recorded again here rather than cross-referenced because a quirk is read per credential."
+attribution = "See `anthropic.console_oauth`'s measurement for the full provenance: Anthropic's CLI docs describe the flow without URLs; the values come from third-party implementations of the same flow and a live-host check."
+measured = "2026-08-12"
+
+# ---------------------------------------------------------------------------------------------
+# THE SUBSCRIPTION OAUTH2 ACQUISITION (C-555, expressible since C-556) — the two-host flow.
+# ---------------------------------------------------------------------------------------------
+#
+# Anthropic's Claude Pro/Max sign-in is a **two-host** OAuth2 flow: the browser leg is
+# `https://claude.ai/oauth/authorize` and the exchange is `https://platform.claude.com/v1/oauth/token`.
+# One `endpoint` cannot express two origins — which is why this was a documented non-declaration in
+# C-555's first round. C-556 added `OAuth2Spec::token_endpoint`, a second service *reference*, and it
+# is what makes this declarable: `endpoint` names the authorize host and `token_endpoint` names the
+# token host, both resolved from declared `[[services]]` base URLs so `http_hosts` and X-154's
+# `NoDeclaredDefault` composition rule keep working. The authorize host is the new
+# `subscription-authorize` service below; the token host is the existing `login` service
+# (`platform.claude.com`), reused rather than duplicated because it is byte-for-byte the same origin.
+#
+# **What this credential authorizes: none of this connector's operations, deliberately.** A Pro/Max
+# subscription OAuth token is a consumer *inference* credential — Anthropic's own Claude Code docs say
+# a `setup-token` OAuth token "can only make model requests" — and this file's charter is "NO
+# INFERENCE OPERATION IN THIS FILE". So it appears in neither `default_auth` nor any operation's
+# `auth`, and the loader permits that: a requirement must name a declared credential, but no rule
+# forces a credential to be named by a requirement (`validate_requirements`,
+# `crates/connector-spec/src/provider.rs`). The credential is declared because the story's consumer is
+# **Exchange's authorize-URL composition and autodev's Anthropic login** (`## Goal`), not an operation
+# here: a host acquires this token to make inference calls that live in flux's native `anthropic`
+# provider, and this connector declares *how the acquisition composes* without modelling the call.
+#
+# **The client id is a FACT recorded, never a declaration value.** Claude Code ships a single
+# well-known public client id for this flow — `9d1c250a-e61b-44d9-88ed-5944d1962f5e`, recorded here in
+# prose so a reader can recognise it. It is deliberately NOT the `client_id` field of the block below,
+# and there is no `oauth_client_id` config binding it: a registration value is deployment
+# configuration, and the loader would refuse a populated registration field anyway. PKCE S256 is
+# mandatory and is what a public client authenticates the exchange with — coqu's implementation notes
+# it plainly: "The auth server enforces PKCE. Omitting `code_verifier` in the token request fails."
+#
+# ⚠ **THE TERMS-OF-SERVICE POSITION, AND THAT THE OWNER ACCEPTED IT EXPLICITLY.** Anthropic states
+# that OAuth on Free, Pro and Max plans "is intended exclusively for Claude Code and Claude.ai", that
+# it "does not offer an OAuth program for third-party tools", and that it "does not provide a way to
+# register new client IDs for third-party projects"; server-side enforcement rejecting consumer-plan
+# OAuth tokens outside those surfaces has been in place since January 2026, and a documentation update
+# on 2026-02-19 confirmed that using such tokens in third-party tools violates the Consumer Terms.
+# **The owner weighed this on 2026-08-12 and accepted it explicitly, choosing to ship the subscription
+# flow anyway** (round-2 re-scope of C-555). This is recorded rather than argued because it is not the
+# connector model's decision to make — the model can express the flow honestly, and whether a
+# deployment is permitted to run it is the operator's and the owner's call, made here with the facts in
+# front of them. Sources: querymt/anthropic-auth and flopsstuff.github.io/coqu (endpoints, client id,
+# scopes, PKCE), NousResearch/hermes-agent#49821 (the console→platform token-host move), and the
+# widely-reported February 2026 Anthropic policy update (the ToS position).
+
+[[auth]]
+name = "anthropic.subscription_oauth"
+scheme = "bearer"
+subject = "user"
+description = "Anthropic Claude Pro/Max subscription OAuth2 access token (sk-ant-oat01-), acquired on behalf of a signed-in consumer-plan user and sent as a bearer. Authorizes inference against Anthropic's consumer surfaces, which this catalogue does not model — it is declared so a host can compose the two-host acquisition, not to authenticate an operation here. Anthropic restricts this flow to Claude Code and Claude.ai; using the token elsewhere violates the Consumer Terms (owner-accepted 2026-08-12)"
+
+[auth.oauth2]
+# Two hosts (C-556): `endpoint` is the authorize origin, `token_endpoint` is the exchange origin.
+endpoint = "subscription-authorize"
+token_endpoint = "login"
+authorize_path = "/oauth/authorize"
+token_path = "/v1/oauth/token"
+# The four `user:*` scopes Claude Code requests on this flow, quoted from the same third-party
+# implementations that carry the endpoints (querymt/anthropic-auth, flopsstuff.github.io/coqu). They
+# are inference/session/mcp scopes — none maps to an operation in this connector, which is the point:
+# the acquisition is real and the operations it would authorize live elsewhere.
+scopes = ["user:profile", "user:inference", "user:sessions:claude_code", "user:mcp_servers"]
+grants = ["authorization_code", "refresh_token"]
+# A public PKCE client — the client id is public and shared, and there is no client secret. See the
+# section comment above for the id (recorded as a fact, not a value) and the PKCE-S256 source.
+public_client = true
+
+[[auth.quirks.token_endpoint]]
+grant = "authorization_code"
+behaviour = "Authorize is `https://claude.ai/oauth/authorize` and the token exchange is `https://platform.claude.com/v1/oauth/token` — two different origins, PKCE S256 mandatory (omitting `code_verifier` fails the exchange). The token host is `platform.claude.com`, NOT the legacy `console.anthropic.com`, which now 404s: the console.anthropic.com to platform.claude.com rename moved it, and an older integration that hard-codes the console host will 404 on fresh logins while refresh keeps working. Anthropic publishes no URL for this flow; both values are measured."
+attribution = "The endpoints, the shared public client id and the `user:*` scopes come from third-party implementations of the Claude Code flow — github.com/querymt/anthropic-auth (\"Max Mode\": authorize `claude.ai/oauth/authorize`) and flopsstuff.github.io/coqu/claude-oauth (token `platform.claude.com/v1/oauth/token`, client id `9d1c250a-e61b-44d9-88ed-5944d1962f5e`, scopes `user:profile user:inference user:sessions:claude_code user:mcp_servers`, PKCE enforced). The console→platform token-host move is the live-host check in NousResearch/hermes-agent#49821. Anthropic's own docs describe consumer OAuth without publishing endpoints, so none of this is confirmed against a vendor specification."
+measured = "2026-08-12"
+
+# ---------------------------------------------------------------------------------------------
+# Configuration — what a human supplies before any of this runs
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "api_key"
+# This provider declares named services (`models`, `admin`), so a config field has no implicit
+# `default` to fall into — this field configures the credential the `models` service's operations
+# actually use.
+service = "models"
+label = "API key"
+help = "Create a key in the Anthropic Console (console.anthropic.com), under API Keys. This is the standard key used for the model catalogue"
+# No `example`, deliberately. An Anthropic API key is `sk-ant-api03-` followed by a long token, and a
+# placeholder of that shape is exactly what trips secret scanning and has blocked a release here
+# before (`providers/notion.toml`, `providers/shopify.toml` record the same call). The shape belongs
+# in prose, where it cannot be copied into a form.
+format = "token"
+secret = true
+docs_url = "https://docs.anthropic.com/en/api/getting-started"
+binds = "credential.anthropic.api_key"
+
+[[config]]
+name = "admin_key"
+service = "admin"
+label = "Admin API key"
+help = "Create an Admin API key in the Anthropic Console — only an organization member with the admin role can provision one. Required only for the Admin API operations, which read organization info, members, workspaces, workspace members, API keys and invites; the model catalogue works with the API key above alone"
+format = "token"
+secret = true
+docs_url = "https://docs.anthropic.com/en/docs/manage-claude/admin-api-keys"
+binds = "credential.anthropic.admin_key"
+
+# **The OAuth registration fields — operator level, and no client secret among them** (C-555).
+#
+# `binds = "oauth.client_id"` is how this repository says *the value is deployment configuration*:
+# the id is public, it is not a secret, and it is emphatically not a declaration field — nothing in
+# the artifact carries a registration value. Both fields sit on the `login` service because that is
+# the service whose endpoints the grant uses.
+#
+# **There is no `oauth_client_secret` field here, unlike `providers/github.toml`, and that is a
+# measured difference rather than an oversight.** Anthropic's Console OAuth is a public client using
+# PKCE: its CLI profile exposes `client_id` as a writable configuration key and exposes no client
+# secret at all (`ant profile set` accepts `workspace_id`, `base_url`, `organization_id`, `scope`,
+# `client_id` and `console_url` —
+# https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication, read 2026-08-12). A
+# secret field here would ask an operator for a credential this flow never issues.
+
+[[config]]
+name = "oauth_client_id"
+service = "login"
+label = "Anthropic OAuth client ID"
+help = "The OAuth client ID this deployment authorizes as. Anthropic does not currently operate a public client-registration program for third-party applications, so a deployment supplies the id it has been issued; the value is public, and PKCE rather than a client secret protects the exchange"
+format = "text"
+required = false
+docs_url = "https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication"
+binds = "oauth.client_id"
+
+[[config]]
+name = "oauth_redirect_uri"
+service = "login"
+label = "Anthropic OAuth callback URL"
+help = "The callback address this deployment serves, registered against the client ID above. Anthropic's own clients use a loopback callback and fall back to displaying the code for manual paste when no loopback is reachable"
+example = "https://exchange.internal/api/oauth/callback"
+format = "url"
+required = false
+docs_url = "https://platform.claude.com/docs/en/cli-sdks-libraries/cli/authentication"
+binds = "oauth.redirect_uri"
+
+# ---------------------------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------------------------
+
+[[services]]
+name = "models"
+tags = ["ai"]
+description = "The live model catalogue: list available models, and retrieve one by id"
+# C-121: the capability shape `openai` and `openrouter` already claim. Filling it costs no reshaping
+# — `anthropic-models-list` already ends in the `list` segment the role's slot matches on
+# (`fills_slot`, `crates/connector-spec/src/ir.rs`), which is the falsification this story exists to
+# run: two vendors with genuinely different management surfaces both fit the same role unchanged.
+roles = ["llm_catalogue"]
+
+[[services]]
+name = "admin"
+tags = ["ai"]
+description = "Admin API: organization info and members, workspaces and their members, API keys, and outstanding invites — read-only"
+
+[[services]]
+# **The Console OAuth2 endpoints, which are not on the API host** (C-555).
+#
+# Declared as a service because that is how this repository names an endpoint whose base URL differs
+# from the connector's, and because `http_hosts` derives from declared base URLs — a token exchange
+# against a host nothing declared is one the egress gate refuses. `OAuth2Spec.endpoint` below names
+# this service rather than carrying a URL of its own, which is the property that keeps it that way.
+#
+# **The base URL is a literal, and that is the consumer contract** (X-154's `NoDeclaredDefault`).
+# Exchange composes the authorize URL from the artifact alone, so a `{placeholder}` with no declared
+# default would leave it with nothing to resolve. Anthropic serves one Console origin for everyone —
+# there is no per-tenant subdomain here, unlike GitLab's self-managed `{origin}` — so the literal is
+# also the honest value.
+#
+# It declares no operations, and must not. An authorize endpoint is a browser redirect and a token
+# endpoint's response body *is* a credential, so neither is a connector operation — AGENTS.md
+# § Authentication contract. The host runs the grant; this service exists so the host knows where.
+name = "login"
+description = "Anthropic's Console OAuth2 authorize and token endpoints on platform.claude.com; also the subscription flow's token host, which redeems here while authorizing on claude.ai."
+base_url = "https://platform.claude.com"
+
+[[services]]
+# **The subscription flow's authorize host, which is neither the API host nor the token host**
+# (C-555, two-host since C-556).
+#
+# Claude Pro/Max sign-in authorizes on `claude.ai` and redeems its token on `platform.claude.com`.
+# This service is the first origin; the `login` service above is the second. `anthropic.subscription_oauth`
+# names this one as its `endpoint` (authorize) and `login` as its `token_endpoint` (exchange), so a
+# host joins each path onto the right host and `http_hosts` admits both. Same `NoDeclaredDefault`
+# reasoning as `login`: `claude.ai` is a single origin with no per-tenant subdomain, so the base URL
+# is a literal a consumer can compose against with no configuration.
+#
+# It declares no operations, and must not — it is a browser-redirect host, not an API surface.
+name = "subscription-authorize"
+description = "Anthropic's Claude Pro/Max subscription OAuth2 authorize endpoint, served by claude.ai. The matching token exchange is on the `login` service (platform.claude.com)."
+base_url = "https://claude.ai"
+
+# ---------------------------------------------------------------------------------------------
+# Operations — the models service (2), then the admin service (9). All eleven are GET, all
+# authenticated, and none takes a body.
+#
+# Op ids are hyphen-separated, not dotted: flux-lang's `is_valid_decl_name` admits ASCII
+# alphanumerics, `_` and `-` only (C-8, `crates/connector-flux/src/names.rs`); C-23 settles the
+# canonical rule.
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-models-list"
+service = "models"
+method = "GET"
+direction = "read"
+path = "/v1/models"
+description = "List the models available to this API key, most recently released first. Unpaginated — this connector cannot request a further page"
+risk = "low"
+idempotency = "idempotent"
+# No parameters at all. The vendor declares three, `after_id`/`before_id`/`limit`, all optional
+# cursor-pagination and all excluded — see the header comment's query-parameter section.
+
+# The envelope is stable and is what this schema commits to; the model entry is not, and is
+# described rather than enumerated field-by-field for the same reason `providers/openrouter.toml`
+# gives for its own models list: Anthropic's `capabilities` object already nests `batch`,
+# `citations`, `code_execution`, `context_management`, `effort`, `image_input`, `pdf_input`,
+# `structured_outputs` and `thinking`, each itself an object, and the vendor adds to that set as it
+# ships new model capabilities. A field list transcribed from today's reference would become a
+# confident description of an earlier response the moment the vendor adds one.
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per model this key can reach. Each carries at least `id` (the string to pass as `model_id` to anthropic-model-get, e.g. `claude-opus-4-6`), `type: \"model\"`, `display_name`, `created_at`, `max_input_tokens`, `max_tokens`, and a `capabilities` object describing which features (batch, citations, code execution, image/PDF input, structured outputs, extended thinking) this model supports", items = { type = "object", required = ["id", "type"], properties = { id = { type = "string" }, type = { const = "model" }, display_name = { type = "string" }, created_at = { type = "string", format = "date-time" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean", description = "True when the account has more models than this unpaginated call returned" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-model-get"
+service = "models"
+method = "GET"
+direction = "read"
+path = "/v1/models/{model_id}"
+description = "Retrieve one model by id, or resolve an alias to the model id it currently points at"
+risk = "low"
+idempotency = "idempotent"
+
+# SCHEMA GAP: a path parameter is interpolated as verbatim as a query parameter is, and `status.rs`
+# deliberately does not flag it — C-30 scopes its refusal to query values. Safe here for the same
+# reason `providers/openai.toml` states for its own model-id path parameter: every character of an
+# Anthropic model id (`claude-opus-4-6`, `claude-3-5-sonnet-20241022`) is drawn from
+# `[A-Za-z0-9.-]`, already a valid URL path character, so nothing about the id can change the shape
+# of the request.
+[[operations.params.path]]
+name = "model_id"
+description = "The model id or alias, e.g. `claude-opus-4-6` or `claude-3-5-sonnet-20241022`"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "type"]
+properties = { id = { type = "string", description = "The model id, echoed back — or the id the alias resolved to" }, type = { const = "model" }, display_name = { type = "string" }, created_at = { type = "string", format = "date-time", description = "When the model was released. May be an epoch value if the vendor does not know the release date" }, max_input_tokens = { type = "integer" }, max_tokens = { type = "integer", description = "The maximum value this model accepts for a completion's own max_tokens parameter" }, capabilities = { type = "object", description = "Which features this model supports — batch, citations, code execution, image/PDF input, structured outputs, extended thinking. See anthropic-models-list for why this is described rather than enumerated" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+# The nine Admin operations. Each needs `anthropic.admin_key`, not the regular API key — see the
+# header comment. Five of them return personal data; see the PERSONAL DATA section of that comment
+# for the rule every such field follows.
+#
+# Ordered by what they address rather than by when they landed: the organization, then its members,
+# then its workspaces and their members, then API keys, then outstanding invites.
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-organization-get"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/me"
+description = "Get the organization this Admin API key belongs to. Takes no parameters; useful for confirming which organization a key resolves to"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+
+[operations.response_schema]
+type = "object"
+required = ["id", "type", "name"]
+properties = { id = { type = "string" }, name = { type = "string" }, type = { const = "organization" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-organization-members-list"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/users"
+description = "List the people in this organization, with each member's name, email address, organization role and the date they joined. Returns personal data about real individuals. Unpaginated — this connector cannot request a further page, so on an organization larger than one page this is a sample and not a roster"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+# No parameters. The vendor declares four optional query filters — `after_id`, `before_id`, `limit`
+# and `email` — all excluded; see the header comment. Losing `email` is the one that stings: it
+# turns "is this person a member" from a filtered lookup into a scan of the first page, and there
+# is no path-shaped route to a user by address. Recorded rather than worked around.
+
+# Every field naming or contacting a person carries the sentence, including `id` — see the header
+# comment's PERSONAL DATA section for why the id is on that list.
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per member of the organization", items = { type = "object", required = ["id", "type"], properties = { id = { type = "string", description = "The member's stable user id, and what anthropic-organization-member-get and anthropic-workspace-member-get address them by. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, name = { type = "string", description = "The member's name as Anthropic holds it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, email = { type = "string", description = "The member's email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, role = { type = "string", description = "The member's organization role — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user. An open set in practice: Anthropic has added to it and this connector does not constrain the value" }, added_at = { type = "string", format = "date-time", description = "When the member joined the organization" }, type = { const = "user" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean", description = "True when the organization has more members than this unpaginated call returned" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-organization-member-get"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/users/{user_id}"
+description = "Retrieve one organization member by user id, returning their name, email address, organization role and join date. Returns personal data about a real individual"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+
+# SCHEMA GAP: a path parameter is interpolated as verbatim as a query parameter is, and `status.rs`
+# deliberately does not flag it — C-30 scopes its refusal to query values. Safe here on the same
+# ground `anthropic-model-get` records for `model_id`: an Anthropic user id is a vendor-minted
+# opaque handle of the form `user_01WCz1Fkm…`, drawn from `[A-Za-z0-9_]`, every character of which
+# is already a valid URL path character. That is a fact about what the vendor mints, not a
+# constraint this connector enforces.
+[[operations.params.path]]
+name = "user_id"
+description = "The member's user id, as returned in `id` by anthropic-organization-members-list or in `user_id` by anthropic-workspace-members-list"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "type"]
+properties = { id = { type = "string", description = "The user id, echoed back. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, name = { type = "string", description = "The member's name as Anthropic holds it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, email = { type = "string", description = "The member's email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, role = { type = "string", description = "The member's organization role — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user. An open set in practice; this connector does not constrain the value" }, added_at = { type = "string", format = "date-time", description = "When the member joined the organization" }, type = { const = "user" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-workspaces-list"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/workspaces"
+description = "List the organization's workspaces. Unpaginated and excludes archived workspaces by default — this connector cannot request a further page or ask for archived ones"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+# No parameters. The vendor declares four, `after_id`/`before_id`/`limit`/`include_archived`, all
+# optional query and all excluded — see the header comment.
+
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per workspace: `id`, `name`, `type: \"workspace\"`, `created_at`, `archived_at` (absent unless the workspace is archived), plus `data_residency` and user-defined `tags` objects", items = { type = "object", required = ["id", "type"], properties = { id = { type = "string" }, name = { type = "string" }, type = { const = "workspace" }, created_at = { type = "string", format = "date-time" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean", description = "True when the organization has more workspaces than this unpaginated call returned" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-workspace-get"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/workspaces/{workspace_id}"
+description = "Retrieve one workspace by id, including its name, creation date, whether it is archived, and its data-residency configuration. Unlike anthropic-workspaces-list this reaches an archived workspace, since the id is given rather than filtered for"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+
+# Safe to interpolate for the reason the header comment records: a workspace id is a vendor-minted
+# opaque handle of the form `wrkspc_01JwQvzr7…`, drawn from `[A-Za-z0-9_]`.
+[[operations.params.path]]
+name = "workspace_id"
+description = "The workspace id, as returned in `id` by anthropic-workspaces-list"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# No personal data here — a workspace is a container, not a person. `external_key_id` names a
+# customer-managed encryption key *configuration*; it is an identifier and never key material, so it
+# is no more a secret than `partial_key_hint` on anthropic-api-keys-list is.
+[operations.response_schema]
+type = "object"
+required = ["id", "type"]
+properties = { id = { type = "string", description = "The workspace id, echoed back" }, name = { type = "string" }, type = { const = "workspace" }, created_at = { type = "string", format = "date-time" }, archived_at = { type = "string", format = "date-time", description = "When the workspace was archived, or null if it is not archived" }, display_color = { type = "string", description = "The hex colour the Anthropic Console shows this workspace in" }, data_residency = { type = "object", description = "Where this workspace's data is stored and which inference geos it permits", properties = { workspace_geo = { type = "string", description = "The region this workspace's data is stored in. Immutable after creation" }, default_inference_geo = { type = "string", description = "The inference geo applied when a request names none" }, allowed_inference_geos = { description = "The permitted inference geos: either an array of geo names or the string `unrestricted`. Left untyped rather than given a type, because the vendor documents it as either shape and this file states only what it can name with confidence" } } }, tags = { type = "object", description = "User-defined string key-value tags on the workspace. Keys may not begin with `anthropic`. Left otherwise untyped — the keys are the operator's own" }, compartment_id = { type = "string", description = "This workspace's encryption-compartment identifier, referenced in a customer-managed KMS key policy on AWS. An identifier, never key material" }, external_key_id = { type = "string", description = "The customer-managed encryption key configuration attached to this workspace, when one is. An identifier, never key material" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-workspace-members-list"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/workspaces/{workspace_id}/members"
+description = "List who belongs to one workspace and the role each holds in it. Returns the user ids of real individuals; resolve one to a name and email with anthropic-organization-member-get. Unpaginated — this connector cannot request a further page, so on a workspace larger than one page this is a sample and not a roster"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+# No parameters beyond the path. The vendor declares three optional query filters — `after_id`,
+# `before_id` and `limit` — all excluded; see the header comment.
+
+[[operations.params.path]]
+name = "workspace_id"
+description = "The workspace id, as returned in `id` by anthropic-workspaces-list"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# A workspace member entry carries exactly one field that reaches a person — `user_id` — so that is
+# the field the personal-data sentence lands on. Without it this operation would return people with
+# nothing saying so.
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per member of the workspace", items = { type = "object", required = ["type", "user_id"], properties = { type = { const = "workspace_member" }, user_id = { type = "string", description = "The member's organization-wide user id, and what anthropic-organization-member-get resolves to a name and email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, workspace_id = { type = "string", description = "The workspace this membership is in — the same id that was passed in" }, workspace_role = { type = "string", description = "The member's role in this workspace — one of workspace_admin, workspace_billing, workspace_developer, workspace_restricted_developer, workspace_user. Distinct from the organization-wide `role` on anthropic-organization-members-list" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean", description = "True when the workspace has more members than this unpaginated call returned" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-workspace-member-get"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/workspaces/{workspace_id}/members/{user_id}"
+description = "Retrieve one person's membership of one workspace, and the role they hold in it. This is the direct answer to whether a given user is in a given workspace; it returns the user id of a real individual"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+
+# Two path parameters, both vendor-minted opaque handles — see the header comment.
+[[operations.params.path]]
+name = "workspace_id"
+description = "The workspace id, as returned in `id` by anthropic-workspaces-list"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "user_id"
+description = "The member's user id, as returned in `id` by anthropic-organization-members-list"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["type", "user_id"]
+properties = { type = { const = "workspace_member" }, user_id = { type = "string", description = "The member's organization-wide user id, echoed back. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, workspace_id = { type = "string", description = "The workspace this membership is in — the same id that was passed in" }, workspace_role = { type = "string", description = "The member's role in this workspace — one of workspace_admin, workspace_billing, workspace_developer, workspace_restricted_developer, workspace_user" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-api-keys-list"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/api_keys"
+description = "List the organization's API keys, with each key's name, status and a redacted hint — never the key itself. Unpaginated and unfiltered"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+# No parameters. The vendor declares six optional query filters — `after_id`, `before_id`, `limit`,
+# `status`, `workspace_id`, `created_by_user_id` — all excluded; see the header comment.
+
+# `partial_key_hint` is Anthropic's own redacted display value, not a secret — it is exactly what
+# this connector must never treat as one. No key material of any shape appears in this schema.
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per API key: `id`, `name`, `status` (`active`, `inactive`, `archived` or `expired`), `type: \"api_key\"`, `created_at`, `expires_at` (absent for a key that never expires), `partial_key_hint` (a partially redacted display string, safe to show in a UI — never the key), `workspace_id` (absent for a key on the default workspace), and `created_by`/`principal` objects each `{id, type}`", items = { type = "object", required = ["id", "type", "status"], properties = { id = { type = "string" }, name = { type = "string" }, type = { const = "api_key" }, status = { type = "string", description = "One of active, inactive, archived, expired" }, created_at = { type = "string", format = "date-time" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "anthropic-invites-list"
+service = "admin"
+method = "GET"
+direction = "read"
+path = "/v1/organizations/invites"
+description = "List the organization's invites, with the email address invited, the role offered, and whether the invite is still pending. Returns personal data — an email address for a real person. Unpaginated and unfiltered by status, so a `pending` invite must be selected from the returned entries rather than asked for"
+risk = "low"
+idempotency = "idempotent"
+auth = [
+    { credentials = ["anthropic.admin_key"] },
+    { credentials = ["anthropic.console_oauth_admin"] },
+]
+# No parameters. The vendor declares three optional query filters — `after_id`, `before_id` and
+# `limit` — all excluded; see the header comment. There is no `status` filter to lose: the vendor
+# publishes none, which is why the description tells a caller to filter `status` themselves.
+
+# `email` is the field that reaches a person here. An invite `id` addresses the invitation rather
+# than the invitee, so it does not carry the sentence — see the header comment's PERSONAL DATA
+# section for where that line is drawn.
+[operations.response_schema]
+type = "object"
+required = ["data"]
+properties = { data = { type = "array", description = "One entry per invite, in whatever status the vendor holds it", items = { type = "object", required = ["id", "type", "status"], properties = { id = { type = "string", description = "The invite's own id — an identifier for the invitation, not for the person" }, type = { const = "invite" }, email = { type = "string", description = "The email address the invitation was sent to. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, role = { type = "string", description = "The organization role the invitee is offered — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user" }, status = { type = "string", description = "One of accepted, deleted, expired, pending. This call cannot filter on it" }, invited_at = { type = "string", format = "date-time", description = "When the invite was created" }, expires_at = { type = "string", format = "date-time", description = "When the invite expires" }, accepted_at = { type = "string", format = "date-time", description = "When the invite was accepted, or null if it has not been" }, rbac_group_ids = { type = "array", items = { type = "string" }, description = "RBAC group ids to assign on acceptance, `[]` when none. A Claude Enterprise beta field; present but empty on organizations not using it" } } } }, first_id = { type = "string", description = "First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)" }, last_id = { type = "string", description = "Last id in `data`, likewise unusable as `after_id` here" }, has_more = { type = "boolean", description = "True when the organization has more invites than this unpaginated call returned" } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/error/message"
+code_pointer = "/error/type"

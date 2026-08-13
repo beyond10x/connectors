@@ -1,0 +1,396 @@
+# Cloudflare API v4 — hand-authored, curated to the surface this pipeline can express honestly.
+#
+# WHY THIS IS NOT A `[spec]` POINTER. Cloudflare publishes a large OpenAPI 3 description of the whole
+# v4 API (`developers.cloudflare.com/api/`, backing the interactive reference), but nothing is
+# vendored under `specs/` for it: ingest (C-4) and fetch (C-14) do not exist yet, and the document
+# covers several thousand operations across zones, DNS, cache, WAF, Workers, Access, R2, Stream and
+# every other Cloudflare product — pointing at it without a selection mechanism would be pointing
+# several thousand LLM tools at one account. When C-14's fetch and C-4's ingest land this file becomes
+# `[spec]` plus a `[[patch.operations]]` selection, and **the five operations below are the selection
+# to reproduce**, by method and path:
+#
+#   GET     /zones
+#   GET     /zones/{zone_id}/dns_records
+#   POST    /zones/{zone_id}/dns_records
+#   DELETE  /zones/{zone_id}/dns_records/{dns_record_id}
+#   POST    /zones/{zone_id}/purge_cache
+#
+# Until then drift is undetectable by machine, exactly as for zendesk, freshdesk, github, notion and
+# every other hand-authored provider here (`docs/designs/provider-operation-inventory.md` §6.7).
+#
+# ---------------------------------------------------------------------------------------------
+# THE DESIGN DECISION THIS CONNECTOR EXISTS TO FORCE: `zone_id` IS AN OPERATOR-PINNED
+# `[[config]]` VALUE, NOT A PER-CALL ARGUMENT - AND THE SCHEMA, NOT A PREFERENCE, DECIDES IT.
+# ---------------------------------------------------------------------------------------------
+#
+# Nearly every Cloudflare endpoint is scoped under `/zones/{zone_id}/...`: a zone is Cloudflare's unit
+# of tenancy (roughly, one DNS-managed domain), and every DNS record and every cache purge belongs to
+# exactly one. Two shapes were live options for that id:
+#
+#   configuration  an operator pins one zone when the connection is made (`[[config]]`), the way
+#                  zendesk pins `{subdomain}` into its host. The connector then reaches exactly one
+#                  zone - a second zone needs a second connection.
+#   argument       every operation declares `zone_id` as a required `params.path` parameter, the way
+#                  airtable declares `base_id` on every record operation. The connector reaches every
+#                  zone the token can, and a caller (a model) names which one on every call.
+#
+# **C-169 shipped the argument shape because the schema could express nothing else**, and said so:
+# `ConfigField::binds` reached a `{placeholder}` in `Connector::base_url` and nothing else, and
+# `base_url` here is `https://api.cloudflare.com/client/v4` - one host, identical for every zone on
+# the platform, with no zone-shaped placeholder to bind. `zone_id` is not a fragment of the *host*; it
+# is the first path segment of the *operation*. That file's header said, in as many words, that if
+# `[[config]]` ever grew a binding reaching an operation path "this file's five operations would drop
+# the parameter in favour of it".
+#
+# **C-187 grew it, and this file did exactly that.** `binds = "path.zone_id"` below pins the zone at
+# install time: the emitted operations bind `zone_id = "{zone_id}"` and a host substitutes the
+# operator's value into that literal, the same mechanism that resolves zendesk's `{subdomain}`. Four
+# consequences, each a property of the schema rather than of this comment:
+#
+#  - **`zone_id` is no longer a parameter anywhere.** The loader and the emitter both refuse a value
+#    that is pinned *and* declared, so the pin cannot be advisory: a model holding this connector
+#    cannot address a zone the operator did not choose, whatever the token would permit. That is the
+#    narrowing C-169 recorded as impossible to express.
+#  - **It is connection level, derived.** A zone is one per tenant, not one per vendor, so it lands
+#    beside the API token in the same connect form rather than in a product-wide registration.
+#  - **It is not a secret and never becomes one.** A zone id is a public identifier an operator reads
+#    back off a settings page; `Binding::is_secret` is `false` for every pinned value, so the loader
+#    refuses a field that claims otherwise, and nothing registers it with a redactor.
+#  - **One connection, one zone.** An operator managing three zones makes three connections, each
+#    with its own pinned zone and its own (ideally zone-scoped) token. That is the cost, and it is the
+#    intended one: the alternative is the connector this file used to describe, where the blast radius
+#    was whatever the token happened to allow.
+#
+# `cloudflare-zone-list` keeps no zone scope, and that is deliberate: it is the call that *discovers*
+# zone ids, so it is what an operator uses to find the value this connector then asks them to pin. A
+# path pin applies only to operations whose path actually carries its placeholder, which is what
+# makes that expressible.
+#
+# `crates/connector-flux/tests/cloudflare_connector.rs` asserts the shape directly: `zone_id` is
+# pinned by a `[[config]]` field, is a path parameter of no operation, and reaches the emitted module
+# as a substitutable placeholder rather than as an argument.
+#
+# ---------------------------------------------------------------------------------------------
+# THE TWO DECLARATIONS THIS CONNECTOR IS ACTUALLY FOR: A DESTRUCTIVE DELETE AND A REPEATABLE PURGE.
+# ---------------------------------------------------------------------------------------------
+#
+# `cloudflare-dns-record-delete` is `risk = "destructive"` for the ordinary reason: the record is gone
+# with no undo route in the API (Cloudflare's dashboard "recently deleted" surface is a UI feature on
+# a retention window, not an endpoint). `idempotency = "non_idempotent"`, for the same reason
+# `providers/airtable.toml` gives its own record delete: `DELETE` is idempotent *in effect* under RFC
+# 9110 §9.2.2 — the record is absent either way — but Cloudflare answers a repeat with `404` and
+# error code 81044 ("record does not exist"), not a repeat of the first `200`, and documents no
+# idempotency guarantee. This file does not mark a write idempotent on a claim it cannot back.
+#
+# `cloudflare-cache-purge` is the harder one, and it is **genuinely idempotent by vendor behaviour**:
+# firing `purge_everything: true` twice empties the same already-empty cache the second time, so
+# repeating it changes nothing beyond the first call. That is exactly what C-169 asked this file to
+# get right. Flux's `Idempotent` is stronger than safe replay because it licenses serving a cached
+# result instead of executing, so the operation uses `Conditional` and states the vendor condition.
+#
+# **C-186 closed that, and the way it closed it is the part worth knowing before editing this
+# file.** Every authored write refuses `Idempotent`, regardless of HTTP method. `Conditional` is the
+# honest replay-safe declaration and `repeatable_because` publishes the vendor behaviour beside it.
+#
+# `risk = "high"` on the purge, not `medium` and not `destructive`. Not `destructive`: nothing is
+# deleted or unrecoverable — the edge cache repopulates from origin on the next request, exactly as
+# it would after a TTL expiry. Not `medium` ("limited blast radius"): `purge_everything` empties the
+# *entire* edge cache for the zone in one call, instantly, for every visitor hitting it worldwide, and
+# can spike origin load hard enough to matter operationally — the "expensive and externally visible"
+# C-169 names. That is `high`'s own definition, "writes a reviewer would want to see first", the same
+# tier `providers/google.toml` gives an unrecallable Gmail send and `providers/asana.toml` gives a
+# task comment nobody can un-notify.
+#
+# ---------------------------------------------------------------------------------------------
+# WHAT IS DELIBERATELY EXCLUDED, AND WHY NO QUERY PARAMETER APPEARS ANYWHERE IN THIS FILE
+# ---------------------------------------------------------------------------------------------
+#
+# Cloudflare's list endpoints (`GET /zones`, `GET /zones/{zone_id}/dns_records`) paginate with
+# `page`/`per_page` and accept filters (`name`, `status`, `type`, `content`, …), and none of it is
+# declared here. Not because of the query-encoding gap AGENTS.md tracks for zendesk and shopify — an
+# integer page number cannot carry a character that changes the shape of a request — but because this
+# file is not confident of the exact bounds Cloudflare enforces on `per_page` for each endpoint and
+# would rather return a first page with no invented cap than assert one that is wrong. A caller gets
+# Cloudflare's default page (100 DNS records, 20-odd zones) and nothing beyond it; that is a known
+# incompleteness, not a silent truncation, the same distinction `providers/notion.toml` draws for its
+# own uncursored lists.
+#
+# Also excluded, each for a stated reason:
+#  - DNS record **update** (`PATCH`/`PUT /zones/{zone_id}/dns_records/{dns_record_id}`) and **read one**
+#    (`GET .../dns_records/{dns_record_id}`) — not in C-169's curated set and not verified here; adding
+#    either is a small, confident follow-on rather than a gap this file works around.
+#  - Selective purge (`files`/`tags`/`hosts` in the purge body) — `tags`/`hosts` are an Enterprise-plan
+#    feature this file cannot assume every token can use, and mixing that with `purge_everything` in
+#    one body is exactly the ambiguous free-form shape AGENTS.md refuses. `cloudflare-cache-purge`
+#    below does the one thing every plan supports: purge everything.
+#  - Zones, WAF rules, Workers, Access, R2, Stream, Load Balancing, and every other Cloudflare product
+#    surface — out of scope for a first curated set built around one support/ops workflow: look up a
+#    zone, read and manage its DNS records, and purge its cache when a change needs to go live now.
+
+id = "cloudflare"
+vendor = "Cloudflare"
+
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/com.cloudflare.api/<credential>` — and until it was
+# declared `Credentials::reference` refused with `NoCredentialAddress`, so this connector could not
+# authenticate at all.
+#
+# Derived from `cloudflare.com`, the vendor's own primary domain, in reverse-DNS form, with the
+# trailing `api` label the already-shipped authorities carry (`com.slack.api`, `com.vercel.api`,
+# `io.fly.api`).
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "com.cloudflare.api"
+
+# The vendor's own spelling, and it is already in `base_url` above: `/client/v4`. Recorded here so a
+# `gid` renders (`com.cloudflare.api:v4`) — a credential path needs only the authority and
+# deliberately carries no version, so a token survives the vendor's next one.
+api_version = "v4"
+
+# One host for the whole v4 API, identical for every zone and every account — see the header comment
+# for why this is exactly what makes `zone_id` an argument rather than `[[config]]`. No
+# `{placeholder}`, so `status.rs` reports no `unbound-base-url-template` issue and this connector has
+# a valid destination URL as soon as it is installed.
+#
+# `http_hosts` derives from this single value (`crates/connector-cli/src/catalog.rs`, `host_of`) and
+# is therefore exactly `api.cloudflare.com`, never widened. Nothing below reaches Cloudflare's
+# dashboard host, its GraphQL Analytics API, or any per-product host (e.g. Workers' own deploy API).
+base_url = "https://api.cloudflare.com/client/v4"
+
+description = "Cloudflare zones and DNS: list zones, list and manage DNS records for a zone, and purge a zone's cache"
+
+# The "Test connection" button: list the zones this token can see. It takes no required parameters —
+# `cloudflare-zone-list` is also the one operation with no `zone_id` to supply — so pressing it can
+# only prove the token resolves and report what it can reach. A `verify` operation must be a read; the
+# loader refuses a `high` or `destructive` one, and this is a plain `GET`.
+verify = "cloudflare-zone-list"
+
+# Every operation authenticates the same way: Cloudflare's modern API Token auth, one bearer value
+# with no scheme word to compose beyond `Bearer` itself. Cloudflare's own docs give the legacy
+# `X-Auth-Email` + `X-Auth-Key` pair equal billing, but that is a distinct, wider-scoped credential
+# this file does not model — the API Token is the vendor's own recommended replacement and the only
+# one that can be scoped to specific zones and permissions.
+default_auth = [{ credentials = ["cloudflare.api_token"] }]
+
+# ---------------------------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "cloudflare.api_token"
+scheme = "bearer"
+# The sole secret. Gated and registered with flux's redactor by the host; its value is never read
+# here and never reaches a generated artifact.
+env = ["CLOUDFLARE_API_TOKEN"]
+description = "Cloudflare API Token, sent as a bearer token, scoped to Zone:Read, DNS:Edit and Cache Purge on the zones this connector should reach"
+
+# ---------------------------------------------------------------------------------------------
+# Configuration — what a human supplies before any of this runs
+#
+# Two fields, and the pair is the point: a token says *what this connector may do*, the pinned zone
+# says *what it may do it to*. Before C-187 only the first was expressible here.
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "api_token"
+label = "Cloudflare API token"
+help = "Create one at My Profile -> API Tokens -> Create Token, using the \"Edit zone DNS\" template or a custom token with Zone:Read, DNS:Edit and Cache Purge permissions on the zones you want this connector to reach. Cloudflare shows the token once"
+# No `example`, deliberately. A Cloudflare API Token is 40 characters of mixed-case alphanumerics and
+# `_`/`-`, a shape that reads as plausible as a real one and that secret scanners match on length and
+# alphabet alone — `providers/notion.toml` and `providers/shopify.toml` record the release this
+# repository actually lost that way, and Cloudflare's own docs illustrate the header with `Bearer
+# <API_TOKEN>` rather than a fabricated value for exactly that reason.
+format = "token"
+secret = true
+docs_url = "https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+binds = "credential.cloudflare.api_token"
+
+# The zone this connection is for. Pinned into the `{zone_id}` segment of every scoped operation's
+# path (C-187), so it is asked for once here instead of being chosen by a model on every call.
+#
+# `format` is left at `text` rather than declared: a zone id is 32 lowercase hex characters, and the
+# closed `Format` enum has no variant that says so — `token` means "an opaque credential string",
+# which this is not. Guessing at the nearest variant would put a misleading rule in front of a user;
+# the shape stays in `help` and in `example`, and `Position::validate_value` independently refuses
+# any value that could escape the path segment it lands in.
+[[config]]
+name = "zone_id"
+label = "Cloudflare zone id"
+help = "The zone (domain) this connection manages, as 32 lowercase hex characters. Find it on the zone's Overview page in the Cloudflare dashboard, bottom right under \"Zone ID\", or by running the connector's \"List zones\" operation. One connection manages one zone"
+example = "023e105f4ecef8ad9ca31a8372d0c353"
+docs_url = "https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/"
+binds = "path.zone_id"
+
+# ---------------------------------------------------------------------------------------------
+# Operations — 5, the curated set C-169 names: list zones, list/create/delete DNS records, purge
+# cache.
+#
+# Op ids are hyphen-separated, not dotted: flux-lang's `is_valid_decl_name` admits ASCII
+# alphanumerics, `_` and `-` only, so `op cloudflare.zone.list` is undeclarable (C-8, C-23).
+#
+# Every response below is wrapped in Cloudflare's one standard envelope —
+# `{"success": bool, "errors": [...], "messages": [...], "result": ...}`, with `result_info` added on
+# list endpoints — declared once per operation because `response_schema` is per-operation and this
+# repository does not have a connector-level place to say "every response looks like this" (the same
+# gap `providers/airtable.toml` and `providers/asana.toml` note for their own envelopes).
+# ---------------------------------------------------------------------------------------------
+
+[[services]]
+# C-153. `default` is the reserved implicit service, and a provider with one API surface
+# declares no services at all — so this entry exists for exactly one reason: a tag attaches
+# to a service, and there is no other service here to attach it to. It carries `tags` and
+# nothing else, which is what keeps `default` implicit and this file emitting the same
+# `cloudflare.flux` it emitted before.
+name = "default"
+tags = ["infrastructure"]
+
+[[operations]]
+id = "cloudflare-zone-list"
+method = "GET"
+direction = "read"
+path = "/zones"
+description = "List the zones (domains) this API token can see, with each zone's id, name, status and assigned Cloudflare name servers. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note). The zone `id` returned here is the value an operator pins as this connection's `zone_id`; every other operation in this connector is already scoped to that one zone and does not take it as an argument"
+risk = "low"
+idempotency = "idempotent"
+
+[operations.response_schema]
+type = "object"
+required = ["success", "result"]
+properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "array", items = { type = "object", properties = { id = { type = "string", description = "The zone's id, 32 lowercase hex characters — pass this as `zone_id` to every other operation", pattern = "^[0-9a-f]{32}$" }, name = { type = "string", description = "The registrable domain, e.g. example.com" }, status = { type = "string", description = "active, pending, initializing, moved, deleted, deactivated, or read only" }, paused = { type = "boolean", description = "True when Cloudflare is bypassed for this zone" }, type = { type = "string", description = "full (Cloudflare is authoritative) or partial (CNAME setup)" }, name_servers = { type = "array", items = { type = "string" }, description = "The Cloudflare name servers this zone's registrar should point at" } } } }, result_info = { type = "object", description = "Pagination totals for this response: page, per_page, count and total_count", properties = { page = { type = "integer" }, per_page = { type = "integer" }, count = { type = "integer" }, total_count = { type = "integer" } } } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "cloudflare-dns-record-list"
+method = "GET"
+direction = "read"
+path = "/zones/{zone_id}/dns_records"
+description = "List the DNS records in a zone: each record's id, type, name, content, TTL and whether it is proxied through Cloudflare. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note)"
+risk = "low"
+idempotency = "idempotent"
+
+[operations.response_schema]
+type = "object"
+required = ["success", "result"]
+properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "array", items = { type = "object", properties = { id = { type = "string", description = "The record's id, 32 lowercase hex characters", pattern = "^[0-9a-f]{32}$" }, zone_id = { type = "string" }, name = { type = "string", description = "The DNS name, e.g. www.example.com or example.com for the apex" }, type = { type = "string", description = "A, AAAA, CNAME, TXT, MX, NS, SRV or CAA, among others" }, content = { type = "string", description = "The record's value; its shape depends on `type` — an IP for A/AAAA, a hostname for CNAME, arbitrary text for TXT" }, proxiable = { type = "boolean", description = "Whether Cloudflare can proxy this record's type" }, proxied = { type = "boolean", description = "Whether Cloudflare currently proxies traffic for it, hiding the origin IP" }, ttl = { type = "integer", description = "Time to live in seconds; 1 means \"automatic\"" }, locked = { type = "boolean" }, comment = { type = "string", description = "An operator-set note, empty string when none" }, tags = { type = "array", items = { type = "string" } }, created_on = { type = "string", format = "date-time" }, modified_on = { type = "string", format = "date-time" } } } }, result_info = { type = "object", properties = { page = { type = "integer" }, per_page = { type = "integer" }, count = { type = "integer" }, total_count = { type = "integer" } } } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "cloudflare-dns-record-create"
+method = "POST"
+direction = "write"
+path = "/zones/{zone_id}/dns_records"
+description = "Create a DNS record in a zone. Cloudflare does not deduplicate: creating the same name/type/content pair twice makes two records, so this is not idempotent. The created record, with its assigned id, is in the response"
+risk = "medium"
+idempotency = "non_idempotent"
+
+# Required fields only. An optional body field the emitter would bind unconditionally (C-56) reaches
+# a caller who did not set it as an explicit `null`, and this file has no evidence Cloudflare accepts
+# `null` for `ttl` or `proxied` on a create — `providers/shopify.toml` and `providers/airtable.toml`
+# make the identical call for the same reason. `ttl` and `proxied` are the obvious additions once
+# C-56 lands.
+[[operations.params.body]]
+name = "type"
+description = "The DNS record type"
+required = true
+schema = { type = "string", enum = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "SRV", "CAA"] }
+
+[[operations.params.body]]
+name = "name"
+description = "The DNS name, e.g. www.example.com or example.com for the apex"
+required = true
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "content"
+description = "The record's value; its shape depends on `type` — an IP for A/AAAA, a hostname for CNAME, arbitrary text for TXT"
+required = true
+schema = { type = "string" }
+
+[operations.response_schema]
+type = "object"
+required = ["success", "result"]
+properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", properties = { id = { type = "string", pattern = "^[0-9a-f]{32}$" }, zone_id = { type = "string" }, name = { type = "string" }, type = { type = "string" }, content = { type = "string" }, proxiable = { type = "boolean" }, proxied = { type = "boolean" }, ttl = { type = "integer" }, created_on = { type = "string", format = "date-time" }, modified_on = { type = "string", format = "date-time" } } } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "cloudflare-dns-record-delete"
+method = "DELETE"
+direction = "write"
+path = "/zones/{zone_id}/dns_records/{dns_record_id}"
+description = "Delete one DNS record. There is no API route back: Cloudflare's dashboard \"recently deleted\" surface is a retention-window UI feature, not an endpoint, so a flux run cannot undo this. Responds with just the deleted record's id"
+# See the header comment. The only tier that makes flux's approval gate stop for this.
+risk = "destructive"
+# `DELETE` is idempotent in effect under RFC 9110 §9.2.2 - the record is gone either way - but
+# Cloudflare answers a repeat with `404` (error 81044, "record does not exist") rather than repeating
+# the first response, and documents no idempotency guarantee. No write here is marked idempotent on a
+# claim this file cannot back.
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "dns_record_id"
+description = "The record's id, 32 lowercase hex characters, as returned by cloudflare-dns-record-list or cloudflare-dns-record-create"
+required = true
+schema = { type = "string", pattern = "^[0-9a-f]{32}$" }
+
+[operations.response_schema]
+type = "object"
+required = ["success", "result"]
+properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", required = ["id"], properties = { id = { type = "string", description = "The deleted record's id", pattern = "^[0-9a-f]{32}$" } } } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+id = "cloudflare-cache-purge"
+method = "POST"
+direction = "write"
+path = "/zones/{zone_id}/purge_cache"
+description = "Purge every cached asset for a zone, immediately, for every visitor worldwide. There is no partial or selective purge in this connector (see its header note) — every call empties the whole zone's edge cache. Repeating it changes nothing further, but each call can spike load on the origin as the cache refills, so it should not be called more often than a real cache-affecting change warrants"
+# Safely repeatable by Cloudflare's behaviour and therefore `conditional`, not `idempotent`: Flux
+# must execute a new purge rather than serve a cached result. The stated condition is published in
+# `web/public/catalog.json`.
+idempotency = "conditional"
+repeatable_because = "`purge_everything` names a target state rather than applying a delta, so a repeat leaves the zone exactly where the first call left it — purging an already-empty edge cache is a no-op. Conditional rather than idempotent because the cache refills from origin between calls, so a stored result must never be served in place of running it"
+# Not `destructive` (nothing is deleted or unrecoverable; the cache refills from origin) and not
+# `medium` (a whole-zone purge is not "limited blast radius"). `high` is "a write a reviewer would
+# want to see first" - exactly what an instantaneous, global, origin-load-spiking purge is.
+risk = "high"
+
+# Constant, not caller-supplied — the same pattern `providers/zendesk.toml` uses for
+# `ticket.safe_update`. This is what makes the operation "purge everything" and only that: there is no
+# selective purge in this connector (see the header note), so nothing about the body varies per call
+# and a model has nothing to guess here.
+[[operations.params.body]]
+name = "purge_everything"
+description = "Constant `true` - this operation always purges the whole zone, never a selective file/tag/host list"
+required = true
+schema = { type = "boolean", const = true }
+
+[operations.response_schema]
+type = "object"
+required = ["success", "result"]
+properties = { success = { type = "boolean" }, errors = { type = "array", items = { type = "object", properties = { code = { type = "integer" }, message = { type = "string" } } } }, result = { type = "object", required = ["id"], properties = { id = { type = "string", description = "The purged zone's id, echoed back", pattern = "^[0-9a-f]{32}$" } } } }
+
+[operations.quirks.error_envelope]
+message_pointer = "/errors/0/message"
+code_pointer = "/errors/0/code"
