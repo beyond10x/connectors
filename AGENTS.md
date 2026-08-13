@@ -166,6 +166,7 @@ python3 scripts/check-links.py
 python3 scripts/check-stories.py
 cargo fetch --locked
 cargo build --workspace --locked
+cargo test --locked -p catalog-build --test main json_governance::
 cargo test --workspace --locked --no-fail-fast
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
@@ -179,6 +180,15 @@ rehashes the provider declarations, vendored specs, lock rows and generated arti
 offline after build and diff. The web job remains owned jointly by S-018/S-020 and is not described
 as enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are
 unavailable.
+
+`json-schemas.toml` is the closed inventory for JSON. Every repository-owned JSON document names a
+local schema, and the dedicated governance gate validates it with the pinned Draft 2020-12
+implementation. Every JSON Schema declares and validates against that same meta-schema. Imported
+vendor specs are listed by exact path as `vendored-source`: the gate syntax-checks their bytes but
+does not pretend they conform to a B10x-owned schema. An unclassified JSON file, an unknown
+schema reference, malformed imported JSON, or an invalid owned document fails the gate. The ignored
+site projection is additionally validated against the embedded bytes of `web/catalog.schema.json`
+inside the generator before the write plan can receive it.
 
 The agent instruction is therefore short:
 

@@ -1,0 +1,1114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/web/catalog.schema.json",
+  "title": "connectors documentation-site catalog projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator",
+    "providers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 4
+    },
+    "generator": {
+      "type": "string",
+      "pattern": "^connectors [0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provider"
+      }
+    }
+  },
+  "$defs": {
+    "string": {
+      "type": "string"
+    },
+    "nonempty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_string": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "string_array": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "string_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "json_schema": {
+      "oneOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "authority",
+        "vendor",
+        "description",
+        "base_url",
+        "api_version",
+        "hosts",
+        "services",
+        "auth",
+        "operation_count",
+        "operations",
+        "events",
+        "channels",
+        "config",
+        "verify",
+        "config_choices"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "authority": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "vendor": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "base_url": {
+          "$ref": "#/$defs/string"
+        },
+        "api_version": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "hosts": {
+          "$ref": "#/$defs/string_array"
+        },
+        "services": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/service"
+          }
+        },
+        "auth": {
+          "$ref": "#/$defs/auth"
+        },
+        "operation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "config": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/config"
+          }
+        },
+        "verify": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "config_choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/config_choices"
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "base_url",
+        "hosts",
+        "api_version",
+        "gid",
+        "operation_count"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "base_url": {
+          "$ref": "#/$defs/string"
+        },
+        "hosts": {
+          "$ref": "#/$defs/string_array"
+        },
+        "api_version": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "gid": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "operation_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemes",
+        "credentials",
+        "default"
+      ],
+      "properties": {
+        "schemes": {
+          "$ref": "#/$defs/string_array"
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/credential"
+          }
+        },
+        "default": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/string_array"
+          }
+        }
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "scheme",
+        "description",
+        "env",
+        "user_env",
+        "user_suffix",
+        "oauth2"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "scheme": {
+          "$ref": "#/$defs/scheme"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "env": {
+          "$ref": "#/$defs/string_array"
+        },
+        "user_env": {
+          "$ref": "#/$defs/string_array"
+        },
+        "user_suffix": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "oauth2": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/oauth2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "scheme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "prefix"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "name": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "prefix": {
+          "$ref": "#/$defs/string"
+        }
+      }
+    },
+    "oauth2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "authorize_path",
+        "token_path",
+        "client_id",
+        "scopes",
+        "grants",
+        "redirect"
+      ],
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/string"
+        },
+        "authorize_path": {
+          "$ref": "#/$defs/string"
+        },
+        "token_path": {
+          "$ref": "#/$defs/string"
+        },
+        "client_id": {
+          "$ref": "#/$defs/string"
+        },
+        "scopes": {
+          "$ref": "#/$defs/string_array"
+        },
+        "grants": {
+          "$ref": "#/$defs/string_array"
+        },
+        "redirect": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "port",
+                "path"
+              ],
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "path": {
+                  "$ref": "#/$defs/string"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "label"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/string"
+        },
+        "label": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "help",
+        "binds",
+        "level"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "service": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "label": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "help": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "example": {
+          "$ref": "#/$defs/string"
+        },
+        "format": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/choice"
+          }
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {
+          "$ref": "#/$defs/string"
+        },
+        "secret": {
+          "type": "boolean"
+        },
+        "approval": {
+          "enum": [
+            "operator"
+          ]
+        },
+        "docs_url": {
+          "$ref": "#/$defs/string"
+        },
+        "binds": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "also_binds": {
+          "$ref": "#/$defs/string_array"
+        },
+        "also_services": {
+          "$ref": "#/$defs/string_array"
+        },
+        "level": {
+          "enum": [
+            "operator",
+            "connection"
+          ]
+        }
+      }
+    },
+    "config_choices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service",
+        "field",
+        "label",
+        "kind",
+        "name",
+        "choices"
+      ],
+      "properties": {
+        "service": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "field": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "label": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "kind": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/choice"
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "wire_value",
+        "service",
+        "oip",
+        "description",
+        "default",
+        "group",
+        "when",
+        "schema"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "wire_value": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "service": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "oip": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "group": {
+          "$ref": "#/$defs/string"
+        },
+        "when": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json_schema"
+          }
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/json_schema"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "name"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "service",
+        "oip",
+        "description",
+        "transport",
+        "connect",
+        "events",
+        "verification",
+        "discriminator",
+        "delivery_id",
+        "payload",
+        "payload_root",
+        "reply",
+        "cursor",
+        "interval",
+        "subscription",
+        "setup"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "service": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "oip": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "transport": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "connect": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/connect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "events": {
+          "$ref": "#/$defs/string_array"
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "discriminator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/selector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delivery_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/selector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/string_map"
+        },
+        "payload_root": {
+          "type": "boolean"
+        },
+        "reply": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/reply"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cursor": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "interval": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "subscription": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/subscription"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "setup": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/setup"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "connect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/string"
+        },
+        "query": {
+          "$ref": "#/$defs/string_map"
+        },
+        "headers": {
+          "$ref": "#/$defs/string_map"
+        },
+        "auth": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "credentials"
+            ],
+            "properties": {
+              "credentials": {
+                "$ref": "#/$defs/string_array"
+              }
+            }
+          }
+        },
+        "subprotocols": {
+          "$ref": "#/$defs/string_array"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "verified",
+        "hmac"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "hmac": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/hmac"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "hmac": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "encoding",
+        "header",
+        "prefix",
+        "signed",
+        "timestamp",
+        "timestamp_format",
+        "secret",
+        "tolerance"
+      ],
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "encoding": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "header": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "prefix": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "signed": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "timestamp": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/selector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp_format": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "secret": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "tolerance": {
+          "$ref": "#/$defs/nullable_string"
+        }
+      }
+    },
+    "reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "oip",
+        "result",
+        "bind"
+      ],
+      "properties": {
+        "operation": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "oip": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "result": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "bind": {
+          "$ref": "#/$defs/string_map"
+        }
+      }
+    },
+    "subscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subscribe",
+        "unsubscribe",
+        "list",
+        "callback_param"
+      ],
+      "properties": {
+        "subscribe": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "unsubscribe": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "list": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "callback_param": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "docs_url",
+        "steps"
+      ],
+      "properties": {
+        "docs_url": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "steps": {
+          "$ref": "#/$defs/string_array"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "provider",
+        "service",
+        "direction",
+        "description",
+        "risk",
+        "idempotency",
+        "effects",
+        "semantic_effects",
+        "interaction_shape",
+        "protocol_driver",
+        "placement_requirement",
+        "implementation_form",
+        "required_capabilities",
+        "repeatable_because",
+        "method",
+        "path",
+        "spec_source",
+        "parameters",
+        "input_schema",
+        "body_schema",
+        "response_schema",
+        "credentials",
+        "hosts",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "provider": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "service": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "direction": {
+          "enum": [
+            "read",
+            "write"
+          ]
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "destructive"
+          ]
+        },
+        "idempotency": {
+          "enum": [
+            "idempotent",
+            "conditional",
+            "non_idempotent"
+          ]
+        },
+        "effects": {
+          "$ref": "#/$defs/string_array"
+        },
+        "semantic_effects": {
+          "$ref": "#/$defs/string_array"
+        },
+        "interaction_shape": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "protocol_driver": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "placement_requirement": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "implementation_form": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "required_capabilities": {
+          "$ref": "#/$defs/string_array"
+        },
+        "repeatable_because": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "method": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "path": {
+          "$ref": "#/$defs/string"
+        },
+        "spec_source": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/spec_source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter"
+          }
+        },
+        "input_schema": {
+          "$ref": "#/$defs/json_schema"
+        },
+        "body_schema": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/json_schema"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "response_schema": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/json_schema"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/string_array"
+          }
+        },
+        "hosts": {
+          "$ref": "#/$defs/string_array"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    },
+    "spec_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "source_url",
+        "upstream_version",
+        "sha256"
+      ],
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "source_url": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "upstream_version": {
+          "$ref": "#/$defs/string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "in",
+        "wire",
+        "description",
+        "required",
+        "schema"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "in": {
+          "enum": [
+            "path",
+            "query",
+            "header",
+            "body"
+          ]
+        },
+        "wire": {
+          "$ref": "#/$defs/nullable_string"
+        },
+        "description": {
+          "$ref": "#/$defs/string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "schema": {
+          "$ref": "#/$defs/json_schema"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "works",
+        "issues",
+        "notes"
+      ],
+      "properties": {
+        "works": {
+          "type": "boolean"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/note"
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "scope",
+        "summary",
+        "params"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "scope": {
+          "enum": [
+            "catalog",
+            "provider",
+            "operation"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "params": {
+          "$ref": "#/$defs/string_array"
+        }
+      }
+    },
+    "note": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "scope",
+        "summary"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "scope": {
+          "enum": [
+            "catalog",
+            "provider",
+            "operation"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    }
+  }
+}

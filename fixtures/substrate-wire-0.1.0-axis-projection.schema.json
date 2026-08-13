@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/substrate-wire-0.1.0-axis-projection.schema.json",
+  "title": "connectors projection of substrate-wire 0.1.0 execution axes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "scope",
+    "generates_provider_document",
+    "source",
+    "target",
+    "closed_mappings",
+    "target_constants",
+    "source_operation_facts",
+    "operation_overlays",
+    "deferred_to_full_projection"
+  ],
+  "properties": {
+    "format": {
+      "const": "b10x.connectors-substrate-axis-projection.v1"
+    },
+    "scope": {
+      "const": "S-023-five-axis-and-effect-mapping-only"
+    },
+    "generates_provider_document": {
+      "const": false
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "closed_mappings": {
+      "$ref": "#/$defs/closed_mappings"
+    },
+    "target_constants": {
+      "$ref": "#/$defs/target_constants"
+    },
+    "source_operation_facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source_operation"
+      }
+    },
+    "operation_overlays": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/operation_overlay"
+      }
+    },
+    "deferred_to_full_projection": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "bundle",
+        "version",
+        "bundle_manifest_sha256",
+        "operation_registry"
+      ],
+      "properties": {
+        "repository": {
+          "const": "b10x/substrate"
+        },
+        "bundle": {
+          "const": "substrate-wire"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "bundle_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operation_registry": {
+          "const": "operations.json"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "schema_version",
+        "schema_sha256"
+      ],
+      "properties": {
+        "repository": {
+          "const": "b10x/connectors"
+        },
+        "schema_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "closed_mappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk",
+        "idempotency",
+        "exposure",
+        "source_effects"
+      ],
+      "properties": {
+        "risk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "write",
+            "destructive"
+          ],
+          "properties": {
+            "read": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "destructive"
+              ]
+            },
+            "write": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "destructive"
+              ]
+            },
+            "destructive": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "destructive"
+              ]
+            }
+          }
+        },
+        "idempotency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "idempotent",
+            "keyed",
+            "none"
+          ],
+          "properties": {
+            "idempotent": {
+              "enum": [
+                "idempotent",
+                "conditional",
+                "non_idempotent"
+              ]
+            },
+            "keyed": {
+              "enum": [
+                "idempotent",
+                "conditional",
+                "non_idempotent"
+              ]
+            },
+            "none": {
+              "enum": [
+                "idempotent",
+                "conditional",
+                "non_idempotent"
+              ]
+            }
+          }
+        },
+        "exposure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "projected",
+            "callable",
+            "callable-direct"
+          ],
+          "properties": {
+            "projected": {
+              "type": "boolean"
+            },
+            "callable": {
+              "type": "boolean"
+            },
+            "callable-direct": {
+              "type": "boolean"
+            }
+          }
+        },
+        "source_effects": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/effect_mapping"
+          }
+        }
+      }
+    },
+    "effect_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_host_effect",
+        "retention",
+        "semantic_effect"
+      ],
+      "properties": {
+        "target_host_effect": {
+          "enum": [
+            "read",
+            "write",
+            "network",
+            "process",
+            "browser",
+            "filesystem",
+            "local_system"
+          ]
+        },
+        "retention": {
+          "const": "substrate_capability_requirement"
+        },
+        "semantic_effect": {
+          "const": false
+        }
+      }
+    },
+    "target_constants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "placement_semantics",
+        "interaction_shape",
+        "protocol_driver",
+        "placement_requirement",
+        "implementation_form",
+        "required_capabilities"
+      ],
+      "properties": {
+        "placement_semantics": {
+          "const": "connector_driver_location_not_external_provider_service_location"
+        },
+        "interaction_shape": {
+          "enum": [
+            "unary",
+            "stream",
+            "subscription",
+            "leased_session",
+            "session_establishment"
+          ]
+        },
+        "protocol_driver": {
+          "const": "http_v1"
+        },
+        "placement_requirement": {
+          "enum": [
+            "connectors_deployment",
+            "substrate_workload",
+            "federated_satellite"
+          ]
+        },
+        "implementation_form": {
+          "const": "built_in"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "public_network",
+              "private_network",
+              "unix_socket",
+              "file_secret",
+              "process",
+              "container",
+              "device"
+            ]
+          }
+        }
+      }
+    },
+    "source_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "risk",
+        "idempotency",
+        "effects",
+        "exposure"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "risk": {
+          "enum": [
+            "read",
+            "write",
+            "destructive"
+          ]
+        },
+        "idempotency": {
+          "enum": [
+            "idempotent",
+            "keyed",
+            "none"
+          ]
+        },
+        "effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exposure": {
+          "enum": [
+            "projected",
+            "callable",
+            "callable-direct"
+          ]
+        }
+      }
+    },
+    "operation_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "direction",
+        "semantic_effects"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "direction": {
+          "enum": [
+            "read",
+            "write"
+          ]
+        },
+        "semantic_effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "money",
+              "delete",
+              "send_external",
+              "public",
+              "pure"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -16,8 +16,8 @@
 //!   There is no per-provider test file here and there will not be one: a rule about connectors is
 //!   stated once and parameterised, so the next connector is covered the moment it exists.
 //! - **The workspace fences** — [`dependency_fence`], [`engine_free`], [`msrv_fence`],
-//!   [`no_network`]. Each is about the *workspace*, not about the catalogue, and each is its own
-//!   argument.
+//!   [`json_governance`], [`no_network`]. Each is about the *workspace*, not about the catalogue,
+//!   and each is its own argument.
 
 mod common;
 
@@ -27,6 +27,8 @@ mod catalog_invariants;
 mod dependency_fence;
 #[path = "main/engine_free.rs"]
 mod engine_free;
+#[path = "main/json_governance.rs"]
+mod json_governance;
 #[path = "main/msrv_fence.rs"]
 mod msrv_fence;
 #[path = "main/no_network.rs"]
