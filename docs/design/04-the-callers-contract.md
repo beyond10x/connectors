@@ -1,4 +1,4 @@
-# 03 — The document carries the caller's contract
+# 04 — The document carries the caller's contract
 
 **Status:** landed with S-001 · **Date:** 2026-08-13 · **Story:** [S-001](../stories/S-001-the-document-carries-the-callers-contract.md)
 
