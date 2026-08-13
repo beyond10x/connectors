@@ -34,7 +34,8 @@ connect-session contract every posture uses.
 - [ ] The connect-session invariants hold unchanged in personal posture: single-purpose, short-lived,
       never returns credential material to its creator, terminal event names the connection id and
       nothing else. The loopback listener is bound to **one** session, admits exactly one callback,
-      binds the port for no longer than the session lives, and refuses on `state`/PKCE mismatch by
+      binds the port for no longer than the session lives, validates `state`, PKCE, exact Host and
+      expected Origin where present, and refuses CSRF, DNS-rebinding, state, or PKCE mismatch by
       name.
 - [ ] The headless case is covered explicitly: an agent obtains the URL and a human completes it
       ([S-014](S-014-auth-as-tool-result.md)'s consumer), **including** the case where the human's

@@ -60,7 +60,8 @@ checking itself currently is not.
 - [ ] AGENTS.md gains an explicit **gate** section naming the exact commands, and the workflow and
       that list are held together by a test rather than by discipline (`ci_gate.test.mjs` is the
       shape, and its own circularity note is worth reading before copying it).
-- [ ] Toolchains and third-party actions are pinned by version; any in-workflow commit uses the
+- [ ] Toolchains are pinned by version and third-party actions by full commit SHA (with the release
+      tag in a comment); any in-workflow commit uses the
       Actions `GITHUB_TOKEN` (`github-actions[bot]`), never the app key and never a PAT
       (AGENTS.md § Automation identity).
 - [ ] **Failing-first:** seed one breach per gate arm — a formatting violation, a clippy warning, a

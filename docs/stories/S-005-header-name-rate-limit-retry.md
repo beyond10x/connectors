@@ -16,8 +16,8 @@ note: "ported from flux-connectors C-224: quirks.rate_limit takes a fixed reques
 
 Let a connector state a rate limit it genuinely knows the shape of, so the information reaches the
 canonical document instead of surviving only in a description a machine cannot act on — and so the
-proxy and the invocation path can normalize backoff from catalog metadata, which is what makes a
-governed proxy better than curl (vision, client contract).
+the declared invocation path, and any later operator-only proxy, can normalize backoff from catalog
+metadata rather than rediscovering it at runtime.
 
 ## What the predecessor measured
 
@@ -45,7 +45,7 @@ Declaring it would be **less** true than declaring nothing.
       in its description shrinks to what the declaration cannot carry. Two spellings of one fact is
       the defect to avoid here.
 - [ ] What a consumer is expected to **do** with a discovered budget is **stated** in the schema's
-      own documentation and the consuming path is **named** (the invocation/proxy egress path) — a
+      own documentation and the consuming path is **named** (the invocation egress path) — a
       declaration nothing can act on is prose with a schema. Implementing the backoff is a separate
       story and is explicitly out of scope here.
 - [ ] Failing-first test: a connector declares a header-discovered budget and it reaches the canonical

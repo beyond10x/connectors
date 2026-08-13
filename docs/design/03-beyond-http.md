@@ -166,3 +166,9 @@ platform.
 
 This design does not schedule an AMI implementation or accept external runtime artifacts. It fixes
 where those concerns belong so later work does not re-derive the old mixed runtime model.
+
+The ownership and five-axis model are accepted by
+[architecture ADR 0010](https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
+Satellite federation and channel authority remain proposals in architecture RFCs 0004 and 0002;
+this design does not make either wire current by implication. Delivery items 1–6 are owned by
+S-023 through S-028 in the story board.

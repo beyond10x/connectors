@@ -248,13 +248,16 @@ dispatched → response or refusal out, audited.
 
 ### Proxy
 
-Raw authenticated passthrough to a connection's provider for the undeclared long tail. A granted
-capability like any operation — but with fixed worst-case facts (`risk = high`, effects =
-network+write, non-idempotent), destination-bounded by the integration's policy, credential
-placed by the platform, pagination/rate-limit behavior normalized from catalog quirks.
+Raw authenticated passthrough is **not part of the generic v1 or model-callable surface**. If an
+operator deployment enables it later, it is a distinct break-glass capability with fixed maximum
+facts: `risk = destructive`, non-idempotent, and the full conservative semantic-effect set,
+including external send, write, delete, money movement, and network access. It has a separately
+granted method/path aperture in addition to the Integration destination policy, and every use is
+audited as raw authority rather than disguised as a catalog operation.
 
-- *Invariant:* the proxy never widens what grants admit; it is *ungoverned surface*, not
-  ungoverned *authority*. Raw access is never a premium feature (vision principle 8).
+- *Invariant:* a model, ordinary Service Account, or catalog grant cannot obtain raw proxy
+  authority. Credential-bearing model calls require a declared operation whose reviewed facts are
+  the execution facts. Raw access is never a premium feature (vision principle 8).
 
 ### Channel
 
@@ -319,9 +322,10 @@ vocabulary, outcome, principal, request id, retention window.
 ## Out of scope (v1)
 
 - **Workflows, managed apps, behaviour of any kind.** Behaviour is a client. The reintroduction
-  path, if ever, is a supervised client runtime over the same contract (flux-roadmap decision
-  0025), never an embedded engine.
-- **Unified data models** — declared operations + proxy are the invocation layer.
+  path, if ever, is a supervised client runtime over the same contract, never an embedded engine.
+  Private predecessor research is provenance for that rule, not required authority.
+- **Unified data models** — declared operations are the generic invocation layer; operator-only raw
+  proxy is deferred behind S-030 and never substitutes for a reviewed operation.
 - **Leases / long-running operation scopes** — designed in the predecessor, never used in anger;
   reintroduce only against a real consumer.
 - **Catalog composition/overlays** — shaped for (source identity in locks and audit from day

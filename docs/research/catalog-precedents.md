@@ -46,7 +46,7 @@ Three readings of these numbers:
    grammar is the gap to close before scaling inbound events across providers.
 3. **The agent era is arriving in their catalog** — 24 `MCP_OAUTH2(_GENERIC)` entries did not
    exist in earlier snapshots. And `AWS_SIGV4` exists as a first-class auth mode: exactly the
-   scheme our aws plugin-retirement wave needs (flux-roadmap decision 0024), with a working
+   scheme the historical AWS plugin-retirement plan needed, with a working
    precedent for its declaration shape.
 
 ## Gap table: what they express that our catalog cannot yet

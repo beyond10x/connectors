@@ -43,12 +43,11 @@ never crossing the boundary. This is the milestone at which the client contract 
       predicate**; CAS-revisioned mutation with previewable proposals and receipts. No store bound is
       an outage (503); an empty store is a refusal (403); a refusal never names the axis that refused.
       Grants bind to connections, never to credentials.
-- [ ] **Invoke and proxy ride one path**: principal → effective catalogue (sealed generation) → grant
+- [ ] **Declared invoke rides one path**: principal → effective catalogue (sealed generation) → grant
       admission through unconstructible proof types → connection resolution → document → `RequestPlan`
       (data) → credential placement → egress → audit. Permission subjects are computed **before**
       placement, so a query-placed secret can never enter an approval prompt or an evidence record.
-      The proxy carries fixed worst-case facts (risk high, network+write, non-idempotent) and widens
-      nothing a grant admits.
+      Generic v1 has no raw proxy; S-030 owns any later operator-only break-glass path.
 - [ ] Exactly **one** request-composition path exists, held by a fence: a consumer that edits a plan
       has become a second one, and that is refused by design.
 - [ ] **Exit**: one end-to-end test — sign in, connect a real provider, grant, invoke — with every
@@ -63,7 +62,7 @@ never crossing the boundary. This is the milestone at which the client contract 
   grant → invoke, all audited."*
 - Depends on [S-007](S-007-m2-the-platform-skeleton-serves.md). Carries
   [S-011](S-011-deployment-declared-destination-aperture.md) (the egress policy the invoke path and
-  the channel runner share) and [S-014](S-014-auth-as-tool-result.md) (what invoke returns when the
+  channel runner share) and [S-014](S-014-auth-as-tool-result.md) (what invoke returns when the
   connection is missing or degraded); [S-013](S-013-connect-session-oauth-custody-in-personal-posture.md)
   decides the personal-posture custody chain this milestone's connect sessions need.
 - The predecessor proved most of these invariants in anger; the ones with the sharpest measured
