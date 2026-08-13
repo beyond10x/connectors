@@ -35,7 +35,7 @@ use clap::{Args, Parser, Subcommand};
     name = "catalog",
     version,
     about = "Compile the reviewed connector declarations into the catalog artifacts",
-    long_about = "The repository-maintenance CLI for selfdirect/connectors.\n\n\
+    long_about = "The repository-maintenance CLI for b10x/connectors.\n\n\
                   Every verb is hermetic and offline: it reads committed bytes and contacts no \
                   vendor. `scaffold` writes to stdout and never over a file in place — the author \
                   diffs and pastes, so a bad run costs nothing."

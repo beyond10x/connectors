@@ -182,9 +182,10 @@ manifest under a single-owner trust bootstrap (the 0011 pattern), with the updat
 arriving when flux's managed personal posture needs it — not before.
 
 Automation (catalog rebuild commits, lock bumps, release cuts) authenticates as an
-**org-owned GitHub App** (`selfdirect-bot`) minting short-lived installation tokens — never a
+**org-owned GitHub App** (`b10x-bot`) minting short-lived installation tokens — never a
 personal account, never a long-lived PAT. In-workflow commits may alternatively use the Actions
-`GITHUB_TOKEN` (`github-actions[bot]`). Human pushes stay human.
+`GITHUB_TOKEN` only for read-only workflow operations. Every automated commit and push uses
+`b10x-bot[bot]`. Human pushes stay human.
 
 ## 9. Build order
 

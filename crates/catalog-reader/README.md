@@ -3,7 +3,7 @@
 Dependency-free reader for the flux-connectors **catalog pack** — every connector's canonical
 document, compiled into one embedded, versioned, digest-checked file.
 
-The pack is built by [`flux-connectors build`](https://github.com/codewandler/flux-connectors)
+The pack is built by [`catalog build`](https://github.com/b10x/connectors)
 from the reviewed per-provider documents (`catalog/<name>.catalog.json`). This crate embeds the
 pack that matches its own release and serves it with **zero non-optional dependencies**: no JSON
 parser, no compression codec, no hash crate — the container is offset-indexed UTF-8 and the
@@ -37,9 +37,9 @@ serving a single record, each by name.
 
 ## Fetching a newer catalogue than the crate embeds
 
-Every `vX.Y.Z` release of
-[flux-connectors](https://github.com/codewandler/flux-connectors/releases) carries the pack of that
-release as two assets, attached by the release workflow rather than by hand:
+B10x has no pre-v1 release artifacts. Historical `vX.Y.Z` releases of the
+[flux-connectors predecessor](https://github.com/codewandler/flux-connectors/releases) carry the
+pack of that release as two assets, attached by its release workflow rather than by hand:
 
 ```text
 https://github.com/codewandler/flux-connectors/releases/download/vX.Y.Z/catalog.pack

@@ -1,4 +1,4 @@
-# selfdirect/connectors — backlog
+# b10x/connectors — backlog
 
 The opening backlog. One file per story lives in this directory (`S-NNN-<slug>.md`); frontmatter
 carries `id`, `title`, `pillar`, `status`, `priority`, `epic`, optional `design`, query-only `areas`,
@@ -12,8 +12,8 @@ arrives with the track scaffolding later; until then, edit this table when you a
 Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 [../design/01-domain-model.md](../design/01-domain-model.md) →
 [../design/02-architecture.md](../design/02-architecture.md), grounded by
-[../research/](../research/). The consolidation record is
-`~/projects/flux-roadmap/decisions/0026-the-family-consolidates-into-selfdirect-connectors.md`.
+[../research/](../research/). Repository housing is governed by
+[`b10x/architecture` ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 ## Status
 

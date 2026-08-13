@@ -39,8 +39,8 @@ edition = "2021"
 # differential is retired — see `crates/catalog-build/src/seam.rs::generator`.
 version = "0.26.0"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/selfdirect/connectors"
-homepage = "https://github.com/selfdirect/connectors"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
 # The predecessor's declared MSRV, carried unchanged. Nothing here is built on it — see the fence.
 rust-version = "1.87"
 # **Nothing publishes** (design 02 §2). Every crate is an internal workspace member with a

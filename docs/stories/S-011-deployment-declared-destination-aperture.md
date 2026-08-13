@@ -47,7 +47,7 @@ destination selection to a model.
 
 ## Notes
 
-- Predecessor: `~/projects/flux-exchange/docs/stories/X-143-deployment-declared-destination-aperture.md`
+- Predecessor: [`X-143 — deployment-declared destination aperture`](https://github.com/codewandler/flux-exchange/blob/main/docs/stories/X-143-deployment-declared-destination-aperture.md)
   — ported per decision 0026's named set (X-143, X-156, C-540/C-541, C-552), not re-derived. Its
   lineage: flux-roadmap decision 0019 rule 3 (the deployment declares admitted egress destinations)
   and 0008 rule 4 (identical post-resolution matching by request construction and permission subject).

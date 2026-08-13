@@ -16,28 +16,29 @@ the domain model and are not renamed casually (vision principle 10).
 
 ## Commits
 
+- This repository is private. Its visibility must not change without Timo's explicit approval.
 - Lowercase `area: summary` titles (`docs:`, `research:`, `scripts:`, `chore:`), body with
   bullet points. Write messages via `git commit -F -` with a quoted heredoc, never `-m` with
   backticks.
-- Never commit key material. `.gitignore` blocks `*.pem`/`*.key`; the bot's private key lives
-  **outside** every working tree (`~/selfdirect/*.pem`, mode 0600).
+- Never commit key material. `.gitignore` blocks `*.pem`/`*.key`; the bot's private key and App
+  configuration live in the user's XDG config directory, outside every working tree, mode 0600.
 
-## Automation identity: selfdirect-bot
+## Automation identity: b10x-bot
 
-**Anything not typed by Timo commits and pushes as the bot — including agent sessions (Claude,
-flux, CI).** Only Timo at the keyboard pushes as `timofriedlberlin`. The bot is the org-owned
-GitHub App **selfdirect-bot** (App ID `4575767`; permissions: contents, pull_requests, metadata,
-deployments — nothing more). No PATs, no machine accounts, no long-lived credentials.
+**Anything not typed by Timo commits and pushes as the bot — including agent sessions and CI.**
+Only Timo at the keyboard pushes as a human. The bot is the org-owned GitHub App
+**b10x-bot** (permissions: contents, workflows, metadata — nothing more). No PATs, machine
+accounts, or long-lived repository credentials.
 
 For agents that means: work normally, but commit via `scripts/as-bot.sh commit …` and push via
 `scripts/as-bot.sh push …` — never plain `git commit`/`git push`.
 
-The scripts work with zero configuration (defaults: App ID baked in, key found at
-`~/selfdirect/selfdirect-bot.*.private-key.pem`; `SELFDIRECT_BOT_*` env vars override).
+The scripts read `b10x-bot.json` and `b10x-bot.private-key.pem` from the external
+B10x XDG config directory; `B10X_BOT_*` environment variables override those defaults.
 
 Three paved paths, in order of everyday-ness:
 
-1. **Git as the bot** — any git command, authored as `selfdirect-bot[bot]`, authenticated with a
+1. **Git as the bot** — any git command, authored as `b10x-bot[bot]`, authenticated with a
    fresh 1-hour installation token (ssh remotes are rewritten to https for the push; the token
    travels via env + credential helper, never argv):
 
@@ -49,8 +50,8 @@ Three paved paths, in order of everyday-ness:
 2. **gh CLI as the bot** — per-invocation override; the human keyring login stays untouched:
 
    ```bash
-   GH_TOKEN=$(scripts/bot-token.sh) gh pr create ...
-   GH_TOKEN=$(scripts/bot-token.sh) gh api ...
+   scripts/bot-gh.sh pr create ...
+   scripts/bot-gh.sh api ...
    ```
 
 3. **API-created commits** (GraphQL `createCommitOnBranch`) — only when the GitHub "Verified"
@@ -59,8 +60,8 @@ Three paved paths, in order of everyday-ness:
 `scripts/bot-token.sh` is the primitive under all three: app JWT → installation lookup → 1-hour
 token on stdout. Diagnostics go to stderr; the token is the only stdout line.
 
-Inside GitHub Actions, prefer the built-in `GITHUB_TOKEN` (`github-actions[bot]`) over the app
-unless cross-repo access is needed.
+GitHub Actions that only read or test may use `GITHUB_TOKEN`. A workflow that creates or pushes a
+commit must authenticate and author it as `b10x-bot[bot]`.
 
 ## Adding a connector
 
@@ -168,7 +169,9 @@ The agent instruction is therefore short:
   is stated once and parameterised, so the next connector is covered the moment it exists. The
   workspace fences (dependency, engine-free, no-network, MSRV) stay separate — each is an argument
   about the workspace, not about the catalogue.
-- The predecessor repositories (`~/projects/flux-connectors`, `~/projects/flux-exchange`) are
-  read-only reference: mine them, copy from them per the architecture's inventory, never edit
-  them from here. Cross-product decisions live in `~/projects/flux-roadmap/decisions/`
-  (0026 is the consolidation record).
+- The predecessor repositories
+  ([`codewandler/flux-connectors`](https://github.com/codewandler/flux-connectors) and
+  [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
+  references: mine them, copy from them per the architecture inventory, and never edit them from
+  here. The durable housing decision is
+  [`b10x/architecture` ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
