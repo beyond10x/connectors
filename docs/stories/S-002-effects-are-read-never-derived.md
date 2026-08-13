@@ -2,8 +2,7 @@
 id: S-002
 title: "Per-operation effects are read from the document, never derived"
 pillar: Catalog
-status: ready
-priority: 2
+status: blocked
 design:
 epic: catalog-day-one
 areas: [catalog, catalog-build, domain]
@@ -67,17 +66,37 @@ declares effects, this function reads them and the paragraph goes."* This story 
       named reason.
 
 ## Progress
-- (not started)
+- 2026-08-13 — deliberately re-sequenced out of `ready` after S-001 landed; nothing here is
+  started. The substance stands — this is architecture §2 day-one change 1's second half and
+  vision principle 2's data — but *today* both of its legs have nothing to stand on: the
+  grant-admission consumer is M2's `crates/domain`, which must not be scaffolded early (AGENTS.md
+  build order; the story's own key test "passes vacuously" until it exists), and the catalogue is
+  55 all-HTTP providers whose 835 operations would all declare the same two values
+  (`[read|write, network]` — verified against the predecessor's C-552 output). Hand-authoring 835
+  zero-information rows invites bulk-scripting, which is derivation moved to authoring time.
+  So: the **schema/declaration half rides S-015's regeneration wave** (strictly sequenced, same
+  implementor — one whole-catalogue wave instead of two, and the schema's `required` list
+  tightens once), and the **grant-admission half is anchored to M2
+  ([S-007](S-007-m2-the-platform-skeleton-serves.md))**, where the failing-first admission test
+  stops being vacuous. Unblocked when S-015 is picked up.
 
 ## Notes
 
+- **When implementing the declaration half, weigh declaration-with-inheritance** — a runtime- or
+  service-level effects declaration with per-operation override, unknown values refused by name —
+  against 835 identical per-op rows. The invariant this story exists for is *no consumer ever
+  infers, the vocabulary is closed, absence is a build error*; an inheritance rule the loader
+  resolves (like `const_headers` already does) preserves it without the ceremony. Decide at
+  implementation and record it in the design series.
 - Read the predecessor's [`exchange-host/src/grant.rs`](https://github.com/codewandler/flux-exchange/blob/main/crates/exchange-host/src/grant.rs) first — the mistake, its
   blast radius and its exit condition are all documented in place by the people who made it.
 - Predecessor stories worth reading: flux-connectors C-155 (the semantic-effect tier and why it is
   separate), C-552 (bundled this field with the caller-contract work; here it is split out because it
   has a second consumer and its own failure mode).
-- **Collides with [S-001](S-001-the-document-carries-the-callers-contract.md)** — same schema, same
-  lowering, same whole-catalog regeneration. Sequence them.
+- **Collided with [S-001](S-001-the-document-carries-the-callers-contract.md)** (same schema, same
+  lowering, same whole-catalog regeneration) — resolved by sequencing: S-001 landed first, done
+  2026-08-13. The live collision is now with
+  [S-015](S-015-retire-the-quirks-umbrella.md), whose wave this story's declaration half rides.
 - Vision principle 2 is the thing at stake: *grants admit from risk/effects/idempotency the catalog
   declares — never from op-id lists a human maintains.* A derived effect set is an op-id list wearing
   a predicate's clothes.
