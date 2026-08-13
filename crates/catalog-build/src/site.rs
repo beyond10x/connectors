@@ -58,8 +58,8 @@ use connector_spec::{
 };
 
 use crate::inbound;
-use crate::surface;
 use crate::status::{self, Status};
+use crate::surface;
 
 /// The document's format version.
 ///

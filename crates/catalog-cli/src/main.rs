@@ -195,7 +195,7 @@ mod tests {
     fn parse(args: &[&str]) -> Result<Invocation, clap::Error> {
         Cli::try_parse_from(std::iter::once("catalog").chain(args.iter().copied()))
             .map(Invocation::from)
-        }
+    }
 
     /// clap's own contract check: an ambiguous or malformed declaration is a panic at startup, and
     /// this is the one call that surfaces it in a test rather than in a user's terminal.
@@ -221,8 +221,17 @@ mod tests {
         let invocation = parse(&["build", "--provider", "zendesk", "--root", "/tmp/x"])
             .expect("build takes a scope");
         assert_eq!(invocation.provider.as_deref(), Some("zendesk"));
-        assert_eq!(invocation.root.as_deref(), Some(std::path::Path::new("/tmp/x")));
-        assert_eq!(parse(&["build", "-p", "zendesk"]).unwrap().provider.as_deref(), Some("zendesk"));
+        assert_eq!(
+            invocation.root.as_deref(),
+            Some(std::path::Path::new("/tmp/x"))
+        );
+        assert_eq!(
+            parse(&["build", "-p", "zendesk"])
+                .unwrap()
+                .provider
+                .as_deref(),
+            Some("zendesk")
+        );
     }
 
     /// The surface's rules are the *types*, not `match` guards: `--select` and `--diff` exist on
@@ -231,7 +240,10 @@ mod tests {
     fn selection_belongs_to_scaffold_alone() {
         assert!(parse(&["build", "--select", "manager"]).is_err());
         assert!(parse(&["diff", "--diff"]).is_err());
-        assert!(parse(&["scaffold"]).is_err(), "scaffold requires a provider");
+        assert!(
+            parse(&["scaffold"]).is_err(),
+            "scaffold requires a provider"
+        );
 
         let invocation = parse(&[
             "scaffold",

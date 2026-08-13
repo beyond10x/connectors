@@ -118,10 +118,6 @@ fn network_namespace_sandbox() -> Option<(&'static str, &'static [&'static str])
     }
     let program = "unshare";
     let args: &[&str] = &["--user", "--map-root-user", "--net", "--"];
-    let probe = Command::new(program)
-        .args(args)
-        .arg("true")
-        .output()
-        .ok()?;
+    let probe = Command::new(program).args(args).arg("true").output().ok()?;
     probe.status.success().then_some((program, args))
 }

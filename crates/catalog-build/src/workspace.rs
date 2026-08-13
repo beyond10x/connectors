@@ -25,7 +25,6 @@ pub fn spec_path(provider: &str, file: &Path) -> String {
     )
 }
 
-
 /// The canonical per-provider catalog documents: `catalog/<name>.catalog.json` (C-536).
 ///
 /// At the repository root beside `connectors/`, as the catalog-artifact design's diagram places
@@ -44,9 +43,6 @@ pub const READER_DIR: &str = "crates/catalog-reader";
 /// The pack's file name inside the reader crate: `catalog.pack`.
 pub const PACK_FILE: &str = "catalog.pack";
 
-
-
-
 /// The public site's data directory (C-42), holding the generated `catalog.json`.
 ///
 /// Outside `connectors/` deliberately: that directory holds what a user *installs* into
@@ -61,9 +57,6 @@ pub const SITE_DIR: &str = "web/public";
 
 /// The site's generated catalogue: `web/public/catalog.json`.
 pub const SITE_CATALOG: &str = "catalog.json";
-
-
-
 
 /// A repository root plus the layout convention applied to it.
 #[derive(Debug, Clone)]
