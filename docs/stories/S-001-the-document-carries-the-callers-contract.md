@@ -3,7 +3,7 @@ id: S-001
 title: "The document carries the caller's contract, so nothing at runtime parses source"
 pillar: Catalog
 status: done
-design: ../design/03-the-callers-contract.md
+design: ../design/04-the-callers-contract.md
 epic: catalog-day-one
 areas: [catalog, catalog-build, connector-resolve]
 note: "ported from flux-connectors C-552 (measured by C-538). Architecture §2 day-one change 1, first half: the caller-facing symbol, the error-envelope-extended description and the contract input_schema. Per-operation effects — C-552's fourth field — are S-002, because they have a second consumer (grant admission) and a mistake of their own to close"
@@ -39,7 +39,7 @@ The three fields, as C-552 measured them:
       **lowered, caller-typed** form — computed at build time by `catalog-build` (which has the
       lowering, `src/contract.rs`) and stored as data. Every committed canonical document was
       regenerated whole-catalogue. → `schema_version` stays 1, not a bump: additive per the
-      schema's own rule and C-537; the resolution is design 03 §2.
+      schema's own rule and C-537; the resolution is design 04 §2.
 - [x] A consumer constructs the **complete** caller-facing contract — name, description,
       `input_schema`, `expose` — from the document's data alone.
       → `catalog::Operation::{contract_description, input_schema, expose}`;
@@ -86,7 +86,7 @@ The three fields, as C-552 measured them:
   `produces_credential` minting join (Minted reachable). Full gate green: workspace build/test
   (all suites), clippy `-D warnings`, fmt, `catalog build` fixed point, `catalog diff` clean,
   four new whole-catalogue invariants (9–12). Decisions recorded in
-  [design 03](../design/03-the-callers-contract.md).
+  [design 04](../design/04-the-callers-contract.md).
 
 ## Notes
 
