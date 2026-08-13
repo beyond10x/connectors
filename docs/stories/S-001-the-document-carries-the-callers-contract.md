@@ -57,6 +57,21 @@ The three fields, as C-552 measured them:
       requires every `format = "origin"` field's bound variable to lower to `["origin"]` in the
       document, so a provider declaring it for a variable inside a larger authority
       (`https://{v}.x/`) cannot silently drop Origin→Host with nothing red.
+- [ ] **`CredentialRequirement` stops being derived.** The document publishes only the *effective*
+      auth list, so "this operation declares `auth = []`" and "nothing is declared anywhere" are the
+      same empty list, and `crates/catalog/src/table.rs::credential_requirement` resolves the
+      difference from the connector default instead of reading it. That derivation reproduces the
+      predecessor's classification for all 835 shipped operations and is **ambiguous in principle**
+      (recorded at `table.rs:31-36`). The document carries the distinction; the failing-first test is
+      the pair of documents today's derivation cannot tell apart.
+- [ ] **`Acquisition::Minted` becomes reachable, or is deferred with the reason recorded.** The
+      minting join lives in the provider TOML's `[[operations]]` block (`produces_credential`) and
+      reaches **no document field**, so `table.rs` can never construct the variant
+      (`table.rs:28-30`, `crates/catalog/src/lib.rs:339-345`). C-136's property — *a caller can use a
+      credential it can never read* — is therefore unreachable through the canonical document. Either
+      the document carries the join (which call mints it, and where in that call's answer the value
+      arrives) or the variant's unreachability is stated where the type is defined, with the story
+      that would close it named.
 - [ ] Determinism is unbroken: two independent builds produce byte-identical documents and pack
       (architecture §7.2), and the one-time migration differential against the predecessor's pack
       (§7.6) still passes for every field the two share.
@@ -69,6 +84,10 @@ The three fields, as C-552 measured them:
 - Predecessor: `~/projects/flux-connectors/docs/stories/C-552-the-document-carries-the-callers-contract.md`
   — read it before starting; its Notes carry the write set and the design edge. Ported, not
   re-derived, per decision 0026's named migration set.
+- The last two acceptance items were **added after M1**, from the two schema gaps the import found in
+  code rather than in a story: both are C-552-shaped document additions (a fact the caller's contract
+  needs that the document does not carry), both are documented in place by the M1 implementor, and
+  both ride this story's schema bump and whole-catalogue regeneration rather than earning a second one.
 - **Collides with [S-002](S-002-effects-are-read-never-derived.md)**: both change the document schema
   and the lowering, and both regenerate every canonical document. One implementor, or strictly
   sequenced — never a shared wave with two authors.
