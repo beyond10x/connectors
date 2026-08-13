@@ -1,0 +1,64 @@
+[package]
+name = "connector-secrets"
+description = "A host library: where a connector's CredentialRef resolves to a value. Deliberately outside this workspace's compile path."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+readme = "README.md"
+
+[lib]
+# Pinned so the published package name and the crate name are independent. The package is
+# `codewandler-*` on crates.io (C-195); the crate every dependent and every one of this
+# crate's own integration tests writes is `connector_secrets`. Without this, renaming the package
+# silently renames the crate and breaks every `use` of it.
+name = "connector_secrets"
+path = "src/lib.rs"
+
+[features]
+# `VaultStore` and its HTTP transport are opt-in. Off by default so that a consumer wanting only
+# the trait, the addressing and `MemoryStore` links no HTTP client at all — and so that this
+# workspace's own gate does not compile a TLS stack it never runs. See the module docs in
+# `src/vault.rs` for why the *transport* is a seam even with the feature on.
+default = []
+vault = ["dep:reqwest", "dep:serde_json"]
+
+[dependencies]
+# The addressing, and the only source of it. `CredentialRef` / `Layout` / `TenantLayout` come from
+# C-90; this crate does not define a second scheme.
+#
+# **`connector-address`, not `connector-spec`** (C-407). This edge is what decides the crates.io
+# closure: the closure is derived from the manifests, so whatever crate the addressing lives in gets
+# published behind this one. It used to be the compiler — 11,832 lines of IR, provider TOML and
+# OpenAPI ingest, validation and the lockfile writer — shipped so that one re-export resolved.
+connector-address.workspace = true
+
+async-trait.workspace = true
+fs2.workspace = true
+thiserror.workspace = true
+
+reqwest = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+# A runtime to drive the async trait in tests. `rt` + `macros` only: nothing here needs threads.
+tokio = { workspace = true, features = ["rt", "macros"] }
+# Used by one `compile_fail` doctest, which is how "`Secret` has no `Serialize`" is asserted rather
+# than merely stated.
+serde.workspace = true

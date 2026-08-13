@@ -1,0 +1,1678 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codewandler/flux-connectors/schema/provider-toml.schema.json",
+  "title": "flux-connectors provider definition",
+  "description": "The format of `providers/<name>.toml`. TOML has a JSON-shaped data model, so this one schema describes both the file an author writes and the JSON the connector IR encodes to.\n\nThe file plays two roles and this schema serves both: a complete hand-authored connector (write `[[operations]]` inline, omit `[spec]`), or a pointer at a vendored vendor spec plus a patch set that selects and corrects operations from it (write `[spec]` and `[[patch.operations]]`). Both produce the same IR.\n\nEvery object here is closed: an unrecognised key is an error, never a silently ignored one. That is not a style preference — a mistyped `authh` on an operation would otherwise mean `auth` is unset, and unset means the operation inherits the connector's default credentials.\n\nNo credential value appears in a provider file, ever. `env` and `user_env` name environment variables; they never hold their contents.",
+  "$ref": "#/$defs/provider",
+  "$defs": {
+    "provider": {
+      "type": "object",
+      "title": "The provider file",
+      "additionalProperties": false,
+      "required": ["id", "base_url"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The connector id, e.g. `zendesk`. Prefixes every operation id and names the generated `<id>.flux` and `<id>.connector.toml`."
+        },
+        "authority": {
+          "type": "string",
+          "description": "The reverse-DNS authority this provider publishes under, e.g. `com.amazonaws`. The leading component of every service address (`com.amazonaws/s3:2006-03-01`). Optional: a provider that declares none simply has no rendered address yet."
+        },
+        "runtime": {
+          "enum": ["http", "socket", "process", "container", "plugin", "remote"],
+          "default": "http",
+          "description": "HOW this connector executes — flux's runtime axis. `http` is a guarded request, `socket` a guarded dial, `process` a guarded argv-only spawn, `container` a spawn inside docker or kubernetes, `plugin` the flux plugin protocol over stdio, and `remote` delegation to another substrate.\n\nOmit it and the connector is `http`, which is every connector this repository generates. The set is closed and an unrecognised word is refused at load rather than defaulted: a hosted deployment serving more than one tenant refuses a locally-executing runtime — process, container and raw-socket execution consume the host's own identity and network position — and a typo that quietly became `http` is exactly how a `process` connector would end up served by one.\n\nThe runtime is declared by the connector and never chosen by a caller. A caller who can pick the runtime is a caller who can pick an effect."
+        },
+        "api_version": {
+          "type": "string",
+          "description": "The vendor's API version, as the DEFAULT for this provider's services. A single-surface provider states it once here; a multi-service provider overrides it per `[[services]]`, because AWS dates `s3` at `2006-03-01` and `bedrock-runtime` at `2023-09-30`. This is the vendor's version, never ours."
+        },
+        "services": {
+          "type": "array",
+          "description": "The API surfaces this provider exposes. Omit the block entirely for a provider with one surface: its operations then belong to the reserved `default` service, which is elided from every published address. A single-surface provider may declare `default` only to carry roles or tags.\n\nA provider growing named services may preserve an already-published default by declaring it with `legacy = true`; every member must then state its service explicitly. This is an address migration, not shorthand for a new connector.",
+          "items": { "$ref": "#/$defs/service" }
+        },
+        "vendor": {
+          "type": "string",
+          "description": "The vendor's display name, e.g. `Zendesk`."
+        },
+        "base_url": {
+          "type": "string",
+          "description": "The API base URL, which may carry tenant templating (`https://{tenant}.zendesk.com`). Required even when `[spec]` is present: the babelforce document declares staging as `servers[0]`, so a positional default would silently target the dev environment."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the connector is for, in one line."
+        },
+        "auth": {
+          "type": "array",
+          "description": "Every credential this connector declares. Operations reference them by name.",
+          "items": { "$ref": "#/$defs/authMethod" }
+        },
+        "default_auth": {
+          "type": "array",
+          "description": "The connector-wide default auth, as a list of alternative mechanisms (OR). Every operation that does not declare its own `auth` inherits this. An omitted or empty list means the connector is unauthenticated by default.",
+          "items": { "$ref": "#/$defs/authRequirement" }
+        },
+        "const_headers": {
+          "type": "object",
+          "description": "Request headers the VENDOR fixes, sent by every operation: `Accept: application/vnd.github+json`, `Notion-Version: 2022-06-28`, a `User-Agent`. Emitted as a literal, so it is never an argument a caller must pass and may overwrite; an operation may replace one entry through its own `params.const_headers`.\n\nIt may never carry a credential. A value that resolves from an environment variable or names a declared credential is refused, as is any header the `$auth` seam owns (`Authorization`, `Proxy-Authorization`, `Cookie`) or that a declared credential is injected into — a constant header is a literal in a committed artifact, and a secret in one would be a secret in the repository. `content-type` is the emitter's, derived from the request body.",
+          "additionalProperties": { "type": "string" }
+        },
+        "operations": {
+          "type": "array",
+          "description": "Operations written out in full. This is the whole connector for a hand-authored provider; alongside `[spec]` it adds operations the vendor document does not describe.",
+          "items": { "$ref": "#/$defs/operation" }
+        },
+        "events": {
+          "type": "array",
+          "description": "The events this connector receives — the inbound call direction. An operation is flux calling the vendor; an event is the vendor calling flux.",
+          "items": { "$ref": "#/$defs/event" }
+        },
+        "channels": {
+          "type": "array",
+          "description": "The ingress surfaces this connector describes. A binding composes events with the operation that replies to them, over a transport flux owns — it is not a new primitive.",
+          "items": { "$ref": "#/$defs/channel" }
+        },
+        "config": {
+          "type": "array",
+          "description": "What a human must supply before any of the above can run — the surface a settings page renders. Every other part of this file models how a credential reaches the wire; this models how it gets there in the first place.",
+          "items": { "$ref": "#/$defs/configField" }
+        },
+        "verify": {
+          "type": "string",
+          "description": "The operation a host calls to prove the configuration works — a `Test connection` button. Read-shaped and cheap by construction; a high-risk or destructive operation is refused, because a connection test runs unattended whenever someone opens a settings page."
+        },
+        "graphs": {
+          "type": "array",
+          "description": "Flows this connector composes from its own members. A graph is the only member kind that is itself a composition of members: its nodes name operations, events and channel bindings already declared here, and it lowers to one Flux `op`.",
+          "items": { "$ref": "#/$defs/graph" }
+        },
+        "spec": {
+          "oneOf": [
+            { "$ref": "#/$defs/spec" },
+            { "type": "array", "items": { "$ref": "#/$defs/spec" } }
+          ],
+          "description": "The vendored vendor documents this connector is derived from. Omit it for a fully hand-authored connector. Write `[spec]` for one document and `[[spec]]` for several — they are one key in two TOML spellings, and the single table is the one-element case. A connector whose vendor splits its API across documents declares one entry per document, each naming the `service` its operations join; babelforce publishes five over two API versions."
+        },
+        "patch": {
+          "$ref": "#/$defs/patch",
+          "description": "Corrections applied over the ingested spec. Only meaningful alongside `[spec]`."
+        }
+      }
+    },
+
+    "event": {
+      "type": "object",
+      "title": "One event the vendor sends",
+      "description": "The inbound member kind. An event keeps its vendor name, exactly as an operation keeps its vendor operation name — a normalized cross-vendor event taxonomy is a different product, and one that discards the fidelity this pipeline exists to preserve.\n\nAn event shares one name namespace with the operations and channel bindings of its service: all three render into the same address (`…#name`) and into flux's declaration namespace, so a collision across kinds is an error.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The event name, in the vendor's own spelling — `issues.opened`, `app_mention`. Lowercase ASCII letters, digits, `-`, `_` and `.`; wider than an operation id because nothing is emitted for an event, so it need not be a declarable Flux symbol. This is the label a flux `trigger { on = … }` matches."
+        },
+        "wire_value": {
+          "type": "string",
+          "description": "The exact discriminator value carried on the wire when it differs from the stable local event name."
+        },
+        "service": {
+          "type": "string",
+          "description": "The `[[services]]` entry this event belongs to. Omit it for a provider with a single API surface."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the event means, in one line."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "Whether a product offers this event on by default when a user connects. Defaults to true. Slack's `message` is the case for saying otherwise — it fires for every human message in every channel the app is in, so defaulting it on turns a connection into a firehose."
+        },
+        "group": {
+          "type": "string",
+          "description": "An optional grouping label, so a long event list renders as sections rather than forty checkboxes."
+        },
+        "when": {
+          "type": "object",
+          "description": "Field equalities that narrow a coarse vendor event into this one. GitHub sends one `issues` event with an `action` field; `{ action = \"opened\" }` is what makes `issues.opened` a distinct thing a trigger can match."
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "The JSON Schema of the event payload, when the vendor publishes one."
+        }
+      }
+    },
+
+    "channel": {
+      "type": "object",
+      "title": "One ingress surface, over a transport flux owns",
+      "description": "The third member kind, and the one that is not a primitive: a binding is the composition of an event (inbound) with an operation (the reply). Both halves already exist in the IR, so a binding emits nothing new into the module — it reaches the manifest and the catalogue only.\n\nNote what is absent: no URL, no secret, no schedule. The endpoint address is the operator's deployment detail, the secret is a credential name the host resolves, and the loop driving a `poll` binding is an operator's `channel schedule` + `trigger`. This repository ships no runtime.",
+      "additionalProperties": false,
+      "required": ["name", "transport"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The binding name, e.g. `slack`. Unique across all three member kinds of its service."
+        },
+        "service": {
+          "type": "string",
+          "description": "The `[[services]]` entry this binding belongs to. Omit it for a provider with a single API surface."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the binding is for, in one line."
+        },
+        "transport": { "$ref": "#/$defs/transport" },
+        "connect": {
+          "$ref": "#/$defs/socketConnect",
+          "description": "The generic RFC 6455 handshake. Valid only for socket transport; absence leaves an explicitly vendor-specific transport such as Slack Socket Mode."
+        },
+        "events": {
+          "type": "array",
+          "description": "The `[[events]]` names this binding carries, all from its own service. Required for `webhook` and `socket`; a `poll` binding may omit them, because its `cursor` operation is what it carries.",
+          "items": { "type": "string" }
+        },
+        "verification": {
+          "$ref": "#/$defs/verification",
+          "description": "How an inbound request proves it came from the vendor. Tri-state: omitted is legal for `socket` and `poll` (the credential that opens the connection authenticates it) and an error for `webhook`; `\"none\"` states deliberately that the vendor publishes no signature; an `hmac` table verifies."
+        },
+        "discriminator": {
+          "$ref": "#/$defs/selector",
+          "description": "Where to read which event this is, when the transport carries it out of band — GitHub's `X-GitHub-Event` header."
+        },
+        "delivery_id": {
+          "$ref": "#/$defs/selector",
+          "description": "Where to read the vendor's redelivery id, so a flow can dedupe at-least-once delivery. Without it a retried webhook is indistinguishable from a second real event."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Flow symbol → dotted source path into the inbound envelope. Keys are what a journey reads (`$text`) and must be snake case; values address the vendor's envelope with the same dotted grammar `wire` uses for request bodies.",
+          "additionalProperties": { "type": "string" }
+        },
+        "payload_root": {
+          "type": "boolean",
+          "description": "Deliver the complete decoded JSON event. Mutually exclusive with a payload field projection."
+        },
+        "reply": {
+          "$ref": "#/$defs/reply",
+          "description": "The operation that answers an event on this binding. Omit for a fire-and-forget binding."
+        },
+        "subscription": {
+          "$ref": "#/$defs/subscription",
+          "description": "How this binding gets registered with the vendor, when the vendor has an API for it. A `webhook` binding declares this or `setup`."
+        },
+        "setup": {
+          "$ref": "#/$defs/manualSetup",
+          "description": "What a human does in the vendor's dashboard, when there is no subscription API. Slack is the case: no Web API method registers an Events API endpoint."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "The operation a `poll` binding calls to read forward from a recorded position. Required for `poll` and refused for the other transports: flux's schedule channel is best-effort — a restart drops ticks and replays none — so the cursor, not the interval, is what makes a poll correct."
+        },
+        "interval": {
+          "type": "string",
+          "description": "The suggested poll interval (`5m`), for `poll` only. Advisory: the operator writes the actual schedule in their own program, and flux's cron drops ticks across a restart."
+        }
+      }
+    },
+
+    "socketConnect": {
+      "type": "object",
+      "title": "A declarative RFC 6455 handshake",
+      "description": "Inert socket connection facts. The service base URL owns the authority; this block adds only a relative path, query parameters, fixed public headers, existing connector auth requirements and optional subprotocols.",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "A path rooted at and resolved against the binding service base URL."
+        },
+        "query": {
+          "type": "object",
+          "description": "Query parameter name to a fixed literal or a {configuration_field} template.",
+          "additionalProperties": { "type": "string" }
+        },
+        "headers": {
+          "type": "object",
+          "description": "Fixed non-secret headers. Handshake-owned and authentication headers are refused.",
+          "additionalProperties": { "type": "string" }
+        },
+        "auth": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/authRequirement" },
+          "description": "Authentication alternatives with the same OR-of-AND meaning as operation auth."
+        },
+        "subprotocols": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "WebSocket subprotocol tokens in preference order."
+        }
+      }
+    },
+
+    "reply": {
+      "type": "object",
+      "title": "The outbound half of a channel binding",
+      "description": "An operation of this same connector, with its parameters filled from the inbound payload. This is the part that removes hand-written code from flux: its Slack adapter ends by constructing a `chat.postMessage` from the message it just received, which expressed here is an operation id and a two-entry map.",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "description": "The `[[operations]]` id that answers. It must belong to this connector and to the binding's own service."
+        },
+        "result": {
+          "type": "string",
+          "description": "The reply parameter that carries the journey's own output. The rest of a reply is filled from the inbound payload, but what a flow computed has no dotted path into the event that triggered it — flux's Slack adapter makes the same split in code, passing the joined run results as `text` while `channel` and `thread_ts` come off the message it received."
+        },
+        "bind": {
+          "type": "object",
+          "description": "Reply parameter name → `payload` key. Every required parameter of the reply operation must be covered, by this map or by `result`: a partially bound reply would build, ship, and then fail on the first real delivery.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+
+    "graph": {
+      "type": "object",
+      "title": "A flow: connector members composed into one Flux op",
+      "description": "The nodes name operations, events and channel bindings this connector already declares; the edges become generated symbols. A graph lowers to a single `op`, which is the only declaration flux lifts from a module — so trigger, schedule and endpoint nodes are the graph's BOUNDARY and are emitted nowhere.\n\nNo node carries a formula. Every rejection in this repository's history was an expression language; every acceptance was declarative structure. A gate's condition is a port reference, a closed operator and a literal — the Flux expression is generated from it.",
+      "additionalProperties": false,
+      "required": ["name", "nodes"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Becomes the emitted `op`'s name, so it must be a legal Flux declaration name. Unique across every member kind of its service."
+        },
+        "service": {
+          "type": "string",
+          "description": "The `[[services]]` entry this graph belongs to. Every member it names must be in the same service."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the flow does, in one line."
+        },
+        "inputs": {
+          "type": "array",
+          "description": "The emitted op's parameters.",
+          "items": { "$ref": "#/$defs/port" }
+        },
+        "output": {
+          "$ref": "#/$defs/portRef",
+          "description": "What the emitted op returns."
+        },
+        "expose": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the emitted op reaches a model as an LLM tool. Defaults to `true`, and means exactly what `expose` means on an operation.\n\nAuthored, unlike the `risk` and `idempotency` the emitted op also carries — those are derived from the operations the flow calls, because a flow that deletes must not inherit the `low` of the reads it also makes. Exposure has no such floor: a CURATED FLOW OVER UNCURATED OPERATIONS — one tool a model sees, composed from members that individually stay callable and unexposed — is the shape this key exists for, and deriving it from the called set would forbid exactly that.",
+          "examples": [false]
+        },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graphNode" }
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/edge" }
+        }
+      }
+    },
+
+    "graphNode": {
+      "type": "object",
+      "title": "One node",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The author-stable identity, unique within the graph. Deliberately unlike flux's own `NodeId`, which is a positional index invalidated by any edit — a saved graph must survive re-ordering."
+        },
+        "kind": {
+          "description": "What the node does. An externally-tagged object: `{ operation = { operation = \"…\" } }`, `{ select = { path = \"a.b\" } }`, `{ gate = { condition = … } }`, and so on. Kinds are `operation`, `select`, `template`, `object`, `literal`, `gate`, `approval`, `retry`, `throttle`, `trigger`, `schedule`, `endpoint`.",
+          "type": "object"
+        },
+        "region": {
+          "type": "string",
+          "description": "The region node containing this one. Recorded on the child so there is one source of truth — a region listing its members and a member naming its region could disagree, and nothing would say which was right. Region kinds are `gate`, `approval`, `retry` and `throttle`."
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/port" }
+        },
+        "outputs": {
+          "type": "array",
+          "description": "The ports values leave on. For a region these are the values that ESCAPE it — the phi node Flux does not have, made explicit. A `gate` may declare none: Flux's `when` has no else here, so a symbol bound inside it is unbound on the false path.",
+          "items": { "$ref": "#/$defs/port" }
+        }
+      }
+    },
+
+    "port": {
+      "type": "object",
+      "title": "A named connection point",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "What the port carries, when known. This is where a graph can be stricter than Flux, whose checker treats two `Named` types as never conflicting."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether a value must reach this port. Defaults to true."
+        }
+      }
+    },
+
+    "portRef": {
+      "type": "object",
+      "title": "One end of an edge",
+      "additionalProperties": false,
+      "required": ["node", "port"],
+      "properties": {
+        "node": { "type": "string" },
+        "port": { "type": "string" }
+      }
+    },
+
+    "edge": {
+      "type": "object",
+      "title": "One connection",
+      "description": "Lowering generates a `$symbol` per edge, satisfying flux's identifier grammar and avoiding its reserved words. An author never sees or names one — which is what makes action-proxy's silent `$emit` shadowing unrepresentable here.",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "$ref": "#/$defs/portRef" },
+        "to": { "$ref": "#/$defs/portRef" }
+      }
+    },
+
+    "condition": {
+      "type": "object",
+      "title": "When a gate opens",
+      "description": "Structured, never a formula. This is the event `when` block's field-equality idea generalised by exactly one closed operator set: `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `exists`. The Flux expression is generated from it, so nothing an author types is evaluated.",
+      "additionalProperties": false,
+      "required": ["left", "op"],
+      "properties": {
+        "left": { "$ref": "#/$defs/portRef" },
+        "op": {
+          "enum": ["eq", "ne", "lt", "lte", "gt", "gte", "exists"]
+        },
+        "right": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "The literal compared against. Absent for `exists`, which takes no right-hand side."
+        }
+      }
+    },
+
+    "configField": {
+      "type": "object",
+      "title": "One thing a human must supply",
+      "description": "Everything a form needs to ask for one value. The presentation fields are separate from `description` on purpose: every `description` in this file is already the text a model receives as a tool contract, so overloading it with UI copy makes one string serve two audiences that want different things.\n\nConfiguration has two levels — operator (set once per vendor: the OAuth app registration) and connection (set once per tenant: the subdomain, the token). The level is DERIVED from `binds`, never authored, because it is a consequence of where the value goes and an author who could state it could state it wrongly.",
+      "additionalProperties": false,
+      "required": ["name", "label", "help", "binds"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The field name, e.g. `subdomain`. Unique across every member kind of its service, and the key a host stores the collected value under."
+        },
+        "service": {
+          "type": "string",
+          "description": "The `[[services]]` entry this field configures. Omit it for a provider with a single API surface."
+        },
+        "label": {
+          "type": "string",
+          "description": "The form label, e.g. `Zendesk subdomain`. Mandatory: defaulting it to `name` would ship an identifier like `zendesk.api_token` into a form as user-facing copy."
+        },
+        "help": {
+          "type": "string",
+          "description": "One line telling a user what the value is and how to find it. Mandatory — a field a user cannot answer is a field that stops the installation."
+        },
+        "example": {
+          "type": "string",
+          "description": "A realistic example, rendered as a placeholder. Never a default, and validated against `format` so it cannot mislead — a placeholder that would fail the field's own validation is worse than none, because a user copies it.\n\nA `secret` field declares NONE, and the loader refuses one. A token-shaped literal in a committed file has tripped GitHub push protection and blocked a release here, and one that is a real token is a disclosed credential. Put the shape of the value in `help` instead."
+        },
+        "format": { "$ref": "#/$defs/format" },
+        "choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/choice" },
+          "description": "The closed set of values this field permits, in the vendor's own order. Omit it for a field that is free text.\n\nA NARROWING of `format`, not an alternative to it: `format` says what shape a value has, `choices` says which values are legal, and every choice is validated against the field's own format at load. The `example` must be one of them, a `secret` field may declare none, and a set of one is refused because a constant is not a choice.\n\nWhat it is for: a vendor with two API hosts and nothing pre-auth that discloses which. A wrong region returns 401 on every call, indistinguishable from a bad key, so the operator rotates a credential that was never wrong.\n\nMembership is checked where a value is SUPPLIED, never where a stored one is read back — a vendor adding a region must not brick a connection configured before it existed."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the connector cannot function without it. Defaults to true: a connector declaring a field it does not need is the rarer case, and the safe default is to ask."
+        },
+        "default": {
+          "type": "string",
+          "description": "A literal sent when an optional value is absent. Refused for required or secret fields and validated like a supplied value."
+        },
+        "secret": {
+          "type": "boolean",
+          "description": "Whether the value is masked on input, never logged, never echoed back. MUST agree with `binds` — a credential binding is secret, an endpoint or username binding is not. flux partitions secret from non-secret by type and enforces it host-side, so a disagreeing flag would be a second, contradicting source of truth."
+        },
+        "approval": {
+          "enum": ["none", "operator"],
+          "description": "Additional policy required before a supplied value becomes active. `operator` is the explicit self-managed-origin contract: the value is still connection-level, but a non-default origin is inert until deployment/operator policy approves and pins it for that connection."
+        },
+        "docs_url": {
+          "type": "string",
+          "description": "Where a user goes to obtain the value — the vendor's own page, never ours."
+        },
+        "binds": {
+          "type": "string",
+          "description": "Where the collected value goes. One of `endpoint.<variable>` (a `{variable}` in the service's base URL), `path.<variable>`, `query.<name>` or `header.<name>` (an operator-pinned request position, sent on every call of the field's service), `credential.<name>` (the secret half of a declared credential), `username.<name>` (the username half of a `basic` credential), `oauth.client_id`, or `oauth.client_secret`.\n\nThe username half is a separate prefix rather than a `.user` suffix because credential names contain dots (`zendesk.api_token`), which would make a suffix ambiguous.\n\nExactly ONE destination, and the head of the list when `also_binds` names more: its target is the `{placeholder}` the emitted module carries and the name a host stores the value under."
+        },
+        "also_binds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The further request positions this same collected value also reaches. Omit it for the ordinary field, which reaches one.\n\nFor the vendor whose tenant scope sits in two places at once: Algolia's application id composes the hostname (`{app_id}-dsn.algolia.net`) AND travels as `X-Algolia-Application-Id` on every call. Declared as two fields that is two host-side slots for one answer, and a second field whose only truthful help text is `type the same value again`; declared as two fields under one name it is refused as a shared slot, correctly. This is the one question those two rules leave unwritable.\n\nEach entry is a request position — `path.<variable>`, `query.<name>`, `header.<name>` — and nothing else: every other destination is resolved under its own address by a different port, and one collected value has exactly one address. A `base_url` variable therefore belongs in `binds`, where it becomes the placeholder every other destination carries.\n\nThe field stays one `name`, one `label`, one `help`, one row in a form and one stored value. The `example` and every `choice` are validated against EVERY destination the field reaches, and the host rule is the strict one."
+        },
+        "also_services": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The further SERVICES whose base URL this one value also fills. Omit it for the ordinary field, which fills one.\n\nFor the vendor whose surfaces share a deployment: a self-managed GitLab serves its REST API at `{origin}/api/v4` and its OAuth2 authorize and token endpoints at `{origin}` — one server, one fact, two services. Without this the connector declares the origin twice and asks the operator one question two ways; two slots that must agree and are not forced to is how a token exchange ends up pointed at a host the API never approved.\n\nThis is ONE address filling several placeholders: `service` stays the head and remains the key the value is stored under, and the services named here resolve their `{variable}` from that same address. One question, one value, one `approval`.\n\nSharing is stated rather than inferred, and the default remains two slots. `The same {variable} in two base URLs is one slot` would be shorter and wrong: Contentful declares `delivery_space_id` and `management_space_id`, both binding `endpoint.space_id` in different services, and they are deliberately two values — keyed as one, a management write went to whichever space the delivery reads had been configured with, and got a `200` from a real server rather than a refusal.\n\nOnly an `endpoint.<variable>` binding may carry entries; a credential or a request pin has no per-service placeholder for a second service to fill."
+        }
+      }
+    },
+
+    "choice": {
+      "type": "object",
+      "title": "One permitted value of a closed set",
+      "description": "The value itself and the text a renderer shows for it. The label is mandatory and is the whole reason a choice is a table rather than a string: a dropdown offering `api.newrelic.com` and `api.eu.newrelic.com` to someone who knows their account is in Frankfurt has moved the declaration without moving the benefit.",
+      "additionalProperties": false,
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The value itself — what a host stores and what substitution puts on the request."
+        },
+        "label": {
+          "type": "string",
+          "description": "The human name for it — `United States`, not `api.newrelic.com`. Sentence case, no trailing colon."
+        }
+      }
+    },
+
+    "format": {
+      "title": "The shape of a configuration value",
+      "description": "Closed on purpose: a renderer switches on this to pick an input type, a validator and an error message. A renderer given a raw regex can reject a value and cannot explain why.",
+      "oneOf": [
+        { "const": "text", "description": "No particular shape. A free-text input." },
+        { "const": "subdomain", "description": "One DNS label — `acme` in `acme.zendesk.com`. The most common tenant value there is." },
+        { "const": "hostname", "description": "A full host — `acme.freshdesk.com`. Freshdesk asks for the whole thing where Zendesk asks for the label." },
+        { "const": "url", "description": "An absolute `https://` URL." },
+        { "const": "origin", "description": "An absolute HTTPS origin with an optional explicit port and no userinfo, path, query or fragment. The connector owns every API path appended to it." },
+        { "const": "email", "description": "An email address. Zendesk and Jira both put one in the Basic username position." },
+        { "const": "token", "description": "An opaque credential string. No shape beyond `no whitespace` — a vendor's token format is the vendor's business, and guessing at it would reject valid tokens the day the vendor changed them." }
+      ]
+    },
+
+    "subscription": {
+      "type": "object",
+      "title": "How a webhook gets registered with the vendor",
+      "description": "Registering a webhook is an ordinary outbound write — an authorized, approvable operation like any other, never a build-time side effect. What was missing was the link: a binding knew its reply and its cursor but had no way to say which operation subscribes it.",
+      "additionalProperties": false,
+      "required": ["subscribe", "callback_param"],
+      "properties": {
+        "subscribe": {
+          "type": "string",
+          "description": "The operation that registers the endpoint. An `[[operations]]` id of the binding's own service."
+        },
+        "unsubscribe": {
+          "type": "string",
+          "description": "The operation that removes it. Absent when the vendor offers no removal — worth knowing, because it means a disconnect leaves the vendor sending to a dead URL."
+        },
+        "list": {
+          "type": "string",
+          "description": "The operation that lists existing registrations, for reconciling duplicates."
+        },
+        "callback_param": {
+          "type": "string",
+          "description": "Which parameter of `subscribe` receives our public callback URL. The URL itself is never here: it is the product's deployment detail, and a connector carrying one would be describing someone else's infrastructure."
+        }
+      }
+    },
+
+    "manualSetup": {
+      "type": "object",
+      "title": "What a human does in the vendor's dashboard",
+      "description": "For vendors with no subscription API. Slack is the case: no Web API method registers an Events API endpoint, so somebody opens api.slack.com/apps and pastes a URL. That work does not disappear because it is undeclared — it moves into a support article nobody keeps current.",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "docs_url": {
+          "type": "string",
+          "description": "The vendor's own page for this, so a UI can link out rather than restate it."
+        },
+        "steps": {
+          "type": "array",
+          "description": "The steps, in order, each one thing a person does. Rendered as a numbered list beside the callback URL the product displays.",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+
+    "selector": {
+      "type": "object",
+      "title": "One named value read off an inbound request",
+      "additionalProperties": false,
+      "required": ["source", "name"],
+      "properties": {
+        "source": { "$ref": "#/$defs/fieldSource" },
+        "name": {
+          "type": "string",
+          "description": "The header name, or — for `source = \"body\"` — the dotted body path."
+        }
+      }
+    },
+
+    "hmac": {
+      "type": "object",
+      "title": "One HMAC webhook signature scheme",
+      "description": "GitHub, Stripe, Slack and Zendesk each document a bespoke-looking signature, and they vary along exactly four axes: which digest, how it is encoded, what string is signed, and how long a signature stays acceptable. Four vendors, one parameterized algorithm — which is a struct, not a script, and therefore something a compiler can carry.\n\nNothing here verifies anything: the comparison runs in flux, over the raw request bytes, before any parsing.",
+      "additionalProperties": false,
+      "required": ["algorithm", "encoding", "header", "signed", "secret"],
+      "properties": {
+        "algorithm": { "$ref": "#/$defs/digest" },
+        "encoding": { "$ref": "#/$defs/encoding" },
+        "header": {
+          "type": "string",
+          "description": "The header carrying the signature, e.g. `X-Hub-Signature-256`."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "A literal prefix the header value carries before the digest, e.g. `sha256=` or `v0=`."
+        },
+        "signed": {
+          "type": "string",
+          "description": "The string that is signed, as a template over a closed vocabulary: `{body}` (the raw request bytes), `{sorted_form}` (the body read as `application/x-www-form-urlencoded`, each field percent-decoded, sorted by name, and re-joined name-onto-value with no delimiter anywhere — Twilio), `{timestamp}` (the value the `timestamp` selector reads) and `{url}` (the full request URL the vendor was configured to call, supplied by the transport and never carried in a connector). Any other placeholder is an error: a template the host cannot fill would fail open or fail confusingly, and neither is acceptable on an authentication path.\n\nThe template must interpolate `{body}` or `{sorted_form}`. One that covers no payload signs a string the request never enters, so one captured signature verifies every forged payload for as long as the window lasts — `signed = \"{timestamp}\"` and `signed = \"{url}\"` are both well-formed templates that do exactly that, and `{url}` is worse because it is a per-endpoint constant and its vendors carry no window at all."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/selector",
+          "description": "Where the `{timestamp}` in `signed` is read from — Slack's `X-Slack-Request-Timestamp`. Required exactly when `signed` interpolates `{timestamp}`: the template says the value is signed but cannot say where it comes from, and a host left to guess would fall back to its own clock, which verifies nothing.\n\n`source = \"body\"` is refused: a timestamp read from the body has to be parsed before the bytes carrying it are verified, which inverts the order that makes verification mean anything."
+        },
+        "timestamp_format": {
+          "$ref": "#/$defs/timestampFormat",
+          "description": "How the selected timestamp is spelled. Omitted means `unix_seconds`. Refused when `signed` does not interpolate `{timestamp}`, because it would describe the spelling of a value nothing reads."
+        },
+        "secret": {
+          "type": "string",
+          "description": "The NAME of the `[[auth]]` credential holding the shared secret — never a value. It must be declared `scheme = \"signing\"`, so that one credential namespace covers both directions and the manifest names every credential this connector requires."
+        },
+        "tolerance": {
+          "type": "string",
+          "description": "How old a signed request may be (`5m`, `300s`, `1h`). Mandatory when `signed` interpolates `{timestamp}`, and refused when it does not: a timestamped signature with no window replays forever, which reads as though replay had been handled.\n\nParsed by the loader, not merely required: a whole number and one of `s`, `m`, `h` — no fractions, no compound `1m30s`, no bare integer — and the window must fall in 1s..=3600s. So `banana`, `5`, `1.5m`, `0s` and `2h` are all refused, and a count too large to scale into seconds is refused rather than wrapped.\n\nDeliberately carries no `pattern`. A regex can express the grammar but not the range, so the obvious `^[0-9]+[smh]$` would admit `0s` and `7200s`, which the loader rejects — and a published schema that accepts what the loader refuses is a worse promise than none. Nothing in this crate can validate a regex against `inbound::parse_tolerance` either, so a pattern here would be an untested second spelling of the rule, which is how it drifted the first time."
+        }
+      }
+    },
+
+    "transport": {
+      "title": "How an inbound event reaches flux",
+      "description": "The three exhaust what vendors actually offer, and the split is what makes inbound an abstraction over transports rather than a synonym for webhook.",
+      "oneOf": [
+        {
+          "const": "webhook",
+          "description": "The vendor POSTs to an endpoint the operator exposes. The only transport that needs `verification`."
+        },
+        {
+          "const": "socket",
+          "description": "We connect outward and hold a stream the vendor pushes down (Slack Socket Mode). Inbound in data direction, outbound in operation — which is why it needs no signature."
+        },
+        {
+          "const": "poll",
+          "description": "The vendor offers no push at all, so a cursor operation is called on a schedule."
+        }
+      ]
+    },
+
+    "verification": {
+      "title": "How an inbound request proves it came from the vendor",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "This transport cannot be verified, stated deliberately. Not the same as saying nothing: an unset verification on a webhook is an error, and this is how an author says `the vendor publishes no signature` in a way the manifest can then say loudly."
+        },
+        {
+          "type": "object",
+          "description": "An HMAC over the raw request bytes.",
+          "additionalProperties": false,
+          "required": ["hmac"],
+          "properties": {
+            "hmac": { "$ref": "#/$defs/hmac" }
+          }
+        }
+      ]
+    },
+
+    "fieldSource": {
+      "title": "Where on an inbound request a value is read from",
+      "oneOf": [
+        { "const": "header", "description": "An HTTP header of the inbound request." },
+        { "const": "body", "description": "A field of the decoded body, by dotted path." }
+      ]
+    },
+
+    "digest": {
+      "title": "The digest an HMAC scheme signs with",
+      "oneOf": [
+        { "const": "sha1", "description": "Legacy — GitHub's `X-Hub-Signature`, superseded by its SHA-256 header." },
+        { "const": "sha256", "description": "What every scheme worth adopting uses." }
+      ]
+    },
+
+    "encoding": {
+      "title": "How an HMAC digest is spelled in the header",
+      "oneOf": [
+        { "const": "hex", "description": "Lowercase hex — GitHub, Stripe, Slack." },
+        { "const": "base64", "description": "Base64 — Zendesk." }
+      ]
+    },
+
+    "timestampFormat": {
+      "title": "How the timestamp an HMAC scheme signs is spelled",
+      "description": "A separate axis from the selector, which says only where the timestamp is read from. Without it a host has to sniff the spelling, and sniffing is exactly the guessing the selector was added to stop.",
+      "oneOf": [
+        { "const": "unix_seconds", "description": "Whole seconds since the unix epoch, as a decimal integer — Slack, Stripe, GitHub. The default." },
+        { "const": "rfc3339", "description": "RFC 3339, as `2022-05-05T18:32:28Z` — Zendesk." }
+      ]
+    },
+
+    "service": {
+      "type": "object",
+      "title": "One API surface of the provider",
+      "description": "The unit you address, version, select and install: `s3` and `bedrock-runtime` under AWS, `support` under Zendesk. Every operation belongs to exactly one, and the per-service operation sets partition the whole set — which is what makes `install the whole s3 service` a well-defined request.\n\nThis is deliberately not a free-form tag: a tag cannot partition an operation set, cannot carry a version, and cannot carry a host.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The service name, e.g. `s3`. Lowercase letters, digits and `-`. Names the emitted `<provider>-<name>.flux`, is the middle segment of the service address, and is what an operation's `service` references. `default` is reserved: a single-surface provider may name it to carry roles or tags, and an already-published default may name it beside new siblings only with `legacy = true`."
+        },
+        "legacy": {
+          "type": "boolean",
+          "default": false,
+          "description": "Marks `default` as an already-published, address-elided service that must retain its GID, OIP, credential address and unsuffixed artifacts while named siblings are added. Admitted only on `default` beside at least one named service. In that mixed shape every operation, spec document, event, channel binding, configuration field and graph must state its service; omission is refused."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the service is for, in one line."
+        },
+        "base_url": {
+          "type": "string",
+          "description": "The service's own API base URL, when it differs from the connector's. AWS is the case: `s3.amazonaws.com` and `bedrock-runtime.<region>.amazonaws.com` share an authority and not a host. Each emitted manifest carries its own service's base URL, so a service's egress surface is never widened to the union."
+        },
+        "api_version": {
+          "type": "string",
+          "description": "The vendor's API version for THIS service, overriding the connector-level default. `s3` is `2006-03-01`; `bedrock-runtime` is `2023-09-30`."
+        },
+        "roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/role" },
+          "description": "The capability shapes this service claims to implement, each checked at load: a service declaring a role whose required members it does not have is refused, naming the missing one.\n\nRoles attach HERE and not to the provider. `openai`'s model-listing surface and its chat surface are different capabilities of one vendor, and a provider-level role would smear them together — so a provider's roles are derived as the union of its services', and a provider-level `roles` key is an error."
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/tag" },
+          "description": "What KIND of thing this service is, so a catalogue of 54 providers can be filtered by domain rather than scrolled.\n\nA tag is deliberately NOT a role. A role answers `can this service do X, checkably?` and carries required members the loader verifies; a tag answers `what kind of thing is this?` and carries nothing — no operation makes a service `storage`. The misread to design against is a UI inferring `this category means these capabilities`. It does not.\n\nTags attach HERE for the same reason roles do, and the case is sharper: `google` is not one kind of thing — its `gmail` is email while its `drive` is storage. A provider's tags are derived as the union of its services', and a provider-level `tags` key is an error.\n\nA service carries a SET: `twilio` is messaging and telephony at once."
+        }
+      }
+    },
+
+    "tag": {
+      "title": "What kind of thing a service is",
+      "description": "A closed set, for the reason a role's is closed but with a quieter failure: a tag carries no members, so nothing downstream can notice that `telephny` is not `telephony` — it simply never matches a filter, and a service that looks tagged is invisible to the one query it was tagged for.\n\nThe vocabulary is DERIVED, not invented: every value below is populated by at least one shipped service, read off all 54 providers rather than designed ahead of them. Seven are singletons today (`search`, `e-signature`, `ecommerce`, `payments`, `identity`, `forms`, `video-conferencing`), kept rather than folded because each names a domain a reader would actually filter for.",
+      "enum": [
+        "ai",
+        "cms",
+        "crm",
+        "database",
+        "design",
+        "developer-tools",
+        "e-signature",
+        "ecommerce",
+        "email",
+        "forms",
+        "identity",
+        "incident-response",
+        "infrastructure",
+        "issue-tracking",
+        "knowledge-base",
+        "marketing",
+        "messaging",
+        "observability",
+        "payments",
+        "project-management",
+        "scheduling",
+        "search",
+        "source-control",
+        "storage",
+        "support",
+        "telephony",
+        "video-conferencing"
+      ]
+    },
+
+    "role": {
+      "title": "A checked capability shape a service claims",
+      "description": "A closed set defined by this repository, never a free-form tag: an open string set cannot be checked, and a typo'd capability that silently means `no capability` is the failure mode this exists to prevent. A role names the members it requires by their name WITHIN the service — the trailing segments of the member name — so `openai-models-list` and `openrouter-models-list` fill one slot and the shape stays vendor-independent.",
+      "oneOf": [
+        {
+          "const": "llm_catalogue",
+          "description": "A live list of the models a vendor serves. Requires a `list` member. Connectors inform the pool of (provider, model) tuples; flux keeps serving inference, which is a stated non-goal here."
+        }
+      ]
+    },
+
+    "spec": {
+      "type": "object",
+      "title": "Vendored spec source",
+      "description": "Points at the committed spec cache under `specs/`, never at a URL fetched during a build — builds are hermetic and offline. One entry is one document and one document is one service; `sha256`, `fetched_at` and `upstream_version` are therefore stated per document, so a drift check can say which of a connector's documents moved.",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The vendored spec file relative to the repository root, e.g. `specs/babelforce/manager-2026-07-10.openapi.yaml`."
+        },
+        "service": {
+          "type": "string",
+          "description": "The service this document's selected operations join. Omit it to join the reserved `default` service, which is what a single `[spec]` block means. A named value must be one a `[[services]]` entry declares: a document joins a service, it does not declare one. Two documents may not join the same service, because a service is one name namespace and two vendor documents can declare the same `operationId`."
+        },
+        "source_url": {
+          "type": "string",
+          "description": "The URL the spec was fetched from. Recorded so drift against upstream can be detected rather than absorbed."
+        },
+        "upstream_version": {
+          "type": "string",
+          "description": "The version string the vendor published for this spec (OpenAPI `info.version`)."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "SHA-256 of the vendored spec bytes. What makes a drift check a fact rather than a guess."
+        },
+        "fetched_at": {
+          "type": "string",
+          "description": "When the spec was fetched, as an RFC 3339 timestamp."
+        }
+      }
+    },
+
+    "patch": {
+      "type": "object",
+      "title": "Patch set",
+      "description": "What the overlay applies on top of a faithfully ingested spec. Selection is opt-in: only operations a `[[patch.operations]] select` names or a `[[patch.select]]` matches reach the connector, so a 398-operation document does not become 398 LLM tools and a new upstream operation is never a new tool by default. There is no `hide`, and there must not be one.\n\nThe merge order is fixed and total: spec, then `[[patch.select]]`, then `[[patch.operations]]`, then validation. A block overrides a selector that also matched it, field by field; where the block is silent the selector's statement stands; where neither speaks, that field's own rule decides or refuses. Two selectors stating different values for one operation are refused rather than ordered.",
+      "additionalProperties": false,
+      "properties": {
+        "select": {
+          "type": "array",
+          "description": "One entry per statement about a set of operations.",
+          "items": { "$ref": "#/$defs/operationSelector" }
+        },
+        "naming": {
+          "$ref": "#/$defs/naming",
+          "description": "How an `operationId` becomes an op id, declared once, with pinned exceptions."
+        },
+        "directions": {
+          "type": "object",
+          "description": "Reviewed vendor-state direction keyed first by stable service and then by exact vendor operationId. Unlike a selector, membership cannot change when an upstream method, path, name or description changes.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/$defs/operationDirection" }
+          }
+        },
+        "operations": {
+          "type": "array",
+          "description": "One entry per operation selected from the spec by name.",
+          "items": { "$ref": "#/$defs/operationPatch" }
+        }
+      }
+    },
+
+    "operationSelector": {
+      "type": "object",
+      "title": "Selection of a set of operations",
+      "description": "One statement that selects many operations, so a full-coverage connector is reviewable rather than 397 near-identical blocks. It matches by `service`, `path_prefix` and `methods`, and may state `risk`, `idempotency` and `expose` for everything it matched.\n\nIt does not make anything default-selected; a file with no selector and no `[[patch.operations]]` publishes nothing. A selector that matches nothing is a loud error, for the same reason a `select` naming an absent `operationId` is: a prefix that stopped matching after an upstream reshuffle would empty the connector quietly. No operation whose path carries an `internal` segment is ever selected.",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "type": "string",
+          "description": "The `service` of the `[[spec]]` entry whose document this selector reads, which is also the service its matched operations land in. Omit it only when the connector declares exactly one document."
+        },
+        "path_prefix": {
+          "type": "string",
+          "description": "The path prefix an operation must carry, matched on whole segments: `/api/v2/agents` reaches `/api/v2/agents/{id}` and does not reach `/api/v2/agentsummary`. Omit it to match every path in the document.",
+          "examples": ["/api/v2/agents"]
+        },
+        "methods": {
+          "type": "array",
+          "description": "The HTTP methods to match. Omit it for every method. Splitting a prefix by method is how one `risk` covers a set honestly, since the reads and the deletes under one prefix are not one damage claim.",
+          "items": { "$ref": "#/$defs/httpMethod" }
+        },
+        "risk": {
+          "$ref": "#/$defs/risk",
+          "description": "The risk every matched operation carries. Silence on an authored write REFUSES THE BUILD: no OpenAPI document publishes risk, and a default that flatters would turn unmade decisions into claims a host reads as a licence. A matched authored read takes `low` — not a flattering default but the only value a read can have, which is the asymmetry this key rests on. Direction comes only from the stable identity map, never from this selector's HTTP-method membership."
+        },
+        "idempotency": {
+          "$ref": "#/$defs/idempotency",
+          "description": "The idempotency every matched operation carries, under the same silence rule as `risk`; an unstated read takes `idempotent`. Stating `conditional` here does not make `repeatable_because` bulk: every matched write still owes a stated condition per operation, which no selector can supply, so the build refuses by name."
+        },
+        "expose": {
+          "type": "boolean",
+          "description": "Whether every matched operation reaches a model as a tool. Omit it for the field's own default, which is exposed. Declaring the inverse per operation is 388 lines for a full-coverage babelforce, which is why this key exists.",
+          "examples": [false]
+        }
+      }
+    },
+
+    "naming": {
+      "type": "object",
+      "title": "Op naming rule",
+      "description": "How an `operationId` becomes an op id, declared once rather than restated per operation. This is the pinned override the pipeline design requires, made bulk: an id is still never derived from a volatile spec field without one. Collisions refuse — two `operationId`s deriving one op id is an error, never last-write-wins — and a derived id that is not a legal flux `decl_name` is reported naming the operation rather than mangled into one that happens to parse.",
+      "additionalProperties": false,
+      "required": ["rule"],
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/namingRule",
+          "description": "The derivation to apply. Required: a rule that could be omitted would be a public contract decided by silence."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Prepended to every derived id, joined with `-`. In practice the connector id, because an op id is global.",
+          "examples": ["babelforce"]
+        },
+        "pin": {
+          "type": "object",
+          "description": "`operationId` to op id, overriding the rule: the escape hatch, and the only per-operation naming cost. Keyed by `operationId` alone, which is unique inside one document and nowhere else, so a key two of the connector's documents both declare is refused; name that one with a `[[patch.operations]] rename`, which states its `service` and outranks a pin.",
+          "additionalProperties": { "type": "string" },
+          "examples": [{ "listAgents": "babelforce-agent-list" }]
+        }
+      }
+    },
+
+    "namingRule": {
+      "enum": ["kebab"],
+      "description": "`listReportingCalls` becomes `list-reporting-calls`, with case boundaries becoming `-`. Acronyms keep their shape: `listHTTPCalls` becomes `list-http-calls`, because the boundary is read at the end of a run of capitals rather than at every capital."
+    },
+
+    "httpMethod": {
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+      "description": "An HTTP method."
+    },
+
+    "operationDirection": {
+      "enum": ["read", "write"],
+      "description": "Whether the operation only observes vendor state or may change it. Required connector truth, independent of HTTP method."
+    },
+
+    "semanticEffect": {
+      "enum": ["pure", "read", "model", "network", "write_file", "write_db", "send_external", "delete", "money", "human_visible"],
+      "description": "A non-deprecated flux_spec::FlowEffect tag. Unknown values are refused; `pure` is part of the shared vocabulary but invalid on an HTTP connector operation."
+    },
+
+    "operationPatch": {
+      "type": "object",
+      "title": "Operation selection and corrections",
+      "description": "Every override is optional so that `not stated` stays distinguishable from `stated as the value the spec happens to have`: an unstated field follows the spec when it changes, a stated one does not move.",
+      "additionalProperties": false,
+      "required": ["select"],
+      "properties": {
+        "service": {
+          "type": "string",
+          "description": "The `service` of the `[[spec]]` entry whose document this patch reads, which is also the service the published operation lands in. Omit it only when the connector declares exactly one document. As soon as a second is declared this is required, because an `operationId` is unique inside one document and nowhere else: babelforce declares `getUser` in both `manager-2026-07-10` and `user-2026-06-25` as two different requests."
+        },
+        "select": {
+          "type": "string",
+          "description": "The spec's `operationId` this entry selects, e.g. `listReportingCalls`."
+        },
+        "defer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Withhold this exact operation from a set already matched by `[[patch.select]]`, with the reviewable reason it cannot publish yet. This is not an opt-out selector and cannot be combined with corrections."
+        },
+        "rename": {
+          "type": "string",
+          "description": "The stable op id to publish it as, e.g. `babelforce.call.list`. Almost always set: `operationId` is a volatile vendor field, while the op name is a public contract users and models call by name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Replaces the spec's summary as the model-facing tool description."
+        },
+        "direction": {
+          "$ref": "#/$defs/operationDirection",
+          "description": "States the reviewed vendor-state direction for this selected operation. When the stable identity map also states it, the two values must agree or loading is refused."
+        },
+        "risk": {
+          "$ref": "#/$defs/risk",
+          "description": "States how much damage the operation can do. Specs do not publish risk, so in practice this is where it is stated rather than overridden."
+        },
+        "idempotency": {
+          "$ref": "#/$defs/idempotency",
+          "description": "States whether repeating the operation is safe. Specs do not publish it either."
+        },
+        "semantic_effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/semanticEffect" },
+          "description": "What this operation means to Flux policy, stated by the author who reviewed it. Distinct from the host-resource effects and never inferred from a vendor document or selector."
+        },
+        "auth": {
+          "type": "array",
+          "description": "Replaces the auth ingest extracted. An empty list means the operation needs no auth. This is the only place a deprecated vendor credential may be removed — ingest must keep seeing it, or drift-check stops reporting on it.",
+          "items": { "$ref": "#/$defs/authRequirement" }
+        },
+        "quirks": {
+          "$ref": "#/$defs/quirks",
+          "description": "Pagination, rate limits and error envelopes to attach. None of these appear in any spec."
+        },
+        "params": {
+          "type": "array",
+          "description": "Parameter-level corrections: a wrong type, a false `required`, a missing description.",
+          "items": { "$ref": "#/$defs/paramPatch" }
+        },
+        "omit": {
+          "$ref": "#/$defs/paramOmission",
+          "description": "Parameters this connector drops from what the document declares. Applied after `params`, so an author may correct a wrong `required` flag and then omit the parameter."
+        },
+        "expose": {
+          "type": "boolean",
+          "description": "Overrides whether this operation reaches a model as a tool. The counterpart of a selector's `expose`, and the reason both exist: a selector states the rule for a set (`expose = false` over 388 operations) and a block states the exception (`expose = true` on the curated nine). Omit it for whatever the selector that matched this operation said, and exposed if none did.",
+          "examples": [true]
+        }
+      }
+    },
+
+    "paramOmission": {
+      "type": "object",
+      "title": "Parameters dropped from the vendor's declaration",
+      "description": "Names to remove, grouped by the position that completes their identity. Omission is always written down and never inferred: a vendor document describes an API rather than a tool contract, and one babelforce endpoint declares 38 query parameters of which the vendor's own prose marks most as aliases of the others. Three refusals: a name the document does not declare there, a required parameter (dropping it composes a request the vendor rejects), and any path parameter (the path template keeps its placeholder).",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "array",
+          "description": "Path parameters to drop — always refused, and accepted here only so that naming one is a refusal that explains itself.",
+          "items": { "type": "string" }
+        },
+        "query": {
+          "type": "array",
+          "description": "Query-string parameters to drop.",
+          "items": { "type": "string" }
+        },
+        "header": {
+          "type": "array",
+          "description": "Caller-supplied headers to drop.",
+          "items": { "type": "string" }
+        },
+        "body": {
+          "type": "array",
+          "description": "Named request-body fields to drop.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "paramPatch": {
+      "type": "object",
+      "title": "Parameter correction",
+      "description": "Identified by name and position together, because a vendor may bind the same name in two places and the position decides where the value travels.",
+      "additionalProperties": false,
+      "required": ["name", "position"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The parameter name as the vendor spec declares it."
+        },
+        "position": {
+          "$ref": "#/$defs/paramPosition",
+          "description": "Where on the request the parameter travels."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Corrects the vendor's `required` flag."
+        },
+        "description": {
+          "type": "string",
+          "description": "Replaces the vendor's description."
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "Replaces the vendor's JSON Schema for this parameter — the pressure valve for a spec that types a date as a bare string."
+        }
+      }
+    },
+
+    "authMethod": {
+      "type": "object",
+      "title": "A declared credential",
+      "description": "How one named credential reaches the wire. The generated Flux carries only the name; the host resolves the environment variable, applies the scheme, and registers the value with its redactor. No credential value belongs here.",
+      "additionalProperties": false,
+      "required": ["name", "scheme"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The credential name an operation's auth mechanism references, e.g. `zendesk.api_token`. It says what the credential is."
+        },
+        "scheme": {
+          "$ref": "#/$defs/authScheme",
+          "description": "How the resolved secret is injected. Mandatory: omitting it would mean defaulting to `bearer`, and how a secret reaches the wire is not a decision to make by silence."
+        },
+        "env": {
+          "type": "array",
+          "description": "Environment variable KEYS to resolve the secret from, tried in order. Never a value.",
+          "items": { "type": "string" }
+        },
+        "user_env": {
+          "type": "array",
+          "description": "For the `basic` scheme only: environment variable keys holding the username half, tried in order. This half is config rather than a gated secret.",
+          "items": { "type": "string" }
+        },
+        "user_suffix": {
+          "type": "string",
+          "description": "For the `basic` scheme only: a literal string appended to the resolved `user_env` value before the `user:secret` join. Zendesk's user half is `<email>/token`, so it sets `user_suffix = \"/token\"`. Declaring the suffix here is what avoids telling an operator to paste `me@corp.com/token` into an environment variable named for an email address."
+        },
+        "description": {
+          "type": "string",
+          "description": "Surfaced when a user is asked to supply the credential."
+        },
+        "oauth2": {
+          "$ref": "#/$defs/oauth2",
+          "description": "Present when the credential is OAuth2-backed and the host runs the token grants. Absent for a plain environment-to-secret credential."
+        },
+        "subject": {
+          "type": "string",
+          "enum": [
+            "unstated",
+            "app",
+            "user"
+          ],
+          "description": "Whose authority this credential carries when it is used — the \"on behalf of\" axis. `app` acts as the integration (Slack's `xoxb-` bot token, a GitHub App installation token); `user` acts as the person who granted it (Slack's `xoxp-` user token, an Atlassian 3LO token, a personal access token). Defaults to `unstated`, which means NOBODY HAS REVIEWED THIS rather than `app`: a consumer needing the distinction refuses on it, because assuming `app` over-grants and assuming `user` silently fails."
+        },
+        "hazard": {
+          "type": "string",
+          "enum": [
+            "resource_owner_secret_shared"
+          ],
+          "description": "A named weakness in HOW this credential is obtained, so a host refuses it by declared property rather than by connector name. A CLOSED set: an unrecognised spelling is refused at the loader, because a free-form string makes the consuming filter a string match, and a near-miss spelling then reads as `no hazard declared` and is admitted by the very deployment that refused the thing it names. `resource_owner_secret_shared` is the OAuth 2.0 resource owner password credentials grant — RFC 9700 §2.4 says it MUST NOT be used, RFC 6749 §4.3 makes discarding the password a MUST for the client, CWE-522 is the nearest weakness entry, and OAuth 2.1 drops the grant. A hazard is a KIND, not a level: it does not belong on `risk`, which is an ordered damage claim, because a password grant that buys a read-only token is low risk AND hazardous. Declaring the `password` grant without a hazard is refused."
+        },
+        "quirks": {
+          "$ref": "#/$defs/authQuirks",
+          "description": "What this credential's authentication surface does that its own document does not say."
+        }
+      }
+    },
+
+    "authScheme": {
+      "title": "Credential injection scheme",
+      "description": "Mirrors flux's `AuthScheme`, so a connector using only the outbound schemes serializes to what flux already understands. `signing` is the one deliberate divergence: every other variant answers `where does this secret go on the way out`, and a webhook signing secret has no answer because it never goes out at all.",
+      "oneOf": [
+        {
+          "const": "bearer",
+          "description": "`Authorization: Bearer <secret>`."
+        },
+        {
+          "const": "signing",
+          "description": "A shared secret that is never placed in a request — it verifies an inbound one, via a channel binding's `verification.hmac.secret`. Declared in `[[auth]]` like any other credential so that one namespace covers both directions and the manifest names everything this connector requires."
+        },
+        {
+          "const": "basic",
+          "description": "`Authorization: Basic base64(<user><user_suffix>:<secret>)`, with the user half from `user_env`."
+        },
+        {
+          "type": "object",
+          "description": "A custom header `<name>: <secret>`, e.g. `X-Auth-Access-Id`.",
+          "additionalProperties": false,
+          "required": ["header"],
+          "properties": {
+            "header": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "description": "The header name." }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "A query parameter `?<name>=<secret>`.",
+          "additionalProperties": false,
+          "required": ["query"],
+          "properties": {
+            "query": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "description": "The query parameter name." }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "oauth2": {
+      "type": "object",
+      "title": "OAuth2 provenance",
+      "description": "Declares that the host runs every token grant for this credential and injects only a fresh bearer. Nothing generated by this repo ever performs OAuth itself.",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "The declared endpoint whose base URL the paths below resolve against; its host allow-list is what admits the token exchange."
+        },
+        "token_endpoint": {
+          "type": "string",
+          "description": "The declared service whose base URL `token_path` resolves against, when the token endpoint lives on a different host from the authorize endpoint. A service NAME and never a URL, so the host set stays derived from declared services. Empty (the default) means the token exchange resolves against `endpoint`, which is today's behaviour byte-for-byte. The loader refuses a name no `[[services]]` entry declares."
+        },
+        "authorize_path": {
+          "type": "string",
+          "description": "The authorize endpoint path, joined onto the endpoint base URL."
+        },
+        "token_path": {
+          "type": "string",
+          "description": "The token endpoint path. Every grant and refresh POSTs here. Resolves against `token_endpoint`'s service base URL when set, and `endpoint`'s otherwise."
+        },
+        "client_id": {
+          "type": "string",
+          "description": "The OAuth2 client id. Never a secret — the client secret resolves from the environment like any other credential."
+        },
+        "public_client": {
+          "type": "boolean",
+          "description": "Whether this is a public PKCE client that issues and uses no client secret. Defaults to false (a confidential client, which registers a client secret an operator supplies). A public client still needs a client_id but must not be required to publish a client_secret."
+        },
+        "scopes": {
+          "type": "array",
+          "description": "Requested scopes.",
+          "items": { "type": "string" }
+        },
+        "grants": {
+          "type": "array",
+          "description": "The grants the host may run for this credential.",
+          "items": {
+            "enum": ["authorization_code", "password", "refresh_token", "client_credentials"]
+          }
+        },
+        "redirect": {
+          "$ref": "#/$defs/oauthRedirect",
+          "description": "The loopback redirect the `authorization_code` login binds."
+        }
+      }
+    },
+
+    "authQuirks": {
+      "type": "object",
+      "title": "Authentication-surface quirks",
+      "description": "Measured departures of a connector's AUTHENTICATION surface from what its own documents declare. The sibling of an operation's `quirks`, one scope up: an authentication endpoint is never a connector operation, so a token endpoint's quirks have nowhere else to live. Declarations, not behaviour — nothing acts on them.",
+      "additionalProperties": false,
+      "properties": {
+        "token_endpoint": {
+          "type": "array",
+          "description": "Measured behaviours of the credential's token endpoint, at most one per vendor `grant_type`. Deliberately prose and not a knob: one vendor's endpoint reads the same undeclared request field differently for every grant — defaulting it to `never expires` on one, clamping it to 60 seconds on another, ignoring it on a third — so a general field would be a promise every other connector was then assumed to keep. Requires an `[auth.oauth2]` block, since a credential declaring no grant has no token endpoint for a quirk to be about.",
+          "items": { "$ref": "#/$defs/tokenEndpointQuirk" }
+        }
+      }
+    },
+
+    "tokenEndpointQuirk": {
+      "type": "object",
+      "title": "One measured token-endpoint behaviour",
+      "description": "Asserted against a vendor's implementation and contradicted by that vendor's own document, which is why the provenance fields are required rather than optional: a reader a year from now has to know which of the two was checked, and when.",
+      "additionalProperties": false,
+      "required": ["grant", "behaviour", "attribution", "measured"],
+      "properties": {
+        "grant": {
+          "type": "string",
+          "description": "The vendor's own `grant_type` word this measurement is about. A free string rather than the `grants` enum, deliberately: an undeclared grant is exactly the kind worth recording, and a closed vocabulary could not name one."
+        },
+        "behaviour": {
+          "type": "string",
+          "description": "What was measured, in prose."
+        },
+        "attribution": {
+          "type": "string",
+          "description": "What was read, and by whom — enough for a reader to repeat the measurement or date it. An unattributed quirk is indistinguishable from a guess that aged."
+        },
+        "measured": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "The day the measurement was made, `YYYY-MM-DD`. The loader refuses anything else: \"recently\" does not let a reader decide whether the claim predates the vendor release they are debugging."
+        }
+      }
+    },
+
+    "oauthRedirect": {
+      "type": "object",
+      "title": "Loopback redirect",
+      "additionalProperties": false,
+      "required": ["port", "path"],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "The loopback port to bind."
+        },
+        "path": {
+          "type": "string",
+          "description": "The callback path the browser is redirected to."
+        }
+      }
+    },
+
+    "authRequirement": {
+      "type": "object",
+      "title": "One auth mechanism",
+      "description": "Every credential named here must be satisfied on the SAME request (AND). The surrounding list is the set of alternatives, any one of which authorizes (OR).\n\nThe list must not contain an empty mechanism. \"No auth\" is written as an empty alternatives list; an empty mechanism would be a second spelling of the same thing, and a trivially satisfiable one, so it would disable auth for every alternative beside it.",
+      "additionalProperties": false,
+      "required": ["credentials"],
+      "properties": {
+        "credentials": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Names of credentials declared in `[[auth]]`. Order carries no meaning — all of them travel on one request — and is normalised on load.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "operation": {
+      "type": "object",
+      "title": "One operation",
+      "description": "A single HTTP call, and everything a Flux `op` declaration needs to wrap it.",
+      "additionalProperties": false,
+      "required": ["id", "method", "direction", "path", "risk", "idempotency"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The op name, e.g. `zendesk.ticket.show`. A stable public contract: users and models call it by name, so it must survive regeneration."
+        },
+        "service": {
+          "type": "string",
+          "description": "The `[[services]]` entry this operation belongs to — exactly one, and one it must actually declare. Omit it for a provider with a single API surface: the operation then belongs to the reserved `default` service. In a provider that declares named services, omitting it is an error rather than an implicit `default`."
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+          "description": "The HTTP method."
+        },
+        "direction": {
+          "$ref": "#/$defs/operationDirection",
+          "description": "Whether this operation only observes vendor state or may change it. Mandatory and never inferred from method, name, description, risk, idempotency, semantic effects, exposure or authorization."
+        },
+        "path": {
+          "type": "string",
+          "description": "The path template relative to `base_url`, e.g. `/api/v2/tickets/{ticket_id}.json`. Must start with `/`, and must carry a `{placeholder}` for every declared path parameter."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the operation does, in one line. Reaches the model as the tool description."
+        },
+        "risk": {
+          "$ref": "#/$defs/risk",
+          "description": "How much damage the operation can do. Mandatory: flux's approval gate reads it, so an omitted value would be a safety decision made by silence."
+        },
+        "idempotency": {
+          "$ref": "#/$defs/idempotency",
+          "description": "Whether repeating the call is safe. Mandatory: it decides whether a retry is sound."
+        },
+        "semantic_effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/semanticEffect" },
+          "description": "What executing this operation means to Flux policy. Distinct from the host-resource effects emitted in Flux; omitted means no semantic consequence is declared."
+        },
+        "repeatable_because": {
+          "type": "string",
+          "minLength": 24,
+          "description": "The condition under which repeating this write is safe. Required whenever an authored write declares `idempotency = \"conditional\"`, and refused anywhere else. Authored direction is independent of HTTP method.\n\n`conditional` is flux's escape hatch for a write that really is replay-safe — flux's own wording is \"genuinely safe to repeat under STATED conditions\" — and this is where the condition is stated. Say what the vendor does on a repeat: that the body carries a target state rather than a delta, that an idempotency key deduplicates, that a second call returns the first result. Not the conclusion (\"it is idempotent\"), the mechanism.\n\nRefused in three cases, each a different mistake: on an authored read, which has no repeat hazard to condition; beside an `idempotency` that is not `conditional`, where the prose contradicts its own field; and when it is shorter than 24 characters after trimming, because an escape hatch that costs nothing is a deleted guard rather than a qualified one.\n\nIt does NOT permit `idempotency = \"idempotent\"` on an authored write; that stays refused unconditionally. `idempotent` licenses flux's op cache to serve a stored result INSTEAD of running the call, which is a stronger claim than \"repeating is safe\".\n\nPublished in `web/public/catalog.json` beside the claim it licenses, so a reader auditing a retry-safety claim on a write can see what it rests on."
+        },
+        "expose": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this operation reaches a model as an LLM tool. Defaults to `true`; set it to `false` for an operation that should stay callable without spending a tool slot.\n\nThese are two different claims, and before this key they were one. CATALOGUED AND CALLABLE is unconditional: every operation appears in the manifest's `operations` list, in `catalog.json` and in the embedded catalogue, and `connector-pack` builds a request for it either way. EXPOSED is this key, and it is the only thing withheld when it is false — `connector-pack` does not register the operation, so no model is handed it as a tool.\n\nWhy it matters: a connector covering a whole API is several hundred operations, and several hundred tools is not a catalogue but a denial of service against the model's context window. That is the reason full-coverage connectors historically shipped a curated handful instead. `expose = false` is how coverage stops costing context — the whole API stays reachable by a caller that names an operation, and only the operations worth a model's attention are advertised to one.\n\nThis is NOT a way to exclude an operation from the build. Nothing here decides which operations are compiled; it says what happens to one that already is.",
+          "examples": [false]
+        },
+        "auth": {
+          "type": "array",
+          "description": "The auth alternatives for this operation (OR of mechanisms).\n\nThree distinct states, all meaningful: OMIT the key to inherit `default_auth`; write `auth = []` for an operation that genuinely needs no credential, such as a health check, which then does NOT inherit; write a non-empty list to name the mechanisms that authorize it.",
+          "items": { "$ref": "#/$defs/authRequirement" }
+        },
+        "params": {
+          "$ref": "#/$defs/paramSet",
+          "description": "The request parameters, grouped by where they travel."
+        },
+        "response_schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "JSON Schema of a successful response body, when one is known."
+        },
+        "credential_response": {
+          "type": "array",
+          "description": "Locations in this operation's own response that carry a CREDENTIAL — a JSON Pointer into the response value per entry, with `*` for every element of an array (`/start_url`, `/Servers/*/ApiTokens`).\n\nDeclaring one WITHHOLDS the operation: the loader refuses it, because an operation whose declared response carries a token cannot ship until C-136's diversion lands — the host's redactor holds only values it resolved itself and cannot know a secret minted by the very call returning it. See `AGENTS.md` § Authentication contract. A location that matches nothing in `response_schema` is a loud error, not a no-op.",
+          "items": { "type": "string", "pattern": "^/" }
+        },
+        "produces_credential": {
+          "$ref": "#/$defs/producedCredential",
+          "description": "This operation's purpose is to MINT a credential — a login. The secret is diverted from the vendor's response straight into the host's credential store and the caller receives the handle `{ \"credential\": \"tenants/<tenant>/<authority>/…\" }`; the secret is absent from the operation's output entirely. Refused at load if the declared `response_schema` still describes the secret's own location, if no secret field is named, if the operation declares `idempotency = \"idempotent\"` (minting is a write and some vendors invalidate the previous token), if the named credential is not declared in `[[auth]]`, if the connector declares no `authority`, or if two operations mint the same credential."
+        },
+        "quirks": {
+          "$ref": "#/$defs/quirks",
+          "description": "The ways this endpoint departs from what its spec implies."
+        }
+      }
+    },
+
+    "producedCredential": {
+      "type": "object",
+      "title": "The credential an operation mints",
+      "additionalProperties": false,
+      "required": ["secret", "credential"],
+      "properties": {
+        "secret": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Where the secret arrives in the vendor's response body — one JSON Pointer into the response value (`/access_token`). Exactly one location: a mint stores one value at one address, so `credential_response`'s `*` (every element of an array) is refused here — that spelling describes where credentials APPEAR, which is a different question."
+        },
+        "credential": {
+          "type": "string",
+          "description": "Which declared `[[auth]]` credential the value is stored as, by name (`babelforce.access_token`). A name, never an address: the address is composed host-side from the authenticated tenant, the connector's `authority` and this credential's leaf."
+        }
+      }
+    },
+
+    "paramSet": {
+      "type": "object",
+      "title": "Parameters by request position",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "array",
+          "description": "Interpolated into the path template.",
+          "items": { "$ref": "#/$defs/param" }
+        },
+        "query": {
+          "type": "array",
+          "description": "Query-string parameters.",
+          "items": { "$ref": "#/$defs/param" }
+        },
+        "header": {
+          "type": "array",
+          "description": "Caller-supplied request headers. Auth headers are NOT here — the host injects those from a declared credential, so no credential passes through the parameter surface.",
+          "items": { "$ref": "#/$defs/param" }
+        },
+        "body": {
+          "type": "array",
+          "description": "Fields assembled into the JSON request body, each at the JSON path its `wire` names.",
+          "items": { "$ref": "#/$defs/param" }
+        },
+        "body_schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "The body IS this schema, rather than being assembled from named fields — a free-form object body such as babelforce's session-variable maps. Mutually exclusive with `body`: codegen refuses an operation that declares both."
+        },
+        "const_headers": {
+          "type": "object",
+          "description": "Request headers the VENDOR fixes, for this operation only — the provider-level `const_headers` table states the ones every operation sends, and an entry here replaces it. Emitted as a literal, never as a parameter. It may never carry a credential: a value resolving from an environment variable or naming a declared credential is refused, and so is any header the `$auth` seam owns.",
+          "additionalProperties": { "type": "string" }
+        },
+        "body_encoding": {
+          "$ref": "#/$defs/bodyEncoding",
+          "description": "How the body above is encoded on the wire. Omit it for `json`, which is what every provider in this repository sends. State `form` for a vendor that parses only `application/x-www-form-urlencoded` — Stripe, Twilio, Mailgun, PayPal classic, and every OAuth2 token endpoint. The emitter derives the `content-type` header from this and refuses a nested body under `form`, because form encoding has no agreed nesting convention."
+        }
+      }
+    },
+
+    "param": {
+      "type": "object",
+      "title": "One request parameter",
+      "additionalProperties": false,
+      "required": ["name", "schema"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The caller-facing name: what the generated op declares and what a model passes. Also the wire name unless `wire` says otherwise."
+        },
+        "wire": {
+          "type": "string",
+          "description": "The spelling the vendor sees, when it differs from `name`. For a body field this is the dot-separated JSON path it occupies (`ticket.comment.body`); for a path, query or header parameter it is a plain alias (`req_id` -> `requester_id`). Without it a nested body field is emitted at the root of the body, which a vendor such as Zendesk accepts and ignores."
+        },
+        "description": {
+          "type": "string",
+          "description": "Surfaced to the model as part of the op's tool contract."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the vendor requires the parameter. Defaults to false."
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema",
+          "description": "The parameter's JSON Schema. Mandatory and with no default: a parameter whose type is unknown is a parameter that has already collapsed to a string."
+        }
+      }
+    },
+
+    "quirks": {
+      "type": "object",
+      "title": "Departures from the spec",
+      "description": "Declarations, not behaviour — codegen compiles them into real Flux control flow: rate limits into `throttle`, pagination into a bounded loop.",
+      "additionalProperties": false,
+      "properties": {
+        "pagination": {
+          "$ref": "#/$defs/pagination",
+          "description": "How the endpoint paginates, if it does."
+        },
+        "rate_limit": {
+          "$ref": "#/$defs/rateLimit",
+          "description": "The endpoint's published rate limit."
+        },
+        "error_envelope": {
+          "$ref": "#/$defs/errorEnvelope",
+          "description": "Where the vendor hides the real error inside a non-2xx body."
+        }
+      }
+    },
+
+    "pagination": {
+      "title": "Pagination style",
+      "description": "`max_pages` is mandatory on every variant because flux's analyzer rejects unbounded loops.",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "Page-number pagination",
+          "description": "`?page=2&per_page=100`.",
+          "additionalProperties": false,
+          "required": ["page"],
+          "properties": {
+            "page": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["page_param", "max_pages"],
+              "properties": {
+                "page_param": {
+                  "type": "string",
+                  "description": "The query parameter carrying the page number."
+                },
+                "size_param": {
+                  "type": "string",
+                  "description": "The query parameter carrying the page size, when the vendor allows one."
+                },
+                "page_size": {
+                  "type": "integer",
+                  "description": "The page size to request."
+                },
+                "max_pages": {
+                  "type": "integer",
+                  "description": "The hard cap on pages fetched."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "title": "Cursor pagination",
+          "description": "The response carries the cursor for the next request.",
+          "additionalProperties": false,
+          "required": ["cursor"],
+          "properties": {
+            "cursor": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["cursor_param", "next_cursor_pointer", "max_pages"],
+              "properties": {
+                "cursor_param": {
+                  "type": "string",
+                  "description": "The query parameter carrying the cursor."
+                },
+                "next_cursor_pointer": {
+                  "type": "string",
+                  "description": "A JSON Pointer (RFC 6901) into the response body locating the next cursor."
+                },
+                "max_pages": {
+                  "type": "integer",
+                  "description": "The hard cap on pages fetched."
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    "rateLimit": {
+      "type": "object",
+      "title": "Published rate limit",
+      "additionalProperties": false,
+      "required": ["requests", "per_seconds"],
+      "properties": {
+        "requests": {
+          "type": "integer",
+          "description": "Requests allowed per window."
+        },
+        "per_seconds": {
+          "type": "integer",
+          "description": "The window, in seconds."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "The throttle bucket name. Omitted, codegen derives one from the connector and operation ids."
+        }
+      }
+    },
+
+    "errorEnvelope": {
+      "type": "object",
+      "title": "Vendor error envelope",
+      "description": "`http.request` treats a non-2xx as a result rather than a failure, so the generated op digs the message out itself. Both fields are JSON Pointers (RFC 6901) into the response body.",
+      "additionalProperties": false,
+      "required": ["message_pointer"],
+      "properties": {
+        "message_pointer": {
+          "type": "string",
+          "description": "Pointer to the human-readable message."
+        },
+        "code_pointer": {
+          "type": "string",
+          "description": "Pointer to the vendor's error code, when it publishes one."
+        }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "title": "Provenance",
+      "description": "Where a connector came from, so upstream drift is detected rather than absorbed. Authors do not write this block: the loader fills it from `[spec]` and from the hash of the provider file itself. It is documented because it is part of the IR this schema also describes.",
+      "additionalProperties": false,
+      "properties": {
+        "source_url": {
+          "type": "string",
+          "description": "The URL the vendor spec was fetched from. Absent for a fully hand-authored connector."
+        },
+        "upstream_version": {
+          "type": "string",
+          "description": "The upstream version string the vendor published for that spec."
+        },
+        "fetched_at": {
+          "type": "string",
+          "description": "When the spec was fetched, RFC 3339."
+        },
+        "spec_sha256": {
+          "type": "string",
+          "description": "SHA-256 of the vendored spec bytes under `specs/`. Filled only when the connector compiles from exactly one document; with several, no single value of it is true and `specs` is the record."
+        },
+        "specs": {
+          "type": "array",
+          "description": "Every vendored document this connector compiles, one entry each, so a drift check can say which document moved. Filled for a single-document connector too — the four fields above are the projection of the one-element case.",
+          "items": { "$ref": "#/$defs/spec" }
+        },
+        "operation_specs": {
+          "type": "object",
+          "description": "Derived map from stable public operation id to the exact selected vendor operation and document. Authors do not write it: patch application fills it, and inline operations have no entry.",
+          "additionalProperties": { "$ref": "#/$defs/operationSpecSource" }
+        },
+        "toml_sha256": {
+          "type": "string",
+          "description": "SHA-256 of the provider TOML bytes, computed by the loader."
+        }
+      }
+    },
+
+    "operationSpecSource": {
+      "type": "object",
+      "title": "Derived operation specification source",
+      "description": "The exact vendor operation and committed document that produced one selected operation. Repository-local paths and fetch timestamps are deliberately absent.",
+      "additionalProperties": false,
+      "required": ["operation_id", "upstream_version", "sha256"],
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "description": "The vendor's exact operationId before the connector gives it a stable public id."
+        },
+        "source_url": {
+          "type": "string",
+          "description": "The public source URL, absent for a private vendoring source whose location may not be published."
+        },
+        "upstream_version": {
+          "type": "string",
+          "description": "The upstream version declared by the ingested document."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Measured SHA-256 of the committed document bytes the compiler ingested."
+        }
+      }
+    },
+
+    "risk": {
+      "enum": ["low", "medium", "high", "destructive"],
+      "description": "How much damage an operation can do, in flux's own vocabulary."
+    },
+
+    "idempotency": {
+      "enum": ["idempotent", "non_idempotent", "conditional"],
+      "description": "Whether repeating an operation is safe, in flux's own vocabulary."
+    },
+
+    "bodyEncoding": {
+      "enum": ["json", "form"],
+      "default": "json",
+      "description": "How an operation's request body is encoded. A closed set rather than a media-type string, because a media type nobody validates is a typo away from a body the vendor accepts and silently ignores."
+    },
+
+    "paramPosition": {
+      "enum": ["path", "query", "header", "body"],
+      "description": "Where a parameter travels on the request."
+    },
+
+    "jsonSchema": {
+      "type": "object",
+      "description": "A JSON Schema, carried verbatim into the op contract. Deliberately unconstrained here: the pipeline's job is to move a vendor's schema without reinterpreting it, and modelling a subset would silently drop every keyword the subset missed."
+    }
+  }
+}

@@ -1,0 +1,38 @@
+[package]
+name = "connector-spec"
+description = "The connector IR and its two front-ends: provider TOML and OpenAPI ingest. Performs no network IO."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+readme = "README.md"
+
+[lib]
+# Pinned so the published package name and the crate name are independent. The package is
+# `codewandler-*` on crates.io (C-195); the crate every dependent and every one of this
+# crate's own integration tests writes is `connector_spec`. Without this, renaming the package
+# silently renames the crate and breaks every `use` of it.
+name = "connector_spec"
+path = "src/lib.rs"
+
+[dependencies]
+# The address vocabulary (C-407): pid/gid/oip and the credential path. It used to be two modules of
+# this crate, and the edge now points the other way — this crate *derives* addresses from a loaded
+# connector and re-exports the vocabulary unchanged, so `connector_spec::address` and
+# `connector_spec::credential` still resolve for everything that already spelled them that way.
+#
+# It moved down because it was the only thing `connector-secrets` needed from here, and the publish
+# closure is derived: that one re-export put this entire crate — the IR, both front-ends, validation
+# and the lockfile writer — on crates.io permanently.
+connector-address.workspace = true
+
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_norway.workspace = true
+toml.workspace = true
+sha2.workspace = true
+indexmap.workspace = true

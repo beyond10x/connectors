@@ -1,0 +1,16 @@
+# Patches with nothing to apply to.
+id = "babelforce"
+base_url = "https://services.babelforce.com"
+
+[[operations]]
+id = "babelforce.agent.list"
+method = "GET"
+direction = "read"
+path = "/api/v2/agents"
+risk = "low"
+idempotency = "idempotent"
+auth = []
+
+[[patch.operations]]
+select = "getAgent"
+rename = "babelforce.agent.get"
