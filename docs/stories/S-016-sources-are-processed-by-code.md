@@ -12,8 +12,9 @@ note: "SOURCES.toml must never be prose + a manual runbook. At 8 ingest provider
 
 ## Goal
 
-`SOURCES.toml` — the single index of everything this repository derives from (vendored vendor
-specs, mined reference artifacts, the predecessor import) — is a **machine-processed manifest**.
+`SOURCES.toml` — the single index of everything this repository derives from (official and
+repository-authored specs, mined reference artifacts, the predecessor import) — is a
+**machine-processed manifest**.
 A `catalog sources` verb family owns it end to end: schema validation, checksum verification,
 orphan detection, drift probing, and refresh execution. No human or agent ever fetches an
 upstream or compares a checksum by hand; the whole refresh discipline collapses to
@@ -23,20 +24,27 @@ upstream or compares a checksum by hand; the whole refresh discipline collapses 
 
 - The `[[source]]` entry schema is owned by code and refused-by-name on unknown fields: `id`,
   `kind` (`openapi-spec | provider-catalog | reference-artifact | predecessor-import`),
-  `upstream` (an exact fetchable location, not a repo homepage), the fetch method (native, or a
-  declared legacy script under `scripts/`), the declared scrub, pins (`sha256`, retrieval date,
-  or a pointer to the per-vendor detail record), and `consumers`.
+  `origin` (`vendor | repository-authored`), `upstream` (an exact fetchable location for vendor
+  bytes), `references` (exact authoritative documentation for repository-authored specs), the
+  refresh method (native, a declared legacy script under `scripts/`, or `authored-review`), the
+  declared scrub, coverage, pins (`sha256`, retrieval/review date, or a pointer to the per-vendor
+  detail record), and `consumers`.
 - `catalog sources check` — validates the index schema; verifies **every** recorded checksum
   against the bytes on disk; detects orphans in both directions (an entry whose files are
   missing, a vendored file no entry covers); exits non-zero on any drift. It runs inside the
   catalog invariant suite, so a drifted pin or an unindexed source fails the build.
-- `catalog sources refresh <id> | --all` — fetches per the entry (invoking the declared
-  legacy `scripts/vendor-*.sh` where one exists), applies the declared scrub, recomputes
-  checksums, and rewrites the pins in the index and the detail record. Nothing under `specs/`
-  is ever hand-edited.
-- `catalog sources diff <id>` — fetches upstream to a scratch location and reports whether
-  the pinned bytes drifted, **mutating nothing**: the cheap "did upstream change?" probe that
-  cadence automation (`b10x-bot`) can run and act on only when the answer is yes.
+- `catalog sources refresh <id> | --all` — for vendor origins, fetches per the entry (invoking the
+  declared legacy `scripts/vendor-*.*` where one exists), applies the declared scrub, recomputes
+  checksums, and rewrites the pins. For repository-authored origins, enters an authored-review
+  workflow that checks source coverage against the cited references and re-pins reviewed bytes;
+  it never implies that those bytes came from the vendor.
+- `catalog sources diff <id>` — for vendor origins, fetches upstream to a scratch location and
+  reports whether the pinned bytes drifted, **mutating nothing**. For authored origins, reports
+  reference and coverage changes that require review. This is the cheap probe that cadence
+  automation (`b10x-bot`) can run without changing the authored spec.
+- The source model records the projection from each spec and its reviewed overlays to the canonical
+  connector document; a reproducibility check rebuilds our format from those inputs and refuses
+  drift. A partial spec may serve an ingest test, but cannot claim full provider reproducibility.
 - Scale is a stated requirement: check/refresh/diff over hundreds of entries with zero
   per-entry human action.
 - The AGENTS.md "Refreshing a source" instruction references only these verbs plus the

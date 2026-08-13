@@ -12,8 +12,8 @@ later and cite this.
 ## 1. Repository layout
 
 ```
-providers/            authored connector declarations (TOML) — the reviewed source
-specs/                vendored vendor API documents + provenance sidecars (declared scrub)
+providers/            reviewed projection overlays/recipes (TOML; transitional declarations in M1)
+specs/                official or repository-authored API specs + provenance sidecars
 catalog/              canonical documents (compiled) + connector-document.schema.json
 connectors.lock       per-provider input/artifact hashes + the pack digest
 crates/               one Rust workspace (catalog family + platform family + the binary)
@@ -25,8 +25,11 @@ console/              operator UI (later; the API and CLI come first)
 ```
 
 The catalog dirs (`providers/`, `specs/`, `catalog/`, `scripts/`, `connectors.lock`) migrate
-from the predecessor **as text, largely unmodified** — their discipline (hermetic offline build,
-byte-determinism, lockfile, provenance) is the asset being carried.
+from the predecessor **as text, largely unmodified**. M1 therefore contains transitional
+hand-authored provider declarations. The target invariant is stricter: every canonical connector
+document is deterministically reproducible from a provenance-bearing source spec plus reviewed
+overlays. An official machine-readable spec is preferred; where none exists, the repository owns
+and marks the authored spec instead of hiding the missing source behind a hand-written output.
 
 ## 2. The workspace
 

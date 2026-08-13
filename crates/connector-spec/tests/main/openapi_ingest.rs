@@ -2,10 +2,10 @@
 //!
 //! Two halves, deliberately kept apart:
 //!
-//! - **Fixture-driven**, over the trimmed real excerpts committed under `specs/`. Those are the
-//!   documents this pipeline actually has to survive, and reading them off disk rather than
-//!   embedding a copy here is what stops the thing under test from drifting away from the thing
-//!   that ships.
+//! - **Fixture-driven**, over the Zendesk and Anthropic source specs committed under `specs/`.
+//!   Anthropic is explicitly repository-authored rather than misrepresented as vendor-published.
+//!   Reading both off disk stops the thing under test from drifting away from its declared
+//!   provenance.
 //! - **Inline**, for the shapes a real excerpt cannot demonstrate without being deformed to carry
 //!   them — an `openapi` version this ingest refuses, a `$ref` out of the document.
 //!
@@ -40,6 +40,40 @@ fn zendesk() -> Ingested {
 
 fn anthropic() -> Ingested {
     ingest_fixture("anthropic/2023-06-01-excerpt.yaml")
+}
+
+/// The repository-authored spec is pinned and cannot masquerade as vendor-published bytes.
+#[test]
+fn the_anthropic_spec_has_authored_provenance() {
+    let directory = specs_dir();
+    let bytes = std::fs::read(directory.join("anthropic/2023-06-01-excerpt.yaml"))
+        .expect("read the Anthropic spec");
+    let provenance = std::fs::read_to_string(directory.join("anthropic.provenance.toml"))
+        .expect("read spec provenance")
+        .parse::<toml::Table>()
+        .expect("spec provenance is TOML");
+    let spec = provenance
+        .get("spec")
+        .and_then(toml::Value::as_array)
+        .and_then(|specs| specs.first())
+        .and_then(toml::Value::as_table)
+        .expect("provenance declares one spec");
+
+    assert_eq!(
+        spec.get("origin").and_then(toml::Value::as_str),
+        Some("repository-authored")
+    );
+    assert_eq!(
+        spec.get("sha256").and_then(toml::Value::as_str),
+        Some(connector_spec::sha256_hex(&bytes).as_str()),
+        "the authored spec moved without its provenance pin"
+    );
+    assert!(
+        spec.get("references")
+            .and_then(toml::Value::as_array)
+            .is_some_and(|references| references.len() >= 3),
+        "the authored spec must cite the official API, version, and model references"
+    );
 }
 
 fn operation<'a>(ingested: &'a Ingested, id: &str) -> &'a SpecOperation {
