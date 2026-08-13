@@ -34,13 +34,13 @@ origin backing a shipped connector is that rule with a hole in it.
 
 ## Acceptance
 
-- [ ] **anthropic** ends in one of two states, and the reason is recorded: either re-vendored
+- [x] **anthropic** ends in one of two states, and the reason is recorded: either re-vendored
       properly — `scripts/vendor-anthropic-spec.*` pulling from a named upstream, the declared scrub
       applied, `specs/anthropic.provenance.toml` with `sha256` + `upstream_sha256` + date, the
       `[[spec]]` hash in `providers/anthropic.toml`, and the catalog diff reviewed — or the excerpt is
       **deleted** and anthropic is curated against cited vendor documentation with no spec ingest at
       all. Nothing hand-edits or model-generates the bytes on the way to either state.
-- [ ] **`specs/flux/core-v1.json`** is deleted together with every claim that something is emitted
+- [x] **`specs/flux/core-v1.json`** is deleted together with every claim that something is emitted
       from it (`web/README.md`'s `public/v1/` paragraph), or a named consumer is filed as its own
       story before it stays. A vendored input with no consumer is a file that still validates and
       describes nothing.
@@ -65,6 +65,9 @@ origin backing a shipped connector is that rule with a hole in it.
   and auth declarations cite vendor documentation directly, so the unknown-origin excerpt was an
   unused file rather than an input to the shipped catalog. The excerpt and its false source-index
   entry were deleted; no catalog artifact changed.
+- The Flux core catalog input and its complete explorer surface were deleted together. M1 had
+  already removed the projection that could generate this data; retaining static routes, types,
+  tests, or publication claims would have described a catalog this repository no longer emits.
 
 ## Notes
 

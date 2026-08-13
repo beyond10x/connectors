@@ -158,8 +158,8 @@ function fieldsOf(body) {
  * Every `export interface` in the source, with `extends` flattened into the child.
  *
  * Flattened rather than followed at lookup time because the document does not know it inherited
- * anything: a core entry carries its base's keys in the same object as its own, so the check needs
- * one flat set per interface.
+ * anything: an interface value carries its base's keys in the same object as its own, so the check
+ * needs one flat set per interface.
  */
 function interfaces(source) {
   const clean = withoutComments(source)
@@ -326,7 +326,5 @@ test('a key the document publishes and the types omit is named, in both directio
   // And the real file parses as the real file: prose, JSDoc `{@link}` braces, inheritance and an
   // inline object type are all things the sources actually contain.
   assert.ok(known.get('Hmac').has('timestamp_format'), 'the parser lost a field to the prose above it')
-  assert.equal(known.get('ToolSpec').get('group').optional, true, 'the parser lost the one optional')
-  assert.ok(known.get('CoreOperation').has('$schema'), 'the parser did not flatten `extends`')
   assert.equal(known.get('Credential').get('scheme').type.startsWith('{'), true)
 })

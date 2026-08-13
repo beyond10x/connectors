@@ -1,6 +1,6 @@
 # The explorer's components, in three tiers
 
-These fourteen Vue components are the explorer. Since C-142 **none of them imports VitePress**, so
+These Vue components are the explorer. Since C-142 **none of them imports VitePress**, so
 the set can be mounted somewhere other than this site — a
 product's own admin surface, a Storybook, a test harness — without a rewrite and without extracting a
 package.
@@ -13,7 +13,7 @@ anywhere, so everything a component renders arrives as a prop or as injected con
 
 ## The one thing a host has to supply
 
-`data/catalog.mts` answers *which page* — `/operations/<id>`, `/core/<section>/<name>` — and that
+`data/catalog.mts` answers *which page* — `/operations/<id>` — and that
 answer is the catalogue's, identical wherever the components are mounted. Turning that path into an
 href a browser can follow is the **host's** answer, and it differs: this site is served under a base
 path and so has `withBase`; another host has its own router, or none at all.
@@ -41,13 +41,10 @@ any Vue application that has never heard of this catalogue.
 
 | Component | Takes |
 |---|---|
-| `FluxSource.vue` | `source: string` |
 | `SchemaBlock.vue` | `schema: unknown` |
 | `SpecChip.vue` | `value: string` |
 
-`FluxSource` deliberately does **not** highlight. Shiki has no Flux grammar, and colouring Flux by
-another language's rules would be worse than plain text — so it is plain text, the bytes the emitter
-produced. Do not "fix" this; `SchemaBlock` highlights because JSON and YAML are real grammars.
+`SchemaBlock` highlights because JSON and YAML are real grammars.
 
 ### Catalogue-aware — typed against `data/catalog.mts`
 
@@ -61,11 +58,7 @@ a prop; the coupling is to the type, not to a source of data.
 | `StatusBadge.vue` | `operation: Operation` |
 | `ProviderCard.vue` | `provider: Provider` |
 | `OperationRow.vue` | `operation: Operation` (+ `resolvePath`) |
-| `CoreExplorer.vue` | `core: CoreCatalog` (+ `resolvePath`) |
 | `CatalogSnapshot.vue` | `catalog: Catalog` (+ `resolvePath`) |
-
-`CoreExplorer` holds local filter state. That is ephemeral view state, not routing — it is not in the
-URL and nothing outside the component can observe it — so it stays in this tier.
 
 ### Page — owns routing and state
 
@@ -76,7 +69,6 @@ allowed to matter. These are what `../index.mts` registers globally.
 |---|---|---|
 | `CatalogExplorer.vue` | `explorer.md` | the explorer's composition and its headline counts |
 | `OperationDetail.vue` | `operations/[operation].md` | resolving the `id` route parameter against the catalogue |
-| `CoreDetail.vue` | `core/[kind]/[name].md` | resolving the `kind`/`name` route parameters |
 | `OperationList.vue` | `CatalogExplorer.vue` | the shareable view: the query string, read on mount and **replaced**, never pushed |
 
 Two rules this tier exists to hold:

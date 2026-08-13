@@ -1266,9 +1266,8 @@ mod tests {
 
     /// Positions whose value is **somebody else's JSON**, carried verbatim.
     ///
-    /// A vendor schema, an event matcher, a binding map, and the independently owned core catalogue.
-    /// Their keys are the vendor's or another emitter's and differ between two operations
-    /// legitimately, so the shape walk stops at them.
+    /// A vendor schema, an event matcher, or a binding map. Their keys are the vendor's or another
+    /// emitter's and differ between two operations legitimately, so the shape walk stops at them.
     ///
     /// This is a list of *opaque positions*, not of optional fields, and the difference is the whole
     /// point: an opaque position is a property of the format and does not drift, while an optional
@@ -1283,7 +1282,6 @@ mod tests {
         "payload",
         "bind",
         "tool_spec",
-        "core",
     ];
 
     /// Assert that two renderings publish the same keys everywhere, recording each position reached.
