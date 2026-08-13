@@ -67,7 +67,7 @@ Day-one changes, from the precedents analysis and the predecessor's own stories:
 | `crates/domain` | the nouns of design 01 as types: entities, closed vocabularies (risk, effects, audit actions…), ports (traits) for every store, and the **proof-type gates** (admission → grant → dispatch). No IO, no HTTP, no persistence. |
 | `crates/protocol` | versioned wire contracts: protocol identities (`connectors.api.v1`, `connectors.invoke-request.v1`, …), request/response DTOs, strict conformance (`deny_unknown_fields`, bounded diagnostics). The single source for SDK generation later. |
 | `crates/service` | use-cases over ports: connection lifecycle, connect sessions, acquisition, grant admission and CAS mutation, invocation assembly (document → plan → placed request), event routing, delivery queues. Pure logic; testable without a socket. |
-| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, posture-selected identity (local owner / OIDC / hosted), SQLite + secret-store bindings, the egress module, channel supervisor, WS subscriptions, the binary's serve path. |
+| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, posture-selected identity (local owner / OIDC / hosted), SQLite + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. |
 
 The predecessor's two-crate split (host/server) was right; its failure mode was god modules
 (one 10.7k-line route file). The four-crate split above moves the pressure points (`service`,
@@ -147,6 +147,12 @@ Structural rules, each with a fence or a type making it non-optional:
 - The proxy rides the same path with fixed worst-case facts; it is a granted capability, not a
   bypass.
 - No runtime parsing of any source form, ever — the plan is derived from document data only.
+
+The invocation path is protocol-neutral at the admission boundary. Per
+[Design 03](03-beyond-http.md), the canonical document fixes interaction shape, protocol driver and
+required capabilities; deployment policy resolves placement. HTTP egress is the first registry
+binding. A missing driver or capability refuses before credential access and never falls back to
+HTTP, Flux, an ambient executable or another placement.
 
 ## 6. Eventing
 

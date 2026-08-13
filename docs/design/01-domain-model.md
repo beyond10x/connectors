@@ -124,6 +124,8 @@ canonical JSON document, hashes it in the lockfile and packs it into an offset-i
   deployment must supply), never a value. No `client_id` ever appears in the catalog.
 - *Invariant:* the request-template vocabulary is closed and total; anything outside it is a
   build error, never a degraded document.
+- *Invariant:* protocol driver, interaction shape and required capabilities are declared facts,
+  never caller choices. HTTP is the first driver, not an implicit default for an unknown one.
 - *Invariant:* the authority is never repointed once published; it leads every credential path.
 
 ### Operation
@@ -131,6 +133,10 @@ canonical JSON document, hashes it in the lockfile and packs it into an offset-i
 One declared, invocable unit of a provider: id (stable, public), service, direction, **risk**
 (ordered), **idempotency**, **effects**, `expose` (callable vs projected-to-models), parameter
 schemas, an explicit request template, response schema, and the runtime traits above.
+
+Beyond HTTP, an Operation also names its closed protocol driver, interaction shape and capability
+requirements as defined by [Design 03](03-beyond-http.md). Process/container placement is not a
+protocol and remains a separate deployment decision.
 
 - *Invariant:* the facts the authorization gate decides on are the facts the catalogue publishes
   — a client can always predict admission from what it can read.
