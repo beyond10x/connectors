@@ -43,6 +43,7 @@ path-local. Two families and one binary:
 | `crates/connector-resolve` | canonical document → `RequestPlan` (data) | copy as-is |
 | `crates/connector-secrets` | owner-bound secret store (+ optional Vault backend) | copy as-is |
 | `crates/catalog-build` | the build orchestrator: pipeline (plan/apply), document lowering, pack writer, site projection, diff | extracted from the predecessor's CLI crate **minus** the Flux emitter and legacy artifact writers |
+| `crates/catalog` | typed views (`Provider`, `Operation`, `Credential`, …) **derived from the pack** for `connector-resolve` | rebuilt over `catalog-reader` in M1; the predecessor's 17k-line generated tables are gone |
 
 Day-one changes, from the precedents analysis and the predecessor's own stories:
 1. The document schema gains the caller-contract fields (predecessor C-552: caller-facing
