@@ -50,6 +50,7 @@
 
 pub mod artifact;
 pub mod cli;
+pub mod contract;
 pub mod diff;
 pub mod discovery;
 pub mod document;

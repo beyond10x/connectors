@@ -56,6 +56,15 @@
           "salesforce.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get the authenticated user and org for the current access token — the identity check for a settings page's Test Connection button. Takes no parameters",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the authenticated user and org for the current access token — the identity check for a settings page's Test Connection button. Takes no parameters",
       "direction": "read",
       "endpoint": {
@@ -129,6 +138,25 @@
           "salesforce.access_token"
         ]
       ],
+      "contract": {
+        "description": "Read one SObject record by id. Returns every field of the record; narrowing to a subset needs the fields query parameter, which this connector cannot encode safely (see the provider file's header) so it is not offered",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sobject_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sobject_type",
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read one SObject record by id. Returns every field of the record; narrowing to a subset needs the fields query parameter, which this connector cannot encode safely (see the provider file's header) so it is not offered",
       "direction": "read",
       "endpoint": {
@@ -148,7 +176,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "sobject_type"
         },
         {
           "description": "The record's Salesforce id, 15 characters (case-sensitive) or 18 (case-insensitive)",
@@ -158,7 +187,8 @@
           "schema": {
             "pattern": "^[a-zA-Z0-9]{15,18}$",
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -206,6 +236,23 @@
           "salesforce.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create one SObject record. Which fields are required depends on the SObject type and the org's own validation rules and page layouts — check with salesforce-sobject-describe first",
+        "input_schema": {
+          "properties": {
+            "body": {},
+            "sobject_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sobject_type",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create one SObject record. Which fields are required depends on the SObject type and the org's own validation rules and page layouts — check with salesforce-sobject-describe first",
       "direction": "write",
       "endpoint": {
@@ -225,7 +272,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "sobject_type"
         },
         {
           "name": "body",
@@ -234,7 +282,8 @@
           "schema": {
             "description": "The new record's field values as a JSON object, e.g. {\"Name\": \"Acme\", \"Industry\": \"Technology\"}. Which fields exist and which are required depends on the SObject type and the org's schema",
             "type": "object"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "request": {
@@ -284,6 +333,27 @@
           "salesforce.access_token"
         ]
       ],
+      "contract": {
+        "description": "Update one or more fields on an existing SObject record. Only the supplied fields change; fields left out are untouched. Answers 204 with no body on success",
+        "input_schema": {
+          "properties": {
+            "body": {},
+            "id": {
+              "type": "string"
+            },
+            "sobject_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sobject_type",
+            "id",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Update one or more fields on an existing SObject record. Only the supplied fields change; fields left out are untouched. Answers 204 with no body on success",
       "direction": "write",
       "endpoint": {
@@ -303,7 +373,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "sobject_type"
         },
         {
           "description": "The record's Salesforce id, 15 characters (case-sensitive) or 18 (case-insensitive)",
@@ -313,7 +384,8 @@
           "schema": {
             "pattern": "^[a-zA-Z0-9]{15,18}$",
             "type": "string"
-          }
+          },
+          "symbol": "id"
         },
         {
           "name": "body",
@@ -322,7 +394,8 @@
           "schema": {
             "description": "The fields to change, as a JSON object, e.g. {\"Industry\": \"Technology\"}. Fields not present are left untouched; which fields exist depends on the SObject type and the org's schema",
             "type": "object"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "request": {
@@ -348,6 +421,21 @@
           "salesforce.access_token"
         ]
       ],
+      "contract": {
+        "description": "Describe an SObject's schema: its label, whether it is custom, its create/update/delete/query permissions, and every field's name, type and constraints. The reference for what salesforce-record-create and salesforce-record-update may send",
+        "input_schema": {
+          "properties": {
+            "sobject_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sobject_type"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Describe an SObject's schema: its label, whether it is custom, its create/update/delete/query permissions, and every field's name, type and constraints. The reference for what salesforce-record-create and salesforce-record-update may send",
       "direction": "read",
       "endpoint": {
@@ -367,7 +455,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "sobject_type"
         }
       ],
       "request": {

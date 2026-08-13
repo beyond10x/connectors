@@ -45,6 +45,53 @@
           "postmark.server_token"
         ]
       ],
+      "contract": {
+        "description": "Send a single email immediately from the token's server. Delivered within seconds and cannot be recalled. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/Message`, its error code at `/ErrorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "bcc": {
+              "type": "string"
+            },
+            "cc": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "html_body": {
+              "type": "string"
+            },
+            "reply_to": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "text_body": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "cc",
+            "bcc",
+            "subject",
+            "text_body",
+            "html_body",
+            "reply_to",
+            "tag"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Send a single email immediately from the token's server. Delivered within seconds and cannot be recalled",
       "direction": "write",
       "expose": true,
@@ -60,6 +107,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "from",
           "wire": "From"
         },
         {
@@ -71,6 +119,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "to",
           "wire": "To"
         },
         {
@@ -81,6 +130,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "cc",
           "wire": "Cc"
         },
         {
@@ -91,6 +141,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "bcc",
           "wire": "Bcc"
         },
         {
@@ -101,6 +152,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "subject",
           "wire": "Subject"
         },
         {
@@ -111,6 +163,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "text_body",
           "wire": "TextBody"
         },
         {
@@ -121,6 +174,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "html_body",
           "wire": "HtmlBody"
         },
         {
@@ -131,6 +185,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "reply_to",
           "wire": "ReplyTo"
         },
         {
@@ -141,6 +196,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "tag",
           "wire": "Tag"
         }
       ],
@@ -231,6 +287,15 @@
           "postmark.server_token"
         ]
       ],
+      "contract": {
+        "description": "Get delivery statistics for this server: total inactive addresses and a breakdown of bounces by type. Also this connector's `verify` — a bounded read that runs unattended, needing no argument. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/Message`, its error code at `/ErrorCode` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get delivery statistics for this server: total inactive addresses and a breakdown of bounces by type. Also this connector's `verify` — a bounded read that runs unattended, needing no argument",
       "direction": "read",
       "expose": true,
@@ -292,6 +357,25 @@
           "postmark.server_token"
         ]
       ],
+      "contract": {
+        "description": "List bounces recorded on this server, most recent first. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/Message`, its error code at `/ErrorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "count": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "count",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List bounces recorded on this server, most recent first",
       "direction": "read",
       "expose": true,
@@ -307,7 +391,8 @@
             "maximum": 500,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "count"
         },
         {
           "description": "Number of bounces to skip, for paging; Postmark requires this on every call",
@@ -317,7 +402,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "quirks": {
@@ -435,6 +521,21 @@
           "postmark.server_token"
         ]
       ],
+      "contract": {
+        "description": "Get one recorded bounce by id. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/Message`, its error code at `/ErrorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "bounce_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "bounce_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one recorded bounce by id",
       "direction": "read",
       "expose": true,
@@ -448,7 +549,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "bounce_id"
         }
       ],
       "quirks": {

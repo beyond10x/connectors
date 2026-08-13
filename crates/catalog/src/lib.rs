@@ -258,6 +258,20 @@ pub struct Operation {
     /// Zendesk is `{subdomain}.zendesk.com` rather than a tenant nobody has chosen yet. What a
     /// caller does with this is decide whether their egress policy admits the call.
     pub hosts: &'static [&'static str],
+    /// **The description a model receives** (S-001) — the document's stored contract projection,
+    /// error-envelope-extended where the vendor declares an envelope. Not
+    /// [`description`](Self::description), the one-line summary.
+    pub contract_description: &'static str,
+    /// **The lowered, caller-typed input schema a model receives** (S-001), as canonical JSON
+    /// text: one object keyed by caller-facing symbols, every declared parameter required. Read
+    /// from the document's stored contract, never derived — together with
+    /// [`contract_description`](Self::contract_description), [`id`](Self::id) and
+    /// [`expose`](Self::expose) this is the complete caller-facing contract, built from document
+    /// data alone.
+    pub input_schema: &'static str,
+    /// Whether the operation is published to callers. An unexposed operation exists (its document
+    /// entry is the audit trail) but is not offered.
+    pub expose: bool,
 }
 
 /// **Where a credential goes on the way out** — the *placement* axis of
@@ -336,10 +350,12 @@ pub enum Acquisition {
     /// shipped connector declares. A variant costs nothing until something uses it, which is the
     /// same reason `skip_serializing_if` is on the IR field.
     ///
-    /// **Unreachable from the canonical document today.** The document publishes no minting join,
-    /// and no shipped connector declares `produces_credential`, so [`table`] never constructs this
-    /// variant. The variant stays because the type is the vocabulary a host matches on; making it
-    /// reachable is a document-schema change, not a change here.
+    /// **Reachable from the canonical document since S-001.** The document carries the minting
+    /// join (`produces_credential` on the minting operation: which credential the value is stored
+    /// as, and where in the response the secret arrives), and [`table`] constructs this variant
+    /// from it. No shipped connector declares one yet —
+    /// `tests/main/pack_table.rs` pins that — so the shipped catalogue still never constructs it;
+    /// the fixture-backed unit test in [`table`] is what proves the path.
     Minted {
         /// The [`Operation::id`] whose call mints this credential.
         by: &'static str,

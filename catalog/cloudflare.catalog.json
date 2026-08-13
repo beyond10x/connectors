@@ -58,6 +58,15 @@
           "cloudflare.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the zones (domains) this API token can see, with each zone's id, name, status and assigned Cloudflare name servers. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note). The zone `id` returned here is the value an operator pins as this connection's `zone_id`; every other operation in this connector is already scoped to that one zone and does not take it as an argument. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message`, its error code at `/errors/0/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the zones (domains) this API token can see, with each zone's id, name, status and assigned Cloudflare name servers. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note). The zone `id` returned here is the value an operator pins as this connection's `zone_id`; every other operation in this connector is already scoped to that one zone and does not take it as an argument",
       "direction": "read",
       "expose": true,
@@ -163,6 +172,15 @@
           "cloudflare.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the DNS records in a zone: each record's id, type, name, content, TTL and whether it is proxied through Cloudflare. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note). A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message`, its error code at `/errors/0/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the DNS records in a zone: each record's id, type, name, content, TTL and whether it is proxied through Cloudflare. Returns Cloudflare's first page only; this connector declares no page or filter parameters (see the connector's header note)",
       "direction": "read",
       "endpoint": {
@@ -297,6 +315,29 @@
           "cloudflare.api_token"
         ]
       ],
+      "contract": {
+        "description": "Create a DNS record in a zone. Cloudflare does not deduplicate: creating the same name/type/content pair twice makes two records, so this is not idempotent. The created record, with its assigned id, is in the response. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message`, its error code at `/errors/0/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a DNS record in a zone. Cloudflare does not deduplicate: creating the same name/type/content pair twice makes two records, so this is not idempotent. The created record, with its assigned id, is in the response",
       "direction": "write",
       "endpoint": {
@@ -325,7 +366,8 @@
               "CAA"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "The DNS name, e.g. www.example.com or example.com for the apex",
@@ -334,7 +376,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "The record's value; its shape depends on `type` — an IP for A/AAAA, a hostname for CNAME, arbitrary text for TXT",
@@ -343,7 +386,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "content"
         }
       ],
       "quirks": {
@@ -447,6 +491,21 @@
           "cloudflare.api_token"
         ]
       ],
+      "contract": {
+        "description": "Delete one DNS record. There is no API route back: Cloudflare's dashboard \"recently deleted\" surface is a retention-window UI feature, not an endpoint, so a flux run cannot undo this. Responds with just the deleted record's id. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message`, its error code at `/errors/0/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "dns_record_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dns_record_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete one DNS record. There is no API route back: Cloudflare's dashboard \"recently deleted\" surface is a retention-window UI feature, not an endpoint, so a flux run cannot undo this. Responds with just the deleted record's id",
       "direction": "write",
       "endpoint": {
@@ -466,7 +525,8 @@
           "schema": {
             "pattern": "^[0-9a-f]{32}$",
             "type": "string"
-          }
+          },
+          "symbol": "dns_record_id"
         }
       ],
       "quirks": {
@@ -528,6 +588,15 @@
           "cloudflare.api_token"
         ]
       ],
+      "contract": {
+        "description": "Purge every cached asset for a zone, immediately, for every visitor worldwide. There is no partial or selective purge in this connector (see its header note) — every call empties the whole zone's edge cache. Repeating it changes nothing further, but each call can spike load on the origin as the cache refills, so it should not be called more often than a real cache-affecting change warrants. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message`, its error code at `/errors/0/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Purge every cached asset for a zone, immediately, for every visitor worldwide. There is no partial or selective purge in this connector (see its header note) — every call empties the whole zone's edge cache. Repeating it changes nothing further, but each call can spike load on the origin as the cache refills, so it should not be called more often than a real cache-affecting change warrants",
       "direction": "write",
       "endpoint": {

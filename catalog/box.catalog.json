@@ -44,6 +44,15 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get the user this access token authenticates as, confirming the token resolves and naming the account it belongs to. Takes no parameters. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the user this access token authenticates as, confirming the token resolves and naming the account it belongs to. Takes no parameters",
       "direction": "read",
       "expose": true,
@@ -88,6 +97,21 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one folder's metadata: name, size, timestamps and parent. Does not return its contents — use box-folder-items-list for that. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "folder_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "folder_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one folder's metadata: name, size, timestamps and parent. Does not return its contents — use box-folder-items-list for that",
       "direction": "read",
       "expose": true,
@@ -103,7 +127,8 @@
             "default": "0",
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "folder_id"
         }
       ],
       "quirks": {
@@ -159,6 +184,21 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the files and folders directly inside a folder, first page only (Box's own default page size). Each entry is a mini item representation — its type, id and name — not the full metadata box-file-get or box-folder-get returns. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "folder_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "folder_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the files and folders directly inside a folder, first page only (Box's own default page size). Each entry is a mini item representation — its type, id and name — not the full metadata box-file-get or box-folder-get returns",
       "direction": "read",
       "expose": true,
@@ -174,7 +214,8 @@
             "default": "0",
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "folder_id"
         }
       ],
       "quirks": {
@@ -219,6 +260,21 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one file's metadata: name, size, timestamps and parent folder. This does NOT return the file's content — Box serves file content from a signed, time-limited URL reached only through a 302 redirect this connector does not follow, so file content is out of scope entirely. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one file's metadata: name, size, timestamps and parent folder. This does NOT return the file's content — Box serves file content from a signed, time-limited URL reached only through a 302 redirect this connector does not follow, so file content is out of scope entirely",
       "direction": "read",
       "expose": true,
@@ -233,7 +289,8 @@
           "schema": {
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "file_id"
         }
       ],
       "quirks": {
@@ -290,6 +347,25 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create a new, empty folder as a child of an existing folder. Naming a folder that already exists under the same parent answers 409 conflict rather than creating a duplicate. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "parent_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new, empty folder as a child of an existing folder. Naming a folder that already exists under the same parent answers 409 conflict rather than creating a duplicate",
       "direction": "write",
       "expose": true,
@@ -304,7 +380,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "The id of the existing folder to create this folder inside, an opaque numeric string — or the literal string \"0\" to create it directly under the account's root",
@@ -316,6 +393,7 @@
             "pattern": "^[0-9]+$",
             "type": "string"
           },
+          "symbol": "parent_id",
           "wire": "parent.id"
         }
       ],
@@ -377,6 +455,25 @@
           "box.access_token"
         ]
       ],
+      "contract": {
+        "description": "Copy an existing file into a different folder, keeping its original name. Each call creates a new, independent file — copying the same file twice produces two copies, not one. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_id": {
+              "type": "string"
+            },
+            "parent_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_id",
+            "parent_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Copy an existing file into a different folder, keeping its original name. Each call creates a new, independent file — copying the same file twice produces two copies, not one",
       "direction": "write",
       "expose": true,
@@ -391,7 +488,8 @@
           "schema": {
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "file_id"
         },
         {
           "description": "The id of the destination folder, an opaque numeric string — or the literal string \"0\" to copy directly into the account's root",
@@ -403,6 +501,7 @@
             "pattern": "^[0-9]+$",
             "type": "string"
           },
+          "symbol": "parent_id",
           "wire": "parent.id"
         }
       ],

@@ -59,6 +59,21 @@
           "shopify.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one order by id, with its line items, totals, fulfilment and financial status, and the customer and addresses attached to it. The response carries personal data: the customer's name, email, phone and shipping address. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors` in the response body.",
+        "input_schema": {
+          "properties": {
+            "order_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one order by id, with its line items, totals, fulfilment and financial status, and the customer and addresses attached to it. The response carries personal data: the customer's name, email, phone and shipping address",
       "direction": "read",
       "endpoint": {
@@ -79,7 +94,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "order_id"
         }
       ],
       "quirks": {
@@ -203,6 +219,21 @@
           "shopify.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one product by id, with its title, description, status, vendor, options, variants and images. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors` in the response body.",
+        "input_schema": {
+          "properties": {
+            "product_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "product_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one product by id, with its title, description, status, vendor, options, variants and images",
       "direction": "read",
       "endpoint": {
@@ -223,7 +254,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "product_id"
         }
       ],
       "quirks": {
@@ -325,6 +357,25 @@
           "shopify.access_token"
         ]
       ],
+      "contract": {
+        "description": "Rename a product. The new title is live on the public storefront as soon as this returns, on every sales channel the product is published to. Shopify applies only the fields sent, so nothing else about the product changes. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors` in the response body.",
+        "input_schema": {
+          "properties": {
+            "product_id": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "product_id",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Rename a product. The new title is live on the public storefront as soon as this returns, on every sales channel the product is published to. Shopify applies only the fields sent, so nothing else about the product changes",
       "direction": "write",
       "endpoint": {
@@ -345,7 +396,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "product_id"
         },
         {
           "description": "The product's new title, as customers see it. Must not be blank",
@@ -356,6 +408,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "title",
           "wire": "product.title"
         }
       ],
@@ -467,6 +520,21 @@
           "shopify.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one customer by id: name, email, phone, default address, marketing consent state and order count. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors` in the response body.",
+        "input_schema": {
+          "properties": {
+            "customer_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "customer_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one customer by id: name, email, phone, default address, marketing consent state and order count. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires",
       "direction": "read",
       "endpoint": {
@@ -487,7 +555,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "customer_id"
         }
       ],
       "quirks": {
@@ -588,6 +657,21 @@
           "shopify.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the inventory levels held at one location — the available quantity per inventory item. Returns the first page only, so a location stocking more items than one page holds is reported incompletely. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors` in the response body.",
+        "input_schema": {
+          "properties": {
+            "location_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "location_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the inventory levels held at one location — the available quantity per inventory item. Returns the first page only, so a location stocking more items than one page holds is reported incompletely",
       "direction": "read",
       "endpoint": {
@@ -608,7 +692,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "location_id"
         }
       ],
       "quirks": {

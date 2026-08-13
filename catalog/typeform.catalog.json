@@ -44,6 +44,15 @@
           "typeform.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get the Typeform account this access token authenticates as: its account id, display alias, own account email and interface language. Confirms the token resolves. Takes no parameters. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/description`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the Typeform account this access token authenticates as: its account id, display alias, own account email and interface language. Confirms the token resolves. Takes no parameters",
       "direction": "read",
       "expose": true,
@@ -93,6 +102,33 @@
           "typeform.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the forms in the authenticated account, most recently updated forms sorting available. Returns each form's id, title and public/private status but not its questions — use typeform-form-get for a form's fields. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/description`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "order_by": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "page_size": {
+              "type": "number"
+            },
+            "sort_by": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "page",
+            "page_size",
+            "sort_by",
+            "order_by"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the forms in the authenticated account, most recently updated forms sorting available. Returns each form's id, title and public/private status but not its questions — use typeform-form-get for a form's fields",
       "direction": "read",
       "expose": true,
@@ -108,7 +144,8 @@
             "default": 1,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Forms per page; Typeform defaults this to 10 and caps it at 200",
@@ -120,7 +157,8 @@
             "maximum": 200,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page_size"
         },
         {
           "description": "Field to sort by",
@@ -133,7 +171,8 @@
               "last_updated_at"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "sort_by"
         },
         {
           "description": "Sort direction",
@@ -146,7 +185,8 @@
               "desc"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "order_by"
         }
       ],
       "quirks": {
@@ -253,6 +293,21 @@
           "typeform.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one form's own definition: its title, language, rendering type and questions (fields), plus its welcome and thank-you screens. Does not return any response data — use typeform-response-list for that. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/description`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "form_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "form_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one form's own definition: its title, language, rendering type and questions (fields), plus its welcome and thank-you screens. Does not return any response data — use typeform-response-list for that",
       "direction": "read",
       "expose": true,
@@ -267,7 +322,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "form_id"
         }
       ],
       "quirks": {
@@ -380,6 +436,49 @@
           "typeform.access_token"
         ]
       ],
+      "contract": {
+        "description": "List one form's responses, newest first by default. Paginate with `before`/`after`, each naming the `token` of a response already retrieved, to page toward older or newer responses respectively; `page_size` alone returns only the first page. Each response's `answers` holds whatever that respondent typed or selected — this connector never inspects or filters on answer content. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/description`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "after": {
+              "type": "string"
+            },
+            "before": {
+              "type": "string"
+            },
+            "form_id": {
+              "type": "string"
+            },
+            "page_size": {
+              "type": "number"
+            },
+            "response_type": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            },
+            "sort": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "form_id",
+            "page_size",
+            "before",
+            "after",
+            "since",
+            "until",
+            "response_type",
+            "sort"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List one form's responses, newest first by default. Paginate with `before`/`after`, each naming the `token` of a response already retrieved, to page toward older or newer responses respectively; `page_size` alone returns only the first page. Each response's `answers` holds whatever that respondent typed or selected — this connector never inspects or filters on answer content",
       "direction": "read",
       "expose": true,
@@ -394,7 +493,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "form_id"
         },
         {
           "description": "Responses per page; Typeform defaults this to 25 and caps it at 1000",
@@ -406,7 +506,8 @@
             "maximum": 1000,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page_size"
         },
         {
           "description": "Return only responses submitted before this response's own `token` (exclusive) — the cursor for paging toward older responses. Pass the `token` field of the oldest response already retrieved. Omit on the first page",
@@ -418,7 +519,8 @@
             "minLength": 32,
             "pattern": "^[0-9a-f]{32}$",
             "type": "string"
-          }
+          },
+          "symbol": "before"
         },
         {
           "description": "Return only responses submitted after this response's own `token` (exclusive) — the cursor for paging toward newer responses. Pass the `token` field of the newest response already retrieved. Omit on the first page",
@@ -430,7 +532,8 @@
             "minLength": 32,
             "pattern": "^[0-9a-f]{32}$",
             "type": "string"
-          }
+          },
+          "symbol": "after"
         },
         {
           "description": "Only include responses at or after this UTC instant, written with no timezone suffix at all, e.g. \"2017-07-09T00:00:00\" — never a trailing \"Z\" or a \"+HH:MM\" offset. Which timestamp this filters (submitted_at, staged_at or landed_at) depends on which response_type is requested",
@@ -440,7 +543,8 @@
           "schema": {
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$",
             "type": "string"
-          }
+          },
+          "symbol": "since"
         },
         {
           "description": "Only include responses at or before this UTC instant, written with no timezone suffix at all, e.g. \"2017-07-09T00:00:00\" — never a trailing \"Z\" or a \"+HH:MM\" offset. Which timestamp this filters (submitted_at, staged_at or landed_at) depends on which response_type is requested",
@@ -450,7 +554,8 @@
           "schema": {
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$",
             "type": "string"
-          }
+          },
+          "symbol": "until"
         },
         {
           "description": "Restrict to one or more submission states, comma-separated: started, partial, completed. Omit to receive every state",
@@ -460,7 +565,8 @@
           "schema": {
             "pattern": "^(started|partial|completed)(,(started|partial|completed)){0,2}$",
             "type": "string"
-          }
+          },
+          "symbol": "response_type"
         },
         {
           "description": "How to order the returned responses: a fixed field name and a direction, comma-separated",
@@ -477,7 +583,8 @@
               "landed_at,desc"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "sort"
         }
       ],
       "quirks": {
@@ -627,6 +734,25 @@
           "typeform.access_token"
         ]
       ],
+      "contract": {
+        "description": "Permanently delete one or more of a form's responses by their own token. There is no undelete: once deleted, a response's answers are gone. Deletion is asynchronous — a successful call confirms the request was registered, not that the responses are already gone. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/description`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "form_id": {
+              "type": "string"
+            },
+            "included_response_ids": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "form_id",
+            "included_response_ids"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Permanently delete one or more of a form's responses by their own token. There is no undelete: once deleted, a response's answers are gone. Deletion is asynchronous — a successful call confirms the request was registered, not that the responses are already gone",
       "direction": "write",
       "expose": true,
@@ -641,7 +767,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "form_id"
         },
         {
           "description": "Comma-separated list of up to 1000 response tokens (the same value as a response's own `token`/`response_id`, from typeform-response-list) to delete permanently",
@@ -651,7 +778,8 @@
           "schema": {
             "pattern": "^[0-9a-f]{32}(,[0-9a-f]{32})*$",
             "type": "string"
-          }
+          },
+          "symbol": "included_response_ids"
         }
       ],
       "quirks": {

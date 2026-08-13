@@ -45,6 +45,25 @@
           "launchdarkly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List every project in the LaunchDarkly account. A project is the top-level grouping that owns environments and feature flags",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every project in the LaunchDarkly account. A project is the top-level grouping that owns environments and feature flags",
       "direction": "read",
       "expose": true,
@@ -59,7 +78,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of projects to skip, for paging past the first page",
@@ -69,7 +89,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -145,6 +166,29 @@
           "launchdarkly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the environments (e.g. production, staging) that belong to one project",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            },
+            "project_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_key",
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the environments (e.g. production, staging) that belong to one project",
       "direction": "read",
       "expose": true,
@@ -159,7 +203,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "project_key"
         },
         {
           "description": "Maximum number of environments to return per page",
@@ -169,7 +214,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of environments to skip, for paging past the first page",
@@ -179,7 +225,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -266,6 +313,33 @@
           "launchdarkly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the feature flags defined in one project",
+        "input_schema": {
+          "properties": {
+            "env": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            },
+            "project_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_key",
+            "env",
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the feature flags defined in one project",
       "direction": "read",
       "expose": true,
@@ -280,7 +354,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "project_key"
         },
         {
           "description": "Restrict each returned flag's environment-specific fields (targeting, on/off state) to this one environment's key, e.g. `production`. Omit to receive every environment's representation",
@@ -291,7 +366,8 @@
             "minLength": 1,
             "pattern": "^[A-Za-z0-9._-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "env"
         },
         {
           "description": "Maximum number of flags to return per page",
@@ -301,7 +377,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of flags to skip, for paging past the first page",
@@ -311,7 +388,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -408,6 +486,29 @@
           "launchdarkly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one feature flag's full definition, including its current on/off state and targeting per environment",
+        "input_schema": {
+          "properties": {
+            "env": {
+              "type": "string"
+            },
+            "feature_flag_key": {
+              "type": "string"
+            },
+            "project_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_key",
+            "feature_flag_key",
+            "env"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one feature flag's full definition, including its current on/off state and targeting per environment",
       "direction": "read",
       "expose": true,
@@ -422,7 +523,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "project_key"
         },
         {
           "description": "The flag's own key, from launchdarkly-flag-list's `key` field",
@@ -432,7 +534,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "feature_flag_key"
         },
         {
           "description": "Restrict the returned environment-specific fields (targeting, on/off state) to this one environment's key, e.g. `production`. Omit to receive every environment's representation",
@@ -443,7 +546,8 @@
             "minLength": 1,
             "pattern": "^[A-Za-z0-9._-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "env"
         }
       ],
       "request": {
@@ -511,6 +615,30 @@
           "launchdarkly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Turn a feature flag on or off in one environment. This is a live production change: every SDK instance currently evaluating this flag in this environment — web, mobile and backend alike — switches to the other branch as soon as this call returns, for every real user it serves. It is reversible by toggling back, but it is not a private or staged edit",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "items": {},
+              "type": "array"
+            },
+            "feature_flag_key": {
+              "type": "string"
+            },
+            "project_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_key",
+            "feature_flag_key",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Turn a feature flag on or off in one environment. This is a live production change: every SDK instance currently evaluating this flag in this environment — web, mobile and backend alike — switches to the other branch as soon as this call returns, for every real user it serves. It is reversible by toggling back, but it is not a private or staged edit",
       "direction": "write",
       "expose": true,
@@ -525,7 +653,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "project_key"
         },
         {
           "description": "The flag's own key, from launchdarkly-flag-list's `key` field",
@@ -535,7 +664,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "feature_flag_key"
         },
         {
           "name": "body",
@@ -572,7 +702,8 @@
             "maxItems": 1,
             "minItems": 1,
             "type": "array"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "repeatability_condition": "the body schema admits exactly one JSON Patch `replace` onto one environment's `on` bit (maxItems 1, op pinned to `replace`, path pinned to `/environments/{key}/on`), so it sets an absolute value and never a toggle or a delta — re-sending it lands the flag where the caller asked, however many times it runs",

@@ -9,24 +9,24 @@
 //! skipped rather than modelled. Interpreting those is somebody else's job, and a struct that
 //! claimed them would have to be kept in step with a schema this crate does not own.
 //!
-//! # The one thing the document does not publish, and what this module does about it
+//! # The caller-facing symbol, which the document now carries (C-552)
 //!
 //! A caller addresses a parameter by the name the operation's **contract** advertises, and that name
 //! is a *Flux symbol*: `time.start` is declared `time_start`, `$top` is `_top`, and a parameter
 //! called `response` becomes `response_2` because the emitter binds `response` itself. The document
-//! publishes the IR name (`time.start`) and the wire name, and **not** the symbol — so the mapping
-//! between the two lives only in `connector-flux`'s `names.rs`, which this crate must not link.
+//! publishes the IR name (`time.start`) and the wire name; since C-552 it **also** publishes the
+//! symbol, computed at build time by the emitter's own allocator (which reserves a symbol for every
+//! body parameter, `const`-pinned ones included) and stored beside `name`. So this crate **reads**
+//! the symbol rather than reproducing the allocation, and the whole-catalogue differential gate
+//! (`connector-pack/tests/main/catalogue_differential.rs`) asserts, for all 835 operations, that the
+//! stored symbol is the name the emitted declaration declares.
 //!
-//! [`Symbols`] therefore reproduces that allocation, and the reproduction is held to the same
-//! standard Decision 0022 sets for everything else in this migration: the whole-catalogue
-//! differential gate (`connector-pack/tests/main/catalogue_differential.rs`) asserts, for all 835
-//! operations, that the names derived here are exactly the names the emitted declaration declares.
-//! A divergence is a red gate rather than a request sent under the wrong parameter name.
-//!
-//! **This is the gap C-540 has to close before it deletes the emitter**, and it is recorded here
-//! rather than in a story only: either the document grows a `symbol` beside `name`, or the pack's
-//! caller-facing names become the IR's. Until one of those happens, the reproduction below is load
-//! bearing.
+//! [`Symbols`] survives only as the fallback for a pre-C-552 document that carries no symbol — no
+//! build this repository produces — kept under the C-537 forward-compat contract that an additive
+//! field's absence must still read. Reading the stored symbol is what closed C-538's ADJACENT-2
+//! trap: a `const`-pinned body field whose name normalizes onto a later parameter's symbol shifts
+//! that parameter under the emitter's allocation, and this crate's reproduction — which never saw
+//! the `const`-pinned field, because the document omits it — would have missed the shift.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
@@ -94,6 +94,14 @@ impl Symbols {
         self.taken.insert(symbol.clone());
         symbol
     }
+
+    /// Reserve a symbol the document already states, so a later fallback allocation cannot reuse it.
+    ///
+    /// Consulted only for a pre-C-552 document that carries symbols for some parameters and not
+    /// others — which no build this repository produces — and harmless otherwise.
+    fn reserve(&mut self, symbol: &str) {
+        self.taken.insert(symbol.to_owned());
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -126,12 +134,46 @@ struct RawOperation {
     request: RequestTemplate,
     #[serde(default)]
     endpoint: BTreeMap<String, Vec<String>>,
+    /// The declared risk tier, as flux's own vocabulary spells it (`low`/`medium`/…). Carried so a
+    /// consumer builds the model-facing contract from the document rather than the emitted Flux
+    /// (C-552). Empty for a document written before the field existed.
+    #[serde(default)]
+    risk: String,
+    /// The declared idempotency, likewise (`idempotent`/`non_idempotent`/`conditional`).
+    #[serde(default)]
+    idempotency: String,
+    /// The **host** effects the authority projection reads — `["read", "network"]` and the like,
+    /// read from the document and never derived (C-552). Distinct from `semantic_effects`, which the
+    /// document also carries and which this crate does not model.
+    #[serde(default)]
+    effects: Vec<String>,
+    /// The model-facing contract projection — the error-envelope-extended description and the
+    /// lowered, Flux-typed input schema — computed at build time and stored so a consumer needs no
+    /// engine to read them (C-552). Absent for a document written before the field existed.
+    #[serde(default)]
+    contract: Option<RawContract>,
+}
+
+/// The stored model-facing contract projection: the ToolSpec's description and input schema, as the
+/// build computed them from the emitted declaration's own lowering.
+#[derive(Debug, Deserialize)]
+struct RawContract {
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    input_schema: Value,
 }
 
 #[derive(Debug, Deserialize)]
 struct RawParam {
     name: String,
     position: String,
+    /// The caller-facing Flux symbol the emitted `op` declares this parameter by (C-552) — the name
+    /// a caller addresses it under, which is not its document `name`. Empty for a document written
+    /// before the field existed, in which case [`Operation::resolve`] falls back to reproducing the
+    /// emitter's allocation.
+    #[serde(default)]
+    symbol: String,
 }
 
 /// One operation's request, in the document's closed template vocabulary.
@@ -282,6 +324,16 @@ pub struct Operation {
     symbols: BTreeMap<String, String>,
     /// Caller parameters the template places in a URL path segment (C-478), by symbol.
     caller_path_parameters: BTreeSet<String>,
+    /// The error-envelope-extended description the model-facing contract carries (C-552).
+    description: String,
+    /// The lowered, Flux-typed input schema the model-facing contract carries (C-552).
+    input_schema: Value,
+    /// The host effects the authority projection reads, read from the document (C-552).
+    effects: Vec<String>,
+    /// The declared risk tier, as flux's vocabulary spells it (C-552).
+    risk: String,
+    /// The declared idempotency, likewise (C-552).
+    idempotency: String,
 }
 
 impl Operation {
@@ -291,15 +343,29 @@ impl Operation {
         let mut parameters = Vec::new();
         let mut caller_path_parameters = BTreeSet::new();
         for param in &raw.params {
-            // The free-form body is allocated *after* every positional group, exactly as
-            // `connector-flux`'s `bind_parameters` does, and the document already lists it last.
-            let symbol = allocator.allocate(&param.name);
+            // **The caller-facing symbol is the document's** (C-552): the emitter computed it at
+            // build time and stored it beside `name`, so no consumer reproduces the allocation. A
+            // document written before the field existed carries no symbol, and only then does the
+            // allocator below reproduce it — the fallback keeps an older document readable under the
+            // C-537 forward-compat contract, and the whole-catalogue differential gate proves the
+            // stored symbol is the emitter's for every shipped operation.
+            let symbol = if param.symbol.is_empty() {
+                allocator.allocate(&param.name)
+            } else {
+                allocator.reserve(&param.symbol);
+                param.symbol.clone()
+            };
             if param.position == "path" {
                 caller_path_parameters.insert(symbol.clone());
             }
             parameters.push(param.name.clone());
             symbols.insert(param.name.clone(), symbol);
         }
+
+        let (description, input_schema) = match raw.contract {
+            Some(contract) => (contract.description, contract.input_schema),
+            None => (String::new(), Value::Null),
+        };
 
         let slots: BTreeMap<String, Slot> = raw
             .endpoint
@@ -325,12 +391,52 @@ impl Operation {
             service: raw.service,
             expose: raw.expose,
             request: raw.request,
+            description,
+            input_schema,
+            effects: raw.effects,
+            risk: raw.risk,
+            idempotency: raw.idempotency,
         }
     }
 
     /// The configuration variables this operation's request needs, in stable order.
     pub fn endpoint_variables(&self) -> &[String] {
         &self.variables
+    }
+
+    /// **The error-envelope-extended description the model-facing contract carries** (C-552).
+    ///
+    /// Not the document's one-line `description`: the extended text a model is handed, computed at
+    /// build time from the emitted declaration's own lowering and stored so a consumer needs no
+    /// engine to read it. Empty for a document written before the field existed.
+    pub fn contract_description(&self) -> &str {
+        &self.description
+    }
+
+    /// **The lowered, Flux-typed input schema the model-facing contract carries** (C-552).
+    ///
+    /// `OpSpec::lower`'s output — keyed by caller-facing Flux symbols, with Flux types (`int64`
+    /// integer, not the vendor's `number`) — so a consumer maps it directly into a `flux_spec`
+    /// ToolSpec without parsing the emitted Flux. [`Value::Null`] for a document written before the
+    /// field existed.
+    pub fn input_schema(&self) -> &Value {
+        &self.input_schema
+    }
+
+    /// **The host effects the authority projection reads** (C-552), read from the document and never
+    /// derived — `["read", "network"]` and the like. Distinct from `semantic_effects`.
+    pub fn effects(&self) -> &[String] {
+        &self.effects
+    }
+
+    /// The declared risk tier, as flux's vocabulary spells it (C-552).
+    pub fn risk(&self) -> &str {
+        &self.risk
+    }
+
+    /// The declared idempotency, as flux's vocabulary spells it (C-552).
+    pub fn idempotency(&self) -> &str {
+        &self.idempotency
     }
 
     /// Where each of those variables lands on the request.
@@ -434,6 +540,59 @@ mod tests {
         assert_eq!(symbols.allocate("payload"), "payload_2");
         assert_eq!(symbols.allocate("response"), "response_2");
         assert_eq!(symbols.allocate("content_type"), "content_type_2");
+    }
+
+    /// **C-538's ADJACENT 2 trap, guarded from the reader's side** (C-552).
+    ///
+    /// The document states each parameter's symbol, and the reader honors it. The fixture's declared
+    /// `a_b` carries the emitter's shifted symbol `a_b_2` — shifted because a `const`-pinned body
+    /// field the document omits reserved `a_b` — and the naive allocation over the declared
+    /// parameters alone (which never saw that `const` field) would have produced `a_b`. Honoring the
+    /// stored symbol is what sends the request under the right name.
+    #[test]
+    fn a_stated_symbol_is_honored_over_the_naive_allocation() {
+        let text = r#"{
+            "connector": "vendor",
+            "services": [{"name": "default", "base_url": "https://x"}],
+            "operations": [{
+                "id": "vendor-thing-create",
+                "service": "default",
+                "expose": true,
+                "params": [{"name": "a_b", "position": "body", "symbol": "a_b_2"}],
+                "request": {"method": "POST", "url": "{base}/things"}
+            }]
+        }"#;
+        let document = Document::parse(text).expect("the fixture parses");
+        let operation = document
+            .operation("vendor-thing-create")
+            .expect("its record");
+        assert_eq!(operation.caller_parameters(), ["a_b_2"]);
+        assert_eq!(operation.symbol("a_b"), Some("a_b_2"));
+
+        // Proof the seed is not a no-op: the naive allocation over the declared parameter alone would
+        // have handed back `a_b`, the very shift the stored symbol exists to preserve.
+        assert_eq!(Symbols::new().allocate("a_b"), "a_b");
+    }
+
+    /// A document written before C-552 carries no symbol, so the reader falls back to reproducing the
+    /// emitter's allocation — the C-537 forward-compat contract, that an additive field's absence
+    /// still reads.
+    #[test]
+    fn a_pre_c552_document_without_symbols_falls_back_to_the_allocation() {
+        let text = r#"{
+            "connector": "vendor",
+            "services": [{"name": "default", "base_url": "https://x"}],
+            "operations": [{
+                "id": "vendor-thing-list",
+                "service": "default",
+                "expose": true,
+                "params": [{"name": "time.start", "position": "query"}],
+                "request": {"method": "GET", "url": "{base}/things"}
+            }]
+        }"#;
+        let document = Document::parse(text).expect("the fixture parses");
+        let operation = document.operation("vendor-thing-list").expect("its record");
+        assert_eq!(operation.caller_parameters(), ["time_start"]);
     }
 
     #[test]

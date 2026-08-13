@@ -23,6 +23,21 @@
   "operations": [
     {
       "auth": [],
+      "contract": {
+        "description": "Verify credentials with a bounded contact read",
+        "input_schema": {
+          "properties": {
+            "per_page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Verify credentials with a bounded contact read",
       "direction": "read",
       "endpoint": {
@@ -43,7 +58,8 @@
             "default": 1,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -86,6 +102,33 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "List and filter tickets",
+        "input_schema": {
+          "properties": {
+            "company_id": {
+              "type": "string"
+            },
+            "req_email": {
+              "type": "string"
+            },
+            "req_id": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "req_id",
+            "req_email",
+            "company_id",
+            "updated"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "List and filter tickets",
       "direction": "read",
       "endpoint": {
@@ -105,6 +148,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "req_id",
           "wire": "requester_id"
         },
         {
@@ -116,6 +160,7 @@
             "format": "email",
             "type": "string"
           },
+          "symbol": "req_email",
           "wire": "email"
         },
         {
@@ -125,7 +170,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "company_id"
         },
         {
           "description": "Only tickets updated at or after this date",
@@ -136,6 +182,7 @@
             "format": "date-time",
             "type": "string"
           },
+          "symbol": "updated",
           "wire": "updated_since"
         }
       ],
@@ -267,6 +314,21 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "View one ticket",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "View one ticket",
       "direction": "read",
       "endpoint": {
@@ -285,7 +347,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -441,6 +504,85 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "Create a ticket. The requester must be identified either by requester_id, or by phone together with name — Freshdesk states this only in prose and its required flags do not capture it",
+        "input_schema": {
+          "properties": {
+            "cc_emails": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "custom_fields": {},
+            "description": {
+              "type": "string"
+            },
+            "email_config_id": {
+              "type": "number"
+            },
+            "group_id": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "product_id": {
+              "type": "number"
+            },
+            "requester_id": {
+              "type": "number"
+            },
+            "responder_id": {
+              "type": "number"
+            },
+            "source": {
+              "type": "number"
+            },
+            "status": {
+              "type": "number"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "phone",
+            "name",
+            "requester_id",
+            "subject",
+            "description",
+            "status",
+            "priority",
+            "source",
+            "responder_id",
+            "type",
+            "email_config_id",
+            "group_id",
+            "product_id",
+            "tags",
+            "cc_emails",
+            "custom_fields"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Create a ticket. The requester must be identified either by requester_id, or by phone together with name — Freshdesk states this only in prose and its required flags do not capture it",
       "direction": "write",
       "endpoint": {
@@ -459,7 +601,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "phone"
         },
         {
           "description": "Requester name. Supply with phone, or supply requester_id instead",
@@ -468,7 +611,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "Requester id. Supply this, or supply phone together with name",
@@ -477,7 +621,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "requester_id"
         },
         {
           "description": "Ticket subject",
@@ -486,7 +631,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "subject"
         },
         {
           "description": "Ticket description; HTML or long text",
@@ -495,7 +641,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "description"
         },
         {
           "description": "Ticket status: 2 open, 3 pending, 4 resolved, 5 closed",
@@ -511,7 +658,8 @@
               5
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "Ticket priority: 1 low, 2 medium, 3 high, 4 urgent",
@@ -527,7 +675,8 @@
               4
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "Channel the ticket came in on",
@@ -546,7 +695,8 @@
               10
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "source"
         },
         {
           "description": "Responding agent id",
@@ -555,7 +705,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "responder_id"
         },
         {
           "description": "Query type",
@@ -564,7 +715,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "Email config used for this ticket",
@@ -573,7 +725,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "email_config_id"
         },
         {
           "description": "Group the ticket is assigned to",
@@ -582,7 +735,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "group_id"
         },
         {
           "description": "Associated product",
@@ -591,7 +745,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "product_id"
         },
         {
           "description": "Ticket tags",
@@ -603,7 +758,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "tags"
         },
         {
           "description": "Addresses to copy on the ticket",
@@ -616,7 +772,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "cc_emails"
         },
         {
           "description": "Custom ticket field data",
@@ -631,7 +788,8 @@
               ]
             },
             "type": "object"
-          }
+          },
+          "symbol": "custom_fields"
         }
       ],
       "request": {
@@ -812,6 +970,82 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "Update a ticket's fields",
+        "input_schema": {
+          "properties": {
+            "custom_fields": {},
+            "description": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "email_config_id": {
+              "type": "number"
+            },
+            "group_id": {
+              "type": "number"
+            },
+            "id": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "product_id": {
+              "type": "number"
+            },
+            "requester_id": {
+              "type": "number"
+            },
+            "responder_id": {
+              "type": "number"
+            },
+            "status": {
+              "type": "number"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "subject",
+            "description",
+            "status",
+            "priority",
+            "requester_id",
+            "responder_id",
+            "name",
+            "phone",
+            "email",
+            "type",
+            "email_config_id",
+            "group_id",
+            "product_id",
+            "tags",
+            "custom_fields"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Update a ticket's fields",
       "direction": "write",
       "endpoint": {
@@ -830,7 +1064,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "id"
         },
         {
           "description": "Ticket subject",
@@ -839,7 +1074,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "subject"
         },
         {
           "description": "Ticket description",
@@ -848,7 +1084,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "description"
         },
         {
           "description": "Ticket status: 2 open, 3 pending, 4 resolved, 5 closed",
@@ -863,7 +1100,8 @@
               5
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "Ticket priority: 1 low, 2 medium, 3 high, 4 urgent",
@@ -878,7 +1116,8 @@
               4
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "Requester id",
@@ -887,7 +1126,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "requester_id"
         },
         {
           "description": "Responding agent id",
@@ -896,7 +1136,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "responder_id"
         },
         {
           "description": "Requester name",
@@ -905,7 +1146,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "Requester phone",
@@ -914,7 +1156,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "phone"
         },
         {
           "description": "Requester email",
@@ -924,7 +1167,8 @@
           "schema": {
             "format": "email",
             "type": "string"
-          }
+          },
+          "symbol": "email"
         },
         {
           "description": "Query type",
@@ -933,7 +1177,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "Email config used for this ticket",
@@ -942,7 +1187,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "email_config_id"
         },
         {
           "description": "Group the ticket is assigned to",
@@ -951,7 +1197,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "group_id"
         },
         {
           "description": "Associated product",
@@ -960,7 +1207,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "product_id"
         },
         {
           "description": "Ticket tags",
@@ -972,7 +1220,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "tags"
         },
         {
           "description": "Custom ticket field data",
@@ -987,7 +1236,8 @@
               ]
             },
             "type": "object"
-          }
+          },
+          "symbol": "custom_fields"
         }
       ],
       "request": {
@@ -1160,6 +1410,40 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "Add a note to a ticket; the note is private unless explicitly made public",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "id": {
+              "type": "number"
+            },
+            "incoming": {
+              "type": "boolean"
+            },
+            "notify_emails": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "private": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "body",
+            "private",
+            "incoming",
+            "notify_emails"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Add a note to a ticket; the note is private unless explicitly made public",
       "direction": "write",
       "endpoint": {
@@ -1178,7 +1462,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "id"
         },
         {
           "description": "Note body",
@@ -1188,7 +1473,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "body"
         },
         {
           "description": "Whether the note is hidden from end users",
@@ -1198,7 +1484,8 @@
           "schema": {
             "default": true,
             "type": "boolean"
-          }
+          },
+          "symbol": "private"
         },
         {
           "description": "Set true when the note originates from an external system",
@@ -1208,7 +1495,8 @@
           "schema": {
             "default": true,
             "type": "boolean"
-          }
+          },
+          "symbol": "incoming"
         },
         {
           "description": "Addresses to notify about the note",
@@ -1221,7 +1509,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "notify_emails"
         }
       ],
       "request": {
@@ -1320,6 +1609,37 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "List and filter contacts, e.g. to resolve a caller before filing a ticket",
+        "input_schema": {
+          "properties": {
+            "company_id": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "mobile": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "phone",
+            "email",
+            "mobile",
+            "company_id",
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "List and filter contacts, e.g. to resolve a caller before filing a ticket",
       "direction": "read",
       "endpoint": {
@@ -1338,7 +1658,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "phone"
         },
         {
           "description": "Filter by email",
@@ -1348,7 +1669,8 @@
           "schema": {
             "format": "email",
             "type": "string"
-          }
+          },
+          "symbol": "email"
         },
         {
           "description": "Filter by mobile number",
@@ -1357,7 +1679,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mobile"
         },
         {
           "description": "Filter by company id",
@@ -1366,7 +1689,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "company_id"
         },
         {
           "description": "Filter by contact state",
@@ -1381,7 +1705,8 @@
               "verified"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "state"
         }
       ],
       "request": {
@@ -1502,6 +1827,21 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "Get one contact",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Get one contact",
       "direction": "read",
       "endpoint": {
@@ -1520,7 +1860,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -1631,6 +1972,29 @@
     },
     {
       "auth": [],
+      "contract": {
+        "description": "Create a contact",
+        "input_schema": {
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "email",
+            "phone"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
       "description": "Create a contact",
       "direction": "write",
       "endpoint": {
@@ -1649,7 +2013,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "Contact email",
@@ -1659,7 +2024,8 @@
           "schema": {
             "format": "email",
             "type": "string"
-          }
+          },
+          "symbol": "email"
         },
         {
           "description": "Contact phone number",
@@ -1668,7 +2034,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "phone"
         }
       ],
       "request": {

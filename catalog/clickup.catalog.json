@@ -45,6 +45,15 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "List the workspaces (called \"teams\" in ClickUp's API) the token can see. Takes no parameters; used as the verify read to prove a token resolves, and as the source of the workspace-level context a space id is nested under",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the workspaces (called \"teams\" in ClickUp's API) the token can see. Takes no parameters; used as the verify read to prove a token resolves, and as the source of the workspace-level context a space id is nested under",
       "direction": "read",
       "expose": true,
@@ -105,6 +114,25 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "List a space's folders. Each folder's own lists are nested inline in the response — read a folder's `lists` field for the list ids clickup-list-task-list and clickup-task-create take, rather than looking for a separate folder-to-list operation",
+        "input_schema": {
+          "properties": {
+            "archived": {
+              "type": "boolean"
+            },
+            "space_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "space_id",
+            "archived"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a space's folders. Each folder's own lists are nested inline in the response — read a folder's `lists` field for the list ids clickup-list-task-list and clickup-task-create take, rather than looking for a separate folder-to-list operation",
       "direction": "read",
       "expose": true,
@@ -119,7 +147,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "space_id"
         },
         {
           "description": "Include archived folders",
@@ -128,7 +157,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "archived"
         }
       ],
       "request": {
@@ -198,6 +228,41 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "List tasks in a list, most recently created first by default",
+        "input_schema": {
+          "properties": {
+            "archived": {
+              "type": "boolean"
+            },
+            "include_closed": {
+              "type": "boolean"
+            },
+            "list_id": {
+              "type": "string"
+            },
+            "order_by": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "reverse": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "list_id",
+            "archived",
+            "page",
+            "order_by",
+            "reverse",
+            "include_closed"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List tasks in a list, most recently created first by default",
       "direction": "read",
       "expose": true,
@@ -212,7 +277,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "list_id"
         },
         {
           "description": "Include archived tasks",
@@ -221,7 +287,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "archived"
         },
         {
           "description": "0-based page number",
@@ -231,7 +298,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Sort field",
@@ -246,7 +314,8 @@
               "due_date"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "order_by"
         },
         {
           "description": "Reverse the sort order",
@@ -255,7 +324,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "reverse"
         },
         {
           "description": "Include closed tasks; excluded by default",
@@ -264,7 +334,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "include_closed"
         }
       ],
       "request": {
@@ -410,6 +481,25 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "Get one task by id",
+        "input_schema": {
+          "properties": {
+            "include_subtasks": {
+              "type": "boolean"
+            },
+            "task_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "task_id",
+            "include_subtasks"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one task by id",
       "direction": "read",
       "expose": true,
@@ -424,7 +514,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "task_id"
         },
         {
           "description": "Include the task's subtasks in the response",
@@ -433,7 +524,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "include_subtasks"
         }
       ],
       "request": {
@@ -513,6 +605,41 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "Create a task in a list. Created with `notify_all` left at its default (false), so nobody is emailed by this call",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "due_date": {
+              "type": "number"
+            },
+            "list_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "list_id",
+            "name",
+            "description",
+            "status",
+            "priority",
+            "due_date"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a task in a list. Created with `notify_all` left at its default (false), so nobody is emailed by this call",
       "direction": "write",
       "expose": true,
@@ -527,7 +654,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "list_id"
         },
         {
           "description": "The task's name, as it appears in ClickUp's list view. The only vendor-required field",
@@ -537,7 +665,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "The task's plain-text description",
@@ -546,7 +675,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "description"
         },
         {
           "description": "The status to create the task in, e.g. \"to do\" — must be one of the list's own configured statuses. Omit to use the list's default status",
@@ -555,7 +685,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "1 (urgent), 2 (high), 3 (normal) or 4 (low). Omit for no priority",
@@ -570,7 +701,8 @@
               4
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "Due date/time as Unix epoch milliseconds",
@@ -579,7 +711,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "due_date"
         }
       ],
       "request": {
@@ -655,6 +788,41 @@
           "clickup.token"
         ]
       ],
+      "contract": {
+        "description": "Update a task's plain fields (name, description, status, priority, due date). Every field below is optional and ClickUp's update is sparse: an omitted field is left unchanged. Reassigning or rewatching the task is not supported by this operation — ClickUp takes those as {add, rem} deltas naming specific people, which this connector does not declare",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "due_date": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "task_id",
+            "name",
+            "description",
+            "status",
+            "priority",
+            "due_date"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Update a task's plain fields (name, description, status, priority, due date). Every field below is optional and ClickUp's update is sparse: an omitted field is left unchanged. Reassigning or rewatching the task is not supported by this operation — ClickUp takes those as {add, rem} deltas naming specific people, which this connector does not declare",
       "direction": "write",
       "expose": true,
@@ -669,7 +837,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "task_id"
         },
         {
           "description": "The task's new name. Omit to leave it unchanged",
@@ -679,7 +848,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "The task's new plain-text description. Omit to leave it unchanged",
@@ -688,7 +858,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "description"
         },
         {
           "description": "The task's new status, e.g. \"complete\" — must be one of the list's own configured statuses. Omit to leave it unchanged",
@@ -697,7 +868,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "1 (urgent), 2 (high), 3 (normal) or 4 (low). Omit to leave it unchanged",
@@ -712,7 +884,8 @@
               4
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "Due date/time as Unix epoch milliseconds. Omit to leave it unchanged",
@@ -721,7 +894,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "due_date"
         }
       ],
       "request": {

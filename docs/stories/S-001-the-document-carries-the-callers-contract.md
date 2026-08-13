@@ -2,9 +2,8 @@
 id: S-001
 title: "The document carries the caller's contract, so nothing at runtime parses source"
 pillar: Catalog
-status: ready
-priority: 1
-design:
+status: done
+design: ../design/03-the-callers-contract.md
 epic: catalog-day-one
 areas: [catalog, catalog-build, connector-resolve]
 note: "ported from flux-connectors C-552 (measured by C-538). Architecture §2 day-one change 1, first half: the caller-facing symbol, the error-envelope-extended description and the contract input_schema. Per-operation effects — C-552's fourth field — are S-002, because they have a second consumer (grant admission) and a mistake of their own to close"
@@ -35,49 +34,59 @@ The three fields, as C-552 measured them:
 
 ## Acceptance
 
-- [ ] `catalog/connector-document.schema.json` gains all three, **additively**, under a minor schema
-      bump: a caller-facing symbol per parameter, the projection description, and the contract
-      `input_schema` in its **lowered, caller-typed** form — computed at build time by
-      `catalog-build` (which has the lowering) and stored as data, not the raw vendor schema, so a
-      consumer maps it directly. Every committed canonical document is regenerated; this is a
-      whole-catalog artifact change, so the regeneration is coordinator-owned, not per-provider.
-- [ ] A consumer constructs the **complete** caller-facing contract — name, description,
-      `input_schema`, `expose` — from the document's data alone, with no parse of any connector
-      source form anywhere in the consumer. Failing-first test names the consumer path and the
-      absence it proves (a guard asserting no source parser is reachable from it).
-- [ ] The symbol is written by the lowering, and the second reproduction of the allocator retires:
-      `crates/connector-resolve` either reads the document field or is demoted to a *validated* read
-      — a document whose symbol disagrees with what the allocator would produce is refused at build,
-      by name.
-- [ ] C-552's const-pinned trap is closed or proven unreachable: a `const`-pinned body field whose
-      name normalizes onto a later parameter's symbol must not shift symbols between the lowering and
-      the document (the emitter allocated for every body parameter; the document omits const-pinned
-      ones). A fixture pins the case.
-- [ ] The `format = "origin"` blind spot is closed (C-538 open question 3): a loader or gate assertion
-      requires every `format = "origin"` field's bound variable to lower to `["origin"]` in the
-      document, so a provider declaring it for a variable inside a larger authority
-      (`https://{v}.x/`) cannot silently drop Origin→Host with nothing red.
-- [ ] **`CredentialRequirement` stops being derived.** The document publishes only the *effective*
-      auth list, so "this operation declares `auth = []`" and "nothing is declared anywhere" are the
-      same empty list, and `crates/catalog/src/table.rs::credential_requirement` resolves the
-      difference from the connector default instead of reading it. That derivation reproduces the
-      predecessor's classification for all 835 shipped operations and is **ambiguous in principle**
-      (recorded at `table.rs:31-36`). The document carries the distinction; the failing-first test is
-      the pair of documents today's derivation cannot tell apart.
-- [ ] **`Acquisition::Minted` becomes reachable, or is deferred with the reason recorded.** The
-      minting join lives in the provider TOML's `[[operations]]` block (`produces_credential`) and
-      reaches **no document field**, so `table.rs` can never construct the variant
-      (`table.rs:28-30`, `crates/catalog/src/lib.rs:339-345`). C-136's property — *a caller can use a
-      credential it can never read* — is therefore unreachable through the canonical document. Either
-      the document carries the join (which call mints it, and where in that call's answer the value
-      arrives) or the variant's unreachability is stated where the type is defined, with the story
-      that would close it named.
-- [ ] Determinism is unbroken: two independent builds produce byte-identical documents and pack
-      (architecture §7.2), and the one-time migration differential against the predecessor's pack
-      (§7.6) still passes for every field the two share.
+- [x] `catalog/connector-document.schema.json` gains all three, **additively**: a caller-facing
+      symbol per parameter, the projection description, and the contract `input_schema` in its
+      **lowered, caller-typed** form — computed at build time by `catalog-build` (which has the
+      lowering, `src/contract.rs`) and stored as data. Every committed canonical document was
+      regenerated whole-catalogue. → `schema_version` stays 1, not a bump: additive per the
+      schema's own rule and C-537; the resolution is design 03 §2.
+- [x] A consumer constructs the **complete** caller-facing contract — name, description,
+      `input_schema`, `expose` — from the document's data alone.
+      → `catalog::Operation::{contract_description, input_schema, expose}`;
+      `consumer_api.rs::the_caller_contract_is_document_data_alone` names the consumer path and
+      proves the absence (no source-form parser in the crate's dependency closure).
+- [x] The symbol is written by the lowering, and the second reproduction of the allocator retires:
+      `crates/connector-resolve` reads the document field (its copy survives only as the
+      pre-S-001-document fallback, exercised by no build here). Disagreement is refused at build:
+      the fixed-point invariant catches any committed symbol the allocator would not produce, and
+      `the_contract_and_the_params_state_the_same_symbols` names the operation whose two symbol
+      statements drift.
+- [x] The const-pinned trap is closed: the allocator reserves a symbol for every body parameter,
+      `const`-pinned ones included, and the document states the shifted result.
+      → `contract.rs::a_const_pinned_body_field_reserves_the_symbol_a_later_field_must_shift_past`
+      (build side) and `connector-resolve/document.rs`'s reader-side twin.
+- [x] The `format = "origin"` blind spot is closed.
+      → `catalog_invariants.rs::every_format_origin_field_lowers_to_the_origin_slot`, with the
+      cannot-go-blind counter (gitlab is the shipped case).
+- [x] **`CredentialRequirement` stops being derived.** The document publishes
+      `credential_requirement` (C-206's tokens), computed at build where `Operation::auth`'s
+      `Option` still distinguishes declared-empty from never-declared;
+      `table.rs::credential_requirement` reads it and the default-resolving derivation is gone.
+      → failing-first pair: `table.rs::tests::the_document_tells_apart_the_pair_the_derivation_could_not`.
+- [x] **`Acquisition::Minted` is reachable** — the carry arm, not the deferral: the document
+      gains the optional `produces_credential { credential, secret }` join (zero byte cost on
+      every shipped document; none declares one) and `table.rs` constructs the variant from it,
+      refusing conflicting provenance by name.
+      → `table.rs::tests::a_minting_join_in_the_document_reaches_acquisition_minted`.
+- [x] Determinism is unbroken: the fixed-point and two-plans invariants are green over the
+      regenerated tree, and the one-time differential against the predecessor ran against its
+      C-552 regenerated documents (the shared fields, which its pack predates): **835/835
+      operations, 1518/1518 symbols** — `symbol`, `contract.description`, `contract.input_schema`
+      all byte-equal to the engine-derived values. Effects excluded (S-002).
 
 ## Progress
-- (not started)
+- 2026-08-13 — done. Ported from the predecessor's reviewed `impl/C-552` (commit `6dae5439`,
+  whose parent `3650a136` is exactly the M1 import pin, so the surviving hunks applied verbatim:
+  `connector-resolve` byte-identical, the document builder/schema with two call-site swaps). The
+  allocator moved whole into `connector_spec::names`; the one engine-bound function
+  (`OpSpec::lower`'s input-schema projection) is restated engine-free in
+  `catalog-build/src/contract.rs` and held to the predecessor's engine output by the one-time
+  differential: 55 providers, 835/835 operations, 1518/1518 symbols, 100% equal. The two post-M1
+  items landed as data: `credential_requirement` (read, no longer derived) and the
+  `produces_credential` minting join (Minted reachable). Full gate green: workspace build/test
+  (all suites), clippy `-D warnings`, fmt, `catalog build` fixed point, `catalog diff` clean,
+  four new whole-catalogue invariants (9–12). Decisions recorded in
+  [design 03](../design/03-the-callers-contract.md).
 
 ## Notes
 

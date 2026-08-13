@@ -60,6 +60,21 @@
           "okta.api_token"
         ]
       ],
+      "contract": {
+        "description": "List users in the Okta org. Returns a JSON array of user objects, most recently created first. Without a filter this is the org's active user population, so use `limit` to bound it — see okta-user-get to read one user by id or login",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List users in the Okta org. Returns a JSON array of user objects, most recently created first. Without a filter this is the org's active user population, so use `limit` to bound it — see okta-user-get to read one user by id or login",
       "direction": "read",
       "endpoint": {
@@ -79,7 +94,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -179,6 +195,21 @@
           "okta.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one user's full record, including their lifecycle status and profile attributes. Accepts the user's Okta id or their login, so a caller holding an email address does not need to list first",
+        "input_schema": {
+          "properties": {
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one user's full record, including their lifecycle status and profile attributes. Accepts the user's Okta id or their login, so a caller holding an email address does not need to list first",
       "direction": "read",
       "endpoint": {
@@ -198,7 +229,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user_id"
         }
       ],
       "request": {
@@ -281,6 +313,21 @@
           "okta.api_token"
         ]
       ],
+      "contract": {
+        "description": "List groups in the Okta org. Returns a JSON array of group objects. A group is how Okta grants application access in bulk, so this is the set a membership question is asked against",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List groups in the Okta org. Returns a JSON array of group objects. A group is how Okta grants application access in bulk, so this is the set a membership question is asked against",
       "direction": "read",
       "endpoint": {
@@ -300,7 +347,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -380,6 +428,25 @@
           "okta.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the groups one user is a member of. This is the direct answer to \"what access does this person have\", because Okta grants application assignments through group membership",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the groups one user is a member of. This is the direct answer to \"what access does this person have\", because Okta grants application assignments through group membership",
       "direction": "read",
       "endpoint": {
@@ -399,7 +466,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user_id"
         },
         {
           "description": "Maximum number of groups to return in this page. Okta caps this per endpoint and the cap is not declared here, so a value above it is reduced by Okta rather than rejected",
@@ -409,7 +477,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -484,6 +553,25 @@
           "okta.api_token"
         ]
       ],
+      "contract": {
+        "description": "Deactivate a user, moving them to DEPROVISIONED. This takes effect immediately: Okta ends the person's active sessions, revokes their tokens and grants, and removes their access to every application the org assigns through Okta. They cannot sign in afterwards. An administrator can reactivate the account later, but that is a separate operation this connector does not offer, and it does not restore the sessions or tokens this call destroyed",
+        "input_schema": {
+          "properties": {
+            "send_email": {
+              "type": "boolean"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id",
+            "send_email"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Deactivate a user, moving them to DEPROVISIONED. This takes effect immediately: Okta ends the person's active sessions, revokes their tokens and grants, and removes their access to every application the org assigns through Okta. They cannot sign in afterwards. An administrator can reactivate the account later, but that is a separate operation this connector does not offer, and it does not restore the sessions or tokens this call destroyed",
       "direction": "write",
       "endpoint": {
@@ -503,7 +591,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user_id"
         },
         {
           "description": "Set true to have Okta send its deactivation notification email. Omit for Okta's default, which sends none",
@@ -513,6 +602,7 @@
           "schema": {
             "type": "boolean"
           },
+          "symbol": "send_email",
           "wire": "sendEmail"
         }
       ],

@@ -29,6 +29,25 @@
           "sentry.auth_token"
         ]
       ],
+      "contract": {
+        "description": "Get one issue — its title, culprit, level, status, assignee, first and last seen timestamps and event counts. An issue is Sentry's group of like events, not a single occurrence; use `sentry-issue-event-latest` for the stack trace. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/detail` in the response body.",
+        "input_schema": {
+          "properties": {
+            "issue_id": {
+              "type": "string"
+            },
+            "organization_id_or_slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "organization_id_or_slug",
+            "issue_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one issue — its title, culprit, level, status, assignee, first and last seen timestamps and event counts. An issue is Sentry's group of like events, not a single occurrence; use `sentry-issue-event-latest` for the stack trace",
       "direction": "read",
       "expose": true,
@@ -44,7 +63,8 @@
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "organization_id_or_slug"
         },
         {
           "description": "The issue's numeric id — the number in a Sentry issue URL, and the `issue_id` an alert payload carries. It is not the short id (`ACME-INC-7F`)",
@@ -55,7 +75,8 @@
             "minLength": 1,
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "issue_id"
         }
       ],
       "quirks": {
@@ -187,6 +208,29 @@
           "sentry.auth_token"
         ]
       ],
+      "contract": {
+        "description": "Change an issue's triage state: resolve it, ignore it, or return it to unresolved. This is the state the whole organization triages against — a resolved issue leaves the unresolved queue, and an ignored one stops alerting until it recurs on Sentry's terms. Recorded in the issue's activity feed under the token's owner. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/detail` in the response body.",
+        "input_schema": {
+          "properties": {
+            "issue_id": {
+              "type": "string"
+            },
+            "organization_id_or_slug": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "organization_id_or_slug",
+            "issue_id",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Change an issue's triage state: resolve it, ignore it, or return it to unresolved. This is the state the whole organization triages against — a resolved issue leaves the unresolved queue, and an ignored one stops alerting until it recurs on Sentry's terms. Recorded in the issue's activity feed under the token's owner",
       "direction": "write",
       "expose": true,
@@ -202,7 +246,8 @@
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "organization_id_or_slug"
         },
         {
           "description": "The issue's numeric id",
@@ -213,7 +258,8 @@
             "minLength": 1,
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "issue_id"
         },
         {
           "description": "`resolved` closes the issue, `ignored` mutes it until Sentry's own recurrence conditions fire, `unresolved` reopens it and puts it back in the team's queue",
@@ -227,7 +273,8 @@
               "unresolved"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "status"
         }
       ],
       "quirks": {
@@ -353,6 +400,25 @@
           "sentry.auth_token"
         ]
       ],
+      "contract": {
+        "description": "Get one project — its name, slug, platform, teams, DSN-bearing client keys' status and whether it is currently accepting events. This is the project an issue belongs to, so it is how a triage flow finds out which service is broken. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/detail` in the response body.",
+        "input_schema": {
+          "properties": {
+            "organization_id_or_slug": {
+              "type": "string"
+            },
+            "project_id_or_slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "organization_id_or_slug",
+            "project_id_or_slug"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one project — its name, slug, platform, teams, DSN-bearing client keys' status and whether it is currently accepting events. This is the project an issue belongs to, so it is how a triage flow finds out which service is broken",
       "direction": "read",
       "expose": true,
@@ -368,7 +434,8 @@
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "organization_id_or_slug"
         },
         {
           "description": "The project's slug as it appears in a Sentry URL (`backend-api`), or its numeric id",
@@ -379,7 +446,8 @@
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "project_id_or_slug"
         }
       ],
       "quirks": {
@@ -501,6 +569,25 @@
           "sentry.auth_token"
         ]
       ],
+      "contract": {
+        "description": "Get the most recent event of an issue — the actual occurrence, with its stack trace, breadcrumbs, request context and tags. This is what makes an issue diagnosable rather than merely countable; the event list itself is excluded because it pages with an opaque cursor. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/detail` in the response body.",
+        "input_schema": {
+          "properties": {
+            "issue_id": {
+              "type": "string"
+            },
+            "organization_id_or_slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "organization_id_or_slug",
+            "issue_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the most recent event of an issue — the actual occurrence, with its stack trace, breadcrumbs, request context and tags. This is what makes an issue diagnosable rather than merely countable; the event list itself is excluded because it pages with an opaque cursor",
       "direction": "read",
       "expose": true,
@@ -516,7 +603,8 @@
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "organization_id_or_slug"
         },
         {
           "description": "The issue's numeric id",
@@ -527,7 +615,8 @@
             "minLength": 1,
             "pattern": "^[0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "issue_id"
         }
       ],
       "quirks": {

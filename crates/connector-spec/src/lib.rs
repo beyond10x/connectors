@@ -97,6 +97,7 @@ pub mod graph;
 pub mod inbound;
 mod ir;
 pub mod lock;
+pub mod names;
 pub mod openapi;
 pub mod provider;
 

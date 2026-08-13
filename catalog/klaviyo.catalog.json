@@ -46,6 +46,15 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "Read the Klaviyo account this API key belongs to, with its timezone, currency, industry and contact details. Returns exactly one account — a private key is scoped to one — so this is the call that answers 'which account am I connected to'. Also this connector's verify: it takes no argument and needs only the accounts:read scope",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read the Klaviyo account this API key belongs to, with its timezone, currency, industry and contact details. Returns exactly one account — a private key is scoped to one — so this is the call that answers 'which account am I connected to'. Also this connector's verify: it takes no argument and needs only the accounts:read scope",
       "direction": "read",
       "expose": true,
@@ -141,6 +150,15 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "List customer profiles in the account, newest first. Returns the FIRST PAGE ONLY — Klaviyo pages with an opaque `page[cursor]` query parameter this connector cannot send, so there is no way to reach later pages and no way to filter. Every profile carries personal data: an email address, often a phone number and a postal location",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List customer profiles in the account, newest first. Returns the FIRST PAGE ONLY — Klaviyo pages with an opaque `page[cursor]` query parameter this connector cannot send, so there is no way to reach later pages and no way to filter. Every profile carries personal data: an email address, often a phone number and a postal location",
       "direction": "read",
       "expose": true,
@@ -270,6 +288,21 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "Read one customer profile by its Klaviyo id, with its identifiers, custom properties, consent state and location. Returns personal data about a named individual",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read one customer profile by its Klaviyo id, with its identifiers, custom properties, consent state and location. Returns personal data about a named individual",
       "direction": "read",
       "expose": true,
@@ -284,7 +317,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -404,6 +438,45 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "Create a customer profile. At least one identifier is required — email, phone number or external id — and Klaviyo answers 409 Conflict if a profile with that identifier already exists, so this creates and never updates. The created profile can be marketed to only once it is subscribed, which this connector does not do",
+        "input_schema": {
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "external_id": {
+              "type": "string"
+            },
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "organization": {
+              "type": "string"
+            },
+            "phone_number": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "phone_number",
+            "external_id",
+            "first_name",
+            "last_name",
+            "organization",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a customer profile. At least one identifier is required — email, phone number or external id — and Klaviyo answers 409 Conflict if a profile with that identifier already exists, so this creates and never updates. The created profile can be marketed to only once it is subscribed, which this connector does not do",
       "direction": "write",
       "expose": true,
@@ -419,6 +492,7 @@
             "format": "email",
             "type": "string"
           },
+          "symbol": "email",
           "wire": "data.attributes.email"
         },
         {
@@ -429,6 +503,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "phone_number",
           "wire": "data.attributes.phone_number"
         },
         {
@@ -439,6 +514,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "external_id",
           "wire": "data.attributes.external_id"
         },
         {
@@ -449,6 +525,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "first_name",
           "wire": "data.attributes.first_name"
         },
         {
@@ -459,6 +536,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "last_name",
           "wire": "data.attributes.last_name"
         },
         {
@@ -469,6 +547,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "organization",
           "wire": "data.attributes.organization"
         },
         {
@@ -479,6 +558,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "title",
           "wire": "data.attributes.title"
         }
       ],
@@ -622,6 +702,15 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the account's lists — static, opt-in collections of profiles, as opposed to segments, which are live queries and are not shipped here. Returns the FIRST PAGE ONLY; Klaviyo's `page[cursor]` query parameter cannot be sent by this connector. Returns the lists themselves, not their members",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's lists — static, opt-in collections of profiles, as opposed to segments, which are live queries and are not shipped here. Returns the FIRST PAGE ONLY; Klaviyo's `page[cursor]` query parameter cannot be sent by this connector. Returns the lists themselves, not their members",
       "direction": "read",
       "expose": true,
@@ -708,6 +797,39 @@
           "klaviyo.api_key"
         ]
       ],
+      "contract": {
+        "description": "Post an event about a customer — a purchase, a page view, anything the account measures. THIS CAN CAUSE A MESSAGE TO BE SENT: an event triggers any Klaviyo flow built on its metric, so an email or SMS may reach the named profile immediately. Klaviyo creates the metric and the profile on first use if they do not exist. Answers 202 Accepted with no body: the event is queued, not confirmed. Pass unique_id to make a retry safe — Klaviyo records only the first event with a given unique_id for the same profile and metric",
+        "input_schema": {
+          "properties": {
+            "metric_name": {
+              "type": "string"
+            },
+            "profile_email": {
+              "type": "string"
+            },
+            "properties": {},
+            "unique_id": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            },
+            "value_currency": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "metric_name",
+            "profile_email",
+            "properties",
+            "value",
+            "value_currency",
+            "unique_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Post an event about a customer — a purchase, a page view, anything the account measures. THIS CAN CAUSE A MESSAGE TO BE SENT: an event triggers any Klaviyo flow built on its metric, so an email or SMS may reach the named profile immediately. Klaviyo creates the metric and the profile on first use if they do not exist. Answers 202 Accepted with no body: the event is queued, not confirmed. Pass unique_id to make a retry safe — Klaviyo records only the first event with a given unique_id for the same profile and metric",
       "direction": "write",
       "expose": true,
@@ -723,6 +845,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "metric_name",
           "wire": "data.attributes.metric.data.attributes.name"
         },
         {
@@ -734,6 +857,7 @@
             "format": "email",
             "type": "string"
           },
+          "symbol": "profile_email",
           "wire": "data.attributes.profile.data.attributes.email"
         },
         {
@@ -744,6 +868,7 @@
           "schema": {
             "type": "object"
           },
+          "symbol": "properties",
           "wire": "data.attributes.properties"
         },
         {
@@ -754,6 +879,7 @@
           "schema": {
             "type": "number"
           },
+          "symbol": "value",
           "wire": "data.attributes.value"
         },
         {
@@ -764,6 +890,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "value_currency",
           "wire": "data.attributes.value_currency"
         },
         {
@@ -774,6 +901,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "unique_id",
           "wire": "data.attributes.unique_id"
         }
       ],

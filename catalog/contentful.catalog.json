@@ -124,6 +124,21 @@
           "contentful.delivery_token"
         ]
       ],
+      "contract": {
+        "description": "Get one published entry by id, with its fields resolved to one locale",
+        "input_schema": {
+          "properties": {
+            "entry_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "entry_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one published entry by id, with its fields resolved to one locale",
       "direction": "read",
       "endpoint": {
@@ -146,7 +161,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "entry_id"
         }
       ],
       "request": {
@@ -192,6 +208,25 @@
           "contentful.delivery_token"
         ]
       ],
+      "contract": {
+        "description": "List published entries in this space and environment, most recently updated first. This connector's `verify` — a bounded read that runs unattended: space and environment are already resolved from configuration, and `limit`/`skip` are optional, so no required argument is ever needed",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "skip": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "skip"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List published entries in this space and environment, most recently updated first. This connector's `verify` — a bounded read that runs unattended: space and environment are already resolved from configuration, and `limit`/`skip` are optional, so no required argument is ever needed",
       "direction": "read",
       "endpoint": {
@@ -215,7 +250,8 @@
             "maximum": 1000,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of entries to skip, for paging",
@@ -225,7 +261,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "skip"
         }
       ],
       "request": {
@@ -287,6 +324,21 @@
           "contentful.delivery_token"
         ]
       ],
+      "contract": {
+        "description": "Get one published asset (an uploaded file, e.g. an image) by id, with its metadata resolved to one locale",
+        "input_schema": {
+          "properties": {
+            "asset_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "asset_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one published asset (an uploaded file, e.g. an image) by id, with its metadata resolved to one locale",
       "direction": "read",
       "endpoint": {
@@ -309,7 +361,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "asset_id"
         }
       ],
       "request": {
@@ -355,6 +408,23 @@
           "contentful.management_token"
         ]
       ],
+      "contract": {
+        "description": "Create a new entry from a content type's field values. Contentful assigns the entry's id. The entry is created as a draft — it is not visible through the Delivery API until contentful-entry-publish publishes it",
+        "input_schema": {
+          "properties": {
+            "body": {},
+            "content_type_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "content_type_id",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new entry from a content type's field values. Contentful assigns the entry's id. The entry is created as a draft — it is not visible through the Delivery API until contentful-entry-publish publishes it",
       "direction": "write",
       "endpoint": {
@@ -378,6 +448,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "content_type_id",
           "wire": "X-Contentful-Content-Type"
         },
         {
@@ -387,7 +458,8 @@
           "schema": {
             "description": "The entry's field values: `{\"fields\": {<field id>: {<locale>: <value>}}}`. Both the field ids and the locale keys (e.g. `en-US`) are this space's own content model and are not knowable at build time — see the header comment for why this is one opaque schema rather than named fields",
             "type": "object"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "request": {
@@ -449,6 +521,25 @@
           "contentful.management_token"
         ]
       ],
+      "contract": {
+        "description": "Publish a draft entry, making it visible through the Delivery API. Sends no body",
+        "input_schema": {
+          "properties": {
+            "entry_id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "entry_id",
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Publish a draft entry, making it visible through the Delivery API. Sends no body",
       "direction": "write",
       "endpoint": {
@@ -471,7 +562,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "entry_id"
         },
         {
           "description": "The entry's current `sys.version` (from contentful-entry-create or a subsequent read). Contentful rejects the request with a version conflict if this is stale, which is the optimistic-concurrency check that keeps a publish from clobbering someone else's more recent edit",
@@ -482,6 +574,7 @@
             "minimum": 1,
             "type": "integer"
           },
+          "symbol": "version",
           "wire": "X-Contentful-Version"
         }
       ],

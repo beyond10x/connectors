@@ -44,6 +44,21 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "List one conversation, confirming the token resolves and carries at least read access. Takes no parameters other than the page bound. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List one conversation, confirming the token resolves and carries at least read access. Takes no parameters other than the page bound",
       "direction": "read",
       "expose": true,
@@ -60,7 +75,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "quirks": {
@@ -103,6 +119,21 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the company's conversations in reverse chronological order (most recently updated first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Front's structured search filter (`q`) is not accepted here: it is a bracket-notation object this pipeline cannot encode as a query string. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the company's conversations in reverse chronological order (most recently updated first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Front's structured search filter (`q`) is not accepted here: it is a bracket-notation object this pipeline cannot encode as a query string",
       "direction": "read",
       "expose": true,
@@ -119,7 +150,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "quirks": {
@@ -193,6 +225,21 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one conversation's metadata: subject, status, assignee, recipient and tags. Does not return its messages — use front-conversation-message-list for those. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "conversation_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversation_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one conversation's metadata: subject, status, assignee, recipient and tags. Does not return its messages — use front-conversation-message-list for those",
       "direction": "read",
       "expose": true,
@@ -207,7 +254,8 @@
           "schema": {
             "pattern": "^cnv_[0-9a-z]+$",
             "type": "string"
-          }
+          },
+          "symbol": "conversation_id"
         }
       ],
       "quirks": {
@@ -294,6 +342,25 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the messages in a conversation in reverse chronological order (newest first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Each message's `body`/`text` is the actual correspondence exchanged on this conversation. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "conversation_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "conversation_id",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the messages in a conversation in reverse chronological order (newest first), first page only — this connector cannot follow Front's next-page link (see providers/front.toml's header comment). Each message's `body`/`text` is the actual correspondence exchanged on this conversation",
       "direction": "read",
       "expose": true,
@@ -308,7 +375,8 @@
           "schema": {
             "pattern": "^cnv_[0-9a-z]+$",
             "type": "string"
-          }
+          },
+          "symbol": "conversation_id"
         },
         {
           "description": "Max messages to return in this one page, up to Front's own cap of 100",
@@ -320,7 +388,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "quirks": {
@@ -428,6 +497,25 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "Reply to a conversation, using its own existing recipients, channel and sender identity — this connector cannot override any of those (see providers/front.toml's header comment). Front queues delivery: the response is an acknowledgement, not the sent message, and is not visible to the recipient until Front actually delivers it. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "conversation_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversation_id",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Reply to a conversation, using its own existing recipients, channel and sender identity — this connector cannot override any of those (see providers/front.toml's header comment). Front queues delivery: the response is an acknowledgement, not the sent message, and is not visible to the recipient until Front actually delivers it",
       "direction": "write",
       "expose": true,
@@ -442,7 +530,8 @@
           "schema": {
             "pattern": "^cnv_[0-9a-z]+$",
             "type": "string"
-          }
+          },
+          "symbol": "conversation_id"
         },
         {
           "description": "The reply's content. Sent as-is to the conversation's existing recipients over its existing channel — this operation cannot redirect it to a different recipient list, channel or sender (C-56; see providers/front.toml's header comment)",
@@ -452,7 +541,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "quirks": {
@@ -499,6 +589,28 @@
           "front.api_token"
         ]
       ],
+      "contract": {
+        "description": "Apply one or more existing tags to a conversation. Applying a tag the conversation already carries changes nothing — Front does not duplicate it. Answers 204 with an empty body on success. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/_error/message`, its error code at `/_error/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "conversation_id": {
+              "type": "string"
+            },
+            "tag_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "conversation_id",
+            "tag_ids"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Apply one or more existing tags to a conversation. Applying a tag the conversation already carries changes nothing — Front does not duplicate it. Answers 204 with an empty body on success",
       "direction": "write",
       "expose": true,
@@ -513,7 +625,8 @@
           "schema": {
             "pattern": "^cnv_[0-9a-z]+$",
             "type": "string"
-          }
+          },
+          "symbol": "conversation_id"
         },
         {
           "description": "The existing tag ids to apply, each an opaque string prefixed `tag_` that a model must not invent — discover them from a conversation's own `tags` field (front-conversation-get) or from Front's tag settings",
@@ -527,7 +640,8 @@
             },
             "minItems": 1,
             "type": "array"
-          }
+          },
+          "symbol": "tag_ids"
         }
       ],
       "quirks": {

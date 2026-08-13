@@ -29,6 +29,31 @@
           "resend.api_key"
         ]
       ],
+      "contract": {
+        "description": "Send one email immediately. Delivered within seconds and cannot be recalled once accepted. The sending domain must already be verified on this account — resend-domain-list names the ones that are",
+        "input_schema": {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "html": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "to": {}
+          },
+          "required": [
+            "from",
+            "to",
+            "subject",
+            "html"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Send one email immediately. Delivered within seconds and cannot be recalled once accepted. The sending domain must already be verified on this account — resend-domain-list names the ones that are",
       "direction": "write",
       "expose": true,
@@ -43,7 +68,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "from"
         },
         {
           "description": "Recipient address, or an array of up to 50 addresses. The caller's own input, never an example value here",
@@ -65,7 +91,8 @@
                 "type": "array"
               }
             ]
-          }
+          },
+          "symbol": "to"
         },
         {
           "description": "The email's subject line",
@@ -75,7 +102,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "subject"
         },
         {
           "description": "The message body, as HTML. Resend generates the plain-text alternative from it, so a plain-text-only message is sent by putting the text here",
@@ -85,7 +113,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "html"
         }
       ],
       "request": {
@@ -135,6 +164,21 @@
           "resend.api_key"
         ]
       ],
+      "contract": {
+        "description": "Read one sent message and its current delivery state. This is how a flow learns whether a send bounced, was delivered, or is still queued",
+        "input_schema": {
+          "properties": {
+            "email_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read one sent message and its current delivery state. This is how a flow learns whether a send bounced, was delivered, or is still queued",
       "direction": "read",
       "expose": true,
@@ -149,7 +193,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "email_id"
         }
       ],
       "request": {
@@ -266,6 +311,15 @@
           "resend.api_key"
         ]
       ],
+      "contract": {
+        "description": "List every sending domain on this account with its verification status. Also this connector's `verify` — a bounded read that runs unattended and needs nothing configured beyond the credential",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every sending domain on this account with its verification status. Also this connector's `verify` — a bounded read that runs unattended and needs nothing configured beyond the credential",
       "direction": "read",
       "expose": true,
@@ -341,6 +395,21 @@
           "resend.api_key"
         ]
       ],
+      "contract": {
+        "description": "Read one sending domain, including the DNS records it needs and the status of each. This is the diagnostic for a domain that will not verify, and therefore for a send refused with an invalid-from error",
+        "input_schema": {
+          "properties": {
+            "domain_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "domain_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read one sending domain, including the DNS records it needs and the status of each. This is the diagnostic for a domain that will not verify, and therefore for a send refused with an invalid-from error",
       "direction": "read",
       "expose": true,
@@ -355,7 +424,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "domain_id"
         }
       ],
       "request": {

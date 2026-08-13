@@ -44,6 +44,15 @@
           "notion.token"
         ]
       ],
+      "contract": {
+        "description": "Get the bot user this integration authenticates as, confirming the token resolves and naming the workspace it belongs to. Takes no parameters. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the bot user this integration authenticates as, confirming the token resolves and naming the workspace it belongs to. Takes no parameters",
       "direction": "read",
       "expose": true,
@@ -94,6 +103,21 @@
           "notion.token"
         ]
       ],
+      "contract": {
+        "description": "Get one page's properties, parent, icon, cover and timestamps. This does NOT return the page's text — in Notion a page's content is a separate tree of blocks, which this connector cannot read. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "page_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "page_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one page's properties, parent, icon, cover and timestamps. This does NOT return the page's text — in Notion a page's content is a separate tree of blocks, which this connector cannot read",
       "direction": "read",
       "expose": true,
@@ -109,7 +133,8 @@
             "minLength": 32,
             "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
             "type": "string"
-          }
+          },
+          "symbol": "page_id"
         }
       ],
       "quirks": {
@@ -168,6 +193,21 @@
           "notion.token"
         ]
       ],
+      "contract": {
+        "description": "Query a database and return its first page of entries (up to 100), unfiltered and in the database's default order. Each entry is a page, and its `properties` are keyed by that database's own column names. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "database_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "database_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Query a database and return its first page of entries (up to 100), unfiltered and in the database's default order. Each entry is a page, and its `properties` are keyed by that database's own column names. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
       "expose": true,
@@ -183,7 +223,8 @@
             "minLength": 32,
             "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
             "type": "string"
-          }
+          },
+          "symbol": "database_id"
         }
       ],
       "quirks": {
@@ -232,6 +273,21 @@
           "notion.token"
         ]
       ],
+      "contract": {
+        "description": "Search the pages and databases shared with this integration by title, returning the first page of matches (up to 100). Notion matches on title only — it does not search page text. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Search the pages and databases shared with this integration by title, returning the first page of matches (up to 100). Notion matches on title only — it does not search page text. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
       "expose": true,
@@ -245,7 +301,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "query"
         }
       ],
       "quirks": {
@@ -302,6 +359,26 @@
           "notion.token"
         ]
       ],
+      "contract": {
+        "description": "Create a new empty page as a child of an existing page. The page is created with a title and no content — this connector cannot write page body text, which in Notion is a separate tree of blocks. The parent page must be shared with this integration. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "parent_page_id": {
+              "type": "string"
+            },
+            "title": {
+              "items": {},
+              "type": "array"
+            }
+          },
+          "required": [
+            "parent_page_id",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new empty page as a child of an existing page. The page is created with a title and no content — this connector cannot write page body text, which in Notion is a separate tree of blocks. The parent page must be shared with this integration",
       "direction": "write",
       "expose": true,
@@ -318,6 +395,7 @@
             "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
             "type": "string"
           },
+          "symbol": "parent_page_id",
           "wire": "parent.page_id"
         },
         {
@@ -353,6 +431,7 @@
             "minItems": 1,
             "type": "array"
           },
+          "symbol": "title",
           "wire": "properties.title"
         }
       ],

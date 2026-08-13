@@ -58,6 +58,15 @@
           "statuspage.api_key"
         ]
       ],
+      "contract": {
+        "description": "List this status page's incidents, most recent first — both unresolved and already-resolved ones. Returns Statuspage's own first page of results; this connector declares no paging parameters, so a page with a long incident history is not enumerated exhaustively here. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List this status page's incidents, most recent first — both unresolved and already-resolved ones. Returns Statuspage's own first page of results; this connector declares no paging parameters, so a page with a long incident history is not enumerated exhaustively here",
       "direction": "read",
       "endpoint": {
@@ -177,6 +186,21 @@
           "statuspage.api_key"
         ]
       ],
+      "contract": {
+        "description": "Get one incident on this status page, including every update posted to it so far. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "incident_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "incident_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one incident on this status page, including every update posted to it so far",
       "direction": "read",
       "endpoint": {
@@ -196,7 +220,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "incident_id"
         }
       ],
       "quirks": {
@@ -300,6 +325,33 @@
           "statuspage.api_key"
         ]
       ],
+      "contract": {
+        "description": "Open a new incident on this status page. It is public the moment this call returns — anyone loading the page sees it, and with deliver_notifications true Statuspage emails and texts every subscriber the page has. The incident itself is reversible (resolve it, or delete it), but a notification that has been sent cannot be recalled, so treat deliver_notifications as the irreversible half of this call. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "deliver_notifications": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "status",
+            "body",
+            "deliver_notifications"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Open a new incident on this status page. It is public the moment this call returns — anyone loading the page sees it, and with deliver_notifications true Statuspage emails and texts every subscriber the page has. The incident itself is reversible (resolve it, or delete it), but a notification that has been sent cannot be recalled, so treat deliver_notifications as the irreversible half of this call",
       "direction": "write",
       "endpoint": {
@@ -320,6 +372,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "name",
           "wire": "incident.name"
         },
         {
@@ -336,6 +389,7 @@
             ],
             "type": "string"
           },
+          "symbol": "status",
           "wire": "incident.status"
         },
         {
@@ -347,6 +401,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "body",
           "wire": "incident.body"
         },
         {
@@ -357,6 +412,7 @@
           "schema": {
             "type": "boolean"
           },
+          "symbol": "deliver_notifications",
           "wire": "incident.deliver_notifications"
         }
       ],
@@ -448,6 +504,33 @@
           "statuspage.api_key"
         ]
       ],
+      "contract": {
+        "description": "Post an update to an existing incident on this status page, moving it to a new lifecycle stage and adding a publicly visible message. The update appears on the page immediately, and with deliver_notifications true Statuspage emails and texts every subscriber. The incident's status can be moved again afterwards, but a notification that has been sent cannot be recalled. Does not rename the incident — this operation cannot change its title. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "deliver_notifications": {
+              "type": "boolean"
+            },
+            "incident_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "incident_id",
+            "status",
+            "body",
+            "deliver_notifications"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Post an update to an existing incident on this status page, moving it to a new lifecycle stage and adding a publicly visible message. The update appears on the page immediately, and with deliver_notifications true Statuspage emails and texts every subscriber. The incident's status can be moved again afterwards, but a notification that has been sent cannot be recalled. Does not rename the incident — this operation cannot change its title",
       "direction": "write",
       "endpoint": {
@@ -467,7 +550,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "incident_id"
         },
         {
           "description": "The lifecycle stage to move the incident to. resolved closes it and marks the status page green again if nothing else is open; monitoring says a fix is deployed and being watched; identified says the cause is known. Moving to a stage the incident is already in is allowed and simply posts another update",
@@ -483,6 +567,7 @@
             ],
             "type": "string"
           },
+          "symbol": "status",
           "wire": "incident.status"
         },
         {
@@ -494,6 +579,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "body",
           "wire": "incident.body"
         },
         {
@@ -504,6 +590,7 @@
           "schema": {
             "type": "boolean"
           },
+          "symbol": "deliver_notifications",
           "wire": "incident.deliver_notifications"
         }
       ],
@@ -599,6 +686,15 @@
           "statuspage.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the components this status page publishes — the individual services whose operational state the page shows. Takes no parameter at all and succeeds for any page the API key can administer, which is what makes it the connection check for a settings page's Test Connection button. Returns Statuspage's own first page of results; this connector declares no paging parameters. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the components this status page publishes — the individual services whose operational state the page shows. Takes no parameter at all and succeeds for any page the API key can administer, which is what makes it the connection check for a settings page's Test Connection button. Returns Statuspage's own first page of results; this connector declares no paging parameters",
       "direction": "read",
       "endpoint": {

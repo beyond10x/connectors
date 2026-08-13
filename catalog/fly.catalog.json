@@ -29,6 +29,15 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Fly's available regions and identify the nearest one; also verifies the configured access token. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Fly's available regions and identify the nearest one; also verifies the configured access token",
       "direction": "read",
       "expose": true,
@@ -68,6 +77,21 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List every Machine in one Fly app, without optional state filters or lease details. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every Machine in one Fly app, without optional state filters or lease details",
       "direction": "read",
       "expose": true,
@@ -82,7 +106,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         }
       ],
       "quirks": {
@@ -128,6 +153,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one Fly Machine's current configuration, state, region, addresses and recent events. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Fly Machine's current configuration, state, region, addresses and recent events",
       "direction": "read",
       "expose": true,
@@ -142,7 +186,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id",
@@ -152,7 +197,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {
@@ -204,6 +250,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the recorded lifecycle events for one Fly Machine; this is history, not a durable event subscription. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the recorded lifecycle events for one Fly Machine; this is history, not a durable event subscription",
       "direction": "read",
       "expose": true,
@@ -218,7 +283,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id whose event history to read",
@@ -228,7 +294,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {
@@ -274,6 +341,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Create and launch a Fly Machine from one image using Fly's generated name and region placement; this begins billable compute. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "image"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create and launch a Fly Machine from one image using Fly's generated name and region placement; this begins billable compute",
       "direction": "write",
       "expose": true,
@@ -288,7 +374,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "OCI image reference for the Machine, such as registry.fly.io/example:deployment-01",
@@ -299,6 +386,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "image",
           "wire": "config.image"
         }
       ],
@@ -358,6 +446,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Start a stopped Fly Machine, restoring service and beginning billable compute. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start a stopped Fly Machine, restoring service and beginning billable compute",
       "direction": "write",
       "expose": true,
@@ -372,7 +479,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id to start",
@@ -382,7 +490,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {
@@ -405,6 +514,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Stop a running Fly Machine using the API's default signal and timeout, interrupting its service. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop a running Fly Machine using the API's default signal and timeout, interrupting its service",
       "direction": "write",
       "expose": true,
@@ -419,7 +547,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id to stop",
@@ -429,7 +558,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {
@@ -452,6 +582,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Restart a Fly Machine using the API's default signal and timeout, causing a service interruption. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Restart a Fly Machine using the API's default signal and timeout, causing a service interruption",
       "direction": "write",
       "expose": true,
@@ -466,7 +615,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id to restart",
@@ -476,7 +626,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {
@@ -499,6 +650,25 @@
           "fly.api_token"
         ]
       ],
+      "contract": {
+        "description": "Permanently delete a stopped Fly Machine. Forced deletion is intentionally unavailable, so a running Machine is refused instead of killed implicitly. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Permanently delete a stopped Fly Machine. Forced deletion is intentionally unavailable, so a running Machine is refused instead of killed implicitly",
       "direction": "write",
       "expose": true,
@@ -513,7 +683,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "app_name"
         },
         {
           "description": "Fly Machine id to delete permanently",
@@ -523,7 +694,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "machine_id"
         }
       ],
       "quirks": {

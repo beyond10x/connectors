@@ -240,6 +240,15 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Get the account's current balance — what is available to pay out and what is still pending, per currency. Takes no parameters, and reports the balance of whichever mode the key belongs to: a test key returns the test balance. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the account's current balance — what is available to pay out and what is still pending, per currency. Takes no parameters, and reports the balance of whichever mode the key belongs to: a test key returns the test balance",
       "direction": "read",
       "expose": true,
@@ -296,6 +305,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Get one customer by id: name, email, phone, billing address, default payment method and account balance. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires. A deleted customer is returned with `deleted: true` and almost no other fields. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "customer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "customer"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one customer by id: name, email, phone, billing address, default payment method and account balance. This is personal data about a named individual — read it only when the task needs it, and do not repeat it further than the task requires. A deleted customer is returned with `deleted: true` and almost no other fields",
       "direction": "read",
       "expose": true,
@@ -311,7 +335,8 @@
             "minLength": 5,
             "pattern": "^cus_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "customer"
         }
       ],
       "quirks": {
@@ -362,6 +387,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Get one charge by id: amount, currency, whether it was captured, whether it was refunded and how much of it, the card's last four digits and brand, and the failure or decline reason if it did not succeed. `amount` is in the currency's smallest unit — 1000 is ten dollars, and also ten thousand yen. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "charge": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "charge"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one charge by id: amount, currency, whether it was captured, whether it was refunded and how much of it, the card's last four digits and brand, and the failure or decline reason if it did not succeed. `amount` is in the currency's smallest unit — 1000 is ten dollars, and also ten thousand yen",
       "direction": "read",
       "expose": true,
@@ -377,7 +417,8 @@
             "minLength": 4,
             "pattern": "^ch_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "charge"
         }
       ],
       "quirks": {
@@ -451,6 +492,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Get one payment intent by id — the modern shape of a payment, covering the whole lifecycle from creation to capture. Its `status` is what says where the payment stands; `requires_capture` means the money is authorized but not yet taken. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "payment_intent": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "payment_intent"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one payment intent by id — the modern shape of a payment, covering the whole lifecycle from creation to capture. Its `status` is what says where the payment stands; `requires_capture` means the money is authorized but not yet taken",
       "direction": "read",
       "expose": true,
@@ -466,7 +522,8 @@
             "minLength": 4,
             "pattern": "^pi_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "payment_intent"
         }
       ],
       "quirks": {
@@ -542,6 +599,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Get one refund by id: its amount, the charge it belongs to, its reason and its status. A refund that reports `pending` has not reached the customer's bank yet, and one that reports `failed` means the money came back — the customer was not paid. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "refund": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "refund"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one refund by id: its amount, the charge it belongs to, its reason and its status. A refund that reports `pending` has not reached the customer's bank yet, and one that reports `failed` means the money came back — the customer was not paid",
       "direction": "read",
       "expose": true,
@@ -557,7 +629,8 @@
             "minLength": 4,
             "pattern": "^re_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "refund"
         }
       ],
       "quirks": {
@@ -620,6 +693,25 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Capture an authorized payment intent, charging the customer the **full** authorized amount. Only a payment intent in `requires_capture` can be captured; a partial capture needs an `amount` this connector cannot send. Stripe answers 402 with an `error.code` such as `card_declined` when the capture is refused, and that arrives as data rather than as a failure. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "idempotency_key": {
+              "type": "string"
+            },
+            "payment_intent": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "payment_intent",
+            "idempotency_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Capture an authorized payment intent, charging the customer the **full** authorized amount. Only a payment intent in `requires_capture` can be captured; a partial capture needs an `amount` this connector cannot send. Stripe answers 402 with an `error.code` such as `card_declined` when the capture is refused, and that arrives as data rather than as a failure",
       "direction": "write",
       "expose": true,
@@ -635,7 +727,8 @@
             "minLength": 4,
             "pattern": "^pi_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "payment_intent"
         },
         {
           "description": "A unique string — a UUID is the convention — identifying this capture attempt. Stripe replays the first result for 24 hours rather than capturing again, so a retry with the same key is safe and a retry with a new key charges the customer twice. Generate it once per intent you mean to capture, and reuse it across retries",
@@ -647,6 +740,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "idempotency_key",
           "wire": "Idempotency-Key"
         }
       ],
@@ -711,6 +805,25 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Cancel a payment intent, releasing any authorization hold on the customer's card. This cannot be undone — a canceled intent is final, and collecting the payment afterwards means creating a new one. An intent that has already succeeded cannot be canceled; refund it instead. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "idempotency_key": {
+              "type": "string"
+            },
+            "payment_intent": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "payment_intent",
+            "idempotency_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Cancel a payment intent, releasing any authorization hold on the customer's card. This cannot be undone — a canceled intent is final, and collecting the payment afterwards means creating a new one. An intent that has already succeeded cannot be canceled; refund it instead",
       "direction": "write",
       "expose": true,
@@ -726,7 +839,8 @@
             "minLength": 4,
             "pattern": "^pi_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "payment_intent"
         },
         {
           "description": "A unique string — a UUID is the convention — identifying this cancellation attempt. Stripe replays the first result for 24 hours rather than acting again. Reuse it across retries of the same cancellation",
@@ -738,6 +852,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "idempotency_key",
           "wire": "Idempotency-Key"
         }
       ],
@@ -793,6 +908,25 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "Refund a charge **in full** and irreversibly: the entire un-refunded amount goes back to the customer's original payment method, usually within five to ten business days. A partial refund needs an `amount` this connector cannot send. Stripe's fee on the original charge is not returned. There is no way to undo a refund — collecting the money again means charging the customer again. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "charge": {
+              "type": "string"
+            },
+            "idempotency_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "charge",
+            "idempotency_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Refund a charge **in full** and irreversibly: the entire un-refunded amount goes back to the customer's original payment method, usually within five to ten business days. A partial refund needs an `amount` this connector cannot send. Stripe's fee on the original charge is not returned. There is no way to undo a refund — collecting the money again means charging the customer again",
       "direction": "write",
       "expose": true,
@@ -808,7 +942,8 @@
             "minLength": 4,
             "pattern": "^ch_[A-Za-z0-9]+$",
             "type": "string"
-          }
+          },
+          "symbol": "charge"
         },
         {
           "description": "A unique string — a UUID is the convention — identifying this refund. Stripe replays the first result for 24 hours rather than refunding again, so a retry with the same key is safe and a retry with a new key refunds the customer twice. Generate it once per refund you intend and reuse it across every retry",
@@ -820,6 +955,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "idempotency_key",
           "wire": "Idempotency-Key"
         }
       ],
@@ -883,6 +1019,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "List country-specific requirements, supported currencies and payment capabilities without changing an account",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List country-specific requirements, supported currencies and payment capabilities without changing an account",
       "direction": "read",
       "expose": true,
@@ -896,7 +1047,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -1101,6 +1253,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "List Stripe account events for operational visibility without replaying or changing an event",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Stripe account events for operational visibility without replaying or changing an event",
       "direction": "read",
       "expose": true,
@@ -1114,7 +1281,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -1289,6 +1457,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "List current Stripe exchange rates without creating a conversion or moving funds",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List current Stripe exchange rates without creating a conversion or moving funds",
       "direction": "read",
       "expose": true,
@@ -1302,7 +1485,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {
@@ -1396,6 +1580,21 @@
           "stripe.secret_key"
         ]
       ],
+      "contract": {
+        "description": "List usage-billing meter definitions without creating, changing or deactivating one",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List usage-billing meter definitions without creating, changing or deactivating one",
       "direction": "read",
       "expose": true,
@@ -1409,7 +1608,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         }
       ],
       "request": {

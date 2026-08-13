@@ -183,6 +183,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the read-only audit history for one ticket, including field changes, comments and notifications",
+        "input_schema": {
+          "properties": {
+            "ticket_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "ticket_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the read-only audit history for one ticket, including field changes, comments and notifications",
       "direction": "read",
       "endpoint": {
@@ -202,7 +217,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "ticket_id"
         }
       ],
       "request": {
@@ -333,6 +349,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Incrementally export tickets updated at or after a required Unix start time",
+        "input_schema": {
+          "properties": {
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Incrementally export tickets updated at or after a required Unix start time",
       "direction": "read",
       "endpoint": {
@@ -351,7 +382,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         }
       ],
       "request": {
@@ -1974,6 +2006,25 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Incrementally export users updated at or after a required Unix start time with an optional integer page size",
+        "input_schema": {
+          "properties": {
+            "per_page": {
+              "type": "number"
+            },
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Incrementally export users updated at or after a required Unix start time with an optional integer page size",
       "direction": "read",
       "endpoint": {
@@ -1992,7 +2043,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         },
         {
           "description": "The number of records to return per page",
@@ -2001,7 +2053,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -2521,6 +2574,25 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Incrementally export organizations updated at or after a required Unix start time with an optional integer page size",
+        "input_schema": {
+          "properties": {
+            "per_page": {
+              "type": "number"
+            },
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Incrementally export organizations updated at or after a required Unix start time with an optional integer page size",
       "direction": "read",
       "endpoint": {
@@ -2539,7 +2611,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         },
         {
           "description": "The number of records to return per page",
@@ -2548,7 +2621,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -2748,6 +2822,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Incrementally export ticket audit events at or after a required Unix start time",
+        "input_schema": {
+          "properties": {
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Incrementally export ticket audit events at or after a required Unix start time",
       "direction": "read",
       "endpoint": {
@@ -2766,7 +2855,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         }
       ],
       "request": {
@@ -2900,6 +2990,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List custom-object definitions, optionally including each definition's UI path",
+        "input_schema": {
+          "properties": {
+            "include_ui_path": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "include_ui_path"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List custom-object definitions, optionally including each definition's UI path",
       "direction": "read",
       "endpoint": {
@@ -2918,7 +3023,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "include_ui_path"
         }
       ],
       "request": {
@@ -3030,6 +3136,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's most recently created or updated tickets",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's most recently created or updated tickets",
       "direction": "read",
       "endpoint": {
@@ -4574,6 +4689,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List tickets from one numeric or built-in Zendesk view",
+        "input_schema": {
+          "properties": {
+            "view_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "view_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List tickets from one numeric or built-in Zendesk view",
       "direction": "read",
       "endpoint": {
@@ -4597,7 +4727,8 @@
               "my_groups"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "view_id"
         }
       ],
       "request": {
@@ -6134,6 +6265,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one Zendesk user by numeric id",
+        "input_schema": {
+          "properties": {
+            "user_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "user_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Zendesk user by numeric id",
       "direction": "read",
       "endpoint": {
@@ -6153,7 +6299,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "user_id"
         }
       ],
       "request": {
@@ -6578,6 +6725,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one Zendesk organization by numeric id",
+        "input_schema": {
+          "properties": {
+            "organization_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "organization_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Zendesk organization by numeric id",
       "direction": "read",
       "endpoint": {
@@ -6597,7 +6759,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "organization_id"
         }
       ],
       "request": {
@@ -6734,6 +6897,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's Zendesk groups without exposing optional filters or pagination",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's Zendesk groups without exposing optional filters or pagination",
       "direction": "read",
       "endpoint": {
@@ -6830,6 +7002,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's ticket field definitions without optional locale, creator, sort or pagination inputs",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's ticket field definitions without optional locale, creator, sort or pagination inputs",
       "direction": "read",
       "endpoint": {
@@ -7149,6 +7330,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's ticket forms without optional visibility, type, brand, locale, sort or pagination inputs",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's ticket forms without optional visibility, type, brand, locale, sort or pagination inputs",
       "direction": "read",
       "endpoint": {
@@ -7391,6 +7581,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's custom ticket statuses without optional category, activity or default filters",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's custom ticket statuses without optional category, activity or default filters",
       "direction": "read",
       "endpoint": {
@@ -7505,6 +7704,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Show Self",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Show Self",
       "direction": "read",
       "endpoint": {
@@ -7951,6 +8159,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Search Results",
+        "input_schema": {
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Search Results",
       "direction": "read",
       "endpoint": {
@@ -7969,7 +8192,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "query"
         }
       ],
       "request": {
@@ -8088,6 +8312,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Show Ticket",
+        "input_schema": {
+          "properties": {
+            "ticket_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "ticket_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Show Ticket",
       "direction": "read",
       "endpoint": {
@@ -8107,7 +8346,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "ticket_id"
         }
       ],
       "request": {
@@ -9641,6 +9881,29 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Comments",
+        "input_schema": {
+          "properties": {
+            "include_inline_images": {
+              "type": "boolean"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "ticket_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "ticket_id",
+            "include_inline_images",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Comments",
       "direction": "read",
       "endpoint": {
@@ -9660,7 +9923,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "ticket_id"
         },
         {
           "description": "Default is false. When true, inline images are also listed as attachments in the response",
@@ -9669,7 +9933,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "include_inline_images"
         },
         {
           "description": "Number of records to return per page.\n\nNote: Default and maximum values vary by endpoint. Check endpoint-specific\ndocumentation for limits.",
@@ -9679,7 +9944,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -10031,6 +10297,23 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Update Ticket",
+        "input_schema": {
+          "properties": {
+            "ticket": {},
+            "ticket_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "ticket_id",
+            "ticket"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Update Ticket",
       "direction": "write",
       "endpoint": {
@@ -10050,7 +10333,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "ticket_id"
         },
         {
           "name": "ticket",
@@ -11567,7 +11851,8 @@
               }
             },
             "type": "object"
-          }
+          },
+          "symbol": "ticket"
         }
       ],
       "request": {
@@ -13250,6 +13535,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Help Center categories; this zero-argument read also verifies that the shared Zendesk account and credential can reach the knowledge base",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Help Center categories; this zero-argument read also verifies that the shared Zendesk account and credential can reach the knowledge base",
       "direction": "read",
       "endpoint": {
@@ -13354,6 +13648,15 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Help Center sections across all categories",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Help Center sections across all categories",
       "direction": "read",
       "endpoint": {
@@ -13467,6 +13770,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List Help Center articles, optionally limited to articles updated since a Unix timestamp",
+        "input_schema": {
+          "properties": {
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Help Center articles, optionally limited to articles updated since a Unix timestamp",
       "direction": "read",
       "endpoint": {
@@ -13485,7 +13803,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         }
       ],
       "request": {
@@ -13662,6 +13981,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Get one Help Center article by its numeric id",
+        "input_schema": {
+          "properties": {
+            "article_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "article_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Help Center article by its numeric id",
       "direction": "read",
       "endpoint": {
@@ -13680,7 +14014,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "article_id"
         }
       ],
       "request": {
@@ -13846,6 +14181,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "List every translation of one Help Center article without exposing unencoded locale filters",
+        "input_schema": {
+          "properties": {
+            "article_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "article_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every translation of one Help Center article without exposing unencoded locale filters",
       "direction": "read",
       "endpoint": {
@@ -13864,7 +14214,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "article_id"
         }
       ],
       "request": {
@@ -13971,6 +14322,21 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Incrementally list Help Center articles updated since an optional integer Unix timestamp",
+        "input_schema": {
+          "properties": {
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Incrementally list Help Center articles updated since an optional integer Unix timestamp",
       "direction": "read",
       "endpoint": {
@@ -13989,7 +14355,8 @@
           "required": false,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         }
       ],
       "request": {
@@ -14166,6 +14533,23 @@
           "zendesk.api_token"
         ]
       ],
+      "contract": {
+        "description": "Publish a new externally visible Help Center article in one numeric section",
+        "input_schema": {
+          "properties": {
+            "article": {},
+            "section_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "section_id",
+            "article"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Publish a new externally visible Help Center article in one numeric section",
       "direction": "write",
       "endpoint": {
@@ -14184,7 +14568,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "section_id"
         },
         {
           "name": "article",
@@ -14220,7 +14605,8 @@
               "locale"
             ],
             "type": "object"
-          }
+          },
+          "symbol": "article"
         }
       ],
       "request": {
@@ -14397,6 +14783,15 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Create an empty SDK group conversation in the configured Zendesk Messaging app",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create an empty SDK group conversation in the configured Zendesk Messaging app",
       "direction": "write",
       "endpoint": {
@@ -14597,6 +14992,21 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Get one conversation by id; this bounded read is the Messaging service's diagnostic operation",
+        "input_schema": {
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one conversation by id; this bounded read is the Messaging service's diagnostic operation",
       "direction": "read",
       "endpoint": {
@@ -14619,7 +15029,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "conversationId"
         }
       ],
       "request": {
@@ -14800,6 +15211,25 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Set one conversation's display name to an absolute non-empty value",
+        "input_schema": {
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "displayName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set one conversation's display name to an absolute non-empty value",
       "direction": "write",
       "endpoint": {
@@ -14822,7 +15252,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "conversationId"
         },
         {
           "description": "A friendly name for the conversation, may be displayed to the business or\nthe user.",
@@ -14833,7 +15264,8 @@
             "maxLength": 100,
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "displayName"
         }
       ],
       "request": {
@@ -15025,6 +15457,21 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "List the participants of one conversation without exposing deep-object pagination",
+        "input_schema": {
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the participants of one conversation without exposing deep-object pagination",
       "direction": "read",
       "endpoint": {
@@ -15047,7 +15494,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "conversationId"
         }
       ],
       "request": {
@@ -15180,6 +15628,25 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Post Message",
+        "input_schema": {
+          "properties": {
+            "author": {},
+            "content": {},
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "author",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Post Message",
       "direction": "write",
       "endpoint": {
@@ -15202,7 +15669,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "conversationId"
         },
         {
           "description": "The author of the message.",
@@ -15287,7 +15755,8 @@
               }
             ],
             "description": "The author of the message."
-          }
+          },
+          "symbol": "author"
         },
         {
           "description": "The content of the message.",
@@ -17217,7 +17686,8 @@
               }
             ],
             "description": "The content of the message."
-          }
+          },
+          "symbol": "content"
         }
       ],
       "request": {
@@ -19702,6 +20172,21 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "List Messages",
+        "input_schema": {
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Messages",
       "direction": "read",
       "endpoint": {
@@ -19724,7 +20209,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "conversationId"
         }
       ],
       "request": {
@@ -22232,6 +22718,21 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Create a Zendesk Messaging user with one required external id",
+        "input_schema": {
+          "properties": {
+            "externalId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "externalId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a Zendesk Messaging user with one required external id",
       "direction": "write",
       "endpoint": {
@@ -22257,7 +22758,8 @@
             "maxLength": 1024,
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "externalId"
         }
       ],
       "request": {
@@ -22450,6 +22952,21 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Get one Zendesk Messaging user by its vendor id or external id",
+        "input_schema": {
+          "properties": {
+            "userIdOrExternalId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "userIdOrExternalId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Zendesk Messaging user by its vendor id or external id",
       "direction": "read",
       "endpoint": {
@@ -22472,7 +22989,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "userIdOrExternalId"
         }
       ],
       "request": {
@@ -22654,6 +23172,25 @@
           "zendesk.messaging_key"
         ]
       ],
+      "contract": {
+        "description": "Set whether one Zendesk Messaging user is retained after becoming inactive",
+        "input_schema": {
+          "properties": {
+            "toBeRetained": {
+              "type": "boolean"
+            },
+            "userIdOrExternalId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "userIdOrExternalId",
+            "toBeRetained"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set whether one Zendesk Messaging user is retained after becoming inactive",
       "direction": "write",
       "endpoint": {
@@ -22676,7 +23213,8 @@
           "schema": {
             "example": "redacted-opaque",
             "type": "string"
-          }
+          },
+          "symbol": "userIdOrExternalId"
         },
         {
           "name": "toBeRetained",
@@ -22684,7 +23222,8 @@
           "required": true,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "toBeRetained"
         }
       ],
       "request": {

@@ -46,6 +46,25 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the incidents this key can see, across every service it has access to. Returns one page; read `more` to learn whether another page exists, and page by adding `limit` to `offset`. No status, service, team or time filter is offered by this connector — see pagerduty-incident-get to inspect one incident in full",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the incidents this key can see, across every service it has access to. Returns one page; read `more` to learn whether another page exists, and page by adding `limit` to `offset`. No status, service, team or time filter is offered by this connector — see pagerduty-incident-get to inspect one incident in full",
       "direction": "read",
       "expose": true,
@@ -61,7 +80,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of incidents to skip before this page begins. To read the next page, add the `limit` just used to the `offset` just used — this is not a page number",
@@ -71,7 +91,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -247,6 +268,21 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "Fetch one incident in full, including its current status, urgency, service, assignments and acknowledgements. Read this before acknowledging or resolving, because PagerDuty refuses a status change that does not follow from the incident's current status",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Fetch one incident in full, including its current status, urgency, service, assignments and acknowledgements. Read this before acknowledging or resolving, because PagerDuty refuses a status change that does not follow from the incident's current status",
       "direction": "read",
       "expose": true,
@@ -261,7 +297,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -402,6 +439,25 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "List the services this key can see. A service is what incidents are opened against and what an escalation policy is attached to, so this is how to discover the ids and names behind an incident's `service` reference. Also this connector's connection test",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the services this key can see. A service is what incidents are opened against and what an escalation policy is attached to, so this is how to discover the ids and names behind an incident's `service` reference. Also this connector's connection test",
       "direction": "read",
       "expose": true,
@@ -417,7 +473,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of services to skip before this page begins. To read the next page, add the `limit` just used to the `offset` just used",
@@ -427,7 +484,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -564,6 +622,25 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "List who is currently on call, as one entry per escalation policy, escalation level and user. An entry with no `schedule` is a user attached directly to an escalation level rather than through a rotation. Time filtering is not offered by this connector, so this answers `who is on call now`",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "offset": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "offset"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List who is currently on call, as one entry per escalation policy, escalation level and user. An entry with no `schedule` is a user attached directly to an escalation level rather than through a rotation. Time filtering is not offered by this connector, so this answers `who is on call now`",
       "direction": "read",
       "expose": true,
@@ -579,7 +656,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Number of on-call entries to skip before this page begins. To read the next page, add the `limit` just used to the `offset` just used",
@@ -589,7 +667,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "offset"
         }
       ],
       "request": {
@@ -680,6 +759,25 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "Acknowledge one incident, on behalf of a named PagerDuty user. This stops the escalation clock and tells the rotation that somebody is working the incident; it does not close it. PagerDuty refuses the change if the incident is already resolved, and answers that as data rather than as a failure",
+        "input_schema": {
+          "properties": {
+            "from_email": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "from_email"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Acknowledge one incident, on behalf of a named PagerDuty user. This stops the escalation clock and tells the rotation that somebody is working the incident; it does not close it. PagerDuty refuses the change if the incident is already resolved, and answers that as data rather than as a failure",
       "direction": "write",
       "expose": true,
@@ -694,7 +792,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         },
         {
           "description": "The login address of the PagerDuty user this acknowledgement is recorded against. It must belong to a user in this PagerDuty account; PagerDuty answers 400 otherwise. A REST API key carries no user identity of its own, which is why this cannot be inferred",
@@ -706,6 +805,7 @@
             "minLength": 3,
             "type": "string"
           },
+          "symbol": "from_email",
           "wire": "From"
         }
       ],
@@ -806,6 +906,25 @@
           "pagerduty.api_token"
         ]
       ],
+      "contract": {
+        "description": "Resolve one incident, on behalf of a named PagerDuty user. This closes it: it leaves the open-incident view and notifications stop. If the underlying condition is still live, the next alert opens a brand-new incident rather than reopening this one, so resolve only what is actually fixed",
+        "input_schema": {
+          "properties": {
+            "from_email": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "from_email"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Resolve one incident, on behalf of a named PagerDuty user. This closes it: it leaves the open-incident view and notifications stop. If the underlying condition is still live, the next alert opens a brand-new incident rather than reopening this one, so resolve only what is actually fixed",
       "direction": "write",
       "expose": true,
@@ -820,7 +939,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         },
         {
           "description": "The login address of the PagerDuty user this resolution is recorded against. It must belong to a user in this PagerDuty account; PagerDuty answers 400 otherwise. A REST API key carries no user identity of its own, which is why this cannot be inferred",
@@ -832,6 +952,7 @@
             "minLength": 3,
             "type": "string"
           },
+          "symbol": "from_email",
           "wire": "From"
         }
       ],
