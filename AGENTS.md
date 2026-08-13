@@ -127,24 +127,24 @@ twice · one reviewable commit, by the bot.
 
 ## Refreshing a source
 
-When asked to update/refresh a vendored spec or any external source (or you discover an upstream
-changed), do exactly this:
+`SOURCES.toml` is a **machine-processed manifest, not documentation**. Code owns it (S-016):
+`connectors sources check` validates the index, verifies every checksum against the bytes on
+disk and refuses orphans in both directions — it runs in the invariant suite, so a drifted pin
+fails the build; you will never discover drift by reading TOML. `connectors sources refresh`
+executes the fetch + declared scrub + re-pin; `connectors sources diff` probes upstream without
+mutating anything. Nobody fetches or compares by hand, at any scale.
 
-1. Look the source up in `SOURCES.toml`. If it has no entry, that is the first defect — stop and
-   add the entry before touching anything.
-2. Run its `refresh` script (scrub included). Never hand-edit or model-generate anything under
-   `specs/` — the sourced-never-authored rule above applies to refreshes too.
-3. Update the pins: the detail record (`specs/<vendor>.provenance.toml`) and the `SOURCES.toml`
-   entry (new hash/date).
-4. `connectors catalog build`, then review the **canonical-document diff** — the catalog diff,
-   not the raw source diff, is the reviewable object. If the catalog diff is empty, say so and
-   commit the pin bump alone.
-5. Newly appeared operations are a **curation decision, not an auto-select**: anything the
-   refresh would newly select needs the step-6 judgment calls (risk/idempotency/effects) filled
-   deliberately, or stays unselected. Vanished operations must be acknowledged, not silently
-   dropped — coverage tests hold in both directions.
-6. One commit: `catalog: refresh <vendor> spec`, body summarizing the catalog diff (ops
-   added/changed/removed), via `as-bot.sh` if you're an agent.
+The agent instruction is therefore short:
+
+1. `connectors sources refresh <id>` (until S-016 lands: run the entry's `scripts/vendor-*.sh`;
+   either way, never hand-edit or model-generate anything under `specs/`).
+2. `connectors catalog build`, review the **canonical-document diff** — the reviewable object.
+   Empty catalog diff → say so and commit the pin bump alone.
+3. Newly selected operations are a **curation decision, never an auto-select** (the runbook's
+   judgment calls apply); vanished operations are acknowledged, not silently dropped — coverage
+   holds in both directions.
+4. One commit: `catalog: refresh <vendor> spec`, body summarizing the catalog diff, via
+   `as-bot.sh`.
 
 ## Boundaries
 
