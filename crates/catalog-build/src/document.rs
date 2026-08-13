@@ -1439,8 +1439,8 @@ fn validator() -> &'static jsonschema::Validator {
         .get_or_init(|| jsonschema::validator_for(schema()).expect("the document schema compiles"))
 }
 
-/// The versioned JSON Schema every document validates against — committed beside the documents
-/// and enforced by [`render`], the way `core_catalog.rs` validates `web/public/v1/**`.
+/// The versioned JSON Schema every document validates against — committed beside the documents and
+/// enforced by [`render`].
 pub fn schema() -> &'static Value {
     static SCHEMA: OnceLock<Value> = OnceLock::new();
     SCHEMA.get_or_init(|| {

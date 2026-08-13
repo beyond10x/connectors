@@ -41,7 +41,6 @@ link, so a broken site fails the workflow instead of publishing silently.
 | `index.md` | Landing page: what the project is, and what does not work yet. |
 | `explorer.md` | The provider & operation explorer. |
 | `operations/[operation].md` | One pre-rendered page per operation, enumerated from the catalogue. |
-| `core/[kind]/[name].md` | One pre-rendered page per Flux core specification. |
 | `data/` | The catalogue's types, the questions the explorer asks of it, and the build-time loader. |
 | `public/` | Served verbatim at the site root. Holds generated catalogue/specs and the Pages CNAME. |
 | `test/` | The explorer's contract with the catalogue, over the built site. |
@@ -72,8 +71,8 @@ reports the domain — not when the CNAME file lands, which is what went wrong.
 `test/explorer.test.mjs` asserts the built HTML's own asset URLs sit under the deployed base, and was
 verified to fail when the base is wrong.
 
-**No hand-written catalogue data.** Everything the site says about providers, connector operations,
-and Flux core entries must come from generated files, not from markdown or a `.vue` component. A
+**No hand-written catalogue data.** Everything the site says about providers and connector
+operations must come from generated files, not from markdown or a `.vue` component. A
 second, hand-maintained copy of the catalogue is the exact failure this repository exists to correct.
 
 `public/catalog.json` is written by `cargo run -p connector-cli -- build` and committed — the same
@@ -81,6 +80,3 @@ plan and drift check as every other generated artifact (`crates/connector-cli/te
 It is not copied here by the Node build, and it must not be edited. The last test in
 `test/explorer.test.mjs` enforces the rule mechanically: it fails if any explorer source names a
 provider, an operation, a credential, a host or an issue code.
-
-`public/v1/` is emitted by the same build from the vendored `specs/flux/core-v1.json`; its documents
-are the dereferenceable `$id` targets linked by the explorer and must not be edited by hand.

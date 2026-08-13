@@ -7,10 +7,6 @@
 # point a drifted pin or an unindexed vendored file fails the build. Until then this file is
 # maintained alongside every vendoring change (AGENTS.md "Refreshing a source").
 #
-# Known defects this index surfaces, tracked for cleanup:
-# - specs/flux/core-v1.json is orphaned: its consumer (the core-catalogue projection) was
-#   deliberately dropped in M1.
-
 [[source]]
 id = "predecessor-flux-connectors"
 kind = "predecessor-import"

@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: flux-connectors
-  text: Operations and core contracts for Flux
-  tagline: Browse SaaS connectors, built-in transformations, language nodes, and versioned network specifications.
+  text: Governed connector operations
+  tagline: Browse reviewed SaaS connector contracts and their safety metadata.
   image:
     src: /brand/mark.svg
     alt: ''
@@ -17,8 +17,8 @@ hero:
       link: '#availability'
 
 features:
-  - title: One explorer, distinct layers
-    details: Explore Flux core operations and nodes separately from generated SaaS connector operations.
+  - title: One reviewed explorer
+    details: Explore generated SaaS connector operations from the committed catalog.
   - title: Know what a call needs
     details: Every operation page shows its typed parameters, request path, credentials, destination hosts, and exact Flux source.
   - title: Limits are part of the contract
@@ -31,9 +31,8 @@ import { data as catalog } from './data/catalog.data.mts'
 
 ## The Flux catalogue
 
-flux-connectors publishes a growing catalogue for [Flux](https://github.com/codewandler/flux). It
-combines generated SaaS operations with Flux-owned core contracts while keeping their ownership and
-execution models explicit.
+The repository publishes a growing connector catalog. Flux is one prospective client, not the owner
+of this catalog or its generic contract.
 
 <CatalogSnapshot :catalog="catalog" />
 
@@ -41,19 +40,14 @@ execution models explicit.
 
 The catalogue is useful before live connector execution is enabled. You can inspect:
 
-- built-in transformations and their complete tool schemas;
-- language nodes and their anchored Flux AST schemas;
-- available and planned network capabilities, including whether each is callable;
 - a stable connector operation name and plain-language description;
 - HTTP method, request path, typed parameters, and published schemas;
 - risk and idempotency metadata for approval and retry decisions;
 - required credentials and destination hosts;
-- the exact Flux operation source; and
 - shared constraints plus any limitation specific to that operation.
 
-Open the [connector and Flux core explorer](explorer.md) to compare the current surface or deep-link
-directly to an entry. Canonical JSON specifications are published under
-`https://flux.codewandler.org/v1/`.
+Open the [connector explorer](explorer.md) to compare the current surface or deep-link directly to an
+entry.
 
 ## Availability {#availability}
 
