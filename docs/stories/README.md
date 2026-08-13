@@ -43,7 +43,7 @@ will spawn children as each milestone is designed.
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
 | [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | backlog | Catalog | catalog, catalog-build, connector-resolve, web |
 | [S-021](S-021-coverage-regains-its-second-direction.md) | Coverage regains its second direction: every gap between declared and published has a reason | backlog | Catalog | catalog-build, providers |
-| [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | backlog | Catalog | specs, migration, web |
+| [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | in-progress | Catalog | specs, migration, web |
 | [S-004](S-004-adopt-token-response-metadata.md) | An OAuth token response can carry declared metadata into the connection, not the credential store | backlog | Catalog | catalog, connector-spec, service |
 | [S-005](S-005-header-name-rate-limit-retry.md) | A rate limit the vendor discloses at runtime can be declared by header name | backlog | Catalog | catalog, connector-spec |
 | [S-006](S-006-per-service-verification-probes.md) | A service declares how a credential is verified, and what a failure means | backlog | Catalog | catalog, connector-spec, service |
@@ -55,27 +55,42 @@ will spawn children as each milestone is designed.
 | [S-012](S-012-declarative-webhook-routing-grammar.md) | Webhook verification and attribution are declared as data, not as a per-provider script | backlog | Catalog | catalog, connector-spec, service |
 | [S-013](S-013-connect-session-oauth-custody-in-personal-posture.md) | Decide the connect-session ↔ OAuth-callback custody chain in personal posture | backlog | Platform | domain, service, catalog |
 | [S-014](S-014-auth-as-tool-result.md) | Not-connected is a next step: the response carries a connect URL | backlog | Platform | protocol, service, server |
+| [S-023](S-023-beyond-http-facts-enter-the-document.md) | Beyond-HTTP facts enter the connector document orthogonally | backlog | Catalog | catalog, catalog-build, connector-spec, connector-resolve |
+| [S-024](S-024-one-zero-io-plan-seam-selects-a-closed-driver.md) | One zero-IO plan seam selects a closed built-in driver | backlog | Platform | domain, service, server, connector-resolve |
+| [S-025](S-025-satellite-federation-has-a-threat-modeled-contract.md) | Satellite federation has a threat-modeled contract | blocked | Platform | domain, protocol, service, server |
+| [S-026](S-026-one-real-non-http-driver-proves-the-model.md) | One real non-HTTP driver proves the five-axis model | backlog | Platform | catalog, domain, service, server |
+| [S-027](S-027-direct-byte-session-establishment-is-operation-scoped.md) | Direct-byte session establishment is operation-scoped | blocked | Platform | domain, protocol, service, server |
+| [S-028](S-028-external-driver-artifacts-stay-deferred.md) | External driver artifacts stay deferred behind attestation | blocked | Platform | domain, service, server, docs |
+| [S-029](S-029-substrate-events-enter-durable-delivery-with-gap-recovery.md) | Substrate events enter durable delivery with gap recovery | blocked | Platform | domain, protocol, service, server |
+| [S-030](S-030-raw-proxy-is-break-glass-not-a-model-capability.md) | Raw proxy is break-glass authority, not a model capability | backlog | Platform | domain, protocol, service, server |
+| [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | blocked | Platform | catalog, protocol, ci, docs |
 
 ## Epics in this seed
 
 | Epic | Stories | What it is |
 |---|---|---|
-| `catalog-day-one` | S-001, S-002, S-003, S-015 | Architecture §2's day-one changes to the migrating catalog. S-001, S-002 and S-015 all change the document schema, the lowering, and every committed document — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
+| `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one changes to the migrating catalog plus the accepted beyond-HTTP fact shape. S-001, S-002, S-015 and S-023 all change the document schema, lowering, and committed documents — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
 | `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open: no CI at all (S-020), a web explorer written against a site JSON that no longer exists (S-018), the predecessor's generator identity still stamped into every artifact (S-019), the coverage direction the test consolidation dropped (S-021), and three orphaned inputs (S-022). Two of them are ordering constraints on other work: S-019 rides the schema wave, S-022 lands before S-016's check. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
-| `carried-constraints` | S-011, S-012, S-013, S-014 | Design constraints ported from the predecessors and the research rather than re-derived — the egress aperture (X-143), the webhook routing grammar, the personal-posture OAuth custody question, and auth-as-tool-result. |
+| `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
+| `beyond-http` | S-023, S-024, S-025, S-026, S-027, S-028 | ADR 0010's delivery order: orthogonal document facts, one plan seam, satellite trust, one real driver, direct-byte establishment, and external artifacts last. |
+| `substrate-integration` | S-029 | The explicit bounded-cursor to durable-delivery bridge and its gap-recovery contract. |
+| `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-repository conformance bundles. |
 
 ## Known gaps in this backlog
 
 - **M1 never had a milestone story**, and now does not need one: the copy-and-extract half shipped
   (catalog dirs, family crates, `catalog-build` minus the emitters, the byte-differential), and what
   it left open is filed as the `post-m1` epic. Its day-one *changes* — S-001, S-002, S-003, S-015 —
-  are still open work.
-- **Decision 0024's waves 2–6** (slack/jira/confluence/opsgenie; the observability set behind
+  and S-023 — are still open work.
+- **The predecessor's later migration waves 2–6** (slack/jira/confluence/opsgenie; the observability set behind
   declared destinations; aws/huggingface's new credential schemes; kubernetes/docker/sql/websearch;
   the final plugin-host deletion) are unfiled here; S-010 covers wave 1 only.
+- **Application migration waves remain historical planning input.** Their unavailable predecessor
+  record is not normative; each future wave must restate its own parity and deletion rules in a
+  B10x story before work starts.
 - **Later-shaped work** named in the vision — SDKs, the platform CLI, an MCP endpoint, the SaaS org
   lifecycle, catalog overlays, the coverage-matrix projection, the meta-tools discovery surface — is
   deliberately unfiled until its milestone is in reach.

@@ -1,4 +1,4 @@
-# 04 — The document carries the caller's contract
+# Design 04: the document carries the caller's contract
 
 **Status:** landed with S-001 · **Date:** 2026-08-13 · **Story:** [S-001](../stories/S-001-the-document-carries-the-callers-contract.md)
 
@@ -6,7 +6,7 @@ The canonical document now stores, per operation, everything a caller or a model
 the caller-facing **symbol** beside every declared parameter, the model-facing **contract**
 (`description` + lowered `input_schema`), the **`credential_requirement`** token, and — when a
 provider declares one — the **`produces_credential`** minting join. This is the predecessor's
-C-552, ported per decision 0026's named migration set, plus the two schema gaps M1 found in code
+C-552, ported from the private predecessor migration set, plus the two schema gaps M1 found in code
 (`table.rs`'s two derivations). Five decisions the story left open are recorded here.
 
 ## 1. The port is an application, not a re-derivation

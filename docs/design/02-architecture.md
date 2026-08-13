@@ -5,6 +5,10 @@
 [../research/catalog-precedents.md](../research/catalog-precedents.md) · the measured predecessor
 inventory (what migrates wholesale, what is redesigned, what is left behind).
 
+Private predecessor decisions are provenance only. Every rule this design carries from them is
+restated here or in a B10x ADR/story so a reader never needs an unavailable record to know the
+current contract.
+
 This document fixes the physical shape: repository layout, crate boundaries, storage, the one
 invocation path, the fence regime, and the build order. Wire schemas and endpoint lists come
 later and cite this.
@@ -93,9 +97,11 @@ Both binaries parse their command line with **clap (derive API)** — hand-rolle
 banned in this repository. The predecessor hand-rolled its connector CLI to avoid a dependency
 mid-flight and it went sideways; the parser is not where this project spends its novelty budget.
 
-`connectors serve` with no config is the **personal posture**: loopback bind, local-owner
-identity, one implicit organization, state under an owner-only user-state root. Zero
-configuration is the personal tier's contract — it is what a supervising client (flux) starts.
+`connectors serve` with no config is the **personal posture**: prefer an owner-permissioned Unix
+socket; otherwise use a loopback listener plus a generated high-entropy token stored under the
+owner-only state root. Local reachability alone is never identity. The posture has one implicit
+organization and refuses a working-tree state path. Zero manual configuration remains the personal
+tier's contract — secure local material is generated automatically.
 
 ## 3. Postures are configuration, not builds
 
@@ -144,8 +150,9 @@ token ─▶ principal (org inside) ─▶ effective catalogue (sealed generatio
 Structural rules, each with a fence or a type making it non-optional:
 - `crates/server`'s egress module is the **only** place a vendor socket is opened; a dependency
   fence classifies every crate as network/no-network and fails on drift.
-- The proxy rides the same path with fixed worst-case facts; it is a granted capability, not a
-  bypass.
+- Generic v1 has no raw proxy. If S-030 later enables operator-only break-glass access, it rides the
+  same path with destructive/max-effect facts plus separate method/path and destination apertures;
+  it is never model-exposed or admitted by an ordinary catalog grant.
 - No runtime parsing of any source form, ever — the plan is derived from document data only.
 
 The invocation path is protocol-neutral at the admission boundary. Per
@@ -202,9 +209,9 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
 |---|---|---|
 | **M1 catalog** | copy catalog dirs + family crates; `catalog-build` extracted minus emitters; schema gains C-552 fields + per-op effects; lock verifier | `catalog build/diff/check` green; one-time pack differential vs predecessor passes |
 | **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; postures + identity (personal, org-OIDC); organizations, service accounts, audit | `connectors serve` healthy in both postures; routes fence green |
-| **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, invoke + proxy | end-to-end: sign in → connect a real provider → grant → invoke, all audited |
+| **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, declared-operation invoke; raw proxy remains deferred to S-030 | end-to-end: sign in → connect a real provider → grant → invoke, all audited |
 | **M4 events** | channels, webhook terminator, event store, deliveries + replay, subscriptions | a provider event reaches a client by push and by pull, with provenance |
-| **M5 clients** | flux re-point (embedded client + local supervise), plugin-retirement wave 1 (gitlab) per flux-roadmap 0024 | flux invokes gitlab through the platform; the gitlab plugin deleted |
+| **M5 clients** | flux re-point (embedded client + local supervise), first measured plugin-retirement wave (gitlab); the acceptance rule is recorded in S-010 | flux invokes gitlab through the platform; the gitlab plugin deleted |
 
 ## Open questions
 

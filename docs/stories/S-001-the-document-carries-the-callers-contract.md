@@ -92,7 +92,8 @@ The three fields, as C-552 measured them:
 
 - Predecessor: [`C-552 — the document carries the caller's contract`](https://github.com/codewandler/flux-connectors/blob/main/docs/stories/C-552-the-document-carries-the-callers-contract.md)
   — read it before starting; its Notes carry the write set and the design edge. Ported, not
-  re-derived, per decision 0026's named migration set.
+  re-derived. The private migration record is provenance; this story and design 04 contain the
+  normative B10x contract.
 - The last two acceptance items were **added after M1**, from the two schema gaps the import found in
   code rather than in a story: both are C-552-shaped document additions (a fact the caller's contract
   needs that the document does not carry), both are documented in place by the M1 implementor, and

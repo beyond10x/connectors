@@ -48,9 +48,8 @@ origin, or a move outside the source layer.
       from it (`web/README.md`'s `public/v1/` paragraph), or a named consumer is filed as its own
       story before it stays. A vendored input with no consumer is a file that still validates and
       describes nothing.
-- [x] **`migration/`** is decided against its live successor: flux-roadmap decision 0024's
-      wave/fixture rule, carried here by
-      [S-010](S-010-m5-flux-re-points-and-the-gitlab-plugin-retires.md), is what actually governs
+- [x] **`migration/`** is decided against its live successor: the wave/fixture rule restated by
+      [S-010](S-010-m5-flux-re-points-and-the-gitlab-plugin-retires.md) is what actually governs
       plugin retirement now. Either the ratchet's records move under that story's evidence with an
       owner and a checker, or the directory goes. It does not stay as an unchecked schema plus two
       fixtures.
@@ -76,8 +75,8 @@ origin, or a move outside the source layer.
   already removed the projection that could generate this data; retaining static routes, types,
   tests, or publication claims would have described a catalog this repository no longer emits.
 - The native-plugin ratchet was deleted rather than re-owned. Its five predecessor implementation
-  waves conflict with accepted Flux roadmap decision 0024's six readiness-ordered retirement
-  waves; it had no checker and carried only synthetic fixtures, with no captured conformance or
+  waves conflict with the six readiness-ordered retirement waves; it had no checker and carried
+  only synthetic fixtures, with no captured conformance or
   publication evidence. S-010 owns the live wave-1 proof over the operation inventory Flux actually
   serves, so retaining this second inventory would create two authorities for the same cutover.
 
@@ -88,7 +87,7 @@ origin, or a move outside the source layer.
   (the view and its input). Sequence them together or let S-018 land first and delete the input here.
 - Read `migration/README.md` before deciding its fate: the ratchet's design point — no authored
   `present`/`published`/`retired` booleans, everything derived from a supplied checkout and paired
-  observations — is a good idea that decision 0024 restates in its own terms, so the question is
+  observations — is a good idea retained by the current cutover story, so the question is
   where it lives, not whether it was right.
 - The Anthropic provider remains outside S-021's fully spec-derived provider count until the authored
   spec plus overlays reproduce its canonical document. The partial spec is real source input, but

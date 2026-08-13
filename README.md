@@ -12,6 +12,13 @@ design work.
 - [docs/VISION.md](docs/VISION.md) — what this is, why, principles, non-goals.
 - [docs/design/01-domain-model.md](docs/design/01-domain-model.md) — the nouns and their
   invariants.
+- [docs/design/02-architecture.md](docs/design/02-architecture.md) — repository layers, ports,
+  postures, and build order.
+- [docs/design/03-beyond-http.md](docs/design/03-beyond-http.md) — interaction shapes, closed
+  drivers, placement, and the direct byte-plane split.
+- [docs/design/04-the-callers-contract.md](docs/design/04-the-callers-contract.md) — measured proof
+  of the catalog document as the caller contract.
+- [docs/stories/README.md](docs/stories/README.md) — sequenced design and implementation backlog.
 - [docs/research/](docs/research/) — the platform-category survey and mined catalog-as-text
   precedents (with vendored primary sources under `docs/research/vendor/`).
 

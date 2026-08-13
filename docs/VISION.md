@@ -70,8 +70,9 @@ the catalog and the auth templates are the same text everywhere.
 - **Context-sized discovery.** The catalog distinguishes *callable* from *worth projecting into a
   model*; search/inspect/execute meta-tools (and later an MCP endpoint) replace dumping hundreds
   of tool schemas into a context window.
-- **A governed proxy** for the long tail: raw authenticated passthrough under the same grants,
-  destination-bounded, with pagination/rate-limit behavior normalized from catalog metadata.
+- **No generic raw proxy in v1.** Credential-bearing model calls use declared operations. A later
+  operator-only break-glass proxy, if accepted, is destructive/max-effect, destination- and
+  method/path-bounded, separately granted, and never model-exposed.
 
 ## Principles
 
@@ -106,8 +107,8 @@ the catalog and the auth templates are the same text everywhere.
   data-only; a hosted-behaviour tier can arrive later as a *supervised client runtime*, never as
   an embedded engine.
 - **No unified data models.** We do not normalize Zendesk tickets and Jira issues into one
-  schema. Declared operations + the governed proxy are the invocation layer; lossiness is the
-  category's tax and we decline to charge it.
+  schema. Declared operations are the generic invocation layer; lossiness is the category's tax and
+  we decline to charge it.
 - **No arbitrary or in-process plugin runtime.** Every integration is a declared connector executed
   by the platform. V1 protocol drivers are built into the closed platform registry; any future
   vendor-specific executable requires a separate attestation decision and runs out-of-process

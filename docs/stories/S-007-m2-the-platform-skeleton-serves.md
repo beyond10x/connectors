@@ -26,10 +26,10 @@ vocabulary) are cheapest to make unrepresentable now.
       §2's boundaries enforced, not merely intended: no IO and no HTTP in `domain`; `protocol` holds
       versioned wire contracts with `deny_unknown_fields` and bounded diagnostics; `service` holds
       use-cases over ports and is testable without a socket; `server` is composition only.
-- [ ] `connectors serve` with no config is the **personal posture**: loopback bind, local-owner
-      identity, one implicit organization, state under an owner-only state root that **refuses a
-      working-tree path**. Zero configuration is the tier's contract — nothing may be required of the
-      user to reach a healthy process.
+- [ ] `connectors serve` with no config is the **personal posture**: an owner-permissioned Unix
+      socket where supported, otherwise loopback plus an automatically generated high-entropy token
+      stored in an owner-only state root that **refuses a working-tree path**. Zero manual
+      configuration remains the contract; unauthenticated localhost is not an identity mode.
 - [ ] `connectors serve --config platform.toml` is the **org posture**: OIDC sign-in with PKCE and
       signature-verified claims, one explicit organization, and an operator subject allowlist keyed
       by immutable IdP subject. A missing or malformed operator policy admits **nobody**; an unknown
@@ -72,5 +72,5 @@ vocabulary) are cheapest to make unrepresentable now.
   [S-003](S-003-the-lockfile-gets-a-verifier.md); the copy-and-extract half of M1 (catalog dirs,
   family crates, `catalog-build` minus the emitters, the one-time pack differential) still needs a
   story of its own.
-- Do not scaffold ahead of the build order (AGENTS.md § Boundaries): nothing in this repository
-  builds yet, and M2 is the milestone that changes that.
+- Do not scaffold the platform family ahead of the build order (AGENTS.md § Boundaries). The catalog
+  family already builds; M2 is the milestone that introduces the deployable platform family.
