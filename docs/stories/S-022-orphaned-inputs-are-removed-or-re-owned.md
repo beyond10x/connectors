@@ -2,7 +2,7 @@
 id: S-022
 title: "Orphaned inputs are removed or re-owned"
 pillar: Catalog
-status: in-progress
+status: done
 priority:
 design:
 epic: post-m1
@@ -40,7 +40,7 @@ origin, or a move outside the source layer.
       provenance says `origin = "repository-authored"`, pins its bytes, records the predecessor
       authorship and exact official grounding references, and states `coverage =
       "partial-ingest-fixture"`; it cannot be mistaken for vendor-published bytes.
-- [ ] **anthropic's full connector** is reproducible from a sufficiently complete authored spec plus
+- [x] **anthropic's full connector** is reproducible from a sufficiently complete authored spec plus
       reviewed overlays into the canonical connector document. Until then,
       `providers/anthropic.toml` is named migration debt and the partial excerpt is not allowed to
       claim provider-level coverage.
@@ -56,7 +56,7 @@ origin, or a move outside the source layer.
 - [x] `SOURCES.toml`'s "known defects" header shrinks by exactly the entries closed, and the
       predecessor-import entry's `consumers` list stops naming paths that no longer exist. The index
       never describes a tree that is not there.
-- [ ] After the sweep, orphan checking passes **in both directions** by construction: every file under
+- [x] After the sweep, orphan checking passes **in both directions** by construction: every file under
       `specs/` is covered by a `[[source]]` entry, and every entry's files exist. Landing this before
       S-016 means that check's first run is a green one; landing it after means S-016 ships with three
       declared exceptions, which is the state this story exists to prevent.
@@ -65,7 +65,20 @@ origin, or a move outside the source layer.
       not cleanup noise.
 
 ## Progress
-- Anthropic's provider was already hand-curated and contained no `[[spec]]` ingest, but the excerpt
+- 2026-08-13 — closed. The two repository-authored OpenAPI 3.1/YAML documents now cover every
+  endpoint, parameter, response and authentication fact used by the eleven shipped Models/Admin
+  reads, with one exact official reference on every operation and shared official authentication
+  and versioning references in provenance. `providers/anthropic.toml` is now only identity,
+  credential/config declarations and reviewed overlays; the real loader reproduces all eleven
+  operations and records source provenance for each. Optional pagination/filter parameters remain
+  visible in source and are omitted explicitly. Directory↔provenance and patch↔published coverage
+  are tested in both directions.
+- 2026-08-13 — removed the undocumented Console and consumer-subscription OAuth endpoints,
+  services, configuration and third-party-inferred acquisition facts from connector authority.
+  Anthropic API and Admin API access remains; Claude/Claude Code credentials belong to the harness
+  adapter boundary fixed by architecture ADR 0014.
+- Earlier in this story Anthropic's provider was hand-curated and contained no `[[spec]]` ingest,
+  while the excerpt
   was not unused: `openapi_ingest.rs` depended on it for OpenAPI 3.1, YAML integer response keys and
   deterministic-ingest coverage. It is restored under `specs/` as a repository-authored,
   hash-pinned source grounded in Anthropic's official API, versioning, Messages and Models
@@ -89,6 +102,8 @@ origin, or a move outside the source layer.
   `present`/`published`/`retired` booleans, everything derived from a supplied checkout and paired
   observations — is a good idea retained by the current cutover story, so the question is
   where it lives, not whether it was right.
-- The Anthropic provider remains outside S-021's fully spec-derived provider count until the authored
-  spec plus overlays reproduce its canonical document. The partial spec is real source input, but
-  parser coverage is not catalog coverage.
+- Anthropic now belongs inside S-021's fully spec-derived provider count: two authored specs plus
+  reviewed overlays reproduce its canonical document. `exact-shipped-surface` is intentionally not
+  a claim of full Anthropic API coverage. A later curated Messages/inference expansion for the
+  agent layer's direct-provider adapter remains possible from official API documentation; only
+  Claude Code and consumer-subscription credential borrowing is outside this connector boundary.

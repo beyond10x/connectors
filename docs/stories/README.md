@@ -19,11 +19,10 @@ Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 
 **M1 has landed.** The catalog builds here: `catalog build` compiles `providers/` plus the vendored
 spec cache into `catalog/`, the pack, `connectors.lock` and the site projection, and the one-time
-byte-differential against the predecessor's pack passed byte-exact. What M1 left open is the `post-m1`
-epic below — Rust/governance/catalog CI now exists, but its web and remaining failing-first arms are
-open; the web explorer is written against a site JSON the projection no longer emits, coverage lost a
-direction in the test consolidation, three inputs are orphaned, and the predecessor's generator
-identity is still stamped into every artifact.
+byte-differential against the predecessor's pack passed byte-exact. S-022 then closed the orphaned
+input debt and made Anthropic's shipped API/Admin connector reproducible from explicitly
+repository-authored specs. What M1 still left open is tracked by the remaining `post-m1` stories:
+web and coverage gates plus the predecessor identity stamped into generated artifacts.
 
 The platform families are unstarted; nothing should be scaffolded ahead of the build order in
 [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
@@ -44,7 +43,7 @@ will spawn children as each milestone is designed.
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
 | [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | backlog | Catalog | catalog, catalog-build, connector-resolve, web |
 | [S-021](S-021-coverage-regains-its-second-direction.md) | Coverage regains its second direction: every gap between declared and published has a reason | backlog | Catalog | catalog-build, providers |
-| [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | in-progress | Catalog | specs, migration, web |
+| [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | done | Catalog | specs, migration, web |
 | [S-004](S-004-adopt-token-response-metadata.md) | An OAuth token response can carry declared metadata into the connection, not the credential store | backlog | Catalog | catalog, connector-spec, service |
 | [S-005](S-005-header-name-rate-limit-retry.md) | A rate limit the vendor discloses at runtime can be declared by header name | backlog | Catalog | catalog, connector-spec |
 | [S-006](S-006-per-service-verification-probes.md) | A service declares how a credential is verified, and what a failure means | backlog | Catalog | catalog, connector-spec, service |
@@ -72,7 +71,7 @@ will spawn children as each milestone is designed.
 |---|---|---|
 | `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one changes to the migrating catalog plus the accepted beyond-HTTP fact shape. S-001, S-002, S-015 and S-023 all change the document schema, lowering, and committed documents — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
-| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open: Rust/governance/catalog CI exists, while its web and remaining failing-first arms remain open (S-020); a web explorer is written against a site JSON that no longer exists (S-018), the predecessor's generator identity is still stamped into every artifact (S-019), the coverage direction the test consolidation dropped (S-021), and three inputs are orphaned (S-022). Two of them are ordering constraints on other work: S-019 rides the schema wave, S-022 lands before S-016's check. |
+| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open. S-022 closed the orphaned inputs; Rust/governance/catalog CI exists while its web and remaining failing-first arms remain open (S-020), the explorer still needs its new site JSON (S-018), the predecessor identity awaits the coordinated schema wave (S-019), and reverse coverage remains S-021. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |

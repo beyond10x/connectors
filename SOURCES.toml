@@ -23,15 +23,24 @@ id = "anthropic-authored-openapi"
 kind = "openapi-spec"
 origin = "repository-authored"
 references = [
-  "https://platform.claude.com/docs/en/api/overview",
+  "https://platform.claude.com/docs/en/manage-claude/authentication",
+  "https://platform.claude.com/docs/en/manage-claude/overview",
   "https://platform.claude.com/docs/en/api/versioning",
-  "https://platform.claude.com/docs/en/api/messages/create",
   "https://platform.claude.com/docs/en/api/models/list",
+  "https://platform.claude.com/docs/en/api/admin/organizations/me",
+  "https://platform.claude.com/docs/en/api/admin/users/list",
+  "https://platform.claude.com/docs/en/api/admin/users/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/api_keys/list",
+  "https://platform.claude.com/docs/en/api/admin/invites/list",
 ]
 refresh = "authored-review"
 pins = "specs/anthropic.provenance.toml"
-consumers = ["crates/connector-spec/tests/main/openapi_ingest.rs"]
-note = "Partial authored source spec for deterministic ingest coverage. It does not yet reproduce providers/anthropic.toml; that source-to-canonical derivation remains open design work."
+consumers = ["providers/anthropic.toml", "catalog/anthropic.catalog.json", "crates/connector-spec/tests/main/openapi_ingest.rs"]
+note = "Two repository-authored OpenAPI 3.1/YAML documents cover the exact shipped Models and read-only Admin API surfaces. Each endpoint cites its official Anthropic reference; reviewed overlays retain stable ids, policy facts and deliberate query omissions."
 
 [[source]]
 id = "asterisk-ari"
