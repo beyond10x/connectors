@@ -1,0 +1,7 @@
+# safety net: key material never enters this repo
+*.pem
+*.key
+
+/target/
+node_modules/
+.DS_Store
