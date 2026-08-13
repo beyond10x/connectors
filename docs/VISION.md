@@ -108,8 +108,10 @@ the catalog and the auth templates are the same text everywhere.
 - **No unified data models.** We do not normalize Zendesk tickets and Jira issues into one
   schema. Declared operations + the governed proxy are the invocation layer; lossiness is the
   category's tax and we decline to charge it.
-- **No plugin runtime.** Every integration is a declared connector executed by the platform;
-  there is no side-loaded vendor code.
+- **No arbitrary or in-process plugin runtime.** Every integration is a declared connector executed
+  by the platform. V1 protocol drivers are built into the closed platform registry; any future
+  vendor-specific executable requires a separate attestation decision and runs out-of-process
+  through substrate, never as side-loaded code or a caller-selected plugin.
 
 ## Relationship to flux
 
