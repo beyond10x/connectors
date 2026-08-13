@@ -587,7 +587,10 @@ idempotency = "idempotent"
         // determinism of every artifact below it rests on.
         assert_eq!(
             connector.canonical_json().unwrap(),
-            load(&inputs(HAND_AUTHORED)).unwrap().canonical_json().unwrap()
+            load(&inputs(HAND_AUTHORED))
+                .unwrap()
+                .canonical_json()
+                .unwrap()
         );
     }
 
@@ -835,5 +838,4 @@ path = \"specs/acme/v1.json\"
         );
         assert!(rendered.contains("bedrock-runtime"), "{rendered}");
     }
-
 }

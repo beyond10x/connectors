@@ -45,7 +45,9 @@ fn the_table_covers_the_whole_pack() {
 /// id the table publishes must resolve through both lookup paths.
 #[test]
 fn every_operation_is_reachable_by_key_exactly_once() {
-    let mut ids: Vec<&str> = catalog::operations().map(|operation| operation.id).collect();
+    let mut ids: Vec<&str> = catalog::operations()
+        .map(|operation| operation.id)
+        .collect();
     let total = ids.len();
     ids.sort_unstable();
     ids.dedup();
@@ -154,11 +156,17 @@ fn every_channel_binding_resolves_its_events() {
     for provider in catalog::providers() {
         for channel in provider.channels {
             channels += 1;
-            assert_eq!(provider.channel(channel.name).map(|c| c.name), Some(channel.name));
+            assert_eq!(
+                provider.channel(channel.name).map(|c| c.name),
+                Some(channel.name)
+            );
             assert!(!channel.base_url.is_empty());
             for event in channel.events {
                 assert!(
-                    provider.events.iter().any(|declared| declared.name == *event),
+                    provider
+                        .events
+                        .iter()
+                        .any(|declared| declared.name == *event),
                     "`{}`'s channel `{}` names event `{event}`, which it does not declare",
                     provider.id,
                     channel.name
