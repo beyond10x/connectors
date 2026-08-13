@@ -72,14 +72,18 @@ The predecessor's two-crate split (host/server) was right; its failure mode was 
 
 ### The binary
 
-One binary, `connectors`, four verb families:
+Two binaries, deliberately — the repo-maintenance tool and the product are different programs
+for different audiences, and conflating them would ship the catalog compiler to every end user
+and spend the product's name on a dev tool:
 
-```
-connectors catalog  build | diff | check | scaffold      # authoring (catalog-build)
-connectors serve    [--config platform.toml]             # run the platform
-connectors admin    org | user | integration | grant | … # operator actions against the API
-connectors version | doctor                              # identity + self-check
-```
+| Binary | Crate | Audience & verbs |
+|---|---|---|
+| `catalog` | `crates/catalog-cli` — internal, **never a release artifact** | this repo's maintainers, agents and CI: `catalog build \| diff \| check \| scaffold`, `catalog sources check \| refresh \| diff \| mint` (S-016/S-017) |
+| `connectors` | `crates/connectors-cli` — the product, arrives with M2 | end users and operators, against any deployment and entirely without flux: `connectors serve`, `connectors admin org \| user \| integration \| grant \| …`, and the client verbs (login, connect, invoke, events) |
+
+The maintenance tool links the compiler family (`connector-spec` ingest, site projection,
+`catalog-build`); the product CLI links `protocol`/`service`/`server` and **never the
+compiler**.
 
 `connectors serve` with no config is the **personal posture**: loopback bind, local-owner
 identity, one implicit organization, state under an owner-only user-state root. Zero
@@ -181,7 +185,7 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
 
 | Milestone | Content | Exit |
 |---|---|---|
-| **M1 catalog** | copy catalog dirs + family crates; `catalog-build` extracted minus emitters; schema gains C-552 fields + per-op effects; lock verifier | `connectors catalog build/diff/check` green; one-time pack differential vs predecessor passes |
+| **M1 catalog** | copy catalog dirs + family crates; `catalog-build` extracted minus emitters; schema gains C-552 fields + per-op effects; lock verifier | `catalog build/diff/check` green; one-time pack differential vs predecessor passes |
 | **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; postures + identity (personal, org-OIDC); organizations, service accounts, audit | `connectors serve` healthy in both postures; routes fence green |
 | **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, invoke + proxy | end-to-end: sign in → connect a real provider → grant → invoke, all audited |
 | **M4 events** | channels, webhook terminator, event store, deliveries + replay, subscriptions | a provider event reaches a client by push and by pull, with provenance |

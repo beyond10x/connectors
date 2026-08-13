@@ -65,7 +65,7 @@ unless cross-repo access is needed.
 ## Adding a connector
 
 The discipline comes from the predecessor pipeline (55 providers, 835 operations) and is
-non-negotiable; the mechanics arrive with M1 (`connectors catalog …`). Read VISION.md
+non-negotiable; the mechanics arrive with M1 (`catalog …`). Read VISION.md
 principles 1–3 and the Provider/Operation sections of the domain model first.
 
 1. **Pick the authoring mode.** Hand-authored curation is the default (47 of 55 predecessor
@@ -80,7 +80,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    details from memory is fabrication; every operation you declare must be grounded in a
    source you fetched and can cite. When hunting a spec location, mine the vendored competitor
    catalogs first (`docs/research/vendor/` — Nango's providers.yaml alone carries docs URLs and
-   auth endpoints for ~950 vendors); `connectors sources mint <vendor>` (S-017) automates the
+   auth endpoints for ~950 vendors); `catalog sources mint <vendor>` (S-017) automates the
    lookup with per-field citations and printed disagreements.
 3. **Identity is irreversible.** In `providers/<id>.toml`: `id` (lowercase, stable, public),
    `authority` (reverse-DNS, e.g. `com.gitlab.api` — it leads every credential path and is
@@ -116,7 +116,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    verification probe. (They live under `quirks` until S-015 renames them; declare them
    regardless.)
 10. **Build, verify, commit as one unit.**
-   `connectors catalog build` → `diff` must then report everything up to date → `check`
+   `catalog build` → `diff` must then report everything up to date → `check`
    (lock verifier, S-003). Unchanged inputs reproduce every artifact byte for byte — if `diff`
    moves without your input changing, stop and investigate; never re-commit drift. Coverage
    tests hold in both directions (an allowlist entry may not outlive the gap it explains).
@@ -131,17 +131,17 @@ twice · one reviewable commit, by the bot.
 ## Refreshing a source
 
 `SOURCES.toml` is a **machine-processed manifest, not documentation**. Code owns it (S-016):
-`connectors sources check` validates the index, verifies every checksum against the bytes on
+`catalog sources check` validates the index, verifies every checksum against the bytes on
 disk and refuses orphans in both directions — it runs in the invariant suite, so a drifted pin
-fails the build; you will never discover drift by reading TOML. `connectors sources refresh`
-executes the fetch + declared scrub + re-pin; `connectors sources diff` probes upstream without
+fails the build; you will never discover drift by reading TOML. `catalog sources refresh`
+executes the fetch + declared scrub + re-pin; `catalog sources diff` probes upstream without
 mutating anything. Nobody fetches or compares by hand, at any scale.
 
 The agent instruction is therefore short:
 
-1. `connectors sources refresh <id>` (until S-016 lands: run the entry's `scripts/vendor-*.sh`;
+1. `catalog sources refresh <id>` (until S-016 lands: run the entry's `scripts/vendor-*.sh`;
    either way, never hand-edit or model-generate anything under `specs/`).
-2. `connectors catalog build`, review the **canonical-document diff** — the reviewable object.
+2. `catalog build`, review the **canonical-document diff** — the reviewable object.
    Empty catalog diff → say so and commit the pin bump alone.
 3. Newly selected operations are a **curation decision, never an auto-select** (the runbook's
    judgment calls apply); vanished operations are acknowledged, not silently dropped — coverage
