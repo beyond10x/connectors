@@ -24,9 +24,13 @@ the domain model and are not renamed casually (vision principle 10).
 
 ## Automation identity: selfdirect-bot
 
-Humans push as humans. Automation authenticates as the org-owned GitHub App **selfdirect-bot**
-(App ID `4575767`; permissions: contents, pull_requests, metadata, deployments — nothing more).
-No PATs, no machine accounts, no long-lived credentials.
+**Anything not typed by Timo commits and pushes as the bot — including agent sessions (Claude,
+flux, CI).** Only Timo at the keyboard pushes as `timofriedlberlin`. The bot is the org-owned
+GitHub App **selfdirect-bot** (App ID `4575767`; permissions: contents, pull_requests, metadata,
+deployments — nothing more). No PATs, no machine accounts, no long-lived credentials.
+
+For agents that means: work normally, but commit via `scripts/as-bot.sh commit …` and push via
+`scripts/as-bot.sh push …` — never plain `git commit`/`git push`.
 
 The scripts work with zero configuration (defaults: App ID baked in, key found at
 `~/selfdirect/selfdirect-bot.*.private-key.pem`; `SELFDIRECT_BOT_*` env vars override).
