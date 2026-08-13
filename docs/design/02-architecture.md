@@ -85,6 +85,10 @@ The maintenance tool links the compiler family (`connector-spec` ingest, site pr
 `catalog-build`); the product CLI links `protocol`/`service`/`server` and **never the
 compiler**.
 
+Both binaries parse their command line with **clap (derive API)** — hand-rolled argv parsing is
+banned in this repository. The predecessor hand-rolled its connector CLI to avoid a dependency
+mid-flight and it went sideways; the parser is not where this project spends its novelty budget.
+
 `connectors serve` with no config is the **personal posture**: loopback bind, local-owner
 identity, one implicit organization, state under an owner-only user-state root. Zero
 configuration is the personal tier's contract — it is what a supervising client (flux) starts.
