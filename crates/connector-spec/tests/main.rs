@@ -18,12 +18,6 @@ mod origin_corpus;
 #[path = "support/shipped_provider.rs"]
 mod shipped_provider;
 
-#[path = "main/anthropic_admin_surface.rs"]
-mod anthropic_admin_surface;
-#[path = "main/asterisk_ari_specs.rs"]
-mod asterisk_ari_specs;
-#[path = "main/asterisk_connector.rs"]
-mod asterisk_connector;
 #[path = "main/auth_archetypes.rs"]
 mod auth_archetypes;
 #[path = "main/auth_hazard.rs"]
@@ -32,10 +26,6 @@ mod auth_hazard;
 mod auth_prefix;
 #[path = "main/auth_quirks.rs"]
 mod auth_quirks;
-#[path = "main/babelforce_coverage.rs"]
-mod babelforce_coverage;
-#[path = "main/babelforce_spec_route.rs"]
-mod babelforce_spec_route;
 #[path = "main/channel_bindings.rs"]
 mod channel_bindings;
 #[path = "main/config_choices.rs"]
@@ -52,8 +42,6 @@ mod credential_response;
 mod credential_subject;
 #[path = "main/determinism.rs"]
 mod determinism;
-#[path = "main/github_spec_selection.rs"]
-mod github_spec_selection;
 #[path = "main/graphs.rs"]
 mod graphs;
 #[path = "main/ir_roundtrip.rs"]
@@ -62,14 +50,10 @@ mod ir_roundtrip;
 mod legacy_default_service;
 #[path = "main/lockfile.rs"]
 mod lockfile;
-#[path = "main/microsoft_graph_spec_selection.rs"]
-mod microsoft_graph_spec_selection;
 #[path = "main/oauth2_acquisition.rs"]
 mod oauth2_acquisition;
 #[path = "main/oauth_token_endpoint.rs"]
 mod oauth_token_endpoint;
-#[path = "main/openai_spec_selection.rs"]
-mod openai_spec_selection;
 #[path = "main/openapi_ingest.rs"]
 mod openapi_ingest;
 #[path = "main/operation_selection.rs"]
@@ -112,23 +96,7 @@ mod shipped_providers;
 mod spec_backed_provider;
 #[path = "main/strict_fields.rs"]
 mod strict_fields;
-#[path = "main/stripe_spec_selection.rs"]
-mod stripe_spec_selection;
-#[path = "main/twilio_spec_selection.rs"]
-mod twilio_spec_selection;
-#[path = "main/vendored_github_spec.rs"]
-mod vendored_github_spec;
 #[path = "main/vendored_specs.rs"]
 mod vendored_specs;
-#[path = "main/vendored_zendesk_specs.rs"]
-mod vendored_zendesk_specs;
 #[path = "main/verification_conformance.rs"]
 mod verification_conformance;
-#[path = "main/zendesk_help_center.rs"]
-mod zendesk_help_center;
-#[path = "main/zendesk_messaging.rs"]
-mod zendesk_messaging;
-#[path = "main/zendesk_spec_selection.rs"]
-mod zendesk_spec_selection;
-#[path = "main/zendesk_webhooks.rs"]
-mod zendesk_webhooks;

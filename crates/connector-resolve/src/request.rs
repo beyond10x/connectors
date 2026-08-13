@@ -278,9 +278,21 @@ mod tests {
         assert_eq!(url, "https://vendor.example/things?page=2#top");
     }
 
+    /// The product token and the repository comment are both facts about *this* build, so both are
+    /// read from the manifest here rather than typed a second time. Hard-coding the repository was
+    /// what this test did before the M1 migration, and it is exactly the staleness the constant's
+    /// own `env!` avoids.
+    ///
+    /// **The product token still says `flux-connectors`, deliberately.** It is the same string the
+    /// build generator stamps into every canonical document, and moving it is a reviewed catalogue
+    /// change — see `catalog_build::seam::generator`. The two move together, in the story that
+    /// retires the migration differential; a wire identity that disagreed with the artifact
+    /// identity would be worse than one that is merely old.
     #[test]
     fn the_default_identity_names_this_software_and_this_repository() {
         assert!(DEFAULT_USER_AGENT.starts_with("flux-connectors/"));
-        assert!(DEFAULT_USER_AGENT.contains("github.com/codewandler/flux-connectors"));
+        assert!(DEFAULT_USER_AGENT.contains(env!("CARGO_PKG_VERSION")));
+        assert!(DEFAULT_USER_AGENT.contains(env!("CARGO_PKG_REPOSITORY")));
+        assert!(DEFAULT_USER_AGENT.ends_with(')'));
     }
 }
