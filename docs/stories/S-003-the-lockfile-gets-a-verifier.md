@@ -32,9 +32,11 @@ is the whole design.
 
 - [x] `catalog check` recomputes every hash in `connectors.lock` whose bytes are identified by the
       current v1 format — each provider's
-      declaration bytes, each vendored spec document, each emitted artifact by repository-relative
+      declaration bytes, each vendored spec document, each committed artifact by repository-relative
       path — and **exits non-zero** on any mismatch, naming the provider and which input moved. A
       populated predecessor-reserved hash without addressable bytes is refused as unverifiable.
+      The ignored site projection is regenerated build output, not reviewed state, so it is not
+      counted as a verified committed artifact.
 - [x] `check` performs **no network IO**, so CI runs it offline and hermetically. Upstream drift
       (has the vendor's document moved?) is a different question with a different answer and is not
       folded in here.
@@ -61,7 +63,8 @@ is the whole design.
   stub. The completed suite covers clean count output/no writes, comment-only provider edits,
   re-vendored specs, hand-edited artifacts, falsified artifact hashes, and provider/spec/artifact
   membership in both directions. The network seam and real binary namespace tests cover `check`
-  alongside `build`. The committed catalogue reports `55 providers, 59 artifacts verified`.
+  alongside `build`. The committed catalogue reports `55 providers, 58 artifacts verified`; the
+  ignored site projection is regenerated separately.
 
 ## Notes
 

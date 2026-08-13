@@ -154,10 +154,17 @@ pub fn verify(workspace: &Workspace) -> Result<Report> {
 
     // The lockfile verifies itself structurally rather than by a self-referential hash: its parsed
     // rows have now been compared against both disk bytes and the freshly planned rows. Count it
-    // alongside the other generated artifacts the command verified.
-    let artifacts = plan.artifacts.len();
+    // alongside the other committed generated artifacts. The ignored site projection is a build
+    // output, not reviewed repository state, and is therefore regenerated rather than "verified".
+    let artifacts = plan
+        .artifacts
+        .iter()
+        .filter(|planned| planned.path != workspace.site_catalog_path())
+        .count();
     for planned in &plan.artifacts {
-        if planned.path == workspace.lockfile_path() {
+        if planned.path == workspace.lockfile_path()
+            || planned.path == workspace.site_catalog_path()
+        {
             continue;
         }
         let key = workspace.artifact_key(&planned.path);
@@ -691,7 +698,7 @@ idempotency = "idempotent"
             fixture.check().expect("a clean lock verifies"),
             Report {
                 providers: 1,
-                artifacts: 5,
+                artifacts: 4,
             }
         );
         let invocation = Invocation {
@@ -703,9 +710,21 @@ idempotency = "idempotent"
         crate::run(&invocation, &mut output).expect("the CLI check succeeds");
         assert_eq!(
             String::from_utf8(output).expect("CLI output is UTF-8"),
-            "1 provider, 5 artifacts verified\n"
+            "1 provider, 4 artifacts verified\n"
         );
         assert_eq!(before, snapshot(&fixture.root), "check wrote to the tree");
+
+        fs::remove_file(fixture.root.join("web/public/catalog.json"))
+            .expect("remove ignored site projection");
+        assert_eq!(
+            fixture
+                .check()
+                .expect("an absent ignored projection is clean"),
+            Report {
+                providers: 1,
+                artifacts: 4,
+            }
+        );
     }
 
     #[test]

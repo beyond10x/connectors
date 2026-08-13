@@ -126,7 +126,7 @@ fn build_succeeds_with_networking_unavailable() {
     );
     assert_eq!(
         String::from_utf8_lossy(&check.stdout),
-        "1 provider, 5 artifacts verified\n"
+        "1 provider, 4 artifacts verified\n"
     );
 }
 

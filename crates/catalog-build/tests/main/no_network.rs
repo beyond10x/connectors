@@ -66,7 +66,7 @@ fn check_records_no_network_attempt() {
     let output = check(fixture.root().to_str().unwrap()).expect("check succeeds offline");
 
     assert_eq!(denial.attempts(), 0, "`check` reached the network seam");
-    assert_eq!(output, "1 provider, 5 artifacts verified\n");
+    assert_eq!(output, "1 provider, 4 artifacts verified\n");
 }
 
 /// Every network primitive in this crate must live behind `src/net.rs`, or the counter above is
