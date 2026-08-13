@@ -59,5 +59,7 @@ destination selection to a model.
   Integration or on a deployment-global document with per-integration references — this story is
   where that question gets answered, so record the answer in the design series.
 - Consumed by [S-008](S-008-m3-connect-a-provider-and-invoke-it.md) (invoke), S-030 (any later raw
-  proxy), and [S-009](S-009-m4-events-reach-a-client-by-push-and-by-pull.md) (channel supervisor).
-  Private-endpoint provider work cannot start without it.
+  proxy), and [S-009](S-009-m4-events-reach-a-client-by-push-and-by-pull.md) (channel supervisor and
+  outbound delivery worker). Delivery endpoint registration requires `delivery.manage`, persists a
+  governed destination, and rechecks the aperture post-resolution at dispatch. Private-endpoint
+  provider work cannot start without it.

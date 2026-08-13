@@ -1,5 +1,5 @@
 //! A provider's **services**: the middle addressing level, as `providers/*.toml` declares it and as
-//! the IR encodes it (C-49, `docs/designs/provider-services.md`).
+//! the IR encodes it (C-49, `predecessor:docs/designs/provider-services.md`).
 //!
 //! Every assertion here goes through `provider::load` and the connector's own canonical encoding,
 //! never through field access. That is deliberate on two counts:

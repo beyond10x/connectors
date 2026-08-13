@@ -2,12 +2,12 @@
 id: S-010
 title: "M5 — flux re-points at the platform and the gitlab plugin is deleted"
 pillar: Clients
-status: backlog
+status: blocked
 priority:
 design: docs/design/02-architecture.md
 epic: build-order
 areas: [protocol, server, docs]
-note: "architecture §9 milestone M5. Exit: flux invokes gitlab through the platform and the gitlab plugin is deleted. Private predecessor records are provenance; this story restates the normative parity and cutover rules"
+note: "Externally gated: Flux must record B10x adoption in its own repository before this family can schedule M5. Private predecessor records are provenance; this story restates the normative parity and cutover rules"
 ---
 
 # M5 — flux re-points at the platform and the gitlab plugin is deleted
@@ -44,7 +44,8 @@ one-way dependency rule fixed; only the trust domain and release origin change.
       without re-authenticating — the "authenticate once" claim, proven rather than asserted.
 
 ## Progress
-- (not started)
+- Externally gated: no B10x adoption decision or story exists in Flux yet. This repository
+  cannot assign an M5 delivery date until the Flux owner records that choice downstream.
 
 ## Notes
 
@@ -53,8 +54,8 @@ one-way dependency rule fixed; only the trust domain and release origin change.
 - Provenance: an unpublished Flux plugin-retirement record supplied the original routing table and
   wave order. It is not required authority: the fixture, parity, precondition, and same-release
   deletion rules are restated in this story. B10x's durable ownership and dependency
-  decisions are [ADR 0009](https://github.com/b10x/architecture/blob/main/adr/0009-b10x-agent-is-provider-and-harness-agnostic.md),
-  [ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md),
+  decisions are [ADR 0009 — b10x/agent is provider- and harness-agnostic](https://github.com/b10x/architecture/blob/main/adr/0009-b10x-agent-is-provider-and-harness-agnostic.md),
+  [ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md),
   and the [dependency rules](https://github.com/b10x/architecture/blob/main/architecture/dependency-rules.md).
 - gitlab is wave 1 because its connector is shipped and frozen migration fixtures
   already exist. Waves 2–6 (slack/jira/confluence/opsgenie, the observability set behind declared

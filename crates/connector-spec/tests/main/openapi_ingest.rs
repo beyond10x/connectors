@@ -454,7 +454,7 @@ fn a_malformed_endpoint_is_a_diagnostic_naming_it_rather_than_a_failed_ingest() 
 /// The tempting alternative — ingest it without its body — produces a `POST` that quietly sends
 /// nothing, which is indistinguishable from a legitimately bodiless write and would ship as a
 /// working connector. `BodyEncoding` is `json | form`; `multipart/form-data` is a known blocker
-/// (`docs/designs/spec-front-end.md`), not a surprise to paper over.
+/// (`predecessor:docs/designs/spec-front-end.md`), not a surprise to paper over.
 #[test]
 fn a_body_the_ir_cannot_express_skips_the_operation_rather_than_dropping_the_body() {
     let zendesk = zendesk();

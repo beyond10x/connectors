@@ -84,7 +84,8 @@ Three readings of these numbers:
 3. Design the declarative webhook-routing rule grammar (verify + attribute) before scaling
    inbound events beyond the five existing channel bindings; keep a script escape hatch off the
    table until a real provider defeats the grammar (Nango data point: 94% never needed one).
-4. `AWS_SIGV4` and client-certificate schemes have working declaration precedents; the aws and
-   kubernetes migration waves (flux-roadmap 0024) should crib Nango's field shapes.
+4. `AWS_SIGV4` and client-certificate schemes have working declaration precedents. Any future AWS
+   or Kubernetes migration story should evaluate Nango's field shapes against its own acceptance
+   criteria; no private predecessor roadmap is normative here.
 5. Do not adopt: template inheritance (fights reviewability), sync/ELT machinery (out of scope),
    catalog-in-a-database (forfeits review-equals-execution).

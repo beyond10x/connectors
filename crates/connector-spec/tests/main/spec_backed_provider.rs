@@ -332,7 +332,7 @@ fn a_selection_that_states_no_risk_or_idempotency_is_refused() {
 
 /// **An op id is a public contract**, so `operationId` is never promoted into one. Users and models
 /// call an operation by name and a vendor's `operationId` is a volatile field; deriving one from the
-/// other silently is what `docs/designs/connector-pipeline.md` refuses under "Op naming is a public
+/// other silently is what `predecessor:docs/designs/connector-pipeline.md` refuses under "Op naming is a public
 /// contract". C-412 replaces the per-operation `rename` with a rule declared once — it does not
 /// remove the requirement to decide.
 #[test]

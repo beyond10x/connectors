@@ -43,8 +43,7 @@ emitter does not migrate, so:
 - **`OAuth2` carries no `client_id`.** The canonical document has no field for a registration
   value by design, and the generated table could only ever emit an empty string there.
 
-Two facts the document cannot state are named rather than guessed:
-`Acquisition::Minted` is unreachable (no shipped connector declares a minting join, and the
-document has no field for one), and `CredentialRequirement` is *derived* — see the module
-documentation on `table`, which records that the derivation reproduces the predecessor's
-classification for all 835 shipped operations and is ambiguous only in a shape nothing ships.
+Design 04 made both formerly implicit facts explicit in document data. Minting joins can construct
+`Acquisition::Minted` from the canonical acquisition record, and each operation publishes its
+`CredentialRequirement` token. The table parser maps those fields; it does not infer either rule
+from predecessor behavior.

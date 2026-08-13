@@ -211,7 +211,7 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
 | **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; postures + identity (personal, org-OIDC); organizations, service accounts, audit | `connectors serve` healthy in both postures; routes fence green |
 | **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, declared-operation invoke; raw proxy remains deferred to S-030 | end-to-end: sign in → connect a real provider → grant → invoke, all audited |
 | **M4 events** | channels, webhook terminator, event store, deliveries + replay, subscriptions | a provider event reaches a client by push and by pull, with provenance |
-| **M5 clients** | flux re-point (embedded client + local supervise), first measured plugin-retirement wave (gitlab); the acceptance rule is recorded in S-010 | flux invokes gitlab through the platform; the gitlab plugin deleted |
+| **M5 clients** | externally gated until Flux records B10x adoption; then flux re-point (embedded client + local supervise) and the first measured plugin-retirement wave (gitlab), as recorded in S-010 | downstream adoption record exists; flux invokes gitlab through the platform; the gitlab plugin is deleted |
 
 ## Open questions
 

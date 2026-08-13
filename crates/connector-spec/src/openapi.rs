@@ -1,7 +1,7 @@
 //! OpenAPI 3.x ingest: a vendored vendor document in, [`Ingested`] out — C-4.
 //!
 //! This is the second front-end the pipeline was designed around
-//! (`docs/designs/connector-pipeline.md`, "Two front-ends, one IR"). A provider file that points at
+//! (`predecessor:docs/designs/connector-pipeline.md`, "Two front-ends, one IR"). A provider file that points at
 //! a document under `specs/` shrinks to a pointer plus patches, and this module is what turns the
 //! pointer into something a patch can select from.
 //!
@@ -57,7 +57,7 @@ use crate::{BodyEncoding, HttpMethod, JsonSchema, Param, ParamSet};
 /// endpoint is describing one request two ways, and picking the one the IR expresses best is a
 /// decision worth making once here rather than per document. Anything not on this list is a
 /// [`Diagnostic`] — `multipart/form-data` most of all, which [`BodyEncoding`] cannot spell and which
-/// `docs/designs/spec-front-end.md` records as a known blocker rather than a surprise.
+/// `predecessor:docs/designs/spec-front-end.md` records as a known blocker rather than a surprise.
 const READABLE_BODIES: [(&str, BodyEncoding); 2] = [
     ("application/json", BodyEncoding::Json),
     ("application/x-www-form-urlencoded", BodyEncoding::Form),
@@ -182,7 +182,7 @@ pub struct ServerVariable {
 ///
 /// Everything an [`Operation`](crate::Operation) needs **except the three things no specification
 /// carries**: the op id (a public contract, so it is stated by a patch and never derived from the
-/// volatile `operationId` — see `docs/designs/connector-pipeline.md`), the
+/// volatile `operationId` — see `predecessor:docs/designs/connector-pipeline.md`), the
 /// [`Risk`](crate::Risk) and the [`Idempotency`](crate::Idempotency). Those have no `Default` in
 /// this IR precisely so that they cannot be decided by silence, and ingest inventing them would be
 /// the silence.

@@ -206,7 +206,7 @@ fn plan_at_width(
     // **The whole-catalogue artifacts.** Each covers every provider at once, so each is a function
     // of a **full** run only. A `--provider zendesk` build would have to drop the other sixteen to
     // write one honestly, so it leaves the committed documents alone instead — neither rewritten nor
-    // reported stale. `docs/designs/catalog-json.md` records the rule for `catalog.json`; C-104
+    // reported stale. `predecessor:docs/designs/catalog-json.md` records the rule for `catalog.json`; C-104
     // brings `crates/catalog/src/generated.rs` under it, which is what makes a provider-scoped run's
     // write set disjoint from another provider's and so lets provider stories run in parallel.
     if whole_catalogue {

@@ -17,7 +17,7 @@
 //! the shipped catalogue, and nothing in these three, needs text *after* the credential.
 //!
 //! **So the axis is `prefix` alone — no `suffix`, and no value template.** The reasoning is recorded
-//! in `docs/designs/unified-auth.md` §"The prefix axis, as built"; the short form is that a template
+//! in `predecessor:docs/designs/unified-auth.md` §"The prefix axis, as built"; the short form is that a template
 //! can spell requests this repository must not be able to author (a credential substituted twice, or
 //! zero times — which sends an unauthenticated request that looks authenticated), while a prefix
 //! makes each of those unspellable rather than merely refused.

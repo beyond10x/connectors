@@ -6,7 +6,7 @@
 //! is the format's consuming side; this module is the only writer. The format decision — a plain
 //! UTF-8 container over the committed document bytes, uncompressed, indexed, digest-carrying — is
 //! recorded with its measurements and its rejected alternative in
-//! `docs/designs/catalog-artifact.md` §2.
+//! `predecessor:docs/designs/catalog-artifact.md` §2.
 //!
 //! # The format, in one place
 //!

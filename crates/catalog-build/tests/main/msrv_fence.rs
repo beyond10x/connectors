@@ -32,9 +32,9 @@
 //! 1. **Whether the code compiles on the declared MSRV.** This reads *declarations*. A dependency
 //!    that uses a 1.88 language feature without raising its own `rust-version`, or a `let`-chain
 //!    written in this repository's own `src/`, passes here untouched. Only a build on the declared
-//!    toolchain proves that, and **nothing builds this workspace on 1.87** — there is no CI yet at
-//!    all. [`the_declared_msrv_is_below_the_toolchain_this_runs_on`] states that gap explicitly
-//!    rather than letting the fence above imply coverage that does not exist.
+//!    toolchain proves that. The CI `msrv` job builds and tests this workspace on 1.87.0;
+//!    [`the_running_toolchain_meets_the_declared_msrv`] keeps both jobs honest about which compiler
+//!    Cargo actually invoked.
 //! 2. **Dev-dependencies of crates outside this workspace**, which cargo does not resolve at all
 //!    and which nothing here compiles.
 //! 3. **A feature set a downstream consumer selects.** This is the graph *this* workspace builds.
@@ -99,11 +99,10 @@ fn no_resolved_dependency_declares_a_rust_version_above_the_crate_that_reaches_i
 /// on that toolchain, and there is none — no CI exists in this repository yet, and the toolchain
 /// this test is running on is far above 1.87.
 ///
-/// So this asserts the **gap**, deliberately: the declared MSRV is below the toolchain in use,
-/// which is exactly the state in which the declaration is unverified. When an MSRV job lands, this
-/// test is what a reader will find and update, rather than discovering the gap by being bitten.
+/// The MSRV job makes equality the important case; the stable job is normally newer. Both must meet
+/// the declared minimum, and the job's pinned toolchain provides the actual equality proof.
 #[test]
-fn the_declared_msrv_is_below_the_toolchain_this_runs_on() {
+fn the_running_toolchain_meets_the_declared_msrv() {
     let root = workspace_root();
     let declared = workspace_msrv(&root);
 
@@ -119,10 +118,8 @@ fn the_declared_msrv_is_below_the_toolchain_this_runs_on() {
         .unwrap_or_else(|| panic!("`cargo --version` is not a version: {version}"));
 
     assert!(
-        running > declared,
-        "this toolchain is {running} and the declared MSRV is {declared}. If they have met, the \
-         declared minimum is now *tested* — which is coverage this repository did not have, and \
-         this test should be rewritten to say that rather than deleted."
+        running >= declared,
+        "this toolchain is {running}, below the declared workspace MSRV {declared}"
     );
 }
 

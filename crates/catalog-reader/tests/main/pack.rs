@@ -262,7 +262,7 @@ fn the_vendored_sha256_agrees_with_sha2_across_padding_boundaries() {
 /// Not part of the gate: a measurement, printed for the design record. Run with
 /// `cargo test -p codewandler-connector-catalog-reader --release -- --ignored --nocapture`.
 #[test]
-#[ignore = "a measurement for docs/designs/catalog-artifact.md, not an assertion"]
+#[ignore = "a measurement for predecessor:docs/designs/catalog-artifact.md, not an assertion"]
 fn measure_read_costs() {
     let bytes = std::fs::read(committed_pack_path()).expect("the committed pack");
     let size = bytes.len();

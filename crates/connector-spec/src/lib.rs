@@ -34,7 +34,7 @@
 //! `auth`/`default_auth` span both; `config` is what a human types before any of it runs; `graphs` is
 //! a flow composed from the members above; a [`Service`]'s `roles` is the capability shape it claims;
 //! and `verify` names the one cheap read that proves the whole arrangement works. See
-//! `docs/designs/connector-surfaces.md` for the surface table, including which of these reach a
+//! `predecessor:docs/designs/connector-surfaces.md` for the surface table, including which of these reach a
 //! generated artifact and which currently stop here.
 //!
 //! Four things about it are worth reading the docs on before using it:
@@ -45,7 +45,7 @@
 //!   URL and its API version, because AWS versions `s3` and `bedrock-runtime` separately. It is also
 //!   what claims a [`Role`] — a checked capability shape, with the provider's set *derived* as the
 //!   union of its services'. See [`Connector::service_names`], [`Connector::roles`],
-//!   `docs/designs/provider-services.md` and `docs/designs/provider-roles.md`.
+//!   `predecessor:docs/designs/provider-services.md` and `predecessor:docs/designs/provider-roles.md`.
 //! - **A service has five member kinds, sharing one namespace.** An [`Operation`] is the outbound
 //!   direction, an [`EventDecl`] the inbound one, and a [`ChannelBinding`] the composition of the two
 //!   — it names the events it carries *and* the operation that replies to them. A [`ConfigField`] is

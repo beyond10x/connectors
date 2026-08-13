@@ -293,6 +293,11 @@ dedicated signing key — retries with backoff, and **replay-by-id** as a first-
 (the researched category's most conspicuous gap).
 
 - *Invariant:* never sign with an API key; never canonicalize the payload before signing.
+- *Invariant:* only an authenticated tenant principal with `delivery.manage` may register or change
+  a delivery endpoint. The normalized endpoint and its post-resolution destination aperture are
+  stored as governed deployment configuration. Event payloads, catalog data, connection values,
+  grants, and models cannot select or widen the destination. Both registration validation and the
+  delivery worker apply the shared aperture immediately before opening a socket.
 
 ### Audit
 

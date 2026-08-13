@@ -1,7 +1,7 @@
 //! Lowering the IR to the canonical per-provider catalog document — C-536 (Decision 0022).
 //!
 //! One deterministic, committed JSON document per provider, at `catalog/<name>.catalog.json`:
-//! the reviewed artifact of [the catalog-artifact design](../../../docs/designs/catalog-artifact.md).
+//! the reviewed artifact traced to `predecessor:docs/designs/catalog-artifact.md` (provenance only).
 //! It carries the complete published surface — provider and services metadata, every operation
 //! with an explicit **request template**, the full auth surface including the complete OAuth2
 //! declaration and its token-endpoint quirks, configuration, verify, events, channel bindings —
@@ -513,7 +513,7 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
     if !connector.graphs.is_empty() {
         bail!(
             "connector `{}` declares a graph, which the catalog document cannot say yet — the \
-             lowering is deferred by docs/designs/catalog-artifact.md's open questions",
+             lowering is deferred by predecessor:docs/designs/catalog-artifact.md's open questions",
             connector.id
         );
     }

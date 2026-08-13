@@ -20,7 +20,7 @@
 //!
 //! # The published shape
 //!
-//! Specified in [`docs/designs/catalog-json.md`](../../../../docs/designs/catalog-json.md), because
+//! Traced to `predecessor:docs/designs/catalog-json.md` (provenance only), because
 //! a website is written against it. Three properties of it are worth stating here, since they are
 //! what the code below is arranged to hold:
 //!
@@ -297,7 +297,7 @@ struct VerificationEntry {
 /// **Every field of `HmacSpec` must appear here**, and restating them is why that needs a test
 /// rather than a comment: a field the IR gains and this struct does not is dropped from the published
 /// catalogue while both halves still compile. `HmacSpec` cannot be flattened in instead — this
-/// document publishes every key always (`docs/designs/catalog-json.md`), and the IR skips its `None`
+/// document publishes every key always (`predecessor:docs/designs/catalog-json.md`), and the IR skips its `None`
 /// fields so that a provider TOML need not spell out absences. So the field set is held to the IR's
 /// by `inbound_artifacts.rs::neither_projection_can_lose_a_field_hmac_spec_declares`, which derives
 /// the authoritative list from `HmacSpec`'s own `Deserialize` impl (C-151).

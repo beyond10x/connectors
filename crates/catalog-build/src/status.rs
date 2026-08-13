@@ -5,7 +5,7 @@
 //! list, and a dozen story files. None of it is machine-readable, so a site rendering
 //! `site/catalog.json` would publish `zendesk-ticket-search` as though it worked. The design's own
 //! risk register says it plainly — *"showing them without their caveats would be worse than not
-//! shipping the site"* (`docs/designs/public-docs.md`).
+//! shipping the site"* (`predecessor:docs/designs/public-docs.md`).
 //!
 //! # Derived, not listed
 //!
@@ -50,7 +50,7 @@
 //!
 //! One consequence is deliberate and visible: a public operation with a bound base URL and no
 //! free-text query parameter is the **first operation in this catalogue to report `works: true`**,
-//! because nothing is in fact standing in its way — see `docs/designs/catalog-json.md`.
+//! because nothing is in fact standing in its way — see `predecessor:docs/designs/catalog-json.md`.
 //!
 //! # The one fact that is not derived
 //!
@@ -81,7 +81,7 @@ use connector_spec::{Binding, Connector, Operation};
 /// Injection was C-10's, and C-535 closed C-10 as superseded-never-implemented: Decision 0022 rules
 /// that flux never grows a connector module loader, so a module naming a credential for flux to
 /// resolve has no consumer and the `$auth` marker is not coming
-/// (`docs/designs/auth-seam.md` records the road not taken). Auth assembly landed in Rust instead —
+/// (`predecessor:docs/designs/auth-seam.md` records the road not taken). Auth assembly landed in Rust instead —
 /// the `Bearer ` prefix, the base64-joined Basic pair and query placement are `connector-pack`'s
 /// (C-114/C-115/C-116) — which is what a *host* uses; the emitted module stays credential-free, and
 /// the compiled form a resolver reads becomes the catalog artifact under C-534's program.
@@ -95,7 +95,7 @@ const CREDENTIALS_REACH_THE_REQUEST: bool = false;
 /// does not work.
 ///
 /// Consumers switch on these, so they are part of the published contract
-/// (`docs/designs/catalog-json.md`) and are not renamed once shipped. A *new* code is additive; an
+/// (`predecessor:docs/designs/catalog-json.md`) and are not renamed once shipped. A *new* code is additive; an
 /// existing one changing meaning is not.
 pub const NO_CREDENTIAL: &str = "no-credential";
 /// See [`NO_CREDENTIAL`].
@@ -250,7 +250,7 @@ pub struct Status {
     ///
     /// **Always encoded, `[]` when there are none.** No `skip_serializing_if`, deliberately: the
     /// published document promises that every key is present so a consumer types it once and never
-    /// tests for existence (`crate::site`, `docs/designs/catalog-json.md`). Omitting this one to
+    /// tests for existence (`crate::site`, `predecessor:docs/designs/catalog-json.md`). Omitting this one to
     /// spare the committed whole-catalogue artifact a rewrite would have bought that saving with a
     /// permanent hole in the promise — and the artifact is regenerated at integration anyway, which
     /// is what `AGENTS.md` means by a story leaving whole-catalogue staleness checks red.
@@ -683,7 +683,7 @@ mod tests {
     /// **Every key is always present**, `notes` included — an operation with none encodes `[]` and
     /// never drops the key.
     ///
-    /// The published document's oldest promise (`crate::site`, `docs/designs/catalog-json.md`): a
+    /// The published document's oldest promise (`crate::site`, `predecessor:docs/designs/catalog-json.md`): a
     /// consumer types it once and never tests for existence. An omitted-when-empty `notes` would
     /// have spared the committed catalogue a rewrite and made that promise false for all 242 shipped
     /// operations, every one of which has no note — so the exception would have been invisible in

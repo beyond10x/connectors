@@ -223,7 +223,7 @@ impl SpecSource {
 /// C-411, C-412 and C-414.
 ///
 /// **Selection is opt-in**, which is why there is no `hide`. A 163-operation spec must not become
-/// 163 LLM tools (`docs/designs/provider-operation-inventory.md` §5.2 selects 9 of them), and an
+/// 163 LLM tools (`predecessor:docs/designs/provider-operation-inventory.md` §5.2 selects 9 of them), and an
 /// opt-out list would make every new upstream operation a new tool by default. Only operations a
 /// [`OperationPatch::select`] names or an [`OperationSelector`] matches reach the connector, and a
 /// selector widens what one *statement* selects without making anything default-selected.
@@ -412,7 +412,7 @@ pub struct OperationSelector {
 ///
 /// # Why a rule is allowed to exist beside "op naming is a public contract"
 ///
-/// It is not allowed to exist *instead* of it. `docs/designs/connector-pipeline.md` refuses ids
+/// It is not allowed to exist *instead* of it. `predecessor:docs/designs/connector-pipeline.md` refuses ids
 /// "derived from volatile spec fields like `operationId` without a pinned override" — and this is
 /// the pinned override, made bulk. Three properties are what make it safe, and all three are
 /// enforced rather than intended:
@@ -654,7 +654,7 @@ pub struct OperationPatch {
     ///
     /// Almost always set: `operationId` is a volatile vendor field and the op name is a public
     /// contract users and models call by name
-    /// (`docs/designs/connector-pipeline.md`, "Op naming is a public contract").
+    /// (`predecessor:docs/designs/connector-pipeline.md`, "Op naming is a public contract").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename: Option<String>,
     /// Replaces the spec's `summary`/`description` as the model-facing tool description.
@@ -1816,7 +1816,7 @@ fn compose(
 
     // **Naming: `rename`, then a pin, then the rule.** An op id is a public contract users and
     // models call by name and `operationId` is a volatile vendor field, so nothing here promotes
-    // one into the other by silence — `docs/designs/connector-pipeline.md`, "Op naming is a public
+    // one into the other by silence — `predecessor:docs/designs/connector-pipeline.md`, "Op naming is a public
     // contract". C-412 makes the *pinned override* bulk; it does not remove the requirement to
     // decide.
     let (id, source) = match patch.and_then(|patch| patch.rename.clone()) {

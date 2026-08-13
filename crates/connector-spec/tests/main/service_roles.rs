@@ -14,7 +14,7 @@
 //! 3. a provider-level `roles` key — a provider's roles are *derived*, never authored;
 //! 4. the same role declared twice on one service.
 //!
-//! See [`docs/designs/provider-roles.md`](../../../docs/designs/provider-roles.md).
+//! See `predecessor:docs/designs/provider-roles.md` (provenance only).
 
 use connector_spec::{Connector, Role};
 
