@@ -3,8 +3,8 @@
 **The connector IR and its two front-ends: provider TOML and OpenAPI ingest. Performs no network
 IO.**
 
-Part of [flux-connectors](https://github.com/codewandler/flux-connectors), which compiles SaaS API
-descriptions into [Flux-Lang](https://github.com/codewandler/flux).
+Part of [b10x/connectors](https://github.com/b10x/connectors), which compiles reviewed
+connector declarations into canonical catalog documents.
 
 ```toml
 [dependencies]

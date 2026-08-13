@@ -7,7 +7,7 @@ priority:
 design: docs/design/02-architecture.md
 epic: build-order
 areas: [protocol, server, docs]
-note: "architecture §9 milestone M5. Exit: flux invokes gitlab through the platform; the gitlab plugin deleted. Wave 1 of flux-roadmap decision 0024 (alignment note 2026-08-13: the target surface is this platform), under 0026 §4's one-way dependency arrow"
+note: "architecture §9 milestone M5. Exit: flux invokes gitlab through the platform; the gitlab plugin deleted. Wave 1 of the unpublished Flux plugin-retirement decision, under B10x's one-way dependency rule"
 ---
 
 # M5 — flux re-points at the platform and the gitlab plugin is deleted
@@ -16,8 +16,8 @@ note: "architecture §9 milestone M5. Exit: flux invokes gitlab through the plat
 
 Prove the client contract against its first native client: flux holds one Service Account token,
 projects the effective catalogue into tools, invokes and subscribes — and the first native plugin
-retires onto the declared surface, deleted rather than deprecated. The seam keeps the shape decision
-0026 §4 fixed; only the trust domain and release origin change.
+retires onto the declared surface, deleted rather than deprecated. The seam keeps B10x's
+one-way dependency rule fixed; only the trust domain and release origin change.
 
 ## Acceptance
 
@@ -25,10 +25,10 @@ retires onto the declared surface, deleted rather than deprecated. The seam keep
       **published protocol identities**: authenticate once, discover the effective catalogue and
       project it to tools, invoke, subscribe. This repository depends on nothing of flux — the
       dependency arrow exists only at runtime, in one direction, over versioned contracts
-      (decision 0026 §4).
+      ([dependency rules](https://github.com/b10x/architecture/blob/main/architecture/dependency-rules.md)).
 - [ ] flux's CLI manages a **personal-posture** instance: verified download, supervised local
       process, zero-configuration `connectors serve`, owner-bound state — decision 0004's managed
-      local install retargeted to the selfdirect trust domain and release origin, without the
+      local install retargeted to the B10x trust domain and release origin, without the
       predecessor's ~31k-LOC local-management ceremony (0026's fate table: the supervision contract
       is redesigned lean, not carried).
 - [ ] **Wave 1 parity, measured the way decision 0024 §4 requires**: gitlab's frozen behavioral
@@ -51,9 +51,11 @@ retires onto the declared surface, deleted rather than deprecated. The seam keep
 
 - Exit criterion, verbatim from architecture §9: *"flux invokes gitlab through the platform; the
   gitlab plugin deleted."*
-- Decisions: `~/projects/flux-roadmap/decisions/0024-every-native-plugin-retires-onto-a-declared-surface.md`
-  (routing table, wave order, the fixture rule, and its 2026-08-13 alignment note retargeting the
-  surface) and `0026-the-family-consolidates-into-selfdirect-connectors.md` §4.
+- Decisions: an unpublished Flux plugin-retirement decision supplies the routing table, wave order,
+  fixture rule, and its 2026-08-13 alignment note. B10x's durable ownership and dependency
+  decisions are [ADR 0002](https://github.com/b10x/architecture/blob/main/adr/0002-flux-owns-the-agent-runtime-lifecycle.md),
+  [ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md),
+  and the [dependency rules](https://github.com/b10x/architecture/blob/main/architecture/dependency-rules.md).
 - gitlab is wave 1 because its connector is shipped and decision 0001's frozen migration fixtures
   already exist. Waves 2–6 (slack/jira/confluence/opsgenie, the observability set behind declared
   destinations, aws/huggingface's new credential schemes, kubernetes/docker/sql/websearch, and the

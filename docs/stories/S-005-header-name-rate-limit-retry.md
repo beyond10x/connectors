@@ -56,7 +56,7 @@ Declaring it would be **less** true than declaring nothing.
 
 ## Notes
 
-- Predecessor: `~/projects/flux-connectors/docs/stories/C-224-ratelimit-cannot-express-a-discovered-budget.md`
+- Predecessor: [`C-224 — rate limit cannot express a discovered budget`](https://github.com/codewandler/flux-connectors/blob/main/docs/stories/C-224-ratelimit-cannot-express-a-discovered-budget.md)
   (status `ready` there, priority 3) — read it, including its warning not to let the story grow into
   implementing backoff, and its pointer to the quirks-as-control-flow position (C-12) so this does
   not become a fourth vocabulary.

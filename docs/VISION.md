@@ -1,4 +1,4 @@
-# Vision: selfdirect/connectors
+# Vision: b10x/connectors
 
 **Status:** founding document · **Date:** 2026-08-13
 

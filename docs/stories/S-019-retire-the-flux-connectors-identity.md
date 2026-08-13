@@ -36,7 +36,7 @@ M1 pinned it on purpose, and said so in two places:
 The differential has now passed byte-exact. The reason for the pin is spent; the pin is not yet.
 
 `DEFAULT_USER_AGENT` (`crates/connector-resolve/src/request.rs:22`) rides along and is already
-half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://github.com/selfdirect/connectors)`
+half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://github.com/b10x/connectors)`
 — the product token from the predecessor, the repository from here.
 
 ## Acceptance

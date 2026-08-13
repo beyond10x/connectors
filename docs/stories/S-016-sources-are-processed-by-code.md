@@ -36,7 +36,7 @@ upstream or compares a checksum by hand; the whole refresh discipline collapses 
   is ever hand-edited.
 - `catalog sources diff <id>` — fetches upstream to a scratch location and reports whether
   the pinned bytes drifted, **mutating nothing**: the cheap "did upstream change?" probe that
-  cadence automation (selfdirect-bot) can run and act on only when the answer is yes.
+  cadence automation (`b10x-bot`) can run and act on only when the answer is yes.
 - Scale is a stated requirement: check/refresh/diff over hundreds of entries with zero
   per-entry human action.
 - The AGENTS.md "Refreshing a source" instruction references only these verbs plus the

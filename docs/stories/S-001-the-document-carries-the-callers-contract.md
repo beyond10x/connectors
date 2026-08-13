@@ -81,7 +81,7 @@ The three fields, as C-552 measured them:
 
 ## Notes
 
-- Predecessor: `~/projects/flux-connectors/docs/stories/C-552-the-document-carries-the-callers-contract.md`
+- Predecessor: [`C-552 — the document carries the caller's contract`](https://github.com/codewandler/flux-connectors/blob/main/docs/stories/C-552-the-document-carries-the-callers-contract.md)
   — read it before starting; its Notes carry the write set and the design edge. Ported, not
   re-derived, per decision 0026's named migration set.
 - The last two acceptance items were **added after M1**, from the two schema gaps the import found in

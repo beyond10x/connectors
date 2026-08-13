@@ -71,7 +71,7 @@ declares effects, this function reads them and the paragraph goes."* This story 
 
 ## Notes
 
-- Read `~/projects/flux-exchange/crates/exchange-host/src/grant.rs:90-147` first — the mistake, its
+- Read the predecessor's [`exchange-host/src/grant.rs`](https://github.com/codewandler/flux-exchange/blob/main/crates/exchange-host/src/grant.rs) first — the mistake, its
   blast radius and its exit condition are all documented in place by the people who made it.
 - Predecessor stories worth reading: flux-connectors C-155 (the semantic-effect tier and why it is
   separate), C-552 (bundled this field with the caller-contract work; here it is split out because it

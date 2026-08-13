@@ -51,7 +51,7 @@ The catalogue is useful before live connector execution is enabled. You can insp
 - the exact Flux operation source; and
 - shared constraints plus any limitation specific to that operation.
 
-Open the [connector and Flux core explorer](/explorer) to compare the current surface or deep-link
+Open the [connector and Flux core explorer](explorer.md) to compare the current surface or deep-link
 directly to an entry. Canonical JSON specifications are published under
 `https://flux.codewandler.org/v1/`.
 
@@ -73,5 +73,5 @@ an unsafe or incomplete request.
 ## Follow the project
 
 The source, release history, local build instructions, and contribution workflow live in the
-[GitHub repository](https://github.com/codewandler/flux-connectors). The public site stays focused
+[GitHub repository](https://github.com/b10x/connectors). The public site stays focused
 on the connector catalogue and its user-facing contract.

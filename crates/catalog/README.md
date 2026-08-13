@@ -2,7 +2,7 @@
 
 **The connector catalogue as typed `&'static` data, served from the embedded catalog pack.**
 
-Part of [selfdirect/connectors](https://github.com/selfdirect/connectors). An internal workspace
+Part of [b10x/connectors](https://github.com/b10x/connectors). An internal workspace
 member: nothing here publishes.
 
 ```rust

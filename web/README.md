@@ -1,8 +1,8 @@
-# web — the public documentation site
+# web — connector explorer source
 
-The [VitePress](https://vitepress.dev) site published to
-<https://flux.codewandler.org/> by
-[`.github/workflows/pages.yml`](../.github/workflows/pages.yml) on every push to `main`.
+The [VitePress](https://vitepress.dev) explorer migrated from the predecessor repository.
+Publishing automation has not yet been restored; the repair is tracked in
+[S-018](../docs/stories/S-018-the-explorer-works-against-the-new-site-json.md).
 
 **The Node toolchain is contained here.** `package.json`, `package-lock.json` and `node_modules` all
 live under `web/`; nothing about the Rust workspace at the repository root knows or cares that this
@@ -67,7 +67,7 @@ it. That shipped an unstyled site: a committed CNAME is a *request* for a custom
 one is serving, and GitHub never accepted it — the Pages API still reports `"cname": null`, so every
 bundled asset resolved a level too high and 404'd.
 
-Flip the base to `'/'` **only** once `gh api repos/codewandler/flux-connectors/pages --jq .cname`
+Flip the base to `'/'` **only** once `gh api repos/b10x/connectors/pages --jq .cname`
 reports the domain — not when the CNAME file lands, which is what went wrong.
 `test/explorer.test.mjs` asserts the built HTML's own asset URLs sit under the deployed base, and was
 verified to fail when the base is wrong.

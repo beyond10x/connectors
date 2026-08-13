@@ -2,8 +2,8 @@
 
 **A host library: where a connector's `CredentialRef` resolves to a value.**
 
-Part of [flux-connectors](https://github.com/codewandler/flux-connectors), which compiles SaaS API
-descriptions into [Flux-Lang](https://github.com/codewandler/flux).
+Part of [b10x/connectors](https://github.com/b10x/connectors), the governed connector
+catalog and platform workspace.
 
 ```toml
 [dependencies]
@@ -90,7 +90,7 @@ permissions to make a credential store pass its checks.
 
 ## What it is not
 
-Part of the compiler. The crate is fenced out of the flux-connectors compile path by a test over the
+Part of the compiler. The crate is fenced out of the catalog build path by a test over the
 resolved dependency graph — including optional dependencies, so adding the edge behind a feature
 flag trips it too. `vault` (and with it `reqwest`) is off by default: a consumer that wants only the
 trait, addressing, `MemoryStore` and `FileStore` links no HTTP client at all.
