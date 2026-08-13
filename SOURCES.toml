@@ -8,8 +8,6 @@
 # maintained alongside every vendoring change (AGENTS.md "Refreshing a source").
 #
 # Known defects this index surfaces, tracked for cleanup:
-# - specs/anthropic/2023-06-01-excerpt.yaml has no provenance sidecar and no vendoring script
-#   (pre-discipline artifact) — needs re-vendoring or removal.
 # - specs/flux/core-v1.json is orphaned: its consumer (the core-catalogue projection) was
 #   deliberately dropped in M1.
 
@@ -86,14 +84,6 @@ upstream = "recorded in pins"
 refresh = "scripts/vendor-zendesk-specs.sh"
 pins = "specs/zendesk.provenance.toml"
 consumers = ["providers/zendesk.toml", "catalog/zendesk.catalog.json"]
-
-[[source]]
-id = "anthropic-openapi-excerpt"
-kind = "openapi-spec"
-upstream = "UNKNOWN — pre-discipline artifact, no sidecar, no script"
-refresh = "manual"
-consumers = ["providers/anthropic.toml", "catalog/anthropic.catalog.json"]
-note = "defect: needs re-vendoring with script + sidecar, or removal; S-016's check must fail on entries like this"
 
 [[source]]
 id = "nango-providers-catalog"
