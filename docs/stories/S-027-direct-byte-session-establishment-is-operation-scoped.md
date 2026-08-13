@@ -2,12 +2,12 @@
 id: S-027
 title: "Direct-byte session establishment is operation-scoped"
 pillar: Platform
-status: blocked
+status: backlog
 priority:
 design: docs/design/03-beyond-http.md
 epic: beyond-http
 areas: [domain, protocol, service, server]
-note: "blocked on b10x/architecture RFC 0002; continuous bytes never enter ordinary invoke"
+note: "architecture closed by ADR 0016; concrete journey and conformance remain"
 ---
 
 # Direct-byte session establishment is operation-scoped
@@ -19,7 +19,7 @@ exchange continuous bytes directly under a short-lived bounded authority.
 
 ## Acceptance
 
-- [ ] Architecture RFC 0002 is accepted with issuer/verifier, audience/resource/principal binding,
+- [x] Architecture RFC 0002 is accepted by ADR 0016 with issuer/verifier, audience/resource/principal binding,
       TTL, replay, reconnect, revocation, proof-of-possession, TLS, and NAT semantics.
 - [ ] Connectors audits grant admission and authority issuance without receiving continuous bytes.
 - [ ] The serving endpoint independently enforces local ownership, limits, and capability facts.
@@ -28,4 +28,7 @@ exchange continuous bytes directly under a short-lived bounded authority.
 
 ## Progress
 
-- (blocked on architecture RFC 0002)
+- Architecture is accepted: governed connectors issuer, local substrate issuer, proof-bound
+  60-second one-shot authority, fresh reconnect grant, explicit lease, TLS, and `unserved` when no
+  independent route exists.
+- Remaining work is a concrete terminal/tunnel/media implementation and shared negative vectors.

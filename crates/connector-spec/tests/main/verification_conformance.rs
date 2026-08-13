@@ -1,6 +1,6 @@
 //! The verification conformance matrix: one parameterized HMAC, checked against real vendors.
 //!
-//! [`HmacSpec`] is the finding `docs/designs/inbound-events.md` rests on — that GitHub, Stripe,
+//! [`HmacSpec`] is the finding `predecessor:docs/designs/inbound-events.md` rests on — that GitHub, Stripe,
 //! Slack and Zendesk document four bespoke-looking webhook signatures which vary along exactly four
 //! axes, so verification is a struct a compiler can carry rather than a script somebody hand-writes
 //! per vendor. This file is the test of that claim, and it is the load-bearing one: if the matrix

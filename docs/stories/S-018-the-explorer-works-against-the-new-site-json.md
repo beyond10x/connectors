@@ -44,7 +44,7 @@ runs the web suite, and this repository has no `.github/` directory (S-020).
       gate in AGENTS.md.
 - [ ] Per-operation rendering shows **the request the runtime will send**: method, the URL template
       with its `{…}` slots intact, constant headers, the body template, and each parameter's
-      position — design 0022's replacement for the per-operation Flux snippet. The values come from
+      position — the repository-owned replacement for the per-operation Flux snippet. The values come from
       the projection; the view derives none of them. The canonical document already carries
       `request { method, url, headers }`; the site record today carries only `method` and `path`, so
       the projection gains what the view needs rather than the view reconstructing it in JavaScript.

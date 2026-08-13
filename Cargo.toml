@@ -41,7 +41,7 @@ version = "0.26.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/b10x/connectors"
 homepage = "https://github.com/b10x/connectors"
-# The predecessor's declared MSRV, carried unchanged. Nothing here is built on it — see the fence.
+# The predecessor's declared MSRV, carried unchanged and built/tested by the CI msrv job.
 rust-version = "1.87"
 # **Nothing publishes** (design 02 §2). Every crate is an internal workspace member with a
 # path-local name; the predecessor's `codewandler-connector-*` registry identities are left behind

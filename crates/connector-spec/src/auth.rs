@@ -50,7 +50,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 /// `rename_all = "snake_case"` externally-tagged encoding, same `Bearer` default. flux already
 /// models exactly these shapes for plugins, and a connector manifest resolves a credential through
 /// the *same* injection logic the plugin host uses — so inventing a second vocabulary here would
-/// mean translating between two spellings of one idea forever (see `docs/designs/auth-seam.md`).
+/// mean translating between two spellings of one idea forever (see `predecessor:docs/designs/auth-seam.md`).
 ///
 /// It is a mirror rather than a re-export because flux-connectors depends on `flux-lang` from
 /// crates.io and on nothing else of flux's; `flux-plugin-protocol` is not a dependency of this
@@ -102,7 +102,7 @@ pub enum AuthScheme {
         /// substitution point would be more expressive and strictly worse — it can spell a credential
         /// substituted twice, or zero times, and the zero case sends an unauthenticated request that
         /// reads as authenticated. A prefix makes both unspellable rather than merely refused.
-        /// `docs/designs/unified-auth.md` §"The prefix axis, as built" records the decision.
+        /// `predecessor:docs/designs/unified-auth.md` §"The prefix axis, as built" records the decision.
         ///
         /// # Why the presets are still variants
         ///
@@ -488,11 +488,11 @@ pub struct AuthMethod {
     ///
     /// Zendesk is why. Its user half is `<email>/token` — an env value **plus a literal suffix** —
     /// where the trailing `/token` is what tells Zendesk the password is an API token rather than a
-    /// password (`docs/designs/auth-seam.md:74`, `docs/designs/provider-operation-inventory.md:163`).
+    /// password (`predecessor:docs/designs/auth-seam.md:74`, `predecessor:docs/designs/provider-operation-inventory.md:163`).
     /// Without this field the only way to author Zendesk is to tell the operator to paste
     /// `me@corp.com/token` into `ZENDESK_USER`, which stores a value that is not the thing it is
     /// named after and that nothing can validate — the pre-composed-credential mistake
-    /// [`auth-seam.md §7.5`](../../../docs/designs/auth-seam.md) rejects explicitly.
+    /// `predecessor:docs/designs/auth-seam.md` §7.5 rejected explicitly (provenance only).
     ///
     /// **Scope.** This is the *authoring* half only, and it is deliberately the narrower of the two
     /// gaps §7.5 records. The sibling gap — Freshdesk's `base64(<api_key>:X)`, where the **secret

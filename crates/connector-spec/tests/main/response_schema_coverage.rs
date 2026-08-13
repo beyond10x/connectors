@@ -1,6 +1,6 @@
 //! **`response_schema` coverage, measured over the shipped catalogue and ratcheted.**
 //!
-//! `docs/designs/member-io-schemas.md` measured 16 of 97 operations carrying a response shape and
+//! `predecessor:docs/designs/member-io-schemas.md` measured 16 of 97 operations carrying a response shape and
 //! drew the conclusion this file exists to enforce: *coverage that nothing watches only ever goes
 //! down*. Not because anyone removes a schema — because a new connector ships without response
 //! shapes, the denominator grows, and the ratio falls with nobody noticing. A number in a design
@@ -30,7 +30,7 @@
 //!
 //! What is *not* asserted here, deliberately: that any particular operation carries a schema. Some
 //! vendor responses are genuinely unspecified or vary by account (babelforce's manager document is
-//! not vendored, and §1.3 of `docs/designs/provider-operation-inventory.md` says why it cannot be),
+//! not vendored, and §1.3 of `predecessor:docs/designs/provider-operation-inventory.md` says why it cannot be),
 //! and a schema nobody can rely on is not an improvement on none. The floor measures the aggregate
 //! and leaves the per-operation judgement to the provider file, where it is reviewable.
 //!

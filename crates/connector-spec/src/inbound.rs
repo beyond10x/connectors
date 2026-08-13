@@ -401,7 +401,7 @@ pub struct ManualSetup {
 /// One ingress surface a connector describes, over a transport flux owns.
 ///
 /// See the module docs for why this is a composition rather than a primitive, and
-/// `docs/designs/inbound-events.md` for the five concerns every vendor webhook decomposes into.
+/// `predecessor:docs/designs/inbound-events.md` for the five concerns every vendor webhook decomposes into.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChannelBinding {

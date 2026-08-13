@@ -14,10 +14,10 @@
 //!
 //! Each separator carries exactly one meaning — `/` hierarchy, `:` version, `#` operation — mirroring
 //! URI path-then-fragment syntax. The scheme is C-37's
-//! ([`docs/designs/global-addressing.md`](../../../docs/designs/global-addressing.md)); what C-49
+//! (`predecessor:docs/designs/global-addressing.md`, provenance only); what C-49
 //! fixes is the **meaning of the middle level**: it is a declared `connector_spec::Service`, not an
 //! anonymous path segment, and it owns the version that renders after the colon
-//! (`docs/designs/provider-services.md`).
+//! (`predecessor:docs/designs/provider-services.md`).
 //!
 //! # The elision is the load-bearing rule
 //!
@@ -170,7 +170,7 @@ impl Gid {
             (Some(_), Some(_)) => return Err(invalid(
                 text,
                 "a gid has exactly one service segment. Deeper resource paths are C-37's and are \
-                     not part of this grammar yet — see `docs/designs/provider-services.md`",
+                     not part of this grammar yet — see `predecessor:docs/designs/provider-services.md`",
             )),
         };
 

@@ -806,7 +806,7 @@ struct Naming {
 impl Plan {
     /// Work out which shipped op ids the naming rule would move, and how to hold each of them still.
     ///
-    /// **An op id is a public contract** (`docs/designs/connector-pipeline.md`), so a rule arriving
+    /// **An op id is a public contract** (`predecessor:docs/designs/connector-pipeline.md`), so a rule arriving
     /// underneath a connector that already publishes 254 of them must not move one. Every pin here
     /// is read off an operation this connector publishes today; nothing is invented.
     fn naming(&self, notes: &mut Notes) -> Naming {
@@ -992,7 +992,7 @@ impl Plan {
     /// It is the one field where the conservative direction is not also the flattering one.
     /// Withholding the *tool* costs a caller nothing — C-413 separates catalogued-and-callable from
     /// exposed precisely so it can — while `expose = true` over a set nobody has curated is the
-    /// denial of service against a model's context that `docs/designs/spec-front-end.md` §3 argues
+    /// denial of service against a model's context that `predecessor:docs/designs/spec-front-end.md` §3 argues
     /// at length: 391 tools is not a catalogue. A wrong `risk = "low"` is read by a host as a
     /// licence; a wrong `expose = false` is read by nobody, and is one line to widen.
     ///
@@ -1027,7 +1027,7 @@ struct Notes {
     /// Narrower problems that did not cost the operation.
     lesser: Vec<String>,
     /// Selected operations with no sentence in them. A tool contract with no description is not a
-    /// tool contract (`docs/designs/spec-front-end.md` §"What retiring manager-sdk requires").
+    /// tool contract (`predecessor:docs/designs/spec-front-end.md` §"What retiring manager-sdk requires").
     nameless: Vec<String>,
     /// Op ids two operations both derive.
     collisions: Vec<String>,

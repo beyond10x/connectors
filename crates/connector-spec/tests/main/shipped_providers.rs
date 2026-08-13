@@ -282,7 +282,7 @@ fn babelforce_is_bearer_only_and_never_the_deprecated_header_pair() {
 /// Zendesk's Basic user half is `<email>/token` — an env value **plus a literal suffix**. The
 /// suffix has to be declared, not baked into `ZENDESK_USER`: a pre-composed credential stores a
 /// value that is not the thing it is named after and that nothing can validate
-/// (`docs/designs/auth-seam.md` §7.5).
+/// (`predecessor:docs/designs/auth-seam.md` §7.5).
 #[test]
 fn zendesk_declares_the_token_suffix_rather_than_pre_composing_it() {
     let loaded = load("zendesk");
@@ -319,7 +319,7 @@ fn no_provider_file_carries_a_credential_value() {
 ///
 /// The measurement this is written against: of the shipped operations, all but six declare
 /// parameters, yet nothing said what an operation *receives* as a single schema — so every consumer
-/// re-derived it and disagreed at the corners (C-125, `docs/designs/member-io-schemas.md` §1). This
+/// re-derived it and disagreed at the corners (C-125, `predecessor:docs/designs/member-io-schemas.md` §1). This
 /// asserts the composition over every shipped operation rather than a fixture, because the corners
 /// are in the real data: babelforce's dotted `time.start`, zendesk's `const`-pinned `safe_update`,
 /// babelforce's two free-form `body_schema` bodies, and six operations that take nothing at all.
@@ -432,7 +432,7 @@ fn every_operation_composes_an_input_schema_covering_its_parameters() {
 
 /// An operation that takes nothing composes an **empty object schema, not absence.**
 ///
-/// The asymmetry with the output side is the point (`docs/designs/member-io-schemas.md`): "this
+/// The asymmetry with the output side is the point (`predecessor:docs/designs/member-io-schemas.md`): "this
 /// operation takes nothing" is a real, derivable answer, while "we do not know what it returns" is
 /// not — so a response schema publishes absence and an input schema never does. Six shipped
 /// operations are in this state; `openai-models-list` is one.

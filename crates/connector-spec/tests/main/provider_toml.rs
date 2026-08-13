@@ -1,7 +1,7 @@
 //! The provider-TOML front-end, exercised through both roles the file plays.
 //!
 //! The fixtures are not invented. The hand-authored one is Zendesk as
-//! `docs/designs/provider-operation-inventory.md` §3 records it — including the `<email>/token`
+//! `predecessor:docs/designs/provider-operation-inventory.md` §3 records it — including the `<email>/token`
 //! user half, which is the shape that decides whether the schema is expressive enough for a real
 //! provider. The spec-pointer one is babelforce as §5 records it, down to the base URL being stated
 //! explicitly because the vendor document's `servers[0]` is staging.
@@ -258,7 +258,7 @@ fn a_hand_authored_file_produces_a_complete_connector() {
 /// Zendesk's Basic user half is an env value **plus a literal suffix**. If the schema could not say
 /// that, the only way to author Zendesk would be to tell an operator to paste `me@corp.com/token`
 /// into a variable named for an email address — storing a value that is not the thing it is named
-/// after, which is the pre-composed-credential mistake `docs/designs/auth-seam.md` §7.5 rejects.
+/// after, which is the pre-composed-credential mistake `predecessor:docs/designs/auth-seam.md` §7.5 rejects.
 #[test]
 fn a_basic_credential_can_state_a_literal_user_suffix() {
     let loaded = provider::load("providers/zendesk.toml", HAND_AUTHORED).expect("loads");

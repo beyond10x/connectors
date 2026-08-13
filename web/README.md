@@ -29,8 +29,8 @@ npm test         # the explorer's contract with the catalogue — run after `npm
 `npm test` is Node's built-in runner over `test/*.test.mjs`; it adds no dependency. It reads
 `public/catalog.json` and the built HTML in `.vitepress/dist`, so it must follow a build.
 
-`npm run build` is what CI runs, and it is a real gate: VitePress fails the build on a dead internal
-link, so a broken site fails the workflow instead of publishing silently.
+S-018 and S-020 own the future CI web job. Until both land, these commands are local diagnostics and
+the repository does not claim that a broken site is mechanically gated.
 
 ## Layout
 
@@ -52,9 +52,9 @@ contracts, safety metadata, credentials, hosts, and current availability. Intern
 and story mechanics, crate architecture, and agent instructions belong in the repository docs and
 must not be linked or reproduced on the public pages.
 
-The navigation, hero, and favicon use `public/brand/{icon,mark}.svg`. They are published copies of
-the canonical files in `assets/brand/`; `npm test` compares them byte for byte so the two locations
-cannot drift.
+The migrated theme references `public/brand/{icon,mark}.svg`, but neither those public copies nor a
+canonical `assets/brand/` source exists yet. S-018 must either add and test one declared source or
+remove the references; no byte-identity check is claimed today.
 
 ## Two things to keep right
 
@@ -75,8 +75,7 @@ verified to fail when the base is wrong.
 operations must come from generated files, not from markdown or a `.vue` component. A
 second, hand-maintained copy of the catalogue is the exact failure this repository exists to correct.
 
-`public/catalog.json` is written by `cargo run -p connector-cli -- build` and committed — the same
-plan and drift check as every other generated artifact (`crates/connector-cli/tests/site_catalog.rs`).
-It is not copied here by the Node build, and it must not be edited. The last test in
-`test/explorer.test.mjs` enforces the rule mechanically: it fails if any explorer source names a
-provider, an operation, a credential, a host or an issue code.
+`public/catalog.json` is a generated, gitignored work product written by
+`cargo run -p catalog-cli -- build`; it is not a committed artifact today. S-018 owns the site input
+and test contract. It must preserve the rule that explorer source never hand-maintains provider,
+operation, credential, host, or issue-code data.

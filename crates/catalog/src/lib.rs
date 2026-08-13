@@ -115,7 +115,7 @@ impl Idempotency {
 /// # The vocabulary is C-206's
 ///
 /// The two named states are the two codes `web/public/catalog.json` already publishes for the same
-/// distinction (`docs/designs/catalog-json.md`), and [`as_str`](Self::as_str) returns those tokens
+/// distinction (`predecessor:docs/designs/catalog-json.md`), and [`as_str`](Self::as_str) returns those tokens
 /// character for character. A host restating them in words of its own is how two surfaces
 /// describing one fact come to disagree, so this crate restates nothing:
 /// `connectors_api::api::Wiring` serializes these tokens directly.
@@ -275,7 +275,7 @@ pub struct Operation {
 }
 
 /// **Where a credential goes on the way out** — the *placement* axis of
-/// `docs/designs/unified-auth.md`.
+/// `predecessor:docs/designs/unified-auth.md`.
 ///
 /// The design's central claim is carried by one field: `prefix` on [`Header`](Self::Header) is what
 /// turns `Bearer` from an enum variant into data, so `Bearer `, `Basic `, `Token `, `GenieKey ` and
@@ -317,7 +317,7 @@ pub enum Placement {
 /// pair. The third, [`Minted`](Self::Minted), is the one effectful acquisition this repository
 /// models, and it is modelled as *provenance* rather than as a step a connector performs — see its
 /// own documentation. The remaining effectful ones — token refresh, expiry, `session` — are still
-/// the host's, by the line `docs/designs/unified-auth.md` draws: they need a cache and a
+/// the host's, by the line `predecessor:docs/designs/unified-auth.md` draws: they need a cache and a
 /// refresh-on-401, and C-90 put both out of scope.
 ///
 /// Not `#[non_exhaustive]`, for the reason [`Placement`] is not.
@@ -375,7 +375,7 @@ pub enum Acquisition {
     /// The user half is **config, not a gated secret**: it is an email address or an account name,
     /// and it resolves from the declared environment variables rather than from the secret store.
     /// `user_suffix` is Zendesk's `/token` marker — public API syntax, and the reason a bare env
-    /// value is not enough (`docs/designs/auth-seam.md` §7.5).
+    /// value is not enough (`predecessor:docs/designs/auth-seam.md` §7.5).
     ///
     /// The secret occupies the **password** position. Freshdesk's shape, where the API key occupies
     /// the *username* position, is not expressible here because the IR cannot yet say so either
@@ -725,7 +725,7 @@ impl Approval {
 
 /// **How a connector executes** — flux's runtime axis, as the catalogue publishes it (C-405).
 ///
-/// The vocabulary mirrors flux's `docs/designs/ecosystem.md`, which replaces the plugin-versus-
+/// The vocabulary mirrors flux's `predecessor:docs/designs/ecosystem.md`, which replaces the plugin-versus-
 /// connector dichotomy with one axis: a plugin is a runtime kind a connector may declare, not a
 /// rival of one. It is the same closed set `connector_spec::Runtime` accepts at load; the emitter
 /// translates one into the other, so a variant that existed on only one side would not compile.

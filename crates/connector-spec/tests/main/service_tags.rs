@@ -17,7 +17,7 @@
 //!
 //! And two properties the fleet itself must satisfy, so the filter cannot pass vacuously.
 //!
-//! See [`docs/designs/provider-roles.md`](../../../docs/designs/provider-roles.md) §tags.
+//! See `predecessor:docs/designs/provider-roles.md` §tags (provenance only).
 
 use connector_spec::{Connector, Tag};
 

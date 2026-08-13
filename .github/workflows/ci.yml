@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: 1.97.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.0 --profile minimal --component clippy,rustfmt
+      - name: Check repository governance
+        run: |
+          python3 scripts/check-links.py
+          python3 scripts/check-stories.py
+      # Metadata fence tests run offline; prefetching makes their failure about the repository.
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Build
+        run: cargo build --workspace --locked
+      - name: Test
+        run: cargo test --workspace --locked --no-fail-fast
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Rebuild canonical catalogue
+        run: cargo run --locked -p catalog-cli -- build
+      - name: Reject generated drift
+        run: cargo run --locked -p catalog-cli -- diff
+
+  msrv:
+    runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: 1.87.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install declared MSRV
+        run: rustup toolchain install 1.87.0 --profile minimal
+      # Tests invoke locked offline metadata, so the registry must be populated first.
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Build on declared MSRV
+        run: cargo build --workspace --locked
+      - name: Test on declared MSRV
+        run: cargo test --workspace --locked --no-fail-fast

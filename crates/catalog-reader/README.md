@@ -37,33 +37,15 @@ serving a single record, each by name.
 
 ## Fetching a newer catalogue than the crate embeds
 
-B10x has no pre-v1 release artifacts. Historical `vX.Y.Z` releases of the
-[flux-connectors predecessor](https://github.com/codewandler/flux-connectors/releases) carry the
-pack of that release as two assets, attached by its release workflow rather than by hand:
+B10x has no pre-v1 release artifacts. Historical predecessor release assets are provenance
+only; they are not a B10x distribution channel and consumers must not treat them as current
+contract bundles.
 
-```text
-https://github.com/codewandler/flux-connectors/releases/download/vX.Y.Z/catalog.pack
-https://github.com/codewandler/flux-connectors/releases/download/vX.Y.Z/catalog.pack.sha256
-```
-
-So a consumer with no Rust toolchain and no clone fetches the catalogue with `curl`, and one that
-has this crate loads the fetched file. Verify out of band first:
-
-```console
-$ base=https://github.com/codewandler/flux-connectors/releases/download/vX.Y.Z
-$ curl -fsSLO "$base/catalog.pack" -O "$base/catalog.pack.sha256"
-$ sha256sum -c catalog.pack.sha256
-catalog.pack: OK
-```
-
-`catalog.pack.sha256` is one line of `sha256sum` output over the whole asset, and the digest in it
-is the value the release tag's `connectors.lock` `[pack]` row records. The workflow computes it from
-the committed pack at the tag and fails rather than attaching a pack whose digest disagrees, so the
-check above is against the number the repository published — not one the file asserts about itself.
-Assets are the byte-identical committed pack; nothing is repacked or recompressed on the way out.
-They exist for every release from `v0.22.0` on.
-
-Then, in band, once:
+The first supported distribution must follow architecture ADR 0019 and S-031: a private OCI
+artifact, immutable digest pin, signed bundle manifest, and independently verified release origin.
+Until that release path exists, use the embedded pack or a locally reviewed build. `Pack::load` can
+read externally supplied bytes, but the caller must authenticate and digest-pin those bytes before
+loading them. After that out-of-band verification, loading is one step:
 
 ```rust
 let pack = catalog_reader::Pack::load("catalog.pack").expect("a verified pack");
@@ -82,13 +64,10 @@ let zendesk = pack.provider("zendesk").expect("shipped provider");
 - `NotAPack`, `NotText`, `Malformed(_)`, `Io(_)` — not a pack, not UTF-8, structurally not a
   version-1 pack, or unreadable.
 
-**Two digests, deliberately.** The out-of-band one above covers the asset as a whole and belongs to
-the tag; the in-band one is a header line covering every byte after itself, which is why it is a
-different value and not comparable to the first. The pair is the point: a client checks before it
-parses, the reader checks before it serves, and both are checking bytes the same release produced.
-Neither is an authentication boundary — an author who can rewrite the payload can rewrite the digest
-line above it — so the out-of-band value is the one that lives outside the file, in the tag and its
-lockfile.
+**Two checks, deliberately.** A future release digest authenticates the artifact as a whole and
+belongs outside the file; the in-band header digest covers every byte after itself and detects local
+corruption before serving. They are not comparable, and the in-band value is not an authentication
+boundary because an author who can rewrite the payload can rewrite its header too.
 
 For the typed `&'static` catalogue API (`providers()`, `operation()`, risk and idempotency enums,
 embedded Flux), use

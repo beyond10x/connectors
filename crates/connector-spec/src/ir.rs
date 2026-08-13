@@ -278,7 +278,7 @@ pub struct Param {
     ///
     /// - a **body** field: the dot-separated JSON path it occupies in the request body.
     ///   Zendesk's comment text is `ticket.comment.body`, not `body`
-    ///   (`docs/designs/provider-operation-inventory.md` §3.3.1); babelforce's agent-status update
+    ///   (`predecessor:docs/designs/provider-operation-inventory.md` §3.3.1); babelforce's agent-status update
     ///   writes `presence.name`. Without this the field is emitted at the root of the body, which
     ///   Zendesk **accepts and ignores** — a wrong result that answers 200, which is why this is a
     ///   correctness field and not a convenience one.
@@ -442,7 +442,7 @@ pub struct ParamSet {
     ///
     /// A free-form object body: `babelforce-call-session-set` and `babelforce-session-update` both
     /// take `{"type": "object"}` with no properties — a map of caller-chosen keys
-    /// (`docs/designs/provider-operation-inventory.md` §6.5). A field list cannot describe that, and
+    /// (`predecessor:docs/designs/provider-operation-inventory.md` §6.5). A field list cannot describe that, and
     /// an operation that declared no body field at all emitted a `PUT` with **no body**, which is
     /// indistinguishable from a legitimately bodiless write.
     ///
@@ -674,7 +674,7 @@ pub use connector_address::DEFAULT_SERVICE;
 /// models; `zendesk`, `freshdesk`, `intercom` and `jira` all show a ticket. Nothing in the IR said
 /// so, so nothing could act on it: a UI could not group them, and a second vendor filling the same
 /// shape was a coincidence rather than a contract. A role is that missing declaration. See
-/// [`docs/designs/provider-roles.md`](../../../docs/designs/provider-roles.md).
+/// `predecessor:docs/designs/provider-roles.md` (provenance only).
 ///
 /// # Why it is closed
 ///
@@ -794,7 +794,7 @@ fn fills_slot(member: &str, slot: &str) -> bool {
 /// [`VideoConferencing`](Self::VideoConferencing) — kept rather than folded because each names a
 /// domain a reader would actually filter for, and folding them would put `algolia` under a label that
 /// describes it worse. The clustering is recorded in
-/// [`docs/designs/provider-roles.md`](../../../docs/designs/provider-roles.md).
+/// `predecessor:docs/designs/provider-roles.md` (provenance only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Tag {
@@ -936,7 +936,7 @@ impl Tag {
 
 /// **How a connector executes** — flux's runtime axis, declared rather than derived (C-405).
 ///
-/// The vocabulary mirrors `docs/designs/ecosystem.md` in the flux repository, which replaces the old
+/// The vocabulary mirrors `predecessor:docs/designs/ecosystem.md` in the flux repository, which replaces the old
 /// plugin-versus-connector dichotomy with a single axis: *a plugin is one runtime kind a connector
 /// may declare*. The invariant that survives the generalization is the one that makes it reviewable:
 ///
@@ -1029,7 +1029,7 @@ pub(crate) fn is_default_runtime(runtime: &Runtime) -> bool {
 ///
 /// `s3` and `bedrock-runtime` under AWS; `support` under Zendesk. A service is the middle level of
 /// C-37's address scheme, promoted from an anonymous path segment to a named thing with an owner —
-/// see [`docs/designs/provider-services.md`](../../../docs/designs/provider-services.md).
+/// see `predecessor:docs/designs/provider-services.md` (provenance only).
 ///
 /// **This is not a tag.** A free-form label cannot do the three things this level exists for: it
 /// cannot *partition* (so "install the whole s3 service" would not denote a set), it cannot carry a
@@ -1205,7 +1205,7 @@ pub struct Operation {
     /// the same claim, and conflating them prices coverage in context. A connector covering the
     /// babelforce manager document is 397 operations; 397 tools is not a catalogue but a denial of
     /// service against the model's context window, and it is the entire reason
-    /// `docs/designs/provider-operation-inventory.md` §5.2 shipped 9 of 163 rather than all of them.
+    /// `predecessor:docs/designs/provider-operation-inventory.md` §5.2 shipped 9 of 163 rather than all of them.
     ///
     /// Curation was the right answer while the connector was the only surface. It is the wrong answer
     /// for a connector that must serve every caller a vendor SDK served. So the claims separate:
@@ -1405,7 +1405,7 @@ pub const CREDENTIAL_HANDLE_FIELD: &str = "credential";
 /// **The declared output of every credential-producing operation**: the handle, and nothing else.
 ///
 /// `{ "credential": "tenants/<tenant>/<authority>/…" }`. It is derived rather than authored, for the
-/// reason `Level` is in `docs/designs/connector-configuration.md`: a value a author could state
+/// reason `Level` is in `predecessor:docs/designs/connector-configuration.md`: a value a author could state
 /// differently per operation is a value some operation will eventually state wrongly, and here
 /// "wrongly" means a published schema that promises a caller the secret.
 pub fn credential_handle_schema() -> JsonSchema {
@@ -1534,7 +1534,7 @@ impl Operation {
     /// Derived, never authored: there is no `input_schema` key in a provider file, and one is a
     /// load error — `Operation` is `deny_unknown_fields` and the editor-facing
     /// [`crate::PROVIDER_TOML_JSON_SCHEMA`] closes the operation object as well. The same rule
-    /// `Level` follows in `docs/designs/connector-configuration.md`, for the same reason: a value
+    /// `Level` follows in `predecessor:docs/designs/connector-configuration.md`, for the same reason: a value
     /// that is both derived and writable is two sources of truth waiting to disagree.
     ///
     /// # Why this exists at all
@@ -1567,7 +1567,7 @@ impl Operation {
     /// - **An operation with no parameters composes an empty object schema, not absence.** "This
     ///   takes nothing" is a derived answer and deserves to be stated; the output side publishes
     ///   absence instead precisely because "we do not know" is *not* an answer
-    ///   (`docs/designs/member-io-schemas.md`).
+    ///   (`predecessor:docs/designs/member-io-schemas.md`).
     ///
     /// # The merge rule for a body declared twice
     ///

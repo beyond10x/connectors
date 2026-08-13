@@ -1,6 +1,6 @@
 # Design 03: beyond HTTP — drivers, satellites, and the byte plane
 
-**Status:** draft for review; v1 direction fixed, external runtime artifacts deferred · **Date:** 2026-08-13
+**Status:** accepted v1 design; external runtime artifacts deferred · **Date:** 2026-08-13
 **Inputs:** the predecessor rich-runtime program; B10x architecture repository boundaries;
 how AMI/AGI (Sangoma Asterisk), DNS/UDP, SIP, TCP protocols and audio channels reach the connector
 model.
@@ -77,10 +77,12 @@ refuse it. The answer is not a bespoke bridge application: it is the **same conn
 deployed near the protocol** in a satellite role. A satellite beside a PBX, cluster or private API
 uses local drivers and declared destinations, then establishes an authenticated relationship upward.
 
-Federation later makes the topology appear as one effective catalogue. The main deployment imports
-the satellite's attested catalogue generation and invokes/subscribes through a bounded remote seam
-under its own grants and audit. Until federation exists, clients may connect to two deployments.
-That is an honest temporary topology and creates no second connector model.
+Federation makes the topology appear as one effective catalogue under
+[architecture ADR 0018 — Connectors satellites federate outward under bounded authority](https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md).
+The main deployment imports a signed monotonic catalog/policy generation and invokes/subscribes
+through a bounded outward-established remote seam under its own grants and audit. Until that
+implementation exists, clients may connect to two deployments. That is an honest temporary
+topology and creates no second connector model.
 
 A satellite is:
 
@@ -104,6 +106,11 @@ For the latter, connectors governs **session establishment**: authenticate, admi
 the connection, select the fixed driver/placement, negotiate bounded parameters, and return a
 short-lived endpoint authority. Bytes then flow directly between the client and the selected local
 driver, satellite or substrate endpoint. Revocation and expiry remain control-plane facts.
+
+[Architecture ADR 0016 — Direct-byte establishment uses operation-scoped authority](https://github.com/b10x/architecture/blob/main/adr/0016-operation-scoped-session-authority.md)
+fixes that authority as an asymmetrically signed, proof-bound, 60-second, single-redemption grant.
+Reconnect gets a fresh grant. The serving endpoint must be independently reachable; otherwise the
+session is `unserved`, and the federation control path never becomes a byte relay.
 
 This byte-plane split covers PTYs, port forwards, raw tunnels and RTP/audio without turning the
 credential broker into a high-volume proxy. Asterisk's ARI `externalMedia` and AudioSocket are
@@ -168,7 +175,10 @@ This design does not schedule an AMI implementation or accept external runtime a
 where those concerns belong so later work does not re-derive the old mixed runtime model.
 
 The ownership and five-axis model are accepted by
-[architecture ADR 0010](https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
-Satellite federation and channel authority remain proposals in architecture RFCs 0004 and 0002;
-this design does not make either wire current by implication. Delivery items 1–6 are owned by
-S-023 through S-028 in the story board.
+[architecture ADR 0010 — Beyond HTTP is a five-axis connector model](https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
+Foundation trust, channel authority, event ingestion, satellite federation, and contract release
+are accepted by architecture ADRs
+[ADR 0015 — Foundation services share one trust envelope](https://github.com/b10x/architecture/blob/main/adr/0015-foundation-trust-envelope.md)
+through
+[ADR 0019 — Foundation contracts ship as signed reproducible bundles](https://github.com/b10x/architecture/blob/main/adr/0019-contract-release-and-conformance.md).
+Delivery items 1–6 remain implementation work owned by S-023 through S-028 in the story board.

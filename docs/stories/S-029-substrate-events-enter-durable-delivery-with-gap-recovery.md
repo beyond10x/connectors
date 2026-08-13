@@ -7,7 +7,7 @@ priority:
 design: docs/design/02-architecture.md
 epic: substrate-integration
 areas: [domain, protocol, service, server]
-note: "blocked on b10x/architecture RFC 0003 and a released substrate event/ledger bundle"
+note: "architecture closed by ADR 0017; blocked only on released substrate event/reconciliation bundle"
 ---
 
 # Substrate events enter durable delivery with gap recovery
@@ -31,4 +31,7 @@ without pretending those guarantees are identical.
 
 ## Progress
 
-- (blocked on architecture RFC 0003 and substrate contract bundle)
+- Architecture is accepted: persisted generation/sequence, transactional connector high-water,
+  explicit history-gap boundary, and barriered resource/operation reconciliation are fixed.
+- Blocked only on the released substrate phase-3 event/reconciliation bundle and implementation
+  fixtures, not on an architectural owner or recovery decision.

@@ -1,6 +1,6 @@
 //! **One closed runtime vocabulary, stated once** — C-405.
 //!
-//! The set lives in flux's `docs/designs/ecosystem.md`, which this repository mirrors: `http`,
+//! The set lives in flux's `predecessor:docs/designs/ecosystem.md`, which this repository mirrors: `http`,
 //! `socket`, `process`, `container`, `plugin`, `remote`. A mirrored closed set that nothing verifies
 //! stops being closed at the seam, so every restatement of it inside this repository is derived from
 //! [`Runtime::ALL`] and checked here rather than hand-typed and hoped over.

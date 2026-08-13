@@ -110,8 +110,9 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    source cannot supply, into the canonical connector document. The same spec + overlays must
    reproduce our own format byte for byte.
    **Register the source in `SOURCES.toml`** — the single index of everything this repo derives
-   from (kind, upstream, refresh script, pins, consumers); the index is test-enforced, so a
-   vendored file without an entry fails. The build is hermetic and offline; a spec refresh is
+   from (kind, upstream, refresh script, pins, consumers). S-016 owns the future mechanical
+   orphan and checksum checks; until it lands, review the index and refresh script together. The
+   build is hermetic and offline; a spec refresh is
    its own reviewable commit (see "Refreshing a source" below).
 5. **Declare the surface as rules, not lists.** `[patch.naming]` is one rule (pins only to
    hold shipped ids still); one `[[patch.select]]` per (document, method class) — never reads
@@ -137,8 +138,9 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
 10. **Build, verify, commit as one unit.**
    `catalog build` → `diff` must then report everything up to date → `check`
    (lock verifier, S-003). Unchanged inputs reproduce every artifact byte for byte — if `diff`
-   moves without your input changing, stop and investigate; never re-commit drift. Coverage
-   tests hold in both directions (an allowlist entry may not outlive the gap it explains).
+   moves without your input changing, stop and investigate; never re-commit drift. Current coverage
+   tests prove selected operations exist; S-021 owns the missing reverse check that an allowlist
+   entry cannot outlive the gap it explains.
    Commit the provider file **and** its generated artifacts together:
    `catalog: add <provider> connector`, via `as-bot.sh` if you're an agent.
 
@@ -149,12 +151,32 @@ twice · one reviewable commit, by the bot.
 
 ## Refreshing a source
 
-`SOURCES.toml` is a **machine-processed manifest, not documentation**. Code owns it (S-016):
-`catalog sources check` validates the index, verifies every checksum against the bytes on
-disk and refuses orphans in both directions — it runs in the invariant suite, so a drifted pin
-fails the build; you will never discover drift by reading TOML. `catalog sources refresh`
-executes the fetch + declared scrub + re-pin; `catalog sources diff` probes upstream without
-mutating anything. Nobody fetches or compares by hand, at any scale.
+`SOURCES.toml` is intended to become a **machine-processed manifest, not documentation**. S-016 owns
+`catalog sources check`, checksum verification, orphan refusal, refresh, and upstream diff. Until
+that story lands, use the registered refresh script and review the source bytes, provenance, pin,
+and consumer list in the same change; do not claim the invariant suite checks them.
+
+## Gate
+
+`.github/workflows/ci.yml` is the authoritative gate for repository governance and the landed Rust
+surface. It runs the following commands on every pull request and push to `main`:
+
+```text
+python3 scripts/check-links.py
+python3 scripts/check-stories.py
+cargo fetch --locked
+cargo build --workspace --locked
+cargo test --workspace --locked --no-fail-fast
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+cargo run --locked -p catalog-cli -- build
+cargo run --locked -p catalog-cli -- diff
+```
+
+A separate job builds and tests with Rust 1.87.0, the declared MSRV. `catalog check` remains owned by
+S-003, and the web job remains owned jointly by S-018/S-020; neither absent arm is described as
+enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are
+unavailable.
 
 The agent instruction is therefore short:
 
@@ -194,4 +216,8 @@ The agent instruction is therefore short:
   [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
   references: mine them, copy from them per the architecture inventory, and never edit them from
   here. The durable housing decision is
-  [`b10x/architecture` ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
+  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
+
+`predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
+navigable authority. The surrounding comment must restate the rule the current implementation uses;
+a private predecessor document can never be the only explanation for a B10x behavior.

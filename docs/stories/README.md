@@ -13,7 +13,7 @@ Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 [../design/01-domain-model.md](../design/01-domain-model.md) →
 [../design/02-architecture.md](../design/02-architecture.md), grounded by
 [../research/](../research/). Repository housing is governed by
-[`b10x/architecture` ADR 0006](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
+[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 ## Status
 
@@ -38,7 +38,7 @@ will spawn children as each milestone is designed.
 | [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
-| [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | ready (6) | Catalog | ci, catalog-build, web |
+| [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | in-progress (6) | Catalog | ci, catalog-build, web |
 | [S-018](S-018-the-explorer-works-against-the-new-site-json.md) | The web explorer works against the site JSON M1 actually emits | ready (7) | Catalog | web, catalog-build |
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
 | [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | backlog | Catalog | catalog, catalog-build, connector-resolve, web |
@@ -50,20 +50,20 @@ will spawn children as each milestone is designed.
 | [S-007](S-007-m2-the-platform-skeleton-serves.md) | M2 — the platform skeleton serves in both postures | backlog | Platform | domain, protocol, service, server |
 | [S-008](S-008-m3-connect-a-provider-and-invoke-it.md) | M3 — connect a real provider, grant it, invoke it | backlog | Platform | domain, protocol, service, server |
 | [S-009](S-009-m4-events-reach-a-client-by-push-and-by-pull.md) | M4 — a provider event reaches a client by push and by pull, with provenance | backlog | Platform | domain, protocol, service, server |
-| [S-010](S-010-m5-flux-re-points-and-the-gitlab-plugin-retires.md) | M5 — flux re-points at the platform and the gitlab plugin is deleted | backlog | Clients | protocol, server, docs |
+| [S-010](S-010-m5-flux-re-points-and-the-gitlab-plugin-retires.md) | M5 — flux re-points at the platform and the gitlab plugin is deleted | blocked | Clients | protocol, server, docs |
 | [S-011](S-011-deployment-declared-destination-aperture.md) | Deployment-declared destination aperture | backlog | Platform | service, server, domain |
 | [S-012](S-012-declarative-webhook-routing-grammar.md) | Webhook verification and attribution are declared as data, not as a per-provider script | backlog | Catalog | catalog, connector-spec, service |
 | [S-013](S-013-connect-session-oauth-custody-in-personal-posture.md) | Decide the connect-session ↔ OAuth-callback custody chain in personal posture | backlog | Platform | domain, service, catalog |
 | [S-014](S-014-auth-as-tool-result.md) | Not-connected is a next step: the response carries a connect URL | backlog | Platform | protocol, service, server |
 | [S-023](S-023-beyond-http-facts-enter-the-document.md) | Beyond-HTTP facts enter the connector document orthogonally | backlog | Catalog | catalog, catalog-build, connector-spec, connector-resolve |
 | [S-024](S-024-one-zero-io-plan-seam-selects-a-closed-driver.md) | One zero-IO plan seam selects a closed built-in driver | backlog | Platform | domain, service, server, connector-resolve |
-| [S-025](S-025-satellite-federation-has-a-threat-modeled-contract.md) | Satellite federation has a threat-modeled contract | blocked | Platform | domain, protocol, service, server |
+| [S-025](S-025-satellite-federation-has-a-threat-modeled-contract.md) | Satellite federation has a threat-modeled contract | backlog | Platform | domain, protocol, service, server |
 | [S-026](S-026-one-real-non-http-driver-proves-the-model.md) | One real non-HTTP driver proves the five-axis model | backlog | Platform | catalog, domain, service, server |
-| [S-027](S-027-direct-byte-session-establishment-is-operation-scoped.md) | Direct-byte session establishment is operation-scoped | blocked | Platform | domain, protocol, service, server |
+| [S-027](S-027-direct-byte-session-establishment-is-operation-scoped.md) | Direct-byte session establishment is operation-scoped | backlog | Platform | domain, protocol, service, server |
 | [S-028](S-028-external-driver-artifacts-stay-deferred.md) | External driver artifacts stay deferred behind attestation | blocked | Platform | domain, service, server, docs |
 | [S-029](S-029-substrate-events-enter-durable-delivery-with-gap-recovery.md) | Substrate events enter durable delivery with gap recovery | blocked | Platform | domain, protocol, service, server |
 | [S-030](S-030-raw-proxy-is-break-glass-not-a-model-capability.md) | Raw proxy is break-glass authority, not a model capability | backlog | Platform | domain, protocol, service, server |
-| [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | blocked | Platform | catalog, protocol, ci, docs |
+| [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | backlog | Platform | catalog, protocol, ci, docs |
 
 ## Epics in this seed
 
