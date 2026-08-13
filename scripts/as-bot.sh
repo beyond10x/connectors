@@ -18,7 +18,7 @@ export SD_BOT_TOKEN
 
 exec git \
   -c user.name='selfdirect-bot[bot]' \
-  -c user.email='4575767+selfdirect-bot[bot]@users.noreply.github.com' \
+  -c user.email='316373684+selfdirect-bot[bot]@users.noreply.github.com' \
   -c 'url.https://github.com/.pushInsteadOf=git@github.com:' \
   -c 'credential.https://github.com.helper=' \
   -c 'credential.https://github.com.helper=!f() { echo username=x-access-token; echo "password=${SD_BOT_TOKEN}"; }; f' \
