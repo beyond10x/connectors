@@ -52,6 +52,9 @@ Day-one changes, from the precedents analysis and the predecessor's own stories:
    exits non-zero on drift.
 3. Adopt from the wild (ordered by cost/benefit): `token_response_metadata`, header-name
    rate-limit retry, per-service verification probes.
+4. Retire the `quirks` umbrella: `pagination`, `rate_limit`, `error_envelope` become first-class
+   fields; a rare `workarounds` category (each entry naming the vendor defect it compensates)
+   exists only if a concrete deviation needs it. Strictly after the M1 differential.
 
 ### Platform family (fresh)
 

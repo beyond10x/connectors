@@ -102,7 +102,10 @@ embeddable component, or headlessly (an agent hands the URL to a human — auth-
 The catalog template for one vendor surface: reverse-DNS **authority** (e.g. `com.gitlab.api`),
 services with base-URL templates, **operations**, the complete credential surface (schemes,
 acquisition, placement, subject, hazard, full OAuth2 spec), configuration fields, events, channel
-bindings, verification probes, and quirks (pagination, rate limits, error envelopes).
+bindings, verification probes, and per-operation runtime traits — pagination, rate limits, error
+envelopes — as **first-class named fields**. (The predecessor bagged these under `quirks`; that
+umbrella retires. A rare, precisely-scoped `workarounds` category may exist for genuine vendor
+spec deviations, each entry naming the defect it compensates — its rarity is the signal.)
 
 Authored as a **connector declaration** (text: provider TOML + optional OpenAPI ingest), compiled
 to one canonical, deterministic JSON document, hashed in the lockfile, packed into an
@@ -121,7 +124,7 @@ offset-indexed artifact. "Connector" names the *authored declaration*; "Provider
 
 One declared, invocable unit of a provider: id (stable, public), service, direction, **risk**
 (ordered), **idempotency**, **effects**, `expose` (callable vs projected-to-models), parameter
-schemas, an explicit request template, response schema, quirks.
+schemas, an explicit request template, response schema, and the runtime traits above.
 
 - *Invariant:* the facts the authorization gate decides on are the facts the catalogue publishes
   — a client can always predict admission from what it can read.
