@@ -90,9 +90,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    **Register the source in `SOURCES.toml`** — the single index of everything this repo derives
    from (kind, upstream, refresh script, pins, consumers); the index is test-enforced, so a
    vendored file without an entry fails. The build is hermetic and offline; a spec refresh is
-   its own reviewable commit. **When an upstream changes**: run the entry's refresh script,
-   update the pin, rebuild, and review the *canonical-document diff* — the catalog diff, not
-   the raw source diff, is what gets judged.
+   its own reviewable commit (see "Refreshing a source" below).
 5. **Declare the surface as rules, not lists.** `[patch.naming]` is one rule (pins only to
    hold shipped ids still); one `[[patch.select]]` per (document, method class) — never reads
    and deletes in one statement, `risk` is a damage claim and they are not one claim;
@@ -126,6 +124,27 @@ Checklist: identity chosen as permanent · spec vendored + scrubbed + provenance
 selects split by damage class · risk/idempotency/effects by judgment, not guessed · no auth-flow
 ops, no credential values · expose is a curation · runtime traits declared · build + diff clean
 twice · one reviewable commit, by the bot.
+
+## Refreshing a source
+
+When asked to update/refresh a vendored spec or any external source (or you discover an upstream
+changed), do exactly this:
+
+1. Look the source up in `SOURCES.toml`. If it has no entry, that is the first defect — stop and
+   add the entry before touching anything.
+2. Run its `refresh` script (scrub included). Never hand-edit or model-generate anything under
+   `specs/` — the sourced-never-authored rule above applies to refreshes too.
+3. Update the pins: the detail record (`specs/<vendor>.provenance.toml`) and the `SOURCES.toml`
+   entry (new hash/date).
+4. `connectors catalog build`, then review the **canonical-document diff** — the catalog diff,
+   not the raw source diff, is the reviewable object. If the catalog diff is empty, say so and
+   commit the pin bump alone.
+5. Newly appeared operations are a **curation decision, not an auto-select**: anything the
+   refresh would newly select needs the step-6 judgment calls (risk/idempotency/effects) filled
+   deliberately, or stays unselected. Vanished operations must be acknowledged, not silently
+   dropped — coverage tests hold in both directions.
+6. One commit: `catalog: refresh <vendor> spec`, body summarizing the catalog diff (ops
+   added/changed/removed), via `as-bot.sh` if you're an agent.
 
 ## Boundaries
 
