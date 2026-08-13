@@ -1,0 +1,19 @@
+version = 1
+
+[[spec]]
+path = "specs/anthropic/2023-06-01-excerpt.yaml"
+origin = "repository-authored"
+origin_repository = "https://github.com/codewandler/flux-connectors"
+origin_commit = "ffd361367f03ab25156bafc988b028be1ba3a516"
+origin_path = "specs/anthropic/2023-06-01-excerpt.yaml"
+authored_at = "2026-08-01"
+reviewed_at = "2026-08-13"
+sha256 = "cd75b7537831810f1800b58e36b19b780bc8899a022f7f534384e82c1ea85190"
+coverage = "partial-ingest-fixture"
+purpose = "Exercise OpenAPI 3.1, YAML integer response keys, local references, nullable type arrays and deterministic ingest. This partial document does not yet reproduce providers/anthropic.toml."
+references = [
+  "https://platform.claude.com/docs/en/api/overview",
+  "https://platform.claude.com/docs/en/api/versioning",
+  "https://platform.claude.com/docs/en/api/messages/create",
+  "https://platform.claude.com/docs/en/api/models/list",
+]

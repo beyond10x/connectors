@@ -107,13 +107,19 @@ envelopes — as **first-class named fields**. (The predecessor bagged these und
 umbrella retires. A rare, precisely-scoped `workarounds` category may exist for genuine vendor
 spec deviations, each entry naming the defect it compensates — its rarity is the signal.)
 
-Authored as a **connector declaration** (text: provider TOML + optional OpenAPI ingest), compiled
-to one canonical, deterministic JSON document, hashed in the lockfile, packed into an
-offset-indexed artifact. "Connector" names the *authored declaration*; "Provider" names the
+Authored from an authoritative **source specification** plus explicit reviewed overlays. The source
+is either an official machine-readable vendor artifact or, when none exists, a
+repository-authored specification that says so and cites the official documentation it models.
+The deterministic projection (currently provider TOML/OpenAPI ingest) compiles those inputs to one
+canonical JSON document, hashes it in the lockfile and packs it into an offset-indexed artifact.
+"Connector" names the *source specification + overlay declaration*; "Provider" names the
 *compiled catalog entry*. One noun pair, fixed here.
 
 - *Invariant:* review-equals-execution — every derived form is byte-identical to the committed
   canonical documents; unchanged inputs reproduce every artifact byte for byte.
+- *Invariant:* every provider is reproducible from a declared spec origin plus reviewed overlays;
+  the current imported hand-authored declarations are migration debt until that derivation is
+  explicit, not an exemption from the model.
 - *Invariant:* the document carries the registration **requirement** (which OAuth fields a
   deployment must supply), never a value. No `client_id` ever appears in the catalog.
 - *Invariant:* the request-template vocabulary is closed and total; anything outside it is a

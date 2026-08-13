@@ -1,8 +1,9 @@
 # SOURCES.toml — the single index of everything this repository derives from.
 #
-# One [[source]] entry per external source: what kind it is, where upstream lives, how it is
-# refreshed, where its byte-level pins sit (`pins` points at the detail record; hashes are not
-# duplicated here), and which files consume it. Hand-bootstrapped 2026-08-13 from the M1 import
+# One [[source]] entry per source: what kind and origin it has, where its upstream bytes or
+# authoritative references live, how it is refreshed or reviewed, where its byte-level pins sit
+# (`pins` points at the detail record; hashes are not duplicated here), and which files consume it.
+# Hand-bootstrapped 2026-08-13 from the M1 import
 # report; S-016 makes this live machinery (`catalog sources check | refresh | diff`), at which
 # point a drifted pin or an unindexed vendored file fails the build. Until then this file is
 # maintained alongside every vendoring change (AGENTS.md "Refreshing a source").
@@ -16,6 +17,21 @@ retrieved = "2026-08-13"
 refresh = "manual"
 consumers = ["providers/", "specs/", "catalog/", "connectors.lock", "web/", "scripts/", "crates/connector-address/", "crates/connector-spec/", "crates/catalog-reader/", "crates/connector-resolve/", "crates/connector-secrets/", "crates/catalog/", "crates/catalog-build/"]
 note = "one-time import at M1; left behind: connector-flux emitter (34.6k LOC), connector-pack, connectors-api, catalog generated tables (17k LOC) + ops/*.flux (835), connectors/* emitted modules+manifests (140), release/publish scripts, migration-check + core-catalogue verbs, per-provider test files (folded into one invariants file). crates/catalog rebuilt over the pack instead of trimmed; crates/catalog-cli is new (clap derive). Byte-differential passed: pack sha256 b9b21eac… identical to predecessor at this commit."
+
+[[source]]
+id = "anthropic-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://platform.claude.com/docs/en/api/overview",
+  "https://platform.claude.com/docs/en/api/versioning",
+  "https://platform.claude.com/docs/en/api/messages/create",
+  "https://platform.claude.com/docs/en/api/models/list",
+]
+refresh = "authored-review"
+pins = "specs/anthropic.provenance.toml"
+consumers = ["crates/connector-spec/tests/main/openapi_ingest.rs"]
+note = "Partial authored source spec for deterministic ingest coverage. It does not yet reproduce providers/anthropic.toml; that source-to-canonical derivation remains open design work."
 
 [[source]]
 id = "asterisk-ari"
