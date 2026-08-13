@@ -44,6 +44,21 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one Outlook message by id: subject, sender, recipients, timestamps and the body — HTML by default. This is personal correspondence; treat the sender, recipients and body as personal data. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "message_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one Outlook message by id: subject, sender, recipients, timestamps and the body — HTML by default. This is personal correspondence; treat the sender, recipients and body as personal data",
       "direction": "read",
       "expose": true,
@@ -59,7 +74,8 @@
             "minLength": 1,
             "pattern": "^[^/?#&]+$",
             "type": "string"
-          }
+          },
+          "symbol": "message_id"
         }
       ],
       "quirks": {
@@ -184,6 +200,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Reply to a message. Graph resolves the recipients automatically — the original message's `replyTo` if it specifies one, otherwise its `from` — and this operation cannot override, widen or add to that audience (C-56 excludes the `message` override Graph's own reply action accepts). Delivered within seconds and cannot be recalled. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "comment": {
+              "type": "string"
+            },
+            "message_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id",
+            "comment"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Reply to a message. Graph resolves the recipients automatically — the original message's `replyTo` if it specifies one, otherwise its `from` — and this operation cannot override, widen or add to that audience (C-56 excludes the `message` override Graph's own reply action accepts). Delivered within seconds and cannot be recalled",
       "direction": "write",
       "expose": true,
@@ -199,7 +234,8 @@
             "minLength": 1,
             "pattern": "^[^/?#&]+$",
             "type": "string"
-          }
+          },
+          "symbol": "message_id"
         },
         {
           "description": "Text to prepend above the quoted original message. May be an empty string — Graph accepts that — but the field itself must always be sent",
@@ -208,7 +244,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "comment"
         }
       ],
       "quirks": {
@@ -242,6 +279,15 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the top-level mail folders in the signed-in user's mailbox — Inbox, Drafts, Sent Items, and any custom top-level folders. Does not descend into subfolders. Graph's default page size here is 10; this connector cannot follow `@odata.nextLink` (an absolute URL, not a constructible cursor), so a mailbox with more than ten top-level folders is reported incompletely. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the top-level mail folders in the signed-in user's mailbox — Inbox, Drafts, Sent Items, and any custom top-level folders. Does not descend into subfolders. Graph's default page size here is 10; this connector cannot follow `@odata.nextLink` (an absolute URL, not a constructible cursor), so a mailbox with more than ten top-level folders is reported incompletely",
       "direction": "read",
       "expose": true,
@@ -310,6 +356,21 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one calendar event: its subject, start and end, organizer, attendee list and cancellation state. Returned in UTC unless a `Prefer: outlook.timezone` header is sent, which this connector does not do. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "event_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one calendar event: its subject, start and end, organizer, attendee list and cancellation state. Returned in UTC unless a `Prefer: outlook.timezone` header is sent, which this connector does not do",
       "direction": "read",
       "expose": true,
@@ -325,7 +386,8 @@
             "minLength": 1,
             "pattern": "^[^/?#&]+$",
             "type": "string"
-          }
+          },
+          "symbol": "event_id"
         }
       ],
       "quirks": {
@@ -483,6 +545,37 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create a single-instance event on the signed-in user's default calendar. No attendees can be declared yet (C-56), so nobody is invited and nobody is notified — the event appears only on the calendar it was created on. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "end_date_time": {
+              "type": "string"
+            },
+            "end_time_zone": {
+              "type": "string"
+            },
+            "start_date_time": {
+              "type": "string"
+            },
+            "start_time_zone": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "subject",
+            "start_date_time",
+            "start_time_zone",
+            "end_date_time",
+            "end_time_zone"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a single-instance event on the signed-in user's default calendar. No attendees can be declared yet (C-56), so nobody is invited and nobody is notified — the event appears only on the calendar it was created on",
       "direction": "write",
       "expose": true,
@@ -497,7 +590,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "subject"
         },
         {
           "description": "When the event starts, as a local date-time with no UTC designator — `2026-01-30T09:00:00` — interpreted in `start_time_zone`",
@@ -507,6 +601,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "start_date_time",
           "wire": "start.dateTime"
         },
         {
@@ -518,6 +613,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "start_time_zone",
           "wire": "start.timeZone"
         },
         {
@@ -528,6 +624,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "end_date_time",
           "wire": "end.dateTime"
         },
         {
@@ -539,6 +636,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "end_time_zone",
           "wire": "end.timeZone"
         }
       ],
@@ -670,6 +768,15 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get the signed-in user's own default calendar: its name, colour and sharing/editing permissions. This is the calendar, not its events — use microsoft_graph-calendar-event-get for one of those. Takes no argument: `/me/calendar` always resolves to the token's own default calendar. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the signed-in user's own default calendar: its name, colour and sharing/editing permissions. This is the calendar, not its events — use microsoft_graph-calendar-event-get for one of those. Takes no argument: `/me/calendar` always resolves to the token's own default calendar",
       "direction": "read",
       "expose": true,
@@ -758,6 +865,21 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one OneDrive item's metadata by id: its name, size and where it lives. This never returns file content — downloading needs the separate /content endpoint, which returns a binary body and is not shipped by this connector. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "item_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one OneDrive item's metadata by id: its name, size and where it lives. This never returns file content — downloading needs the separate /content endpoint, which returns a binary body and is not shipped by this connector",
       "direction": "read",
       "expose": true,
@@ -773,7 +895,8 @@
             "minLength": 1,
             "pattern": "^[^/?#&]+$",
             "type": "string"
-          }
+          },
+          "symbol": "item_id"
         }
       ],
       "quirks": {
@@ -903,6 +1026,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "Rename a OneDrive item: sets its name and changes nothing else. Does not move it — moving is a PATCH to the separate parentReference field, which this operation deliberately does not declare (C-56). A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "item_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Rename a OneDrive item: sets its name and changes nothing else. Does not move it — moving is a PATCH to the separate parentReference field, which this operation deliberately does not declare (C-56)",
       "direction": "write",
       "expose": true,
@@ -918,7 +1060,8 @@
             "minLength": 1,
             "pattern": "^[^/?#&]+$",
             "type": "string"
-          }
+          },
+          "symbol": "item_id"
         },
         {
           "description": "The item's new name",
@@ -928,7 +1071,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "name"
         }
       ],
       "quirks": {
@@ -1035,6 +1179,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "List Outlook messages visible to the signed-in user with the Microsoft Graph Mail.Read permission; returns personal correspondence, so treat subjects, senders, recipients and bodies as personal data",
+        "input_schema": {
+          "properties": {
+            "_skip": {
+              "type": "number"
+            },
+            "_top": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_top",
+            "_skip"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Outlook messages visible to the signed-in user with the Microsoft Graph Mail.Read permission; returns personal correspondence, so treat subjects, senders, recipients and bodies as personal data",
       "direction": "read",
       "expose": true,
@@ -1049,7 +1212,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_top"
         },
         {
           "description": "Skip the first n items",
@@ -1059,7 +1223,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_skip"
         }
       ],
       "request": {
@@ -7833,6 +7998,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the signed-in user's Outlook master categories with the Microsoft Graph MailboxSettings.Read permission",
+        "input_schema": {
+          "properties": {
+            "_skip": {
+              "type": "number"
+            },
+            "_top": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_top",
+            "_skip"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the signed-in user's Outlook master categories with the Microsoft Graph MailboxSettings.Read permission",
       "direction": "read",
       "expose": true,
@@ -7847,7 +8031,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_top"
         },
         {
           "description": "Skip the first n items",
@@ -7857,7 +8042,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_skip"
         }
       ],
       "request": {
@@ -9141,6 +9327,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the mailbox server's supported time zones with the Microsoft Graph MailboxSettings.Read permission",
+        "input_schema": {
+          "properties": {
+            "_skip": {
+              "type": "number"
+            },
+            "_top": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_top",
+            "_skip"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the mailbox server's supported time zones with the Microsoft Graph MailboxSettings.Read permission",
       "direction": "read",
       "expose": true,
@@ -9155,7 +9360,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_top"
         },
         {
           "description": "Skip the first n items",
@@ -9165,7 +9371,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_skip"
         }
       ],
       "request": {
@@ -9246,6 +9453,25 @@
           "microsoft_graph.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the mailbox server's supported languages and locales with the Microsoft Graph MailboxSettings.Read permission",
+        "input_schema": {
+          "properties": {
+            "_skip": {
+              "type": "number"
+            },
+            "_top": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_top",
+            "_skip"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the mailbox server's supported languages and locales with the Microsoft Graph MailboxSettings.Read permission",
       "direction": "read",
       "expose": true,
@@ -9260,7 +9486,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_top"
         },
         {
           "description": "Skip the first n items",
@@ -9270,7 +9497,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "_skip"
         }
       ],
       "request": {

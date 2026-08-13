@@ -30,6 +30,20 @@
 //!    published.
 //! 8. [`a_full_build_leaves_no_orphaned_artifact`] — no committed file under an artifact root that
 //!    the plan does not claim.
+//! 9. [`the_document_carries_the_callers_contract`] — every operation stores the model-facing
+//!    contract (S-001): a description, a lowered object `input_schema`, and a symbol on every
+//!    declared parameter — with the two measured cases pinned by name (babelforce's dotted
+//!    parameter, airtable's error-envelope description).
+//! 10. [`the_contract_and_the_params_state_the_same_symbols`] — the two places the document states
+//!     a symbol (each param's `symbol`, the contract's `input_schema` keys and `required` order)
+//!     agree, so a lowering bug cannot ship a contract keyed by names the params do not carry.
+//! 11. [`every_format_origin_field_lowers_to_the_origin_slot`] — a `format = "origin"` config
+//!     field's bound variable lands on exactly `["origin"]` in every operation that carries it
+//!     (S-001; predecessor C-538 open question 3), so a provider declaring it for a variable
+//!     inside a larger authority cannot silently drop Origin→Host with nothing red.
+//! 12. [`the_credential_requirement_agrees_with_the_auth_list`] — the stored token (S-001) is
+//!     `declared` exactly when the effective `auth` list is non-empty; the empty side carries one
+//!     of the two distinction tokens the old derivation could not tell apart.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -79,11 +93,7 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
     plan.providers
         .iter()
         .map(|provider| {
-            let text = planned(
-                workspace,
-                plan,
-                &format!("catalog/{provider}.catalog.json"),
-            );
+            let text = planned(workspace, plan, &format!("catalog/{provider}.catalog.json"));
             let value: Value = serde_json::from_str(text)
                 .unwrap_or_else(|error| panic!("`{provider}`'s document is not JSON: {error}"));
             (provider.clone(), value)
@@ -167,11 +177,7 @@ fn two_plans_over_the_same_inputs_are_byte_identical() {
 fn every_canonical_document_validates_against_the_committed_schema() {
     let (workspace, plan) = full_plan();
 
-    let schema_text = planned(
-        &workspace,
-        &plan,
-        "catalog/connector-document.schema.json",
-    );
+    let schema_text = planned(&workspace, &plan, "catalog/connector-document.schema.json");
     let schema: Value = serde_json::from_str(schema_text).expect("the schema is JSON");
     let validator = jsonschema::validator_for(&schema).expect("the schema compiles");
 
@@ -242,8 +248,9 @@ fn the_pack_serves_the_committed_documents_byte_for_byte() {
         for record in provider.operations() {
             operations += 1;
             seen += 1;
-            let sliced: Value = serde_json::from_str(record.record())
-                .unwrap_or_else(|error| panic!("`{}`'s pack record is not JSON: {error}", record.id()));
+            let sliced: Value = serde_json::from_str(record.record()).unwrap_or_else(|error| {
+                panic!("`{}`'s pack record is not JSON: {error}", record.id())
+            });
             let carried = declared
                 .iter()
                 .find(|operation| operation["id"] == sliced["id"])
@@ -578,8 +585,8 @@ fn method_word(method: connector_spec::HttpMethod) -> &'static str {
 #[test]
 fn spec_backed_coverage_holds_in_both_directions() {
     let workspace = Workspace::new(repo_root());
-    let providers =
-        catalog_build::discovery::discover(&workspace, None).expect("the catalogue is discoverable");
+    let providers = catalog_build::discovery::discover(&workspace, None)
+        .expect("the catalogue is discoverable");
 
     let mut spec_backed = 0usize;
     for provider in &providers {
@@ -600,7 +607,11 @@ fn spec_backed_coverage_holds_in_both_directions() {
         let mut operation_ids: BTreeSet<&str> = BTreeSet::new();
         for document in &loaded.ingested {
             for operation in &document.ingested.operations {
-                declared.insert(format!("{} {}", method_word(operation.method), operation.path));
+                declared.insert(format!(
+                    "{} {}",
+                    method_word(operation.method),
+                    operation.path
+                ));
                 operation_ids.insert(operation.operation_id.as_str());
             }
             for diagnostic in &document.ingested.diagnostics {
@@ -709,4 +720,212 @@ fn a_full_build_leaves_no_orphaned_artifact() {
         "committed files under an artifact root that no plan claims:\n{}",
         orphans.join("\n")
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// 9–12. The caller's contract (S-001)
+// ---------------------------------------------------------------------------------------------
+
+/// **Every operation stores the model-facing contract, and every parameter its symbol** (S-001).
+///
+/// The two measured cases that motivated the predecessor's C-552 are pinned by name: babelforce's
+/// dotted `time.start` must carry the normalized symbol `time_start`, and `airtable-record-get`'s
+/// contract description must be the one-line summary *extended* with the error-envelope sentence
+/// — longer than the summary, stating where the vendor's error message lives.
+#[test]
+fn the_document_carries_the_callers_contract() {
+    let (workspace, plan) = full_plan();
+    let mut operations = 0;
+    let mut symbols = 0;
+    for (provider, document) in documents(&workspace, &plan) {
+        for operation in document["operations"].as_array().into_iter().flatten() {
+            operations += 1;
+            let id = operation["id"].as_str().unwrap_or_default();
+            let contract = &operation["contract"];
+            // Present, not necessarily non-empty: an operation whose one-line summary is empty
+            // and that declares no error envelope stores the empty description it has — the
+            // contract carries what the declaration states, it does not invent prose.
+            assert!(
+                contract["description"].is_string(),
+                "`{provider}`'s `{id}` stores no contract description"
+            );
+            let schema = &contract["input_schema"];
+            assert_eq!(
+                schema["type"].as_str(),
+                Some("object"),
+                "`{provider}`'s `{id}` stores a non-object contract input schema"
+            );
+            for param in operation["params"].as_array().into_iter().flatten() {
+                symbols += 1;
+                assert!(
+                    !param["symbol"].as_str().unwrap_or_default().is_empty(),
+                    "`{provider}`'s `{id}` parameter `{}` carries no symbol",
+                    param["name"].as_str().unwrap_or_default()
+                );
+            }
+        }
+    }
+    assert!(operations >= 835, "only {operations} operations checked");
+    assert!(symbols >= 1518, "only {symbols} parameter symbols checked");
+
+    let all = documents(&workspace, &plan);
+    let babelforce = &all["babelforce"];
+    let dotted = babelforce["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|op| op["params"].as_array().into_iter().flatten())
+        .find(|param| param["name"] == "time.start")
+        .expect("babelforce declares the dotted `time.start`");
+    assert_eq!(dotted["symbol"], "time_start");
+
+    let airtable = &all["airtable"];
+    let record_get = airtable["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|op| op["id"] == "airtable-record-get")
+        .expect("airtable-record-get is shipped");
+    let summary = record_get["description"].as_str().unwrap();
+    let extended = record_get["contract"]["description"].as_str().unwrap();
+    assert!(extended.starts_with(summary.trim_end_matches('.')));
+    assert!(extended.len() > summary.len());
+    assert!(extended.contains("A non-2xx response is returned as data"));
+}
+
+/// **The two places the document states a symbol agree** (S-001): the contract's `input_schema`
+/// is keyed by exactly the declared params' symbols, its `required` list is those symbols in
+/// declaration order, and no two parameters of one operation share a symbol. A lowering bug that
+/// let the schema keys drift from the params would ship a contract a caller cannot satisfy.
+#[test]
+fn the_contract_and_the_params_state_the_same_symbols() {
+    let (workspace, plan) = full_plan();
+    let mut compared = 0;
+    for (provider, document) in documents(&workspace, &plan) {
+        for operation in document["operations"].as_array().into_iter().flatten() {
+            let id = operation["id"].as_str().unwrap_or_default();
+            let declared: Vec<&str> = operation["params"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|param| param["symbol"].as_str().unwrap_or_default())
+                .collect();
+            let unique: BTreeSet<&str> = declared.iter().copied().collect();
+            assert_eq!(
+                unique.len(),
+                declared.len(),
+                "`{provider}`'s `{id}` hands one symbol to two parameters"
+            );
+            let required: Vec<&str> = operation["contract"]["input_schema"]["required"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .map(|value| value.as_str().unwrap_or_default())
+                .collect();
+            assert_eq!(
+                required, declared,
+                "`{provider}`'s `{id}` contract requires different symbols than its params declare"
+            );
+            let keys: BTreeSet<&str> = operation["contract"]["input_schema"]["properties"]
+                .as_object()
+                .map(|properties| properties.keys().map(String::as_str).collect())
+                .unwrap_or_default();
+            assert_eq!(
+                keys, unique,
+                "`{provider}`'s `{id}` contract is keyed by symbols its params do not declare"
+            );
+            compared += 1;
+        }
+    }
+    assert!(compared >= 835, "only {compared} operations compared");
+}
+
+/// **A `format = "origin"` field's variable lands on exactly `["origin"]`** (S-001; the
+/// predecessor's C-538 open question 3). The format promises "swap the whole authority"; a
+/// variable bound inside a larger authority (`https://{v}.x/`) would lower to `host` instead, and
+/// silently dropping Origin→Host is the failure this gate turns red. Asserted beside the loader's
+/// own IR-layer refusal, over the artifact a consumer actually reads.
+#[test]
+fn every_format_origin_field_lowers_to_the_origin_slot() {
+    let (workspace, plan) = full_plan();
+    let mut checked = 0;
+    for (provider, document) in documents(&workspace, &plan) {
+        for field in document["config"].as_array().into_iter().flatten() {
+            if field["format"] != "origin" {
+                continue;
+            }
+            let mut variables: Vec<&str> = Vec::new();
+            for bound in std::iter::once(&field["binds"])
+                .chain(field["also_binds"].as_array().into_iter().flatten())
+            {
+                let bound = bound.as_str().unwrap_or_default();
+                if let Some(variable) = bound.strip_prefix("endpoint.") {
+                    variables.push(variable);
+                }
+            }
+            assert!(
+                !variables.is_empty(),
+                "`{provider}`'s origin field `{}` binds no endpoint variable",
+                field["name"].as_str().unwrap_or_default()
+            );
+            for operation in document["operations"].as_array().into_iter().flatten() {
+                let Some(endpoint) = operation["endpoint"].as_object() else {
+                    continue;
+                };
+                for variable in &variables {
+                    let Some(slots) = endpoint.get(*variable) else {
+                        continue;
+                    };
+                    assert_eq!(
+                        slots,
+                        &serde_json::json!(["origin"]),
+                        "`{provider}`'s `{}` lowers origin variable `{variable}` to {slots}",
+                        operation["id"].as_str().unwrap_or_default()
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        checked > 0,
+        "no origin binding was checked — the gate is blind"
+    );
+}
+
+/// **The stored `credential_requirement` agrees with the effective `auth` list** (S-001):
+/// `declared` exactly when the list is non-empty, and the empty side carries one of the two
+/// distinction tokens. The distinction itself — declared-empty versus never-declared — is not
+/// re-derivable from the document, which is the point; what is checkable is that the token and
+/// the list never contradict each other.
+#[test]
+fn the_credential_requirement_agrees_with_the_auth_list() {
+    let (workspace, plan) = full_plan();
+    let mut checked = 0;
+    for (provider, document) in documents(&workspace, &plan) {
+        for operation in document["operations"].as_array().into_iter().flatten() {
+            let id = operation["id"].as_str().unwrap_or_default();
+            let token = operation["credential_requirement"]
+                .as_str()
+                .unwrap_or_default();
+            let declared = !operation["auth"]
+                .as_array()
+                .map(Vec::is_empty)
+                .unwrap_or(true);
+            if declared {
+                assert_eq!(
+                    token, "declared",
+                    "`{provider}`'s `{id}` authenticates but claims `{token}`"
+                );
+            } else {
+                assert!(
+                    token == "no-credential-required" || token == "no-credential",
+                    "`{provider}`'s `{id}` has an empty auth list but claims `{token}`"
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked >= 835, "only {checked} operations checked");
 }

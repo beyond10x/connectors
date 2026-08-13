@@ -29,6 +29,15 @@
           "openrouter.api_key"
         ]
       ],
+      "contract": {
+        "description": "List every model OpenRouter routes to, with its context length, modalities and per-token pricing",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every model OpenRouter routes to, with its context length, modalities and per-token pricing",
       "direction": "read",
       "expose": true,
@@ -63,6 +72,25 @@
           "openrouter.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the upstream provider endpoints serving one model, with each one's pricing, context length and quantization",
+        "input_schema": {
+          "properties": {
+            "author": {
+              "type": "string"
+            },
+            "slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "author",
+            "slug"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the upstream provider endpoints serving one model, with each one's pricing, context length and quantization",
       "direction": "read",
       "expose": true,
@@ -77,7 +105,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "author"
         },
         {
           "description": "The model slug, the part of a model id after the `/` — e.g. `gpt-4`, `claude-3.5-sonnet`",
@@ -87,7 +116,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "slug"
         }
       ],
       "request": {
@@ -116,6 +146,30 @@
           "openrouter.api_key"
         ]
       ],
+      "contract": {
+        "description": "Create a chat completion through OpenRouter, routed to the named model. Billed per input and output token, so the caller must state a token budget via max_completion_tokens",
+        "input_schema": {
+          "properties": {
+            "max_completion_tokens": {
+              "type": "number"
+            },
+            "messages": {
+              "items": {},
+              "type": "array"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "model",
+            "messages",
+            "max_completion_tokens"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a chat completion through OpenRouter, routed to the named model. Billed per input and output token, so the caller must state a token budget via max_completion_tokens",
       "direction": "write",
       "expose": true,
@@ -130,7 +184,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "model"
         },
         {
           "description": "The conversation so far: a list of `{role, content}` objects, where role is one of system, developer, user, assistant or tool",
@@ -143,7 +198,8 @@
             },
             "minItems": 1,
             "type": "array"
-          }
+          },
+          "symbol": "messages"
         },
         {
           "description": "Upper bound on generated tokens, including reasoning tokens. Required by this connector so that every call states its cost bound",
@@ -153,7 +209,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "max_completion_tokens"
         }
       ],
       "request": {
@@ -245,6 +302,15 @@
           "openrouter.api_key"
         ]
       ],
+      "contract": {
+        "description": "Read the account's total purchased credits and total usage, in credit units",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read the account's total purchased credits and total usage, in credit units",
       "direction": "read",
       "expose": true,

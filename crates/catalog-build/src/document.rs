@@ -248,6 +248,21 @@ struct DocOperation<'a> {
     /// The **effective** requirement — the inheritance rule already resolved, so a consumer never
     /// re-implements it.
     auth: Vec<Vec<&'a str>>,
+    /// What the effective `auth` list cannot say when it is empty (S-001): whether the connector
+    /// **declared** that nothing is required (`auth = []`, `no-credential-required`) or simply
+    /// declared nothing anywhere (`no-credential`, the fail-closed reading). Published as data —
+    /// C-206's tokens — so no consumer resolves the connector default to reconstruct it.
+    credential_requirement: &'static str,
+    /// The model-facing **contract** projection: the error-envelope-extended description and the
+    /// lowered, caller-typed input schema (S-001; predecessor C-552). Stored so a consumer builds
+    /// the caller's contract from document data alone, with no parse of any source form.
+    contract: DocContract,
+    /// The minting join, when this operation's call mints a declared credential (S-001): which
+    /// credential the value is stored as, and where in the response body the secret arrives. No
+    /// shipped connector declares one yet; the field exists so `Acquisition::Minted` is reachable
+    /// from the document rather than only from the provider TOML.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    produces_credential: Option<DocProducedCredential<'a>>,
     request: DocRequest<'a>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     params: Vec<DocParam<'a>>,
@@ -308,10 +323,39 @@ struct DocFormField {
     required: bool,
 }
 
+/// The model-facing contract projection stored per operation — the caller contract's description
+/// and input schema, exactly as [`crate::contract`] computes them (S-001; predecessor C-552).
+#[derive(Serialize)]
+struct DocContract {
+    /// The error-envelope-extended description a model receives — not the operation's one-line
+    /// `description` summary above.
+    description: String,
+    /// The lowered, caller-typed input schema, keyed by caller-facing symbols.
+    input_schema: Value,
+}
+
+/// The minting join (S-001): the fact the provider TOML's `produces_credential` block declares,
+/// carried onto the canonical document so a consumer can construct the mint without reading TOML.
+#[derive(Serialize)]
+struct DocProducedCredential<'a> {
+    /// Which declared credential the minted value is stored as — an auth method name,
+    /// e.g. `babelforce.access_token`.
+    credential: &'a str,
+    /// Where the secret arrives in the vendor's response body — one JSON Pointer, `/access_token`.
+    secret: &'a str,
+}
+
 #[derive(Serialize)]
 struct DocParam<'a> {
     name: &'a str,
     position: &'static str,
+    /// The caller-facing symbol the document's contract declares this parameter by (S-001): the
+    /// name a caller and a model address it under. The document `name` is the IR spelling
+    /// (`time.start`); this is `time_start`. Computed by the one allocator
+    /// (`connector_spec::names`), which reserves a symbol for every body parameter —
+    /// `const`-pinned ones included — so a later parameter cannot silently reclaim a `const`
+    /// field's symbol (the predecessor's ADJACENT-2 trap).
+    symbol: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     wire: Option<&'a str>,
     #[serde(skip_serializing_if = "str::is_empty")]
@@ -750,7 +794,11 @@ fn doc_operation<'a>(
 ) -> Result<DocOperation<'a>> {
     let pins = pins_of(connector, operation);
 
-    let params = doc_params(operation);
+    // The caller-facing symbols and the model-facing contract, computed here at build and stored
+    // as data (S-001; predecessor C-552) so no consumer reproduces the allocation or the lowering.
+    let contract = crate::contract::contract_of(operation)?;
+
+    let params = doc_params(operation, &contract.symbols)?;
     let request = request_template(operation, &pins)?;
     let endpoint = endpoint_slots(connector, operation, &pins)?;
 
@@ -771,6 +819,17 @@ fn doc_operation<'a>(
         semantic_effects: &operation.semantic_effects,
         expose: operation.expose,
         auth: requirements(connector.effective_auth(operation)),
+        credential_requirement: credential_requirement(connector, operation),
+        contract: DocContract {
+            description: contract.description,
+            input_schema: contract.input_schema,
+        },
+        produces_credential: operation.produces_credential.as_ref().map(|produced| {
+            DocProducedCredential {
+                credential: &produced.credential,
+                secret: &produced.secret,
+            }
+        }),
         request,
         params,
         // The *effective* schema, so a credential-minting operation's document promises the
@@ -781,11 +840,29 @@ fn doc_operation<'a>(
     })
 }
 
-/// The caller surface: every declared parameter with its structural position. A `const`-pinned
-/// body field is sent but never declared — it lives in the body template, exactly as the emitted
-/// declaration omits it — and a free-form body is one parameter under [`FREE_FORM_BODY`].
-fn doc_params(operation: &Operation) -> Vec<DocParam<'_>> {
+/// The caller surface: every declared parameter with its structural position and its caller-facing
+/// symbol. A `const`-pinned body field is sent but never declared — it lives in the body template,
+/// exactly as the contract omits it — and a free-form body is one parameter under
+/// [`FREE_FORM_BODY`].
+///
+/// `symbols` is [`crate::contract::Contract::symbols`], which omits exactly the same `const`-pinned
+/// body fields this function does, so every declared parameter has an entry. A parameter with no
+/// symbol would be a build the contract and the document disagree about, refused here rather than
+/// shipped.
+fn doc_params<'a>(
+    operation: &'a Operation,
+    symbols: &BTreeMap<String, String>,
+) -> Result<Vec<DocParam<'a>>> {
     let set = &operation.params;
+    let symbol_of = |name: &str| -> Result<String> {
+        symbols.get(name).cloned().ok_or_else(|| {
+            anyhow!(
+                "operation `{}`'s parameter `{name}` has no caller-facing symbol, so the contract \
+                 and the document disagree about its declared parameters",
+                operation.id
+            )
+        })
+    };
     let mut params = Vec::new();
     for (position, group) in [
         ("path", &set.path),
@@ -800,6 +877,7 @@ fn doc_params(operation: &Operation) -> Vec<DocParam<'_>> {
             params.push(DocParam {
                 name: &param.name,
                 position,
+                symbol: symbol_of(&param.name)?,
                 wire: param.wire.as_deref(),
                 description: &param.description,
                 required: param.required,
@@ -811,13 +889,32 @@ fn doc_params(operation: &Operation) -> Vec<DocParam<'_>> {
         params.push(DocParam {
             name: FREE_FORM_BODY,
             position: "body",
+            symbol: symbol_of(FREE_FORM_BODY)?,
             wire: None,
             description: "",
             required: true,
             schema,
         });
     }
-    params
+    Ok(params)
+}
+
+/// The C-206 token for what the effective `auth` list cannot say when it is empty (S-001).
+///
+/// Computed here, where [`Operation::auth`]'s `Option` still distinguishes "declared `auth = []`"
+/// (`Some` and empty — a positive statement that the vendor requires nothing) from "declared
+/// nothing anywhere" (`None` with an empty connector default — the fail-closed reading). The
+/// document's `auth` list is the *effective* requirement, which collapses the two; this field is
+/// the distinction, carried as data. The tokens are C-206's published spellings, frozen with the
+/// predecessor's status contract.
+fn credential_requirement(connector: &Connector, operation: &Operation) -> &'static str {
+    if !connector.effective_auth(operation).is_empty() {
+        "declared"
+    } else if operation.auth.is_some() {
+        "no-credential-required"
+    } else {
+        "no-credential"
+    }
 }
 
 /// An operator-pinned value that applies to this operation, in the emitter's own selection order
@@ -1601,8 +1698,14 @@ pub fn schema() -> &'static Value {
                         "idempotency": { "enum": ["idempotent", "non_idempotent", "conditional"] },
                         "repeatability_condition": { "type": "string" },
                         "semantic_effects": { "type": "array", "items": { "type": "string" } },
+                        "contract": { "$ref": "#/$defs/contract" },
                         "expose": { "type": "boolean" },
                         "auth": { "$ref": "#/$defs/requirements" },
+                        "credential_requirement": {
+                            "description": "What the effective `auth` list cannot say when it is empty (S-001): whether the connector declared that nothing is required (`no-credential-required`) or declared nothing anywhere (`no-credential`, the fail-closed reading). C-206's published tokens, carried as data so no consumer resolves the connector default to reconstruct the distinction.",
+                            "enum": ["declared", "no-credential-required", "no-credential"]
+                        },
+                        "produces_credential": { "$ref": "#/$defs/produces_credential" },
                         "request": { "$ref": "#/$defs/request" },
                         "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
                         "response_schema": { "$ref": "#/$defs/json_schema" },
@@ -1616,7 +1719,27 @@ pub fn schema() -> &'static Value {
                         },
                         "quirks": { "$ref": "#/$defs/quirks" }
                     },
-                    "required": ["id", "service", "direction", "risk", "idempotency", "semantic_effects", "expose", "auth", "request"],
+                    "required": ["id", "service", "direction", "risk", "idempotency", "semantic_effects", "contract", "expose", "auth", "credential_requirement", "request"],
+                    "additionalProperties": false
+                },
+                "contract": {
+                    "description": "The model-facing contract projection (S-001; predecessor C-552): the error-envelope-extended description and the lowered, caller-typed input schema, computed at build time and stored so a consumer builds the caller's contract from document data alone.",
+                    "type": "object",
+                    "properties": {
+                        "description": { "type": "string" },
+                        "input_schema": { "$ref": "#/$defs/json_schema" }
+                    },
+                    "required": ["description", "input_schema"],
+                    "additionalProperties": false
+                },
+                "produces_credential": {
+                    "description": "The minting join (S-001): this operation's call mints a declared credential — which credential the value is stored as, and where in the response body the secret arrives (one JSON Pointer, no wildcard).",
+                    "type": "object",
+                    "properties": {
+                        "credential": { "type": "string", "minLength": 1 },
+                        "secret": { "type": "string", "minLength": 1 }
+                    },
+                    "required": ["credential", "secret"],
                     "additionalProperties": false
                 },
                 "request": {
@@ -1708,12 +1831,17 @@ pub fn schema() -> &'static Value {
                     "properties": {
                         "name": { "type": "string", "minLength": 1 },
                         "position": { "enum": ["path", "query", "header", "body"] },
+                        "symbol": {
+                            "description": "The caller-facing symbol the contract declares this parameter by (S-001): the name a caller addresses it under, which is not its document `name`.",
+                            "type": "string",
+                            "minLength": 1
+                        },
                         "wire": { "type": "string" },
                         "description": { "type": "string" },
                         "required": { "type": "boolean" },
                         "schema": { "$ref": "#/$defs/json_schema" }
                     },
-                    "required": ["name", "position", "required", "schema"],
+                    "required": ["name", "position", "symbol", "required", "schema"],
                     "additionalProperties": false
                 },
                 "quirks": {

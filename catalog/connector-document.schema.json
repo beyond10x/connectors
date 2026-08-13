@@ -362,6 +362,23 @@
       ],
       "type": "object"
     },
+    "contract": {
+      "additionalProperties": false,
+      "description": "The model-facing contract projection (S-001; predecessor C-552): the error-envelope-extended description and the lowered, caller-typed input schema, computed at build time and stored so a consumer builds the caller's contract from document data alone.",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/json_schema"
+        }
+      },
+      "required": [
+        "description",
+        "input_schema"
+      ],
+      "type": "object"
+    },
     "event": {
       "additionalProperties": false,
       "properties": {
@@ -475,6 +492,17 @@
         "auth": {
           "$ref": "#/$defs/requirements"
         },
+        "contract": {
+          "$ref": "#/$defs/contract"
+        },
+        "credential_requirement": {
+          "description": "What the effective `auth` list cannot say when it is empty (S-001): whether the connector declared that nothing is required (`no-credential-required`) or declared nothing anywhere (`no-credential`, the fail-closed reading). C-206's published tokens, carried as data so no consumer resolves the connector default to reconstruct the distinction.",
+          "enum": [
+            "declared",
+            "no-credential-required",
+            "no-credential"
+          ]
+        },
         "description": {
           "type": "string"
         },
@@ -520,6 +548,9 @@
           },
           "type": "array"
         },
+        "produces_credential": {
+          "$ref": "#/$defs/produces_credential"
+        },
         "quirks": {
           "$ref": "#/$defs/quirks"
         },
@@ -558,8 +589,10 @@
         "risk",
         "idempotency",
         "semantic_effects",
+        "contract",
         "expose",
         "auth",
+        "credential_requirement",
         "request"
       ],
       "type": "object"
@@ -588,6 +621,11 @@
         "schema": {
           "$ref": "#/$defs/json_schema"
         },
+        "symbol": {
+          "description": "The caller-facing symbol the contract declares this parameter by (S-001): the name a caller addresses it under, which is not its document `name`.",
+          "minLength": 1,
+          "type": "string"
+        },
         "wire": {
           "type": "string"
         }
@@ -595,6 +633,7 @@
       "required": [
         "name",
         "position",
+        "symbol",
         "required",
         "schema"
       ],
@@ -611,6 +650,25 @@
       },
       "required": [
         "$param"
+      ],
+      "type": "object"
+    },
+    "produces_credential": {
+      "additionalProperties": false,
+      "description": "The minting join (S-001): this operation's call mints a declared credential — which credential the value is stored as, and where in the response body the secret arrives (one JSON Pointer, no wildcard).",
+      "properties": {
+        "credential": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "secret": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "credential",
+        "secret"
       ],
       "type": "object"
     },

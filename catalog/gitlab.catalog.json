@@ -131,6 +131,15 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "Get the currently authenticated user. Takes no parameters; used as the verify read to prove a token resolves",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the currently authenticated user. Takes no parameters; used as the verify read to prove a token resolves",
       "direction": "read",
       "endpoint": {
@@ -190,6 +199,33 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "List the groups the authenticated user is a member of, optionally narrowed by a search term",
+        "input_schema": {
+          "properties": {
+            "min_access_level": {
+              "type": "number"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "search": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "search",
+            "min_access_level",
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the groups the authenticated user is a member of, optionally narrowed by a search term",
       "direction": "read",
       "endpoint": {
@@ -209,7 +245,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "search"
         },
         {
           "description": "Only groups where the user has at least this access level. GitLab's scale: 10 guest, 20 reporter, 30 developer, 40 maintainer, 50 owner",
@@ -225,7 +262,8 @@
               50
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "min_access_level"
         },
         {
           "description": "1-based page number",
@@ -235,7 +273,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Results per page, at most 100",
@@ -246,7 +285,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -331,6 +371,41 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "List projects the authenticated user can reach, optionally narrowed by a search term — this is how a caller obtains the numeric project id every other operation requires",
+        "input_schema": {
+          "properties": {
+            "membership": {
+              "type": "boolean"
+            },
+            "min_access_level": {
+              "type": "number"
+            },
+            "owned": {
+              "type": "boolean"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "search": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "search",
+            "membership",
+            "owned",
+            "min_access_level",
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List projects the authenticated user can reach, optionally narrowed by a search term — this is how a caller obtains the numeric project id every other operation requires",
       "direction": "read",
       "endpoint": {
@@ -350,7 +425,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "search"
         },
         {
           "description": "Limit to projects the authenticated user is a member of",
@@ -359,7 +435,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "membership"
         },
         {
           "description": "Limit to projects the authenticated user owns",
@@ -368,7 +445,8 @@
           "required": false,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "owned"
         },
         {
           "description": "Only projects where the user has at least this access level. GitLab's scale: 10 guest, 20 reporter, 30 developer, 40 maintainer, 50 owner",
@@ -384,7 +462,8 @@
               50
             ],
             "type": "integer"
-          }
+          },
+          "symbol": "min_access_level"
         },
         {
           "description": "1-based page number",
@@ -394,7 +473,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Results per page, at most 100",
@@ -405,7 +485,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -513,6 +594,33 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "List issues in a project, optionally filtered by state, newest activity first",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "state",
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List issues in a project, optionally filtered by state, newest activity first",
       "direction": "read",
       "endpoint": {
@@ -532,7 +640,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "Filter by issue state",
@@ -545,7 +654,8 @@
               "closed"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "state"
         },
         {
           "description": "1-based page number",
@@ -555,7 +665,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Results per page",
@@ -566,7 +677,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -694,6 +806,25 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "Get one issue by its project-scoped number (iid), not its global id",
+        "input_schema": {
+          "properties": {
+            "issue_iid": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id",
+            "issue_iid"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one issue by its project-scoped number (iid), not its global id",
       "direction": "read",
       "endpoint": {
@@ -713,7 +844,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "The project-scoped issue number — the number shown in GitLab's UI and in the issue's URL, not the global id",
@@ -723,7 +855,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "issue_iid"
         }
       ],
       "request": {
@@ -827,6 +960,33 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "Open a new issue on a project. Visible immediately to everyone with access to the project (the whole world, if the project is public) and notifies its watchers",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "labels": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "title",
+            "description",
+            "labels"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Open a new issue on a project. Visible immediately to everyone with access to the project (the whole world, if the project is public) and notifies its watchers",
       "direction": "write",
       "endpoint": {
@@ -846,7 +1006,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "The issue title; the only required field",
@@ -856,7 +1017,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "title"
         },
         {
           "description": "The issue body as Markdown",
@@ -865,7 +1027,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "description"
         },
         {
           "description": "Comma-separated label names, e.g. \"bug,urgent\" — GitLab's issue-create endpoint takes labels as one comma-separated string, not an array. A name the project does not have yet is created",
@@ -874,7 +1037,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "labels"
         }
       ],
       "request": {
@@ -964,6 +1128,33 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "List merge requests in a project, optionally filtered by state, newest activity first",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "state",
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List merge requests in a project, optionally filtered by state, newest activity first",
       "direction": "read",
       "endpoint": {
@@ -983,7 +1174,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "Filter by merge request state. Omit to list every state",
@@ -998,7 +1190,8 @@
               "merged"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "state"
         },
         {
           "description": "1-based page number",
@@ -1008,7 +1201,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Results per page",
@@ -1019,7 +1213,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {
@@ -1142,6 +1337,25 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "Get one CI/CD pipeline's status and timing by its id",
+        "input_schema": {
+          "properties": {
+            "pipeline_id": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id",
+            "pipeline_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one CI/CD pipeline's status and timing by its id",
       "direction": "read",
       "endpoint": {
@@ -1161,7 +1375,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "The pipeline's numeric id, as shown in its GitLab CI/CD URL",
@@ -1171,7 +1386,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "pipeline_id"
         }
       ],
       "request": {
@@ -1267,6 +1483,29 @@
           "gitlab.token"
         ]
       ],
+      "contract": {
+        "description": "List a project's repository branches",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id",
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a project's repository branches",
       "direction": "read",
       "endpoint": {
@@ -1286,7 +1525,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         },
         {
           "description": "1-based page number",
@@ -1296,7 +1536,8 @@
           "schema": {
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         },
         {
           "description": "Results per page",
@@ -1307,7 +1548,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         }
       ],
       "request": {

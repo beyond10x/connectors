@@ -52,11 +52,15 @@ fn the_lookup_surface_and_every_operation_field_are_reachable() {
         credentials,
         credential_requirement,
         hosts,
+        contract_description,
+        input_schema,
+        expose,
         ..
     } = *operation;
     let _: (&str, &str, &str, &str) = (id, owner, service, description);
     let _: OperationDirection = direction;
     let _: (&[&str], &[&[&str]], &[&str]) = (semantic_effects, credentials, hosts);
+    let _: (&str, &str, bool) = (contract_description, input_schema, expose);
     assert!(!risk.as_str().is_empty());
     assert!(!idempotency.as_str().is_empty());
     assert!(!direction.as_str().is_empty());
@@ -422,5 +426,43 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
         for field in provider.config {
             read_config(*field);
         }
+    }
+}
+
+/// **The complete caller-facing contract is document data alone** (S-001).
+///
+/// The consumer path this test names is `catalog::operation(key)` → the four contract fields —
+/// `id`, `contract_description`, `input_schema`, `expose` — and the absence it proves is a source
+/// parser: this crate's dependency set contains no provider-TOML loader, no OpenAPI ingest and no
+/// TOML parser at all, so nothing on the path from the pack to these fields *can* parse a source
+/// form. The predecessor recovered the same three values by parsing emitted Flux; S-001 stores
+/// them in the document, and this is the consumer-side half of that closure.
+#[test]
+fn the_caller_contract_is_document_data_alone() {
+    let operation = catalog::operation(OperationKey::id("airtable-record-get"))
+        .expect("airtable-record-get is shipped");
+
+    assert!(operation
+        .contract_description
+        .starts_with("Read one record"));
+    assert!(operation
+        .contract_description
+        .contains("A non-2xx response is returned as data"));
+    assert!(operation.expose);
+
+    let schema: serde_json::Value =
+        serde_json::from_str(operation.input_schema).expect("the stored contract schema is JSON");
+    assert_eq!(schema["type"], "object");
+    assert!(schema["properties"].is_object());
+    assert!(schema["required"].is_array());
+
+    // The named absence: no source-form parser in the dependency closure of this crate.
+    let manifest = include_str!("../../Cargo.toml");
+    for parser in ["connector-spec", "toml", "openapi"] {
+        assert!(
+            !manifest.contains(parser),
+            "crates/catalog depends on `{parser}` — a source parser is reachable from the \
+             consumer path"
+        );
     }
 }

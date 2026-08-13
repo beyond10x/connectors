@@ -97,6 +97,25 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Get one repository's metadata, including its default branch, visibility and permissions",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one repository's metadata, including its default branch, visibility and permissions",
       "direction": "read",
       "expose": true,
@@ -111,7 +130,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The repository name, without the owner prefix",
@@ -121,7 +141,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         }
       ],
       "request": {
@@ -221,6 +242,29 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Get one issue by number. GitHub treats a pull request as an issue, so a PR number returns that PR's issue view; use github-pull-get for its merge and review state",
+        "input_schema": {
+          "properties": {
+            "issue_number": {
+              "type": "number"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "issue_number"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one issue by number. GitHub treats a pull request as an issue, so a PR number returns that PR's issue view; use github-pull-get for its merge and review state",
       "direction": "read",
       "expose": true,
@@ -235,7 +279,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The repository name, without the owner prefix",
@@ -245,7 +290,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The issue number within the repository — the number in its URL, not its global id",
@@ -256,7 +302,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "issue_number"
         }
       ],
       "request": {
@@ -370,6 +417,29 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Get one pull request by number, with its merge state, head and base refs and review counts",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "pull_number": {
+              "type": "number"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one pull request by number, with its merge state, head and base refs and review counts",
       "direction": "read",
       "expose": true,
@@ -384,7 +454,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The repository name, without the owner prefix",
@@ -394,7 +465,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The pull request number within the repository",
@@ -405,7 +477,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "pull_number"
         }
       ],
       "request": {
@@ -513,6 +586,47 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Open a new issue on a repository. The issue is immediately visible to everyone who can see the repository and notifies its subscribers",
+        "input_schema": {
+          "properties": {
+            "assignees": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "body": {
+              "type": "string"
+            },
+            "labels": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "title",
+            "body",
+            "labels",
+            "assignees"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Open a new issue on a repository. The issue is immediately visible to everyone who can see the repository and notifies its subscribers",
       "direction": "write",
       "expose": true,
@@ -527,7 +641,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The repository name, without the owner prefix",
@@ -537,7 +652,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The issue title; the only required field",
@@ -547,7 +663,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "title"
         },
         {
           "description": "The issue body as GitHub-flavoured Markdown",
@@ -556,7 +673,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "body"
         },
         {
           "description": "Label names to apply; a name the repository does not have yet is created",
@@ -569,7 +687,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "labels"
         },
         {
           "description": "User logins to assign; GitHub silently drops any login without push access to the repository",
@@ -582,7 +701,8 @@
               "type": "string"
             },
             "type": "array"
-          }
+          },
+          "symbol": "assignees"
         }
       ],
       "request": {
@@ -689,6 +809,33 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Add a comment to an issue or pull request. The comment is public to everyone who can see the repository and notifies its participants; GitHub has no private or internal comment here",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "issue_number": {
+              "type": "number"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "issue_number",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Add a comment to an issue or pull request. The comment is public to everyone who can see the repository and notifies its participants; GitHub has no private or internal comment here",
       "direction": "write",
       "expose": true,
@@ -703,7 +850,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The repository name, without the owner prefix",
@@ -713,7 +861,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The issue or pull request number to comment on",
@@ -724,7 +873,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "issue_number"
         },
         {
           "description": "The comment text as GitHub-flavoured Markdown; must not be blank",
@@ -734,7 +884,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "request": {
@@ -820,6 +971,33 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List a repository's issues and pull requests with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a repository's issues and pull requests with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -833,7 +1011,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The name of the repository without the `.git` extension. The name is not case sensitive.",
@@ -842,7 +1021,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -852,7 +1032,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -862,7 +1043,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -3545,6 +3727,37 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List the files changed by one pull request with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "pull_number": {
+              "type": "number"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "pull_number",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the files changed by one pull request with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -3558,7 +3771,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The name of the repository without the `.git` extension. The name is not case sensitive.",
@@ -3567,7 +3781,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The number that identifies the pull request.",
@@ -3576,7 +3791,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "pull_number"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -3586,7 +3802,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -3596,7 +3813,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -3700,6 +3918,33 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List a repository's GitHub Actions workflow runs with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a repository's GitHub Actions workflow runs with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -3713,7 +3958,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The name of the repository without the `.git` extension. The name is not case sensitive.",
@@ -3722,7 +3968,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -3732,7 +3979,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -3742,7 +3990,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -5713,6 +5962,33 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List commits in a repository with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "repo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List commits in a repository with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -5726,7 +6002,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "owner"
         },
         {
           "description": "The name of the repository without the `.git` extension. The name is not case sensitive.",
@@ -5735,7 +6012,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "repo"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -5745,7 +6023,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -5755,7 +6034,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -6275,6 +6555,15 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "Get the authenticated user — the identity the configured token acts as",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the authenticated user — the identity the configured token acts as",
       "direction": "read",
       "expose": true,
@@ -6733,6 +7022,25 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List the organisations the authenticated user belongs to, with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the organisations the authenticated user belongs to, with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -6747,7 +7055,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -6757,7 +7066,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -6858,6 +7168,41 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List an organisation's repositories, filtered by type and ordered, with bounded integer pagination",
+        "input_schema": {
+          "properties": {
+            "direction": {
+              "type": "string"
+            },
+            "org": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "sort": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "org",
+            "type",
+            "sort",
+            "direction",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List an organisation's repositories, filtered by type and ordered, with bounded integer pagination",
       "direction": "read",
       "expose": true,
@@ -6871,7 +7216,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "org"
         },
         {
           "description": "Specifies the types of repositories you want returned.",
@@ -6889,7 +7235,8 @@
               "member"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "The property to sort the results by.",
@@ -6905,7 +7252,8 @@
               "full_name"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "sort"
         },
         {
           "description": "The order to sort by. Default: `asc` when using `full_name`, otherwise `desc`.",
@@ -6918,7 +7266,8 @@
               "desc"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "direction"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -6928,7 +7277,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -6938,7 +7288,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {
@@ -7677,6 +8028,45 @@
           "github.token"
         ]
       ],
+      "contract": {
+        "description": "List the repositories the authenticated user can access, filtered by visibility, affiliation and type",
+        "input_schema": {
+          "properties": {
+            "affiliation": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "sort": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "visibility",
+            "affiliation",
+            "type",
+            "sort",
+            "direction",
+            "per_page",
+            "page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the repositories the authenticated user can access, filtered by visibility, affiliation and type",
       "direction": "read",
       "expose": true,
@@ -7696,7 +8086,8 @@
               "private"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "visibility"
         },
         {
           "description": "Comma-separated list of values. Can include:  \n * `owner`: Repositories that are owned by the authenticated user.  \n * `collaborator`: Repositories that the user has been added to as a collaborator.  \n * `organization_member`: Repositories that the user has access to through being a member of an organization. This includes every repository on every team that the user is on.",
@@ -7706,7 +8097,8 @@
           "schema": {
             "default": "owner,collaborator,organization_member",
             "type": "string"
-          }
+          },
+          "symbol": "affiliation"
         },
         {
           "description": "Limit results to repositories of the specified type. Will cause a `422` error if used in the same request as **visibility** or **affiliation**.",
@@ -7723,7 +8115,8 @@
               "member"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "The property to sort the results by.",
@@ -7739,7 +8132,8 @@
               "full_name"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "sort"
         },
         {
           "description": "The order to sort by. Default: `asc` when using `full_name`, otherwise `desc`.",
@@ -7752,7 +8146,8 @@
               "desc"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "direction"
         },
         {
           "description": "The number of results per page (max 100). For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -7762,7 +8157,8 @@
           "schema": {
             "default": 30,
             "type": "integer"
-          }
+          },
+          "symbol": "per_page"
         },
         {
           "description": "The page number of the results to fetch. For more information, see \"[Using pagination in the REST API](https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api).\"",
@@ -7772,7 +8168,8 @@
           "schema": {
             "default": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page"
         }
       ],
       "request": {

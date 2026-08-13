@@ -44,6 +44,15 @@
           "calendly.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get the authenticated user: their own resource URI, name, scheduling slug, account email and current organization. The URI in the response is the value later operations expect as their `user` query parameter",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the authenticated user: their own resource URI, name, scheduling slug, account email and current organization. The URI in the response is the value later operations expect as their `user` query parameter",
       "direction": "read",
       "expose": true,
@@ -111,6 +120,25 @@
           "calendly.access_token"
         ]
       ],
+      "contract": {
+        "description": "List event types owned by a user — the bookable meeting templates (name, duration, scheduling link). Takes the user's own URI, not a bare id",
+        "input_schema": {
+          "properties": {
+            "count": {
+              "type": "number"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user",
+            "count"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List event types owned by a user — the bookable meeting templates (name, duration, scheduling link). Takes the user's own URI, not a bare id",
       "direction": "read",
       "expose": true,
@@ -126,7 +154,8 @@
             "minLength": 33,
             "pattern": "^https://api\\.calendly\\.com/users/[A-Za-z0-9-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "user"
         },
         {
           "description": "Results per page; Calendly caps this at 100",
@@ -138,7 +167,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "count"
         }
       ],
       "request": {
@@ -225,6 +255,29 @@
           "calendly.access_token"
         ]
       ],
+      "contract": {
+        "description": "List a user's scheduled events (past and upcoming bookings). Takes the user's own URI, not a bare id",
+        "input_schema": {
+          "properties": {
+            "count": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user",
+            "status",
+            "count"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a user's scheduled events (past and upcoming bookings). Takes the user's own URI, not a bare id",
       "direction": "read",
       "expose": true,
@@ -240,7 +293,8 @@
             "minLength": 33,
             "pattern": "^https://api\\.calendly\\.com/users/[A-Za-z0-9-]+$",
             "type": "string"
-          }
+          },
+          "symbol": "user"
         },
         {
           "description": "Filter to `active` (not canceled) or `canceled` events",
@@ -253,7 +307,8 @@
               "canceled"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "Results per page; Calendly caps this at 100",
@@ -265,7 +320,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "count"
         }
       ],
       "request": {
@@ -378,6 +434,21 @@
           "calendly.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one scheduled event by id. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/title` in the response body.",
+        "input_schema": {
+          "properties": {
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one scheduled event by id",
       "direction": "read",
       "expose": true,
@@ -394,7 +465,8 @@
             "minLength": 36,
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "type": "string"
-          }
+          },
+          "symbol": "uuid"
         }
       ],
       "quirks": {
@@ -485,6 +557,29 @@
           "calendly.access_token"
         ]
       ],
+      "contract": {
+        "description": "List a scheduled event's invitees. Each invitee is personal data about a named third party — their name, email and any answers they gave to the event type's custom questions. Read it only for what the calling flow needs and do not persist or repeat it beyond that. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/title` in the response body.",
+        "input_schema": {
+          "properties": {
+            "count": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "status",
+            "count"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a scheduled event's invitees. Each invitee is personal data about a named third party — their name, email and any answers they gave to the event type's custom questions. Read it only for what the calling flow needs and do not persist or repeat it beyond that",
       "direction": "read",
       "expose": true,
@@ -501,7 +596,8 @@
             "minLength": 36,
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "type": "string"
-          }
+          },
+          "symbol": "uuid"
         },
         {
           "description": "Filter to `active` (not canceled) or `canceled` invitees",
@@ -514,7 +610,8 @@
               "canceled"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "status"
         },
         {
           "description": "Results per page; Calendly caps this at 100",
@@ -526,7 +623,8 @@
             "maximum": 100,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "count"
         }
       ],
       "quirks": {

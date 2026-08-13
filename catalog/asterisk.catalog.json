@@ -9246,6 +9246,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all applications.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all applications.",
       "direction": "read",
       "endpoint": {
@@ -9336,6 +9345,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Response pong message.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Response pong message.",
       "direction": "read",
       "endpoint": {
@@ -9383,6 +9401,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all active bridges in Asterisk.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all active bridges in Asterisk.",
       "direction": "read",
       "endpoint": {
@@ -9479,6 +9506,31 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create a new bridge.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "type",
+            "bridgeId",
+            "name",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new bridge.",
       "direction": "write",
       "endpoint": {
@@ -9497,7 +9549,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "Unique ID to give to the bridge being created.",
@@ -9506,7 +9559,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "Name to give to the bridge being created.",
@@ -9515,7 +9569,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "name": "variables",
@@ -9524,7 +9579,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -9641,6 +9697,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Shut down a bridge.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Shut down a bridge.",
       "direction": "write",
       "endpoint": {
@@ -9659,7 +9730,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         }
       ],
       "request": {
@@ -9676,6 +9748,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all active channels in Asterisk.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all active channels in Asterisk.",
       "direction": "read",
       "endpoint": {
@@ -9840,6 +9921,71 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create a new channel (originate).",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "callerId": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "context": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "extension": {
+              "type": "string"
+            },
+            "formats": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "originator": {
+              "type": "string"
+            },
+            "otherChannelId": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "timeout": {
+              "type": "number"
+            },
+            "variables": {}
+          },
+          "required": [
+            "endpoint",
+            "extension",
+            "context",
+            "priority",
+            "label",
+            "app",
+            "appArgs",
+            "callerId",
+            "timeout",
+            "channelId",
+            "otherChannelId",
+            "originator",
+            "formats",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new channel (originate).",
       "direction": "write",
       "endpoint": {
@@ -9858,7 +10004,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "endpoint"
         },
         {
           "description": "The extension to dial after the endpoint answers. Mutually exclusive with 'app'.",
@@ -9867,7 +10014,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "extension"
         },
         {
           "description": "The context to dial after the endpoint answers. If omitted, uses 'default'. Mutually exclusive with 'app'.",
@@ -9876,7 +10024,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "context"
         },
         {
           "description": "The priority to dial after the endpoint answers. If omitted, uses 1. Mutually exclusive with 'app'.",
@@ -9886,7 +10035,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "The label to dial after the endpoint answers. Will supersede 'priority' if provided. Mutually exclusive with 'app'.",
@@ -9895,7 +10045,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "label"
         },
         {
           "description": "The application that is subscribed to the originated channel. When the channel is answered, it will be passed to this Stasis application. Mutually exclusive with 'context', 'extension', 'priority', and 'label'.",
@@ -9904,7 +10055,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application provided by 'app'. Mutually exclusive with 'context', 'extension', 'priority', and 'label'.",
@@ -9913,7 +10065,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         },
         {
           "description": "CallerID to use when dialing the endpoint or extension.",
@@ -9922,7 +10075,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "callerId"
         },
         {
           "description": "Timeout (in seconds) before giving up dialing, or -1 for no timeout.",
@@ -9933,7 +10087,8 @@
             "default": 30,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "timeout"
         },
         {
           "description": "The unique id to assign the channel on creation.",
@@ -9942,7 +10097,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The unique id to assign the second channel when using local channels.",
@@ -9951,7 +10107,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "otherChannelId"
         },
         {
           "description": "The unique id of the channel which is originating this one.",
@@ -9960,7 +10117,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "originator"
         },
         {
           "description": "The format name capability list to use if originator is not specified. Ex. \"ulaw,slin16\".  Format names can be found with \"core show codecs\".",
@@ -9969,7 +10127,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "formats"
         },
         {
           "name": "variables",
@@ -9978,7 +10137,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -10223,6 +10383,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Delete (i.e. hangup) a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "reason_code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "reason_code",
+            "reason"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete (i.e. hangup) a channel.",
       "direction": "write",
       "endpoint": {
@@ -10241,7 +10424,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The reason code for hanging up the channel for detail use. Mutually exclusive with 'reason'. See detail hangup codes at here. https://docs.asterisk.org/Configuration/Miscellaneous/Hangup-Cause-Mappings/",
@@ -10250,7 +10434,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "reason_code"
         },
         {
           "description": "Reason for hanging up the channel for simple use. Mutually exclusive with 'reason_code'.",
@@ -10274,7 +10459,8 @@
               "answered_elsewhere"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "reason"
         }
       ],
       "request": {
@@ -10305,6 +10491,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all ARI controlled device states.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all ARI controlled device states.",
       "direction": "read",
       "endpoint": {
@@ -10361,6 +10556,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all endpoints.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all endpoints.",
       "direction": "read",
       "endpoint": {
@@ -10423,6 +10627,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all mailboxes.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all mailboxes.",
       "direction": "read",
       "endpoint": {
@@ -10475,6 +10688,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get a playback's details.",
+        "input_schema": {
+          "properties": {
+            "playbackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "playbackId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get a playback's details.",
       "direction": "read",
       "endpoint": {
@@ -10493,7 +10721,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "playbackId"
         }
       ],
       "request": {
@@ -10553,6 +10782,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop a playback.",
+        "input_schema": {
+          "properties": {
+            "playbackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "playbackId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop a playback.",
       "direction": "write",
       "endpoint": {
@@ -10571,7 +10815,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "playbackId"
         }
       ],
       "request": {
@@ -10588,6 +10833,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List recordings that are complete.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List recordings that are complete.",
       "direction": "read",
       "endpoint": {
@@ -10631,6 +10885,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List all sounds.",
+        "input_schema": {
+          "properties": {
+            "format": {
+              "type": "string"
+            },
+            "lang": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "lang",
+            "format"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List all sounds.",
       "direction": "read",
       "endpoint": {
@@ -10649,7 +10922,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "lang"
         },
         {
           "description": "Lookup sound in a specific format.",
@@ -10658,7 +10932,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "format"
         }
       ],
       "request": {
@@ -10730,6 +11005,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get details of an application.",
+        "input_schema": {
+          "properties": {
+            "applicationName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "applicationName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get details of an application.",
       "direction": "read",
       "endpoint": {
@@ -10748,7 +11038,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "applicationName"
         }
       ],
       "request": {
@@ -10828,6 +11119,23 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Filter application events types.",
+        "input_schema": {
+          "properties": {
+            "applicationName": {
+              "type": "string"
+            },
+            "body": {}
+          },
+          "required": [
+            "applicationName",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Filter application events types.",
       "direction": "write",
       "endpoint": {
@@ -10846,7 +11154,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "applicationName"
         },
         {
           "name": "body",
@@ -10855,7 +11164,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "body"
         }
       ],
       "request": {
@@ -10944,6 +11254,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Retrieve a dynamic configuration object.",
+        "input_schema": {
+          "properties": {
+            "configClass": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "objectType": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "configClass",
+            "objectType",
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve a dynamic configuration object.",
       "direction": "read",
       "endpoint": {
@@ -10962,7 +11295,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "configClass"
         },
         {
           "description": "The type of configuration object to retrieve.",
@@ -10971,7 +11305,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "objectType"
         },
         {
           "description": "The unique identifier of the object to retrieve.",
@@ -10980,7 +11315,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -11018,6 +11354,31 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create or update a dynamic configuration object.",
+        "input_schema": {
+          "properties": {
+            "configClass": {
+              "type": "string"
+            },
+            "fields": {},
+            "id": {
+              "type": "string"
+            },
+            "objectType": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "configClass",
+            "objectType",
+            "id",
+            "fields"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create or update a dynamic configuration object.",
       "direction": "write",
       "endpoint": {
@@ -11036,7 +11397,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "configClass"
         },
         {
           "description": "The type of configuration object to create or update.",
@@ -11045,7 +11407,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "objectType"
         },
         {
           "description": "The unique identifier of the object to create or update.",
@@ -11054,7 +11417,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "id"
         },
         {
           "name": "fields",
@@ -11063,7 +11427,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "fields"
         }
       ],
       "request": {
@@ -11112,6 +11477,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Delete a dynamic configuration object.",
+        "input_schema": {
+          "properties": {
+            "configClass": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "objectType": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "configClass",
+            "objectType",
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete a dynamic configuration object.",
       "direction": "write",
       "endpoint": {
@@ -11130,7 +11518,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "configClass"
         },
         {
           "description": "The type of configuration object to delete.",
@@ -11139,7 +11528,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "objectType"
         },
         {
           "description": "The unique identifier of the object to delete.",
@@ -11148,7 +11538,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -11165,6 +11556,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Gets Asterisk log channel information.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Gets Asterisk log channel information.",
       "direction": "read",
       "endpoint": {
@@ -11220,6 +11620,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Adds a log channel.",
+        "input_schema": {
+          "properties": {
+            "configuration": {
+              "type": "string"
+            },
+            "logChannelName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "logChannelName",
+            "configuration"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Adds a log channel.",
       "direction": "write",
       "endpoint": {
@@ -11238,7 +11657,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "logChannelName"
         },
         {
           "description": "levels of the log channel",
@@ -11247,7 +11667,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "configuration"
         }
       ],
       "request": {
@@ -11272,6 +11693,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Deletes a log channel.",
+        "input_schema": {
+          "properties": {
+            "logChannelName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "logChannelName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Deletes a log channel.",
       "direction": "write",
       "endpoint": {
@@ -11290,7 +11726,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "logChannelName"
         }
       ],
       "request": {
@@ -11307,6 +11744,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Rotates a log channel.",
+        "input_schema": {
+          "properties": {
+            "logChannelName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "logChannelName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Rotates a log channel.",
       "direction": "write",
       "endpoint": {
@@ -11325,7 +11777,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "logChannelName"
         }
       ],
       "request": {
@@ -11342,6 +11795,15 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List Asterisk modules.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List Asterisk modules.",
       "direction": "read",
       "endpoint": {
@@ -11403,6 +11865,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get Asterisk module information.",
+        "input_schema": {
+          "properties": {
+            "moduleName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "moduleName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get Asterisk module information.",
       "direction": "read",
       "endpoint": {
@@ -11421,7 +11898,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "moduleName"
         }
       ],
       "request": {
@@ -11472,6 +11950,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Load an Asterisk module.",
+        "input_schema": {
+          "properties": {
+            "moduleName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "moduleName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Load an Asterisk module.",
       "direction": "write",
       "endpoint": {
@@ -11490,7 +11983,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "moduleName"
         }
       ],
       "request": {
@@ -11507,6 +12001,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Reload an Asterisk module.",
+        "input_schema": {
+          "properties": {
+            "moduleName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "moduleName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Reload an Asterisk module.",
       "direction": "write",
       "endpoint": {
@@ -11525,7 +12034,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "moduleName"
         }
       ],
       "request": {
@@ -11542,6 +12052,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Unload an Asterisk module.",
+        "input_schema": {
+          "properties": {
+            "moduleName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "moduleName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Unload an Asterisk module.",
       "direction": "write",
       "endpoint": {
@@ -11560,7 +12085,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "moduleName"
         }
       ],
       "request": {
@@ -11577,6 +12103,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get the value of a global variable.",
+        "input_schema": {
+          "properties": {
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "variable"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the value of a global variable.",
       "direction": "read",
       "endpoint": {
@@ -11595,7 +12136,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         }
       ],
       "request": {
@@ -11633,6 +12175,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set the value of a global variable.",
+        "input_schema": {
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "variable",
+            "value"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set the value of a global variable.",
       "direction": "write",
       "endpoint": {
@@ -11651,7 +12212,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         },
         {
           "description": "The value to set the variable to",
@@ -11660,7 +12222,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "value"
         }
       ],
       "request": {
@@ -11691,6 +12254,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get bridge details.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get bridge details.",
       "direction": "read",
       "endpoint": {
@@ -11709,7 +12287,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         }
       ],
       "request": {
@@ -11795,6 +12374,31 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create a new bridge.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "bridgeId",
+            "type",
+            "name",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new bridge.",
       "direction": "write",
       "endpoint": {
@@ -11813,7 +12417,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "Comma separated list of bridge type attributes (mixing, holding, dtmf_events, proxy_media, video_sfu, video_single, sdp_label) to set.",
@@ -11822,7 +12427,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "type"
         },
         {
           "description": "Set the name of the bridge.",
@@ -11831,7 +12437,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "name": "variables",
@@ -11840,7 +12447,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -11951,6 +12559,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Play music on hold to a bridge or change the MOH class that is playing.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "mohClass": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId",
+            "mohClass"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Play music on hold to a bridge or change the MOH class that is playing.",
       "direction": "write",
       "endpoint": {
@@ -11969,7 +12596,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "Channel's id",
@@ -11978,7 +12606,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mohClass"
         }
       ],
       "request": {
@@ -12003,6 +12632,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop playing music on hold to a bridge.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop playing music on hold to a bridge.",
       "direction": "write",
       "endpoint": {
@@ -12021,7 +12665,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         }
       ],
       "request": {
@@ -12038,6 +12683,53 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Start a recording.",
+        "input_schema": {
+          "properties": {
+            "beep": {
+              "type": "boolean"
+            },
+            "bridgeId": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string"
+            },
+            "ifExists": {
+              "type": "string"
+            },
+            "maxDurationSeconds": {
+              "type": "number"
+            },
+            "maxSilenceSeconds": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "recorder_format": {
+              "type": "string"
+            },
+            "terminateOn": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId",
+            "name",
+            "format",
+            "recorder_format",
+            "maxDurationSeconds",
+            "maxSilenceSeconds",
+            "ifExists",
+            "beep",
+            "terminateOn"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start a recording.",
       "direction": "write",
       "endpoint": {
@@ -12056,7 +12748,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "Recording's filename",
@@ -12065,7 +12758,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "Format to encode audio in",
@@ -12074,7 +12768,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "format"
         },
         {
           "description": "Format of the 'Recorder' channel attached to the bridge. Defaults to the same format as the 'format' parameter.",
@@ -12083,7 +12778,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recorder_format"
         },
         {
           "description": "Maximum duration of the recording, in seconds. 0 for no limit.",
@@ -12095,7 +12791,8 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "maxDurationSeconds"
         },
         {
           "description": "Maximum duration of silence, in seconds. 0 for no limit.",
@@ -12107,7 +12804,8 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "maxSilenceSeconds"
         },
         {
           "description": "Action to take if a recording with the same name already exists.",
@@ -12122,7 +12820,8 @@
               "append"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "ifExists"
         },
         {
           "description": "Play beep when recording begins",
@@ -12132,7 +12831,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "beep"
         },
         {
           "description": "DTMF input to terminate recording.",
@@ -12148,7 +12848,8 @@
               "#"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "terminateOn"
         }
       ],
       "request": {
@@ -12269,6 +12970,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get the value of a bridge variable or function.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId",
+            "variable"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the value of a bridge variable or function.",
       "direction": "read",
       "endpoint": {
@@ -12287,7 +13007,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "The bridge variable or function to get",
@@ -12296,7 +13017,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         }
       ],
       "request": {
@@ -12334,6 +13056,33 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set the value of a bridge variable or function.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "report_events": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId",
+            "variable",
+            "value",
+            "report_events"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set the value of a bridge variable or function.",
       "direction": "write",
       "endpoint": {
@@ -12352,7 +13101,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "The bridge variable or function to set",
@@ -12361,7 +13111,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         },
         {
           "description": "The value to set the variable to",
@@ -12370,7 +13121,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "value"
         },
         {
           "description": "Whether this variable should be included in bridge events. Defaults to false.",
@@ -12380,7 +13132,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "report_events"
         }
       ],
       "request": {
@@ -12417,6 +13170,23 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set the values of multiple bridge variables or functions.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "bridgeId",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set the values of multiple bridge variables or functions.",
       "direction": "write",
       "endpoint": {
@@ -12435,7 +13205,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "name": "variables",
@@ -12444,7 +13215,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -12472,6 +13244,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Removes any explicit video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants. When no explicit video source is set, talk detection will be used to determine the active video stream.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Removes any explicit video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants. When no explicit video source is set, talk detection will be used to determine the active video stream.",
       "direction": "write",
       "endpoint": {
@@ -12490,7 +13277,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         }
       ],
       "request": {
@@ -12507,6 +13295,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set a channel as the video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants.",
+        "input_schema": {
+          "properties": {
+            "bridgeId": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "bridgeId",
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set a channel as the video source in a multi-party mixing bridge. This operation has no effect on bridges with two or fewer participants.",
       "direction": "write",
       "endpoint": {
@@ -12525,7 +13332,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "bridgeId"
         },
         {
           "description": "Channel's id",
@@ -12534,7 +13342,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -12551,6 +13360,47 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create channel.",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "formats": {
+              "type": "string"
+            },
+            "originator": {
+              "type": "string"
+            },
+            "otherChannelId": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "endpoint",
+            "app",
+            "appArgs",
+            "channelId",
+            "otherChannelId",
+            "originator",
+            "formats",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create channel.",
       "direction": "write",
       "endpoint": {
@@ -12569,7 +13419,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "endpoint"
         },
         {
           "description": "Stasis Application to place channel into",
@@ -12578,7 +13429,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application provided by 'app'. Mutually exclusive with 'context', 'extension', 'priority', and 'label'.",
@@ -12587,7 +13439,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         },
         {
           "description": "The unique id to assign the channel on creation.",
@@ -12596,7 +13449,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The unique id to assign the second channel when using local channels.",
@@ -12605,7 +13459,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "otherChannelId"
         },
         {
           "description": "Unique ID of the calling channel",
@@ -12614,7 +13469,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "originator"
         },
         {
           "description": "The format name capability list to use if originator is not specified. Ex. \"ulaw,slin16\".  Format names can be found with \"core show codecs\".",
@@ -12623,7 +13479,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "formats"
         },
         {
           "name": "variables",
@@ -12632,7 +13489,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -12841,6 +13699,59 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Start an External Media session.",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "connection_type": {
+              "type": "string"
+            },
+            "data": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            },
+            "encapsulation": {
+              "type": "string"
+            },
+            "external_host": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string"
+            },
+            "transport": {
+              "type": "string"
+            },
+            "transport_data": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "channelId",
+            "app",
+            "external_host",
+            "encapsulation",
+            "transport",
+            "connection_type",
+            "format",
+            "direction",
+            "data",
+            "transport_data",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start an External Media session.",
       "direction": "write",
       "endpoint": {
@@ -12859,7 +13770,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Stasis Application to place channel into",
@@ -12868,7 +13780,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "Hostname/ip:port or websocket_client connection ID of external host.  May be empty for a websocket server connection.",
@@ -12877,7 +13790,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "external_host"
         },
         {
           "description": "Payload encapsulation protocol.  Must be 'none' for the websocket transport.",
@@ -12892,7 +13806,8 @@
               "none"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "encapsulation"
         },
         {
           "description": "Transport protocol",
@@ -12907,7 +13822,8 @@
               "websocket"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "transport"
         },
         {
           "description": "Connection type (client/server). 'server' is only valid for the websocket transport.",
@@ -12921,7 +13837,8 @@
               "server"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "connection_type"
         },
         {
           "description": "Format to encode audio in",
@@ -12930,7 +13847,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "format"
         },
         {
           "description": "External media direction",
@@ -12943,7 +13861,8 @@
               "both"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "direction"
         },
         {
           "description": "An arbitrary data field",
@@ -12952,7 +13871,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "data"
         },
         {
           "description": "Transport-specific data. For websocket this is appended to the dialstring.",
@@ -12961,7 +13881,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "transport_data"
         },
         {
           "name": "variables",
@@ -12970,7 +13891,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -13197,6 +14119,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Channel details.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Channel details.",
       "direction": "read",
       "endpoint": {
@@ -13215,7 +14152,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -13369,6 +14307,71 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Create a new channel (originate with id).",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "callerId": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "context": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "extension": {
+              "type": "string"
+            },
+            "formats": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "originator": {
+              "type": "string"
+            },
+            "otherChannelId": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "timeout": {
+              "type": "number"
+            },
+            "variables": {}
+          },
+          "required": [
+            "channelId",
+            "endpoint",
+            "extension",
+            "context",
+            "priority",
+            "label",
+            "app",
+            "appArgs",
+            "callerId",
+            "timeout",
+            "otherChannelId",
+            "originator",
+            "formats",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a new channel (originate with id).",
       "direction": "write",
       "endpoint": {
@@ -13387,7 +14390,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Endpoint to call.",
@@ -13396,7 +14400,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "endpoint"
         },
         {
           "description": "The extension to dial after the endpoint answers. Mutually exclusive with 'app'.",
@@ -13405,7 +14410,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "extension"
         },
         {
           "description": "The context to dial after the endpoint answers. If omitted, uses 'default'. Mutually exclusive with 'app'.",
@@ -13414,7 +14420,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "context"
         },
         {
           "description": "The priority to dial after the endpoint answers. If omitted, uses 1. Mutually exclusive with 'app'.",
@@ -13424,7 +14431,8 @@
           "schema": {
             "format": "int64",
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "The label to dial after the endpoint answers. Will supersede 'priority' if provided. Mutually exclusive with 'app'.",
@@ -13433,7 +14441,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "label"
         },
         {
           "description": "The application that is subscribed to the originated channel. When the channel is answered, it will be passed to this Stasis application. Mutually exclusive with 'context', 'extension', 'priority', and 'label'.",
@@ -13442,7 +14451,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application provided by 'app'. Mutually exclusive with 'context', 'extension', 'priority', and 'label'.",
@@ -13451,7 +14461,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         },
         {
           "description": "CallerID to use when dialing the endpoint or extension.",
@@ -13460,7 +14471,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "callerId"
         },
         {
           "description": "Timeout (in seconds) before giving up dialing, or -1 for no timeout.",
@@ -13471,7 +14483,8 @@
             "default": 30,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "timeout"
         },
         {
           "description": "The unique id to assign the second channel when using local channels.",
@@ -13480,7 +14493,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "otherChannelId"
         },
         {
           "description": "The unique id of the channel which is originating this one.",
@@ -13489,7 +14503,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "originator"
         },
         {
           "description": "The format name capability list to use if originator is not specified. Ex. \"ulaw,slin16\".  Format names can be found with \"core show codecs\".",
@@ -13498,7 +14513,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "formats"
         },
         {
           "name": "variables",
@@ -13507,7 +14523,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -13746,6 +14763,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Answer a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Answer a channel.",
       "direction": "write",
       "endpoint": {
@@ -13764,7 +14796,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -13781,6 +14814,37 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Exit application; continue execution in the dialplan.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "context": {
+              "type": "string"
+            },
+            "extension": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "channelId",
+            "context",
+            "extension",
+            "priority",
+            "label"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Exit application; continue execution in the dialplan.",
       "direction": "write",
       "endpoint": {
@@ -13799,7 +14863,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The context to continue to.",
@@ -13808,7 +14873,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "context"
         },
         {
           "description": "The extension to continue to.",
@@ -13817,7 +14883,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "extension"
         },
         {
           "description": "The priority to continue to.",
@@ -13827,7 +14894,8 @@
           "schema": {
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "priority"
         },
         {
           "description": "The label to continue to - will supersede 'priority' if both are provided.",
@@ -13836,7 +14904,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "label"
         }
       ],
       "request": {
@@ -13879,6 +14948,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Dial a created channel.",
+        "input_schema": {
+          "properties": {
+            "caller": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "timeout": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "channelId",
+            "caller",
+            "timeout"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Dial a created channel.",
       "direction": "write",
       "endpoint": {
@@ -13897,7 +14989,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Channel ID of caller",
@@ -13906,7 +14999,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "caller"
         },
         {
           "description": "Dial timeout",
@@ -13918,7 +15012,8 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "timeout"
         }
       ],
       "request": {
@@ -13949,6 +15044,41 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Send provided DTMF to a given channel.",
+        "input_schema": {
+          "properties": {
+            "after": {
+              "type": "number"
+            },
+            "before": {
+              "type": "number"
+            },
+            "between": {
+              "type": "number"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "dtmf": {
+              "type": "string"
+            },
+            "duration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "channelId",
+            "dtmf",
+            "before",
+            "between",
+            "duration",
+            "after"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Send provided DTMF to a given channel.",
       "direction": "write",
       "endpoint": {
@@ -13967,7 +15097,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "DTMF To send.",
@@ -13976,7 +15107,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "dtmf"
         },
         {
           "description": "Amount of time to wait before DTMF digits (specified in milliseconds) start.",
@@ -13987,7 +15119,8 @@
             "default": 0,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "before"
         },
         {
           "description": "Amount of time in between DTMF digits (specified in milliseconds).",
@@ -13998,7 +15131,8 @@
             "default": 100,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "between"
         },
         {
           "description": "Length of each DTMF digit (specified in milliseconds).",
@@ -14009,7 +15143,8 @@
             "default": 100,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "duration"
         },
         {
           "description": "Amount of time to wait after DTMF digits (specified in milliseconds) end.",
@@ -14020,7 +15155,8 @@
             "default": 0,
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "after"
         }
       ],
       "request": {
@@ -14069,6 +15205,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Hold a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Hold a channel.",
       "direction": "write",
       "endpoint": {
@@ -14087,7 +15238,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14104,6 +15256,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Remove a channel from hold.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Remove a channel from hold.",
       "direction": "write",
       "endpoint": {
@@ -14122,7 +15289,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14139,6 +15307,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Play music on hold to a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "mohClass": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "mohClass"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Play music on hold to a channel.",
       "direction": "write",
       "endpoint": {
@@ -14157,7 +15344,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Music on hold class to use",
@@ -14166,7 +15354,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mohClass"
         }
       ],
       "request": {
@@ -14191,6 +15380,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop playing music on hold to a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop playing music on hold to a channel.",
       "direction": "write",
       "endpoint": {
@@ -14209,7 +15413,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14226,6 +15431,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Move the channel from one Stasis application to another.",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "app",
+            "appArgs"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Move the channel from one Stasis application to another.",
       "direction": "write",
       "endpoint": {
@@ -14244,7 +15472,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The channel will be passed to this Stasis application.",
@@ -14253,7 +15482,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application provided by 'app'.",
@@ -14262,7 +15492,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         }
       ],
       "request": {
@@ -14293,6 +15524,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Mute a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "direction"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Mute a channel.",
       "direction": "write",
       "endpoint": {
@@ -14311,7 +15561,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Direction in which to mute audio",
@@ -14326,7 +15577,8 @@
               "out"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "direction"
         }
       ],
       "request": {
@@ -14351,6 +15603,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Unmute a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "direction"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Unmute a channel.",
       "direction": "write",
       "endpoint": {
@@ -14369,7 +15640,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Direction in which to unmute audio",
@@ -14384,7 +15656,8 @@
               "out"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "direction"
         }
       ],
       "request": {
@@ -14409,6 +15682,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Indicate progress on a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Indicate progress on a channel.",
       "direction": "write",
       "endpoint": {
@@ -14427,7 +15715,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14444,6 +15733,49 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Start a recording.",
+        "input_schema": {
+          "properties": {
+            "beep": {
+              "type": "boolean"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string"
+            },
+            "ifExists": {
+              "type": "string"
+            },
+            "maxDurationSeconds": {
+              "type": "number"
+            },
+            "maxSilenceSeconds": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "terminateOn": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "name",
+            "format",
+            "maxDurationSeconds",
+            "maxSilenceSeconds",
+            "ifExists",
+            "beep",
+            "terminateOn"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start a recording.",
       "direction": "write",
       "endpoint": {
@@ -14462,7 +15794,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Recording's filename",
@@ -14471,7 +15804,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "Format to encode audio in",
@@ -14480,7 +15814,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "format"
         },
         {
           "description": "Maximum duration of the recording, in seconds. 0 for no limit",
@@ -14492,7 +15827,8 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "maxDurationSeconds"
         },
         {
           "description": "Maximum duration of silence, in seconds. 0 for no limit",
@@ -14504,7 +15840,8 @@
             "format": "int32",
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "maxSilenceSeconds"
         },
         {
           "description": "Action to take if a recording with the same name already exists.",
@@ -14519,7 +15856,8 @@
               "append"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "ifExists"
         },
         {
           "description": "Play beep when recording begins",
@@ -14529,7 +15867,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "beep"
         },
         {
           "description": "DTMF input to terminate recording",
@@ -14545,7 +15884,8 @@
               "#"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "terminateOn"
         }
       ],
       "request": {
@@ -14660,6 +16000,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Redirect the channel to a different location.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "endpoint"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Redirect the channel to a different location.",
       "direction": "write",
       "endpoint": {
@@ -14678,7 +16037,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The endpoint to redirect the channel to",
@@ -14687,7 +16047,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "endpoint"
         }
       ],
       "request": {
@@ -14712,6 +16073,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Indicate ringing to a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Indicate ringing to a channel.",
       "direction": "write",
       "endpoint": {
@@ -14730,7 +16106,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14747,6 +16124,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop ringing indication on a channel if locally generated.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop ringing indication on a channel if locally generated.",
       "direction": "write",
       "endpoint": {
@@ -14765,7 +16157,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14782,6 +16175,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "RTP stats on a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "RTP stats on a channel.",
       "direction": "read",
       "endpoint": {
@@ -14800,7 +16208,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -14993,6 +16402,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Play silence to a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Play silence to a channel.",
       "direction": "write",
       "endpoint": {
@@ -15011,7 +16435,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -15028,6 +16453,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop playing silence to a channel.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop playing silence to a channel.",
       "direction": "write",
       "endpoint": {
@@ -15046,7 +16486,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         }
       ],
       "request": {
@@ -15063,6 +16504,41 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Start snooping.",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "snoopId": {
+              "type": "string"
+            },
+            "spy": {
+              "type": "string"
+            },
+            "whisper": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "spy",
+            "whisper",
+            "app",
+            "appArgs",
+            "snoopId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start snooping.",
       "direction": "write",
       "endpoint": {
@@ -15081,7 +16557,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Direction of audio to spy on",
@@ -15097,7 +16574,8 @@
               "in"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "spy"
         },
         {
           "description": "Direction of audio to whisper into",
@@ -15113,7 +16591,8 @@
               "in"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "whisper"
         },
         {
           "description": "Application the snooping channel is placed into",
@@ -15122,7 +16601,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application",
@@ -15131,7 +16611,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         },
         {
           "description": "Unique ID to assign to snooping channel",
@@ -15140,7 +16621,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "snoopId"
         }
       ],
       "request": {
@@ -15326,6 +16808,41 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Start snooping.",
+        "input_schema": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "appArgs": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "snoopId": {
+              "type": "string"
+            },
+            "spy": {
+              "type": "string"
+            },
+            "whisper": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "snoopId",
+            "spy",
+            "whisper",
+            "app",
+            "appArgs"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Start snooping.",
       "direction": "write",
       "endpoint": {
@@ -15344,7 +16861,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "Unique ID to assign to snooping channel",
@@ -15353,7 +16871,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "snoopId"
         },
         {
           "description": "Direction of audio to spy on",
@@ -15369,7 +16888,8 @@
               "in"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "spy"
         },
         {
           "description": "Direction of audio to whisper into",
@@ -15385,7 +16905,8 @@
               "in"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "whisper"
         },
         {
           "description": "Application the snooping channel is placed into",
@@ -15394,7 +16915,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "app"
         },
         {
           "description": "The application arguments to pass to the Stasis application",
@@ -15403,7 +16925,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "appArgs"
         }
       ],
       "request": {
@@ -15583,6 +17106,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Inform the channel about the progress of the attended/blind transfer.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "states": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "states"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Inform the channel about the progress of the attended/blind transfer.",
       "direction": "write",
       "endpoint": {
@@ -15601,7 +17143,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The state of the progress",
@@ -15610,7 +17153,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "states"
         }
       ],
       "request": {
@@ -15635,6 +17179,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get the value of a channel variable or function.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "variable"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the value of a channel variable or function.",
       "direction": "read",
       "endpoint": {
@@ -15653,7 +17216,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The channel variable or function to get",
@@ -15662,7 +17226,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         }
       ],
       "request": {
@@ -15700,6 +17265,33 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set the value of a channel variable or function.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "report_events": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "variable",
+            "value",
+            "report_events"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set the value of a channel variable or function.",
       "direction": "write",
       "endpoint": {
@@ -15718,7 +17310,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The channel variable or function to set",
@@ -15727,7 +17320,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "variable"
         },
         {
           "description": "The value to set the variable to",
@@ -15736,7 +17330,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "value"
         },
         {
           "description": "Whether this variable should be included in channel events. Defaults to false.",
@@ -15746,7 +17341,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "report_events"
         }
       ],
       "request": {
@@ -15783,6 +17379,23 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Set the values of multiple channel variables or functions.",
+        "input_schema": {
+          "properties": {
+            "channelId": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "channelId",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Set the values of multiple channel variables or functions.",
       "direction": "write",
       "endpoint": {
@@ -15801,7 +17414,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "name": "variables",
@@ -15810,7 +17424,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -15838,6 +17453,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Retrieve the current state of a device.",
+        "input_schema": {
+          "properties": {
+            "deviceName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve the current state of a device.",
       "direction": "read",
       "endpoint": {
@@ -15856,7 +17486,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "deviceName"
         }
       ],
       "request": {
@@ -15902,6 +17533,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Change the state of a device controlled by ARI. (Note - implicitly creates the device state).",
+        "input_schema": {
+          "properties": {
+            "deviceName": {
+              "type": "string"
+            },
+            "deviceState": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceName",
+            "deviceState"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Change the state of a device controlled by ARI. (Note - implicitly creates the device state).",
       "direction": "write",
       "endpoint": {
@@ -15920,7 +17570,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "deviceName"
         },
         {
           "description": "Device state value",
@@ -15939,7 +17590,8 @@
               "ONHOLD"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "deviceState"
         }
       ],
       "request": {
@@ -15964,6 +17616,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Destroy a device-state controlled by ARI.",
+        "input_schema": {
+          "properties": {
+            "deviceName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Destroy a device-state controlled by ARI.",
       "direction": "write",
       "endpoint": {
@@ -15982,7 +17649,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "deviceName"
         }
       ],
       "request": {
@@ -15999,6 +17667,35 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
+        "input_schema": {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "refer_to": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "to_self": {
+              "type": "boolean"
+            },
+            "variables": {}
+          },
+          "required": [
+            "to",
+            "from",
+            "refer_to",
+            "to_self",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
       "direction": "write",
       "endpoint": {
@@ -16017,7 +17714,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "to"
         },
         {
           "description": "The endpoint resource or technology specific identity to refer from.",
@@ -16026,7 +17724,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "from"
         },
         {
           "description": "The endpoint resource or technology specific URI to refer to.",
@@ -16035,7 +17734,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "refer_to"
         },
         {
           "description": "If true and \"refer_to\" refers to an Asterisk endpoint, the \"refer_to\" value is set to point to this Asterisk endpoint - so the referee is referred to Asterisk. Otherwise, use the contact URI associated with the endpoint.",
@@ -16045,7 +17745,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "to_self"
         },
         {
           "name": "variables",
@@ -16054,7 +17755,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -16108,6 +17810,31 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Send a message to some technology URI or endpoint.",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "to",
+            "from",
+            "body",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Send a message to some technology URI or endpoint.",
       "direction": "write",
       "endpoint": {
@@ -16126,7 +17853,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "to"
         },
         {
           "description": "The endpoint resource or technology specific identity to send this message from. Valid resources are pjsip, and xmpp.",
@@ -16135,7 +17863,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "from"
         },
         {
           "description": "The body of the message",
@@ -16144,7 +17873,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "body"
         },
         {
           "name": "variables",
@@ -16153,7 +17883,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -16201,6 +17932,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List available endoints for a given endpoint technology.",
+        "input_schema": {
+          "properties": {
+            "tech": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tech"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List available endoints for a given endpoint technology.",
       "direction": "read",
       "endpoint": {
@@ -16219,7 +17965,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "tech"
         }
       ],
       "request": {
@@ -16274,6 +18021,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Details for an endpoint.",
+        "input_schema": {
+          "properties": {
+            "resource": {
+              "type": "string"
+            },
+            "tech": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tech",
+            "resource"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Details for an endpoint.",
       "direction": "read",
       "endpoint": {
@@ -16292,7 +18058,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "tech"
         },
         {
           "description": "ID of the endpoint",
@@ -16301,7 +18068,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "resource"
         }
       ],
       "request": {
@@ -16353,6 +18121,39 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
+        "input_schema": {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "refer_to": {
+              "type": "string"
+            },
+            "resource": {
+              "type": "string"
+            },
+            "tech": {
+              "type": "string"
+            },
+            "to_self": {
+              "type": "boolean"
+            },
+            "variables": {}
+          },
+          "required": [
+            "tech",
+            "resource",
+            "from",
+            "refer_to",
+            "to_self",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Refer an endpoint or technology URI to some technology URI or endpoint.",
       "direction": "write",
       "endpoint": {
@@ -16371,7 +18172,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "tech"
         },
         {
           "description": "ID of the endpoint",
@@ -16380,7 +18182,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "resource"
         },
         {
           "description": "The endpoint resource or technology specific identity to refer from.",
@@ -16389,7 +18192,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "from"
         },
         {
           "description": "The endpoint resource or technology specific URI to refer to.",
@@ -16398,7 +18202,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "refer_to"
         },
         {
           "description": "If true and \"refer_to\" refers to an Asterisk endpoint, the \"refer_to\" value is set to point to this Asterisk endpoint - so the referee is referred to Asterisk. Otherwise, use the contact URI associated with the endpoint.",
@@ -16408,7 +18213,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "to_self"
         },
         {
           "name": "variables",
@@ -16417,7 +18223,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -16465,6 +18272,35 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Send a message to some endpoint in a technology.",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "resource": {
+              "type": "string"
+            },
+            "tech": {
+              "type": "string"
+            },
+            "variables": {}
+          },
+          "required": [
+            "tech",
+            "resource",
+            "from",
+            "body",
+            "variables"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Send a message to some endpoint in a technology.",
       "direction": "write",
       "endpoint": {
@@ -16483,7 +18319,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "tech"
         },
         {
           "description": "ID of the endpoint",
@@ -16492,7 +18329,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "resource"
         },
         {
           "description": "The endpoint resource or technology specific identity to send this message from. Valid resources are pjsip and xmpp.",
@@ -16501,7 +18339,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "from"
         },
         {
           "description": "The body of the message",
@@ -16510,7 +18349,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "body"
         },
         {
           "name": "variables",
@@ -16519,7 +18359,8 @@
           "schema": {
             "additionalProperties": true,
             "type": "object"
-          }
+          },
+          "symbol": "variables"
         }
       ],
       "request": {
@@ -16561,6 +18402,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Claim a broadcast channel for this application.",
+        "input_schema": {
+          "properties": {
+            "application": {
+              "type": "string"
+            },
+            "channelId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelId",
+            "application"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Claim a broadcast channel for this application.",
       "direction": "write",
       "endpoint": {
@@ -16579,7 +18439,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "channelId"
         },
         {
           "description": "The name of the application claiming the channel",
@@ -16588,7 +18449,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "application"
         }
       ],
       "request": {
@@ -16619,6 +18481,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Retrieve the current state of a mailbox.",
+        "input_schema": {
+          "properties": {
+            "mailboxName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mailboxName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve the current state of a mailbox.",
       "direction": "read",
       "endpoint": {
@@ -16637,7 +18514,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mailboxName"
         }
       ],
       "request": {
@@ -16679,6 +18557,29 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Change the state of a mailbox. (Note - implicitly creates the mailbox).",
+        "input_schema": {
+          "properties": {
+            "mailboxName": {
+              "type": "string"
+            },
+            "newMessages": {
+              "type": "number"
+            },
+            "oldMessages": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "mailboxName",
+            "oldMessages",
+            "newMessages"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Change the state of a mailbox. (Note - implicitly creates the mailbox).",
       "direction": "write",
       "endpoint": {
@@ -16697,7 +18598,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mailboxName"
         },
         {
           "description": "Count of old messages in the mailbox",
@@ -16707,7 +18609,8 @@
           "schema": {
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "oldMessages"
         },
         {
           "description": "Count of new messages in the mailbox",
@@ -16717,7 +18620,8 @@
           "schema": {
             "format": "int32",
             "type": "integer"
-          }
+          },
+          "symbol": "newMessages"
         }
       ],
       "request": {
@@ -16748,6 +18652,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Destroy a mailbox.",
+        "input_schema": {
+          "properties": {
+            "mailboxName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mailboxName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Destroy a mailbox.",
       "direction": "write",
       "endpoint": {
@@ -16766,7 +18685,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "mailboxName"
         }
       ],
       "request": {
@@ -16783,6 +18703,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Control a playback.",
+        "input_schema": {
+          "properties": {
+            "operation": {
+              "type": "string"
+            },
+            "playbackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "playbackId",
+            "operation"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Control a playback.",
       "direction": "write",
       "endpoint": {
@@ -16801,7 +18740,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "playbackId"
         },
         {
           "description": "Operation to perform on the playback.",
@@ -16817,7 +18757,8 @@
               "forward"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "operation"
         }
       ],
       "request": {
@@ -16842,6 +18783,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "List live recordings.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List live recordings.",
       "direction": "read",
       "endpoint": {
@@ -16860,7 +18816,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -16931,6 +18888,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop a live recording and discard it.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop a live recording and discard it.",
       "direction": "write",
       "endpoint": {
@@ -16949,7 +18921,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -16966,6 +18939,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Mute a live recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Mute a live recording.",
       "direction": "write",
       "endpoint": {
@@ -16984,7 +18972,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17001,6 +18990,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Unmute a live recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Unmute a live recording.",
       "direction": "write",
       "endpoint": {
@@ -17019,7 +19023,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17036,6 +19041,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Pause a live recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Pause a live recording.",
       "direction": "write",
       "endpoint": {
@@ -17054,7 +19074,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17071,6 +19092,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Unpause a live recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Unpause a live recording.",
       "direction": "write",
       "endpoint": {
@@ -17089,7 +19125,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17106,6 +19143,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Stop a live recording and store it.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Stop a live recording and store it.",
       "direction": "write",
       "endpoint": {
@@ -17124,7 +19176,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17141,6 +19194,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get a stored recording's details.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get a stored recording's details.",
       "direction": "read",
       "endpoint": {
@@ -17159,7 +19227,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17192,6 +19261,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Delete a stored recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete a stored recording.",
       "direction": "write",
       "endpoint": {
@@ -17210,7 +19294,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17227,6 +19312,25 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Copy a stored recording.",
+        "input_schema": {
+          "properties": {
+            "destinationRecordingName": {
+              "type": "string"
+            },
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName",
+            "destinationRecordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Copy a stored recording.",
       "direction": "write",
       "endpoint": {
@@ -17245,7 +19349,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         },
         {
           "description": "The destination name of the recording",
@@ -17254,7 +19359,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "destinationRecordingName"
         }
       ],
       "request": {
@@ -17295,6 +19401,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get the file associated with the stored recording.",
+        "input_schema": {
+          "properties": {
+            "recordingName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "recordingName"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the file associated with the stored recording.",
       "direction": "read",
       "endpoint": {
@@ -17313,7 +19434,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "recordingName"
         }
       ],
       "request": {
@@ -17330,6 +19452,21 @@
           "asterisk.password"
         ]
       ],
+      "contract": {
+        "description": "Get a sound's details.",
+        "input_schema": {
+          "properties": {
+            "soundId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "soundId"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get a sound's details.",
       "direction": "read",
       "endpoint": {
@@ -17348,7 +19485,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "soundId"
         }
       ],
       "request": {

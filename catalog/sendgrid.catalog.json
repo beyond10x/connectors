@@ -44,6 +44,25 @@
           "sendgrid.api_key"
         ]
       ],
+      "contract": {
+        "description": "List transactional templates (name, id, generation, and each template's versions). Also this connector's `verify` — a bounded read that runs unattended",
+        "input_schema": {
+          "properties": {
+            "generations": {
+              "type": "string"
+            },
+            "page_size": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "generations",
+            "page_size"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List transactional templates (name, id, generation, and each template's versions). Also this connector's `verify` — a bounded read that runs unattended",
       "direction": "read",
       "expose": true,
@@ -62,7 +81,8 @@
               "both"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "generations"
         },
         {
           "description": "Results per page; SendGrid caps this at 200",
@@ -73,7 +93,8 @@
             "maximum": 200,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "page_size"
         }
       ],
       "request": {
@@ -151,6 +172,21 @@
           "sendgrid.api_key"
         ]
       ],
+      "contract": {
+        "description": "Get one transactional template by id, including every version's subject and content",
+        "input_schema": {
+          "properties": {
+            "template_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "template_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one transactional template by id, including every version's subject and content",
       "direction": "read",
       "expose": true,
@@ -165,7 +201,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "template_id"
         }
       ],
       "request": {
@@ -212,6 +249,25 @@
           "sendgrid.api_key"
         ]
       ],
+      "contract": {
+        "description": "List addresses that have bounced and are suppressed from receiving further mail. Each entry is personal data about a third party — read it only for what the calling flow needs",
+        "input_schema": {
+          "properties": {
+            "end_time": {
+              "type": "number"
+            },
+            "start_time": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "start_time",
+            "end_time"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List addresses that have bounced and are suppressed from receiving further mail. Each entry is personal data about a third party — read it only for what the calling flow needs",
       "direction": "read",
       "expose": true,
@@ -226,7 +282,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "start_time"
         },
         {
           "description": "Only bounces created at or before this Unix timestamp",
@@ -236,7 +293,8 @@
           "schema": {
             "minimum": 0,
             "type": "integer"
-          }
+          },
+          "symbol": "end_time"
         }
       ],
       "request": {
@@ -298,6 +356,25 @@
           "sendgrid.api_key"
         ]
       ],
+      "contract": {
+        "description": "Check whether an email address is well-formed and likely deliverable, without sending it any mail. Requires SendGrid's Email Address Validation add-on to be enabled on the account. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/errors/0/message` in the response body.",
+        "input_schema": {
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "source"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Check whether an email address is well-formed and likely deliverable, without sending it any mail. Requires SendGrid's Email Address Validation add-on to be enabled on the account",
       "direction": "write",
       "expose": true,
@@ -312,7 +389,8 @@
           "schema": {
             "format": "email",
             "type": "string"
-          }
+          },
+          "symbol": "email"
         },
         {
           "description": "A free-text label for where the check originated, e.g. `signup`. Purely descriptive; SendGrid does not validate its contents",
@@ -321,7 +399,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "source"
         }
       ],
       "quirks": {

@@ -72,6 +72,15 @@
           "datadog.application_key"
         ]
       ],
+      "contract": {
+        "description": "List every monitor visible to this API key. Also this connector's `verify` — a bounded read that runs unattended, needing no argument",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every monitor visible to this API key. Also this connector's `verify` — a bounded read that runs unattended, needing no argument",
       "direction": "read",
       "expose": true,
@@ -160,6 +169,21 @@
           "datadog.application_key"
         ]
       ],
+      "contract": {
+        "description": "Get one monitor by id",
+        "input_schema": {
+          "properties": {
+            "monitor_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "monitor_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one monitor by id",
       "direction": "read",
       "expose": true,
@@ -173,7 +197,8 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
+          },
+          "symbol": "monitor_id"
         }
       ],
       "request": {
@@ -256,6 +281,15 @@
           "datadog.application_key"
         ]
       ],
+      "contract": {
+        "description": "List the organization's incidents",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the organization's incidents",
       "direction": "read",
       "expose": true,
@@ -276,6 +310,21 @@
           "datadog.application_key"
         ]
       ],
+      "contract": {
+        "description": "Get one incident by id",
+        "input_schema": {
+          "properties": {
+            "incident_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "incident_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one incident by id",
       "direction": "read",
       "expose": true,
@@ -289,7 +338,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "incident_id"
         }
       ],
       "request": {

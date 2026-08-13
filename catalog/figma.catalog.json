@@ -45,6 +45,15 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "Get the authenticated user's id, email, display handle and avatar URL. Used to verify a token works before running anything else. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the authenticated user's id, email, display handle and avatar URL. Used to verify a token works before running anything else",
       "direction": "read",
       "expose": true,
@@ -94,6 +103,21 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "Get a Figma file's document tree, components and styles by file key. Does not include comments or rendered images. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get a Figma file's document tree, components and styles by file key. Does not include comments or rendered images",
       "direction": "read",
       "expose": true,
@@ -108,7 +132,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "file_key"
         }
       ],
       "quirks": {
@@ -178,6 +203,25 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "Get one or more specific nodes from a file by id, without walking the whole document tree. Use this to read a particular frame or layer instead of downloading the entire file. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_key": {
+              "type": "string"
+            },
+            "ids": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_key",
+            "ids"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one or more specific nodes from a file by id, without walking the whole document tree. Use this to read a particular frame or layer instead of downloading the entire file",
       "direction": "read",
       "expose": true,
@@ -192,7 +236,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "file_key"
         },
         {
           "description": "Comma-separated node ids to fetch, each in Figma's own `<page>:<node>` form, e.g. `1:23,1:45`. Copy these from a Figma share link (the `node-id` query parameter) or from a prior figma-file-get response",
@@ -202,7 +247,8 @@
           "schema": {
             "pattern": "^[0-9]+:[0-9]+(,[0-9]+:[0-9]+)*$",
             "type": "string"
-          }
+          },
+          "symbol": "ids"
         }
       ],
       "quirks": {
@@ -256,6 +302,25 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "Render one or more nodes to images and return download URLs for them. The URLs point at short-lived storage and expire — Figma does not guarantee they stay valid, so fetch or store the image promptly rather than caching the URL itself. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_key": {
+              "type": "string"
+            },
+            "ids": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_key",
+            "ids"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Render one or more nodes to images and return download URLs for them. The URLs point at short-lived storage and expire — Figma does not guarantee they stay valid, so fetch or store the image promptly rather than caching the URL itself",
       "direction": "read",
       "expose": true,
@@ -270,7 +335,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "file_key"
         },
         {
           "description": "Comma-separated node ids to render, each in Figma's own `<page>:<node>` form, e.g. `1:23,1:45` — see figma-file-nodes-get",
@@ -280,7 +346,8 @@
           "schema": {
             "pattern": "^[0-9]+:[0-9]+(,[0-9]+:[0-9]+)*$",
             "type": "string"
-          }
+          },
+          "symbol": "ids"
         }
       ],
       "quirks": {
@@ -326,6 +393,21 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "List the files in a project: each file's key, name, thumbnail and last-modified time. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the files in a project: each file's key, name, thumbnail and last-modified time",
       "direction": "read",
       "expose": true,
@@ -341,7 +423,8 @@
             "format": "uint64",
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "project_id"
         }
       ],
       "quirks": {
@@ -403,6 +486,21 @@
           "figma.token"
         ]
       ],
+      "contract": {
+        "description": "List a file's comments: who wrote each one, when, its text, what it is attached to, and whether it has been resolved. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/err` in the response body.",
+        "input_schema": {
+          "properties": {
+            "file_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List a file's comments: who wrote each one, when, its text, what it is attached to, and whether it has been resolved",
       "direction": "read",
       "expose": true,
@@ -417,7 +515,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "file_key"
         }
       ],
       "quirks": {

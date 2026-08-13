@@ -72,6 +72,15 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "List every board the token's own member can see, newest activity first. Takes no argument — `me` resolves to whoever the token belongs to. Also this connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the credential pair",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every board the token's own member can see, newest activity first. Takes no argument — `me` resolves to whoever the token belongs to. Also this connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the credential pair",
       "direction": "read",
       "expose": true,
@@ -161,6 +170,21 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "Get one board by id, with its settings and current state",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one board by id, with its settings and current state",
       "direction": "read",
       "expose": true,
@@ -175,7 +199,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -259,6 +284,21 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "List the open lists (columns) on a board, left to right. Each carries the `id` trello-list-cards and trello-card-create take",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the open lists (columns) on a board, left to right. Each carries the `id` trello-list-cards and trello-card-create take",
       "direction": "read",
       "expose": true,
@@ -273,7 +313,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -291,6 +332,21 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "List the open cards in one list, in board order. Archived cards are not returned",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the open cards in one list, in board order. Archived cards are not returned",
       "direction": "read",
       "expose": true,
@@ -305,7 +361,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         }
       ],
       "request": {
@@ -421,6 +478,29 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "Create a card at the bottom of a list. The card is created unassigned, with no due date and no labels; Trello notifies whoever watches the list",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "list_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "list_id",
+            "name",
+            "description"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a card at the bottom of a list. The card is created unassigned, with no due date and no labels; Trello notifies whoever watches the list",
       "direction": "write",
       "expose": true,
@@ -436,6 +516,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "list_id",
           "wire": "idList"
         },
         {
@@ -445,7 +526,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "name"
         },
         {
           "description": "The card's description, as Markdown. Trello renders it on the card's back",
@@ -455,6 +537,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "description",
           "wire": "desc"
         }
       ],
@@ -570,6 +653,25 @@
           "trello.token"
         ]
       ],
+      "contract": {
+        "description": "Archive a card, or restore an archived one. Archiving is reversible and destroys nothing: the card leaves its list and stays readable in the board's archive",
+        "input_schema": {
+          "properties": {
+            "closed": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "closed"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Archive a card, or restore an archived one. Archiving is reversible and destroys nothing: the card leaves its list and stays readable in the board's archive",
       "direction": "write",
       "expose": true,
@@ -584,7 +686,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "id"
         },
         {
           "description": "true archives the card; false restores it to the list it was archived from",
@@ -593,7 +696,8 @@
           "required": true,
           "schema": {
             "type": "boolean"
-          }
+          },
+          "symbol": "closed"
         }
       ],
       "request": {

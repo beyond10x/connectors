@@ -69,6 +69,15 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the account's own top-level folders — Draft, Sent Items, Inbox, and any custom ones. Takes no parameters and succeeds for any account with API access, which is what makes it the connection check for a settings page's Test Connection button. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's own top-level folders — Draft, Sent Items, Inbox, and any custom ones. Takes no parameters and succeeds for any account with API access, which is what makes it the connection check for a settings page's Test Connection button",
       "direction": "read",
       "endpoint": {
@@ -134,6 +143,21 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "List envelopes whose status changed on or after a given date. DocuSign requires a from_date (or an explicit envelope_ids/transaction_ids list, which this operation does not offer) on every call to this resource — omitting it is a 400 from the vendor, not a limitation of this connector. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "from_date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from_date"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List envelopes whose status changed on or after a given date. DocuSign requires a from_date (or an explicit envelope_ids/transaction_ids list, which this operation does not offer) on every call to this resource — omitting it is a 400 from the vendor, not a limitation of this connector",
       "direction": "read",
       "endpoint": {
@@ -156,7 +180,8 @@
           "schema": {
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "type": "string"
-          }
+          },
+          "symbol": "from_date"
         }
       ],
       "quirks": {
@@ -238,6 +263,21 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one envelope's own status and metadata. No recipient or document detail — see docusign-envelope-recipients-get for who is on it. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "envelope_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "envelope_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one envelope's own status and metadata. No recipient or document detail — see docusign-envelope-recipients-get for who is on it",
       "direction": "read",
       "endpoint": {
@@ -260,7 +300,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "envelope_id"
         }
       ],
       "quirks": {
@@ -318,6 +359,21 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get every recipient on an envelope and their signing status. Recipient name and email are personal data — see this operation's own response_schema before logging, displaying or forwarding it. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "envelope_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "envelope_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get every recipient on an envelope and their signing status. Recipient name and email are personal data — see this operation's own response_schema before logging, displaying or forwarding it",
       "direction": "read",
       "endpoint": {
@@ -340,7 +396,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "envelope_id"
         }
       ],
       "quirks": {
@@ -432,6 +489,30 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create an envelope from an existing template. When status is sent, DocuSign dispatches it immediately to every named recipient — a real, legally binding signature request to a real person. Use status created to save it as an editable draft that notifies nobody instead. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "templateId": {
+              "type": "string"
+            },
+            "templateRoles": {
+              "items": {},
+              "type": "array"
+            }
+          },
+          "required": [
+            "templateId",
+            "templateRoles",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create an envelope from an existing template. When status is sent, DocuSign dispatches it immediately to every named recipient — a real, legally binding signature request to a real person. Use status created to save it as an editable draft that notifies nobody instead",
       "direction": "write",
       "endpoint": {
@@ -454,7 +535,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "templateId"
         },
         {
           "description": "One entry per role the template defines, supplying the recipient DocuSign routes that role to. email, name and roleName are all required by DocuSign. No example is given here — a signer's name and email are personal data — and roleName must match a role the template itself declares",
@@ -486,7 +568,8 @@
             },
             "minItems": 1,
             "type": "array"
-          }
+          },
+          "symbol": "templateRoles"
         },
         {
           "description": "sent dispatches the envelope to every named recipient immediately; created saves it as an editable draft and notifies nobody",
@@ -499,7 +582,8 @@
               "created"
             ],
             "type": "string"
-          }
+          },
+          "symbol": "status"
         }
       ],
       "quirks": {
@@ -564,6 +648,25 @@
           "docusign.access_token"
         ]
       ],
+      "contract": {
+        "description": "Void an envelope: cancel it permanently. Every recipient who has not yet finished signing is immediately locked out, and no further signing action is possible on this envelope id. Irreversible. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/errorCode` in the response body.",
+        "input_schema": {
+          "properties": {
+            "envelope_id": {
+              "type": "string"
+            },
+            "voidedReason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "envelope_id",
+            "voidedReason"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Void an envelope: cancel it permanently. Every recipient who has not yet finished signing is immediately locked out, and no further signing action is possible on this envelope id. Irreversible",
       "direction": "write",
       "endpoint": {
@@ -586,7 +689,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "envelope_id"
         },
         {
           "description": "Why this envelope is being voided. DocuSign shows this to any recipient who already opened the envelope, so avoid putting anything sensitive in it",
@@ -596,7 +700,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "voidedReason"
         }
       ],
       "quirks": {

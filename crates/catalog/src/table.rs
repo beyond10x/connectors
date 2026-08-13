@@ -23,17 +23,20 @@
 //! below names the provider, the member and the value, so the failure is one line rather than an
 //! index panic.
 //!
-//! # What the document cannot say, and what this module does about it
+//! # Two things the document could not say, and no longer cannot (S-001)
 //!
-//! - **[`Acquisition::Minted`]** — the minting join lives in the provider TOML's `[[operations]]`
-//!   block and reaches no document field. No shipped connector declares one, so the variant is
-//!   never constructed here. Closing it is a document-schema change.
-//! - **[`CredentialRequirement`]** — the document publishes the *effective* requirement, so
-//!   "declared `auth = []`" and "nothing declared anywhere" are the same empty list. The
-//!   derivation in [`credential_requirement`] resolves it from the connector's default, and it
-//!   reproduces the predecessor's generated classification for all 835 shipped operations
-//!   (`tests/main/pack_table.rs`). It is exact for today's catalogue and *ambiguous in principle*
-//!   — the schema gap a caller-contract story closes.
+//! - **[`Acquisition::Minted`]** — the minting join used to live only in the provider TOML's
+//!   `[[operations]]` block and reached no document field. The document now carries it
+//!   (`produces_credential`: which credential the value is stored as, and where in the response
+//!   the secret arrives), and [`build`] constructs the variant from it. No shipped connector
+//!   declares one yet; the fixture-backed test below proves the path.
+//! - **[`CredentialRequirement`]** — the document used to publish only the *effective* auth list,
+//!   so "declared `auth = []`" and "nothing declared anywhere" were the same empty list, and this
+//!   module *derived* the difference from the connector default — exact for the shipped
+//!   catalogue, ambiguous in principle. The document now publishes `credential_requirement`
+//!   itself (C-206's tokens, computed at build where the declaration's `Option` still holds the
+//!   distinction), and [`credential_requirement`] **reads** it. The pair of documents the old
+//!   derivation could not tell apart is pinned below.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -116,8 +119,6 @@ struct RawDocument {
     services: Vec<RawService>,
     #[serde(default)]
     auth: Vec<RawAuth>,
-    #[serde(default)]
-    default_auth: Vec<Vec<String>>,
     #[serde(default)]
     config: Vec<RawConfig>,
     #[serde(default)]
@@ -230,6 +231,33 @@ struct RawOperation {
     semantic_effects: Vec<String>,
     #[serde(default)]
     auth: Vec<Vec<String>>,
+    /// C-206's token for what the effective `auth` list cannot say when it is empty (S-001).
+    /// Absent only in a pre-S-001 document, which this build never serves — refused by name.
+    #[serde(default)]
+    credential_requirement: String,
+    /// The stored model-facing contract projection (S-001): the error-envelope-extended
+    /// description and the lowered, caller-typed input schema, as the build computed them.
+    #[serde(default)]
+    contract: Option<RawContract>,
+    #[serde(default)]
+    expose: bool,
+    /// The minting join (S-001), when this operation's call mints a declared credential.
+    #[serde(default)]
+    produces_credential: Option<RawProducedCredential>,
+}
+
+#[derive(Deserialize)]
+struct RawContract {
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    input_schema: Value,
+}
+
+#[derive(Deserialize)]
+struct RawProducedCredential {
+    credential: String,
+    secret: String,
 }
 
 #[derive(Deserialize)]
@@ -316,7 +344,11 @@ fn build(id: &str, text: &str) -> &'static Provider {
     let base_url = base_urls
         .get(Service::DEFAULT)
         .copied()
-        .or_else(|| raw.services.first().map(|service| service.base_url.as_str()))
+        .or_else(|| {
+            raw.services
+                .first()
+                .map(|service| service.base_url.as_str())
+        })
         .unwrap_or_else(|| panic!("`{id}`'s document declares no service, so it names no host"));
 
     let operations = raw
@@ -324,6 +356,34 @@ fn build(id: &str, text: &str) -> &'static Provider {
         .iter()
         .map(|operation| build_operation(&raw, operation, &base_urls))
         .collect();
+
+    // The minting joins (S-001): credential name → (minting operation, response pointer). Built
+    // before the credentials so `acquisition` can answer the provenance axis from document data.
+    let mut mints: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+    for operation in &raw.operations {
+        let Some(produced) = &operation.produces_credential else {
+            continue;
+        };
+        if !raw
+            .auth
+            .iter()
+            .any(|method| method.name == produced.credential)
+        {
+            panic!(
+                "operation `{}` mints `{}`, which its document does not declare",
+                operation.id, produced.credential
+            );
+        }
+        if let Some((earlier, _)) = mints.insert(
+            produced.credential.as_str(),
+            (operation.id.as_str(), produced.secret.as_str()),
+        ) {
+            panic!(
+                "credential `{}` is minted by both `{earlier}` and `{}`",
+                produced.credential, operation.id
+            );
+        }
+    }
 
     let config_choices = raw.config.iter().filter_map(build_choices).collect();
 
@@ -346,7 +406,7 @@ fn build(id: &str, text: &str) -> &'static Provider {
         auth: leak_slice(
             raw.auth
                 .iter()
-                .map(|method| build_credential(id, method))
+                .map(|method| build_credential(id, method, mints.get(method.name.as_str())))
                 .collect(),
         ),
         operations: leak_slice(operations),
@@ -402,12 +462,15 @@ fn build_operation(
     raw: &RawOperation,
     base_urls: &BTreeMap<&str, &str>,
 ) -> Operation {
-    let base_url = base_urls.get(raw.service.as_str()).copied().unwrap_or_else(|| {
-        panic!(
-            "operation `{}` names service `{}`, which its document does not declare",
-            raw.id, raw.service
-        )
-    });
+    let base_url = base_urls
+        .get(raw.service.as_str())
+        .copied()
+        .unwrap_or_else(|| {
+            panic!(
+                "operation `{}` names service `{}`, which its document does not declare",
+                raw.id, raw.service
+            )
+        });
     Operation {
         id: leak_str(raw.id.clone()),
         provider: leak_str(document.connector.clone()),
@@ -418,26 +481,48 @@ fn build_operation(
         idempotency: idempotency(&raw.id, &raw.idempotency),
         semantic_effects: leak_strs(raw.semantic_effects.clone()),
         credentials: leak_requirements(raw.auth.clone()),
-        credential_requirement: credential_requirement(document, raw),
+        credential_requirement: credential_requirement(raw),
         // Per operation, through its service: a multi-service provider reaches a different host per
         // service, and the union would be a wider egress claim than any single call makes.
         hosts: leak_slice(vec![leak_str(host_of(&raw.id, base_url))]),
+        contract_description: leak_str(
+            raw.contract
+                .as_ref()
+                .map(|contract| contract.description.clone())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "operation `{}` carries no contract, which S-001 made required",
+                        raw.id
+                    )
+                }),
+        ),
+        input_schema: leak_str(
+            raw.contract
+                .as_ref()
+                .map(|contract| contract.input_schema.to_string())
+                .expect("the contract was just proven present"),
+        ),
+        expose: raw.expose,
     }
 }
 
-/// Why an operation's credential list is what it is — see this module's header for the gap.
-fn credential_requirement(document: &RawDocument, raw: &RawOperation) -> CredentialRequirement {
-    if !raw.auth.is_empty() {
-        CredentialRequirement::Declared
-    } else if document.default_auth.is_empty() {
-        // Nothing is declared anywhere: the request would go out unauthenticated, which is the
-        // fail-closed reading and the one the predecessor's tables carry for all nine such
-        // operations.
-        CredentialRequirement::Withheld
-    } else {
-        // The connector authenticates and this operation opted out, which is a positive statement
-        // that the vendor requires nothing here.
-        CredentialRequirement::NoneRequired
+/// Why an operation's credential list is what it is — **read** from the document (S-001), never
+/// derived. The build computes the token where the declaration's `Option` still distinguishes
+/// "declared `auth = []`" from "declared nothing anywhere"; resolving it here from the connector
+/// default — what this function did before S-001 — could not tell those two apart.
+fn credential_requirement(raw: &RawOperation) -> CredentialRequirement {
+    match raw.credential_requirement.as_str() {
+        "declared" => CredentialRequirement::Declared,
+        "no-credential-required" => CredentialRequirement::NoneRequired,
+        "no-credential" => CredentialRequirement::Withheld,
+        "" => panic!(
+            "operation `{}` carries no credential requirement, which S-001 made required",
+            raw.id
+        ),
+        other => panic!(
+            "operation `{}` carries unknown credential requirement `{other}`",
+            raw.id
+        ),
     }
 }
 
@@ -459,27 +544,31 @@ fn host_of(operation: &str, base_url: &str) -> String {
     host.to_owned()
 }
 
-fn build_credential(provider: &str, raw: &RawAuth) -> Credential {
+fn build_credential(provider: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Credential {
     // The leaf of the credential's address. Credentials share one flat `<connector>.<name>`
     // namespace, so a name whose prefix disagrees would render a path under the wrong vendor.
     let leaf = raw
         .name
         .strip_prefix(&format!("{provider}."))
-        .unwrap_or_else(|| {
-            panic!("credential `{}` is not prefixed `{provider}.`", raw.name)
-        });
+        .unwrap_or_else(|| panic!("credential `{}` is not prefixed `{provider}.`", raw.name));
     Credential {
         name: leak_str(raw.name.clone()),
         leaf: leak_str(leaf),
-        acquire: acquisition(&raw.name, raw),
+        acquire: acquisition(&raw.name, raw, mint),
         place: placement(&raw.name, &raw.scheme),
         subject: subject(&raw.name, raw.subject.as_deref()),
         hazard: hazard(&raw.name, raw.hazard.as_deref()),
     }
 }
 
-fn acquisition(name: &str, raw: &RawAuth) -> Acquisition {
+fn acquisition(name: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Acquisition {
     if let Some(oauth2) = &raw.oauth2 {
+        if mint.is_some() {
+            panic!(
+                "credential `{name}` declares OAuth2 and is minted by an operation — two \
+                 provenances for one value"
+            );
+        }
         return Acquisition::OAuth2(Box::leak(Box::new(OAuth2 {
             endpoint: leak_str(oauth2.endpoint.clone()),
             token_endpoint: leak_str(oauth2.token_endpoint.clone()),
@@ -504,6 +593,14 @@ fn acquisition(name: &str, raw: &RawAuth) -> Acquisition {
         return Acquisition::BasicJoin {
             user_env: leak_strs(raw.user_env.clone()),
             user_suffix: leak_str(raw.user_suffix.clone().unwrap_or_default()),
+        };
+    }
+    // The minting join, read from the document (S-001): placement-wise this is `Static` — the
+    // stored value goes out unchanged — plus the provenance fact only the document carries.
+    if let Some((by, from)) = mint {
+        return Acquisition::Minted {
+            by: leak_str((*by).to_string()),
+            from: leak_str((*from).to_string()),
         };
     }
     Acquisition::Static
@@ -535,11 +632,21 @@ fn placement(credential: &str, scheme: &RawScheme) -> Placement {
             prefix: "Basic ",
         },
         "header" => Placement::Header {
-            name: leak_str(required(credential, "header", "name", scheme.name.as_deref())),
+            name: leak_str(required(
+                credential,
+                "header",
+                "name",
+                scheme.name.as_deref(),
+            )),
             prefix: leak_str(scheme.prefix.clone().unwrap_or_default()),
         },
         "query" => Placement::Query {
-            name: leak_str(required(credential, "query", "name", scheme.name.as_deref())),
+            name: leak_str(required(
+                credential,
+                "query",
+                "name",
+                scheme.name.as_deref(),
+            )),
         },
         "signing" => Placement::Inbound,
         other => panic!("credential `{credential}` declares unknown auth scheme `{other}`"),
@@ -593,7 +700,9 @@ fn approval(provider: &str, field: &str, word: &str) -> Approval {
     match word {
         "none" => Approval::None,
         "operator" => Approval::Operator,
-        other => panic!("`{provider}`'s config field `{field}` declares unknown approval `{other}`"),
+        other => {
+            panic!("`{provider}`'s config field `{field}` declares unknown approval `{other}`")
+        }
     }
 }
 
@@ -628,7 +737,14 @@ fn build_choices(raw: &RawConfig) -> Option<ConfigChoices> {
 /// value under. `None` for a binding this grammar does not admit, which a loaded connector cannot
 /// carry.
 fn binding(binds: &str) -> Option<(String, String)> {
-    for kind in ["endpoint", "credential", "username", "path", "query", "header"] {
+    for kind in [
+        "endpoint",
+        "credential",
+        "username",
+        "path",
+        "query",
+        "header",
+    ] {
         if let Some(name) = binds.strip_prefix(&format!("{kind}.")) {
             if !name.is_empty() && !(kind == "credential" && name.is_empty()) {
                 return Some((kind.to_owned(), name.to_owned()));
@@ -761,5 +877,93 @@ fn idempotency(operation: &str, word: &str) -> Idempotency {
         "non_idempotent" => Idempotency::NonIdempotent,
         "conditional" => Idempotency::Conditional,
         other => panic!("operation `{operation}` declares unknown idempotency `{other}`"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A minimal parseable document with one operation, parameterized on the auth-axis fields.
+    fn document(operation_extra: &str, auth: &str) -> String {
+        format!(
+            r#"{{
+                "connector": "t",
+                "runtime": "http",
+                "services": [{{ "name": "default", "base_url": "https://api.example.com" }}],
+                "auth": {auth},
+                "operations": [{{
+                    "id": "t-thing-get",
+                    "service": "default",
+                    "direction": "read",
+                    "risk": "low",
+                    "idempotency": "idempotent",
+                    "semantic_effects": [],
+                    "contract": {{
+                        "description": "Get a thing.",
+                        "input_schema": {{ "type": "object", "properties": {{}}, "required": [] }}
+                    }},
+                    "expose": true,
+                    "auth": [],
+                    "request": {{ "method": "GET", "url": "{{base}}/thing" }}
+                    {operation_extra}
+                }}]
+            }}"#
+        )
+    }
+
+    /// **The pair the old derivation could not tell apart** (S-001 acceptance): two documents,
+    /// byte-identical on the effective `auth` list (empty) and the connector default (absent),
+    /// differing only in the stored `credential_requirement`. Under the pre-S-001 derivation —
+    /// empty `auth` + empty `default_auth` → `Withheld` — both classified `Withheld`, so the
+    /// connector that positively declared `auth = []` was reported as withholding a credential it
+    /// never needed. Reading the stored token tells them apart.
+    #[test]
+    fn the_document_tells_apart_the_pair_the_derivation_could_not() {
+        let declared_none = build(
+            "t",
+            &document(
+                r#", "credential_requirement": "no-credential-required""#,
+                "[]",
+            ),
+        );
+        let withheld = build(
+            "t",
+            &document(r#", "credential_requirement": "no-credential""#, "[]"),
+        );
+        assert_eq!(
+            declared_none.operations[0].credential_requirement,
+            CredentialRequirement::NoneRequired
+        );
+        assert_eq!(
+            withheld.operations[0].credential_requirement,
+            CredentialRequirement::Withheld
+        );
+    }
+
+    /// **The minting join reaches [`Acquisition::Minted`] from document data alone** (S-001): the
+    /// document states which call mints the credential and where in the response the secret
+    /// arrives, and the table constructs the variant no shipped connector reaches yet.
+    #[test]
+    fn a_minting_join_in_the_document_reaches_acquisition_minted() {
+        let provider = build(
+            "t",
+            &document(
+                r#", "credential_requirement": "no-credential-required",
+                    "produces_credential": {{ "credential": "t.token", "secret": "/access_token" }}"#
+                    .replace("{{", "{")
+                    .replace("}}", "}")
+                    .as_str(),
+                r#"[{ "name": "t.token", "scheme": { "kind": "bearer" } }]"#,
+            ),
+        );
+        let credential = provider.credential("t.token").expect("t.token is declared");
+        assert_eq!(
+            credential.acquire,
+            Acquisition::Minted {
+                by: "t-thing-get",
+                from: "/access_token"
+            }
+        );
     }
 }

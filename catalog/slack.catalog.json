@@ -227,6 +227,29 @@
           "slack.bot_token"
         ]
       ],
+      "contract": {
+        "description": "Post a message to a Slack channel, visible to everyone in it. Slack answers HTTP 200 even on failure: check `ok` in the response body before treating the message as sent. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "thread_ts": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel",
+            "text",
+            "thread_ts"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Post a message to a Slack channel, visible to everyone in it. Slack answers HTTP 200 even on failure: check `ok` in the response body before treating the message as sent",
       "direction": "write",
       "expose": true,
@@ -241,7 +264,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "channel"
         },
         {
           "description": "Message text, in Slack's mrkdwn syntax",
@@ -251,7 +275,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "text"
         },
         {
           "description": "The `ts` of a parent message to reply to, threading the reply under it. Omit to post at channel level",
@@ -260,7 +285,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "thread_ts"
         }
       ],
       "quirks": {
@@ -327,6 +353,33 @@
           "slack.bot_token"
         ]
       ],
+      "contract": {
+        "description": "Read recent messages from a Slack channel, newest first. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `channel_not_found` appears at `error`. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "latest": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "oldest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel",
+            "limit",
+            "oldest",
+            "latest"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read recent messages from a Slack channel, newest first. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `channel_not_found` appears at `error`",
       "direction": "write",
       "expose": true,
@@ -341,7 +394,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "channel"
         },
         {
           "description": "Maximum messages to return in one call, newest first. Slack's documented maximum is 999 and it advises far less",
@@ -353,7 +407,8 @@
             "maximum": 999,
             "minimum": 1,
             "type": "integer"
-          }
+          },
+          "symbol": "limit"
         },
         {
           "description": "Only messages after this `ts`, e.g. `1728394857.123456`. Omit for no lower bound",
@@ -362,7 +417,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "oldest"
         },
         {
           "description": "Only messages up to this `ts`. Omit for no upper bound",
@@ -371,7 +427,8 @@
           "required": false,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "latest"
         }
       ],
       "quirks": {
@@ -447,6 +504,25 @@
           "slack.bot_token"
         ]
       ],
+      "contract": {
+        "description": "Look up one Slack user by id — display name, real name, time zone and whether they are a bot. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `user_not_found` appears at `error`. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "include_locale": {
+              "type": "boolean"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user",
+            "include_locale"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Look up one Slack user by id — display name, real name, time zone and whether they are a bot. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `user_not_found` appears at `error`",
       "direction": "write",
       "expose": true,
@@ -461,7 +537,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user"
         },
         {
           "description": "Also return the user's locale",
@@ -471,7 +548,8 @@
           "schema": {
             "default": false,
             "type": "boolean"
-          }
+          },
+          "symbol": "include_locale"
         }
       ],
       "quirks": {
@@ -527,6 +605,29 @@
           "slack.bot_token"
         ]
       ],
+      "contract": {
+        "description": "Add an emoji reaction to a message, visible to everyone in the channel. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `already_reacted` appears at `error`. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
+        "input_schema": {
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel",
+            "timestamp",
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Add an emoji reaction to a message, visible to everyone in the channel. Slack answers HTTP 200 even on failure: check `ok` in the response body, where an error such as `already_reacted` appears at `error`",
       "direction": "write",
       "expose": true,
@@ -541,7 +642,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "channel"
         },
         {
           "description": "The `ts` of the message to react to, e.g. `1728394857.123456`",
@@ -551,7 +653,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "timestamp"
         },
         {
           "description": "Emoji name without colons, e.g. `thumbsup` or `white_check_mark`",
@@ -561,7 +664,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "name"
         }
       ],
       "quirks": {

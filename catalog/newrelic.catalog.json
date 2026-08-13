@@ -69,6 +69,15 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "List every application this account is monitoring with APM, each with its current health status and a summary of its response time, throughput and error rate. Takes no argument. Also this connector's `verify`: a bounded read that runs unattended and needs nothing beyond the configured host and key",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List every application this account is monitoring with APM, each with its current health status and a summary of its response time, throughput and error rate. Takes no argument. Also this connector's `verify`: a bounded read that runs unattended and needs nothing beyond the configured host and key",
       "direction": "read",
       "endpoint": {
@@ -154,6 +163,21 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "Get one application by id, with its current health status and the same summary figures the list returns. Use this to re-read one application after a deploy rather than listing the whole account",
+        "input_schema": {
+          "properties": {
+            "application_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "application_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one application by id, with its current health status and the same summary figures the list returns. Use this to re-read one application after a deploy rather than listing the whole account",
       "direction": "read",
       "endpoint": {
@@ -173,7 +197,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "application_id"
         }
       ],
       "request": {
@@ -247,6 +272,15 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the account's alert policies — the groupings New Relic evaluates conditions under, each with its incident rollup preference. Takes no argument. This lists the policies themselves, not the conditions inside them and not anything currently alerting; for that, read newrelic-alert-violation-list",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's alert policies — the groupings New Relic evaluates conditions under, each with its incident rollup preference. Takes no argument. This lists the policies themselves, not the conditions inside them and not anything currently alerting; for that, read newrelic-alert-violation-list",
       "direction": "read",
       "endpoint": {
@@ -311,6 +345,15 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the account's alert violations from New Relic's default recent window. READ `closed_at` ON EVERY ENTRY: this returns closed violations as well as open ones, and a violation with a non-null `closed_at` has already resolved. Each entry names the policy and condition that fired and the entity that broke",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the account's alert violations from New Relic's default recent window. READ `closed_at` ON EVERY ENTRY: this returns closed violations as well as open ones, and a violation with a non-null `closed_at` has already resolved. Each entry names the policy and condition that fired and the entity that broke",
       "direction": "read",
       "endpoint": {
@@ -396,6 +439,21 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "List the deployment markers recorded against one application, most recent first. These are the markers New Relic overlays on its charts — read them to answer \"what shipped before this went wrong\"",
+        "input_schema": {
+          "properties": {
+            "application_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "application_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the deployment markers recorded against one application, most recent first. These are the markers New Relic overlays on its charts — read them to answer \"what shipped before this went wrong\"",
       "direction": "read",
       "endpoint": {
@@ -415,7 +473,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "application_id"
         }
       ],
       "request": {
@@ -480,6 +539,37 @@
           "newrelic.api_key"
         ]
       ],
+      "contract": {
+        "description": "Record a deployment marker against an application, timestamped now. The marker appears on every chart for that application and is visible to everyone on the account; this connector cannot remove one once recorded. Calling this twice records two deployments",
+        "input_schema": {
+          "properties": {
+            "application_id": {
+              "type": "string"
+            },
+            "changelog": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "application_id",
+            "revision",
+            "changelog",
+            "description",
+            "user"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Record a deployment marker against an application, timestamped now. The marker appears on every chart for that application and is visible to everyone on the account; this connector cannot remove one once recorded. Calling this twice records two deployments",
       "direction": "write",
       "endpoint": {
@@ -499,7 +589,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "application_id"
         },
         {
           "description": "The version that shipped — a commit sha, a tag or a build number. The only field New Relic requires, and the one every chart overlay is labelled with, so pass something a human can trace back to a build",
@@ -510,6 +601,7 @@
             "minLength": 1,
             "type": "string"
           },
+          "symbol": "revision",
           "wire": "deployment.revision"
         },
         {
@@ -520,6 +612,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "changelog",
           "wire": "deployment.changelog"
         },
         {
@@ -530,6 +623,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "description",
           "wire": "deployment.description"
         },
         {
@@ -540,6 +634,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "user",
           "wire": "deployment.user"
         }
       ],

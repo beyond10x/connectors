@@ -44,6 +44,15 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the boards this access token can see, with each board's id, name and description. Returns Miro's first page only; this connector declares no cursor or limit parameter (see the connector's header note). The board `id` returned here is what every other operation in this connector needs as `board_id`",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the boards this access token can see, with each board's id, name and description. Returns Miro's first page only; this connector declares no cursor or limit parameter (see the connector's header note). The board `id` returned here is what every other operation in this connector needs as `board_id`",
       "direction": "read",
       "expose": true,
@@ -107,6 +116,21 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "List the items on a board, of any type (sticky note, shape, text or frame). Each item's shape depends on its `type`: sticky notes and text carry `data.content`, shapes carry `data.content` and `data.shape`, frames carry `data.title`. Returns Miro's first page only; this connector declares no cursor or limit parameter (see the connector's header note)",
+        "input_schema": {
+          "properties": {
+            "board_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "board_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the items on a board, of any type (sticky note, shape, text or frame). Each item's shape depends on its `type`: sticky notes and text carry `data.content`, shapes carry `data.content` and `data.shape`, frames carry `data.title`. Returns Miro's first page only; this connector declares no cursor or limit parameter (see the connector's header note)",
       "direction": "read",
       "expose": true,
@@ -120,7 +144,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "board_id"
         }
       ],
       "request": {
@@ -381,6 +406,25 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "Get one item from a board, of any type (sticky note, shape, text or frame). Its shape depends on its `type` — see miro-board-item-list's description for what each carries",
+        "input_schema": {
+          "properties": {
+            "board_id": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "board_id",
+            "item_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get one item from a board, of any type (sticky note, shape, text or frame). Its shape depends on its `type` — see miro-board-item-list's description for what each carries",
       "direction": "read",
       "expose": true,
@@ -394,7 +438,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "board_id"
         },
         {
           "description": "The item's id, as returned by miro-board-item-list",
@@ -403,7 +448,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "item_id"
         }
       ],
       "request": {
@@ -645,6 +691,25 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create a sticky note on a board. Miro does not deduplicate: creating the same content twice makes two sticky notes, so this is not idempotent. The created note, with its assigned id, is in the response",
+        "input_schema": {
+          "properties": {
+            "board_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "board_id",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create a sticky note on a board. Miro does not deduplicate: creating the same content twice makes two sticky notes, so this is not idempotent. The created note, with its assigned id, is in the response",
       "direction": "write",
       "expose": true,
@@ -658,7 +723,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "board_id"
         },
         {
           "description": "The sticky note's text content, as HTML",
@@ -668,6 +734,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "content",
           "wire": "data.content"
         }
       ],
@@ -755,6 +822,29 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "Update a sticky note's text content. The content sent replaces what was there, so setting the same content twice ends in the same state. The updated note is in the response",
+        "input_schema": {
+          "properties": {
+            "board_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "board_id",
+            "item_id",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Update a sticky note's text content. The content sent replaces what was there, so setting the same content twice ends in the same state. The updated note is in the response",
       "direction": "write",
       "expose": true,
@@ -768,7 +858,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "board_id"
         },
         {
           "description": "The sticky note's id, as returned by miro-board-item-list or miro-sticky-note-create",
@@ -777,7 +868,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "item_id"
         },
         {
           "description": "The sticky note's new text content, as HTML, replacing the existing content entirely",
@@ -787,6 +879,7 @@
           "schema": {
             "type": "string"
           },
+          "symbol": "content",
           "wire": "data.content"
         }
       ],
@@ -875,6 +968,25 @@
           "miro.access_token"
         ]
       ],
+      "contract": {
+        "description": "Delete one sticky note. There is no undo route in the API. Responds with no content",
+        "input_schema": {
+          "properties": {
+            "board_id": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "board_id",
+            "item_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete one sticky note. There is no undo route in the API. Responds with no content",
       "direction": "write",
       "expose": true,
@@ -888,7 +1000,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "board_id"
         },
         {
           "description": "The sticky note's id, as returned by miro-board-item-list or miro-sticky-note-create",
@@ -897,7 +1010,8 @@
           "required": true,
           "schema": {
             "type": "string"
-          }
+          },
+          "symbol": "item_id"
         }
       ],
       "request": {

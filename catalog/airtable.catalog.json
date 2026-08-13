@@ -29,6 +29,29 @@
           "airtable.access_token"
         ]
       ],
+      "contract": {
+        "description": "Read one record from a table — its cell values are under `fields` in the response, keyed by column name. Returns every column the token can see, in Airtable's default JSON cell format: narrowing or reformatting them needs the `fields[]` and `cellFormat` query parameters this connector cannot encode. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "base_id": {
+              "type": "string"
+            },
+            "record_id": {
+              "type": "string"
+            },
+            "table_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "base_id",
+            "table_id",
+            "record_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Read one record from a table — its cell values are under `fields` in the response, keyed by column name. Returns every column the token can see, in Airtable's default JSON cell format: narrowing or reformatting them needs the `fields[]` and `cellFormat` query parameters this connector cannot encode",
       "direction": "read",
       "expose": true,
@@ -44,6 +67,7 @@
             "pattern": "^app[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "base_id",
           "wire": "baseId"
         },
         {
@@ -55,6 +79,7 @@
             "pattern": "^tbl[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "table_id",
           "wire": "tableIdOrName"
         },
         {
@@ -66,6 +91,7 @@
             "pattern": "^rec[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "record_id",
           "wire": "recordId"
         }
       ],
@@ -113,6 +139,27 @@
           "airtable.access_token"
         ]
       ],
+      "contract": {
+        "description": "Create one record in a table. Cell values are supplied under `fields`, keyed by column name, and must already be in the exact JSON form each column expects — Airtable's `typecast` coercion cannot be requested yet (see the connector's notes). The created record, with its `rec…` id, is in the response. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "base_id": {
+              "type": "string"
+            },
+            "cell_values": {},
+            "table_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "base_id",
+            "table_id",
+            "cell_values"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Create one record in a table. Cell values are supplied under `fields`, keyed by column name, and must already be in the exact JSON form each column expects — Airtable's `typecast` coercion cannot be requested yet (see the connector's notes). The created record, with its `rec…` id, is in the response",
       "direction": "write",
       "expose": true,
@@ -128,6 +175,7 @@
             "pattern": "^app[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "base_id",
           "wire": "baseId"
         },
         {
@@ -139,6 +187,7 @@
             "pattern": "^tbl[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "table_id",
           "wire": "tableIdOrName"
         },
         {
@@ -150,6 +199,7 @@
             "description": "A map from column name to cell value. Untyped here because the columns are the base's own schema",
             "type": "object"
           },
+          "symbol": "cell_values",
           "wire": "fields"
         }
       ],
@@ -208,6 +258,31 @@
           "airtable.access_token"
         ]
       ],
+      "contract": {
+        "description": "Update one record's cell values. The write is sparse: only the columns named in `fields` change and every other column of the record is left exactly as it was. Values must already be in the form each column expects — `typecast` coercion cannot be requested yet. The updated record is in the response. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "base_id": {
+              "type": "string"
+            },
+            "cell_values": {},
+            "record_id": {
+              "type": "string"
+            },
+            "table_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "base_id",
+            "table_id",
+            "record_id",
+            "cell_values"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Update one record's cell values. The write is sparse: only the columns named in `fields` change and every other column of the record is left exactly as it was. Values must already be in the form each column expects — `typecast` coercion cannot be requested yet. The updated record is in the response",
       "direction": "write",
       "expose": true,
@@ -223,6 +298,7 @@
             "pattern": "^app[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "base_id",
           "wire": "baseId"
         },
         {
@@ -234,6 +310,7 @@
             "pattern": "^tbl[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "table_id",
           "wire": "tableIdOrName"
         },
         {
@@ -245,6 +322,7 @@
             "pattern": "^rec[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "record_id",
           "wire": "recordId"
         },
         {
@@ -256,6 +334,7 @@
             "description": "A map from column name to cell value. Untyped here because the columns are the base's own schema",
             "type": "object"
           },
+          "symbol": "cell_values",
           "wire": "fields"
         }
       ],
@@ -314,6 +393,29 @@
           "airtable.access_token"
         ]
       ],
+      "contract": {
+        "description": "Delete one record and every cell value in it. There is no API route back: Airtable's trash and revision history are UI features on a retention window, not endpoints, so a flux run cannot undo this. Responds `{\"id\": …, \"deleted\": true}`. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "base_id": {
+              "type": "string"
+            },
+            "record_id": {
+              "type": "string"
+            },
+            "table_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "base_id",
+            "table_id",
+            "record_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Delete one record and every cell value in it. There is no API route back: Airtable's trash and revision history are UI features on a retention window, not endpoints, so a flux run cannot undo this. Responds `{\"id\": …, \"deleted\": true}`",
       "direction": "write",
       "expose": true,
@@ -329,6 +431,7 @@
             "pattern": "^app[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "base_id",
           "wire": "baseId"
         },
         {
@@ -340,6 +443,7 @@
             "pattern": "^tbl[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "table_id",
           "wire": "tableIdOrName"
         },
         {
@@ -351,6 +455,7 @@
             "pattern": "^rec[A-Za-z0-9]+$",
             "type": "string"
           },
+          "symbol": "record_id",
           "wire": "recordId"
         }
       ],

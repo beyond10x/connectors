@@ -191,6 +191,15 @@
           "anthropic.console_oauth"
         ]
       ],
+      "contract": {
+        "description": "List the models available to this API key, most recently released first. Unpaginated — this connector cannot request a further page. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the models available to this API key, most recently released first. Unpaginated — this connector cannot request a further page",
       "direction": "read",
       "expose": true,
@@ -268,6 +277,21 @@
           "anthropic.console_oauth"
         ]
       ],
+      "contract": {
+        "description": "Retrieve one model by id, or resolve an alias to the model id it currently points at. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "model_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "model_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve one model by id, or resolve an alias to the model id it currently points at",
       "direction": "read",
       "expose": true,
@@ -282,7 +306,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "model_id"
         }
       ],
       "quirks": {
@@ -346,6 +371,15 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "Get the organization this Admin API key belongs to. Takes no parameters; useful for confirming which organization a key resolves to. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Get the organization this Admin API key belongs to. Takes no parameters; useful for confirming which organization a key resolves to",
       "direction": "read",
       "expose": true,
@@ -396,6 +430,15 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "List the people in this organization, with each member's name, email address, organization role and the date they joined. Returns personal data about real individuals. Unpaginated — this connector cannot request a further page, so on an organization larger than one page this is a sample and not a roster. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the people in this organization, with each member's name, email address, organization role and the date they joined. Returns personal data about real individuals. Unpaginated — this connector cannot request a further page, so on an organization larger than one page this is a sample and not a roster",
       "direction": "read",
       "expose": true,
@@ -484,6 +527,21 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "Retrieve one organization member by user id, returning their name, email address, organization role and join date. Returns personal data about a real individual. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve one organization member by user id, returning their name, email address, organization role and join date. Returns personal data about a real individual",
       "direction": "read",
       "expose": true,
@@ -498,7 +556,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user_id"
         }
       ],
       "quirks": {
@@ -560,6 +619,15 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "List the organization's workspaces. Unpaginated and excludes archived workspaces by default — this connector cannot request a further page or ask for archived ones. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the organization's workspaces. Unpaginated and excludes archived workspaces by default — this connector cannot request a further page or ask for archived ones",
       "direction": "read",
       "expose": true,
@@ -637,6 +705,21 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "Retrieve one workspace by id, including its name, creation date, whether it is archived, and its data-residency configuration. Unlike anthropic-workspaces-list this reaches an archived workspace, since the id is given rather than filtered for. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve one workspace by id, including its name, creation date, whether it is archived, and its data-residency configuration. Unlike anthropic-workspaces-list this reaches an archived workspace, since the id is given rather than filtered for",
       "direction": "read",
       "expose": true,
@@ -651,7 +734,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "workspace_id"
         }
       ],
       "quirks": {
@@ -741,6 +825,21 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "List who belongs to one workspace and the role each holds in it. Returns the user ids of real individuals; resolve one to a name and email with anthropic-organization-member-get. Unpaginated — this connector cannot request a further page, so on a workspace larger than one page this is a sample and not a roster. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List who belongs to one workspace and the role each holds in it. Returns the user ids of real individuals; resolve one to a name and email with anthropic-organization-member-get. Unpaginated — this connector cannot request a further page, so on a workspace larger than one page this is a sample and not a roster",
       "direction": "read",
       "expose": true,
@@ -755,7 +854,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "workspace_id"
         }
       ],
       "quirks": {
@@ -832,6 +932,25 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "Retrieve one person's membership of one workspace, and the role they hold in it. This is the direct answer to whether a given user is in a given workspace; it returns the user id of a real individual. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {
+            "user_id": {
+              "type": "string"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "user_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "Retrieve one person's membership of one workspace, and the role they hold in it. This is the direct answer to whether a given user is in a given workspace; it returns the user id of a real individual",
       "direction": "read",
       "expose": true,
@@ -846,7 +965,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "workspace_id"
         },
         {
           "description": "The member's user id, as returned in `id` by anthropic-organization-members-list",
@@ -856,7 +976,8 @@
           "schema": {
             "minLength": 1,
             "type": "string"
-          }
+          },
+          "symbol": "user_id"
         }
       ],
       "quirks": {
@@ -909,6 +1030,15 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "List the organization's API keys, with each key's name, status and a redacted hint — never the key itself. Unpaginated and unfiltered. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the organization's API keys, with each key's name, status and a redacted hint — never the key itself. Unpaginated and unfiltered",
       "direction": "read",
       "expose": true,
@@ -990,6 +1120,15 @@
           "anthropic.console_oauth_admin"
         ]
       ],
+      "contract": {
+        "description": "List the organization's invites, with the email address invited, the role offered, and whether the invite is still pending. Returns personal data — an email address for a real person. Unpaginated and unfiltered by status, so a `pending` invite must be selected from the returned entries rather than asked for. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error/message`, its error code at `/error/type` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
       "description": "List the organization's invites, with the email address invited, the role offered, and whether the invite is still pending. Returns personal data — an email address for a real person. Unpaginated and unfiltered by status, so a `pending` invite must be selected from the returned entries rather than asked for",
       "direction": "read",
       "expose": true,

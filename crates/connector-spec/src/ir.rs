@@ -1550,8 +1550,9 @@ impl Operation {
     /// - **Keyed by the caller-facing [`Param::name`], never the wire name.** The vendor's own
     ///   spelling stays exactly where it already lives, in [`Param::wire`]; a schema keyed by it
     ///   would name arguments no caller passes. Where the caller-facing name is not a spellable
-    ///   Flux symbol — babelforce's `time.start` — the emitted `op` declares a normalized symbol
-    ///   instead, and that mapping stays in `connector-flux`'s `names` module, which owns it.
+    ///   symbol — babelforce's `time.start` — the document's contract declares a normalized symbol
+    ///   instead, and that mapping lives in this crate's [`crate::names`] module, which owns it
+    ///   (S-001; the predecessor's emitter owned it before).
     /// - **Each property is the declared schema, verbatim.** This composes; it does not enrich.
     ///   Folding [`Param::description`] in would be this function improving a vendor's declaration,
     ///   and raising declaration quality is its own work.
