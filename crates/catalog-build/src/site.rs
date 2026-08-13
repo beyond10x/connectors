@@ -46,8 +46,9 @@
 //! provider index by hand, reached from the other direction.
 
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::Serialize;
 
 use connector_spec::{
@@ -68,6 +69,30 @@ use crate::surface;
 /// it** — every consumer reads by name, so a new key is invisible to one that does not know it, and
 /// C-37's `oip` is the case this rule is written for.
 const SCHEMA_VERSION: u32 = 4;
+
+/// The committed contract for the generated site projection.
+///
+/// Keeping it in the binary makes validation part of artifact construction rather than a check a
+/// caller can accidentally omit. The repository-wide JSON governance test independently proves
+/// that this schema is valid Draft 2020-12 and that its path is registered.
+const SITE_SCHEMA: &str = include_str!("../../../web/catalog.schema.json");
+
+fn site_validator() -> &'static jsonschema::Validator {
+    static VALIDATOR: OnceLock<jsonschema::Validator> = OnceLock::new();
+    VALIDATOR.get_or_init(|| {
+        let schema: serde_json::Value =
+            serde_json::from_str(SITE_SCHEMA).expect("the embedded site catalog schema is JSON");
+        assert_eq!(
+            schema.get("$schema").and_then(serde_json::Value::as_str),
+            Some("https://json-schema.org/draft/2020-12/schema"),
+            "the site catalog schema declares the pinned Draft 2020-12 meta-schema"
+        );
+        jsonschema::draft202012::meta::validate(&schema)
+            .expect("the embedded site catalog schema is valid Draft 2020-12");
+        jsonschema::draft202012::new(&schema)
+            .expect("the embedded site catalog schema compiles as Draft 2020-12")
+    })
+}
 
 /// The whole catalogue: every provider, every operation, and what does not work.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -832,6 +857,17 @@ pub fn document(providers: Vec<ProviderEntry>) -> Result<String> {
         generator: crate::seam::generator(),
         providers,
     };
+    let document = serde_json::to_value(document)?;
+    let errors: Vec<_> = site_validator()
+        .iter_errors(&document)
+        .map(|error| error.to_string())
+        .collect();
+    if !errors.is_empty() {
+        bail!(
+            "generated site catalog violates web/catalog.schema.json:\n{}",
+            errors.join("\n")
+        );
+    }
     Ok(format!("{}\n", serde_json::to_string_pretty(&document)?))
 }
 

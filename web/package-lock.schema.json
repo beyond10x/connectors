@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/web/package-lock.schema.json",
+  "title": "npm package-lock document used by the connectors documentation site",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "lockfileVersion",
+    "requires",
+    "packages"
+  ],
+  "properties": {
+    "name": {
+      "const": "b10x-connectors-site"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lockfileVersion": {
+      "const": 3
+    },
+    "requires": {
+      "const": true
+    },
+    "packages": {
+      "type": "object",
+      "required": [
+        ""
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/package"
+      }
+    }
+  },
+  "$defs": {
+    "nonempty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "string_map": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/nonempty_string"
+      }
+    },
+    "string_array": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonempty_string"
+      }
+    },
+    "funding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "url": {
+          "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "peer_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "optional": {
+          "type": "boolean"
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "version": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "license": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "resolved": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "integrity": {
+          "$ref": "#/$defs/nonempty_string"
+        },
+        "dev": {
+          "type": "boolean"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "peer": {
+          "type": "boolean"
+        },
+        "hasInstallScript": {
+          "type": "boolean"
+        },
+        "dependencies": {
+          "$ref": "#/$defs/string_map"
+        },
+        "devDependencies": {
+          "$ref": "#/$defs/string_map"
+        },
+        "optionalDependencies": {
+          "$ref": "#/$defs/string_map"
+        },
+        "peerDependencies": {
+          "$ref": "#/$defs/string_map"
+        },
+        "peerDependenciesMeta": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/peer_meta"
+          }
+        },
+        "bin": {
+          "$ref": "#/$defs/string_map"
+        },
+        "engines": {
+          "$ref": "#/$defs/string_map"
+        },
+        "cpu": {
+          "$ref": "#/$defs/string_array"
+        },
+        "os": {
+          "$ref": "#/$defs/string_array"
+        },
+        "libc": {
+          "$ref": "#/$defs/string_array"
+        },
+        "funding": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/funding"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/funding"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -26,6 +26,8 @@ jobs:
         run: cargo fetch --locked
       - name: Build
         run: cargo build --workspace --locked
+      - name: Validate every JSON document and schema
+        run: cargo test --locked -p catalog-build --test main json_governance::
       - name: Test
         run: cargo test --workspace --locked --no-fail-fast
       - name: Clippy
