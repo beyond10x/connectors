@@ -78,7 +78,10 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    vendor's published documentation and name the doc URLs in it — but never fabricate a spec
    document to ingest. For an agent specifically: writing endpoint paths, parameters or auth
    details from memory is fabrication; every operation you declare must be grounded in a
-   source you fetched and can cite.
+   source you fetched and can cite. When hunting a spec location, mine the vendored competitor
+   catalogs first (`docs/research/vendor/` — Nango's providers.yaml alone carries docs URLs and
+   auth endpoints for ~950 vendors); `connectors sources mint <vendor>` (S-017) automates the
+   lookup with per-field citations and printed disagreements.
 3. **Identity is irreversible.** In `providers/<id>.toml`: `id` (lowercase, stable, public),
    `authority` (reverse-DNS, e.g. `com.gitlab.api` — it leads every credential path and is
    never repointed once published), and operation ids (one namespace per service, public API

@@ -5,7 +5,7 @@ pillar: Catalog
 status: ready
 priority: 5
 design:
-epic: catalog-day-one
+epic: sources
 areas: [catalog-build, connector-spec]
 note: "SOURCES.toml must never be prose + a manual runbook. At 8 ingest providers hand-comparison survives; at catalog scale (Nango: 957 providers) it cannot. Code owns the index."
 ---
