@@ -2,7 +2,7 @@
 id: S-019
 title: "Retire the flux-connectors identity from the artifacts"
 pillar: Catalog
-status: backlog
+status: done
 priority:
 design:
 epic: post-m1
@@ -41,17 +41,17 @@ half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://git
 
 ## Acceptance
 
-- [ ] The generator identity names **this** repository, the workspace version is chosen deliberately
+- [x] The generator identity names **this** repository, the workspace version is chosen deliberately
       (a fresh line, or a continuation of 0.26.0 — either is defensible), and the `User-Agent` product
       token matches both. All three move in **one commit** with **one** whole-catalogue regeneration:
       55 documents, the pack digest, `connectors.lock`, `web/public/catalog.json`.
-- [ ] The reasons are replaced, not deleted: `Cargo.toml`'s load-bearing comment and `seam.rs`'s
+- [x] The reasons are replaced, not deleted: `Cargo.toml`'s load-bearing comment and `seam.rs`'s
       generator doc say what the version means **now** (and that the differential is retired), rather
       than losing the paragraph that explained the old pin.
-- [ ] `DEFAULT_USER_AGENT`'s three assertions in `request.rs` move with the value, so the constant
+- [x] `DEFAULT_USER_AGENT`'s three assertions in `request.rs` move with the value, so the constant
       stays derived from the manifest (`CARGO_PKG_VERSION`, `CARGO_PKG_REPOSITORY`) and cannot go
       stale at a release.
-- [ ] The **whole identity inventory is enumerated and each item decided** — renamed now, or kept with
+- [x] The **whole identity inventory is enumerated and each item decided** — renamed now, or kept with
       a written reason. Known members, measured post-M1:
       the pack magic `flux-connectors-catalog-pack` (`crates/catalog-reader/src/lib.rs:70` — renaming
       it is a pack-format break, so decide it here or state why it stays);
@@ -62,15 +62,28 @@ half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://git
       `web/package.json`'s `name` and `description`;
       and the site's `PATH_RESOLVER = 'flux-connectors:path-resolver'` injection key.
       A rename that leaves half the strings behind has not retired anything.
-- [ ] After the rewrite the tree is a fixed point: `catalog build` writes nothing on a second run,
+- [x] After the rewrite the tree is a fixed point: `catalog build` writes nothing on a second run,
       `catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)) is green on the new lock, and
       the catalog invariants pass unchanged.
-- [ ] `grep -ri flux-connectors` over `crates/`, `catalog/`, `web/` and the manifests returns only the
+- [x] `grep -ri flux-connectors` over `crates/`, `catalog/`, `web/` and the manifests returns only the
       decided exceptions plus historical references in documentation (design series, stories,
       predecessor citations) — history stays legible, artifacts do not.
 
 ## Progress
-- (not started)
+
+- 2026-08-13 — done in the coordinated schema wave. The product identity is `connectors`; this is
+  the first `b10x/connectors` artifact line, version `0.1.0`. Canonical generator strings,
+  the derived request `User-Agent`, all internal crate versions, schema identifiers, pack magic,
+  package metadata and the site path-resolver key moved together and were regenerated once.
+- Inventory decisions: `connectors.lock` already used the product-neutral `catalog build/check`
+  commands and stayed; the pack magic changed to `connectors-catalog-pack` because no released
+  B10x reader contract existed to preserve. `SOURCES.toml`, `AGENTS.md`, root/provider
+  comments and design/story prose retain predecessor citations as history.
+- The explorer's `/flux-connectors/` GitHub Pages base, its matching test, and its visual labels are
+  deliberately retained until S-018 repairs and republishes the explorer. Renaming those alone
+  would produce a broken deployment path and would exceed this artifact-identity story.
+- The second build was a fixed point; `catalog diff`, `catalog check`, the whole-catalog invariants,
+  reader checks and request identity assertions pass on the new hashes.
 
 ## Notes
 

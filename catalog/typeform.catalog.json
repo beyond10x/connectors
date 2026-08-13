@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Typeform access token sent as a bearer — a personal access token or an OAuth2 access token",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Typeform: read the authenticated account, forms and their responses, and delete responses",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,19 +55,28 @@
       "credential_requirement": "declared",
       "description": "Get the Typeform account this access token authenticates as: its account id, display alias, own account email and interface language. Confirms the token resolves. Takes no parameters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/description"
+      },
       "expose": true,
       "id": "typeform-user-me",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/description"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_id": {
@@ -131,9 +140,19 @@
       "credential_requirement": "declared",
       "description": "List the forms in the authenticated account, most recently updated forms sorting available. Returns each form's id, title and public/private status but not its questions — use typeform-form-get for a form's fields",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/description"
+      },
       "expose": true,
       "id": "typeform-form-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Page number, 1-based",
@@ -189,12 +208,8 @@
           "symbol": "order_by"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/description"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -225,6 +240,9 @@
         ],
         "url": "{base}/forms"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -310,9 +328,19 @@
       "credential_requirement": "declared",
       "description": "Get one form's own definition: its title, language, rendering type and questions (fields), plus its welcome and thank-you screens. Does not return any response data — use typeform-response-list for that",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/description"
+      },
       "expose": true,
       "id": "typeform-form-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The form's own id, from typeform-form-list's `id` field, or the trailing path segment of the form's own URL (the part after `/to/`)",
@@ -326,16 +354,15 @@
           "symbol": "form_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/description"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/forms/{form_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "fields": {
@@ -481,9 +508,19 @@
       "credential_requirement": "declared",
       "description": "List one form's responses, newest first by default. Paginate with `before`/`after`, each naming the `token` of a response already retrieved, to page toward older or newer responses respectively; `page_size` alone returns only the first page. Each response's `answers` holds whatever that respondent typed or selected — this connector never inspects or filters on answer content",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/description"
+      },
       "expose": true,
       "id": "typeform-response-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The form's own id, from typeform-form-list's `id` field, or the trailing path segment of the form's own URL (the part after `/to/`)",
@@ -587,12 +624,8 @@
           "symbol": "sort"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/description"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -641,6 +674,9 @@
         ],
         "url": "{base}/forms/{form_id}/responses"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -755,9 +791,19 @@
       "credential_requirement": "declared",
       "description": "Permanently delete one or more of a form's responses by their own token. There is no undelete: once deleted, a response's answers are gone. Deletion is asynchronous — a successful call confirms the request was registered, not that the responses are already gone",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/description"
+      },
       "expose": true,
       "id": "typeform-response-delete",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The form's own id, from typeform-form-list's `id` field, or the trailing path segment of the form's own URL (the part after `/to/`)",
@@ -782,12 +828,8 @@
           "symbol": "included_response_ids"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/description"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "DELETE",
         "query": [
@@ -800,13 +842,15 @@
         ],
         "url": "{base}/forms/{form_id}/responses"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "destructive",
       "semantic_effects": [],
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.typeform.com",

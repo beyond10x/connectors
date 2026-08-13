@@ -198,6 +198,12 @@ name = "default"
 tags = ["design"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-board-list"
 method = "GET"
 direction = "read"
@@ -214,6 +220,12 @@ properties = { data = { type = "array", items = { type = "object", required = ["
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-board-item-list"
 method = "GET"
 direction = "read"
@@ -241,6 +253,12 @@ properties = { data = { type = "array", items = { oneOf = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-board-item-get"
 method = "GET"
 direction = "read"
@@ -272,6 +290,12 @@ oneOf = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-sticky-note-create"
 method = "POST"
 direction = "write"
@@ -306,6 +330,12 @@ properties = { id = { type = "string" }, type = { type = "string", const = "stic
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-sticky-note-update"
 method = "PATCH"
 direction = "write"
@@ -353,6 +383,12 @@ properties = { id = { type = "string" }, type = { type = "string", const = "stic
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "miro-sticky-note-delete"
 method = "DELETE"
 direction = "write"

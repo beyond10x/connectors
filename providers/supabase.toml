@@ -224,6 +224,12 @@ name = "default"
 tags = ["database", "infrastructure"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "supabase-schema-describe"
 method = "GET"
 direction = "read"
@@ -247,6 +253,12 @@ properties = { swagger = { type = "string", description = "The OpenAPI version o
 # The shape a caller actually needs is discoverable at runtime and from a *real* schema, which is
 # what supabase-schema-describe is for, and the description below says so.
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "supabase-rows-list"
 method = "GET"
 direction = "read"
@@ -280,6 +292,12 @@ schema = { type = "integer", minimum = 1 }
 # know which sign-in buttons to render. It requires the `apikey` header and nothing else, and it
 # returns configuration only: no user, no identity, no token.
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "supabase-auth-settings"
 method = "GET"
 direction = "read"

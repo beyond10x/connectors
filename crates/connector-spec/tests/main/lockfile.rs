@@ -2,7 +2,7 @@
 //!
 //! Two properties are the whole story, and both are here as tests rather than as intentions:
 //!
-//! 1. **Unchanged inputs reproduce the file byte for byte.** `flux-connectors check` (C-14) is only
+//! 1. **Unchanged inputs reproduce the file byte for byte.** `connectors check` (C-14) is only
 //!    worth running if a clean tree is silent, so anything that varies without an input changing —
 //!    a timestamp, a map's iteration order, the order providers were discovered in — would make the
 //!    tool cry wolf until someone turned it off.
@@ -40,6 +40,12 @@ path = "/api/v2/tickets/{ticket_id}.json"
 description = "Show one ticket"
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "ticket_id"
@@ -52,7 +58,7 @@ const SPEC: &str = r#"{"openapi":"3.0.0","info":{"title":"Zendesk","version":"1.
 /// Where [`SPEC`] sits in the cache, spelled as the two fixtures below spell `[spec] path`.
 const SPEC_PATH: &str = "specs/zendesk/1.0.0.json";
 
-const GENERATOR: &str = "flux-connectors 0.1.0";
+const GENERATOR: &str = "connectors 0.1.0";
 
 /// The committed bytes one build reads, plus the identity of the generator reading them — every
 /// input `connectors.lock` claims to cover.
@@ -142,7 +148,6 @@ fn bare(provenance: Provenance) -> Connector {
     Connector {
         id: "zendesk".into(),
         authority: None,
-        runtime: connector_spec::Runtime::Http,
         api_version: None,
         services: Vec::new(),
         vendor: "Zendesk".into(),
@@ -418,7 +423,7 @@ version = 1
 
 [[provider]]
 id = "zendesk"
-generator = "flux-connectors 0.1.0"
+generator = "connectors 0.1.0"
 source_url = "https://example.test/openapi.json"
 upstream_version = "0.7.0"
 spec_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -561,7 +566,7 @@ fn a_changed_generator_moves_the_artifact_hashes_alone() {
     let before = entry(&Inputs::default());
 
     let after = entry(&Inputs {
-        generator: "flux-connectors 0.2.0".to_string(),
+        generator: "connectors 0.2.0".to_string(),
         ..Inputs::default()
     });
 

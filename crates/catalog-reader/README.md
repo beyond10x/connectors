@@ -1,6 +1,6 @@
 # codewandler-connector-catalog-reader
 
-Dependency-free reader for the flux-connectors **catalog pack** — every connector's canonical
+Dependency-free reader for the connectors **catalog pack** — every connector's canonical
 document, compiled into one embedded, versioned, digest-checked file.
 
 The pack is built by [`catalog build`](https://github.com/b10x/connectors)

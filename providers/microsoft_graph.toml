@@ -313,6 +313,12 @@ sha256 = "d3cf91ee72c4f23f7b1a80b5d7796462bef5ea448dd268d328233b8f0479f57a"
 
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "me.ListMessages"
 rename = "microsoft_graph-mail-message-list"
 service = "mail"
@@ -330,6 +336,12 @@ omit.query = [
 ]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "me.outlook.ListMasterCategories"
 rename = "microsoft_graph-calendar-category-list"
 service = "calendar"
@@ -339,6 +351,12 @@ idempotency = "idempotent"
 omit.query = ["$search", "$filter", "$count", "$orderby", "$select", "$expand"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "me.outlook.supportedTimeZones-5c4f"
 rename = "microsoft_graph-calendar-time-zone-list"
 service = "calendar"
@@ -348,6 +366,12 @@ idempotency = "idempotent"
 omit.query = ["$search", "$filter", "$count"]
 
 [[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 select = "me.outlook.supportedLanguages"
 rename = "microsoft_graph-calendar-language-list"
 service = "calendar"
@@ -403,6 +427,12 @@ binds = "credential.microsoft_graph.access_token"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-mail-message-get"
 service = "mail"
 method = "GET"
@@ -423,13 +453,19 @@ type = "object"
 required = ["id", "subject"]
 properties = { id = { type = "string", description = "The message's id — what this operation takes" }, subject = { type = "string" }, bodyPreview = { type = "string", description = "A plain-text extract of the body, truncated. Personal correspondence — never an example value here" }, body = { type = "object", description = "`{contentType, content}` — HTML by default. Send `Prefer: outlook.body-content-type=\"text\"` to get plain text instead, which this connector does not do: no header parameter is declared, so every body here arrives as HTML", properties = { contentType = { type = "string", enum = ["text", "html"] }, content = { type = "string" } } }, from = { type = "object", description = "`{emailAddress: {name, address}}` — the sender. Personal data, never an example value here", properties = { emailAddress = { type = "object", properties = { name = { type = "string" }, address = { type = "string" } } } } }, toRecipients = { type = "array", description = "Each `{emailAddress: {name, address}}`. Personal data, never an example value here", items = { type = "object" } }, receivedDateTime = { type = "string", format = "date-time" }, sentDateTime = { type = "string", format = "date-time" }, hasAttachments = { type = "boolean" }, isRead = { type = "boolean" }, isDraft = { type = "boolean" }, importance = { type = "string", enum = ["low", "normal", "high"] }, conversationId = { type = "string", description = "Groups messages in the same thread" }, internetMessageId = { type = "string", description = "The RFC 2822 `Message-ID`, distinct from Graph's own `id`" }, parentFolderId = { type = "string", description = "The mail folder this message currently lives in" }, webLink = { type = "string", format = "uri", description = "Opens the message in Outlook on the web. Requires the viewer's own sign-in session; does not itself carry a credential" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-mail-message-reply"
 service = "mail"
 method = "POST"
@@ -467,13 +503,19 @@ schema = { type = "string" }
 # same honest-absence convention `zoom-meeting-delete` and `front-conversation-reply`'s queuing
 # acknowledgement both carry. A `{}` here would assert a body that never arrives.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-mail-folder-list"
 service = "mail"
 method = "GET"
@@ -488,13 +530,19 @@ type = "object"
 required = ["value"]
 properties = { value = { type = "array", description = "First page only — see this operation's own description. Each folder is `{id, displayName, parentFolderId, childFolderCount, unreadItemCount, totalItemCount, isHidden}`", items = { type = "object", required = ["id", "displayName"], properties = { id = { type = "string" }, displayName = { type = "string", description = "e.g. `Inbox`, `Drafts`, `Sent Items` — localized to the mailbox's own language" }, parentFolderId = { type = "string" }, childFolderCount = { type = "integer" }, unreadItemCount = { type = "integer" }, totalItemCount = { type = "integer" }, isHidden = { type = "boolean" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-calendar-event-get"
 service = "calendar"
 method = "GET"
@@ -520,13 +568,19 @@ type = "object"
 required = ["id", "subject", "isCancelled"]
 properties = { id = { type = "string", description = "The event's id — what this operation takes" }, subject = { type = "string", description = "Absent-titled events render as an empty string, not a missing member" }, bodyPreview = { type = "string" }, body = { type = "object", description = "`{contentType, content}` — HTML by default, the same convention as the mail body above", properties = { contentType = { type = "string", enum = ["text", "html"] }, content = { type = "string" } } }, start = { type = "object", description = "`{dateTime, timeZone}`. By default `dateTime` is UTC; a `Prefer: outlook.timezone` header (not sent here) would change it", properties = { dateTime = { type = "string" }, timeZone = { type = "string" } } }, end = { type = "object", description = "Same shape as `start`", properties = { dateTime = { type = "string" }, timeZone = { type = "string" } } }, isAllDay = { type = "boolean", description = "When true, `start`/`end` represent midnight in the stated time zone rather than a real time of day" }, isCancelled = { type = "boolean", description = "**A cancelled event is still returned by this operation**, with `isCancelled: true`. Check this before treating the event as live" }, location = { type = "object", description = "`{displayName, ...}` — free text, not a structured address", properties = { displayName = { type = "string" } } }, organizer = { type = "object", description = "`{emailAddress: {name, address}}` — who owns the event. Personal data, never an example value here", properties = { emailAddress = { type = "object", properties = { name = { type = "string" }, address = { type = "string" } } } } }, attendees = { type = "array", description = "Each `{type, status: {response, time}, emailAddress: {name, address}}`, where `status.response` is `none`, `accepted`, `declined` or `tentativelyAccepted`. Personal data throughout, never an example value here", items = { type = "object" } }, seriesMasterId = { type = "string", description = "Present when this event is one instance of a recurring series" }, showAs = { type = "string", enum = ["free", "tentative", "busy", "oof", "workingElsewhere", "unknown"] }, sensitivity = { type = "string", enum = ["normal", "personal", "private", "confidential"] }, iCalUId = { type = "string", description = "Identifies this event across calendars, distinct from Graph's own `id`" }, webLink = { type = "string", format = "uri", description = "Opens the event in Outlook on the web. Requires the viewer's own sign-in session; does not itself carry a credential" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-calendar-event-create"
 service = "calendar"
 method = "POST"
@@ -596,13 +650,19 @@ type = "object"
 required = ["id", "subject", "isCancelled"]
 properties = { id = { type = "string", description = "The new event's id — the only handle on it, and what `microsoft_graph-calendar-event-get` reads back" }, subject = { type = "string", description = "Echoes the title that was sent" }, start = { type = "object", description = "`{dateTime, timeZone}` as created", properties = { dateTime = { type = "string" }, timeZone = { type = "string" } } }, end = { type = "object", description = "Same shape", properties = { dateTime = { type = "string" }, timeZone = { type = "string" } } }, isAllDay = { type = "boolean" }, isCancelled = { type = "boolean", description = "`false` on a freshly created event" }, organizer = { type = "object", description = "The token's own account. Personal data, never an example value here", properties = { emailAddress = { type = "object", properties = { name = { type = "string" }, address = { type = "string" } } } } }, attendees = { type = "array", description = "ABSENT on every event this operation creates: no attendee can be declared yet (C-56), so nobody was invited and nobody was notified", items = { type = "object" } }, iCalUId = { type = "string" }, webLink = { type = "string", format = "uri", description = "Opens the event in Outlook on the web. Requires the viewer's own sign-in session; does not itself carry a credential" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-calendar-calendar-get"
 service = "calendar"
 method = "GET"
@@ -619,13 +679,19 @@ type = "object"
 required = ["id", "name"]
 properties = { id = { type = "string", description = "The calendar's own id, distinct from any event's id" }, name = { type = "string", description = "The calendar's display name, e.g. `Calendar` for the default one" }, color = { type = "string", description = "A named colour preset, or `auto`" }, hexColor = { type = "string", description = "A custom hex colour when `color` is set to a custom value; empty string otherwise" }, canShare = { type = "boolean" }, canViewPrivateItems = { type = "boolean" }, canEdit = { type = "boolean" }, allowedOnlineMeetingProviders = { type = "array", description = "Which online-meeting providers can be attached to events on this calendar, e.g. `teamsForBusiness`", items = { type = "string" } }, defaultOnlineMeetingProvider = { type = "string" }, isTallyingResponses = { type = "boolean" }, isRemovable = { type = "boolean", description = "`false` for the default calendar — it cannot be deleted" }, owner = { type = "object", description = "`{name, address}` — the mailbox this calendar belongs to. Personal data, never an example value here", properties = { name = { type = "string" }, address = { type = "string" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-files-item-get"
 service = "files"
 method = "GET"
@@ -649,13 +715,19 @@ type = "object"
 required = ["id", "name"]
 properties = { id = { type = "string", description = "The item's id — what this operation takes" }, name = { type = "string" }, size = { type = "integer", description = "Size in bytes" }, webUrl = { type = "string", format = "uri", description = "Opens the item in a browser. Requires the viewer's own sign-in session; does not itself carry a credential" }, createdDateTime = { type = "string", format = "date-time" }, lastModifiedDateTime = { type = "string", format = "date-time" }, eTag = { type = "string" }, cTag = { type = "string", description = "Changes when the item's content changes; `eTag` also changes on a metadata-only edit" }, file = { type = "object", description = "Present when this item is a file rather than a folder — `{mimeType, hashes}`", properties = { mimeType = { type = "string" } } }, folder = { type = "object", description = "Present when this item is a folder rather than a file — `{childCount}`. `file` and `folder` never both appear on the same item", properties = { childCount = { type = "integer" } } }, parentReference = { type = "object", description = "`{driveId, id, path}` — the folder this item lives in", properties = { driveId = { type = "string" }, id = { type = "string" }, path = { type = "string" } } }, createdBy = { type = "object", description = "`{user: {id, displayName}}` — whoever created the item. Personal data, never an example value here", properties = { user = { type = "object", properties = { id = { type = "string" }, displayName = { type = "string" } } } } }, lastModifiedBy = { type = "object", description = "Same shape as `createdBy`. Personal data, never an example value here", properties = { user = { type = "object", properties = { id = { type = "string" }, displayName = { type = "string" } } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "microsoft_graph-files-item-update"
 service = "files"
 method = "PATCH"
@@ -694,6 +766,6 @@ type = "object"
 required = ["id", "name"]
 properties = { id = { type = "string" }, name = { type = "string", description = "The name **after** the update. Compare it against what was sent" }, size = { type = "integer" }, webUrl = { type = "string", format = "uri", description = "Opens the item in a browser. Requires the viewer's own sign-in session; does not itself carry a credential" }, createdDateTime = { type = "string", format = "date-time" }, lastModifiedDateTime = { type = "string", format = "date-time", description = "Moves on an accepted rename" }, eTag = { type = "string", description = "Changes on an accepted rename" }, cTag = { type = "string" }, file = { type = "object", description = "Present when this item is a file rather than a folder", properties = { mimeType = { type = "string" } } }, folder = { type = "object", description = "Present when this item is a folder rather than a file", properties = { childCount = { type = "integer" } } }, parentReference = { type = "object", description = "Unchanged by this call — a rename never moves the item", properties = { driveId = { type = "string" }, id = { type = "string" }, path = { type = "string" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/code"

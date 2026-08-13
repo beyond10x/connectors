@@ -42,11 +42,11 @@ declares effects, this function reads them and the paragraph goes."* This story 
 
 ## Acceptance
 
-- [ ] `catalog/connector-document.schema.json` carries `effects` **per operation** as a closed
+- [x] `catalog/connector-document.schema.json` carries `effects` **per operation** as a closed
       vocabulary (domain model: risk, idempotency, effects, direction). An unknown effect value is a
       build error refused by name — never a downgrade, never a default, never a catch-all arm that
       answers a level it has not heard of with a plausible wrong one.
-- [ ] Every operation in every provider declaration states its effects, proven by a whole-catalog
+- [x] Every operation in every provider declaration states its effects, proven by a whole-catalog
       declared-count gate: an operation with no effects declaration fails the build. Nothing infers
       effects from an HTTP verb, from `hosts`, or from `risk`.
 - [ ] Grant admission in `crates/domain` reads the effects the document carries. A fence or test
@@ -56,16 +56,25 @@ declares effects, this function reads them and the paragraph goes."* This story 
       selector whose effect subset contains that effect, and is refused by
       `with_effects_within([network])`. Under the predecessor's rule this test passes vacuously —
       name it so, so the regression is visible if derivation ever returns.
-- [ ] The predecessor's two compensating assertions are deliberately **not** carried, and the story
+- [x] The predecessor's two compensating assertions are deliberately **not** carried, and the story
       records why: they existed to bound a derivation that no longer exists. A grep proving neither
       spelling survives the migration is cheap and worth having.
-- [ ] The relationship to the semantic tier is decided and recorded: host-resource effects (what a
+- [x] The relationship to the semantic tier is decided and recorded: host-resource effects (what a
       call touches) and semantic effects (what it *means* — money, delete, send-external, from
       flux-connectors C-155) are distinct axes, and collapsing them is what lost `money` in the
       predecessor. Either the schema carries both fields or the second is explicitly deferred with a
       named reason.
 
 ## Progress
+- 2026-08-13 — the schema/declaration half is complete in S-015's single regeneration wave. Effects
+  are a required, non-empty, sorted/unique closed list on every exact operation, exact patch, or
+  reviewed selector rule. Every shipped HTTP read explicitly states `[read, network]` and every
+  write states `[write, network]`; there is no provider/service default and no verb, risk, host, or
+  driver inference. Missing declarations and unknown values refuse by name.
+- Host effects and `semantic_effects` remain separate required axes. A test pins a money semantic
+  effect beside host effects and proves neither substitutes for the other.
+- The story remains **blocked**, not done: its grant-admission half intentionally lands only with
+  M2/S-007's `crates/domain`. No domain scaffolding or vacuous admission test was added early.
 - 2026-08-13 — deliberately re-sequenced out of `ready` after S-001 landed; nothing here is
   started. The substance stands — this is architecture §2 day-one change 1's second half and
   vision principle 2's data — but *today* both of its legs have nothing to stand on: the

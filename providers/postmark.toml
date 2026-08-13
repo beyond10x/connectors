@@ -188,6 +188,12 @@ description = "Postmark Server API token, scoped to one server. Authenticates se
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "postmark-email-send"
 service = "server"
 method = "POST"
@@ -265,13 +271,19 @@ type = "object"
 required = ["To", "SubmittedAt", "MessageID", "ErrorCode", "Message"]
 properties = { To = { type = "string", description = "Echoes the recipient(s) this message was sent to — personal data, never an example value" }, SubmittedAt = { type = "string", description = "When Postmark accepted the message for delivery" }, MessageID = { type = "string", description = "Postmark's id for this send; the handle for later bounce or delivery-stat lookups" }, ErrorCode = { type = "integer", description = "0 on success" }, Message = { type = "string", description = "Human-readable status, \"OK\" on success" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/Message"
 code_pointer = "/ErrorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "postmark-deliverystats-get"
 service = "server"
 method = "GET"
@@ -286,13 +298,19 @@ type = "object"
 required = ["InactiveMails", "Bounces"]
 properties = { InactiveMails = { type = "integer", description = "Recipient addresses currently marked inactive on this server" }, Bounces = { type = "array", description = "One entry per bounce type, plus a leading \"All\" total with no `Type` field", items = { type = "object", required = ["Name", "Count"], properties = { Type = { type = "string", description = "Absent on the leading \"All\" total entry" }, Name = { type = "string" }, Count = { type = "integer" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/Message"
 code_pointer = "/ErrorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "postmark-bounce-list"
 service = "server"
 method = "GET"
@@ -321,13 +339,19 @@ type = "object"
 required = ["TotalCount", "Bounces"]
 properties = { TotalCount = { type = "integer" }, Bounces = { type = "array", items = { type = "object", required = ["ID", "Type", "Name", "Email", "Inactive", "CanActivate"], properties = { ID = { type = "integer" }, Type = { type = "string", description = "e.g. HardBounce, SoftBounce, SpamComplaint" }, TypeCode = { type = "integer" }, Name = { type = "string" }, Tag = { type = "string", description = "The message's tag, when it had one" }, MessageID = { type = "string" }, ServerID = { type = "integer" }, Description = { type = "string" }, Details = { type = "string" }, Email = { type = "string", description = "The bounced recipient's own address — personal data, never an example value" }, From = { type = "string", description = "The sending address the bounced message used — never an example value" }, BouncedAt = { type = "string" }, DumpAvailable = { type = "boolean", description = "Whether the raw SMTP dump can be fetched separately" }, Inactive = { type = "boolean" }, CanActivate = { type = "boolean" }, Subject = { type = "string" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/Message"
 code_pointer = "/ErrorCode"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "postmark-bounce-get"
 service = "server"
 method = "GET"
@@ -349,7 +373,7 @@ type = "object"
 required = ["ID", "Type", "Name", "Email", "Inactive", "CanActivate"]
 properties = { ID = { type = "integer" }, Type = { type = "string" }, TypeCode = { type = "integer" }, Name = { type = "string" }, Tag = { type = "string" }, MessageID = { type = "string" }, ServerID = { type = "integer" }, Description = { type = "string" }, Details = { type = "string" }, Email = { type = "string", description = "The bounced recipient's own address — personal data, never an example value" }, From = { type = "string", description = "The sending address the bounced message used — never an example value" }, BouncedAt = { type = "string" }, DumpAvailable = { type = "boolean" }, Inactive = { type = "boolean" }, CanActivate = { type = "boolean" }, Subject = { type = "string" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/Message"
 code_pointer = "/ErrorCode"
 

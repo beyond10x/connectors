@@ -57,6 +57,12 @@ description = "Fly access token, preferably scoped to the app or organization th
 # authority on whether it started, and `fly-machine-events-list` is the audit trail.
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-regions-list"
 service = "machines"
 method = "GET"
@@ -67,11 +73,17 @@ risk = "low"
 idempotency = "idempotent"
 response_schema = { type = "object", properties = { nearest = { type = "string" }, regions = { type = "array", items = { type = "object" } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machines-list"
 service = "machines"
 method = "GET"
@@ -88,11 +100,17 @@ description = "Fly app name whose Machines to list"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-get"
 service = "machines"
 method = "GET"
@@ -115,11 +133,17 @@ description = "Fly Machine id"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-events-list"
 service = "machines"
 method = "GET"
@@ -142,11 +166,17 @@ description = "Fly Machine id whose event history to read"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-create"
 service = "machines"
 method = "POST"
@@ -170,11 +200,17 @@ description = "OCI image reference for the Machine, such as registry.fly.io/exam
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-start"
 service = "machines"
 method = "POST"
@@ -196,11 +232,17 @@ description = "Fly Machine id to start"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-stop"
 service = "machines"
 method = "POST"
@@ -222,11 +264,17 @@ description = "Fly Machine id to stop"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-restart"
 service = "machines"
 method = "POST"
@@ -248,11 +296,17 @@ description = "Fly Machine id to restart"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "fly-machine-delete"
 service = "machines"
 method = "DELETE"
@@ -274,6 +328,6 @@ description = "Fly Machine id to delete permanently"
 required = true
 schema = { type = "string", minLength = 1 }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error"
 code_pointer = "/status"

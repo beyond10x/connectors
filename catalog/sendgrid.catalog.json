@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "SendGrid API key sent as a bearer",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "SendGrid transactional email: read templates and bounce suppressions, validate an email address. Cannot send mail — see the header comment for why the send envelope is not expressible here",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -65,9 +65,15 @@
       "credential_requirement": "declared",
       "description": "List transactional templates (name, id, generation, and each template's versions). Also this connector's `verify` — a bounded read that runs unattended",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "sendgrid-template-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Restrict the list to `legacy`, `dynamic`, or `both` templates. SendGrid defaults to `dynamic` when this is omitted",
@@ -97,6 +103,8 @@
           "symbol": "page_size"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -115,6 +123,9 @@
         ],
         "url": "{base}/v3/templates"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "_metadata": {
@@ -189,9 +200,15 @@
       "credential_requirement": "declared",
       "description": "Get one transactional template by id, including every version's subject and content",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "sendgrid-template-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The template's id, e.g. `d-…` for a dynamic template — the `id` field from sendgrid-template-list",
@@ -205,10 +222,15 @@
           "symbol": "template_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v3/templates/{template_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "generation": {
@@ -270,9 +292,15 @@
       "credential_requirement": "declared",
       "description": "List addresses that have bounced and are suppressed from receiving further mail. Each entry is personal data about a third party — read it only for what the calling flow needs",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "sendgrid-suppression-bounce-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Only bounces created at or after this Unix timestamp",
@@ -297,6 +325,8 @@
           "symbol": "end_time"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -315,6 +345,9 @@
         ],
         "url": "{base}/v3/suppression/bounces"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The matching bounces",
         "items": {
@@ -377,9 +410,18 @@
       "credential_requirement": "declared",
       "description": "Check whether an email address is well-formed and likely deliverable, without sending it any mail. Requires SendGrid's Email Address Validation add-on to be enabled on the account",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/errors/0/message"
+      },
       "expose": true,
       "id": "sendgrid-email-validate",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The address to check. This is the address a caller supplies for validation — not a recipient this connector addresses mail to, and never an example value here",
@@ -403,11 +445,8 @@
           "symbol": "source"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/errors/0/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -426,6 +465,9 @@
         "method": "POST",
         "url": "{base}/v3/validations/email"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "result": {
@@ -475,8 +517,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v3",

@@ -36,7 +36,7 @@ crates.io closure is `connector-address`, `connector-catalog`, `connector-secret
 vocabulary was extracted and cannot be withdrawn; nothing new is published from here.
 
 A client, a fetcher, or a runtime. **This crate performs no network IO.** Ingest takes bytes, so
-every stage is a pure, unit-testable function; fetching lives in the `flux-connectors` binary alone,
+every stage is a pure, unit-testable function; fetching lives in the `connectors` binary alone,
 and that fence is asserted by a test over the resolved dependency graph.
 
 ## License

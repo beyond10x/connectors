@@ -337,6 +337,12 @@ name = "default"
 tags = ["source-control"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-repository-list"
 method = "GET"
 direction = "read"
@@ -350,12 +356,18 @@ type = "object"
 required = ["values"]
 properties = { values = { type = "array", items = { type = "object", properties = { uuid = { type = "string", description = "The repository's stable identifier, in braces. Survives a rename, which `slug` does not" }, name = { type = "string", description = "The repository's display name" }, slug = { type = "string", description = "The repository's URL segment — pass this as `repo_slug` to every other operation here" }, full_name = { type = "string", description = "`workspace/slug`. Note that this is two segments: `repo_slug` is the second one alone" }, description = { type = "string" }, is_private = { type = "boolean", description = "Whether the repository is visible only to the workspace" }, scm = { type = "string", description = "Always `git` on Bitbucket Cloud today" }, language = { type = "string", description = "The primary language Bitbucket detected, empty when it detected none" }, size = { type = "integer", description = "The repository's size in bytes" }, has_issues = { type = "boolean", description = "Whether the repository's own issue tracker is enabled" }, has_wiki = { type = "boolean" }, fork_policy = { type = "string", description = "allow_forks, no_public_forks, or no_forks" }, mainbranch = { type = "object", description = "The default branch — the `destination_branch` most pull requests target", properties = { name = { type = "string" } } }, project = { type = "object", description = "The Bitbucket project grouping this repository. Left untyped rather than enumerated" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time", description = "When the repository last changed" }, links = { type = "object", description = "Bitbucket's hypermedia links for this repository, including `html.href` — the page to give a human" } } } }, page = { type = "integer", description = "The 1-based page this response is" }, pagelen = { type = "integer", description = "How many values a page holds; 10 by default" }, size = { type = "integer", description = "The total number of repositories, when Bitbucket computes it" }, next = { type = "string", format = "uri", description = "The URL of the next page, absent on the last one. This connector cannot follow it — see its header note on pagination" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-repository-get"
 method = "GET"
 direction = "read"
@@ -375,7 +387,7 @@ type = "object"
 required = ["uuid", "name", "slug", "full_name"]
 properties = { uuid = { type = "string", description = "The repository's stable identifier, in braces" }, name = { type = "string" }, slug = { type = "string", description = "The repository's URL segment" }, full_name = { type = "string", description = "`workspace/slug`" }, description = { type = "string" }, is_private = { type = "boolean" }, scm = { type = "string" }, language = { type = "string" }, size = { type = "integer", description = "The repository's size in bytes" }, has_issues = { type = "boolean" }, has_wiki = { type = "boolean" }, fork_policy = { type = "string", description = "allow_forks, no_public_forks, or no_forks" }, mainbranch = { type = "object", description = "The default branch — the branch a pull request usually targets", properties = { name = { type = "string" } } }, project = { type = "object", description = "The Bitbucket project grouping this repository. Left untyped rather than enumerated" }, owner = { type = "object", description = "The account owning the repository. Identifies a named person for a personal workspace — read it for what the calling flow needs and do not persist it beyond that" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time" }, links = { type = "object", description = "Bitbucket's hypermedia links, including `html.href` — the page to give a human" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
@@ -390,6 +402,12 @@ message_pointer = "/error/message"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-pull-request-list"
 method = "GET"
 direction = "read"
@@ -409,12 +427,18 @@ type = "object"
 required = ["values"]
 properties = { values = { type = "array", items = { type = "object", properties = { id = { type = "integer", description = "The pull request's number within its repository — what the other pull-request operations address it by" }, title = { type = "string" }, description = { type = "string", description = "The pull request's body, as Markdown" }, state = { type = "string", description = "OPEN, MERGED, DECLINED or SUPERSEDED. Always OPEN here, because this call declares no state filter" }, author = { type = "object", description = "The account that opened it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, source = { type = "object", description = "Where the change comes from", properties = { branch = { type = "object", properties = { name = { type = "string" } } } } }, destination = { type = "object", description = "Where the change would land", properties = { branch = { type = "object", properties = { name = { type = "string" } } } } }, close_source_branch = { type = "boolean", description = "Whether merging will delete the source branch" }, comment_count = { type = "integer" }, task_count = { type = "integer" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time" }, links = { type = "object", description = "Bitbucket's hypermedia links, including `html.href` — the pull request's page, the link to give a human" } } } }, page = { type = "integer" }, pagelen = { type = "integer", description = "How many values a page holds; 10 by default" }, size = { type = "integer" }, next = { type = "string", format = "uri", description = "The URL of the next page, absent on the last one" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-pull-request-get"
 method = "GET"
 direction = "read"
@@ -440,7 +464,7 @@ type = "object"
 required = ["id", "title", "state"]
 properties = { id = { type = "integer", description = "The pull request's number within its repository" }, title = { type = "string" }, description = { type = "string", description = "The pull request's body, as Markdown" }, state = { type = "string", description = "OPEN, MERGED, DECLINED or SUPERSEDED" }, author = { type = "object", description = "The account that opened it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, source = { type = "object", description = "Where the change comes from", properties = { branch = { type = "object", properties = { name = { type = "string" } } }, commit = { type = "object", properties = { hash = { type = "string" } } } } }, destination = { type = "object", description = "Where the change would land", properties = { branch = { type = "object", properties = { name = { type = "string" } } }, commit = { type = "object", properties = { hash = { type = "string" } } } } }, merge_commit = { type = "object", description = "The commit the merge produced, null while the pull request is open", properties = { hash = { type = "string" } } }, close_source_branch = { type = "boolean" }, reason = { type = "string", description = "Why it was declined, empty otherwise" }, comment_count = { type = "integer" }, task_count = { type = "integer" }, participants = { type = "array", items = { type = "object" }, description = "Everyone who has touched the pull request, each with their `approved` flag and `role`. Left untyped rather than enumerated; this is the field bitbucket-pull-request-approve writes into" }, reviewers = { type = "array", items = { type = "object" }, description = "The accounts asked to review. Left untyped rather than enumerated" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time" }, links = { type = "object", description = "Bitbucket's hypermedia links, including `html.href` — the link to give a human" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
@@ -465,6 +489,12 @@ message_pointer = "/error/message"
 # additions once C-56 lands.
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-pull-request-create"
 method = "POST"
 direction = "write"
@@ -514,12 +544,18 @@ type = "object"
 required = ["id", "title", "state"]
 properties = { id = { type = "integer", description = "The new pull request's number — what bitbucket-pull-request-comment and -approve address it by" }, title = { type = "string" }, description = { type = "string" }, state = { type = "string", description = "OPEN on a pull request just created" }, author = { type = "object", description = "The account the token belongs to. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that" }, source = { type = "object", properties = { branch = { type = "object", properties = { name = { type = "string" } } } } }, destination = { type = "object", properties = { branch = { type = "object", properties = { name = { type = "string" } } } } }, close_source_branch = { type = "boolean", description = "False unless the repository defaults it otherwise; this connector does not set it" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time" }, links = { type = "object", description = "Bitbucket's hypermedia links, including `html.href` — the new pull request's page, the link to give a human" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-pull-request-comment"
 method = "POST"
 direction = "write"
@@ -553,7 +589,7 @@ type = "object"
 required = ["id", "content"]
 properties = { id = { type = "integer", description = "The comment's id within the pull request" }, content = { type = "object", description = "The comment as stored and as rendered", properties = { raw = { type = "string", description = "The Markdown that was sent" }, markup = { type = "string" }, html = { type = "string", description = "Bitbucket's rendering of it" } } }, user = { type = "object", description = "The account the comment is attributed to — the token's own. Identifies a named person; read it for what the calling flow needs and do not persist it beyond that" }, deleted = { type = "boolean" }, created_on = { type = "string", format = "date-time" }, updated_on = { type = "string", format = "date-time" }, links = { type = "object", description = "Bitbucket's hypermedia links, including `html.href` — the comment's anchor on the pull request page" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 
 # ---------------------------------------------------------------------------------------------
@@ -573,6 +609,12 @@ message_pointer = "/error/message"
 # This operation sends no body: the approval is the `POST` itself, and the approver is whoever the
 # token belongs to. A model calling it has nothing to choose beyond which pull request.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "bitbucket-pull-request-approve"
 method = "POST"
 direction = "write"
@@ -598,5 +640,5 @@ type = "object"
 required = ["approved"]
 properties = { approved = { type = "boolean", description = "True once the approval landed" }, state = { type = "string", description = "approved, changes_requested, or null" }, role = { type = "string", description = "PARTICIPANT or REVIEWER — how the token's account relates to this pull request" }, user = { type = "object", description = "The account the approval is attributed to — the token's own. Identifies a named person; read it for what the calling flow needs and do not persist it beyond that" }, participated_on = { type = "string", format = "date-time", description = "When the approval was recorded" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"

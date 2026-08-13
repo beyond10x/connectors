@@ -84,7 +84,7 @@ pub(crate) mod tests {
     /// live fixtures of their own, and another agent's run owns its own debris; a scan that tripped
     /// over either would be exactly as untrustworthy as the flake it exists to prevent.
     fn surviving_fixtures(root: &Path, label: &str) -> Vec<PathBuf> {
-        let prefix = format!("flux-connectors-artifact-{label}-{}", std::process::id());
+        let prefix = format!("connectors-artifact-{label}-{}", std::process::id());
         let Ok(entries) = fs::read_dir(root) else {
             return Vec::new();
         };
@@ -99,7 +99,7 @@ pub(crate) mod tests {
     }
 
     /// Cleanup is not "the last line of a passing test": a panicking test must remove its fixture
-    /// too. Skipping that is what left 55 `flux-connectors-artifact-*` directories in a tmpfs that
+    /// too. Skipping that is what left 55 `connectors-artifact-*` directories in a tmpfs that
     /// was 80% full, and made a full `cargo test --workspace` fail twice under a wave of concurrent
     /// builds — both times blamed on the diff that happened to be merging.
     #[test]
@@ -226,7 +226,7 @@ pub(crate) mod tests {
             .join("artifact-fixtures");
 
         let path = root.join(format!(
-            "flux-connectors-artifact-{label}-{}-{}",
+            "connectors-artifact-{label}-{}-{}",
             std::process::id(),
             run_unique()
         ));

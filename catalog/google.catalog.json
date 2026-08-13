@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Google OAuth2 access token sent as a bearer; short-lived, and refreshed by the host rather than by generated Flux",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Google Workspace: read and send Gmail messages, read and create Calendar events, read and rename Drive files",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -50,9 +50,19 @@
       "credential_requirement": "declared",
       "description": "Get one Gmail message by id, in Gmail's default `full` format: headers plus the parsed MIME structure, whose body parts are base64url-encoded. Needs the `gmail.readonly` scope (or `gmail.modify`)",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-gmail-message-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The mailbox to read: the literal `me` for the token's own mailbox, or the user's email address. `me` is what a flow should use — an address here must be one the token is authorized for, and domain-wide delegation is the only way that happens",
@@ -81,16 +91,15 @@
           "wire": "id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/gmail/v1/users/{user_id}/messages/{message_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "historyId": {
@@ -166,9 +175,19 @@
       "credential_requirement": "declared",
       "description": "Send a Gmail message, supplied as a complete base64url-encoded RFC 2822 message. It is delivered immediately from the token owner's mailbox and cannot be recalled. Needs the `gmail.send` scope",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-gmail-message-send",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The sending mailbox: the literal `me` for the token's own mailbox, or an email address the token is authorized to send as",
@@ -196,12 +215,8 @@
           "symbol": "raw"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -217,6 +232,9 @@
         "method": "POST",
         "url": "{base}/gmail/v1/users/{user_id}/messages/send"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "id": {
@@ -267,9 +285,19 @@
       "credential_requirement": "declared",
       "description": "List every label in a mailbox — the system labels (`INBOX`, `SENT`, `SPAM`) and the user's own — as `{\"labels\": [...]}`. Needs the `gmail.readonly` scope (or `gmail.labels`)",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-gmail-labels-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The mailbox whose labels to list: the literal `me` for the token's own mailbox, or an authorized email address",
@@ -285,16 +313,15 @@
           "wire": "userId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/gmail/v1/users/{user_id}/labels"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "labels": {
@@ -378,9 +405,19 @@
       "credential_requirement": "declared",
       "description": "Get one calendar event: its summary, start and end, organizer, attendee list and status. Needs the `calendar.events.readonly` scope (or `calendar.readonly`)",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-calendar-event-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The calendar the event is on: the literal `primary` for the token owner's own calendar, or a calendar address such as `team@group.calendar.google.com`",
@@ -409,16 +446,15 @@
           "wire": "eventId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/calendar/v3/calendars/{calendar_id}/events/{event_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "attendees": {
@@ -547,9 +583,19 @@
       "credential_requirement": "declared",
       "description": "Create a timed event on a calendar. No attendees can be declared yet, so nobody is invited and no notification is sent; invite people in Calendar afterwards. Needs the `calendar.events` scope",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-calendar-event-insert",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The calendar to create the event on: the literal `primary` for the token owner's own calendar, or a calendar address the token can write to",
@@ -600,12 +646,8 @@
           "wire": "end.dateTime"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -631,6 +673,9 @@
         "method": "POST",
         "url": "{base}/calendar/v3/calendars/{calendar_id}/events"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "attendees": {
@@ -734,9 +779,19 @@
       "credential_requirement": "declared",
       "description": "Get one calendar's own metadata — its summary, description, location and time zone. This is the calendar, not its events: use `google-calendar-event-get` for one of those. Needs the `calendar.readonly` scope",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-calendar-calendar-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The calendar to read: the literal `primary` for the token owner's own calendar, or a calendar address",
@@ -752,16 +807,15 @@
           "wire": "calendarId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/calendar/v3/calendars/{calendar_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "conferenceProperties": {
@@ -827,9 +881,19 @@
       "credential_requirement": "declared",
       "description": "Get one Drive file's metadata — its id, name and MIME type. This never returns file content: downloading needs `alt=media`, which is a query parameter and therefore unavailable (C-30). Needs the `drive.metadata.readonly` scope (or `drive.readonly`)",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-drive-file-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file's id — the base64url-ish string in its Drive URL after `/d/`. A folder is a file too, with the folder MIME type",
@@ -845,16 +909,15 @@
           "wire": "fileId"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/drive/v3/files/{file_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "drive"
@@ -886,9 +949,19 @@
       "credential_requirement": "declared",
       "description": "Rename a Drive file: sets its name and changes nothing else. It does not move, share, trash or replace the file's content. Needs the `drive.file` scope for files this token created, or `drive` for any other",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/error/status",
+        "message_pointer": "/error/message"
+      },
       "expose": true,
       "id": "google-drive-file-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The file to rename",
@@ -915,12 +988,8 @@
           "symbol": "name"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/error/status",
-          "message_pointer": "/error/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -936,13 +1005,15 @@
         "method": "PATCH",
         "url": "{base}/drive/v3/files/{file_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "medium",
       "semantic_effects": [],
       "service": "drive"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

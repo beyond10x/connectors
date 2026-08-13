@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "DocuSign OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -61,7 +61,7 @@
     ]
   ],
   "description": "DocuSign eSignature REST API: list and read envelopes and their recipients, create an envelope from a template, and void one",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -80,6 +80,10 @@
       "credential_requirement": "declared",
       "description": "List the account's own top-level folders — Draft, Sent Items, Inbox, and any custom ones. Takes no parameters and succeeds for any account with API access, which is what makes it the connection check for a settings page's Test Connection button",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -88,19 +92,24 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-verify",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/folders"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "DocuSign's own folder structure, not envelope data",
         "properties": {
@@ -160,6 +169,10 @@
       "credential_requirement": "declared",
       "description": "List envelopes whose status changed on or after a given date. DocuSign requires a from_date (or an explicit envelope_ids/transaction_ids list, which this operation does not offer) on every call to this resource — omitting it is a 400 from the vendor, not a limitation of this connector",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -168,9 +181,15 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-envelope-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Only envelopes with a status change on or after this date, as YYYY-MM-DD. Required — DocuSign's own resource has no unfiltered form",
@@ -184,12 +203,8 @@
           "symbol": "from_date"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -202,6 +217,9 @@
         ],
         "url": "{base}/envelopes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "envelopes": {
@@ -280,6 +298,10 @@
       "credential_requirement": "declared",
       "description": "Get one envelope's own status and metadata. No recipient or document detail — see docusign-envelope-recipients-get for who is on it",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -288,9 +310,15 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-envelope-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The envelope's DocuSign id (a GUID), as returned by docusign-envelope-list or docusign-envelope-create-from-template",
@@ -304,16 +332,15 @@
           "symbol": "envelope_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/envelopes/{envelope_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "completedDateTime": {
@@ -376,6 +403,10 @@
       "credential_requirement": "declared",
       "description": "Get every recipient on an envelope and their signing status. Recipient name and email are personal data — see this operation's own response_schema before logging, displaying or forwarding it",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -384,9 +415,15 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-envelope-recipients-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The envelope's DocuSign id (a GUID)",
@@ -400,16 +437,15 @@
           "symbol": "envelope_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/envelopes/{envelope_id}/recipients"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Every recipient list here carries personal data: name and email identify a real person DocuSign is asking to sign, view or receive a copy. No example value is given anywhere in this connector for either field",
         "properties": {
@@ -515,6 +551,10 @@
       "credential_requirement": "declared",
       "description": "Create an envelope from an existing template. When status is sent, DocuSign dispatches it immediately to every named recipient — a real, legally binding signature request to a real person. Use status created to save it as an editable draft that notifies nobody instead",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -523,9 +563,15 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-envelope-create-from-template",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The template's id (a GUID) to generate the envelope from",
@@ -586,12 +632,8 @@
           "symbol": "status"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -613,6 +655,9 @@
         "method": "POST",
         "url": "{base}/envelopes"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "envelopeId": {
@@ -669,6 +714,10 @@
       "credential_requirement": "declared",
       "description": "Void an envelope: cancel it permanently. Every recipient who has not yet finished signing is immediately locked out, and no further signing action is possible on this envelope id. Irreversible",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "account_host": [
           "host"
@@ -677,9 +726,15 @@
           "path"
         ]
       },
+      "error_envelope": {
+        "code_pointer": "/errorCode",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "docusign-envelope-void",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The envelope's DocuSign id (a GUID) to void",
@@ -704,12 +759,8 @@
           "symbol": "voidedReason"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/errorCode",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -726,6 +777,9 @@
         "method": "PUT",
         "url": "{base}/envelopes/{envelope_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "envelopeId": {
@@ -747,8 +801,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2.1",

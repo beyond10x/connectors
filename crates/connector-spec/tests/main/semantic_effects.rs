@@ -16,6 +16,12 @@ path = "/action"
 description = "Perform the action."
 risk = "{risk}"
 idempotency = "{idempotency}"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 repeatable_because = "the caller supplies one stable key and the vendor replays the first result"
 {effect_line}
 "#

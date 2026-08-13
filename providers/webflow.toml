@@ -214,6 +214,12 @@ name = "default"
 tags = ["cms"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-site-list"
 method = "GET"
 direction = "read"
@@ -230,6 +236,12 @@ properties = { sites = { type = "array", items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-collection-list"
 method = "GET"
 direction = "read"
@@ -252,6 +264,12 @@ properties = { collections = { type = "array", items = { type = "object", requir
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-collection-get"
 method = "GET"
 direction = "read"
@@ -276,6 +294,12 @@ properties = { id = { type = "string" }, displayName = { type = "string" }, sing
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-collection-item-list"
 method = "GET"
 direction = "read"
@@ -301,6 +325,12 @@ properties = { items = { type = "array", items = { type = "object", required = [
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-collection-item-get"
 method = "GET"
 direction = "read"
@@ -332,6 +362,12 @@ properties = { id = { type = "string" }, cmsLocaleId = { type = "string" }, last
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "webflow-site-publish"
 method = "POST"
 direction = "write"

@@ -261,6 +261,12 @@ name = "default"
 tags = ["knowledge-base"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "notion-user-me"
 method = "GET"
 direction = "read"
@@ -273,13 +279,19 @@ idempotency = "idempotent"
 type = "object"
 properties = { object = { const = "user" }, id = { type = "string", description = "The bot user's id" }, name = { type = "string" }, type = { const = "bot" }, bot = { type = "object", description = "The integration's owner and workspace name" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "notion-page-get"
 method = "GET"
 direction = "read"
@@ -302,7 +314,7 @@ schema = { type = "string", pattern = "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA
 type = "object"
 properties = { object = { const = "page" }, id = { type = "string" }, created_time = { type = "string", format = "date-time" }, last_edited_time = { type = "string", format = "date-time" }, archived = { type = "boolean" }, parent = { type = "object", description = "Where the page lives: `{type: \"database_id\", database_id}`, `{type: \"page_id\", page_id}` or `{type: \"workspace\"}`" }, properties = { type = "object", description = "The page's property values, keyed by property name. For a page in a database the keys are that database's own columns, so they are known only at runtime; for a page with a page parent there is exactly one, `title`" }, url = { type = "string" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
@@ -311,6 +323,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "notion-database-query"
 method = "POST"
 direction = "write"
@@ -343,13 +361,19 @@ schema = { type = "string", pattern = "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA
 type = "object"
 properties = { object = { const = "list" }, results = { type = "array", description = "The matching pages, each with its own `properties` object keyed by the database's column names", items = { type = "object" } }, has_more = { type = "boolean", description = "True when the database holds more entries than this page returned. This connector cannot fetch them — the cursor is an opaque token and no query parameter is encodable (C-30)" }, next_cursor = { type = "string", description = "The cursor for the next page. Unusable here, for the reason given on `has_more`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "notion-search"
 method = "POST"
 direction = "write"
@@ -374,7 +398,7 @@ schema = { type = "string" }
 type = "object"
 properties = { object = { const = "list" }, results = { type = "array", description = "The matching pages and databases, newest first", items = { type = "object" } }, has_more = { type = "boolean", description = "True when more matches exist than this page returned. This connector cannot fetch them — see notion-database-query" }, next_cursor = { type = "string" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"
 
@@ -383,6 +407,12 @@ code_pointer = "/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "notion-page-create"
 method = "POST"
 direction = "write"
@@ -444,6 +474,6 @@ schema = { type = "array", minItems = 1, items = { type = "object", required = [
 type = "object"
 properties = { object = { const = "page" }, id = { type = "string", description = "The created page's id, which is what later calls address it by" }, url = { type = "string", description = "The created page's Notion URL" }, created_time = { type = "string", format = "date-time" }, parent = { type = "object" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/code"

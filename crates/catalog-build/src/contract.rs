@@ -142,7 +142,7 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
 /// failure. Ported verbatim from the predecessor (C-552); the shipped catalogue froze the wording.
 fn description(operation: &Operation) -> String {
     let mut out = operation.description.clone();
-    let Some(envelope) = &operation.quirks.error_envelope else {
+    let Some(envelope) = &operation.error_envelope else {
         return out;
     };
     if !out.is_empty() && !out.ends_with(['.', '!', '?']) {
@@ -208,6 +208,15 @@ mod tests {
             description: "Get a thing.".to_string(),
             risk: Risk::Low,
             idempotency: Idempotency::Idempotent,
+            effects: vec![
+                connector_spec::HostEffect::Read,
+                connector_spec::HostEffect::Network,
+            ],
+            interaction_shape: connector_spec::InteractionShape::Unary,
+            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+            placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+            implementation_form: connector_spec::ImplementationForm::BuiltIn,
+            required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
             semantic_effects: Vec::new(),
             repeatable_because: None,
             expose: true,
@@ -216,7 +225,11 @@ mod tests {
             response_schema: None,
             credential_response: Vec::new(),
             produces_credential: None,
-            quirks: Default::default(),
+            pagination: None,
+
+            rate_limit: None,
+
+            error_envelope: None,
         }
     }
 
@@ -307,7 +320,7 @@ mod tests {
     #[test]
     fn the_description_extends_with_the_error_envelope() {
         let mut operation = operation(ParamSet::default());
-        operation.quirks.error_envelope = Some(ErrorEnvelope {
+        operation.error_envelope = Some(ErrorEnvelope {
             message_pointer: "/error/message".to_string(),
             code_pointer: Some("/error/type".to_string()),
         });

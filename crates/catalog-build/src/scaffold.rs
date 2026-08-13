@@ -1,4 +1,4 @@
-//! `flux-connectors scaffold` — write the patch set from the document, so referencing a spec is
+//! `connectors scaffold` — write the patch set from the document, so referencing a spec is
 //! cheaper than hand-authoring it (C-419).
 //!
 //! C-411, C-412 and C-414 reduced how much has to be *said* about 397 operations. They did not
@@ -48,8 +48,8 @@ use serde::Serialize;
 
 use connector_spec::{
     AuthMethod, AuthRequirement, ChannelBinding, ConfigField, Connector, EventDecl, Graph,
-    HttpMethod, Idempotency, Ingested, Operation, OperationDirection, ParamPosition, Risk, Runtime,
-    Service, SpecOperation, SpecSource, DEFAULT_SERVICE,
+    HttpMethod, Idempotency, Ingested, Operation, OperationDirection, ParamPosition, Risk, Service,
+    SpecOperation, SpecSource, DEFAULT_SERVICE,
 };
 
 use crate::seam::{self, ProviderInputs, SpecInput};
@@ -1149,8 +1149,6 @@ struct Identity<'a> {
     vendor: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     authority: Option<&'a str>,
-    #[serde(skip_serializing_if = "is_http")]
-    runtime: Runtime,
     #[serde(skip_serializing_if = "Option::is_none")]
     api_version: Option<&'a str>,
     base_url: &'a str,
@@ -1184,10 +1182,6 @@ struct Declarations<'a> {
 #[derive(Serialize)]
 struct Specs {
     spec: Vec<SpecSource>,
-}
-
-fn is_http(runtime: &Runtime) -> bool {
-    *runtime == Runtime::Http
 }
 
 impl Plan {
@@ -1231,10 +1225,10 @@ impl Plan {
         let _ = writeln!(
             out,
             "\
-# {} — scaffolded from {documents} vendored {noun} by `flux-connectors scaffold` (C-419).
+# {} — scaffolded from {documents} vendored {noun} by `connectors scaffold` (C-419).
 #
 # **This is input to a human, not an artifact.** Nothing hashes it, it is not in `connectors.lock`,
-# and `flux-connectors diff` says nothing about it. Read it, correct it, and paste it over
+# and `connectors diff` says nothing about it. Read it, correct it, and paste it over
 # `{}/{}.toml` yourself — the reviewed file stays a human's.
 #
 # Two rules govern what is here, and they are the same rule twice:
@@ -1293,7 +1287,6 @@ impl Plan {
             id: &connector.id,
             vendor: &connector.vendor,
             authority: connector.authority.as_deref(),
-            runtime: connector.runtime,
             api_version: connector.api_version.as_deref(),
             base_url: &connector.base_url,
             description: &connector.description,
@@ -1670,7 +1663,6 @@ impl Plan {
                 .map(|document| document.ingested.title.clone())
                 .unwrap_or_default(),
             authority: None,
-            runtime: Runtime::Http,
             api_version: None,
             services: Vec::new(),
             auth: Vec::new(),

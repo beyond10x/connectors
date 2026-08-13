@@ -190,6 +190,12 @@ name = "default"
 tags = ["marketing"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-ping"
 method = "GET"
 direction = "read"
@@ -217,6 +223,12 @@ properties = { health_status = { type = "string", description = "Mailchimp's fix
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-audience-list"
 method = "GET"
 direction = "read"
@@ -233,6 +245,12 @@ properties = { lists = { type = "array", description = "The audiences on this pa
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-audience-get"
 method = "GET"
 direction = "read"
@@ -266,6 +284,12 @@ properties = { id = { type = "string", description = "The audience id" }, web_id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-audience-member-list"
 method = "GET"
 direction = "read"
@@ -288,6 +312,12 @@ properties = { members = { type = "array", description = "The contacts on this p
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-audience-member-get"
 method = "GET"
 direction = "read"
@@ -335,6 +365,12 @@ properties = { id = { type = "string", description = "The MD5 hash of the lowerc
 # replacement addressed by a hash of the address itself — sending the same body twice leaves the
 # contact in the state it was already in. It is *not* "safe": the first call may create.
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-audience-member-upsert"
 method = "PUT"
 direction = "write"
@@ -387,6 +423,12 @@ properties = { id = { type = "string", description = "The MD5 hash of the lowerc
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "mailchimp-campaign-list"
 method = "GET"
 direction = "read"

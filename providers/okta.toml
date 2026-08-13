@@ -130,6 +130,12 @@ name = "default"
 tags = ["identity"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "okta-user-list"
 method = "GET"
 direction = "read"
@@ -152,6 +158,12 @@ items = { type = "object", required = ["id", "status", "profile"], properties = 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "okta-user-get"
 method = "GET"
 direction = "read"
@@ -174,6 +186,12 @@ properties = { id = { type = "string" }, status = { type = "string", description
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "okta-group-list"
 method = "GET"
 direction = "read"
@@ -196,6 +214,12 @@ items = { type = "object", required = ["id", "type", "profile"], properties = { 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "okta-user-group-list"
 method = "GET"
 direction = "read"
@@ -239,6 +263,12 @@ items = { type = "object", required = ["id", "type", "profile"], properties = { 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "okta-user-deactivate"
 method = "POST"
 direction = "write"

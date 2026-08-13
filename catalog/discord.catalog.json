@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Discord bot token, sent as `Authorization: Bot <token>`. The `Bot ` scheme word is supplied by the connector; the token is the value alone. `Bearer ` is a valid Discord scheme word for a different credential — an OAuth2 user token — so sending this token with that prefix yields a 401 indistinguishable from a revoked token",
@@ -38,7 +38,7 @@
     ]
   ],
   "description": "Discord bot API v10: read the bot's own identity, list the guilds it has joined, read one guild and its channels, read a channel's recent messages, and post a message. Every request authenticates as a bot — `Authorization: Bot <token>`, never `Bearer`, which is Discord's scheme word for a different credential with different reach. Every Discord id is a snowflake and is carried as a string, because a 64-bit id does not survive a JSON number. Discord rate-limits per route and answers 429 with a `Retry-After` header instead of queueing: honour it rather than retrying immediately",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -57,13 +57,24 @@
       "credential_requirement": "declared",
       "description": "Read the bot user this token authenticates as — its snowflake id, username and application flags. Takes no argument. Also this connector's `verify`: the cheapest call that proves the token, the `Bot ` scheme word and the base URL are all correct together, and the one to run first when any other operation returns 401",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "discord-current-user",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/users/@me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "avatar": {
@@ -142,13 +153,24 @@
       "credential_requirement": "declared",
       "description": "List the guilds (servers) this bot has been installed into — the complete set of guild ids the rest of this connector can address. Returns a partial guild object per entry, not the full one: call discord-guild-get for a guild's settings. Discord returns at most 200 per page and this connector does not page, so a bot in more guilds than that sees only the first 200",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "discord-guild-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/users/@me/guilds"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The guilds this bot is a member of, as partial guild objects",
         "items": {
@@ -221,9 +243,15 @@
       "credential_requirement": "declared",
       "description": "Read one guild's settings and current state by id — its name, owner, moderation levels and enabled features. Membership counts are not included: they require a query flag this connector does not send, and Discord documents them as approximate",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "discord-guild-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The guild's snowflake id, from discord-guild-list's `id`. A decimal string of digits, never a guild name and never a URL — Discord ids are 64-bit and are carried as strings",
@@ -237,10 +265,15 @@
           "symbol": "guild_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/guilds/{guild_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "afk_channel_id": {
@@ -383,9 +416,15 @@
       "credential_requirement": "declared",
       "description": "List every channel in a guild — text, voice, category and forum — in Discord's own ordering. This is where a channel id comes from: read `type` to find the text channels (type 0) discord-channel-messages and discord-message-create can address. Threads are not included; Discord returns them from a separate route this connector does not expose",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "discord-guild-channels",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The guild's snowflake id, from discord-guild-list's `id`. A decimal string of digits, never a guild name",
@@ -399,10 +438,15 @@
           "symbol": "guild_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/guilds/{guild_id}/channels"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The guild's channels",
         "items": {
@@ -504,9 +548,15 @@
       "credential_requirement": "declared",
       "description": "Read the most recent messages in a text channel, newest first. Requires the bot to have READ_MESSAGE_HISTORY in the channel; without it Discord answers 403 rather than an empty list. The response is personal content — what people said, with author identity attached — so read it for what the calling flow needs and do not persist it beyond that",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "discord-channel-messages",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The channel's snowflake id, from discord-guild-channels' `id`. A decimal string of digits, never a channel name like `#general` and never a Discord URL",
@@ -532,6 +582,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -544,6 +596,9 @@
         ],
         "url": "{base}/channels/{channel_id}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The channel's most recent messages, newest first",
         "items": {
@@ -688,9 +743,15 @@
       "credential_requirement": "declared",
       "description": "Post a message to a text channel, visible to everyone in it and notifying whoever is watching. Requires the bot to have SEND_MESSAGES in the channel. Posting twice posts two messages — Discord offers no idempotency key on this route. Discord rate-limits this route per channel and does not publish the figure: on a 429, wait the number of seconds in the `Retry-After` header before retrying, rather than retrying immediately",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "discord-message-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The channel to post into, from discord-guild-channels' `id`. A decimal string of digits, never a channel name like `#general`. Confirm it is a text channel (`type` 0) before posting",
@@ -726,6 +787,8 @@
           "symbol": "tts"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -744,6 +807,9 @@
         "method": "POST",
         "url": "{base}/channels/{channel_id}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The message as Discord stored it",
         "properties": {
@@ -845,8 +911,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v10",

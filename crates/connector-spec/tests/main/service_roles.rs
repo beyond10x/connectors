@@ -44,6 +44,12 @@ path = "/v1/things"
 description = "Fetch things."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#
     )
 }
@@ -242,6 +248,12 @@ path = "/v1/models"
 description = "List the models — and name no service."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 "#,
         operation("acme-chat-completion", "chat"),
     ));

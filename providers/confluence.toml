@@ -339,6 +339,12 @@ name = "default"
 tags = ["knowledge-base"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-space-list"
 method = "GET"
 direction = "read"
@@ -358,6 +364,12 @@ properties = { results = { type = "array", description = "This page's spaces —
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-space-get"
 method = "GET"
 direction = "read"
@@ -383,6 +395,12 @@ properties = { id = { type = "string", description = "The space's id, as a strin
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-space-pages"
 method = "GET"
 direction = "read"
@@ -408,6 +426,12 @@ properties = { results = { type = "array", description = "This page's pages — 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-page-get"
 method = "GET"
 direction = "read"
@@ -451,6 +475,12 @@ properties = { id = { type = "string", description = "The page's id, as a string
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-page-create"
 method = "POST"
 direction = "write"
@@ -514,6 +544,12 @@ properties = { id = { type = "string", description = "The new page's id — the 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "confluence-comment-add"
 method = "POST"
 direction = "write"

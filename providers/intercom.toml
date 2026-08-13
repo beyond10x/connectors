@@ -223,6 +223,12 @@ name = "default"
 tags = ["support"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "intercom-contact-get"
 method = "GET"
 direction = "read"
@@ -270,7 +276,7 @@ type = "object"
 required = ["type", "id"]
 properties = { type = { const = "contact" }, id = { type = "string", description = "The 24-character Intercom id, which is what this operation takes" }, workspace_id = { type = "string", description = "The workspace the contact belongs to — Intercom's app id" }, external_id = { type = "string", description = "Your own id for this person, or null. Intercom's identity model treats this and `email` as the two identifiers" }, role = { type = "string", description = "`user` for an identified person or `lead` for an unidentified visitor. A lead can be merged into a user later, which changes the id a flow should hold" }, email = { type = "string", format = "email" }, phone = { type = "string", description = "Null unless set" }, name = { type = "string", description = "Null unless set" }, avatar = { type = "object", description = "`{type, image_url}` or null — an object, not a URL string" }, owner_id = { type = "integer", description = "The admin who owns the contact, or null" }, created_at = { type = "integer", description = "Unix seconds — an integer, not an ISO string" }, updated_at = { type = "integer", description = "Unix seconds" }, signed_up_at = { type = "integer", description = "Unix seconds, or null for a contact that never signed up" }, last_seen_at = { type = "integer", description = "Unix seconds of the last time Intercom saw this person, or null. This is the field that says whether a contact is live" }, last_replied_at = { type = "integer", description = "Unix seconds, or null" }, last_contacted_at = { type = "integer", description = "Unix seconds, or null" }, unsubscribed_from_emails = { type = "boolean", description = "TRUE MEANS DO NOT EMAIL THIS PERSON. Check it before a flow sends anything" }, has_hard_bounced = { type = "boolean", description = "Their address bounced permanently; mail to it will not arrive" }, marked_email_as_spam = { type = "boolean" }, custom_attributes = { type = "object", description = "The workspace's own attributes, keyed by name. Which keys exist is per workspace, so none is declared" }, tags = { type = "object", description = "A PAGINATED WRAPPER, not an array: `{type, data, url, total_count, has_more}`. The tags are at `.data`, and `has_more` true means there are more than were returned" }, companies = { type = "object", description = "The same wrapper shape — companies at `.data`" }, notes = { type = "object", description = "The same wrapper shape — notes at `.data`" }, location = { type = "object", description = "Intercom's IP-derived guess: `{type, country, region, city}`" }, social_profiles = { type = "object", description = "The same wrapper shape" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # See the header comment: this names the *first* error of a list, which is all the model can hold.
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
@@ -278,6 +284,12 @@ code_pointer = "/errors/0/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "intercom-contact-create"
 method = "POST"
 direction = "write"
@@ -323,13 +335,19 @@ type = "object"
 required = ["type", "id"]
 properties = { type = { const = "contact" }, id = { type = "string", description = "The new contact's id — the only handle on the record this call created, and what a following note addresses" }, workspace_id = { type = "string" }, external_id = { type = "string" }, role = { type = "string", description = "Echoes back `user` or `lead` as sent" }, email = { type = "string", format = "email" }, phone = { type = "string" }, name = { type = "string" }, avatar = { type = "object", description = "`{type, image_url}` or null" }, created_at = { type = "integer", description = "Unix seconds — an integer, not an ISO string" }, updated_at = { type = "integer", description = "Unix seconds" }, signed_up_at = { type = "integer", description = "Null on a contact created this way" }, last_seen_at = { type = "integer", description = "Null until Intercom sees the person" }, unsubscribed_from_emails = { type = "boolean" }, custom_attributes = { type = "object" }, tags = { type = "object", description = "The paginated wrapper shape, empty on a new contact" }, companies = { type = "object", description = "The paginated wrapper shape" }, notes = { type = "object", description = "The paginated wrapper shape" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "intercom-conversation-get"
 method = "GET"
 direction = "read"
@@ -358,7 +376,7 @@ type = "object"
 required = ["type", "id", "state"]
 properties = { type = { const = "conversation" }, id = { type = "string", description = "The conversation id, a decimal string" }, title = { type = "string", description = "The subject, or null — most conversations have none" }, state = { type = "string", enum = ["open", "closed", "snoozed"], description = "The inbox state. `snoozed` is a *kind of open*: see `open` beside it" }, open = { type = "boolean", description = "True while the conversation is unresolved — **including while it is snoozed**. Use with `state` rather than instead of it" }, read = { type = "boolean", description = "Whether a teammate has read it" }, priority = { type = "string", description = "`priority` or `not_priority` — Intercom's own two-valued flag, not a severity scale" }, created_at = { type = "integer", description = "Unix seconds" }, updated_at = { type = "integer", description = "Unix seconds" }, waiting_since = { type = "integer", description = "Unix seconds since the customer has been waiting for a reply, or null when they are not. This is the SLA-relevant field" }, snoozed_until = { type = "integer", description = "Unix seconds when a snoozed conversation reopens, or null" }, source = { type = "object", description = "How it started: `{type, id, delivered_as, subject, body, author, attachments}` — the first message, and `author` is who sent it" }, contacts = { type = "object", description = "The customers on the conversation, as `{type, contacts: […]}` — a wrapper, not an array" }, teammates = { type = "object", description = "The admins on it, same wrapper shape, or null" }, admin_assignee_id = { type = "integer", description = "The assigned admin, or null when unassigned" }, team_assignee_id = { type = "integer", description = "The assigned team, or null" }, tags = { type = "object", description = "The paginated wrapper shape — tags at `.data`" }, conversation_rating = { type = "object", description = "The customer's rating of the conversation, or null: `{rating, remark, created_at, contact, teammate}`" }, statistics = { type = "object", description = "Timing aggregates — first response time, last close time and so on — or null" }, conversation_parts = { type = "object", description = "THE MESSAGES, nested twice: `{type, conversation_parts: […], total_count}`. Each part carries `part_type` (`comment`, `note`, `assignment`, `close`), `body` as HTML, `author` and `created_at`. Only a page of them is returned — check `total_count`" }, custom_attributes = { type = "object" }, ai_agent_participated = { type = "boolean", description = "Whether Intercom's own AI agent replied in this conversation, which is worth knowing before a second automation replies too" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
@@ -379,6 +397,12 @@ code_pointer = "/errors/0/code"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "intercom-conversation-reply"
 method = "POST"
 direction = "write"
@@ -441,13 +465,19 @@ type = "object"
 required = ["type", "id", "state"]
 properties = { type = { const = "conversation" }, id = { type = "string", description = "The conversation's id, unchanged by the reply" }, state = { type = "string", enum = ["open", "closed", "snoozed"], description = "The state after the reply. An admin comment on a closed conversation reopens it" }, open = { type = "boolean", description = "True while unresolved, including while snoozed" }, read = { type = "boolean" }, priority = { type = "string" }, created_at = { type = "integer", description = "Unix seconds — of the conversation, not of this reply" }, updated_at = { type = "integer", description = "Unix seconds, moved by this reply" }, waiting_since = { type = "integer", description = "Null after an admin reply, since the customer is no longer waiting" }, snoozed_until = { type = "integer" }, source = { type = "object", description = "The conversation's first message, not this reply" }, contacts = { type = "object", description = "`{type, contacts: […]}` — who the reply went to, when `message_type` was `comment`" }, admin_assignee_id = { type = "integer" }, team_assignee_id = { type = "integer" }, conversation_parts = { type = "object", description = "WHERE THE SENT REPLY IS: `{type, conversation_parts: […], total_count}`, and the reply is the last entry. Its `part_type` is `comment` (delivered to the customer) or `note` (internal), which is the only confirmation of which audience was written to" }, statistics = { type = "object" }, tags = { type = "object" }, custom_attributes = { type = "object" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "intercom-contact-note-create"
 method = "POST"
 direction = "write"
@@ -493,7 +523,7 @@ type = "object"
 required = ["type", "id"]
 properties = { type = { const = "note" }, id = { type = "string", description = "The note's own id" }, created_at = { type = "integer", description = "Unix seconds — an integer, e.g. 1674589321" }, body = { type = "string", description = "The note as stored, HTML" }, author = { type = "object", description = "The admin it is attributed to: `{type, id, name, email, job_title, away_mode_enabled}`. This is what the required `admin_id` produced" }, contact = { type = "object", description = "The contact it was attached to, as `{type, id}` — **nullable** in Intercom's schema, so confirm it rather than assuming the note landed on a person" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 code_pointer = "/errors/0/code"
 

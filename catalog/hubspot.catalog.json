@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "HubSpot private-app access token (pat-…) with crm.objects.contacts.read/write, crm.objects.companies.read and crm.objects.deals.read",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "HubSpot CRM: read contacts, companies and deals, and create and update contact records",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -46,9 +46,19 @@
       "credential_requirement": "declared",
       "description": "Read one contact by record id. Returns only HubSpot's default contact properties — name, email and record timestamps; a custom property needs a `properties` projection this connector cannot express yet",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/category",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "hubspot-contact-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact's HubSpot record id (`hs_object_id`), e.g. 512",
@@ -63,16 +73,15 @@
           "symbol": "contact_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/category",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/crm/v3/objects/contacts/{contact_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -154,9 +163,19 @@
       "credential_requirement": "declared",
       "description": "Create a contact from an email address. HubSpot treats email as the contact's unique identifier and rejects a duplicate with 409. The new record is visible to everyone in the portal and can be enrolled by a workflow, which may send it marketing email",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/category",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "hubspot-contact-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact's email address — HubSpot's unique identifier for a contact",
@@ -171,12 +190,8 @@
           "wire": "properties.email"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/category",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -194,6 +209,9 @@
         "method": "POST",
         "url": "{base}/crm/v3/objects/contacts"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -270,9 +288,19 @@
       "credential_requirement": "declared",
       "description": "Overwrite a contact's first and last name. Both are written on every call — this operation replaces them rather than merging, so re-send the one you are not changing (read it first with hubspot-contact-get). The change is visible to everyone in the portal and can trigger a workflow",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/category",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "hubspot-contact-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The contact's HubSpot record id (`hs_object_id`)",
@@ -309,12 +337,8 @@
           "wire": "properties.lastname"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/category",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -335,6 +359,9 @@
         "method": "PATCH",
         "url": "{base}/crm/v3/objects/contacts/{contact_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
@@ -362,9 +389,19 @@
       "credential_requirement": "declared",
       "description": "Read one company by record id. Returns only HubSpot's default company properties — name, domain and record timestamps",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/category",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "hubspot-company-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The company's HubSpot record id (`hs_object_id`)",
@@ -379,16 +416,15 @@
           "symbol": "company_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/category",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/crm/v3/objects/companies/{company_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -467,9 +503,19 @@
       "credential_requirement": "declared",
       "description": "Read one deal by record id. Returns only HubSpot's default deal properties — name, amount, stage, pipeline and close date",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/category",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "hubspot-deal-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The deal's HubSpot record id (`hs_object_id`)",
@@ -484,16 +530,15 @@
           "symbol": "deal_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/category",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/crm/v3/objects/deals/{deal_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -550,8 +595,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v3",

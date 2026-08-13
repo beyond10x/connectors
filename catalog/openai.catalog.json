@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "OpenAI API key, sent as a bearer token",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "OpenAI platform: inspect models, stored responses, files and batches, and create chat completions and embeddings",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -40,13 +40,24 @@
       "credential_requirement": "declared",
       "description": "List the models available to this API key, with their ids and owners",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-models-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/models"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -113,9 +124,15 @@
       "credential_requirement": "declared",
       "description": "Retrieve one model by id, with its ownership and permissions",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-model-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The model id, e.g. `gpt-4o` or `text-embedding-3-small`",
@@ -129,10 +146,15 @@
           "symbol": "model"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/models/{model}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created": {
@@ -193,9 +215,15 @@
       "credential_requirement": "declared",
       "description": "Create a chat completion. Billed per input and output token, so the caller must state a token budget via max_completion_tokens",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "openai-chat-completion",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The model to run, e.g. `gpt-4o`",
@@ -234,6 +262,8 @@
           "symbol": "max_completion_tokens"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -255,6 +285,9 @@
         "method": "POST",
         "url": "{base}/v1/chat/completions"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "choices": {
@@ -343,9 +376,15 @@
       "credential_requirement": "declared",
       "description": "Create embedding vectors for one or more input texts. Billed per input token",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "openai-embeddings-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The embedding model to use, e.g. `text-embedding-3-small`",
@@ -381,6 +420,8 @@
           "symbol": "input"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -399,6 +440,9 @@
         "method": "POST",
         "url": "{base}/v1/embeddings"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -474,9 +518,15 @@
       "credential_requirement": "declared",
       "description": "Retrieve one stored model response by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-response-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the response to retrieve.",
@@ -489,10 +539,15 @@
           "symbol": "response_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v1/responses/{response_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "allOf": [
           {
@@ -20652,9 +20707,15 @@
       "credential_requirement": "declared",
       "description": "List input items retained for one stored response with a bounded integer limit",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-response-input-item-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the response to retrieve input items for.",
@@ -20678,6 +20739,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -20690,6 +20753,9 @@
         ],
         "url": "{base}/v1/responses/{response_id}/input_items"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "A list of Response items.",
         "properties": {
@@ -29064,9 +29130,15 @@
       "credential_requirement": "declared",
       "description": "List files available to this API key with a bounded integer limit",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-file-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and 10,000, and the default is 10,000.",
@@ -29080,6 +29152,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -29092,6 +29166,9 @@
         ],
         "url": "{base}/v1/files"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -29223,9 +29300,15 @@
       "credential_requirement": "declared",
       "description": "List batch jobs available to this API key with a bounded integer limit",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openai-batch-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 20.",
@@ -29239,6 +29322,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -29251,6 +29336,9 @@
         ],
         "url": "{base}/v1/batches"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -29532,8 +29620,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

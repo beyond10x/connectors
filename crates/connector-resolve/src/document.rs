@@ -5,7 +5,7 @@
 //! **request** is made of into types: the services' base URLs, and each operation's request
 //! template, declared parameters and endpoint slots.
 //!
-//! Everything else the document carries — response schemas, quirks, events, the OAuth2 spec — is
+//! Everything else the document carries — response schemas, operation traits, events, the OAuth2 spec — is
 //! skipped rather than modelled. Interpreting those is somebody else's job, and a struct that
 //! claimed them would have to be kept in step with a schema this crate does not own.
 //!
@@ -123,6 +123,66 @@ struct RawService {
     base_url: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum HostEffect {
+    Read,
+    Write,
+    Network,
+    Process,
+    Browser,
+    Filesystem,
+    LocalSystem,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum InteractionShape {
+    Unary,
+    Stream,
+    Subscription,
+    LeasedSession,
+    SessionEstablishment,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum ProtocolDriver {
+    HttpV1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum PlacementRequirement {
+    ConnectorsDeployment,
+    SubstrateWorkload,
+    FederatedSatellite,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum ImplementationForm {
+    BuiltIn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum RequiredCapability {
+    PublicNetwork,
+    PrivateNetwork,
+    UnixSocket,
+    FileSecret,
+    Process,
+    Container,
+    Device,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawOperation {
     id: String,
@@ -145,8 +205,12 @@ struct RawOperation {
     /// The **host** effects the authority projection reads — `["read", "network"]` and the like,
     /// read from the document and never derived (C-552). Distinct from `semantic_effects`, which the
     /// document also carries and which this crate does not model.
-    #[serde(default)]
-    effects: Vec<String>,
+    effects: Vec<HostEffect>,
+    interaction_shape: InteractionShape,
+    protocol_driver: ProtocolDriver,
+    placement_requirement: PlacementRequirement,
+    implementation_form: ImplementationForm,
+    required_capabilities: Vec<RequiredCapability>,
     /// The model-facing contract projection — the error-envelope-extended description and the
     /// lowered, Flux-typed input schema — computed at build time and stored so a consumer needs no
     /// engine to read them (C-552). Absent for a document written before the field existed.
@@ -329,7 +393,12 @@ pub struct Operation {
     /// The lowered, Flux-typed input schema the model-facing contract carries (C-552).
     input_schema: Value,
     /// The host effects the authority projection reads, read from the document (C-552).
-    effects: Vec<String>,
+    effects: Vec<HostEffect>,
+    interaction_shape: InteractionShape,
+    protocol_driver: ProtocolDriver,
+    placement_requirement: PlacementRequirement,
+    implementation_form: ImplementationForm,
+    required_capabilities: Vec<RequiredCapability>,
     /// The declared risk tier, as flux's vocabulary spells it (C-552).
     risk: String,
     /// The declared idempotency, likewise (C-552).
@@ -394,6 +463,11 @@ impl Operation {
             description,
             input_schema,
             effects: raw.effects,
+            interaction_shape: raw.interaction_shape,
+            protocol_driver: raw.protocol_driver,
+            placement_requirement: raw.placement_requirement,
+            implementation_form: raw.implementation_form,
+            required_capabilities: raw.required_capabilities,
             risk: raw.risk,
             idempotency: raw.idempotency,
         }
@@ -425,8 +499,29 @@ impl Operation {
 
     /// **The host effects the authority projection reads** (C-552), read from the document and never
     /// derived — `["read", "network"]` and the like. Distinct from `semantic_effects`.
-    pub fn effects(&self) -> &[String] {
+    pub fn effects(&self) -> &[HostEffect] {
         &self.effects
+    }
+
+    /// The declared member lifecycle.
+    pub fn interaction_shape(&self) -> InteractionShape {
+        self.interaction_shape
+    }
+    /// The closed, versioned protocol driver.
+    pub fn protocol_driver(&self) -> ProtocolDriver {
+        self.protocol_driver
+    }
+    /// The placement requirement, before deployment selection.
+    pub fn placement_requirement(&self) -> PlacementRequirement {
+        self.placement_requirement
+    }
+    /// How the implementation is supplied.
+    pub fn implementation_form(&self) -> ImplementationForm {
+        self.implementation_form
+    }
+    /// Capabilities admission must prove before dispatch.
+    pub fn required_capabilities(&self) -> &[RequiredCapability] {
+        &self.required_capabilities
     }
 
     /// The declared risk tier, as flux's vocabulary spells it (C-552).
@@ -558,6 +653,12 @@ mod tests {
                 "id": "vendor-thing-create",
                 "service": "default",
                 "expose": true,
+                "effects": ["write", "network"],
+                "interaction_shape": "unary",
+                "protocol_driver": "http_v1",
+                "placement_requirement": "connectors_deployment",
+                "implementation_form": "built_in",
+                "required_capabilities": ["public_network"],
                 "params": [{"name": "a_b", "position": "body", "symbol": "a_b_2"}],
                 "request": {"method": "POST", "url": "{base}/things"}
             }]
@@ -586,6 +687,12 @@ mod tests {
                 "id": "vendor-thing-list",
                 "service": "default",
                 "expose": true,
+                "effects": ["read", "network"],
+                "interaction_shape": "unary",
+                "protocol_driver": "http_v1",
+                "placement_requirement": "connectors_deployment",
+                "implementation_form": "built_in",
+                "required_capabilities": ["public_network"],
                 "params": [{"name": "time.start", "position": "query"}],
                 "request": {"method": "GET", "url": "{base}/things"}
             }]

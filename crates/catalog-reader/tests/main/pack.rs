@@ -22,7 +22,7 @@ fn with_digest(body: &str) -> Vec<u8> {
     for byte in Sha256::digest(body.as_bytes()) {
         hex.push_str(&format!("{byte:02x}"));
     }
-    format!("flux-connectors-catalog-pack 1\ndigest sha256 {hex}\n{body}").into_bytes()
+    format!("connectors-catalog-pack 1\ndigest sha256 {hex}\n{body}").into_bytes()
 }
 
 #[test]
@@ -138,11 +138,7 @@ fn a_tampered_payload_is_refused_before_any_record() {
 #[test]
 fn a_newer_container_format_is_refused_by_name() {
     let text = std::fs::read_to_string(committed_pack_path()).expect("the committed pack");
-    let newer = text.replacen(
-        "flux-connectors-catalog-pack 1",
-        "flux-connectors-catalog-pack 2",
-        1,
-    );
+    let newer = text.replacen("connectors-catalog-pack 1", "connectors-catalog-pack 2", 1);
     match Pack::from_bytes(newer.into_bytes()) {
         Err(Error::UnsupportedFormat { found }) => assert_eq!(found, 2),
         other => panic!("a newer format must refuse with UnsupportedFormat, got {other:?}"),
@@ -161,9 +157,9 @@ fn something_that_is_not_a_pack_is_refused() {
 /// verified, well-formed pack that is refused anyway — fail closed, by name.
 #[test]
 fn a_newer_schema_version_is_refused_by_name() {
-    let bytes = with_digest("schema 2\nproviders 0\noperations 0\npayload 0\n");
+    let bytes = with_digest("schema 3\nproviders 0\noperations 0\npayload 0\n");
     match Pack::from_bytes(bytes) {
-        Err(Error::UnsupportedSchema { found }) => assert_eq!(found, 2),
+        Err(Error::UnsupportedSchema { found }) => assert_eq!(found, 3),
         other => panic!("a newer schema must refuse with UnsupportedSchema, got {other:?}"),
     }
 }
@@ -175,7 +171,7 @@ fn a_newer_schema_version_is_refused_by_name() {
 fn additive_growth_is_tolerated() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 1\nflavor experimental\nproviders 1\noperations 1\n\
+        "schema 2\nflavor experimental\nproviders 1\noperations 1\n\
          p acme 0 {len}\no acme-thing-get acme default 0 {len}\n\
          e acme-event acme 7 4\npayload {len}\n{payload}",
         len = payload.len()
@@ -197,7 +193,7 @@ fn additive_growth_is_tolerated() {
 fn a_span_outside_the_payload_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 1\nproviders 1\noperations 0\np acme 0 {}\npayload {}\n{payload}",
+        "schema 2\nproviders 1\noperations 0\np acme 0 {}\npayload {}\n{payload}",
         payload.len() + 7,
         payload.len()
     );
@@ -211,7 +207,7 @@ fn a_span_outside_the_payload_is_refused() {
 fn an_operation_naming_an_absent_provider_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 1\nproviders 1\noperations 1\np acme 0 {len}\n\
+        "schema 2\nproviders 1\noperations 1\np acme 0 {len}\n\
          o ghost-op ghost default 0 {len}\npayload {len}\n{payload}",
         len = payload.len()
     );
@@ -229,7 +225,7 @@ fn an_operation_naming_an_absent_provider_is_refused() {
 fn a_payload_length_disagreement_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 1\nproviders 0\noperations 0\npayload {}\n{payload}",
+        "schema 2\nproviders 0\noperations 0\npayload {}\n{payload}",
         payload.len() + 3
     );
     match Pack::from_bytes(with_digest(&body)) {
@@ -251,7 +247,7 @@ fn the_vendored_sha256_agrees_with_sha2_across_padding_boundaries() {
     for len in (0..=130).chain([1000, 4096, 100_000]) {
         let payload: String = (0..len).map(|i| char::from((i % 79 + 33) as u8)).collect();
         let body = format!(
-            "schema 1\nproviders 0\noperations 0\npayload {}\n{payload}",
+            "schema 2\nproviders 0\noperations 0\npayload {}\n{payload}",
             payload.len()
         );
         Pack::from_bytes(with_digest(&body))

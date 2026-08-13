@@ -23,6 +23,12 @@ path = "/v1/models"
 description = "List the models."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations]]
 id = "acme-chat-completion"
@@ -33,3 +39,9 @@ path = "/v1/chat/completions"
 description = "Run a completion."
 risk = "low"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]

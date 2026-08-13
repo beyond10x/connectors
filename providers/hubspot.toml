@@ -235,6 +235,12 @@ name = "default"
 tags = ["crm"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "hubspot-contact-get"
 method = "GET"
 direction = "read"
@@ -290,7 +296,7 @@ properties = { id = { type = "string", description = "The record id (`hs_object_
 # `ErrorEnvelope` is for. `category` is the machine code — `OBJECT_NOT_FOUND`, `VALIDATION_ERROR`,
 # `RATE_LIMIT` — and `message` the human half. Declared on every operation because it is a property of
 # the whole API rather than of one endpoint.
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/category"
 
@@ -318,6 +324,12 @@ code_pointer = "/category"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "hubspot-contact-create"
 method = "POST"
 direction = "write"
@@ -353,13 +365,19 @@ type = "object"
 required = ["id", "properties", "createdAt", "updatedAt", "archived"]
 properties = { id = { type = "string", description = "The new record's id, as a string. This is the `contact_id` for a following update — and the update's parameter is a number, so it has to be converted" }, properties = { type = "object", additionalProperties = { type = "string" }, description = "The created record's properties, keyed by internal name, EVERY VALUE A STRING. HubSpot fills in more than was sent — `createdate`, `lastmodifieddate` and `hs_object_id` at minimum" }, createdAt = { type = "string", format = "date-time" }, updatedAt = { type = "string", format = "date-time" }, archived = { type = "boolean" }, warnings = { type = "array", description = "Non-fatal complaints about the create — a property HubSpot ignored, for instance. Present only on the create schema, and worth reading: the call still succeeded", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/category"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "hubspot-contact-update"
 method = "PATCH"
 direction = "write"
@@ -409,13 +427,19 @@ schema = { type = "string" }
 # So this operation is one of the eighteen the coverage table counts as absent, and the absence is the
 # record. Confirm an update by reading the contact back with `hubspot-contact-get`.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/category"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "hubspot-company-get"
 method = "GET"
 direction = "read"
@@ -439,13 +463,19 @@ type = "object"
 required = ["id", "properties", "createdAt", "updatedAt"]
 properties = { id = { type = "string", description = "The company's record id, as a string" }, properties = { type = "object", additionalProperties = { type = "string" }, description = "The company's property values, keyed by internal name (`name`, `domain`, `createdate`, `hs_lastmodifieddate`, `hs_object_id`). EVERY VALUE IS A STRING — including numeric properties such as `numberofemployees` and `annualrevenue`" }, createdAt = { type = "string", format = "date-time" }, updatedAt = { type = "string", format = "date-time" }, archived = { type = "boolean" }, archivedAt = { type = "string", format = "date-time" }, propertiesWithHistory = { type = "object", additionalProperties = { type = "array", items = { type = "object" } }, description = "Returned only when asked for, which this connector cannot do" }, associations = { type = "object", description = "Related contacts, deals and tickets. Returned only when asked for" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/category"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "hubspot-deal-get"
 method = "GET"
 direction = "read"
@@ -470,6 +500,6 @@ type = "object"
 required = ["id", "properties", "createdAt", "updatedAt"]
 properties = { id = { type = "string", description = "The deal's record id, as a string" }, properties = { type = "object", additionalProperties = { type = "string" }, description = "The deal's property values, keyed by internal name (`dealname`, `amount`, `dealstage`, `pipeline`, `closedate`, `hs_object_id`). EVERY VALUE IS A STRING — `amount` arrives as `\"1500.00\"` and `closedate` as an ISO string, so a numeric or date comparison has to convert first. `dealstage` and `pipeline` are per-portal internal ids, not display names" }, createdAt = { type = "string", format = "date-time" }, updatedAt = { type = "string", format = "date-time" }, archived = { type = "boolean" }, archivedAt = { type = "string", format = "date-time" }, propertiesWithHistory = { type = "object", additionalProperties = { type = "array", items = { type = "object" } }, description = "Returned only when asked for" }, associations = { type = "object", description = "The contacts and companies on the deal. Returned only when asked for" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 code_pointer = "/category"

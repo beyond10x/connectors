@@ -43,6 +43,12 @@ direction = "write"
 path = "/reply"
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.body]]
 name = "room"
@@ -736,7 +742,10 @@ fn a_duplicate_operation_id_is_reported_once_and_not_also_as_a_namespace_collisi
     let source = fixture(GOOD).replace(
         "[[events]]\nname = \"thing.created\"",
         "[[operations]]\nid = \"acme-reply\"\nmethod = \"GET\"\npath = \"/other\"\nrisk = \"medium\"\n\
-         direction = \"read\"\nidempotency = \"non_idempotent\"\n\n[[events]]\nname = \"thing.created\"",
+         direction = \"read\"\nidempotency = \"non_idempotent\"\neffects = [\"read\", \"network\"]\n\
+         interaction_shape = \"unary\"\nprotocol_driver = \"http_v1\"\n\
+         placement_requirement = \"connectors_deployment\"\nimplementation_form = \"built_in\"\n\
+         required_capabilities = [\"public_network\"]\n\n[[events]]\nname = \"thing.created\"",
     );
     let error = refuse(&source);
     assert_eq!(

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "OpenRouter API key, sent as a bearer token",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "OpenRouter model router: list models and their endpoints, create chat completions, and read credit balance",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -40,13 +40,24 @@
       "credential_requirement": "declared",
       "description": "List every model OpenRouter routes to, with its context length, modalities and per-token pricing",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openrouter-models-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v1/models"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -93,9 +104,15 @@
       "credential_requirement": "declared",
       "description": "List the upstream provider endpoints serving one model, with each one's pricing, context length and quantization",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openrouter-model-endpoints-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The model's author or organization, the part of a model id before the `/` — e.g. `openai`, `anthropic`, `meta-llama`",
@@ -120,10 +137,15 @@
           "symbol": "slug"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v1/models/{author}/{slug}/endpoints"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -172,9 +194,15 @@
       "credential_requirement": "declared",
       "description": "Create a chat completion through OpenRouter, routed to the named model. Billed per input and output token, so the caller must state a token budget via max_completion_tokens",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "openrouter-chat-completion",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The model to route to, as `<author>/<slug>` — e.g. `openai/gpt-4o` or `anthropic/claude-3.5-sonnet`",
@@ -213,6 +241,8 @@
           "symbol": "max_completion_tokens"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -234,6 +264,9 @@
         "method": "POST",
         "url": "{base}/api/v1/chat/completions"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "choices": {
@@ -313,13 +346,24 @@
       "credential_requirement": "declared",
       "description": "Read the account's total purchased credits and total usage, in credit units",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "openrouter-credits-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v1/credits"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "data": {
@@ -350,8 +394,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

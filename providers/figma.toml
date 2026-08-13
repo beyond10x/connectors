@@ -133,6 +133,12 @@ name = "default"
 tags = ["design"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-user-me"
 method = "GET"
 direction = "read"
@@ -146,12 +152,18 @@ type = "object"
 required = ["id", "email"]
 properties = { id = { type = "string", description = "The user's Figma id, an opaque string — not necessarily numeric" }, email = { type = "string", description = "Personal data" }, handle = { type = "string", description = "The display name shown on comments and file activity" }, img_url = { type = "string", description = "URL of the user's avatar image" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-file-get"
 method = "GET"
 direction = "read"
@@ -173,12 +185,18 @@ type = "object"
 required = ["document", "name", "lastModified", "version"]
 properties = { name = { type = "string", description = "The file's name as shown in Figma" }, lastModified = { type = "string", format = "date-time", description = "When the file was last modified, ISO 8601" }, version = { type = "string", description = "An opaque version identifier Figma bumps on every save — not a semantic version" }, role = { type = "string", description = "The calling user's own permission on this file, e.g. `owner`, `editor`, `viewer` — not a property of the file itself" }, editorType = { type = "string", description = "`figma` or `figjam`. A FigJam board's document tree uses different node types than a design file's" }, thumbnailUrl = { type = "string", description = "A preview image URL. Like the image-render endpoint's URLs, treat this as not guaranteed stable long-term rather than a permanent asset address" }, document = { type = "object", description = "The root node of the file's recursive node tree: a node with `id`, `name`, `type` and (for container types) a `children` array of more nodes. Not modeled further here — JSON Schema without recursion cannot describe it faithfully, and `figma-file-nodes-get` is how a caller reaches one node's own subtree by id instead of walking this one" }, components = { type = "object", description = "Reusable components defined in the file, keyed by node id. Each entry carries at least `key`, `name` and `description`" }, styles = { type = "object", description = "Shared text, color, effect and grid styles defined in the file, keyed by node id" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-file-nodes-get"
 method = "GET"
 direction = "read"
@@ -206,7 +224,7 @@ type = "object"
 required = ["nodes"]
 properties = { name = { type = "string", description = "The file's name" }, lastModified = { type = "string", format = "date-time" }, err = { type = "string", description = "Set when the whole request failed; absent otherwise. A per-node failure instead surfaces as that id being missing from `nodes`" }, nodes = { type = "object", description = "Keyed by the requested node id. Each present entry carries a `document` object — that node's own subtree, in the same opaque shape figma-file-get's `document` describes — plus that node's own `components` and `styles`. A requested id that does not exist in the file is simply absent from this object rather than an error" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------
@@ -216,6 +234,12 @@ message_pointer = "/err"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-image-render-get"
 method = "GET"
 direction = "read"
@@ -241,12 +265,18 @@ type = "object"
 required = ["images"]
 properties = { err = { type = "string", description = "Set when the whole request failed; absent otherwise" }, images = { type = "object", description = "Keyed by the requested node id. Each value is either a URL string or null (that particular node failed to render). Every URL here is temporary — it is served from short-lived storage and is not guaranteed to remain valid, so treat it as something to fetch immediately rather than an address to keep" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-project-files-list"
 method = "GET"
 direction = "read"
@@ -266,12 +296,18 @@ type = "object"
 required = ["files"]
 properties = { name = { type = "string", description = "The project's own name" }, files = { type = "array", description = "One entry per file in the project, each `{key, name, thumbnail_url, last_modified}` and optionally `branches` when the file has any", items = { type = "object", required = ["key", "name"], properties = { key = { type = "string", description = "The file key figma-file-get, figma-file-nodes-get, figma-image-render-get and figma-file-comments-list all take" }, name = { type = "string" }, thumbnail_url = { type = "string", description = "Like other thumbnail URLs here, not guaranteed stable long-term" }, last_modified = { type = "string", format = "date-time" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "figma-file-comments-list"
 method = "GET"
 direction = "read"
@@ -291,7 +327,7 @@ type = "object"
 required = ["comments"]
 properties = { comments = { type = "array", description = "Every comment on the file, oldest first", items = { type = "object", required = ["id", "message"], properties = { id = { type = "string" }, file_key = { type = "string" }, parent_id = { type = "string", description = "The id of the comment this replies to, or an empty string for a top-level comment — Figma uses an empty string here, not null" }, message = { type = "string", description = "The comment text. May quote or discuss design content and the commenter's own name is attached via `user` — treat both as data about a named individual" }, user = { type = "object", description = "Who wrote it: `{id, handle, img_url}` — the same shape figma-user-me returns for the caller" }, created_at = { type = "string", format = "date-time" }, resolved_at = { type = "string", format = "date-time", description = "When the comment was marked resolved, or absent while still open" }, client_meta = { type = "object", description = "Where the comment is pinned: either a canvas position or an offset within a frame, in one of two vendor-specific shapes. Not modeled further here" }, order_id = { type = "string", description = "Orders comments within their thread; not a public id anything else addresses" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/err"
 
 # ---------------------------------------------------------------------------------------------

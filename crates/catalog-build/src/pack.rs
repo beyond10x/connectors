@@ -11,7 +11,7 @@
 //! # The format, in one place
 //!
 //! ```text
-//! flux-connectors-catalog-pack 1                    ← magic + container format version
+//! connectors-catalog-pack 1                    ← magic + container format version
 //! digest sha256 <64 lowercase hex>                  ← over every byte after this line
 //! schema <n>                                        ← the documents' schema_version
 //! providers <n>
@@ -40,7 +40,7 @@ use anyhow::{bail, Context, Result};
 use connector_spec::sha256_hex;
 
 /// The pack's magic word — the first token of the first line.
-pub const MAGIC: &str = "flux-connectors-catalog-pack";
+pub const MAGIC: &str = "connectors-catalog-pack";
 
 /// The container format version this writer emits. A reader refuses a version above what it
 /// knows, by name, so bumping this is a coordinated change with `crates/catalog-reader`.
@@ -268,7 +268,7 @@ mod tests {
     /// inside operation records, exactly where a naive scan goes wrong.
     const DOCUMENT: &str = r#"{
   "connector": "acme",
-  "schema_version": 1,
+  "schema_version": 2,
   "operations": [
     {
       "id": "acme-thing-get",
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn a_nested_operations_key_is_not_the_array() {
         let document = r#"{
-  "schema_version": 1,
+  "schema_version": 2,
   "config": [ { "help": "operations", "operations": [ { "id": "decoy" } ] } ],
   "operations": [ { "id": "real-op", "service": "default" } ]
 }
@@ -327,14 +327,14 @@ mod tests {
     fn the_compiled_pack_round_trips_its_own_spans() {
         let pack = compile(&[("acme", DOCUMENT)]).expect("the pack compiles");
         let mut lines = pack.lines();
-        assert_eq!(lines.next(), Some("flux-connectors-catalog-pack 1"));
+        assert_eq!(lines.next(), Some("connectors-catalog-pack 1"));
         let digest = lines.next().expect("a digest line");
         let stated = digest
             .strip_prefix("digest sha256 ")
             .expect("the digest spelling");
         let body_start = pack.find('\n').expect("a newline") + 1 + digest.len() + 1;
         assert_eq!(stated, sha256_hex(&pack.as_bytes()[body_start..]));
-        assert_eq!(lines.next(), Some("schema 1"));
+        assert_eq!(lines.next(), Some("schema 2"));
         assert_eq!(lines.next(), Some("providers 1"));
         assert_eq!(lines.next(), Some("operations 2"));
     }
@@ -352,11 +352,11 @@ mod tests {
 
     #[test]
     fn disagreeing_schema_versions_are_refused() {
-        let newer = DOCUMENT.replace("\"schema_version\": 1", "\"schema_version\": 2");
+        let newer = DOCUMENT.replace("\"schema_version\": 2", "\"schema_version\": 3");
         let error = compile(&[("acme", DOCUMENT), ("beacon", &newer)])
             .expect_err("one pack cannot carry two schema versions");
         assert!(
-            format!("{error:#}").contains("schema_version 2"),
+            format!("{error:#}").contains("schema_version 3"),
             "the refusal names the disagreement: {error:#}"
         );
     }

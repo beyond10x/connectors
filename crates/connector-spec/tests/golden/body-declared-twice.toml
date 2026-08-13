@@ -11,6 +11,12 @@ direction = "write"
 path = "/v2/sessions/{id}"
 risk = "medium"
 idempotency = "idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 auth = []
 
 [[operations.params.path]]

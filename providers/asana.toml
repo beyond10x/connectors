@@ -199,6 +199,12 @@ name = "default"
 tags = ["project-management"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "asana-task-get"
 method = "GET"
 direction = "read"
@@ -218,7 +224,7 @@ type = "object"
 required = ["data"]
 properties = { data = { type = "object", description = "The task resource, in Asana's default field set. Individual fields are not enumerated here — recording the envelope is what a consumer cannot infer; the resource's own shape is in Asana's reference" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 
 # ---------------------------------------------------------------------------------------------
@@ -242,6 +248,12 @@ message_pointer = "/errors/0/message"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "asana-task-create"
 method = "POST"
 direction = "write"
@@ -284,12 +296,18 @@ type = "object"
 required = ["data"]
 properties = { data = { type = "object", description = "The created task, in Asana's default field set. Its `gid` is what later calls address it by" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "asana-task-update"
 method = "PUT"
 direction = "write"
@@ -341,12 +359,18 @@ type = "object"
 required = ["data"]
 properties = { data = { type = "object", description = "The task as it stands after the update, in Asana's default field set" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "asana-task-story-add"
 method = "POST"
 direction = "write"
@@ -383,12 +407,18 @@ type = "object"
 required = ["data"]
 properties = { data = { type = "object", description = "The created story: its `gid`, `created_at`, `created_by` and `text`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "asana-project-get"
 method = "GET"
 direction = "read"
@@ -408,5 +438,5 @@ type = "object"
 required = ["data"]
 properties = { data = { type = "object", description = "The project resource, in Asana's default field set" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/errors/0/message"

@@ -46,9 +46,10 @@ use serde_json::Value;
 
 use crate::{
     Acquisition, Approval, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
-    ConfigField, Credential, CredentialRequirement, Event, Idempotency, OAuth2, OAuthGrant,
-    OAuthRedirect, Operation, OperationDirection, Pair, Placement, Provider, Risk, Runtime,
-    Selector, Service, SocketConnect, Subject,
+    ConfigField, Credential, CredentialRequirement, Event, HostEffect, Idempotency,
+    ImplementationForm, InteractionShape, OAuth2, OAuthGrant, OAuthRedirect, Operation,
+    OperationDirection, Pair, Placement, PlacementRequirement, ProtocolDriver, Provider,
+    RequiredCapability, Risk, Selector, Service, SocketConnect, Subject,
 };
 
 /// Every provider in the embedded pack, ordered by id, built once.
@@ -110,7 +111,6 @@ struct RawDocument {
     vendor: String,
     #[serde(default)]
     description: String,
-    runtime: String,
     #[serde(default)]
     authority: Option<String>,
     #[serde(default)]
@@ -227,8 +227,14 @@ struct RawOperation {
     description: String,
     risk: String,
     idempotency: String,
+    effects: Vec<String>,
     #[serde(default)]
     semantic_effects: Vec<String>,
+    interaction_shape: String,
+    protocol_driver: String,
+    placement_requirement: String,
+    implementation_form: String,
+    required_capabilities: Vec<String>,
     #[serde(default)]
     auth: Vec<Vec<String>>,
     /// C-206's token for what the effective `auth` list cannot say when it is empty (S-001).
@@ -392,7 +398,6 @@ fn build(id: &str, text: &str) -> &'static Provider {
         vendor: leak_str(raw.vendor.clone()),
         description: leak_str(raw.description.clone()),
         authority: leak_opt(raw.authority.clone()),
-        runtime: runtime(id, &raw.runtime),
         services: leak_slice(
             raw.services
                 .iter()
@@ -479,7 +484,23 @@ fn build_operation(
         description: leak_str(raw.description.clone()),
         risk: risk(&raw.id, &raw.risk),
         idempotency: idempotency(&raw.id, &raw.idempotency),
+        effects: leak_slice(
+            raw.effects
+                .iter()
+                .map(|word| host_effect(&raw.id, word))
+                .collect(),
+        ),
         semantic_effects: leak_strs(raw.semantic_effects.clone()),
+        interaction_shape: interaction_shape(&raw.id, &raw.interaction_shape),
+        protocol_driver: protocol_driver(&raw.id, &raw.protocol_driver),
+        placement_requirement: placement_requirement(&raw.id, &raw.placement_requirement),
+        implementation_form: implementation_form(&raw.id, &raw.implementation_form),
+        required_capabilities: leak_slice(
+            raw.required_capabilities
+                .iter()
+                .map(|word| required_capability(&raw.id, word))
+                .collect(),
+        ),
         credentials: leak_requirements(raw.auth.clone()),
         credential_requirement: credential_requirement(raw),
         // Per operation, through its service: a multi-service provider reaches a different host per
@@ -841,23 +862,71 @@ fn selector(channel: &str, raw: &RawSelector) -> Selector {
     }
 }
 
-fn runtime(provider: &str, word: &str) -> Runtime {
-    match word {
-        "http" => Runtime::Http,
-        "socket" => Runtime::Socket,
-        "process" => Runtime::Process,
-        "container" => Runtime::Container,
-        "plugin" => Runtime::Plugin,
-        "remote" => Runtime::Remote,
-        other => panic!("connector `{provider}` declares unknown runtime `{other}`"),
-    }
-}
-
 fn direction(operation: &str, word: &str) -> OperationDirection {
     match word {
         "read" => OperationDirection::Read,
         "write" => OperationDirection::Write,
         other => panic!("operation `{operation}` declares unknown direction `{other}`"),
+    }
+}
+
+fn host_effect(operation: &str, word: &str) -> HostEffect {
+    match word {
+        "read" => HostEffect::Read,
+        "write" => HostEffect::Write,
+        "network" => HostEffect::Network,
+        "process" => HostEffect::Process,
+        "browser" => HostEffect::Browser,
+        "filesystem" => HostEffect::Filesystem,
+        "local_system" => HostEffect::LocalSystem,
+        other => panic!("operation `{operation}` declares unknown host effect `{other}`"),
+    }
+}
+
+fn interaction_shape(operation: &str, word: &str) -> InteractionShape {
+    match word {
+        "unary" => InteractionShape::Unary,
+        "stream" => InteractionShape::Stream,
+        "subscription" => InteractionShape::Subscription,
+        "leased_session" => InteractionShape::LeasedSession,
+        "session_establishment" => InteractionShape::SessionEstablishment,
+        other => panic!("operation `{operation}` declares unknown interaction shape `{other}`"),
+    }
+}
+
+fn protocol_driver(operation: &str, word: &str) -> ProtocolDriver {
+    match word {
+        "http_v1" => ProtocolDriver::HttpV1,
+        other => panic!("operation `{operation}` declares unknown protocol driver `{other}`"),
+    }
+}
+
+fn placement_requirement(operation: &str, word: &str) -> PlacementRequirement {
+    match word {
+        "connectors_deployment" => PlacementRequirement::ConnectorsDeployment,
+        "substrate_workload" => PlacementRequirement::SubstrateWorkload,
+        "federated_satellite" => PlacementRequirement::FederatedSatellite,
+        other => panic!("operation `{operation}` declares unknown placement requirement `{other}`"),
+    }
+}
+
+fn implementation_form(operation: &str, word: &str) -> ImplementationForm {
+    match word {
+        "built_in" => ImplementationForm::BuiltIn,
+        other => panic!("operation `{operation}` declares unknown implementation form `{other}`"),
+    }
+}
+
+fn required_capability(operation: &str, word: &str) -> RequiredCapability {
+    match word {
+        "public_network" => RequiredCapability::PublicNetwork,
+        "private_network" => RequiredCapability::PrivateNetwork,
+        "unix_socket" => RequiredCapability::UnixSocket,
+        "file_secret" => RequiredCapability::FileSecret,
+        "process" => RequiredCapability::Process,
+        "container" => RequiredCapability::Container,
+        "device" => RequiredCapability::Device,
+        other => panic!("operation `{operation}` declares unknown required capability `{other}`"),
     }
 }
 
@@ -889,7 +958,6 @@ mod tests {
         format!(
             r#"{{
                 "connector": "t",
-                "runtime": "http",
                 "services": [{{ "name": "default", "base_url": "https://api.example.com" }}],
                 "auth": {auth},
                 "operations": [{{
@@ -898,7 +966,13 @@ mod tests {
                     "direction": "read",
                     "risk": "low",
                     "idempotency": "idempotent",
+                    "effects": ["read", "network"],
                     "semantic_effects": [],
+                    "interaction_shape": "unary",
+                    "protocol_driver": "http_v1",
+                    "placement_requirement": "connectors_deployment",
+                    "implementation_form": "built_in",
+                    "required_capabilities": ["public_network"],
                     "contract": {{
                         "description": "Get a thing.",
                         "input_schema": {{ "type": "object", "properties": {{}}, "required": [] }}

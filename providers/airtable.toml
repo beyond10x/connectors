@@ -265,6 +265,12 @@ name = "default"
 tags = ["database"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "airtable-record-get"
 method = "GET"
 direction = "read"
@@ -301,7 +307,7 @@ type = "object"
 required = ["id", "createdTime", "fields"]
 properties = { id = { type = "string", pattern = "^rec[A-Za-z0-9]+$", description = "The record's id" }, createdTime = { type = "string", format = "date-time", description = "When the record was created" }, fields = { type = "object", description = "The record's cell values, keyed by column name. Individual columns are not enumerated: they are the base's own schema, which differs per base and changes at runtime — recording the envelope is what a consumer cannot infer" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/type"
 
@@ -330,6 +336,12 @@ code_pointer = "/error/type"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "airtable-record-create"
 method = "POST"
 direction = "write"
@@ -367,13 +379,19 @@ type = "object"
 required = ["id", "createdTime", "fields"]
 properties = { id = { type = "string", pattern = "^rec[A-Za-z0-9]+$", description = "The created record's id — what later calls address it by" }, createdTime = { type = "string", format = "date-time", description = "When the record was created" }, fields = { type = "object", description = "The created record's cell values as Airtable stored them, keyed by column name. Computed and formula columns appear here having been evaluated" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/type"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "airtable-record-update"
 method = "PATCH"
 direction = "write"
@@ -429,13 +447,19 @@ type = "object"
 required = ["id", "createdTime", "fields"]
 properties = { id = { type = "string", pattern = "^rec[A-Za-z0-9]+$", description = "The record's id" }, createdTime = { type = "string", format = "date-time", description = "When the record was created — unchanged by an update" }, fields = { type = "object", description = "The record's cell values after the update, keyed by column name. Every column is returned, not only the changed ones" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/type"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "airtable-record-delete"
 method = "DELETE"
 direction = "write"
@@ -476,6 +500,6 @@ type = "object"
 required = ["id", "deleted"]
 properties = { id = { type = "string", pattern = "^rec[A-Za-z0-9]+$", description = "The id of the record that was deleted" }, deleted = { type = "boolean", description = "Always `true` on a 2xx. Airtable reports a record that was already gone as a 404 rather than as `false`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/error/message"
 code_pointer = "/error/type"

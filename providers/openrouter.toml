@@ -311,6 +311,12 @@ name = "default"
 tags = ["ai"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openrouter-models-list"
 method = "GET"
 direction = "read"
@@ -348,6 +354,12 @@ properties = { data = { type = "array", description = "One entry per model, each
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openrouter-model-endpoints-list"
 method = "GET"
 direction = "read"
@@ -415,6 +427,12 @@ properties = { data = { type = "object", description = "The model, with an `endp
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openrouter-chat-completion"
 method = "POST"
 direction = "write"
@@ -479,6 +497,12 @@ properties = { id = { type = "string", description = "The generation's id, which
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "openrouter-credits-get"
 method = "GET"
 direction = "read"

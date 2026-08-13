@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Postmark Server API token, scoped to one server. Authenticates sending and that server's own message history; cannot list or manage servers",
@@ -37,7 +37,7 @@
     ]
   ],
   "description": "Postmark transactional email: send a message, read delivery stats and bounces. Listing and inspecting servers is withheld — the Account API returns live Server Tokens in plaintext (C-430)",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -94,9 +94,19 @@
       "credential_requirement": "declared",
       "description": "Send a single email immediately from the token's server. Delivered within seconds and cannot be recalled",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/ErrorCode",
+        "message_pointer": "/Message"
+      },
       "expose": true,
       "id": "postmark-email-send",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The sending address. Must be a Sender Signature or verified domain address on this server — the caller's own input, never an example value here",
@@ -200,12 +210,8 @@
           "wire": "Tag"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/ErrorCode",
-          "message_pointer": "/Message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -245,6 +251,9 @@
         "method": "POST",
         "url": "{base}/email"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "ErrorCode": {
@@ -298,19 +307,28 @@
       "credential_requirement": "declared",
       "description": "Get delivery statistics for this server: total inactive addresses and a breakdown of bounces by type. Also this connector's `verify` — a bounded read that runs unattended, needing no argument",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/ErrorCode",
+        "message_pointer": "/Message"
+      },
       "expose": true,
       "id": "postmark-deliverystats-get",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/ErrorCode",
-          "message_pointer": "/Message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/deliverystats"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "Bounces": {
@@ -378,9 +396,19 @@
       "credential_requirement": "declared",
       "description": "List bounces recorded on this server, most recent first",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/ErrorCode",
+        "message_pointer": "/Message"
+      },
       "expose": true,
       "id": "postmark-bounce-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Number of bounces to return; Postmark requires this on every call",
@@ -406,12 +434,8 @@
           "symbol": "offset"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/ErrorCode",
-          "message_pointer": "/Message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -430,6 +454,9 @@
         ],
         "url": "{base}/bounces"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "Bounces": {
@@ -538,9 +565,19 @@
       "credential_requirement": "declared",
       "description": "Get one recorded bounce by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/ErrorCode",
+        "message_pointer": "/Message"
+      },
       "expose": true,
       "id": "postmark-bounce-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The bounce's id, from postmark-bounce-list or postmark-email-send's follow-up lookups",
@@ -553,16 +590,15 @@
           "symbol": "bounce_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/ErrorCode",
-          "message_pointer": "/Message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/bounces/{bounce_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "BouncedAt": {
@@ -631,8 +667,7 @@
       "service": "server"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.postmarkapp.com",

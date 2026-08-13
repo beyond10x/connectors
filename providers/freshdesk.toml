@@ -159,6 +159,12 @@ name = "default"
 tags = ["support"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-test"
 method = "GET"
 direction = "read"
@@ -187,6 +193,12 @@ items = { type = "object", properties = { id = { type = "integer" }, name = { ty
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-ticket-list"
 method = "GET"
 direction = "read"
@@ -242,6 +254,12 @@ items = { type = "object", properties = { id = { type = "integer" }, subject = {
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-ticket-get"
 method = "GET"
 direction = "read"
@@ -267,6 +285,12 @@ properties = { id = { type = "integer" }, subject = { type = "string" }, descrip
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-ticket-create"
 method = "POST"
 direction = "write"
@@ -395,6 +419,12 @@ properties = { id = { type = "integer", description = "The new ticket's id — t
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-ticket-update"
 method = "PUT"
 direction = "write"
@@ -515,6 +545,12 @@ properties = { id = { type = "integer" }, subject = { type = "string" }, descrip
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-ticket-note-add"
 method = "POST"
 direction = "write"
@@ -575,6 +611,12 @@ properties = { id = { type = "integer", description = "The note's own id, distin
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-contact-list"
 method = "GET"
 direction = "read"
@@ -629,6 +671,12 @@ items = { type = "object", properties = { id = { type = "integer", description =
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-contact-get"
 method = "GET"
 direction = "read"
@@ -657,6 +705,12 @@ properties = { id = { type = "integer" }, name = { type = "string" }, email = { 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "freshdesk-contact-create"
 method = "POST"
 direction = "write"

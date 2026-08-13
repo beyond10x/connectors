@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Statuspage API key, sent as the Authorization header after the literal scheme word `OAuth ` — a static key from the account's own API settings, not an OAuth2 access token",
@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Atlassian Statuspage: read a status page's components and incidents, and open or update a publicly visible incident on it",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -69,23 +69,32 @@
       "credential_requirement": "declared",
       "description": "List this status page's incidents, most recent first — both unresolved and already-resolved ones. Returns Statuspage's own first page of results; this connector declares no paging parameters, so a page with a long incident history is not enumerated exhaustively here",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "page_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "statuspage-incident-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/incidents"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The page's incidents, most recent first. Statuspage returns a bare JSON array here, not an object wrapping one",
         "items": {
@@ -203,14 +212,23 @@
       "credential_requirement": "declared",
       "description": "Get one incident on this status page, including every update posted to it so far",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "page_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "statuspage-incident-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's own id, from statuspage-incident-list's `id` field or from statuspage-incident-create's response",
@@ -224,15 +242,15 @@
           "symbol": "incident_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/incidents/{incident_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "components": {
@@ -354,14 +372,23 @@
       "credential_requirement": "declared",
       "description": "Open a new incident on this status page. It is public the moment this call returns — anyone loading the page sees it, and with deliver_notifications true Statuspage emails and texts every subscriber the page has. The incident itself is reversible (resolve it, or delete it), but a notification that has been sent cannot be recalled, so treat deliver_notifications as the irreversible half of this call",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "page_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "statuspage-incident-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's title, shown on the public status page and used as the subject line of the notification. Write it for the page's readers, not for an operator",
@@ -416,11 +443,8 @@
           "wire": "incident.deliver_notifications"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -447,6 +471,9 @@
         "method": "POST",
         "url": "{base}/incidents"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_at": {
@@ -533,14 +560,23 @@
       "credential_requirement": "declared",
       "description": "Post an update to an existing incident on this status page, moving it to a new lifecycle stage and adding a publicly visible message. The update appears on the page immediately, and with deliver_notifications true Statuspage emails and texts every subscriber. The incident's status can be moved again afterwards, but a notification that has been sent cannot be recalled. Does not rename the incident — this operation cannot change its title",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "page_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "statuspage-incident-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's own id, from statuspage-incident-list's `id` field or statuspage-incident-create's response",
@@ -594,11 +630,8 @@
           "wire": "incident.deliver_notifications"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -622,6 +655,9 @@
         "method": "PATCH",
         "url": "{base}/incidents/{incident_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_at": {
@@ -697,23 +733,32 @@
       "credential_requirement": "declared",
       "description": "List the components this status page publishes — the individual services whose operational state the page shows. Takes no parameter at all and succeeds for any page the API key can administer, which is what makes it the connection check for a settings page's Test Connection button. Returns Statuspage's own first page of results; this connector declares no paging parameters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "page_id": [
           "path"
         ]
       },
+      "error_envelope": {
+        "message_pointer": "/error"
+      },
       "expose": true,
       "id": "statuspage-component-list",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/components"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The page's components, in the page's own display order. Statuspage returns a bare JSON array here, not an object wrapping one",
         "items": {
@@ -784,8 +829,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

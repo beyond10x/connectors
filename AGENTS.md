@@ -132,9 +132,9 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
 8. **Credentials: requirements, never values.** `[[auth]]` declares scheme, acquisition,
    placement, subject, hazard, full OAuth2 shape — and publishes which fields a deployment must
    supply, never a `client_id`, secret, or credential-shaped example anywhere.
-9. **Declare the runtime traits** — pagination, rate-limit header names, error envelope,
-   verification probe. (They live under `quirks` until S-015 renames them; declare them
-   regardless.)
+9. **Declare the operation traits** — pagination, rate-limit header names, error envelope and
+   verification probe. Pagination, rate limits and error envelopes are first-class operation
+   fields; the retired `quirks` umbrella must not return.
 10. **Build, verify, commit as one unit.**
    `catalog build` → `diff` must then report everything up to date → `check`
    (lock verifier, S-003). Unchanged inputs reproduce every artifact byte for byte — if `diff`
@@ -146,7 +146,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
 
 Checklist: identity chosen as permanent · spec origin + provenance explicit ·
 selects split by damage class · risk/idempotency/effects by judgment, not guessed · no auth-flow
-ops, no credential values · expose is a curation · runtime traits declared · build + diff clean
+ops, no credential values · expose is a curation · operation traits declared · build + diff clean
 twice · one reviewable commit, by the bot.
 
 ## Refreshing a source

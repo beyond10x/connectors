@@ -214,6 +214,12 @@ name = "default"
 tags = ["support"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-verify"
 method = "GET"
 direction = "read"
@@ -234,13 +240,19 @@ schema = { type = "integer", minimum = 1, maximum = 100, default = 1 }
 type = "object"
 properties = { _results = { type = "array", description = "Up to `limit` conversations. Empty is still a successful credential check — a company can genuinely have none yet", items = { type = "object" } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-conversation-list"
 method = "GET"
 direction = "read"
@@ -259,13 +271,19 @@ schema = { type = "integer", minimum = 1, maximum = 100, default = 50 }
 type = "object"
 properties = { _pagination = { type = "object", description = "Carries `next`, a full absolute URL to the following page when more conversations exist. This connector cannot follow it — Front's cursor is an opaque, server-issued token unconstructable by a caller, and unencodable here regardless (C-30) — so a non-null `next` means more conversations exist beyond this first page only", properties = { next = { type = "string", description = "Unusable here; see this field's own description" } } }, _results = { type = "array", description = "This page's conversations, each `{id, subject, status, assignee, recipient, tags, created_at, ...}`", items = { type = "object", properties = { id = { type = "string", pattern = "^cnv_[0-9a-z]+$", description = "The conversation's id, prefixed `cnv_`" }, subject = { type = "string" }, status = { type = "string", description = "Front's own conversation status, e.g. `assigned`, `unassigned`, `archived` or `deleted`" }, is_private = { type = "boolean" }, created_at = { type = "number", description = "Unix timestamp, seconds" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-conversation-get"
 method = "GET"
 direction = "read"
@@ -284,13 +302,19 @@ schema = { type = "string", pattern = "^cnv_[0-9a-z]+$" }
 type = "object"
 properties = { id = { type = "string", pattern = "^cnv_[0-9a-z]+$" }, subject = { type = "string" }, status = { type = "string", description = "e.g. `assigned`, `unassigned`, `archived` or `deleted`" }, assignee = { type = "object", description = "The assigned teammate, `{id, email, first_name, last_name}` — absent (`null`) when unassigned", properties = { id = { type = "string", pattern = "^tea_[0-9a-z]+$" } } }, recipient = { type = "object", description = "The conversation's primary counterparty, `{name, handle, role}` — `handle` is an email address or phone number depending on the originating channel", properties = { name = { type = "string" }, handle = { type = "string" }, role = { type = "string" } } }, tags = { type = "array", description = "Tags currently applied, each `{id, name}`", items = { type = "object", properties = { id = { type = "string", pattern = "^tag_[0-9a-z]+$" }, name = { type = "string" } } } }, is_private = { type = "boolean" }, created_at = { type = "number", description = "Unix timestamp, seconds" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-conversation-message-list"
 method = "GET"
 direction = "read"
@@ -315,7 +339,7 @@ schema = { type = "integer", minimum = 1, maximum = 100, default = 50 }
 type = "object"
 properties = { _pagination = { type = "object", description = "Carries `next`, a full absolute URL to the following page. This connector cannot follow it — see front-conversation-list's own response_schema for why — so a non-null `next` means more messages exist beyond this first page only", properties = { next = { type = "string", description = "Unusable here; see this field's own description" } } }, _results = { type = "array", description = "This page's messages, each `{id, type, is_inbound, author, recipients, subject, body, text, created_at}`", items = { type = "object", properties = { id = { type = "string", pattern = "^msg_[0-9a-z]+$", description = "The message's id, prefixed `msg_`" }, type = { type = "string", description = "The channel kind this message travelled over, e.g. `email`, `sms` or `intercom`" }, is_inbound = { type = "boolean", description = "True for a message received from the outside party, false for one sent from Front" }, author = { type = "object", description = "The teammate who sent this message — absent (`null`) on an inbound message, since nobody on the team authored it", properties = { id = { type = "string", pattern = "^tea_[0-9a-z]+$" } } }, recipients = { type = "array", description = "Each `{name, handle, role}`; `role` is one of `from`, `to`, `cc`, `bcc` or `reply-to`", items = { type = "object", properties = { name = { type = "string" }, handle = { type = "string" }, role = { type = "string" } } } }, body = { type = "string", description = "The message content, HTML for most channels" }, text = { type = "string", description = "A plain-text rendering of `body`" }, created_at = { type = "number", description = "Unix timestamp, seconds" } } } } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"
 
@@ -324,6 +348,12 @@ code_pointer = "/_error/status"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-conversation-reply"
 method = "POST"
 direction = "write"
@@ -356,13 +386,19 @@ type = "object"
 description = "An acknowledgement that Front accepted the reply for delivery, not the sent message itself"
 properties = { status = { const = "accepted" }, message_uid = { type = "string", description = "A resource alias for the queued message. Not a `msg_`-prefixed id and not usable as one — Front assigns the real id only once delivery completes" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "front-conversation-tag-add"
 method = "POST"
 direction = "write"
@@ -397,6 +433,6 @@ schema = { type = "array", minItems = 1, items = { type = "string", pattern = "^
 # one. The honest record is the `description` above ("Answers 204 with an empty body on success"),
 # which reaches the tool contract a model actually reads.
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/_error/message"
 code_pointer = "/_error/status"

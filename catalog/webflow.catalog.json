@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Webflow API token (a Site API token or an OAuth2 access token), sent as a bearer token, scoped to read sites, collections and items, and to publish",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Webflow sites and CMS: discover sites, read a collection's own field schema, read collection items of any tenant-defined shape, and publish a site live",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,13 +55,24 @@
       "credential_requirement": "declared",
       "description": "List the sites this token can see, with each site's id, display name, hosted subdomain and last-published time. The `id` returned here is what every other operation in this connector needs as `site_id`",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-site-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/sites"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "sites": {
@@ -137,9 +148,15 @@
       "credential_requirement": "declared",
       "description": "List the CMS collections defined on a site, with each collection's id, display name and slug. Does not include a collection's fields — call webflow-collection-get for that. Returns Webflow's first page only; this connector declares no offset or limit parameter",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-collection-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The site's id, as returned by webflow-site-list",
@@ -153,10 +170,15 @@
           "symbol": "site_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/sites/{site_id}/collections"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "collections": {
@@ -226,9 +248,15 @@
       "credential_requirement": "declared",
       "description": "Get a collection's own schema: its display name, slug, and the full list of fields the site owner defined for it — each field's id, slug, display name, type, and whether it is required. This is the honest way to learn what an item's fieldData will contain, since that shape is tenant-defined and unknowable at compile time; this connector cannot type fieldData any more precisely than this lets a caller discover it",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-collection-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The collection's id, as returned by webflow-collection-list",
@@ -242,10 +270,15 @@
           "symbol": "collection_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/collections/{collection_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "createdOn": {
@@ -338,9 +371,15 @@
       "credential_requirement": "declared",
       "description": "List the items in a collection, in Webflow's default order. Each item's fieldData is a flat object keyed by that collection's own field slugs — call webflow-collection-get to discover them; this connector cannot type fieldData beyond that, because it is defined per-tenant, per-collection. Returns Webflow's first page only; this connector declares no offset or limit parameter",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-collection-item-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The collection's id, as returned by webflow-collection-list",
@@ -354,10 +393,15 @@
           "symbol": "collection_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/collections/{collection_id}/items"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -443,9 +487,15 @@
       "credential_requirement": "declared",
       "description": "Get one item from a collection. Its fieldData is a flat object keyed by that collection's own field slugs — call webflow-collection-get to discover them; this connector cannot type fieldData beyond that, because it is defined per-tenant, per-collection",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-collection-item-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The collection's id, as returned by webflow-collection-list",
@@ -470,10 +520,15 @@
           "symbol": "item_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/collections/{collection_id}/items/{item_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "cmsLocaleId": {
@@ -539,9 +594,15 @@
       "credential_requirement": "declared",
       "description": "Publish a site's currently staged changes to its live, public domains — every connected custom domain and the Webflow-hosted subdomain. This has immediate public effect: whatever is staged goes live for every visitor as soon as this call returns, with no separate confirmation step. Takes no body — Webflow's optional custom-domain selector is itself an array this connector cannot express (C-185), so this always publishes to every connected domain rather than a caller-chosen subset",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "webflow-site-publish",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The site's id, as returned by webflow-site-list",
@@ -555,17 +616,21 @@
           "symbol": "site_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/sites/{site_id}/publish"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

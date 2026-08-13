@@ -18,7 +18,7 @@
 //!             auth: [AuthMethod], default_auth: [AuthRequirement],
 //!             operations: [Operation { id, service, method, path, params, response_schema,
 //!                                      risk, idempotency, description,
-//!                                      auth: Option<[AuthRequirement]>, quirks }],
+//!                                      auth: Option<[AuthRequirement]>, workarounds }],
 //!             events:   [EventDecl { name, service, description, when, schema }],
 //!             channels: [ChannelBinding { name, service, transport, events, verification,
 //!                                         discriminator, delivery_id, payload,
@@ -87,7 +87,7 @@
 //! # Recording what produced an artifact
 //!
 //! [`Lockfile`] renders `connectors.lock`: one [`LockEntry`] per provider, holding the hashes and
-//! versions `flux-connectors check` recomputes. Its contract is that unchanged inputs reproduce the
+//! versions `connectors check` recomputes. Its contract is that unchanged inputs reproduce the
 //! file byte for byte — see the [`lock`] module docs for what is hashed, what is deliberately not,
 //! and why no timestamp appears anywhere in it.
 
@@ -117,8 +117,8 @@ pub use connector_address::{
 };
 
 pub use auth::{
-    AuthHazard, AuthMethod, AuthQuirks, AuthRequirement, AuthScheme, OAuth2Spec, OAuthGrant,
-    OAuthRedirect, Subject, TokenEndpointQuirk,
+    AuthHazard, AuthMethod, AuthRequirement, AuthScheme, AuthWorkarounds, OAuth2Spec, OAuthGrant,
+    OAuthRedirect, Subject, TokenEndpointWorkaround,
 };
 pub use config::{Approval, Binding, Choice, ConfigField, Format, Level, Pin, Position};
 pub use credential::{CredentialRef, InstanceId, Layout, TenantInstances, TenantLayout};
@@ -131,10 +131,11 @@ pub use inbound::{
 };
 pub use ir::{
     constrains_nothing, credential_handle_schema, response_location_exists, BodyEncoding,
-    Connector, ErrorEnvelope, HttpMethod, Idempotency, JsonSchema, Operation, OperationDirection,
-    OperationSpecSource, Pagination, Param, ParamSet, ProducedCredential, Provenance, Quirks,
-    RateLimit, Risk, Role, Runtime, SemanticEffect, Service, Tag, CREDENTIAL_HANDLE_FIELD,
-    FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
+    Connector, ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm,
+    InteractionShape, JsonSchema, Operation, OperationDirection, OperationSpecSource, Pagination,
+    Param, ParamSet, PlacementRequirement, ProducedCredential, ProtocolDriver, Provenance,
+    RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service, Tag,
+    CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
 };
 pub use lock::{
     sha256_hex, LockEntry, LockPack, LockSpec, Lockfile, LOCKFILE_NAME, LOCKFILE_VERSION,

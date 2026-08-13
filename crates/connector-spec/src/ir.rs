@@ -7,7 +7,7 @@
 //!    stringly-typed shadow of one. The cautionary tale is action-proxy's YAML, where `type:
 //!    string` stood in for dates and ids alike and no schema ever reached the caller.
 //! 2. **Serialization is deterministic.** Identical values encode to identical bytes.
-//!    `connectors.lock` (C-7) hashes this encoding and `flux-connectors check` fails on a
+//!    `connectors.lock` (C-7) hashes this encoding and `connectors check` fails on a
 //!    mismatch, so any leaked iteration order would surface as phantom drift on every build.
 //!
 //! # Why these types are strict on deserialization
@@ -260,6 +260,85 @@ impl SemanticEffect {
                 | Self::Money
         )
     }
+}
+
+/// Host-resource consequences that admission evaluates.
+///
+/// This is deliberately separate from [`SemanticEffect`]: `network` says which host resource a
+/// call touches, while `money` or `send_external` says what the call means. The list is authored on
+/// an exact operation or reviewed selector and resolved before publication; no consumer derives it
+/// from direction, HTTP method, host, risk, or protocol driver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostEffect {
+    Read,
+    Write,
+    Network,
+    Process,
+    Browser,
+    Filesystem,
+    LocalSystem,
+}
+
+impl HostEffect {
+    pub const fn tag(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Network => "network",
+            Self::Process => "process",
+            Self::Browser => "browser",
+            Self::Filesystem => "filesystem",
+            Self::LocalSystem => "local_system",
+        }
+    }
+}
+
+/// Lifecycle exposed by one connector member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InteractionShape {
+    Unary,
+    Stream,
+    Subscription,
+    LeasedSession,
+    SessionEstablishment,
+}
+
+/// Closed, versioned protocol implementation used to speak to the external system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProtocolDriver {
+    HttpV1,
+}
+
+/// Where an operation must be served; deployment policy chooses a matching instance later.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlacementRequirement {
+    ConnectorsDeployment,
+    SubstrateWorkload,
+    FederatedSatellite,
+}
+
+/// How the protocol implementation is supplied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImplementationForm {
+    BuiltIn,
+}
+
+/// Host authority an operation needs before any credential is materialized.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RequiredCapability {
+    PublicNetwork,
+    PrivateNetwork,
+    UnixSocket,
+    FileSecret,
+    Process,
+    Container,
+    Device,
 }
 
 /// One request parameter, carrying its JSON Schema.
@@ -557,32 +636,6 @@ pub struct ErrorEnvelope {
     /// Pointer to the vendor's error code, when it publishes one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_pointer: Option<String>,
-}
-
-/// The ways a real vendor API departs from what its spec implies.
-///
-/// Quirks are declarations, not behavior: C-12 compiles them into real Flux control flow —
-/// `throttle`, a bounded pagination loop — which is the payoff for targeting a language instead of
-/// interpreting config.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Quirks {
-    /// How the endpoint paginates, if it does.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pagination: Option<Pagination>,
-    /// The endpoint's rate limit, if the vendor publishes one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rate_limit: Option<RateLimit>,
-    /// The vendor's error envelope, if its errors are not plain HTTP status codes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error_envelope: Option<ErrorEnvelope>,
-}
-
-impl Quirks {
-    /// Whether the operation declares no quirks, in which case codegen emits a plain request.
-    pub fn is_empty(&self) -> bool {
-        self.pagination.is_none() && self.rate_limit.is_none() && self.error_envelope.is_none()
-    }
 }
 
 /// The exact vendor document selection that produced one public operation — C-481.
@@ -934,97 +987,6 @@ impl Tag {
     }
 }
 
-/// **How a connector executes** — flux's runtime axis, declared rather than derived (C-405).
-///
-/// The vocabulary mirrors `predecessor:docs/designs/ecosystem.md` in the flux repository, which replaces the old
-/// plugin-versus-connector dichotomy with a single axis: *a plugin is one runtime kind a connector
-/// may declare*. The invariant that survives the generalization is the one that makes it reviewable:
-///
-/// > **The runtime is declared by the connector, never chosen by the caller.** A caller who can pick
-/// > the runtime is a caller who can pick an effect. The manifest names; the operator grants.
-///
-/// # Why it is closed, and why it is never silently defaulted
-///
-/// The same reason [`Role`] is closed, with a sharper consequence. HTTP is easy to multi-tenant
-/// because the effect leaves the machine; process spawning, container exec and raw sockets do not —
-/// they consume the host's own identity, network position, filesystem and descriptors. So a hosted
-/// deployment serving more than one tenant **refuses** a locally-executing connector, mechanically,
-/// by reading this field. An open string set could not be checked; a typo that fell back to
-/// [`Http`](Self::Http) would be how a `process` connector ends up served by a multi-tenant host.
-/// The loader therefore refuses an unrecognised word at the parse — see [`Runtime::ALL`].
-///
-/// # Why the default is `http` anyway
-///
-/// Every connector this repository generates is an HTTP call to a vendor's SaaS API; that is the
-/// charter boundary (`AGENTS.md`), not an accident of the current fleet. Requiring all 53 shipped
-/// providers to restate it would be ceremony, and a *default* is not a *derivation*: the value is
-/// still a declared fact of the IR, published verbatim into every artifact, and the only way to get
-/// a non-`http` value is to write one.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Runtime {
-    /// A guarded HTTP request — flux-web's `http.request`. Every connector generated here.
-    #[default]
-    Http,
-    /// A guarded dial: TCP, UDP or ICMP against a declared target. **Locally executing.**
-    Socket,
-    /// A guarded, argv-only spawn under a sandbox backend. **Locally executing.**
-    Process,
-    /// A spawn inside docker or kubernetes. **Locally executing.**
-    Container,
-    /// The flux plugin protocol over stdio — a special case of [`Process`](Self::Process), and the
-    /// reason this axis exists at all: a plugin is a runtime kind, not a rival of a connector.
-    /// **Locally executing.**
-    Plugin,
-    /// Delegation to another substrate — a remote executor. Not locally executing: the effect leaves
-    /// the machine exactly as an HTTP call does.
-    Remote,
-}
-
-impl Runtime {
-    /// Every runtime there is, in the order flux's own table lists them — which is also the order an
-    /// error message lists them.
-    ///
-    /// A `const` rather than a derived iterator, for the reason [`Role::ALL`] is one: the set the
-    /// loader accepts and the set a refusal prints are the same value, and a variant added without
-    /// extending this fails the exhaustive `match` in [`word`](Self::word) rather than going
-    /// silently unlisted. `crates/connector-spec/tests/runtime_vocabulary.rs` reads it, so the
-    /// published JSON schema cannot drift from it either.
-    pub const ALL: [Self; 6] = [
-        Self::Http,
-        Self::Socket,
-        Self::Process,
-        Self::Container,
-        Self::Plugin,
-        Self::Remote,
-    ];
-
-    /// The token this runtime serializes as, in a provider file and in every artifact.
-    pub fn word(self) -> &'static str {
-        match self {
-            Self::Http => "http",
-            Self::Socket => "socket",
-            Self::Process => "process",
-            Self::Container => "container",
-            Self::Plugin => "plugin",
-            Self::Remote => "remote",
-        }
-    }
-}
-
-/// `skip_serializing_if` for [`Connector::runtime`], so that omitting the key and writing
-/// `runtime = "http"` produce **identical bytes**.
-///
-/// The same property [`is_default_service`] holds, for the same reason: the IR encoding of every
-/// connector shipped before C-405 must be unchanged, or landing this moves every `ir_sha256` in the
-/// repository and `connectors.lock` churns for a provider nobody edited. Note that this is a
-/// property of the *hash domain and the canonical JSON*, not of the published artifacts — the
-/// manifest and `catalog.json` state `http` explicitly, because a consumer inferring an absent
-/// field is precisely the derivation this story removes.
-pub(crate) fn is_default_runtime(runtime: &Runtime) -> bool {
-    matches!(runtime, Runtime::Http)
-}
-
 /// One API surface of a provider: the unit you address, version, select and install.
 ///
 /// `s3` and `bedrock-runtime` under AWS; `support` under Zendesk. A service is the middle level of
@@ -1158,10 +1120,22 @@ pub struct Operation {
     pub risk: Risk,
     /// Whether repeating it is safe. See [`Idempotency`].
     pub idempotency: Idempotency,
+    /// Declared host-resource consequences, resolved from an exact operation or reviewed selector.
+    pub effects: Vec<HostEffect>,
     /// What executing this operation means to Flux policy, independently of the host resources it
     /// touches. Empty means no semantic consequence has been declared.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub semantic_effects: Vec<SemanticEffect>,
+    /// The operation's lifecycle, independently of its protocol and placement.
+    pub interaction_shape: InteractionShape,
+    /// The closed, versioned protocol implementation.
+    pub protocol_driver: ProtocolDriver,
+    /// A placement requirement, not a deployment-selected destination.
+    pub placement_requirement: PlacementRequirement,
+    /// How the protocol implementation is supplied.
+    pub implementation_form: ImplementationForm,
+    /// Host capabilities required before credential access or dispatch.
+    pub required_capabilities: Vec<RequiredCapability>,
     /// **The condition under which repeating this write is safe** — mandatory on an authored write
     /// declaring [`Idempotency::Conditional`], and meaningless anywhere else.
     ///
@@ -1354,9 +1328,15 @@ pub struct Operation {
     /// the same reason.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub produces_credential: Option<ProducedCredential>,
-    /// The ways this endpoint departs from its spec.
-    #[serde(default, skip_serializing_if = "Quirks::is_empty")]
-    pub quirks: Quirks,
+    /// How this endpoint paginates, when it returns a collection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<Pagination>,
+    /// The endpoint's published rate limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit: Option<RateLimit>,
+    /// Where structured vendor errors carry their code and message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_envelope: Option<ErrorEnvelope>,
 }
 
 /// **A credential an operation mints**: where the secret arrives, and which declared credential it
@@ -1620,14 +1600,6 @@ pub struct Connector {
     /// oip, and an address missing its authority is not an address. See [`crate::address`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authority: Option<String>,
-    /// **How this connector executes** — see [`Runtime`]. `http` unless the file says otherwise.
-    ///
-    /// Not an `Option`: "unset" and "http" would be two spellings of one meaning, which is the
-    /// objection [`Operation::service`] already records. The absence lives in the *file*, where it
-    /// deserializes to [`Runtime::Http`]; the IR always names a runtime, and so does every artifact
-    /// compiled from it.
-    #[serde(default, skip_serializing_if = "is_default_runtime")]
-    pub runtime: Runtime,
     /// The vendor's API version for this connector, as the *default* for its services.
     ///
     /// A multi-service provider overrides it per [`Service`]; a single-surface provider states it
@@ -1765,7 +1737,7 @@ impl Connector {
     /// The declared credential of that name, or `None` when nothing declares it.
     ///
     /// A requirement naming an undeclared credential is an authoring error the loader rejects
-    /// (C-3); codegen must never invent one, because that would be flux-connectors deciding on its
+    /// (C-3); codegen must never invent one, because that would be connectors deciding on its
     /// own how to spend a credential.
     pub fn auth_method(&self, name: &str) -> Option<&AuthMethod> {
         self.auth.iter().find(|method| method.name == name)
@@ -2173,7 +2145,7 @@ impl Connector {
     /// channel binding is declared into the manifest and the catalogue, never emitted as code. The
     /// hash domain is the connector's compiled meaning, not the module's bytes, and a binding whose
     /// reply operation or verification scheme moved is a connector that changed. Leaving them out
-    /// would make `flux-connectors check` blind to a drifting event schema, which is the one thing
+    /// would make `connectors check` blind to a drifting event schema, which is the one thing
     /// the lockfile exists to catch.
     ///
     /// # What is out of it, and why
@@ -2225,12 +2197,6 @@ struct HashDomain<'a> {
     id: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     authority: &'a Option<String>,
-    /// In the domain, and not arguably: the runtime decides *how the effect happens*, so a connector
-    /// whose runtime moved from `http` to `process` is a different connector even if every operation
-    /// is byte-identical. It carries `skip_serializing_if` for the reason the fields below it do —
-    /// a connector that declares no runtime must hash to what it hashed before C-405 existed.
-    #[serde(skip_serializing_if = "is_default_runtime")]
-    runtime: &'a Runtime,
     #[serde(skip_serializing_if = "Option::is_none")]
     api_version: &'a Option<String>,
     #[serde(skip_serializing_if = "<[Service]>::is_empty")]
@@ -2253,7 +2219,7 @@ struct HashDomain<'a> {
     /// field is presentation, and presentation usually is not compiled meaning. But a field's `binds`
     /// decides *where a value goes* — a changed binding sends a token to a different place — and its
     /// `secret` flag decides whether a value is masked. Both are behaviour. Splitting the struct so
-    /// that only those two hashed would make `flux-connectors check` silent about a label that had
+    /// that only those two hashed would make `connectors check` silent about a label that had
     /// drifted from the vendor's own name for the field, which is a change a user sees.
     #[serde(skip_serializing_if = "<[ConfigField]>::is_empty")]
     config: &'a [ConfigField],
@@ -2274,7 +2240,6 @@ impl<'a> HashDomain<'a> {
         let Connector {
             id,
             authority,
-            runtime,
             api_version,
             services,
             vendor,
@@ -2297,7 +2262,6 @@ impl<'a> HashDomain<'a> {
         Self {
             id,
             authority,
-            runtime,
             api_version,
             services,
             vendor,

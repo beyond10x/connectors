@@ -1,6 +1,6 @@
 # Design 03: beyond HTTP — drivers, satellites, and the byte plane
 
-**Status:** accepted v1 design; external runtime artifacts deferred · **Date:** 2026-08-13
+**Status:** accepted v1 design; document axes landed; external runtime artifacts deferred · **Date:** 2026-08-13
 **Inputs:** the predecessor rich-runtime program; B10x architecture repository boundaries;
 how AMI/AGI (Sangoma Asterisk), DNS/UDP, SIP, TCP protocols and audio channels reach the connector
 model.
@@ -181,4 +181,8 @@ are accepted by architecture ADRs
 [ADR 0015 — Foundation services share one trust envelope](https://github.com/b10x/architecture/blob/main/adr/0015-foundation-trust-envelope.md)
 through
 [ADR 0019 — Foundation contracts ship as signed reproducible bundles](https://github.com/b10x/architecture/blob/main/adr/0019-contract-release-and-conformance.md).
-Delivery items 1–6 remain implementation work owned by S-023 through S-028 in the story board.
+Delivery item 1's document facts landed in S-023. The next seam and later runtime work remain owned
+by S-024 through S-028 in the story board. The connectors-owned
+`fixtures/substrate-wire-0.1.0-axis-projection.json` pins substrate's owner-issued 0.1.0 bundle and
+records the non-mechanical vocabulary mapping; it is not the full provider projection or S-031's
+release machinery.

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "LaunchDarkly API access token, sent as the entire value of the Authorization header with no scheme word in front of it — LaunchDarkly rejects a `Bearer `-prefixed value",
@@ -37,7 +37,7 @@
     ]
   ],
   "description": "LaunchDarkly feature management: read projects, environments and feature flags, and toggle a flag on or off in one environment",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -66,9 +66,15 @@
       "credential_requirement": "declared",
       "description": "List every project in the LaunchDarkly account. A project is the top-level grouping that owns environments and feature flags",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "launchdarkly-project-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Maximum number of projects to return per page",
@@ -93,6 +99,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -111,6 +119,9 @@
         ],
         "url": "{base}/projects"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -191,9 +202,15 @@
       "credential_requirement": "declared",
       "description": "List the environments (e.g. production, staging) that belong to one project",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "launchdarkly-environment-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's own key, from launchdarkly-project-list's `key` field",
@@ -229,6 +246,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -247,6 +266,9 @@
         ],
         "url": "{base}/projects/{project_key}/environments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -342,9 +364,15 @@
       "credential_requirement": "declared",
       "description": "List the feature flags defined in one project",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "launchdarkly-flag-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's own key, from launchdarkly-project-list's `key` field",
@@ -392,6 +420,8 @@
           "symbol": "offset"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -416,6 +446,9 @@
         ],
         "url": "{base}/flags/{project_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "items": {
@@ -511,9 +544,15 @@
       "credential_requirement": "declared",
       "description": "Get one feature flag's full definition, including its current on/off state and targeting per environment",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "launchdarkly-flag-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's own key, from launchdarkly-project-list's `key` field",
@@ -550,6 +589,8 @@
           "symbol": "env"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -562,6 +603,9 @@
         ],
         "url": "{base}/flags/{project_key}/{feature_flag_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "description": {
@@ -641,9 +685,15 @@
       "credential_requirement": "declared",
       "description": "Turn a feature flag on or off in one environment. This is a live production change: every SDK instance currently evaluating this flag in this environment — web, mobile and backend alike — switches to the other branch as soon as this call returns, for every real user it serves. It is reversible by toggling back, but it is not a private or staged edit",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "expose": true,
       "id": "launchdarkly-flag-toggle",
       "idempotency": "conditional",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The project's own key, from launchdarkly-project-list's `key` field",
@@ -706,6 +756,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "repeatability_condition": "the body schema admits exactly one JSON Patch `replace` onto one environment's `on` bit (maxItems 1, op pinned to `replace`, path pinned to `/environments/{key}/on`), so it sets an absolute value and never a toggle or a delta — re-sending it lands the flag where the caller asked, however many times it runs",
       "request": {
         "body": {
@@ -720,6 +772,9 @@
         "method": "PATCH",
         "url": "{base}/flags/{project_key}/{feature_flag_key}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "environments": {
@@ -748,8 +803,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

@@ -243,6 +243,12 @@ name = "default"
 tags = ["issue-tracking", "project-management"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-get"
 method = "GET"
 direction = "read"
@@ -291,6 +297,12 @@ properties = { id = { type = "string", description = "The issue's numeric id, **
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-create"
 method = "POST"
 direction = "write"
@@ -349,6 +361,12 @@ properties = { id = { type = "string", description = "The new issue's numeric id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-comment-list"
 method = "GET"
 direction = "read"
@@ -376,6 +394,12 @@ properties = { comments = { type = "array", description = "The comments, oldest 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-comment-add"
 method = "POST"
 direction = "write"
@@ -418,6 +442,12 @@ properties = { id = { type = "string", description = "The new comment's id, as a
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-transitions-list"
 method = "GET"
 direction = "read"
@@ -451,6 +481,12 @@ properties = { transitions = { type = "array", description = "The transitions av
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "jira-issue-transition"
 method = "POST"
 direction = "write"

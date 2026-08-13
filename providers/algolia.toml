@@ -193,6 +193,12 @@ name = "default"
 tags = ["search"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "algolia-index-list"
 method = "GET"
 direction = "read"
@@ -206,13 +212,19 @@ type = "object"
 required = ["items"]
 properties = { items = { type = "array", description = "The application's indices", items = { type = "object", required = ["name"], properties = { name = { type = "string", description = "The index name — what every other operation here passes as `index_name`" }, entries = { type = "integer", description = "How many records the index holds" }, dataSize = { type = "integer", description = "The size of the index's records in bytes" }, fileSize = { type = "integer", description = "The size of the index on disk in bytes, records plus internal structures" }, lastBuildTimeS = { type = "integer", description = "How long the index's last build took, in seconds" }, numberOfPendingTasks = { type = "integer", description = "Indexing operations accepted but not yet applied. Non-zero means a recent write is not visible to search yet" }, pendingTask = { type = "boolean", description = "Whether any indexing operation is still pending" }, createdAt = { type = "string", format = "date-time" }, updatedAt = { type = "string", format = "date-time" }, primary = { type = "string", description = "For a replica index, the name of the index it replicates. Absent on a primary" }, replicas = { type = "array", description = "The names of this index's replicas, if it has any", items = { type = "string" } } } } }, nbPages = { type = "integer", description = "How many pages of indices exist. This connector requests only the first" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 # Algolia answers a failure with `{"message": …, "status": …}`. The status repeats the HTTP code
 # rather than carrying a machine-readable error code of its own, so there is no `code_pointer`.
 message_pointer = "/message"
 
 # ---------------------------------------------------------------------------------------------
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "algolia-index-search"
 method = "GET"
 direction = "read"
@@ -257,11 +269,17 @@ type = "object"
 required = ["hits", "nbHits"]
 properties = { hits = { type = "array", description = "The matching records, in Algolia's ranked order. Each hit is the stored record itself — its attributes are this index's own content and are not knowable at build time — plus `objectID` and Algolia's `_highlightResult` annotations", items = { type = "object", required = ["objectID"], properties = { objectID = { type = "string", description = "The record's own id — what algolia-object-get, -save and -delete address it by" } } } }, nbHits = { type = "integer", description = "How many records matched in total, which may exceed what this page returned" }, page = { type = "integer", description = "The page that was returned, counting from 0" }, nbPages = { type = "integer", description = "How many pages the result set has at this `hitsPerPage`" }, hitsPerPage = { type = "integer" }, exhaustiveNbHits = { type = "boolean", description = "False when `nbHits` is an approximation, which Algolia does for very large result sets" }, processingTimeMS = { type = "integer", description = "How long Algolia spent on the query, in milliseconds" }, query = { type = "string", description = "Echoes the search text" }, params = { type = "string", description = "Echoes the search parameters Algolia actually applied, URL-encoded" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 
 # ---------------------------------------------------------------------------------------------
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "algolia-object-get"
 method = "GET"
 direction = "read"
@@ -288,11 +306,17 @@ required = ["objectID"]
 description = "The stored record. Every attribute other than `objectID` is this index's own content and is not knowable at build time"
 properties = { objectID = { type = "string", description = "The record's own id, echoed back" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 
 # ---------------------------------------------------------------------------------------------
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "algolia-object-save"
 method = "PUT"
 direction = "write"
@@ -334,11 +358,17 @@ type = "object"
 required = ["objectID", "taskID"]
 properties = { objectID = { type = "string", description = "The id the record was stored under, echoed back" }, taskID = { type = "integer", description = "Algolia's own id for the asynchronous indexing task. The write is accepted when this returns and visible to search some time after; this connector declares no operation that waits on it" }, updatedAt = { type = "string", format = "date-time", description = "When Algolia accepted the write" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"
 
 # ---------------------------------------------------------------------------------------------
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "algolia-object-delete"
 method = "DELETE"
 direction = "write"
@@ -369,5 +399,5 @@ type = "object"
 required = ["taskID"]
 properties = { taskID = { type = "integer", description = "Algolia's own id for the asynchronous delete task. The delete is accepted when this returns and visible to search some time after" }, deletedAt = { type = "string", format = "date-time", description = "When Algolia accepted the delete" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/message"

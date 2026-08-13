@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Salesforce OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -48,7 +48,7 @@
     ]
   ],
   "description": "Salesforce REST API: read the authenticated identity, read/create/update an SObject record, and describe an SObject's schema",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -67,6 +67,10 @@
       "credential_requirement": "declared",
       "description": "Get the authenticated user and org for the current access token — the identity check for a settings page's Test Connection button. Takes no parameters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "instance": [
           "host"
@@ -75,10 +79,17 @@
       "expose": true,
       "id": "salesforce-whoami",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/services/oauth2/userinfo"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "active": {
@@ -159,6 +170,10 @@
       "credential_requirement": "declared",
       "description": "Read one SObject record by id. Returns every field of the record; narrowing to a subset needs the fields query parameter, which this connector cannot encode safely (see the provider file's header) so it is not offered",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "instance": [
           "host"
@@ -167,6 +182,8 @@
       "expose": true,
       "id": "salesforce-record-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The SObject's API name, e.g. Account, Contact, Opportunity, or a custom object ending in __c",
@@ -191,10 +208,15 @@
           "symbol": "id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "Every member besides `attributes` is one of the SObject's own fields — standard and custom — and the set is per-object and per-org. Read it with `salesforce-sobject-describe` rather than assuming a fixed shape",
         "properties": {
@@ -255,6 +277,10 @@
       "credential_requirement": "declared",
       "description": "Create one SObject record. Which fields are required depends on the SObject type and the org's own validation rules and page layouts — check with salesforce-sobject-describe first",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "instance": [
           "host"
@@ -263,6 +289,8 @@
       "expose": true,
       "id": "salesforce-record-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The SObject's API name, e.g. Account, Contact, Opportunity, or a custom object ending in __c",
@@ -286,6 +314,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -299,6 +329,9 @@
         "method": "POST",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "errors": {
@@ -356,6 +389,10 @@
       "credential_requirement": "declared",
       "description": "Update one or more fields on an existing SObject record. Only the supplied fields change; fields left out are untouched. Answers 204 with no body on success",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "instance": [
           "host"
@@ -364,6 +401,8 @@
       "expose": true,
       "id": "salesforce-record-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The SObject's API name, e.g. Account, Contact, Opportunity, or a custom object ending in __c",
@@ -398,6 +437,8 @@
           "symbol": "body"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -411,6 +452,9 @@
         "method": "PATCH",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/{id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "medium",
       "semantic_effects": [],
       "service": "default"
@@ -438,6 +482,10 @@
       "credential_requirement": "declared",
       "description": "Describe an SObject's schema: its label, whether it is custom, its create/update/delete/query permissions, and every field's name, type and constraints. The reference for what salesforce-record-create and salesforce-record-update may send",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "instance": [
           "host"
@@ -446,6 +494,8 @@
       "expose": true,
       "id": "salesforce-sobject-describe",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The SObject's API name, e.g. Account, Contact, Opportunity, or a custom object ending in __c",
@@ -459,10 +509,15 @@
           "symbol": "sobject_type"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/describe"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "createable": {
@@ -551,8 +606,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://{instance}.my.salesforce.com",

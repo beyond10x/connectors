@@ -48,6 +48,12 @@ path = "/{bucket}/{key}"
 description = "Fetch one object."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "bucket"
@@ -68,6 +74,12 @@ path = "/model/{model_id}/invoke"
 description = "Invoke a model."
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "model_id"
@@ -90,6 +102,12 @@ path = "/v1/things/{thing_id}"
 description = "Fetch one thing."
 risk = "low"
 idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 
 [[operations.params.path]]
 name = "thing_id"

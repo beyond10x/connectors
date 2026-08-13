@@ -51,9 +51,10 @@ use anyhow::Result;
 use serde::Serialize;
 
 use connector_spec::{
-    AuthScheme, ChannelBinding, ConfigField, Connector, EventDecl, HttpMethod, Idempotency,
-    JsonSchema, Level, ManualSetup, OAuth2Spec, OAuthGrant, OAuthRedirect, Operation,
-    OperationSpecSource, Param, Reply, Risk, Selector, SemanticEffect, SocketConnectSpec,
+    AuthScheme, ChannelBinding, ConfigField, Connector, EventDecl, HostEffect, HttpMethod,
+    Idempotency, ImplementationForm, InteractionShape, JsonSchema, Level, ManualSetup, OAuth2Spec,
+    OAuthGrant, OAuthRedirect, Operation, OperationSpecSource, Param, PlacementRequirement,
+    ProtocolDriver, Reply, RequiredCapability, Risk, Selector, SemanticEffect, SocketConnectSpec,
     Subscription, VerificationScheme,
 };
 
@@ -66,7 +67,7 @@ use crate::surface;
 /// Bumped only when an existing field changes meaning or disappears. **Adding a field does not bump
 /// it** — every consumer reads by name, so a new key is invisible to one that does not know it, and
 /// C-37's `oip` is the case this rule is written for.
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 4;
 
 /// The whole catalogue: every provider, every operation, and what does not work.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -91,16 +92,6 @@ pub struct ProviderEntry {
     vendor: String,
     /// What the connector is for, in one line.
     description: String,
-    /// **How this connector executes** (C-405): `http`, `socket`, `process`, `container`, `plugin`
-    /// or `remote` — flux's runtime axis, mirrored.
-    ///
-    /// Always present and never null, unlike [`authority`](Self::authority) and
-    /// [`api_version`](Self::api_version): the IR always names a runtime, so the published document
-    /// always does too. A consumer refusing a locally-executing connector — a host serving more than
-    /// one tenant must, because process, container and raw-socket execution consume the host's own
-    /// identity and network position — reads this rather than deriving `http` from the fact that
-    /// every connector shipped so far happens to be one.
-    runtime: String,
     /// The API base URL, templating included. A service may override it; see
     /// [`ServiceEntry::base_url`].
     base_url: String,
@@ -502,8 +493,15 @@ struct OperationEntry {
     risk: Risk,
     /// Whether repeating it is safe (`idempotent`, `non_idempotent`, `conditional`).
     idempotency: Idempotency,
+    /// Host-resource consequences, read as declared and never inferred.
+    effects: Vec<HostEffect>,
     /// What execution means to Flux policy. Always present; empty means none declared.
     semantic_effects: Vec<SemanticEffect>,
+    interaction_shape: InteractionShape,
+    protocol_driver: ProtocolDriver,
+    placement_requirement: PlacementRequirement,
+    implementation_form: ImplementationForm,
+    required_capabilities: Vec<RequiredCapability>,
     /// **The condition under which repeating this write is safe** — `null` for every operation that
     /// does not declare `idempotency = "conditional"`, which is almost all of them.
     ///
@@ -646,7 +644,6 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
         authority: connector.authority.clone(),
         vendor: connector.vendor.clone(),
         description: connector.description.clone(),
-        runtime: connector.runtime.word().to_owned(),
         base_url: connector.base_url.clone(),
         api_version: connector.api_version.clone(),
         hosts,
@@ -847,7 +844,13 @@ fn operation_entry(connector: &Connector, operation: &Operation, host: String) -
         description: operation.description.clone(),
         risk: operation.risk,
         idempotency: operation.idempotency,
+        effects: operation.effects.clone(),
         semantic_effects: operation.semantic_effects.clone(),
+        interaction_shape: operation.interaction_shape,
+        protocol_driver: operation.protocol_driver,
+        placement_requirement: operation.placement_requirement,
+        implementation_form: operation.implementation_form,
+        required_capabilities: operation.required_capabilities.clone(),
         // The trimmed reading, not the raw field: an author's stray whitespace is not part of the
         // claim, and a reason too short to be one never reaches here because the loader refused the
         // provider file that stated it.
@@ -1013,7 +1016,7 @@ fn scheme_prefix(scheme: &AuthScheme) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use connector_spec::{AuthMethod, AuthRequirement, ParamSet, Quirks};
+    use connector_spec::{AuthMethod, AuthRequirement, ParamSet};
     use serde_json::{json, Value};
 
     fn operation() -> Operation {
@@ -1026,6 +1029,15 @@ mod tests {
             description: "List things".to_string(),
             risk: Risk::Destructive,
             idempotency: Idempotency::NonIdempotent,
+            effects: vec![
+                connector_spec::HostEffect::Read,
+                connector_spec::HostEffect::Network,
+            ],
+            interaction_shape: connector_spec::InteractionShape::Unary,
+            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
+            placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
+            implementation_form: connector_spec::ImplementationForm::BuiltIn,
+            required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
             semantic_effects: Vec::new(),
             repeatable_because: None,
             expose: true,
@@ -1043,7 +1055,11 @@ mod tests {
             response_schema: None,
             credential_response: Vec::new(),
             produces_credential: None,
-            quirks: Quirks::default(),
+            pagination: None,
+
+            rate_limit: None,
+
+            error_envelope: None,
         }
     }
 
@@ -1051,7 +1067,6 @@ mod tests {
         Connector {
             id: "acme".to_string(),
             authority: None,
-            runtime: connector_spec::Runtime::Http,
             api_version: None,
             services: Vec::new(),
             vendor: "Acme".to_string(),

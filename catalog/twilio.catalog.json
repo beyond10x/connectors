@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Twilio Account SID and Auth Token, sent as HTTP Basic credentials",
@@ -256,7 +256,7 @@
       "service": "default"
     }
   ],
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -281,9 +281,15 @@
       "credential_requirement": "declared",
       "description": "Verify credentials by fetching the authenticated Twilio account",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "twilio-account-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The Account SID — the same identifier entered as this connection's Basic-auth username",
@@ -296,10 +302,15 @@
           "symbol": "account_sid"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "date_created": {
@@ -383,9 +394,23 @@
       "credential_requirement": "declared",
       "description": "List messages sent from or received by this account",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "twilio-message-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "pagination": {
+        "page": {
+          "max_pages": 10,
+          "page_param": "Page",
+          "page_size": 50,
+          "size_param": "PageSize"
+        }
+      },
       "params": [
         {
           "description": "The Account SID — the same identifier entered as this connection's Basic-auth username",
@@ -425,16 +450,8 @@
           "wire": "PageSize"
         }
       ],
-      "quirks": {
-        "pagination": {
-          "page": {
-            "max_pages": 10,
-            "page_param": "Page",
-            "page_size": 50,
-            "size_param": "PageSize"
-          }
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -453,6 +470,9 @@
         ],
         "url": "{base}/Accounts/{account_sid}/Messages.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "first_page_uri": {
@@ -614,9 +634,15 @@
       "credential_requirement": "declared",
       "description": "Fetch one message",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "twilio-message-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The Account SID — the same identifier entered as this connection's Basic-auth username",
@@ -639,10 +665,15 @@
           "symbol": "message_sid"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}/Messages/{message_sid}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_sid": {
@@ -783,9 +814,23 @@
       "credential_requirement": "declared",
       "description": "List calls made from or received by this account",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "twilio-call-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "pagination": {
+        "page": {
+          "max_pages": 10,
+          "page_param": "Page",
+          "page_size": 50,
+          "size_param": "PageSize"
+        }
+      },
       "params": [
         {
           "description": "The Account SID — the same identifier entered as this connection's Basic-auth username",
@@ -846,16 +891,8 @@
           "wire": "PageSize"
         }
       ],
-      "quirks": {
-        "pagination": {
-          "page": {
-            "max_pages": 10,
-            "page_param": "Page",
-            "page_size": 50,
-            "size_param": "PageSize"
-          }
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -880,6 +917,9 @@
         ],
         "url": "{base}/Accounts/{account_sid}/Calls.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "calls": {
@@ -1038,9 +1078,15 @@
       "credential_requirement": "declared",
       "description": "Fetch one call",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "twilio-call-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The Account SID — the same identifier entered as this connection's Basic-auth username",
@@ -1063,10 +1109,15 @@
           "symbol": "call_sid"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}/Calls/{call_sid}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_sid": {
@@ -1198,6 +1249,10 @@
       "credential_requirement": "declared",
       "description": "List recordings for the configured Twilio account with bounded pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "username.twilio.basic_auth": [
           "path"
@@ -1206,6 +1261,8 @@
       "expose": true,
       "id": "twilio-recording-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A boolean parameter indicating whether to retrieve soft deleted recordings or not. Recordings metadata are kept after deletion for a retention period of 40 days.",
@@ -1242,6 +1299,8 @@
           "symbol": "Page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1266,6 +1325,9 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Recordings.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "end": {
@@ -1468,6 +1530,10 @@
       "credential_requirement": "declared",
       "description": "Fetch one recording's metadata from the configured Twilio account",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "username.twilio.basic_auth": [
           "path"
@@ -1476,6 +1542,8 @@
       "expose": true,
       "id": "twilio-recording-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The Twilio-provided string that uniquely identifies the Recording resource to fetch.",
@@ -1501,6 +1569,8 @@
           "symbol": "IncludeSoftDeleted"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1513,6 +1583,9 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Recordings/{Sid}.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_sid": {
@@ -1680,6 +1753,10 @@
       "credential_requirement": "declared",
       "description": "List usage records for the configured Twilio account with bounded pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "username.twilio.basic_auth": [
           "path"
@@ -1688,6 +1765,8 @@
       "expose": true,
       "id": "twilio-usage-record-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Whether to include usage from the master account and all its subaccounts. Can be: `true` (the default) to include usage from the master account and all subaccounts or `false` to retrieve usage from only the specified account.",
@@ -1724,6 +1803,8 @@
           "symbol": "Page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1748,6 +1829,9 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Usage/Records.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "end": {
@@ -1905,6 +1989,10 @@
       "credential_requirement": "declared",
       "description": "List conferences for the configured Twilio account with bounded pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "username.twilio.basic_auth": [
           "path"
@@ -1913,6 +2001,8 @@
       "expose": true,
       "id": "twilio-conference-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "How many resources to return in each list page. The default is 50, and the maximum is 1000.",
@@ -1939,6 +2029,8 @@
           "symbol": "Page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -1957,6 +2049,9 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Conferences.json"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "conferences": {
@@ -2088,8 +2183,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2010-04-01",

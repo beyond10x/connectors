@@ -133,6 +133,12 @@ name = "default"
 tags = ["project-management"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-team-list"
 method = "GET"
 direction = "read"
@@ -153,6 +159,12 @@ properties = { teams = { type = "array", description = "Every workspace the toke
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-space-folder-list"
 method = "GET"
 direction = "read"
@@ -183,6 +195,12 @@ properties = { folders = { type = "array", description = "The space's folders", 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-list-task-list"
 method = "GET"
 direction = "read"
@@ -235,6 +253,12 @@ properties = { tasks = { type = "array", description = "The matching tasks", ite
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-task-get"
 method = "GET"
 direction = "read"
@@ -270,6 +294,12 @@ properties = { id = { type = "string" }, name = { type = "string" }, description
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-task-create"
 method = "POST"
 direction = "write"
@@ -322,6 +352,12 @@ properties = { id = { type = "string", description = "The created task's id — 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "clickup-task-update"
 method = "PUT"
 direction = "write"

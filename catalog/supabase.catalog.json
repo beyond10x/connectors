@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Supabase project anon (publishable) key. Travels as the `apikey` header on every request. Requests made with it run as the project's `anon` Postgres role, so everything they return is bounded by the project's row-level-security policies — it is not the `service_role` key and confers none of that key's authority",
@@ -51,7 +51,7 @@
     ]
   ],
   "description": "Supabase project data and configuration: describe the tables the API exposes, read a table's rows, and read which sign-in methods the project has enabled. Reads only, through the project's public anon key, so every row returned is bounded by the project's own row-level-security policies",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -70,6 +70,10 @@
       "credential_requirement": "declared",
       "description": "Describe the tables, views and columns this project's data API exposes, as an OpenAPI 2.0 document. Takes no argument. Call this first to discover the table names supabase-rows-list takes and what columns each one has — the document reflects only what the anon role may see, so a table absent from it is a table this key cannot read. Also this connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the project ref and the key",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "project_ref": [
           "host"
@@ -78,10 +82,17 @@
       "expose": true,
       "id": "supabase-schema-describe",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/rest/v1/"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "basePath": {
@@ -169,6 +180,10 @@
       "credential_requirement": "declared",
       "description": "Read rows from one table or view in this project. Returns a JSON array of row objects with every column the anon role may read; the columns are the project's own, so call supabase-schema-describe first to learn them. Row-level security decides which rows come back — an empty array means the policies matched nothing, not that the table is empty. This connector cannot filter, project or sort: pass `limit` to bound the read and do the rest in the flow",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "project_ref": [
           "host"
@@ -177,6 +192,8 @@
       "expose": true,
       "id": "supabase-rows-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The table or view to read, exactly as it appears under `paths` in supabase-schema-describe's response, without the leading slash. Must be a relation the project exposes to its API — a name the schema document does not list is not readable with this key",
@@ -203,6 +220,8 @@
           "symbol": "limit"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -215,6 +234,9 @@
         ],
         "url": "{base}/rest/v1/{table}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
@@ -236,6 +258,10 @@
       "credential_requirement": "declared",
       "description": "Read which sign-in methods this project has enabled, and whether self-service sign-up is open. Takes no argument and returns configuration only — no user data and no identities. Use it to decide whether a flow can offer a given provider before it tries",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "project_ref": [
           "host"
@@ -244,10 +270,17 @@
       "expose": true,
       "id": "supabase-auth-settings",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/auth/v1/settings"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "disable_signup": {
@@ -286,8 +319,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

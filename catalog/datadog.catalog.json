@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Datadog API key. Identifies the organization; required on every request together with the Application Key — neither key alone authenticates a call",
@@ -63,7 +63,7 @@
     ]
   ],
   "description": "Datadog monitoring: list and inspect monitors, list and inspect incidents. Authenticates every request with an API key and an Application key together",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -83,13 +83,24 @@
       "credential_requirement": "declared",
       "description": "List every monitor visible to this API key. Also this connector's `verify` — a bounded read that runs unattended, needing no argument",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "datadog-monitor-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v1/monitor"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "items": {
           "properties": {
@@ -186,9 +197,15 @@
       "credential_requirement": "declared",
       "description": "Get one monitor by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "datadog-monitor-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The monitor's id, from datadog-monitor-list",
@@ -201,10 +218,15 @@
           "symbol": "monitor_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v1/monitor/{monitor_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created": {
@@ -292,13 +314,24 @@
       "credential_requirement": "declared",
       "description": "List the organization's incidents",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "datadog-incident-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/incidents"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
@@ -327,9 +360,15 @@
       "credential_requirement": "declared",
       "description": "Get one incident by id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "expose": true,
       "id": "datadog-incident-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The incident's id (a UUID), from datadog-incident-list",
@@ -342,17 +381,21 @@
           "symbol": "incident_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/incidents/{incident_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "base_url": "https://api.datadoghq.com",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Notion integration token sent as a bearer — an internal integration token or an OAuth-issued access token",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Notion workspace: read a page's properties, query a database, search shared content, and create a page",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,15 +55,21 @@
       "credential_requirement": "declared",
       "description": "Get the bot user this integration authenticates as, confirming the token resolves and naming the workspace it belongs to. Takes no parameters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "notion-user-me",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Notion-Version": "2022-06-28"
@@ -71,6 +77,9 @@
         "method": "GET",
         "url": "{base}/v1/users/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "bot": {
@@ -120,9 +129,19 @@
       "credential_requirement": "declared",
       "description": "Get one page's properties, parent, icon, cover and timestamps. This does NOT return the page's text — in Notion a page's content is a separate tree of blocks, which this connector cannot read",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "notion-page-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The page's id, a UUID. It is the last path segment of the page's URL, where it appears without hyphens — either spelling is accepted",
@@ -137,12 +156,8 @@
           "symbol": "page_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Notion-Version": "2022-06-28"
@@ -150,6 +165,9 @@
         "method": "GET",
         "url": "{base}/v1/pages/{page_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "archived": {
@@ -210,9 +228,19 @@
       "credential_requirement": "declared",
       "description": "Query a database and return its first page of entries (up to 100), unfiltered and in the database's default order. Each entry is a page, and its `properties` are keyed by that database's own column names. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "notion-database-query",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The database's id, a UUID. Open the database as a full page in Notion and it is the last path segment of the URL — not the id of a page inside it",
@@ -227,12 +255,8 @@
           "symbol": "database_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "headers": {
           "Notion-Version": "2022-06-28"
@@ -240,6 +264,9 @@
         "method": "POST",
         "url": "{base}/v1/databases/{database_id}/query"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "has_more": {
@@ -290,9 +317,19 @@
       "credential_requirement": "declared",
       "description": "Search the pages and databases shared with this integration by title, returning the first page of matches (up to 100). Notion matches on title only — it does not search page text. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "notion-search",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The text to match against page and database titles. An empty string returns everything shared with the integration",
@@ -305,12 +342,8 @@
           "symbol": "query"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -327,6 +360,9 @@
         "method": "POST",
         "url": "{base}/v1/search"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "has_more": {
@@ -381,9 +417,19 @@
       "credential_requirement": "declared",
       "description": "Create a new empty page as a child of an existing page. The page is created with a title and no content — this connector cannot write page body text, which in Notion is a separate tree of blocks. The parent page must be shared with this integration",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
       "expose": true,
       "id": "notion-page-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the existing page to create this page inside, a UUID. It must be a page, not a database, and it must be shared with this integration",
@@ -435,12 +481,8 @@
           "wire": "properties.title"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "code_pointer": "/code",
-          "message_pointer": "/message"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -464,6 +506,9 @@
         "method": "POST",
         "url": "{base}/v1/pages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "created_time": {
@@ -492,8 +537,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v1",

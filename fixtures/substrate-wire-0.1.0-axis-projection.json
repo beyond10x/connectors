@@ -1,0 +1,183 @@
+{
+  "format": "b10x.connectors-substrate-axis-projection.v1",
+  "scope": "S-023-five-axis-and-effect-mapping-only",
+  "generates_provider_document": false,
+  "source": {
+    "repository": "b10x/substrate",
+    "bundle": "substrate-wire",
+    "version": "0.1.0",
+    "bundle_manifest_sha256": "f71e1305367ec75c14f8f0db45a8bd750e4d0c6c0cdda1ef642b5f1ada5da9fa",
+    "operation_registry": "operations.json"
+  },
+  "target": {
+    "repository": "b10x/connectors",
+    "schema_version": 2,
+    "schema_sha256": "afae1fcb55378863bfba7db9657462204d31a094accc7ab924e59e5e9d3a028d"
+  },
+  "closed_mappings": {
+    "risk": {
+      "read": "low",
+      "write": "high",
+      "destructive": "destructive"
+    },
+    "idempotency": {
+      "idempotent": "idempotent",
+      "keyed": "conditional",
+      "none": "non_idempotent"
+    },
+    "exposure": {
+      "projected": true,
+      "callable": false,
+      "callable-direct": false
+    },
+    "source_effects": {
+      "filesystem:workspace": {
+        "target_host_effect": "filesystem",
+        "retention": "substrate_capability_requirement",
+        "semantic_effect": false
+      },
+      "network:egress": {
+        "target_host_effect": "network",
+        "retention": "substrate_capability_requirement",
+        "semantic_effect": false
+      },
+      "process": {
+        "target_host_effect": "process",
+        "retention": "substrate_capability_requirement",
+        "semantic_effect": false
+      }
+    }
+  },
+  "target_constants": {
+    "placement_semantics": "connector_driver_location_not_external_provider_service_location",
+    "interaction_shape": "unary",
+    "protocol_driver": "http_v1",
+    "placement_requirement": "connectors_deployment",
+    "implementation_form": "built_in",
+    "required_capabilities": [
+      "private_network"
+    ]
+  },
+  "source_operation_facts": [
+    {
+      "id": "machine.get",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "callable"
+    },
+    {
+      "id": "workspace.create",
+      "risk": "write",
+      "idempotency": "keyed",
+      "effects": [
+        "filesystem:workspace",
+        "network:egress"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "workspace.get",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "callable"
+    },
+    {
+      "id": "workspace.file.read",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "projected"
+    },
+    {
+      "id": "workspace.file.write",
+      "risk": "write",
+      "idempotency": "keyed",
+      "effects": [
+        "filesystem:workspace"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "workspace.file.delete",
+      "risk": "destructive",
+      "idempotency": "keyed",
+      "effects": [
+        "filesystem:workspace"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "workspace.destroy",
+      "risk": "destructive",
+      "idempotency": "keyed",
+      "effects": [
+        "filesystem:workspace"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "exec.start",
+      "risk": "write",
+      "idempotency": "keyed",
+      "effects": [
+        "process",
+        "filesystem:workspace",
+        "network:egress"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "exec.get",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "callable"
+    },
+    {
+      "id": "exec.output.get",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "projected"
+    },
+    {
+      "id": "exec.signal",
+      "risk": "destructive",
+      "idempotency": "keyed",
+      "effects": [
+        "process"
+      ],
+      "exposure": "projected"
+    },
+    {
+      "id": "operation.get",
+      "risk": "read",
+      "idempotency": "idempotent",
+      "effects": [],
+      "exposure": "callable"
+    }
+  ],
+  "operation_overlays": [
+    { "source_id": "machine.get", "direction": "read", "semantic_effects": [] },
+    { "source_id": "workspace.create", "direction": "write", "semantic_effects": [] },
+    { "source_id": "workspace.get", "direction": "read", "semantic_effects": [] },
+    { "source_id": "workspace.file.read", "direction": "read", "semantic_effects": [] },
+    { "source_id": "workspace.file.write", "direction": "write", "semantic_effects": [] },
+    { "source_id": "workspace.file.delete", "direction": "write", "semantic_effects": ["delete"] },
+    { "source_id": "workspace.destroy", "direction": "write", "semantic_effects": ["delete"] },
+    { "source_id": "exec.start", "direction": "write", "semantic_effects": [] },
+    { "source_id": "exec.get", "direction": "read", "semantic_effects": [] },
+    { "source_id": "exec.output.get", "direction": "read", "semantic_effects": [] },
+    { "source_id": "exec.signal", "direction": "write", "semantic_effects": [] },
+    { "source_id": "operation.get", "direction": "read", "semantic_effects": [] }
+  ],
+  "deferred_to_full_projection": [
+    "operation identity/path/input/output templates",
+    "source capability predicates",
+    "auth and credential requirements",
+    "request lowering",
+    "generated provider byte equality"
+  ]
+}

@@ -179,6 +179,12 @@ name = "default"
 tags = ["email"]
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "resend-email-send"
 method = "POST"
 direction = "write"
@@ -236,6 +242,12 @@ properties = { id = { type = "string", format = "uuid", description = "Resend's 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "resend-email-get"
 method = "GET"
 direction = "read"
@@ -262,6 +274,12 @@ properties = { object = { const = "email" }, id = { type = "string", format = "u
 # This connector's `verify`: an argument-free read that a settings page can run unattended, and one
 # that answers a second question a sender needs — which domains are actually usable in `from`.
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "resend-domain-list"
 method = "GET"
 direction = "read"
@@ -278,6 +296,12 @@ properties = { object = { const = "list" }, has_more = { type = "boolean", descr
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "resend-domain-get"
 method = "GET"
 direction = "read"

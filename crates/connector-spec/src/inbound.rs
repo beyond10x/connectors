@@ -29,7 +29,7 @@
 //! **No URL, no secret, no schedule.** The endpoint address is the operator's deployment detail, the
 //! secret is a credential *name* the host resolves (principle 4), and the loop that drives a
 //! [`Transport::Poll`] binding is an operator's `channel schedule` + `trigger` — a documented program
-//! pattern, not something this repository emits or runs. flux-connectors ships no runtime.
+//! pattern, not something this repository emits or runs. connectors ships no runtime.
 //!
 //! # Polling is lossy, so the cursor carries the correctness
 //!

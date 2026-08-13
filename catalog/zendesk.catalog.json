@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Zendesk API token; the user half is the agent email with Zendesk's /token marker",
@@ -175,7 +175,7 @@
     ]
   ],
   "description": "Zendesk Support ticketing: search, read and update tickets and comments; inspect audits, incremental exports and custom-object definitions",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -200,6 +200,10 @@
       "credential_requirement": "declared",
       "description": "List the read-only audit history for one ticket, including field changes, comments and notifications",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -208,6 +212,8 @@
       "expose": true,
       "id": "zendesk-ticket-audit-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the ticket",
@@ -221,10 +227,15 @@
           "symbol": "ticket_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/tickets/{ticket_id}/audits"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "audits": {
@@ -366,6 +377,10 @@
       "credential_requirement": "declared",
       "description": "Incrementally export tickets updated at or after a required Unix start time",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -374,6 +389,8 @@
       "expose": true,
       "id": "zendesk-incremental-ticket-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The time to start the incremental export from. Must be at least one minute in the past. Data isn't provided for the most recent minute",
@@ -386,6 +403,8 @@
           "symbol": "start_time"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -398,6 +417,9 @@
         ],
         "url": "{base}/api/v2/incremental/tickets"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "See [Tickets](/api-reference/ticketing/tickets/tickets/) for a detailed example.\n",
         "example": {
@@ -2027,6 +2049,10 @@
       "credential_requirement": "declared",
       "description": "Incrementally export users updated at or after a required Unix start time with an optional integer page size",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -2035,6 +2061,8 @@
       "expose": true,
       "id": "zendesk-incremental-user-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The time to start the incremental export from. Must be at least one minute in the past. Data isn't provided for the most recent minute",
@@ -2057,6 +2085,8 @@
           "symbol": "per_page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -2075,6 +2105,9 @@
         ],
         "url": "{base}/api/v2/incremental/users"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "example": {
           "count": 1,
@@ -2595,6 +2628,10 @@
       "credential_requirement": "declared",
       "description": "Incrementally export organizations updated at or after a required Unix start time with an optional integer page size",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -2603,6 +2640,8 @@
       "expose": true,
       "id": "zendesk-incremental-organization-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The time to start the incremental export from. Must be at least one minute in the past. Data isn't provided for the most recent minute",
@@ -2625,6 +2664,8 @@
           "symbol": "per_page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -2643,6 +2684,9 @@
         ],
         "url": "{base}/api/v2/incremental/organizations"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "example": {
           "count": 1,
@@ -2839,6 +2883,10 @@
       "credential_requirement": "declared",
       "description": "Incrementally export ticket audit events at or after a required Unix start time",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -2847,6 +2895,8 @@
       "expose": true,
       "id": "zendesk-incremental-ticket-event-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The time to start the incremental export from. Must be at least one minute in the past. Data isn't provided for the most recent minute",
@@ -2859,6 +2909,8 @@
           "symbol": "start_time"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -2871,6 +2923,9 @@
         ],
         "url": "{base}/api/v2/incremental/ticket_events"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "example": {
           "count": 1,
@@ -3007,6 +3062,10 @@
       "credential_requirement": "declared",
       "description": "List custom-object definitions, optionally including each definition's UI path",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -3015,6 +3074,8 @@
       "expose": true,
       "id": "zendesk-custom-object-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Include UI path in the response",
@@ -3027,6 +3088,8 @@
           "symbol": "include_ui_path"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -3039,6 +3102,9 @@
         ],
         "url": "{base}/api/v2/custom_objects"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "custom_objects": {
@@ -3147,6 +3213,10 @@
       "credential_requirement": "declared",
       "description": "List the account's most recently created or updated tickets",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -3155,10 +3225,17 @@
       "expose": true,
       "id": "zendesk-ticket-recent-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/tickets/recent"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "tickets": {
@@ -4706,6 +4783,10 @@
       "credential_requirement": "declared",
       "description": "List tickets from one numeric or built-in Zendesk view",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -4714,6 +4795,8 @@
       "expose": true,
       "id": "zendesk-view-ticket-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the view, or one of the string aliases `\"incoming\"`, `\"my\"`, or `\"my_groups\"`.",
@@ -4731,10 +4814,15 @@
           "symbol": "view_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/views/{view_id}/tickets"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "tickets": {
@@ -6282,6 +6370,10 @@
       "credential_requirement": "declared",
       "description": "Get one Zendesk user by numeric id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -6290,6 +6382,8 @@
       "expose": true,
       "id": "zendesk-user-show",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The id of the user",
@@ -6303,10 +6397,15 @@
           "symbol": "user_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/users/{user_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "user": {
@@ -6742,6 +6841,10 @@
       "credential_requirement": "declared",
       "description": "Get one Zendesk organization by numeric id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -6750,6 +6853,8 @@
       "expose": true,
       "id": "zendesk-organization-show",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of an organization",
@@ -6763,10 +6868,15 @@
           "symbol": "organization_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/organizations/{organization_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "organization": {
@@ -6908,6 +7018,10 @@
       "credential_requirement": "declared",
       "description": "List the account's Zendesk groups without exposing optional filters or pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -6916,10 +7030,17 @@
       "expose": true,
       "id": "zendesk-group-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/groups"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "groups": {
@@ -7013,6 +7134,10 @@
       "credential_requirement": "declared",
       "description": "List the account's ticket field definitions without optional locale, creator, sort or pagination inputs",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -7021,10 +7146,17 @@
       "expose": true,
       "id": "zendesk-ticket-field-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/ticket_fields"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "ticket_fields": {
@@ -7341,6 +7473,10 @@
       "credential_requirement": "declared",
       "description": "List the account's ticket forms without optional visibility, type, brand, locale, sort or pagination inputs",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -7349,10 +7485,17 @@
       "expose": true,
       "id": "zendesk-ticket-form-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/ticket_forms"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "ticket_forms": {
@@ -7592,6 +7735,10 @@
       "credential_requirement": "declared",
       "description": "List the account's custom ticket statuses without optional category, activity or default filters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -7600,10 +7747,17 @@
       "expose": true,
       "id": "zendesk-custom-status-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/custom_statuses"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "custom_statuses": {
@@ -7715,6 +7869,10 @@
       "credential_requirement": "declared",
       "description": "Show Self",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -7723,10 +7881,17 @@
       "expose": true,
       "id": "zendesk-test",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/users/me"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "user": {
@@ -8176,6 +8341,10 @@
       "credential_requirement": "declared",
       "description": "List Search Results",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -8184,6 +8353,8 @@
       "expose": true,
       "id": "zendesk-ticket-search",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The search query. See [Query basics](#query-basics) above. For details on the query syntax, see the [Zendesk Support search reference](https://support.zendesk.com/hc/en-us/articles/4408886879258)",
@@ -8196,6 +8367,8 @@
           "symbol": "query"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -8208,6 +8381,9 @@
         ],
         "url": "{base}/api/v2/search"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "example": {
           "count": 1,
@@ -8329,6 +8505,10 @@
       "credential_requirement": "declared",
       "description": "Show Ticket",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -8337,6 +8517,8 @@
       "expose": true,
       "id": "zendesk-ticket-show",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the ticket",
@@ -8350,10 +8532,15 @@
           "symbol": "ticket_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/tickets/{ticket_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "ticket": {
@@ -9906,6 +10093,10 @@
       "credential_requirement": "declared",
       "description": "List Comments",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -9914,6 +10105,8 @@
       "expose": true,
       "id": "zendesk-ticket-comment-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the ticket",
@@ -9948,6 +10141,8 @@
           "symbol": "per_page"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -9966,6 +10161,9 @@
         ],
         "url": "{base}/api/v2/tickets/{ticket_id}/comments"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "comments": {
@@ -10316,6 +10514,10 @@
       "credential_requirement": "declared",
       "description": "Update Ticket",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -10324,6 +10526,8 @@
       "expose": true,
       "id": "zendesk-ticket-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The ID of the ticket",
@@ -11855,6 +12059,8 @@
           "symbol": "ticket"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -11870,6 +12076,9 @@
         "method": "PUT",
         "url": "{base}/api/v2/tickets/{ticket_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "audit": {
@@ -13546,6 +13755,10 @@
       "credential_requirement": "declared",
       "description": "List Help Center categories; this zero-argument read also verifies that the shared Zendesk account and credential can reach the knowledge base",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -13554,10 +13767,17 @@
       "expose": true,
       "id": "zendesk-help-center-category-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/help_center/categories"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "categories": {
@@ -13659,6 +13879,10 @@
       "credential_requirement": "declared",
       "description": "List Help Center sections across all categories",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -13667,10 +13891,17 @@
       "expose": true,
       "id": "zendesk-help-center-section-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/help_center/sections"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "sections": {
@@ -13787,6 +14018,10 @@
       "credential_requirement": "declared",
       "description": "List Help Center articles, optionally limited to articles updated since a Unix timestamp",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -13795,6 +14030,8 @@
       "expose": true,
       "id": "zendesk-help-center-article-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "You can use the incremental article endpoint to list all the articles that were updated since a certain date and time.",
@@ -13807,6 +14044,8 @@
           "symbol": "start_time"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -13819,6 +14058,9 @@
         ],
         "url": "{base}/api/v2/help_center/articles"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "articles": {
@@ -13998,6 +14240,10 @@
       "credential_requirement": "declared",
       "description": "Get one Help Center article by its numeric id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -14006,6 +14252,8 @@
       "expose": true,
       "id": "zendesk-help-center-article-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The unique ID of the article",
@@ -14018,10 +14266,15 @@
           "symbol": "article_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/help_center/articles/{article_id}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "article": {
@@ -14198,6 +14451,10 @@
       "credential_requirement": "declared",
       "description": "List every translation of one Help Center article without exposing unencoded locale filters",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -14206,6 +14463,8 @@
       "expose": true,
       "id": "zendesk-help-center-translation-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The unique ID of the article",
@@ -14218,10 +14477,15 @@
           "symbol": "article_id"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/v2/help_center/articles/{article_id}/translations"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "translations": {
@@ -14339,6 +14603,10 @@
       "credential_requirement": "declared",
       "description": "Incrementally list Help Center articles updated since an optional integer Unix timestamp",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -14347,6 +14615,8 @@
       "expose": true,
       "id": "zendesk-help-center-article-incremental-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "You can use the incremental article endpoint to list all the articles that were updated since a certain date and time.",
@@ -14359,6 +14629,8 @@
           "symbol": "start_time"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "query": [
@@ -14371,6 +14643,9 @@
         ],
         "url": "{base}/api/v2/help_center/incremental/articles"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "articles": {
@@ -14552,6 +14827,10 @@
       "credential_requirement": "declared",
       "description": "Publish a new externally visible Help Center article in one numeric section",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "subdomain": [
           "host"
@@ -14560,6 +14839,8 @@
       "expose": true,
       "id": "zendesk-help-center-article-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The unique ID of the section",
@@ -14609,6 +14890,8 @@
           "symbol": "article"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -14624,6 +14907,9 @@
         "method": "POST",
         "url": "{base}/api/v2/help_center/sections/{section_id}/articles"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "article": {
@@ -14794,6 +15080,10 @@
       "credential_requirement": "declared",
       "description": "Create an empty SDK group conversation in the configured Zendesk Messaging app",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -14805,6 +15095,10 @@
       "expose": true,
       "id": "zendesk-messaging-conversation-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -14818,6 +15112,9 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/conversations"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "conversation": {
@@ -15009,6 +15306,10 @@
       "credential_requirement": "declared",
       "description": "Get one conversation by id; this bounded read is the Messaging service's diagnostic operation",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -15020,6 +15321,8 @@
       "expose": true,
       "id": "zendesk-messaging-conversation-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Identifies the conversation.",
@@ -15033,10 +15336,15 @@
           "symbol": "conversationId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "conversation": {
@@ -15232,6 +15540,10 @@
       "credential_requirement": "declared",
       "description": "Set one conversation's display name to an absolute non-empty value",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -15243,6 +15555,8 @@
       "expose": true,
       "id": "zendesk-messaging-conversation-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Identifies the conversation.",
@@ -15268,6 +15582,8 @@
           "symbol": "displayName"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -15283,6 +15599,9 @@
         "method": "PATCH",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "conversation": {
@@ -15474,6 +15793,10 @@
       "credential_requirement": "declared",
       "description": "List the participants of one conversation without exposing deep-object pagination",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -15485,6 +15808,8 @@
       "expose": true,
       "id": "zendesk-messaging-participant-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Identifies the conversation.",
@@ -15498,10 +15823,15 @@
           "symbol": "conversationId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/participants"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "List of returned participants.",
         "properties": {
@@ -15649,6 +15979,10 @@
       "credential_requirement": "declared",
       "description": "Post Message",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -15660,6 +15994,8 @@
       "expose": true,
       "id": "zendesk-messaging-message-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Identifies the conversation.",
@@ -17690,6 +18026,8 @@
           "symbol": "content"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -17708,6 +18046,9 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "description": "The created messages. A single request may produce multiple messages when the shorthand syntax is used to send a template message with leading text.",
         "properties": {
@@ -20189,6 +20530,10 @@
       "credential_requirement": "declared",
       "description": "List Messages",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -20200,6 +20545,8 @@
       "expose": true,
       "id": "zendesk-messaging-message-list",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "Identifies the conversation.",
@@ -20213,10 +20560,15 @@
           "symbol": "conversationId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/messages"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "links": {
@@ -22735,6 +23087,10 @@
       "credential_requirement": "declared",
       "description": "Create a Zendesk Messaging user with one required external id",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -22746,6 +23102,8 @@
       "expose": true,
       "id": "zendesk-messaging-user-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "A unique identifier for the user. The `externalId` can be used to link a user to the same conversation [across multiple devices](https://developer.zendesk.com/documentation/conversations/messaging-platform/users/authenticating-users/).",
@@ -22762,6 +23120,8 @@
           "symbol": "externalId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -22777,6 +23137,9 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/users"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "user": {
@@ -22969,6 +23332,10 @@
       "credential_requirement": "declared",
       "description": "Get one Zendesk Messaging user by its vendor id or external id",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -22980,6 +23347,8 @@
       "expose": true,
       "id": "zendesk-messaging-user-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The user's id or externalId.",
@@ -22993,10 +23362,15 @@
           "symbol": "userIdOrExternalId"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/users/{userIdOrExternalId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "user": {
@@ -23193,6 +23567,10 @@
       "credential_requirement": "declared",
       "description": "Set whether one Zendesk Messaging user is retained after becoming inactive",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
       "endpoint": {
         "appId": [
           "path"
@@ -23204,6 +23582,8 @@
       "expose": true,
       "id": "zendesk-messaging-user-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The user's id or externalId.",
@@ -23226,6 +23606,8 @@
           "symbol": "toBeRetained"
         }
       ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -23241,6 +23623,9 @@
         "method": "PATCH",
         "url": "{base}/v2/apps/{appId}/users/{userIdOrExternalId}"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "user": {
@@ -23411,8 +23796,7 @@
       "service": "messaging"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "v2",

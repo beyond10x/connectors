@@ -235,6 +235,12 @@ name = "default"
 tags = ["observability"]
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sentry-issue-get"
 method = "GET"
 direction = "read"
@@ -272,7 +278,7 @@ type = "object"
 required = ["id", "title", "status"]
 properties = { id = { type = "string", description = "The issue's numeric id, as a string" }, shortId = { type = "string", description = "The human-facing id shown in Sentry's UI and in alert emails, e.g. `ACME-INC-7F`. It is not accepted by this connector's `issue_id` parameter" }, title = { type = "string", description = "The grouped error's title, e.g. `TypeError: undefined is not a function`" }, culprit = { type = "string", description = "Where Sentry attributes it — a function or transaction name. Null when it cannot attribute one" }, level = { type = "string", enum = ["sample", "debug", "info", "warning", "error", "fatal", "unknown"], description = "The severity of the grouped events" }, status = { type = "string", enum = ["resolved", "ignored", "unresolved", "pending_deletion", "pending_merge", "reprocessing"], description = "The triage state. Note the last three: an issue can be mid-deletion, mid-merge or reprocessing, which is neither open nor closed" }, substatus = { type = "string", description = "Why it is in that state: `new`, `ongoing`, `regressed`, `escalating`, `archived_until_escalating`, `archived_until_condition_met`, `archived_forever`, or null. `regressed` is the one that matters in a triage flow — it means a resolved issue came back" }, count = { type = "string", description = "How many events are grouped in this issue — **a STRING, not a number**, per Sentry's own schema (its example is `\"150\"`). Compare it as a number only after converting" }, userCount = { type = "integer", description = "How many distinct users hit it — an integer, unlike `count` beside it" }, firstSeen = { type = "string", format = "date-time", description = "When the first event of this group arrived" }, lastSeen = { type = "string", format = "date-time", description = "When the most recent one did. This, not `count`, is what says whether the issue is still live" }, permalink = { type = "string", format = "uri", description = "The issue's page in Sentry — the link to give a human" }, project = { type = "object", description = "Which project it belongs to: `{id, name, slug, platform}`. Its `slug` is what `sentry-project-get` takes" }, metadata = { type = "object", description = "Sentry's own grouping metadata — typically `{type, value, filename, function}`. Free-form in the vendor's schema, so no member is declared" }, assignedTo = { type = "object", description = "Who owns it: `{type: \"user\"|\"team\", id, name, email}`, or null when unassigned" }, numComments = { type = "integer" }, isSubscribed = { type = "boolean" }, isBookmarked = { type = "boolean" }, hasSeen = { type = "boolean" }, isUnhandled = { type = "boolean", description = "True when the error was not caught by application code" }, priority = { type = "string", description = "`low`, `medium`, `high` or null — Sentry's own computed priority, distinct from `level`" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/detail"
 
 # ---------------------------------------------------------------------------------------------
@@ -291,6 +297,12 @@ message_pointer = "/detail"
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sentry-issue-update"
 method = "PUT"
 direction = "write"
@@ -354,12 +366,18 @@ type = "object"
 required = ["id", "status"]
 properties = { id = { type = "string" }, shortId = { type = "string" }, title = { type = "string" }, culprit = { type = "string" }, level = { type = "string", enum = ["sample", "debug", "info", "warning", "error", "fatal", "unknown"] }, status = { type = "string", enum = ["resolved", "ignored", "unresolved", "pending_deletion", "pending_merge", "reprocessing"], description = "The state **after** this call — read it to confirm the transition applied" }, substatus = { type = "string", description = "`new`, `ongoing`, `regressed`, `escalating`, `archived_until_escalating`, `archived_until_condition_met`, `archived_forever`, or null. An `ignored` issue lands in one of the `archived_*` values, which is how the mute's terms are visible" }, statusDetails = { type = "object", description = "How the status was reached — which release resolved it, or the conditions an archive is waiting on. Free-form in the vendor's schema" }, count = { type = "string", description = "Event count, a STRING here as on the read" }, userCount = { type = "integer" }, firstSeen = { type = "string", format = "date-time" }, lastSeen = { type = "string", format = "date-time" }, permalink = { type = "string", format = "uri" }, project = { type = "object", description = "`{id, name, slug, platform}`" }, assignedTo = { type = "object", description = "`{type, id, name, email}`, or null" }, isSubscribed = { type = "boolean" }, isBookmarked = { type = "boolean" }, hasSeen = { type = "boolean" }, priority = { type = "string", description = "`low`, `medium`, `high` or null" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/detail"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sentry-project-get"
 method = "GET"
 direction = "read"
@@ -400,12 +418,18 @@ type = "object"
 required = ["id", "slug", "name"]
 properties = { id = { type = "string", description = "The project's numeric id, as a string" }, slug = { type = "string", description = "The URL slug, e.g. `backend-api` — what an issue's `project.slug` names and what this operation takes" }, name = { type = "string", description = "The display name, which is not the slug" }, platform = { type = "string", description = "The SDK platform, e.g. `python`, `javascript-react`, or null" }, platforms = { type = "array", description = "Every platform that has actually sent events to this project", items = { type = "string" } }, status = { type = "string", description = "The project's own lifecycle state — `active`, `disabled`, `pending_deletion`, `deletion_in_progress`. A non-active project explains an issue that stopped updating" }, dateCreated = { type = "string", format = "date-time" }, firstEvent = { type = "string", format = "date-time", description = "When this project first received an event, or null if it never has — which is the signal that an SDK was never wired up" }, isPublic = { type = "boolean" }, isMember = { type = "boolean", description = "Whether the token's own user is a member of the project" }, isInternal = { type = "boolean" }, hasAccess = { type = "boolean" }, access = { type = "array", description = "The permission scopes the token holds on this project", items = { type = "string" } }, features = { type = "array", description = "Enabled feature flags, as opaque strings", items = { type = "string" } }, team = { type = "object", description = "`{id, name, slug}` — the owning team, or null. Deprecated in favour of `teams`" }, teams = { type = "array", description = "All owning teams, each `{id, name, slug}`. This is who to notify", items = { type = "object" } }, organization = { type = "object", description = "The owning organization, itself a large object; its `slug` is what every other operation here takes" }, latestRelease = { type = "object", description = "`{version}` of the most recent release seen, or null. Useful for deciding whether an error predates a deploy" }, processingIssues = { type = "integer", description = "How many processing problems the project has, e.g. missing debug symbols" }, options = { type = "object", description = "Per-project settings, keyed by option name. Free-form in the vendor's schema" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/detail"
 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 id = "sentry-issue-event-latest"
 method = "GET"
 direction = "read"
@@ -448,5 +472,5 @@ type = "object"
 required = ["id", "eventID"]
 properties = { id = { type = "string", description = "The event's id" }, eventID = { type = "string", description = "The same event id again, under Sentry's other spelling" }, groupID = { type = "string", description = "The issue this event belongs to — the `issue_id` that fetched it. Nullable in the vendor's schema" }, projectID = { type = "string" }, title = { type = "string", description = "The event's title, usually the same as the issue's" }, message = { type = "string", description = "The log message, or null for an exception-only event" }, platform = { type = "string", description = "The SDK platform that sent it" }, dateCreated = { type = "string", format = "date-time", description = "When the event occurred" }, dateReceived = { type = "string", format = "date-time", description = "When Sentry ingested it. Late-arriving events make these differ" }, culprit = { type = "string" }, tags = { type = "array", description = "The event's tags as `{key, value}` pairs — **an array, not a map**. `environment`, `release`, `server_name`, `url` and `level` all arrive here, so finding the environment means searching the array for `key == \"environment\"`", items = { type = "object", required = ["key", "value"], properties = { key = { type = "string" }, value = { type = "string" } } } }, entries = { type = "array", description = "THE INTERESTING PART, and undocumented: the stack trace, breadcrumbs, HTTP request and message are all entries here, each shown in Sentry's examples as `{type, data}` with `type` naming which (`exception`, `stacktrace`, `breadcrumbs`, `request`, `message`). The vendor's schema declares the item as an empty schema, so nothing is asserted about `data`", items = {} }, user = { type = "object", description = "Who hit it: `{id, email, username, ip_address, name, geo, data}`, or null. **Personal data** — an IP address and an email — so read it only when the task needs it" }, contexts = { type = "object", description = "Runtime context keyed by name (`browser`, `os`, `device`, `trace`). Free-form in the vendor's schema" }, sdk = { type = "object", description = "`{name, version}` of the SDK that reported it, or null" }, release = { type = "object", description = "The release the event came from, or null" }, size = { type = "integer", description = "The stored event's size in bytes, or null" }, errors = { type = "array", description = "Ingest-time problems with the event itself — a missing source map, an unparseable frame — each `{type, message, data}`. Not the error the event is about", items = { type = "object" } }, nextEventID = { type = "string", description = "The next event in the same issue, or null when this is the latest — which it is for this operation" }, previousEventID = { type = "string", description = "The preceding event in the same issue, or null" } }
 
-[operations.quirks.error_envelope]
+[operations.error_envelope]
 message_pointer = "/detail"

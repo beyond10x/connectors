@@ -13,6 +13,12 @@ direction = "write"
 path = "/api/v2/tickets/{ticket_id}.json"
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 auth = []
 
 [[operations.params.path]]
@@ -27,6 +33,12 @@ direction = "write"
 path = "/api/v2/tickets/{ticket_id}.json"
 risk = "medium"
 idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 auth = []
 
 [[operations.params.path]]

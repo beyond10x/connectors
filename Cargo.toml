@@ -30,14 +30,9 @@ members = [
 
 [workspace.package]
 edition = "2021"
-# **0.26.0 is carried deliberately, and it is load-bearing.** The generator identity
-# `flux-connectors <version>` is embedded in every canonical document (`catalog/*.catalog.json`)
-# and in every `connectors.lock` row, so it is an *input* to the migration differential design 02
-# §7 item 6 requires: our pack, byte-identical to the predecessor's at the same inputs. Renaming
-# the generator or moving the version rewrites all 55 documents and the pack digest, which is a
-# reviewed catalogue change and not a side effect of standing up a workspace. It moves when the
-# differential is retired — see `crates/catalog-build/src/seam.rs::generator`.
-version = "0.26.0"
+# The predecessor differential has passed and its 0.26 line is retired. `0.1.0` is the first
+# b10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
+version = "0.1.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/b10x/connectors"
 homepage = "https://github.com/b10x/connectors"
@@ -51,13 +46,13 @@ publish = false
 [workspace.dependencies]
 # Internal crates. Path-local names: the package name, the library name and the workspace key are
 # the same word, so there is no `package = "…"` alias to keep in step with anything.
-connector-address = { version = "0.26.0", path = "crates/connector-address" }
-connector-spec = { version = "0.26.0", path = "crates/connector-spec" }
-catalog-reader = { version = "0.26.0", path = "crates/catalog-reader" }
-catalog = { version = "0.26.0", path = "crates/catalog" }
-connector-resolve = { version = "0.26.0", path = "crates/connector-resolve" }
-connector-secrets = { version = "0.26.0", path = "crates/connector-secrets" }
-catalog-build = { version = "0.26.0", path = "crates/catalog-build" }
+connector-address = { version = "0.1.0", path = "crates/connector-address" }
+connector-spec = { version = "0.1.0", path = "crates/connector-spec" }
+catalog-reader = { version = "0.1.0", path = "crates/catalog-reader" }
+catalog = { version = "0.1.0", path = "crates/catalog" }
+connector-resolve = { version = "0.1.0", path = "crates/connector-resolve" }
+connector-secrets = { version = "0.1.0", path = "crates/connector-secrets" }
+catalog-build = { version = "0.1.0", path = "crates/catalog-build" }
 
 # Shared third-party.
 anyhow = "1"

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Sentry auth token sent as a bearer — an organization, user or internal-integration token",
@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Sentry error tracking: read an issue and its latest event, triage an issue, read a project",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -50,9 +50,18 @@
       "credential_requirement": "declared",
       "description": "Get one issue — its title, culprit, level, status, assignee, first and last seen timestamps and event counts. An issue is Sentry's group of like events, not a single occurrence; use `sentry-issue-event-latest` for the stack trace",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/detail"
+      },
       "expose": true,
       "id": "sentry-issue-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The organization's slug as it appears in a Sentry URL (`acme-inc`), or its numeric id",
@@ -79,15 +88,15 @@
           "symbol": "issue_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/detail"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignedTo": {
@@ -233,9 +242,18 @@
       "credential_requirement": "declared",
       "description": "Change an issue's triage state: resolve it, ignore it, or return it to unresolved. This is the state the whole organization triages against — a resolved issue leaves the unresolved queue, and an ignored one stops alerting until it recurs on Sentry's terms. Recorded in the issue's activity feed under the token's owner",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/detail"
+      },
       "expose": true,
       "id": "sentry-issue-update",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The organization's slug as it appears in a Sentry URL (`acme-inc`), or its numeric id",
@@ -277,11 +295,8 @@
           "symbol": "status"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/detail"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -297,6 +312,9 @@
         "method": "PUT",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "assignedTo": {
@@ -421,9 +439,18 @@
       "credential_requirement": "declared",
       "description": "Get one project — its name, slug, platform, teams, DSN-bearing client keys' status and whether it is currently accepting events. This is the project an issue belongs to, so it is how a triage flow finds out which service is broken",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/detail"
+      },
       "expose": true,
       "id": "sentry-project-get",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The organization's slug as it appears in a Sentry URL (`acme-inc`), or its numeric id",
@@ -450,15 +477,15 @@
           "symbol": "project_id_or_slug"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/detail"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/0/projects/{organization_id_or_slug}/{project_id_or_slug}/"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "access": {
@@ -590,9 +617,18 @@
       "credential_requirement": "declared",
       "description": "Get the most recent event of an issue — the actual occurrence, with its stack trace, breadcrumbs, request context and tags. This is what makes an issue diagnosable rather than merely countable; the event list itself is excluded because it pages with an opaque cursor",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/detail"
+      },
       "expose": true,
       "id": "sentry-issue-event-latest",
       "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The organization's slug as it appears in a Sentry URL (`acme-inc`), or its numeric id",
@@ -619,15 +655,15 @@
           "symbol": "issue_id"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/detail"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/events/latest/"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "contexts": {
@@ -741,8 +777,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "0",

@@ -24,15 +24,13 @@ regenerated documents rather than its pack): all **835 operations** and **1518 p
 symbols** — `symbol`, `contract.description`, `contract.input_schema` — match the
 engine-derived values exactly. Effects were excluded; they are S-002's.
 
-## 2. `schema_version` stays 1
+## 2. The S-001 release used schema 1; the coordinated axis wave is schema 2
 
-The story said "under a minor schema bump"; the field is a single `u32` with no minor component,
-and the code's own rule (`document.rs::SCHEMA_VERSION`) is that **additive evolution does not
-bump it** — a bump is what *refuses* older readers, which is exactly wrong for additions a
-C-537-compatible reader must tolerate. The predecessor's C-552 made the same call. Every new
-operation-level field is `required` in the schema — the validator describes this build's
-artifacts, and schema + documents regenerate as one commit — while readers keep
-`#[serde(default)]` fallbacks.
+S-001 itself was an additive release and stayed on schema 1. The later coordinated S-002/S-015/S-023
+wave deliberately moved to schema 2: it removed the `quirks` object and old mixed `runtime` noun,
+made effects and five execution axes required, and therefore must refuse old documents instead of
+quietly defaulting facts used by authorization and dispatch. Readers and the resolver now require
+those fields and refuse a different schema version before serving records.
 
 ## 3. The extended description belongs to the artifact
 
@@ -64,9 +62,10 @@ credential it can never read*, now reaches the typed views. Conflicting provenan
 mint on one credential, two mints of one credential, a mint of an undeclared credential) is
 refused by name at table build.
 
-## What S-002 still owns
+## What S-002 now carries, and what remains
 
-Per-operation host **effects** (the predecessor's fourth C-552 field) are deliberately absent:
-S-002 rejects the predecessor's derived `[direction, "network"]` and demands declared effects
-with a closed vocabulary and a grant-admission consumer — a curation pass over every provider,
-not a port. The `semantic_effects` tier ships unchanged.
+Per-operation host **effects** (the predecessor's fourth C-552 field) now ship as required declared
+data with a closed vocabulary. Every existing HTTP operation explicitly states its directional
+effect plus `network`; no consumer derives that pair. The separate `semantic_effects` tier remains
+required and unchanged. S-002 is still blocked only on M2's grant-admission consumer and its
+non-vacuous no-derivation test in `crates/domain`.

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/codewandler/flux-connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Dropbox access token sent as a bearer — a scoped app access token or an OAuth2 access token",
@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Dropbox: browse folder contents, read file and folder metadata, search files, create folders, and get temporary download links",
-  "generator": "flux-connectors 0.26.0",
+  "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
@@ -55,18 +55,27 @@
       "credential_requirement": "declared",
       "description": "Get the account this access token authenticates as, confirming the token resolves and naming the account it belongs to. Takes no parameters. Dropbox routes this read through POST, like every operation this connector declares — there is no GET anywhere in Dropbox's v2 API",
       "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-user-me",
       "idempotency": "idempotent",
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "method": "POST",
         "url": "{base}/2/users/get_current_account"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "account_id": {
@@ -124,9 +133,18 @@
       "credential_requirement": "declared",
       "description": "List the files and folders directly inside a folder, first page only. Each entry names its own type (file, folder, or deleted), name and full path. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-folder-list",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full path of the folder to list, from the account root — or the empty string \"\" for the root folder itself. Dropbox's root has no other spelling: \"/\" is a documented error (path/not_found or path/malformed_path), not an alias for \"\"",
@@ -140,11 +158,8 @@
           "symbol": "path"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -160,6 +175,9 @@
         "method": "POST",
         "url": "{base}/2/files/list_folder"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "cursor": {
@@ -207,9 +225,18 @@
       "credential_requirement": "declared",
       "description": "Get metadata for a file or folder at a given path: its type, name, id, and — for a file — size and content hash. Does not return a folder's contents (use dropbox-folder-list) or a file's content (use dropbox-temporary-link-get). Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-metadata-get",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full path of the file or folder to inspect, from the account root. Unlike dropbox-folder-list, the account root itself (\"\") is not addressable this way — this path must name an existing file or folder",
@@ -223,11 +250,8 @@
           "symbol": "path"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -243,6 +267,9 @@
         "method": "POST",
         "url": "{base}/2/files/get_metadata"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           ".tag": {
@@ -314,9 +341,18 @@
       "credential_requirement": "declared",
       "description": "Search file and folder names across the account, returning the first page of matches. Dropbox matches on name, not file content. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-search",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The text to match against file and folder names",
@@ -330,11 +366,8 @@
           "symbol": "query"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -350,6 +383,9 @@
         "method": "POST",
         "url": "{base}/2/files/search_v2"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "cursor": {
@@ -397,9 +433,18 @@
       "credential_requirement": "declared",
       "description": "Create a new folder at the given path, including any missing parent folders. Naming a path that already exists answers 409 conflict rather than creating a duplicate, since autorename is not offered by this connector",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-folder-create",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full path of the new folder, from the account root, e.g. \"/Homework/math\". Dropbox creates any missing parent folders along the way",
@@ -413,11 +458,8 @@
           "symbol": "path"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -433,6 +475,9 @@
         "method": "POST",
         "url": "{base}/2/files/create_folder_v2"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "metadata": {
@@ -484,9 +529,18 @@
       "credential_requirement": "declared",
       "description": "Get a temporary, unauthenticated download link for an existing file's content, valid for approximately four hours. This connector cannot follow the link itself — it only returns the URL, for a caller to fetch separately. Direction remains conservatively authored as write pending individual review; POST is transport only and supplied no evidence",
       "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "message_pointer": "/error_summary"
+      },
       "expose": true,
       "id": "dropbox-temporary-link-get",
       "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
       "params": [
         {
           "description": "The full path of the file to link, from the account root. Must name a file, not a folder",
@@ -500,11 +554,8 @@
           "symbol": "path"
         }
       ],
-      "quirks": {
-        "error_envelope": {
-          "message_pointer": "/error_summary"
-        }
-      },
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
       "request": {
         "body": {
           "encoding": "json",
@@ -520,6 +571,9 @@
         "method": "POST",
         "url": "{base}/2/files/get_temporary_link"
       },
+      "required_capabilities": [
+        "public_network"
+      ],
       "response_schema": {
         "properties": {
           "link": {
@@ -538,8 +592,7 @@
       "service": "default"
     }
   ],
-  "runtime": "http",
-  "schema_version": 1,
+  "schema_version": 2,
   "services": [
     {
       "api_version": "2",

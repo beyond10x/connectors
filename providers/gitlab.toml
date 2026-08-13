@@ -193,6 +193,12 @@ description = "GitLab's OAuth2 authorize and token endpoints, at the instance or
 base_url = "{origin}"
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-user-get"
 method = "GET"
@@ -225,6 +231,12 @@ properties = { id = { type = "integer", description = "The user's global id" }, 
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-group-list"
 method = "GET"
@@ -265,6 +277,12 @@ items = { type = "object", required = ["id", "name", "path", "full_path"], prope
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-project-list"
 method = "GET"
@@ -317,6 +335,12 @@ items = { type = "object", required = ["id", "name", "path_with_namespace"], pro
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-issue-list"
 method = "GET"
@@ -358,6 +382,12 @@ items = { type = "object", required = ["id", "iid", "project_id", "title", "stat
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-issue-get"
 method = "GET"
@@ -393,6 +423,12 @@ properties = { id = { type = "integer", description = "The issue's global id" },
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-issue-create"
 method = "POST"
@@ -434,6 +470,12 @@ properties = { id = { type = "integer", description = "The new issue's global id
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-merge-request-list"
 method = "GET"
@@ -475,6 +517,12 @@ items = { type = "object", required = ["id", "iid", "project_id", "title", "stat
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-pipeline-get"
 method = "GET"
@@ -504,6 +552,12 @@ properties = { id = { type = "integer", description = "The pipeline's own id, wh
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-branch-list"
 method = "GET"
