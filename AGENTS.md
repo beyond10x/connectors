@@ -87,7 +87,12 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    into `specs/<vendor>/`, a **declared scrub** (credential-shaped examples, emails, phone
    numbers removed, allowlist-shaped, test-enforced), a `specs/<vendor>.provenance.toml`
    (source, date, `sha256`, `upstream_sha256`), then `[[spec]]` + hash in the provider file.
-   The build is hermetic and offline; a spec refresh is its own reviewable commit.
+   **Register the source in `SOURCES.toml`** — the single index of everything this repo derives
+   from (kind, upstream, refresh script, pins, consumers); the index is test-enforced, so a
+   vendored file without an entry fails. The build is hermetic and offline; a spec refresh is
+   its own reviewable commit. **When an upstream changes**: run the entry's refresh script,
+   update the pin, rebuild, and review the *canonical-document diff* — the catalog diff, not
+   the raw source diff, is what gets judged.
 5. **Declare the surface as rules, not lists.** `[patch.naming]` is one rule (pins only to
    hold shipped ids still); one `[[patch.select]]` per (document, method class) — never reads
    and deletes in one statement, `risk` is a damage claim and they are not one claim;
