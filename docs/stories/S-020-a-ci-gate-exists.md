@@ -38,8 +38,9 @@ unchecked acceptance items below name the remaining web and verifier arms.
 - [x] `.github/workflows/ci.yml` exists, triggers on pull request and on push to the default branch,
       and runs the Rust gate: `cargo build --workspace`, `cargo test --workspace --no-fail-fast`,
       `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`.
-- [x] The **catalogue** is gated, not just the code: `catalog build` → `diff` must report everything
-      up to date → `catalog check` ([S-003](S-003-the-lockfile-gets-a-verifier.md)). A drifted
+- [x] The **catalogue** is gated, not just the code: read-only `catalog check` first verifies the
+      committed state; `catalog build` then has to leave no tracked Git diff and `catalog diff`
+      must report everything up to date ([S-003](S-003-the-lockfile-gets-a-verifier.md)). A drifted
       artifact fails CI instead of reaching a reviewer, which is what makes review-equals-execution
       mechanical.
 - [x] **`cargo fetch` runs before any job that invokes `cargo metadata --locked --offline`** (the MSRV
