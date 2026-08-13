@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -24,8 +25,16 @@ def target_text(raw: str) -> str:
 
 def main() -> int:
     failures: list[str] = []
-    for document in sorted(ROOT.rglob("*.md")):
-        if ".git" in document.parts:
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for relative in sorted(filter(None, listed.stdout.splitlines())):
+        document = ROOT / relative
+        if not document.is_file():
             continue
         source = document.read_text(encoding="utf-8")
         for line_number, line in enumerate(source.splitlines(), 1):
