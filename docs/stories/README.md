@@ -17,10 +17,17 @@ Context these stories assume, read in order: [../VISION.md](../VISION.md) →
 
 ## Status
 
-Pre-v1, design phase — nothing builds yet, and nothing should be scaffolded ahead of the build order
-in [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's
-day-one changes (architecture §2); the milestone stories M2–M5 are containers that will spawn
-children as each milestone is designed.
+**M1 has landed.** The catalog builds here: `catalog build` compiles `providers/` plus the vendored
+spec cache into `catalog/`, the pack, `connectors.lock` and the site projection, and the one-time
+byte-differential against the predecessor's pack passed byte-exact. What M1 left open is the `post-m1`
+epic below — there is no CI at all, the web explorer is written against a site JSON the projection no
+longer emits, coverage lost a direction in the test consolidation, three inputs are orphaned, and the
+predecessor's generator identity is still stamped into every artifact.
+
+The platform families are unstarted; nothing should be scaffolded ahead of the build order in
+[02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
+changes (architecture §2) plus the post-M1 repairs; the milestone stories M2–M5 are containers that
+will spawn children as each milestone is designed.
 
 ## Index
 
@@ -31,7 +38,12 @@ children as each milestone is designed.
 | [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` recomputes every hash and exits non-zero on drift | ready (3) | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | ready (4) | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
+| [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | ready (6) | Catalog | ci, catalog-build, web |
+| [S-018](S-018-the-explorer-works-against-the-new-site-json.md) | The web explorer works against the site JSON M1 actually emits | ready (7) | Catalog | web, catalog-build |
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
+| [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | backlog | Catalog | catalog, catalog-build, connector-resolve, web |
+| [S-021](S-021-coverage-regains-its-second-direction.md) | Coverage regains its second direction: every gap between declared and published has a reason | backlog | Catalog | catalog-build, providers |
+| [S-022](S-022-orphaned-inputs-are-removed-or-re-owned.md) | Orphaned inputs are removed or re-owned | backlog | Catalog | specs, migration, web |
 | [S-004](S-004-adopt-token-response-metadata.md) | An OAuth token response can carry declared metadata into the connection, not the credential store | backlog | Catalog | catalog, connector-spec, service |
 | [S-005](S-005-header-name-rate-limit-retry.md) | A rate limit the vendor discloses at runtime can be declared by header name | backlog | Catalog | catalog, connector-spec |
 | [S-006](S-006-per-service-verification-probes.md) | A service declares how a credential is verified, and what a failure means | backlog | Catalog | catalog, connector-spec, service |
@@ -50,17 +62,17 @@ children as each milestone is designed.
 |---|---|---|
 | `catalog-day-one` | S-001, S-002, S-003, S-015 | Architecture §2's day-one changes to the migrating catalog. S-001, S-002 and S-015 all change the document schema, the lowering, and every committed document — one implementor or a strict sequence, never parallel authors. S-015 additionally waits on the M1 byte-identity differential. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
+| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open: no CI at all (S-020), a web explorer written against a site JSON that no longer exists (S-018), the predecessor's generator identity still stamped into every artifact (S-019), the coverage direction the test consolidation dropped (S-021), and three orphaned inputs (S-022). Two of them are ordering constraints on other work: S-019 rides the schema wave, S-022 lands before S-016's check. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014 | Design constraints ported from the predecessors and the research rather than re-derived — the egress aperture (X-143), the webhook routing grammar, the personal-posture OAuth custody question, and auth-as-tool-result. |
 
-## Known gaps in this seed
+## Known gaps in this backlog
 
-- **M1 has no milestone story.** Its day-one changes are S-001/S-002/S-003 (and S-015 after the
-  differential), but the copy-and-extract half — migrating `providers/`, `specs/`, `catalog/`,
-  `scripts/`, `connectors.lock` and the catalog-family crates, extracting `catalog-build` minus the
-  emitters and legacy writers, and running the one-time pack differential against the predecessor —
-  still needs a story of its own.
+- **M1 never had a milestone story**, and now does not need one: the copy-and-extract half shipped
+  (catalog dirs, family crates, `catalog-build` minus the emitters, the byte-differential), and what
+  it left open is filed as the `post-m1` epic. Its day-one *changes* — S-001, S-002, S-003, S-015 —
+  are still open work.
 - **Decision 0024's waves 2–6** (slack/jira/confluence/opsgenie; the observability set behind
   declared destinations; aws/huggingface's new credential schemes; kubernetes/docker/sql/websearch;
   the final plugin-host deletion) are unfiled here; S-010 covers wave 1 only.
