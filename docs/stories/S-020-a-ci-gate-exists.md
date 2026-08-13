@@ -72,6 +72,16 @@ checking itself currently is not.
 
 ## Notes
 
+- **Suite-speed facts CI should assume (measured 2026-08-13):** the workspace suite was 289 s
+  wall on 20 cores, 96% of it two binaries, and the whole wall was one test's critical path —
+  `verification_conformance::every_shipped_hmac_scheme_is_covered_by_the_matrix` at 200 s,
+  because every whole-catalogue sweep re-ingested 21 MB of vendored specs in debug-mode serde.
+  Two fixes landed the same day: `[profile.dev.package."*"] opt-level = 2` in the root manifest
+  (dependencies optimized, workspace crates still opt 0 — CI caches should key on it), and a
+  memoized undoctored shipped-provider load in `tests/support/shipped_provider.rs` plus a cached
+  `full_plan()` in `catalog_invariants.rs`. If CI adopts **cargo-nextest**, know both cache wins
+  vanish (process per test) — nextest is worth having for per-test timing and slow-test flagging,
+  not for wall time here; measure before switching the gate to it.
 - Ordering: this arguably outranks the schema wave, because every "green" claim the other stories
   make is currently unverified — but it is ranked below them to avoid renumbering work already
   underway. If the coordinator disagrees, move it to 1; nothing in it depends on the wave.

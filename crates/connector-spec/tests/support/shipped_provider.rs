@@ -177,15 +177,44 @@ pub fn sources(name: &str) -> Sources {
 /// `definition` is passed rather than re-read for the same reason [`Sources::load`] takes one: a
 /// test that doctors the shipped bytes to prove a refusal must still be compiled against the real
 /// cache.
+///
+/// # The undoctored load is memoized
+///
+/// A whole-catalogue sweep re-ingests 21 MB of vendored spec documents (github alone is 9.9 MB),
+/// and a dozen such sweeps made ingest the suite's entire cost — one conformance sweep alone ran
+/// 200 s before this cache. When `definition` is byte-equal to the shipped file, the result is
+/// served from a per-process cache as a clone; **doctored bytes are never cached and never served
+/// from it** — the comparison against the disk bytes is the guard, so a refusal test cannot
+/// observe another test's load. Two threads racing the first load of one provider may both parse
+/// it; both results are equal and the waste is bounded by one extra parse. A process-per-test
+/// runner gets no benefit; the win is for `cargo test`'s threaded binaries, which is what the
+/// gate runs.
 pub fn load_definition(name: &str, definition: &str) -> connector_spec::Result<LoadedProvider> {
-    sources(name).load(definition)
+    use std::collections::HashMap;
+    use std::sync::{LazyLock, Mutex};
+
+    static SHIPPED: LazyLock<Mutex<HashMap<String, LoadedProvider>>> =
+        LazyLock::new(Default::default);
+
+    let sources = sources(name);
+    if definition != sources.definition {
+        return sources.load(definition);
+    }
+    if let Some(hit) = SHIPPED.lock().unwrap().get(name) {
+        return Ok(hit.clone());
+    }
+    let loaded = sources.load(definition)?;
+    SHIPPED
+        .lock()
+        .unwrap()
+        .insert(name.to_owned(), loaded.clone());
+    Ok(loaded)
 }
 
 /// Load one shipped provider, cache and all — for a caller that has not read the file yet.
 pub fn load(name: &str) -> LoadedProvider {
     let sources = sources(name);
-    sources
-        .load(&sources.definition)
+    load_definition(name, &sources.definition)
         .unwrap_or_else(|error| panic!("{} does not load: {error}", label(name)))
 }
 
