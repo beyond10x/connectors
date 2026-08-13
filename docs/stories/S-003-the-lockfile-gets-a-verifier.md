@@ -1,16 +1,15 @@
 ---
 id: S-003
-title: "`catalog check` recomputes every hash and exits non-zero on drift"
+title: "`catalog check` verifies every addressable hash and refuses unverifiable claims"
 pillar: Catalog
-status: ready
-priority: 3
+status: done
 design:
 epic: catalog-day-one
 areas: [catalog-build, connector-spec]
 note: "the predecessor's lockfile has a writer (C-189) and no verifier (C-14, never built), so provenance is computed, committed, and never checked. Architecture §2 day-one change 2. Review-equals-execution is a claim until something recomputes it in CI"
 ---
 
-# `catalog check` recomputes every hash and exits non-zero on drift
+# `catalog check` verifies every addressable hash and refuses unverifiable claims
 
 ## Goal
 
@@ -31,34 +30,46 @@ is the whole design.
 
 ## Acceptance
 
-- [ ] `catalog check` recomputes **every** hash in `connectors.lock` — each provider's
+- [x] `catalog check` recomputes every hash in `connectors.lock` whose bytes are identified by the
+      current v1 format — each provider's
       declaration bytes, each vendored spec document, each emitted artifact by repository-relative
-      path — and **exits non-zero** on any mismatch, naming the provider and which input moved.
-- [ ] `check` performs **no network IO**, so CI runs it offline and hermetically. Upstream drift
+      path — and **exits non-zero** on any mismatch, naming the provider and which input moved. A
+      populated predecessor-reserved hash without addressable bytes is refused as unverifiable.
+- [x] `check` performs **no network IO**, so CI runs it offline and hermetically. Upstream drift
       (has the vendor's document moved?) is a different question with a different answer and is not
       folded in here.
-- [ ] Four drift classes are distinct, named failures, each proven by a seeded case: a mutated
+- [x] Four drift classes are distinct, named failures, each proven by a seeded case: a mutated
       artifact; an edited provider declaration (**including a comment-only edit** — the hash domain
       is file bytes, and a comment can change what an operator believes the connector does); a
       re-vendored spec whose bytes changed; and a lock row that no longer matches its artifact.
-- [ ] Coverage is checked in both directions: a provider with no lock row fails, and a lock row with
+- [x] Coverage is checked in both directions: a provider with no lock row fails, and a lock row with
       no provider fails. A verifier that only checks the rows it finds cannot see a deletion.
-- [ ] Failing-first test: a mutated committed artifact makes `check` exit non-zero and name it; a
+- [x] Failing-first test: a mutated committed artifact makes `check` exit non-zero and name it; a
       clean tree exits zero and prints the counts it verified (providers, artifacts) rather than a
       bare "ok".
-- [ ] `check` is in the repository's gate, and the gate's definition says so — a verifier nothing
+- [x] `check` is in the repository's gate, and the gate's definition says so — a verifier nothing
       runs is the same as no verifier.
 
 ## Progress
-- (not started)
+- 2026-08-13 — done. `catalog check` now parses the committed lock, discovers providers independently,
+  hashes provider and selected-spec bytes before compiling, rebuilds the full catalogue offline,
+  and compares committed lock claims, current bytes, and freshly planned rows. That three-way
+  comparison distinguishes artifact drift from a falsified lock digest. Provider, spec and artifact
+  membership are checked in both directions; unsafe lock paths and populated hashes without
+  identifiable local bytes refuse rather than being trusted.
+- Failing-first was recorded before implementation: all six initial cases failed at the verifier
+  stub. The completed suite covers clean count output/no writes, comment-only provider edits,
+  re-vendored specs, hand-edited artifacts, falsified artifact hashes, and provider/spec/artifact
+  membership in both directions. The network seam and real binary namespace tests cover `check`
+  alongside `build`. The committed catalogue reports `55 providers, 59 artifacts verified`.
 
 ## Notes
 
 - Predecessors: flux-connectors C-7 (the hash domain and reproducible hashing), C-189 (the writer,
   the path-keying lesson, the multi-document `specs` rows), C-14 (this story's intent, plus a
   `fetch`/`--upstream` half that is deliberately **not** in scope here).
-- `upstream_spec_sha256` was filled by nobody in the predecessor (it needed the spec provenance
-  sidecars wired in). Decide here whether the migrated lock carries it or whether the field is
-  dropped until something fills it — a field nothing fills detects nothing and reads as if it did.
+- `upstream_spec_sha256` remains absent from every row. If a future row populates it without an
+  identifiable local input path, `check` refuses it as unverifiable; S-016 may later wire source
+  provenance into a checkable local record rather than treating an upstream claim as verified.
 - A scoped or partial build must never truncate the lockfile; it is a whole-catalog artifact. The
   predecessor's `a_scoped_build_leaves_the_lockfile_byte_identical` is the shape of the test to carry.

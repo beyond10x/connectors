@@ -58,10 +58,11 @@ enum Verb {
         #[command(flatten)]
         scope: Scope,
     },
-    /// Recompute every hash in connectors.lock and refuse on drift. Not yet implemented.
+    /// Recompute every hash in connectors.lock and refuse on drift.
     Check {
-        #[command(flatten)]
-        scope: Scope,
+        /// Repository root (default: the current directory).
+        #[arg(long, value_name = "DIR")]
+        root: Option<PathBuf>,
     },
     /// Write the provider TOML that references a vendored document, to stdout.
     Scaffold {
@@ -126,9 +127,10 @@ impl From<Cli> for catalog_build::cli::Invocation {
                 command: Command::Diff,
                 ..scope.into()
             },
-            Verb::Check { scope } => Invocation {
+            Verb::Check { root } => Invocation {
                 command: Command::Check,
-                ..scope.into()
+                root,
+                ..Default::default()
             },
             Verb::Scaffold {
                 provider,
@@ -272,19 +274,18 @@ mod tests {
         }
     }
 
-    /// `check` is declared in the surface and unbuilt, so it **refuses at run time and points at
-    /// what lands it**. A verb that exits zero without doing anything is how a CI pipeline comes to
-    /// believe it is checking something it is not.
+    /// `check` is whole-catalogue: a partial verification could miss the deleted row it exists to
+    /// detect and then report a truncated lock clean.
     #[test]
-    fn check_refuses_and_names_the_verifier_it_is_waiting_for() {
-        let invocation = parse(&["check"]).expect("`check` is a declared verb");
-        let mut out = Vec::new();
-        let error = catalog_build::run(&invocation, &mut out).expect_err("`check` is unbuilt");
-        let message = format!("{error}");
-        assert!(message.contains("not yet implemented"));
-        assert!(
-            message.contains("lockfile verifier"),
-            "the refusal must say what `check` will do: {message}"
+    fn check_accepts_no_scope() {
+        assert!(parse(&["check", "--provider", "zendesk"]).is_err());
+        assert!(parse(&["check", "--service", "default"]).is_err());
+        assert_eq!(
+            parse(&["check", "--root", "/tmp/x"])
+                .expect("check accepts a workspace root")
+                .root
+                .as_deref(),
+            Some(std::path::Path::new("/tmp/x"))
         );
     }
 }

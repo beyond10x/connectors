@@ -109,6 +109,25 @@ fn build_succeeds_with_networking_unavailable() {
         fixture.0.join("catalog").join("acme.catalog.json").exists(),
         "the offline build wrote no canonical document"
     );
+
+    let check = Command::new(program)
+        .args(args)
+        .arg(env!("CARGO_BIN_EXE_catalog"))
+        .arg("check")
+        .arg("--root")
+        .arg(&fixture.0)
+        .output()
+        .expect("run check under a network namespace");
+    assert!(
+        check.status.success(),
+        "check failed with networking unavailable:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr),
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&check.stdout),
+        "1 provider, 5 artifacts verified\n"
+    );
 }
 
 /// `Some((program, args))` if this host can drop the child into an empty network namespace.

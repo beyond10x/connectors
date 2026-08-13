@@ -49,6 +49,7 @@
 #![recursion_limit = "256"]
 
 pub mod artifact;
+pub mod check;
 pub mod cli;
 pub mod contract;
 pub mod diff;
@@ -78,7 +79,7 @@ pub fn run(invocation: &Invocation, out: &mut impl Write) -> Result<()> {
         Command::Build => build(invocation, out),
         Command::Diff => show_diff(invocation, out),
         Command::Scaffold => scaffold(invocation, out),
-        Command::Check => not_yet_implemented(),
+        Command::Check => check(invocation, out),
     }
 }
 
@@ -161,6 +162,21 @@ fn show_diff(invocation: &Invocation, out: &mut impl Write) -> Result<()> {
     refuse_orphans(&workspace, &plan)
 }
 
+/// Independently verify the committed lock inputs and generated artifacts.
+fn check(invocation: &Invocation, out: &mut impl Write) -> Result<()> {
+    if invocation.provider.is_some() || invocation.service.is_some() {
+        bail!("`catalog check` is always whole-catalogue and accepts no provider or service scope");
+    }
+    let workspace = workspace_for(invocation)?;
+    let report = check::verify(&workspace)?;
+    writeln!(
+        out,
+        "{} verified",
+        summarize(report.providers, report.artifacts)
+    )?;
+    Ok(())
+}
+
 /// Stop, naming every committed file under an artifact root that the plan does not claim.
 ///
 /// Silent on a scoped run, because [`pipeline::plan_selected`] leaves the list empty there: a
@@ -205,19 +221,4 @@ fn workspace_for(invocation: &Invocation) -> Result<Workspace> {
         None => std::env::current_dir().context("cannot determine the current directory")?,
     };
     Ok(Workspace::new(root))
-}
-
-/// `check` is declared and unbuilt, and it fails loudly rather than exiting zero.
-///
-/// Deliberately an error rather than a no-op: a command that exits zero without doing anything is
-/// how a CI pipeline comes to believe it is checking something it is not. The verifier
-/// `connectors.lock` never had is design 02 §2's day-one change and lands with its own story;
-/// until it does, this refusal is the honest answer.
-fn not_yet_implemented() -> Result<()> {
-    bail!(
-        "`catalog check` is not yet implemented. It is the day-one lockfile verifier of design 02 \
-         §2: recompute every hash in `connectors.lock` and exit non-zero on drift. Until it lands, \
-         `catalog diff` reports drift in the artifacts (but not in the lockfile's own record of \
-         them)."
-    )
 }

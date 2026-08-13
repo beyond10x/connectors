@@ -27,6 +27,17 @@ fn build(root: &str) -> anyhow::Result<String> {
     Ok(String::from_utf8(out).expect("CLI output is UTF-8"))
 }
 
+fn check(root: &str) -> anyhow::Result<String> {
+    let invocation = catalog_build::cli::Invocation {
+        command: catalog_build::cli::Command::Check,
+        root: Some(std::path::PathBuf::from(root)),
+        ..Default::default()
+    };
+    let mut out = Vec::new();
+    catalog_build::run(&invocation, &mut out)?;
+    Ok(String::from_utf8(out).expect("CLI output is UTF-8"))
+}
+
 /// The build performs **no network IO**.
 #[test]
 fn build_records_no_network_attempt() {
@@ -42,6 +53,20 @@ fn build_records_no_network_attempt() {
          script under `scripts/`, run deliberately and reviewed as a diff."
     );
     assert!(fixture.exists("catalog/zendesk.catalog.json"));
+}
+
+/// Check recompiles and hashes committed bytes, but never treats upstream freshness as a reason to
+/// contact a vendor. That belongs to `catalog sources diff`, not the lock verifier.
+#[test]
+fn check_records_no_network_attempt() {
+    let fixture = Fixture::with_provider("check-no-network", "zendesk");
+    build(fixture.root().to_str().unwrap()).expect("build the fixture");
+
+    let denial = catalog_build::net::deny();
+    let output = check(fixture.root().to_str().unwrap()).expect("check succeeds offline");
+
+    assert_eq!(denial.attempts(), 0, "`check` reached the network seam");
+    assert_eq!(output, "1 provider, 5 artifacts verified\n");
 }
 
 /// Every network primitive in this crate must live behind `src/net.rs`, or the counter above is

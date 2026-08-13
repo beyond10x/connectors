@@ -32,8 +32,12 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Format
         run: cargo fmt --all --check
+      - name: Verify catalog lock inputs and artifacts
+        run: cargo run --locked --offline -p catalog-cli -- check
       - name: Rebuild canonical catalogue
         run: cargo run --locked -p catalog-cli -- build
+      - name: Prove rebuild wrote nothing
+        run: git diff --exit-code
       - name: Reject generated drift
         run: cargo run --locked -p catalog-cli -- diff
 

@@ -171,11 +171,13 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 cargo run --locked -p catalog-cli -- build
 cargo run --locked -p catalog-cli -- diff
+cargo run --locked -p catalog-cli -- check
 ```
 
-A separate job builds and tests with Rust 1.87.0, the declared MSRV. `catalog check` remains owned by
-S-003, and the web job remains owned jointly by S-018/S-020; neither absent arm is described as
-enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are
+A separate job builds and tests with Rust 1.87.0, the declared MSRV. `catalog check` independently
+rehashes the provider declarations, vendored specs, lock rows and generated artifacts; it runs
+offline after build and diff. The web job remains owned jointly by S-018/S-020 and is not described
+as enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are
 unavailable.
 
 The agent instruction is therefore short:
