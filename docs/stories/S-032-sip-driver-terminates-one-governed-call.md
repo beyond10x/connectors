@@ -7,7 +7,7 @@ priority:
 design: docs/design/05-native-sip-and-rtvbp.md
 epic: native-voice
 areas: [catalog, domain, service, server, driver-sip]
-note: "Development loopback driver is real; catalog provider, full conformance, and stable network aperture remain"
+note: "Source-grounded catalog and dev-cluster outbound proof exist; full conformance and stable network aperture remain"
 ---
 
 # The SIP driver terminates one governed call
@@ -23,11 +23,12 @@ SIP call without importing RTVBP or requiring a live carrier.
       `TelephonySession` port and only `server` selects it after admission.
 - [x] The closed catalog vocabulary represents `sip_v1` without accepting arbitrary driver names;
       canonical-document and consumer round-trip tests preserve it exactly.
-- [ ] At least one authoritative or repository-authored carrier/PBX source with registered
+- [x] At least one authoritative or repository-authored carrier/PBX source with registered
       provenance produces a reviewed provider declaration and generated canonical catalog member
       whose interaction shape is `session_establishment`, driver is `sip_v1`, implementation is
-      `built_in`, initial model exposure is false, and capability/risk/idempotency facts are exact.
-- [ ] The source, provenance, provider declaration, canonical document, lock row, pack, and web
+      `built_in`, and capability/risk/idempotency facts are exact. The first exposure is deliberately
+      limited to the alias-only `sip.dial` member after the driver and development route proof.
+- [x] The source, provenance, provider declaration, canonical document, lock row, pack, and web
       projection land atomically; the effective catalog exposes the member only where the selected
       deployment can actually dispatch `sip_v1`.
 - [x] `driver-sip` is the only named network-capable driver and calls `sipx` bind only from a
@@ -64,7 +65,18 @@ SIP call without importing RTVBP or requiring a live carrier.
   supervisor. Media/signal EOF is no longer reclassified as remote hangup; a sipx timeout remains
   `transport_lost` through the neutral port. Session teardown joins the sipx owner task through
   endpoint shutdown, while dropping an abandoned session aborts that owner.
+- Asterisk's pinned first-party SIP and RTP samples, provenance, provider declaration, canonical
+  document, lock row, pack, and web projection now land together. One catalog invariant permits
+  exactly that reviewed `sip-dial` member, requires its non-HTTP facts, and refuses an inherited
+  HTTP endpoint/host.
+- `sip.dial` takes only a Connection-owned symbolic alias. Planning independently requires
+  B10x initiation authority and a Grant; server admission resolves the alias to an exact
+  deployment route and refuses caller-supplied URIs, hosts, ports, placement, credentials, or
+  aperture widening before the driver.
+- The operator-authorized development mode completed a real TCP SIP call and RTP echo against the
+  dev-cluster Asterisk. The proof is intentionally weaker than stable support: the learned peer is
+  validated before the session is returned, but the selected sipx media runtime may already have
+  transmitted symmetric RTP internally. The complete lifecycle matrix and enforceable pre-send
+  learned-peer gate remain open.
 - CI builds/tests/lints the isolated exact lock, and a dependency fence keeps sipx out of the
-  canonical compiler closure. No provider member is advertised yet: the authoritative source,
-  generated artifacts, remaining conformance matrix, and stable learned-peer enforcement are open.
-  A catalog invariant fails if any provider advertises `sip_v1` before that atomic change lands.
+  canonical compiler closure.

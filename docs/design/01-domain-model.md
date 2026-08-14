@@ -200,6 +200,17 @@ created ──authorize──▶ authorized ──verify──▶ callable
   attribution) survives a token refresh or re-auth.
 - *Invariant:* labels are an overlay for humans and disambiguation; credential existence is
   authoritative. Multiple connections per integration are first-class (labels distinguish them).
+- *Invariant:* every callable Connection has a non-empty initiation policy containing
+  `b10x`, `provider`, or both. `b10x` allows an operation caller (including the coding
+  harness) to start work through the Connection; `provider` allows the configured external system
+  to start an admitted inbound session or event path. Inactivity is a lifecycle state, never an
+  empty initiation policy.
+- *Invariant:* initiation policy and Grant authority are independent gates. Allowing
+  `b10x` does not grant `sip.dial` or any other operation; allowing `provider` does not grant
+  every inbound channel. The Connection answers *who may start*, then the Grant answers *which
+  reviewed member may run*.
+- *Invariant:* initiation is not the catalog operation's `direction`. `direction = write` describes
+  vendor-state effect; it cannot say which side is allowed to begin a connection.
 - Scope rationale: agent automation needs both the team's shared GitLab connection and a user's
   personal calendar; the industry models only end-user-owned connections, the predecessor only
   org-owned ones. We carry both, and grants decide who may exercise which.
@@ -270,6 +281,9 @@ dispatched → response or refusal out, audited.
   parses source of any kind (the predecessor's parse-back mistake, closed by construction).
 - *Invariant:* there is exactly one request-composition path; a consumer that edits a plan has
   become a second one, and that is refused by design (and by fence tests).
+- *Invariant:* caller-initiated planning additionally proves that the selected Connection admits
+  the `b10x` initiator. Provider-started session/channel admission proves `provider` on its
+  own path; neither path infers the other.
 
 ### Proxy
 

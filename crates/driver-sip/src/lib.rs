@@ -11,11 +11,11 @@ use domain::voice::{
     AudioFrame, ChannelSignal, ContextTrust, MediaDescriptor, ParticipantContext, TelephonySession,
     TerminationReason, VoiceError, VoiceRef,
 };
-use server::{AdmittedSipPlan, CredentialSet};
+use server::{AdmittedSipPlan, CredentialSet, SipSignalingTransport};
 use sipx_call::{CallEvent, Codecs, DialOptions, EndCause, Served};
 use sipx_media::{Interrupt, MediaSession, Playback};
 use sipx_sip::{Host, Uri};
-use sipx_transport::{Config, Target};
+use sipx_transport::{Config, Target, TransportKind};
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -104,7 +104,11 @@ pub async fn establish_outbound(
             return Err(DriverError::Credentials);
         }
     }
-    let target = Target::udp(route.target);
+    let transport = match route.signaling_transport {
+        SipSignalingTransport::Udp => TransportKind::Udp,
+        SipSignalingTransport::Tcp => TransportKind::Tcp,
+    };
+    let target = Target::new(route.target, transport);
     if cancelled.is_cancelled() {
         endpoint.shutdown().await;
         return Err(DriverError::Cancelled);
@@ -437,8 +441,8 @@ mod tests {
     use std::time::Duration;
 
     use domain::{
-        AdmittedOperation, Capability, Implementation, Interaction, OperationFacts, Placement,
-        ProtocolPlan, SipPlan, ZeroIoPlan,
+        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
     };
     use protocol::voice::Ready;
     use rtvbp::transport::memory::Config as RtvbpConfig;
@@ -472,7 +476,8 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                "connection-1",
+                ConnectionAuthority::new("connection-1", InitiationPolicy::b10x_only())
+                    .unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection-1".to_owned(),
@@ -494,6 +499,7 @@ mod tests {
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
                 target: callee.local_addr(),
+                signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
                 media_advertised: loopback(),
@@ -501,7 +507,7 @@ mod tests {
                 signaling_apertures: vec![all_loopback_ports.clone()],
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
-                development_loopback_only: true,
+                network_mode: server::SipNetworkMode::Loopback,
             },
         )
         .unwrap();
@@ -661,6 +667,7 @@ mod tests {
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
                 target: callee.local_addr(),
+                signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
                 media_advertised: loopback(),
@@ -668,7 +675,7 @@ mod tests {
                 signaling_apertures: vec![all_loopback_ports.clone()],
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
-                development_loopback_only: true,
+                network_mode: server::SipNetworkMode::Loopback,
             },
         )
         .unwrap();

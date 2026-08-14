@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use crate::ConnectionAuthority;
+
 /// Closed built-in driver identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DriverId {
@@ -78,7 +80,7 @@ pub struct AdmittedOperation {
     organization: String,
     principal: String,
     grant: String,
-    connection: String,
+    connection: ConnectionAuthority,
 }
 
 impl AdmittedOperation {
@@ -89,7 +91,7 @@ impl AdmittedOperation {
         organization: impl Into<String>,
         principal: impl Into<String>,
         grant: impl Into<String>,
-        connection: impl Into<String>,
+        connection: ConnectionAuthority,
     ) -> Self {
         Self {
             provider: provider.into(),
@@ -97,7 +99,7 @@ impl AdmittedOperation {
             organization: organization.into(),
             principal: principal.into(),
             grant: grant.into(),
-            connection: connection.into(),
+            connection,
         }
     }
 
@@ -122,6 +124,10 @@ impl AdmittedOperation {
     }
 
     pub fn connection(&self) -> &str {
+        self.connection.id()
+    }
+
+    pub fn connection_authority(&self) -> &ConnectionAuthority {
         &self.connection
     }
 }

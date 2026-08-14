@@ -113,29 +113,39 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
         .collect()
 }
 
-/// Runtime vocabulary may precede a provider, but the effective catalog may not advertise an
-/// ungrounded or undispatchable SIP member. Remove this guard only in the atomic change that adds
-/// the reviewed source/provenance, provider, generated artifacts, and serving composition.
+/// Native SIP enters the effective catalog through one reviewed, served member. A second member
+/// must make the same source/runtime case explicitly instead of inheriting permission from the
+/// existence of the driver vocabulary.
 #[test]
-fn no_sip_provider_is_advertised_before_its_atomic_catalog_change() {
-    fn contains_string(value: &Value, expected: &str) -> bool {
-        match value {
-            Value::String(value) => value == expected,
-            Value::Array(values) => values.iter().any(|value| contains_string(value, expected)),
-            Value::Object(values) => values
-                .values()
-                .any(|value| contains_string(value, expected)),
-            Value::Null | Value::Bool(_) | Value::Number(_) => false,
-        }
-    }
-
+fn sip_catalog_surface_is_the_bounded_dial_member() {
     let (workspace, plan) = full_plan();
-    for (provider, document) in documents(&workspace, &plan) {
-        assert!(
-            !contains_string(&document, "sip_v1"),
-            "`{provider}` advertises sip_v1 before the required atomic provider/runtime change"
-        );
-    }
+    let sip = documents(&workspace, &plan)
+        .into_iter()
+        .flat_map(|(provider, document)| {
+            document["operations"]
+                .as_array()
+                .expect("operations")
+                .iter()
+                .filter(|operation| operation["protocol_driver"] == "sip_v1")
+                .map(|operation| (provider.clone(), operation.clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sip.len(),
+        1,
+        "every SIP member needs an atomic source/runtime review"
+    );
+    let (provider, operation) = &sip[0];
+    assert_eq!(provider, "asterisk");
+    assert_eq!(operation["id"], "sip-dial");
+    assert_eq!(operation["interaction_shape"], "session_establishment");
+    assert_eq!(operation["risk"], "high");
+    assert_eq!(operation["idempotency"], "non_idempotent");
+    assert_eq!(operation["expose"], true);
+    assert!(operation.get("endpoint").is_none());
+    assert!(operation["request"].get("method").is_none());
+    assert!(operation["request"].get("path").is_none());
 }
 
 /// S-015 is a vocabulary migration, not a behavioural edit. The digest is the pre-migration

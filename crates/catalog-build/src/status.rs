@@ -317,7 +317,10 @@ pub fn of(connector: &Connector, operation: &Operation) -> Status {
     //    left the other invisible to every consumer of this status. The loader now refuses a variable
     //    no `[[config]]` field binds (C-86), so a provider reaching this point has declared what it
     //    needs — and the issue's job is to say the values are not *supplied* yet, naming all of them.
-    let unbound =
+    let unbound = if matches!(
+        operation.request,
+        connector_spec::OperationRequest::HttpV1 { .. }
+    ) {
         connector_spec::config::template_variables(connector.base_url_of(&operation.service))
             .into_iter()
             .filter(|variable| {
@@ -330,7 +333,10 @@ pub fn of(connector: &Connector, operation: &Operation) -> Status {
                         )
                 })
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     if !unbound.is_empty() {
         let named = unbound
             .iter()

@@ -1499,6 +1499,10 @@ fn endpoint_slots(
 ) -> Result<BTreeMap<String, BTreeSet<&'static str>>> {
     let mut slots: BTreeMap<String, BTreeSet<&'static str>> = BTreeMap::new();
 
+    if matches!(operation.request, OperationRequest::SipV1) {
+        return Ok(slots);
+    }
+
     let base = connector
         .base_url_of(&operation.service)
         .trim_end_matches('/');

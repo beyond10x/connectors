@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use domain::voice::{TerminationReason, VoiceSessionDescriptor};
+use protocol::sip::{SipDialEstablished, SipDialState};
 use rtvbp::{KeepalivePolicy, Transport as _};
 use rtvbp_voice_endpoint::bounded_ws::Bounds;
 use rtvbp_voice_endpoint::connect::connect_authenticated;
@@ -15,7 +16,7 @@ use rtvbp_voice_endpoint::{BindingError, ControlOutcome, VoiceEndpoint, PROFILE}
 use server::authority::{AuthorityIssuer, IssueRequest, ProofKey};
 use server::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute, VOICE_APPLICATION_PROFILE};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::Notify;
+use tokio::sync::{oneshot, Notify};
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
@@ -151,6 +152,57 @@ pub struct NoopObserver;
 
 impl VoiceObserver for NoopObserver {
     fn observe(&self, _observation: VoiceObservation<'_>) {}
+}
+
+/// Redaction-safe refusal when a dial invocation ends before it can return an established handle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("sip.dial ended before the voice session was established")]
+pub struct DialEstablishmentError;
+
+/// One-shot observer used by an operation server to return `sip.dial` as soon as both sides bind.
+pub struct DialEstablishmentObserver {
+    result: Mutex<Option<oneshot::Sender<Result<SipDialEstablished, DialEstablishmentError>>>>,
+}
+
+/// Awaitable half of [`dial_establishment_channel`].
+pub struct DialEstablishmentWaiter {
+    result: oneshot::Receiver<Result<SipDialEstablished, DialEstablishmentError>>,
+}
+
+/// Create the observer/waiter pair that bridges the supervised session to operation invocation.
+#[must_use]
+pub fn dial_establishment_channel() -> (DialEstablishmentObserver, DialEstablishmentWaiter) {
+    let (sender, result) = oneshot::channel();
+    (
+        DialEstablishmentObserver {
+            result: Mutex::new(Some(sender)),
+        },
+        DialEstablishmentWaiter { result },
+    )
+}
+
+impl DialEstablishmentWaiter {
+    /// Wait until the session is established or its supervisor reports a pre-establishment end.
+    pub async fn wait(self) -> Result<SipDialEstablished, DialEstablishmentError> {
+        self.result.await.unwrap_or(Err(DialEstablishmentError))
+    }
+}
+
+impl VoiceObserver for DialEstablishmentObserver {
+    fn observe(&self, observation: VoiceObservation<'_>) {
+        let result = match observation {
+            VoiceObservation::Established { descriptor } => Ok(SipDialEstablished {
+                call: descriptor.call.as_str().to_owned(),
+                session: descriptor.session.as_str().to_owned(),
+                channel: descriptor.channel.as_str().to_owned(),
+                state: SipDialState::Established,
+            }),
+            VoiceObservation::Terminated { .. } => Err(DialEstablishmentError),
+        };
+        if let Some(sender) = lock(&self.result).take() {
+            let _ = sender.send(result);
+        }
+    }
 }
 
 /// Finite transport and liveness policy for one runtime generation.

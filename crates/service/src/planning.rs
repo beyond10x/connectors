@@ -5,8 +5,8 @@ use connector_resolve::document::{
     RequiredCapability,
 };
 use domain::{
-    AdmittedOperation, Capability, DriverId, HttpPlan, Implementation, Interaction, OperationFacts,
-    Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
+    AdmittedOperation, Capability, ConnectionInitiator, DriverId, HttpPlan, Implementation,
+    Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
 };
 
 /// Deployment facts consulted during pure planning.
@@ -31,6 +31,8 @@ pub enum PlanError {
     CapabilityUnavailable(&'static str),
     #[error("operation has no reviewed permission subject")]
     PermissionSubjectMissing,
+    #[error("Connection does not permit B10x to initiate operations")]
+    ConnectionInitiationRefused,
 }
 
 /// Produce the complete inert plan after grant admission and before credentials or I/O.
@@ -51,6 +53,13 @@ pub fn plan_operation(
             admitted: admission.operation().to_owned(),
             catalog: operation.id.clone(),
         });
+    }
+    if !admission
+        .connection_authority()
+        .initiation()
+        .allows(ConnectionInitiator::B10x)
+    {
+        return Err(PlanError::ConnectionInitiationRefused);
     }
 
     let driver = driver_of(operation);
@@ -155,6 +164,7 @@ fn capability_word(value: Capability) -> &'static str {
 mod tests {
     use super::*;
     use connector_resolve::document::Document;
+    use domain::{ConnectionAuthority, InitiationPolicy};
 
     fn document(driver: &str, shape: &str, request: &str) -> Document {
         Document::parse(&format!(
@@ -174,15 +184,19 @@ mod tests {
         .expect("fixture document parses")
     }
 
-    fn admission() -> AdmittedOperation {
+    fn admission_with(initiation: InitiationPolicy) -> AdmittedOperation {
         AdmittedOperation::from_grant_decision(
             "acme",
             "acme-call",
             "org-1",
             "principal-1",
             "grant-1",
-            "connection-1",
+            ConnectionAuthority::new("connection-1", initiation).unwrap(),
         )
+    }
+
+    fn admission() -> AdmittedOperation {
+        admission_with(InitiationPolicy::b10x_only())
     }
 
     fn environment(driver: DriverId) -> PlanningEnvironment {
@@ -219,5 +233,33 @@ mod tests {
         )
         .expect_err("missing SIP driver refuses");
         assert_eq!(error, PlanError::DriverUnavailable("sip_v1"));
+    }
+
+    #[test]
+    fn provider_only_connection_refuses_a_caller_initiated_operation() {
+        let document = document("sip_v1", "session_establishment", "{}");
+        let operation = document.operation("acme-call").expect("operation");
+        let error = plan_operation(
+            "acme",
+            operation,
+            admission_with(InitiationPolicy::provider_only()),
+            &environment(DriverId::SipV1),
+        )
+        .expect_err("provider-only connection refuses outbound start");
+        assert_eq!(error, PlanError::ConnectionInitiationRefused);
+    }
+
+    #[test]
+    fn bidirectional_connection_still_requires_the_operation_admission() {
+        let document = document("sip_v1", "session_establishment", "{}");
+        let operation = document.operation("acme-call").expect("operation");
+        let plan = plan_operation(
+            "acme",
+            operation,
+            admission_with(InitiationPolicy::bidirectional()),
+            &environment(DriverId::SipV1),
+        )
+        .expect("B10x is one allowed initiator");
+        assert_eq!(plan.admission().grant(), "grant-1");
     }
 }

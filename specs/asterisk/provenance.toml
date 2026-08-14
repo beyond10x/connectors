@@ -9,6 +9,7 @@ source_commit = "f0e408a7b0d829c85bf15fa4b487870a50cb3000"
 source_url = "https://raw.githubusercontent.com/asterisk/asterisk/f0e408a7b0d829c85bf15fa4b487870a50cb3000"
 upstream_license = "GPL-2.0-only"
 raw_document_count = 11
+sip_sample_count = 2
 source_path_count = 76
 source_operation_count = 109
 rest_operation_count = 108
@@ -28,6 +29,18 @@ path = "resources.json"
 source_url = "https://raw.githubusercontent.com/asterisk/asterisk/f0e408a7b0d829c85bf15fa4b487870a50cb3000/rest-api/resources.json"
 sha256 = "76411a27e9cf97ff6271f8e27fb4c005c3cff3c1338ee3b082e6cbc90d78bcbe"
 bytes = 1266
+
+[[source_files]]
+path = "samples/pjsip.conf.sample"
+source_url = "https://raw.githubusercontent.com/asterisk/asterisk/f0e408a7b0d829c85bf15fa4b487870a50cb3000/configs/samples/pjsip.conf.sample"
+sha256 = "adadb59def8a8fc51a28fb511dfbcdde121f1fe1f72bde6bc2dfd87b7a78a0f8"
+bytes = 91057
+
+[[source_files]]
+path = "samples/rtp.conf.sample"
+source_url = "https://raw.githubusercontent.com/asterisk/asterisk/f0e408a7b0d829c85bf15fa4b487870a50cb3000/configs/samples/rtp.conf.sample"
+sha256 = "9f9a8a0d492915a1f7d2cd47afd0b7a4f1914589d3f7a193fc0f7c443afa9aa7"
+bytes = 7894
 
 [[source_files]]
 path = "api-docs/applications.json"
