@@ -47,7 +47,7 @@ unchecked acceptance items below name the remaining web and verifier arms.
       and no-network fences). The workflow states why in a comment, so the step is not later removed
       as redundant.
 - [x] A job builds and tests the workspace **on the declared MSRV toolchain**, so `rust-version` stops
-      being an unchecked number. If the workspace does not build on 1.87, the declared MSRV moves to
+      being an unchecked number. If the workspace does not build on 1.88, the declared MSRV moves to
       the version that does — the fence's point is that the number is *true*, not that it is low —
       and `msrv_fence.rs`'s "there is no CI yet at all" paragraph is corrected to describe the
       coverage that now exists.
@@ -65,7 +65,7 @@ unchecked acceptance items below name the remaining web and verifier arms.
       observed failing is a gate nobody has tested.
 
 ## Progress
-- Landed the pinned Rust 1.97.0 and MSRV 1.87.0 jobs, link/story governance checks, locked prefetch,
+- Landed the pinned Rust 1.97.0 and MSRV 1.88.0 jobs, link/story governance checks, locked prefetch,
   build, tests, clippy, format, catalogue rebuild, drift rejection, and S-003's independent offline
   lock/input/artifact verification. The verifier's seeded artifact mutation supplies the catalogue
   arm's failing-first evidence.

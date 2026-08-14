@@ -313,6 +313,53 @@ pub enum ProtocolDriver {
     SipV1,
 }
 
+/// Driver-specific request facts for one operation.
+///
+/// This is flattened into the canonical IR so existing HTTP operations retain their wire spelling
+/// (`protocol_driver`, `method`, `path`) while the Rust type makes an incoherent combination such
+/// as `sip_v1` plus an HTTP method impossible to construct. A SIP operation deliberately has no
+/// HTTP request fields: its bounded destination and call parameters live in [`Operation::params`]
+/// and are interpreted only by the closed SIP driver after admission.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "protocol_driver", rename_all = "snake_case")]
+pub enum OperationRequest {
+    /// One HTTP request template.
+    HttpV1 {
+        /// The HTTP method.
+        method: HttpMethod,
+        /// The path template relative to the service base URL.
+        path: String,
+    },
+    /// One admitted SIP call-establishment request.
+    SipV1,
+}
+
+impl OperationRequest {
+    /// The closed driver selected by this request shape.
+    pub const fn driver(&self) -> ProtocolDriver {
+        match self {
+            Self::HttpV1 { .. } => ProtocolDriver::HttpV1,
+            Self::SipV1 => ProtocolDriver::SipV1,
+        }
+    }
+
+    /// The HTTP method when this is an HTTP request.
+    pub const fn http_method(&self) -> Option<HttpMethod> {
+        match self {
+            Self::HttpV1 { method, .. } => Some(*method),
+            Self::SipV1 => None,
+        }
+    }
+
+    /// The HTTP path when this is an HTTP request.
+    pub fn http_path(&self) -> Option<&str> {
+        match self {
+            Self::HttpV1 { path, .. } => Some(path),
+            Self::SipV1 => None,
+        }
+    }
+}
+
 /// Where an operation must be served; deployment policy chooses a matching instance later.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1079,13 +1126,12 @@ fn is_false(value: &bool) -> bool {
 /// the defect class C-186 was filed for, and duplicating it here would have re-enacted it.
 pub const MIN_REPEATABILITY_CONDITION: usize = 24;
 
-/// One operation: a single HTTP call, and everything a Flux `op` declaration needs to wrap it.
+/// One operation and the closed driver request it dispatches.
 ///
 /// `description`, `risk` and `idempotency` map straight onto the metadata a Flux composite op
 /// declares (`op … description "…" risk "low" idempotency "idempotent"`), which is also the
 /// `ToolSpec` surface flux exposes to a model.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Operation {
     /// The op name, e.g. `babelforce.call.list`. This is a **stable public contract**: users and
     /// models call it by name, so it must survive regeneration and must not be derived from a
@@ -1102,20 +1148,14 @@ pub struct Operation {
     /// selection non-partitioning, so "the s3 service" would stop being answerable by set membership.
     /// An operation that genuinely serves two services is duplicated deliberately with two ids —
     /// which is visible in a diff — rather than resolved by a rule nobody can see.
-    #[serde(
-        default = "default_service",
-        skip_serializing_if = "is_default_service"
-    )]
     pub service: String,
-    /// The HTTP method.
-    pub method: HttpMethod,
+    /// Driver-specific request facts. Flattened so `protocol_driver` remains a first-class public
+    /// field while impossible cross-driver field combinations stay unrepresentable.
+    pub request: OperationRequest,
     /// Whether the operation reads or may change vendor state. Required and never inferred from
     /// [`Self::method`], its name, risk, idempotency, semantic effects, or exposure.
     pub direction: OperationDirection,
-    /// The path template, relative to the connector's base URL (`/v2/calls/{call_id}`).
-    pub path: String,
     /// What the operation does, in one line. Reaches the model as the tool description.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
     /// How much damage the operation can do. See [`Risk`].
     pub risk: Risk,
@@ -1125,12 +1165,9 @@ pub struct Operation {
     pub effects: Vec<HostEffect>,
     /// What executing this operation means to Flux policy, independently of the host resources it
     /// touches. Empty means no semantic consequence has been declared.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub semantic_effects: Vec<SemanticEffect>,
     /// The operation's lifecycle, independently of its protocol and placement.
     pub interaction_shape: InteractionShape,
-    /// The closed, versioned protocol implementation.
-    pub protocol_driver: ProtocolDriver,
     /// A placement requirement, not a deployment-selected destination.
     pub placement_requirement: PlacementRequirement,
     /// How the protocol implementation is supplied.
@@ -1171,7 +1208,6 @@ pub struct Operation {
     /// be two spellings of one thing, and `skip_serializing_if` keeps every `ir_sha256` in the
     /// repository exactly where it was for the operations that do not use it — asserted by
     /// `tests/ir_roundtrip.rs`, not merely claimed here.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repeatable_because: Option<String>,
     /// **Whether this operation reaches a model as an LLM tool.**
     ///
@@ -1219,7 +1255,6 @@ pub struct Operation {
     /// It is **not a curation mechanism in the loader**. Nothing here decides *which* operations a
     /// build compiles; that is selection, it stays opt-in, and it belongs to C-411. This field says
     /// what happens to an operation that was already selected.
-    #[serde(default = "exposed", skip_serializing_if = "is_exposed")]
     pub expose: bool,
     /// Which auth this operation requires, as a set of **alternatives** (OR); each alternative is
     /// an [`AuthRequirement`] — one mechanism — whose credentials must all be satisfied together
@@ -1237,13 +1272,10 @@ pub struct Operation {
     /// Collapsing the two empty cases into one would make an unauthenticated endpoint
     /// inexpressible on a connector that has a default, which is most of them. Use
     /// [`Connector::effective_auth`] to resolve the inheritance rather than reading this directly.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<Vec<AuthRequirement>>,
     /// The request parameters, grouped by position.
-    #[serde(default, skip_serializing_if = "ParamSet::is_empty")]
     pub params: ParamSet,
     /// The JSON Schema of a successful response body, when the spec publishes one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_schema: Option<JsonSchema>,
     /// **Where in this operation's own response a credential arrives** — one location per entry,
     /// each a [`response_location_exists`] pointer into [`response_schema`](Self::response_schema).
@@ -1287,7 +1319,6 @@ pub struct Operation {
     /// documents for the same reason.
     ///
     /// [C-79]: ../../../docs/stories/C-79-sensitive-response-fields.md
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub credential_response: Vec<String>,
     /// **This operation's whole purpose is to mint a credential**, and this says which one and
     /// where in the vendor's answer it arrives — C-136's declaration.
@@ -1327,17 +1358,182 @@ pub struct Operation {
     /// and none of the generated artifacts — the same property
     /// [`credential_response`](Self::credential_response) and [`Operation::expose`] document, for
     /// the same reason.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub produces_credential: Option<ProducedCredential>,
     /// How this endpoint paginates, when it returns a collection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pagination: Option<Pagination>,
     /// The endpoint's published rate limit.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_limit: Option<RateLimit>,
     /// Where structured vendor errors carry their code and message.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_envelope: Option<ErrorEnvelope>,
+}
+
+impl Serialize for Operation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap as _;
+
+        // Keep the established HTTP key order byte-for-byte: connector lock hashes cover encoded
+        // IR, and adding a second driver must not churn every existing connector. SIP omits the two
+        // HTTP-only entries while retaining the shared fields in the same relative order.
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("id", &self.id)?;
+        if !is_default_service(&self.service) {
+            map.serialize_entry("service", &self.service)?;
+        }
+        if let OperationRequest::HttpV1 { method, .. } = &self.request {
+            map.serialize_entry("method", method)?;
+        }
+        map.serialize_entry("direction", &self.direction)?;
+        if let OperationRequest::HttpV1 { path, .. } = &self.request {
+            map.serialize_entry("path", path)?;
+        }
+        if !self.description.is_empty() {
+            map.serialize_entry("description", &self.description)?;
+        }
+        map.serialize_entry("risk", &self.risk)?;
+        map.serialize_entry("idempotency", &self.idempotency)?;
+        map.serialize_entry("effects", &self.effects)?;
+        if !self.semantic_effects.is_empty() {
+            map.serialize_entry("semantic_effects", &self.semantic_effects)?;
+        }
+        map.serialize_entry("interaction_shape", &self.interaction_shape)?;
+        map.serialize_entry("protocol_driver", &self.request.driver())?;
+        map.serialize_entry("placement_requirement", &self.placement_requirement)?;
+        map.serialize_entry("implementation_form", &self.implementation_form)?;
+        map.serialize_entry("required_capabilities", &self.required_capabilities)?;
+        if let Some(value) = &self.repeatable_because {
+            map.serialize_entry("repeatable_because", value)?;
+        }
+        if !is_exposed(&self.expose) {
+            map.serialize_entry("expose", &self.expose)?;
+        }
+        if let Some(value) = &self.auth {
+            map.serialize_entry("auth", value)?;
+        }
+        if !self.params.is_empty() {
+            map.serialize_entry("params", &self.params)?;
+        }
+        if let Some(value) = &self.response_schema {
+            map.serialize_entry("response_schema", value)?;
+        }
+        if !self.credential_response.is_empty() {
+            map.serialize_entry("credential_response", &self.credential_response)?;
+        }
+        if let Some(value) = &self.produces_credential {
+            map.serialize_entry("produces_credential", value)?;
+        }
+        if let Some(value) = &self.pagination {
+            map.serialize_entry("pagination", value)?;
+        }
+        if let Some(value) = &self.rate_limit {
+            map.serialize_entry("rate_limit", value)?;
+        }
+        if let Some(value) = &self.error_envelope {
+            map.serialize_entry("error_envelope", value)?;
+        }
+        map.end()
+    }
+}
+
+/// Deserialization spelling for [`Operation`]. Serde cannot combine `deny_unknown_fields` with a
+/// flattened internally-tagged enum reliably, so this explicit wire shape keeps typo refusal while
+/// constructing the closed driver union only after all top-level fields have been read.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationWire {
+    id: String,
+    #[serde(default = "default_service")]
+    service: String,
+    #[serde(default)]
+    method: Option<HttpMethod>,
+    direction: OperationDirection,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    description: String,
+    risk: Risk,
+    idempotency: Idempotency,
+    effects: Vec<HostEffect>,
+    #[serde(default)]
+    semantic_effects: Vec<SemanticEffect>,
+    interaction_shape: InteractionShape,
+    protocol_driver: ProtocolDriver,
+    placement_requirement: PlacementRequirement,
+    implementation_form: ImplementationForm,
+    required_capabilities: Vec<RequiredCapability>,
+    #[serde(default)]
+    repeatable_because: Option<String>,
+    #[serde(default = "exposed")]
+    expose: bool,
+    #[serde(default)]
+    auth: Option<Vec<AuthRequirement>>,
+    #[serde(default)]
+    params: ParamSet,
+    #[serde(default)]
+    response_schema: Option<JsonSchema>,
+    #[serde(default)]
+    credential_response: Vec<String>,
+    #[serde(default)]
+    produces_credential: Option<ProducedCredential>,
+    #[serde(default)]
+    pagination: Option<Pagination>,
+    #[serde(default)]
+    rate_limit: Option<RateLimit>,
+    #[serde(default)]
+    error_envelope: Option<ErrorEnvelope>,
+}
+
+impl<'de> Deserialize<'de> for Operation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = OperationWire::deserialize(deserializer)?;
+        let request = match (wire.protocol_driver, wire.method, wire.path) {
+            (ProtocolDriver::HttpV1, Some(method), Some(path)) => {
+                OperationRequest::HttpV1 { method, path }
+            }
+            (ProtocolDriver::HttpV1, None, _) => {
+                return Err(serde::de::Error::missing_field("method"));
+            }
+            (ProtocolDriver::HttpV1, Some(_), None) => {
+                return Err(serde::de::Error::missing_field("path"));
+            }
+            (ProtocolDriver::SipV1, None, None) => OperationRequest::SipV1,
+            (ProtocolDriver::SipV1, _, _) => {
+                return Err(serde::de::Error::custom(
+                    "sip_v1 operation refuses HTTP-only `method` and `path`",
+                ));
+            }
+        };
+        Ok(Self {
+            id: wire.id,
+            service: wire.service,
+            request,
+            direction: wire.direction,
+            description: wire.description,
+            risk: wire.risk,
+            idempotency: wire.idempotency,
+            effects: wire.effects,
+            semantic_effects: wire.semantic_effects,
+            interaction_shape: wire.interaction_shape,
+            placement_requirement: wire.placement_requirement,
+            implementation_form: wire.implementation_form,
+            required_capabilities: wire.required_capabilities,
+            repeatable_because: wire.repeatable_because,
+            expose: wire.expose,
+            auth: wire.auth,
+            params: wire.params,
+            response_schema: wire.response_schema,
+            credential_response: wire.credential_response,
+            produces_credential: wire.produces_credential,
+            pagination: wire.pagination,
+            rate_limit: wire.rate_limit,
+            error_envelope: wire.error_envelope,
+        })
+    }
 }
 
 /// **A credential an operation mints**: where the secret arrives, and which declared credential it

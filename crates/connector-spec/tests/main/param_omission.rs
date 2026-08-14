@@ -211,8 +211,8 @@ omit.query = [\"filters.q\"]
     let after = narrowed
         .operation("babelforce-call-list")
         .expect("selected");
-    assert_eq!(before.method, after.method);
-    assert_eq!(before.path, after.path);
+    assert_eq!(before.request.http_method(), after.request.http_method());
+    assert_eq!(before.request.http_path(), after.request.http_path());
     assert_eq!(before.description, after.description);
     assert_eq!(before.response_schema, after.response_schema);
     assert_eq!(before.params.query.len(), after.params.query.len() + 1);

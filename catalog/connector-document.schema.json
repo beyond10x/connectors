@@ -147,6 +147,29 @@
     },
     "channel": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "not": {
+              "required": [
+                "session"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "transport": {
+                "const": "session"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "session"
+            ]
+          }
+        }
+      ],
       "properties": {
         "connect": {
           "type": "object"
@@ -216,6 +239,9 @@
           "minLength": 1,
           "type": "string"
         },
+        "session": {
+          "$ref": "#/$defs/session_binding"
+        },
         "setup": {
           "type": "object"
         },
@@ -226,7 +252,8 @@
           "enum": [
             "webhook",
             "socket",
-            "poll"
+            "poll",
+            "session"
           ]
         },
         "verification": {
@@ -437,6 +464,60 @@
       ],
       "type": "object"
     },
+    "http_request": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/body"
+        },
+        "headers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/value_template"
+          },
+          "type": "object"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "query": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "value": {
+                "$ref": "#/$defs/value_template"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "url": {
+          "pattern": "^\\{base\\}/",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "url"
+      ],
+      "type": "object"
+    },
     "json_schema": {
       "description": "A JSON Schema value, carried verbatim from the vendor's declaration.",
       "type": [
@@ -503,6 +584,40 @@
     },
     "operation": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": {
+                "const": "http_v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "request": {
+                "$ref": "#/$defs/http_request"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": {
+                "const": "sip_v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "request": {
+                "$ref": "#/$defs/sip_request"
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "auth": {
           "$ref": "#/$defs/requirements"
@@ -622,7 +737,7 @@
           "type": "string"
         },
         "request": {
-          "$ref": "#/$defs/request"
+          "type": "object"
         },
         "required_capabilities": {
           "items": {
@@ -841,60 +956,6 @@
       ],
       "type": "object"
     },
-    "request": {
-      "additionalProperties": false,
-      "properties": {
-        "body": {
-          "$ref": "#/$defs/body"
-        },
-        "headers": {
-          "additionalProperties": {
-            "$ref": "#/$defs/value_template"
-          },
-          "type": "object"
-        },
-        "method": {
-          "enum": [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE",
-            "HEAD",
-            "OPTIONS"
-          ]
-        },
-        "query": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "value": {
-                "$ref": "#/$defs/value_template"
-              }
-            },
-            "required": [
-              "name",
-              "value"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "url": {
-          "pattern": "^\\{base\\}/",
-          "type": "string"
-        }
-      },
-      "required": [
-        "method",
-        "url"
-      ],
-      "type": "object"
-    },
     "requirements": {
       "description": "Auth alternatives: OR of AND-groups of declared credential names.",
       "items": {
@@ -991,6 +1052,56 @@
         "name",
         "base_url"
       ],
+      "type": "object"
+    },
+    "session_binding": {
+      "additionalProperties": false,
+      "properties": {
+        "implementation_form": {
+          "const": "built_in"
+        },
+        "interaction_shape": {
+          "const": "session_establishment"
+        },
+        "placement_requirement": {
+          "enum": [
+            "connectors_deployment",
+            "substrate_workload",
+            "federated_satellite"
+          ]
+        },
+        "protocol_driver": {
+          "const": "sip_v1"
+        },
+        "required_capabilities": {
+          "items": {
+            "enum": [
+              "public_network",
+              "private_network",
+              "unix_socket",
+              "file_secret",
+              "process",
+              "container",
+              "device"
+            ]
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "interaction_shape",
+        "protocol_driver",
+        "placement_requirement",
+        "implementation_form",
+        "required_capabilities"
+      ],
+      "type": "object"
+    },
+    "sip_request": {
+      "description": "SIP driver request marker. HTTP-shaped request facts are structurally impossible.",
+      "maxProperties": 0,
       "type": "object"
     },
     "token_endpoint_workaround": {

@@ -26,6 +26,21 @@ path = "web/package.schema.json"
 [[schema]]
 path = "web/package-lock.schema.json"
 
+[[schema]]
+path = "contracts/voice-session/v0alpha1/voice-session.schema.json"
+
+[[schema]]
+path = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
+path = "contracts/voice-session/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
+
+[[schema]]
+path = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
+
 [[document]]
 pattern = "catalog/*.catalog.json"
 schema = "catalog/connector-document.schema.json"
@@ -41,6 +56,26 @@ schema = "web/package.schema.json"
 [[document]]
 path = "web/package-lock.json"
 schema = "web/package-lock.schema.json"
+
+[[document]]
+path = "contracts/voice-session/v0alpha1/vectors.json"
+schema = "contracts/voice-session/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/voice-session/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/manifest.json"
+schema = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/vectors.json"
+schema = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
 
 # Generated and intentionally git-ignored. `catalog build` validates the same bytes before writing;
 # the governance audit validates the file too whenever it exists in the working tree.

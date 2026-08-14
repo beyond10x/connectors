@@ -50,9 +50,9 @@ use serde_json::{json, Value};
 use connector_spec::{
     AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector, ErrorEnvelope,
     HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape, ManualSetup,
-    OAuthGrant, OAuthRedirect, Operation, OperationDirection, Pagination, Param,
-    PlacementRequirement, ProtocolDriver, RateLimit, RequiredCapability, Risk, Role,
-    SemanticEffect, Service, SocketConnectSpec, Subscription, Tag, TokenEndpointWorkaround,
+    OAuthGrant, OAuthRedirect, Operation, OperationDirection, OperationRequest, Pagination, Param,
+    PlacementRequirement, RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service,
+    SessionBinding, SocketConnectSpec, Subscription, Tag, TokenEndpointWorkaround,
     VerificationScheme, FREE_FORM_BODY,
 };
 
@@ -247,7 +247,11 @@ struct DocOperation<'a> {
     /// Explicit even when empty: "none declared" is an answer, not an absence.
     semantic_effects: &'a [SemanticEffect],
     interaction_shape: &'a InteractionShape,
-    protocol_driver: &'a ProtocolDriver,
+    /// Driver and request are one discriminated shape. Flattening preserves the established HTTP
+    /// document spelling while making a SIP operation structurally unable to carry an HTTP
+    /// method, URL, headers, or query.
+    #[serde(flatten)]
+    protocol: DocProtocolOperation<'a>,
     placement_requirement: &'a PlacementRequirement,
     implementation_form: &'a ImplementationForm,
     required_capabilities: &'a [RequiredCapability],
@@ -270,7 +274,6 @@ struct DocOperation<'a> {
     /// from the document rather than only from the provider TOML.
     #[serde(skip_serializing_if = "Option::is_none")]
     produces_credential: Option<DocProducedCredential<'a>>,
-    request: DocRequest<'a>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     params: Vec<DocParam<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -288,9 +291,22 @@ struct DocOperation<'a> {
     error_envelope: Option<&'a ErrorEnvelope>,
 }
 
-/// **The request template** — the data equivalent of the emitted Flux body.
+/// Driver-specific request facts, flattened into one operation.
 #[derive(Serialize)]
-struct DocRequest<'a> {
+#[serde(tag = "protocol_driver", rename_all = "snake_case")]
+enum DocProtocolOperation<'a> {
+    HttpV1 { request: DocHttpRequest<'a> },
+    SipV1 { request: DocSipRequest },
+}
+
+/// The admitted SIP request carries no HTTP-shaped data. Call arguments remain in the operation's
+/// declared parameter contract and become a bounded driver plan only after grant admission.
+#[derive(Serialize)]
+struct DocSipRequest {}
+
+/// **The HTTP request template** — the data equivalent of the emitted Flux body.
+#[derive(Serialize)]
+struct DocHttpRequest<'a> {
     method: &'a HttpMethod,
     /// `{base}` plus the vendor path, each placeholder renamed to the caller-facing parameter
     /// name or the endpoint slot it interpolates.
@@ -403,6 +419,8 @@ struct DocChannel<'a> {
     #[serde(skip_serializing_if = "str::is_empty")]
     description: &'a str,
     transport: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session: Option<&'a SessionBinding>,
     #[serde(skip_serializing_if = "Option::is_none")]
     connect: Option<&'a SocketConnectSpec>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -722,6 +740,7 @@ fn doc_channel<'a>(connector: &Connector, channel: &'a ChannelBinding) -> DocCha
         oip: member_oip(connector, &channel.service, &channel.name),
         description: &channel.description,
         transport: crate::inbound::transport_token(channel.transport),
+        session: channel.session.as_ref(),
         connect: channel.connect.as_ref(),
         events: channel.events.iter().map(String::as_str).collect(),
         cursor: channel.cursor.as_deref(),
@@ -799,7 +818,7 @@ fn doc_operation<'a>(
     let contract = crate::contract::contract_of(operation)?;
 
     let params = doc_params(operation, &contract.symbols)?;
-    let request = request_template(operation, &pins)?;
+    let protocol = request_template(operation, &pins)?;
     let endpoint = endpoint_slots(connector, operation, &pins)?;
 
     Ok(DocOperation {
@@ -813,7 +832,7 @@ fn doc_operation<'a>(
         repeatability_condition: operation.repeatability_condition(),
         semantic_effects: &operation.semantic_effects,
         interaction_shape: &operation.interaction_shape,
-        protocol_driver: &operation.protocol_driver,
+        protocol,
         placement_requirement: &operation.placement_requirement,
         implementation_form: &operation.implementation_form,
         required_capabilities: &operation.required_capabilities,
@@ -830,7 +849,6 @@ fn doc_operation<'a>(
                 secret: &produced.secret,
             }
         }),
-        request,
         params,
         // The *effective* schema, so a credential-minting operation's document promises the
         // handle, never the secret (C-136/C-430).
@@ -933,9 +951,9 @@ fn pins_of<'a>(connector: &'a Connector, operation: &'a Operation) -> Vec<DocPin
         .config_of(&operation.service)
         .flat_map(|field| field.pins())
         .filter(|pin| match pin.position {
-            connector_spec::Position::Path => {
-                connector_spec::config::template_variables(&operation.path).contains(&pin.name)
-            }
+            connector_spec::Position::Path => operation.request.http_path().is_some_and(|path| {
+                connector_spec::config::template_variables(path).contains(&pin.name)
+            }),
             connector_spec::Position::Query | connector_spec::Position::Header => true,
         })
         .map(|pin| DocPin {
@@ -951,9 +969,17 @@ fn param_splice(name: &str) -> Value {
     json!({ "$param": name })
 }
 
-fn request_template<'a>(operation: &'a Operation, pins: &[DocPin<'a>]) -> Result<DocRequest<'a>> {
+fn request_template<'a>(
+    operation: &'a Operation,
+    pins: &[DocPin<'a>],
+) -> Result<DocProtocolOperation<'a>> {
+    let OperationRequest::HttpV1 { method, path } = &operation.request else {
+        return Ok(DocProtocolOperation::SipV1 {
+            request: DocSipRequest {},
+        });
+    };
     let set = &operation.params;
-    let url = format!("{{base}}{}", path_template(operation, pins)?);
+    let url = format!("{{base}}{}", path_template(operation, path, pins)?);
 
     // The structured query record, in the emitted record's own order: BTreeMap over wire names.
     let mut query: BTreeMap<&str, Value> = BTreeMap::new();
@@ -1009,26 +1035,28 @@ fn request_template<'a>(operation: &'a Operation, pins: &[DocPin<'a>]) -> Result
 
     let body = body_template(operation)?;
 
-    Ok(DocRequest {
-        method: &operation.method,
-        url,
-        headers,
-        query: query
-            .into_iter()
-            .map(|(name, value)| DocQueryEntry { name, value })
-            .collect(),
-        body,
+    Ok(DocProtocolOperation::HttpV1 {
+        request: DocHttpRequest {
+            method,
+            url,
+            headers,
+            query: query
+                .into_iter()
+                .map(|(name, value)| DocQueryEntry { name, value })
+                .collect(),
+            body,
+        },
     })
 }
 
 /// The vendor path with each `{wire}` renamed to the caller-facing parameter name or the pin's
 /// slot variable — `connector-flux`'s `path_template`, writing template names instead of Flux
 /// symbols. Both directions of mismatch are refused for the emitter's reasons.
-fn path_template(operation: &Operation, pins: &[DocPin<'_>]) -> Result<String> {
+fn path_template(operation: &Operation, path: &str, pins: &[DocPin<'_>]) -> Result<String> {
     let path_params = &operation.params.path;
     let mut out = String::new();
     let mut used = vec![false; path_params.len()];
-    let mut rest = operation.path.as_str();
+    let mut rest = path;
 
     while let Some(open) = rest.find('{') {
         out.push_str(&rest[..open]);
@@ -1037,7 +1065,7 @@ fn path_template(operation: &Operation, pins: &[DocPin<'_>]) -> Result<String> {
             bail!(
                 "operation `{}`'s path {:?} has an unterminated placeholder",
                 operation.id,
-                operation.path
+                path
             );
         };
         let wire = &after[..close];
@@ -1713,7 +1741,7 @@ pub fn schema() -> &'static Value {
                             "enum": ["declared", "no-credential-required", "no-credential"]
                         },
                         "produces_credential": { "$ref": "#/$defs/produces_credential" },
-                        "request": { "$ref": "#/$defs/request" },
+                        "request": { "type": "object" },
                         "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
                         "response_schema": { "$ref": "#/$defs/json_schema" },
                         "endpoint": {
@@ -1729,6 +1757,16 @@ pub fn schema() -> &'static Value {
                         "error_envelope": { "$ref": "#/$defs/error_envelope" }
                     },
                     "required": ["id", "service", "direction", "risk", "idempotency", "effects", "semantic_effects", "interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities", "contract", "expose", "auth", "credential_requirement", "request"],
+                    "allOf": [
+                        {
+                            "if": { "properties": { "protocol_driver": { "const": "http_v1" } } },
+                            "then": { "properties": { "request": { "$ref": "#/$defs/http_request" } } }
+                        },
+                        {
+                            "if": { "properties": { "protocol_driver": { "const": "sip_v1" } } },
+                            "then": { "properties": { "request": { "$ref": "#/$defs/sip_request" } } }
+                        }
+                    ],
                     "additionalProperties": false
                 },
                 "contract": {
@@ -1751,7 +1789,7 @@ pub fn schema() -> &'static Value {
                     "required": ["credential", "secret"],
                     "additionalProperties": false
                 },
-                "request": {
+                "http_request": {
                     "type": "object",
                     "properties": {
                         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
@@ -1773,6 +1811,11 @@ pub fn schema() -> &'static Value {
                     },
                     "required": ["method", "url"],
                     "additionalProperties": false
+                },
+                "sip_request": {
+                    "description": "SIP driver request marker. HTTP-shaped request facts are structurally impossible.",
+                    "type": "object",
+                    "maxProperties": 0
                 },
                 "param_splice": {
                     "description": "The whole value of the named caller parameter.",
@@ -1934,7 +1977,8 @@ pub fn schema() -> &'static Value {
                         "service": { "type": "string", "minLength": 1 },
                         "oip": { "type": "string" },
                         "description": { "type": "string" },
-                        "transport": { "enum": ["webhook", "socket", "poll"] },
+                        "transport": { "enum": ["webhook", "socket", "poll", "session"] },
+                        "session": { "$ref": "#/$defs/session_binding" },
                         "connect": { "type": "object" },
                         "events": { "type": "array", "items": { "type": "string" } },
                         "cursor": { "type": "string" },
@@ -1968,6 +2012,25 @@ pub fn schema() -> &'static Value {
                         "setup": { "type": "object" }
                     },
                     "required": ["name", "service", "transport", "verification"],
+                    "allOf": [
+                        {
+                            "if": { "properties": { "transport": { "const": "session" } } },
+                            "then": { "required": ["session"] },
+                            "else": { "not": { "required": ["session"] } }
+                        }
+                    ],
+                    "additionalProperties": false
+                },
+                "session_binding": {
+                    "type": "object",
+                    "properties": {
+                        "interaction_shape": { "const": "session_establishment" },
+                        "protocol_driver": { "const": "sip_v1" },
+                        "placement_requirement": { "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"] },
+                        "implementation_form": { "const": "built_in" },
+                        "required_capabilities": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"] } }
+                    },
+                    "required": ["interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities"],
                     "additionalProperties": false
                 },
                 "selector": {

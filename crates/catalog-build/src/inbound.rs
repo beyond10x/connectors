@@ -49,6 +49,8 @@ pub(crate) enum Verification {
     /// a signature to check and neither states one. This is the unset arm of the tri-state, and it
     /// is a positive answer rather than the absence of one.
     Connection,
+    /// A direct-byte session is authenticated by its proof-bound, one-shot session authority.
+    SessionAuthority,
 }
 
 impl Verification {
@@ -61,6 +63,7 @@ impl Verification {
             Self::Hmac => "hmac",
             Self::None => "none",
             Self::Connection => "connection",
+            Self::SessionAuthority => "session_authority",
         }
     }
 
@@ -87,6 +90,7 @@ pub(crate) fn verification_of(channel: &ChannelBinding) -> Verification {
         // Unset. Legal only for the two transports nothing arrives unsolicited on; a webhook is a
         // loader error, so this arm cannot silently launder one.
         (None, Transport::Socket | Transport::Poll) => Verification::Connection,
+        (None, Transport::Session) => Verification::SessionAuthority,
         (None, Transport::Webhook) => Verification::None,
     }
 }
@@ -101,6 +105,7 @@ pub(crate) fn transport_token(transport: Transport) -> &'static str {
         Transport::Webhook => "webhook",
         Transport::Socket => "socket",
         Transport::Poll => "poll",
+        Transport::Session => "session",
     }
 }
 
@@ -165,6 +170,7 @@ mod tests {
             service: connector_spec::DEFAULT_SERVICE.to_string(),
             description: String::new(),
             transport,
+            session: None,
             connect: None,
             events: Vec::new(),
             verification,

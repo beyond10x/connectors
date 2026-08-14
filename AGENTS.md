@@ -165,17 +165,27 @@ surface. It runs the following commands on every pull request and push to `main`
 python3 scripts/check-links.py
 python3 scripts/check-stories.py
 cargo fetch --locked
+cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
+cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo build --workspace --locked
+cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
+cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo test --locked -p catalog-build --test main json_governance::
 cargo test --workspace --locked --no-fail-fast
+cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
+cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo clippy --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all-targets --locked -- -D warnings
+cargo clippy --manifest-path crates/driver-sip/Cargo.toml --all-targets --locked -- -D warnings
 cargo fmt --all --check
+cargo fmt --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all --check
+cargo fmt --manifest-path crates/driver-sip/Cargo.toml --all --check
 cargo run --locked -p catalog-cli -- build
 cargo run --locked -p catalog-cli -- diff
 cargo run --locked -p catalog-cli -- check
 ```
 
-A separate job builds and tests with Rust 1.87.0, the declared MSRV. `catalog check` independently
+A separate job builds and tests with Rust 1.88.0, the declared MSRV. `catalog check` independently
 rehashes the provider declarations, vendored specs, lock rows and generated artifacts; it runs
 offline after build and diff. The web job remains owned jointly by S-018/S-020 and is not described
 as enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are

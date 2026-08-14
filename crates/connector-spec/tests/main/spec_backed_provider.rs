@@ -147,7 +147,10 @@ required_capabilities = [\"public_network\"]
     let operation = connector
         .operation("zendesk-ticket-show")
         .expect("the renamed operation");
-    assert_eq!(operation.path, "/api/v2/tickets/{ticket_id}");
+    assert_eq!(
+        operation.request.http_path(),
+        Some("/api/v2/tickets/{ticket_id}")
+    );
     assert_eq!(operation.description, "Show one ticket by id.");
     assert_eq!(operation.risk, Risk::Low);
     assert_eq!(operation.idempotency, Idempotency::Idempotent);
@@ -611,7 +614,9 @@ required_capabilities = [\"public_network\"]
             .connector
             .operation("zendesk-ticket-show")
             .expect("selected")
-            .path,
+            .request
+            .http_path()
+            .expect("HTTP operation"),
         "/api/v2/tickets/{ticket_id}",
         "the pin was read as a label and a different document was compiled"
     );
@@ -963,13 +968,13 @@ fn several_documents_each_become_one_service() {
         .operation("acme-manager-user-get")
         .expect("the manager document's operation");
     assert_eq!(manager.service, "manager");
-    assert_eq!(manager.path, "/api/v2/users/{user_id}");
+    assert_eq!(manager.request.http_path(), Some("/api/v2/users/{user_id}"));
 
     let user = connector
         .operation("acme-user-me-get")
         .expect("the user document's operation");
     assert_eq!(user.service, "user");
-    assert_eq!(user.path, "/api/v3/me");
+    assert_eq!(user.request.http_path(), Some("/api/v3/me"));
 }
 
 /// **The same `operationId` in two documents is two operations, not one won by file order.**
@@ -982,7 +987,14 @@ fn one_operation_id_in_two_documents_is_two_operations() {
     let connector = load_many(BOTH_GET_USER);
     assert_eq!(connector.operations.len(), 2);
     assert_ne!(
-        connector.operations[0].path, connector.operations[1].path,
+        connector.operations[0]
+            .request
+            .http_path()
+            .expect("HTTP operation"),
+        connector.operations[1]
+            .request
+            .http_path()
+            .expect("HTTP operation"),
         "both patches were resolved against the same document"
     );
 }

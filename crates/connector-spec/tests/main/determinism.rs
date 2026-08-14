@@ -58,9 +58,11 @@ fn connector(reversed: bool) -> Connector {
         operations: vec![Operation {
             id: "b.call.list".into(),
             service: DEFAULT_SERVICE.into(),
-            method: HttpMethod::Get,
+            request: connector_spec::OperationRequest::HttpV1 {
+                method: HttpMethod::Get,
+                path: "/v2/calls".into(),
+            },
             direction: OperationDirection::Read,
-            path: "/v2/calls".into(),
             description: "List calls".into(),
             risk: Risk::Low,
             idempotency: Idempotency::Idempotent,
@@ -69,7 +71,6 @@ fn connector(reversed: bool) -> Connector {
                 connector_spec::HostEffect::Network,
             ],
             interaction_shape: connector_spec::InteractionShape::Unary,
-            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
             placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
             implementation_form: connector_spec::ImplementationForm::BuiltIn,
             required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],

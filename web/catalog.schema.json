@@ -536,6 +536,7 @@
         "oip",
         "description",
         "transport",
+        "session",
         "connect",
         "events",
         "verification",
@@ -563,7 +564,22 @@
           "$ref": "#/$defs/string"
         },
         "transport": {
-          "$ref": "#/$defs/nonempty_string"
+          "enum": [
+            "webhook",
+            "socket",
+            "poll",
+            "session"
+          ]
+        },
+        "session": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/session_binding"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "connect": {
           "oneOf": [
@@ -642,6 +658,52 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "transport": { "const": "session" }
+            }
+          },
+          "then": {
+            "properties": {
+              "session": { "$ref": "#/$defs/session_binding" }
+            }
+          },
+          "else": {
+            "properties": {
+              "session": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "session_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interaction_shape",
+        "protocol_driver",
+        "placement_requirement",
+        "implementation_form",
+        "required_capabilities"
+      ],
+      "properties": {
+        "interaction_shape": { "const": "session_establishment" },
+        "protocol_driver": { "const": "sip_v1" },
+        "placement_requirement": {
+          "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"]
+        },
+        "implementation_form": { "const": "built_in" },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"]
+          }
         }
       }
     },
@@ -842,8 +904,6 @@
         "implementation_form",
         "required_capabilities",
         "repeatable_because",
-        "method",
-        "path",
         "spec_source",
         "parameters",
         "input_schema",
@@ -897,7 +957,7 @@
           "$ref": "#/$defs/nonempty_string"
         },
         "protocol_driver": {
-          "$ref": "#/$defs/nonempty_string"
+          "enum": ["http_v1", "sip_v1"]
         },
         "placement_requirement": {
           "$ref": "#/$defs/nonempty_string"
@@ -968,7 +1028,27 @@
         "status": {
           "$ref": "#/$defs/status"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": { "const": "http_v1" }
+            }
+          },
+          "then": {
+            "required": ["method", "path"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["method"] },
+                { "required": ["path"] }
+              ]
+            }
+          }
+        }
+      ]
     },
     "spec_source": {
       "type": "object",

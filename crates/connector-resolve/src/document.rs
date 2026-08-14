@@ -192,7 +192,8 @@ struct RawOperation {
     expose: bool,
     #[serde(default)]
     params: Vec<RawParam>,
-    request: RequestTemplate,
+    #[serde(flatten)]
+    protocol: RawProtocolOperation,
     #[serde(default)]
     endpoint: BTreeMap<String, Vec<String>>,
     /// The declared risk tier, as flux's own vocabulary spells it (`low`/`medium`/…). Carried so a
@@ -208,7 +209,6 @@ struct RawOperation {
     /// document also carries and which this crate does not model.
     effects: Vec<HostEffect>,
     interaction_shape: InteractionShape,
-    protocol_driver: ProtocolDriver,
     placement_requirement: PlacementRequirement,
     implementation_form: ImplementationForm,
     required_capabilities: Vec<RequiredCapability>,
@@ -218,6 +218,17 @@ struct RawOperation {
     #[serde(default)]
     contract: Option<RawContract>,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "protocol_driver", rename_all = "snake_case")]
+enum RawProtocolOperation {
+    HttpV1 { request: RequestTemplate },
+    SipV1 { request: EmptySipRequest },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptySipRequest {}
 
 /// The stored model-facing contract projection: the ToolSpec's description and input schema, as the
 /// build computed them from the emitted declaration's own lowering.
@@ -377,8 +388,8 @@ pub struct Operation {
     pub service: String,
     /// Whether the operation reaches a model as a tool (C-413).
     pub expose: bool,
-    /// The request template.
-    pub request: RequestTemplate,
+    /// Driver-specific request template. SIP never masquerades as an HTTP request.
+    pub request: ProtocolRequestTemplate,
     /// The configuration variables the request needs, in stable order.
     variables: Vec<String>,
     /// Where each of them lands.
@@ -396,7 +407,6 @@ pub struct Operation {
     /// The host effects the authority projection reads, read from the document (C-552).
     effects: Vec<HostEffect>,
     interaction_shape: InteractionShape,
-    protocol_driver: ProtocolDriver,
     placement_requirement: PlacementRequirement,
     implementation_form: ImplementationForm,
     required_capabilities: Vec<RequiredCapability>,
@@ -404,6 +414,33 @@ pub struct Operation {
     risk: String,
     /// The declared idempotency, likewise (C-552).
     idempotency: String,
+}
+
+/// The canonical document's closed driver request vocabulary.
+#[derive(Debug, Clone)]
+pub enum ProtocolRequestTemplate {
+    /// One HTTP request template.
+    HttpV1(RequestTemplate),
+    /// One admitted SIP session-establishment operation.
+    SipV1,
+}
+
+impl ProtocolRequestTemplate {
+    /// The selected closed driver.
+    pub const fn driver(&self) -> ProtocolDriver {
+        match self {
+            Self::HttpV1(_) => ProtocolDriver::HttpV1,
+            Self::SipV1 => ProtocolDriver::SipV1,
+        }
+    }
+
+    /// Borrow the HTTP request template, if this operation is HTTP.
+    pub const fn http(&self) -> Option<&RequestTemplate> {
+        match self {
+            Self::HttpV1(request) => Some(request),
+            Self::SipV1 => None,
+        }
+    }
 }
 
 impl Operation {
@@ -451,6 +488,14 @@ impl Operation {
             })
             .collect();
 
+        let request = match raw.protocol {
+            RawProtocolOperation::HttpV1 { request } => ProtocolRequestTemplate::HttpV1(request),
+            RawProtocolOperation::SipV1 { request } => {
+                let EmptySipRequest {} = request;
+                ProtocolRequestTemplate::SipV1
+            }
+        };
+
         Operation {
             variables: slots.keys().cloned().collect(),
             slots,
@@ -460,12 +505,11 @@ impl Operation {
             id: raw.id,
             service: raw.service,
             expose: raw.expose,
-            request: raw.request,
+            request,
             description,
             input_schema,
             effects: raw.effects,
             interaction_shape: raw.interaction_shape,
-            protocol_driver: raw.protocol_driver,
             placement_requirement: raw.placement_requirement,
             implementation_form: raw.implementation_form,
             required_capabilities: raw.required_capabilities,
@@ -510,7 +554,7 @@ impl Operation {
     }
     /// The closed, versioned protocol driver.
     pub fn protocol_driver(&self) -> ProtocolDriver {
-        self.protocol_driver
+        self.request.driver()
     }
     /// The placement requirement, before deployment selection.
     pub fn placement_requirement(&self) -> PlacementRequirement {
@@ -562,8 +606,9 @@ impl Operation {
     /// which travels through `parse(…, as: "json")` and is therefore validated rather than sent
     /// verbatim.
     pub(crate) fn has_free_form_body(&self) -> bool {
-        matches!(&self.request.body, Some(BodyTemplate::Json { template })
-            if matches!(splice_of(template), Some(name) if name == FREE_FORM_BODY))
+        matches!(self.request.http().and_then(|request| request.body.as_ref()),
+            Some(BodyTemplate::Json { template })
+                if matches!(splice_of(template), Some(name) if name == FREE_FORM_BODY))
     }
 }
 
@@ -719,7 +764,7 @@ mod tests {
                 "implementation_form": "built_in",
                 "required_capabilities": ["private_network"],
                 "params": [],
-                "request": {"method": "POST", "url": "{base}"}
+                "request": {}
             }]
         }"#;
         let document = Document::parse(text).expect("the SIP fixture parses");
@@ -743,8 +788,9 @@ mod tests {
         let operation = document
             .operation("zendesk-ticket-update")
             .expect("the document carries it");
-        assert_eq!(operation.request.method, "PUT");
-        assert_eq!(operation.request.url, "{base}/api/v2/tickets/{ticket_id}");
+        let request = operation.request.http().expect("HTTP request");
+        assert_eq!(request.method, "PUT");
+        assert_eq!(request.url, "{base}/api/v2/tickets/{ticket_id}");
         assert_eq!(operation.endpoint_variables(), ["subdomain"]);
         assert_eq!(operation.endpoint_slots()["subdomain"], Slot::Host);
         assert_eq!(operation.caller_parameters(), ["ticket_id", "ticket"]);

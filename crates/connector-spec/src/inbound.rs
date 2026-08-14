@@ -45,8 +45,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ir::{default_service, is_default_service, JsonSchema},
-    AuthRequirement,
+    AuthRequirement, ImplementationForm, InteractionShape, PlacementRequirement, ProtocolDriver,
+    RequiredCapability,
 };
+
+/// The non-event facts required to admit one inbound direct-byte session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionBinding {
+    /// Must be `session_establishment`; stated so every catalogue consumer sees the axis.
+    pub interaction_shape: InteractionShape,
+    /// The closed driver accepting the external session.
+    pub protocol_driver: ProtocolDriver,
+    /// Where a deployment must be able to place the accepting endpoint.
+    pub placement_requirement: PlacementRequirement,
+    /// How the endpoint implementation is supplied.
+    pub implementation_form: ImplementationForm,
+    /// Capabilities admission proves before the endpoint listens or reads credentials.
+    pub required_capabilities: Vec<RequiredCapability>,
+}
 
 /// The declarative RFC 6455 handshake for a [`Transport::Socket`] binding.
 ///
@@ -88,6 +105,9 @@ pub enum Transport {
     /// The vendor offers no push at all, so a cursor operation is called on a schedule. See the
     /// module docs on why [`ChannelBinding::cursor`] is mandatory here.
     Poll,
+    /// A provider initiates a governed session rather than delivering an event envelope. The
+    /// binding's [`ChannelBinding::session`] carries the closed driver and capability facts.
+    Session,
 }
 
 /// Where on an inbound request a single named value is read from.
@@ -418,6 +438,10 @@ pub struct ChannelBinding {
     pub description: String,
     /// How events reach flux.
     pub transport: Transport,
+    /// Session-establishment facts, required exactly for [`Transport::Session`] and refused for
+    /// event transports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<SessionBinding>,
     /// The generic RFC 6455 handshake, valid only for [`Transport::Socket`].
     ///
     /// Socket bindings without this block are vendor-specific transports such as Slack Socket Mode

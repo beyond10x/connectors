@@ -197,6 +197,13 @@ impl Derivation<'_> {
 
     fn build(&self, base_url: &str, params: &Value) -> Result<Request, Error> {
         let operation = self.operation;
+        let template = operation.request.http().ok_or_else(|| Error::Unbuildable {
+            operation: operation.id.clone(),
+            message: format!(
+                "driver `{:?}` requires the platform driver dispatcher, not the HTTP request resolver",
+                operation.protocol_driver()
+            ),
+        })?;
 
         // Every declared parameter must be supplied, exactly as flux's own composite dispatch
         // requires. An *optional* parameter is one a caller may pass `null` for, not one they may
@@ -227,7 +234,7 @@ impl Derivation<'_> {
         // parameter in — and a name nothing binds stays verbatim, which is what the
         // `UnresolvedEndpoint` guard below then refuses rather than sends.
         let mut refusal = None;
-        let mut url = scan_template(&operation.request.url, |name| {
+        let mut url = scan_template(&template.url, |name| {
             if name == "base" {
                 return Some(base.clone());
             }
@@ -249,7 +256,7 @@ impl Derivation<'_> {
         // The structured query: null omitted, everything encoded exactly once (C-30). A list or a
         // record has no wire spelling and is refused rather than flattened.
         let mut pairs = Vec::new();
-        for entry in &operation.request.query {
+        for entry in &template.query {
             let rendered = match self.value(&entry.value, params)? {
                 Value::Null => continue,
                 Value::String(value) => value,
@@ -274,11 +281,11 @@ impl Derivation<'_> {
             .map_err(|message| self.unbuildable(format!("its structured query {message}")))?;
 
         let mut headers = BTreeMap::new();
-        for (name, template) in &operation.request.headers {
-            headers.insert(name.clone(), text(&self.value(template, params)?));
+        for (name, value_template) in &template.headers {
+            headers.insert(name.clone(), text(&self.value(value_template, params)?));
         }
 
-        let body = match &operation.request.body {
+        let body = match &template.body {
             None => None,
             Some(BodyTemplate::Json { template }) => {
                 let mut value = self.instantiate(template, params)?;
@@ -309,7 +316,7 @@ impl Derivation<'_> {
         };
 
         let mut request = Request {
-            method: operation.request.method.clone(),
+            method: template.method.clone(),
             url,
             headers,
             body,

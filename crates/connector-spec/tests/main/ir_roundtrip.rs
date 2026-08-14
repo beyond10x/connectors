@@ -64,9 +64,11 @@ fn op(id: &str, auth: Option<Vec<AuthRequirement>>) -> Operation {
     Operation {
         id: id.into(),
         service: DEFAULT_SERVICE.into(),
-        method: HttpMethod::Get,
+        request: connector_spec::OperationRequest::HttpV1 {
+            method: HttpMethod::Get,
+            path: "/v2/calls".into(),
+        },
         direction: OperationDirection::Read,
-        path: "/v2/calls".into(),
         description: "List calls".into(),
         risk: Risk::Low,
         idempotency: Idempotency::Idempotent,
@@ -75,7 +77,6 @@ fn op(id: &str, auth: Option<Vec<AuthRequirement>>) -> Operation {
             connector_spec::HostEffect::Network,
         ],
         interaction_shape: connector_spec::InteractionShape::Unary,
-        protocol_driver: connector_spec::ProtocolDriver::HttpV1,
         placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
         implementation_form: connector_spec::ImplementationForm::BuiltIn,
         required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],
@@ -557,7 +558,7 @@ type = "object"
     );
 
     let operation = &connector.operations[0];
-    assert_eq!(operation.method, HttpMethod::Post);
+    assert_eq!(operation.request.http_method(), Some(HttpMethod::Post));
     assert_eq!(operation.idempotency, Idempotency::NonIdempotent);
     assert_eq!(operation.params.body.len(), 2);
     assert_eq!(operation.params.body[0].schema["type"], json!("string"));

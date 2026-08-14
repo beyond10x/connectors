@@ -45,8 +45,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{
-    Acquisition, Approval, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
-    ConfigField, Credential, CredentialRequirement, Event, HostEffect, Idempotency,
+    Acquisition, Approval, AuthHazard, Channel, ChannelSession, ChannelTransport, Choice,
+    ConfigChoices, ConfigField, Credential, CredentialRequirement, Event, HostEffect, Idempotency,
     ImplementationForm, InteractionShape, OAuth2, OAuthGrant, OAuthRedirect, Operation,
     OperationDirection, Pair, Placement, PlacementRequirement, ProtocolDriver, Provider,
     RequiredCapability, Risk, Selector, Service, SocketConnect, Subject,
@@ -289,6 +289,8 @@ struct RawChannel {
     description: String,
     transport: String,
     #[serde(default)]
+    session: Option<RawChannelSession>,
+    #[serde(default)]
     connect: Option<RawConnect>,
     #[serde(default)]
     events: Vec<String>,
@@ -300,6 +302,15 @@ struct RawChannel {
     payload: BTreeMap<String, String>,
     #[serde(default)]
     payload_root: bool,
+}
+
+#[derive(Deserialize)]
+struct RawChannelSession {
+    interaction_shape: String,
+    protocol_driver: String,
+    placement_requirement: String,
+    implementation_form: String,
+    required_capabilities: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -819,6 +830,19 @@ fn build_channel(
         base_url: leak_str(base_url),
         description: leak_str(raw.description.clone()),
         transport: transport(provider, &raw.name, &raw.transport),
+        session: raw.session.as_ref().map(|session| ChannelSession {
+            interaction_shape: interaction_shape(&raw.name, &session.interaction_shape),
+            protocol_driver: protocol_driver(&raw.name, &session.protocol_driver),
+            placement_requirement: placement_requirement(&raw.name, &session.placement_requirement),
+            implementation_form: implementation_form(&raw.name, &session.implementation_form),
+            required_capabilities: leak_slice(
+                session
+                    .required_capabilities
+                    .iter()
+                    .map(|word| required_capability(&raw.name, word))
+                    .collect(),
+            ),
+        }),
         events: leak_strs(raw.events.clone()),
         connect: raw.connect.as_ref().map(|connect| SocketConnect {
             path: leak_str(connect.path.clone()),
@@ -846,6 +870,7 @@ fn transport(provider: &str, channel: &str, word: &str) -> ChannelTransport {
         "webhook" => ChannelTransport::Webhook,
         "socket" => ChannelTransport::Socket,
         "poll" => ChannelTransport::Poll,
+        "session" => ChannelTransport::Session,
         other => {
             panic!("`{provider}`'s channel `{channel}` declares unknown transport `{other}`")
         }

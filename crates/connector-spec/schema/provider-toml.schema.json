@@ -160,6 +160,10 @@
           "description": "What the binding is for, in one line."
         },
         "transport": { "$ref": "#/$defs/transport" },
+        "session": {
+          "$ref": "#/$defs/sessionBinding",
+          "description": "Closed driver, placement, implementation and capability facts. Required exactly for session transport."
+        },
         "connect": {
           "$ref": "#/$defs/socketConnect",
           "description": "The generic RFC 6455 handshake. Valid only for socket transport; absence leaves an explicitly vendor-specific transport such as Slack Socket Mode."
@@ -608,7 +612,7 @@
 
     "transport": {
       "title": "How an inbound event reaches flux",
-      "description": "The three exhaust what vendors actually offer, and the split is what makes inbound an abstraction over transports rather than a synonym for webhook.",
+      "description": "The four closed ingress shapes keep event delivery distinct from direct session establishment.",
       "oneOf": [
         {
           "const": "webhook",
@@ -621,8 +625,35 @@
         {
           "const": "poll",
           "description": "The vendor offers no push at all, so a cursor operation is called on a schedule."
+        },
+        {
+          "const": "session",
+          "description": "A provider initiates a governed direct-byte session; the sibling session block carries admission facts."
         }
       ]
+    },
+
+    "sessionBinding": {
+      "type": "object",
+      "title": "Admission facts for one inbound direct-byte session",
+      "additionalProperties": false,
+      "required": ["interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities"],
+      "properties": {
+        "interaction_shape": { "const": "session_establishment" },
+        "protocol_driver": { "const": "sip_v1" },
+        "placement_requirement": {
+          "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"]
+        },
+        "implementation_form": { "const": "built_in" },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"]
+          }
+        }
+      }
     },
 
     "verification": {
@@ -1339,9 +1370,9 @@
     "operation": {
       "type": "object",
       "title": "One operation",
-      "description": "A single HTTP call, and everything a Flux `op` declaration needs to wrap it.",
+      "description": "One closed driver operation and the policy facts required before dispatch.",
       "additionalProperties": false,
-      "required": ["id", "method", "direction", "path", "risk", "idempotency", "effects", "interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities"],
+      "required": ["id", "direction", "risk", "idempotency", "effects", "interaction_shape", "protocol_driver", "placement_requirement", "implementation_form", "required_capabilities"],
       "properties": {
         "id": {
           "type": "string",
@@ -1434,7 +1465,21 @@
         "pagination": { "$ref": "#/$defs/pagination" },
         "rate_limit": { "$ref": "#/$defs/rateLimit" },
         "error_envelope": { "$ref": "#/$defs/errorEnvelope" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "protocol_driver": { "const": "http_v1" } } },
+          "then": { "required": ["method", "path"] },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["method"] },
+                { "required": ["path"] }
+              ]
+            }
+          }
+        }
+      ]
     },
 
     "producedCredential": {

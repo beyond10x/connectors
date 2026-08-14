@@ -152,6 +152,7 @@ fn the_closed_vocabularies_match_exhaustively() {
             ChannelTransport::Webhook => "webhook",
             ChannelTransport::Socket => "socket",
             ChannelTransport::Poll => "poll",
+            ChannelTransport::Session => "session",
         }
     }
     fn activation(approval: Approval) -> &'static str {
@@ -287,6 +288,7 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
             base_url,
             description,
             transport,
+            session,
             events,
             connect,
             discriminator,
@@ -297,8 +299,12 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
         } = channel;
         let _: (&str, &str, &str, &str) = (name, service, base_url, description);
         match transport {
-            ChannelTransport::Webhook | ChannelTransport::Socket | ChannelTransport::Poll => {}
+            ChannelTransport::Webhook
+            | ChannelTransport::Socket
+            | ChannelTransport::Poll
+            | ChannelTransport::Session => {}
         }
+        let _: Option<catalog::ChannelSession> = session;
         let _: &[&str] = events;
         if let Some(SocketConnect {
             path,
@@ -367,6 +373,7 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
         base_url: "https://api.acme.example",
         description: "The vendor's event socket.",
         transport: ChannelTransport::Socket,
+        session: None,
         events: &["acme.ping"],
         connect: Some(SocketConnect {
             path: "/ws",

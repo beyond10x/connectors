@@ -266,8 +266,8 @@ impl Plan {
                 // named services would match nothing and every reviewed claim it holds would be
                 // thrown away as though nobody had made it.
                 (!document.names_service || published.service == document.service)
-                    && published.method == operation.method
-                    && published.path == operation.path
+                    && published.request.http_method() == Some(operation.method)
+                    && published.request.http_path() == Some(operation.path.as_str())
             })
         })
     }
@@ -1867,13 +1867,18 @@ impl Plan {
                         continue;
                     }
                     let still_there = document.ingested.operations.iter().any(|operation| {
-                        operation.method == publication.method && operation.path == publication.path
+                        publication.request.http_method() == Some(operation.method)
+                            && publication.request.http_path() == Some(operation.path.as_str())
                     });
                     if !still_there {
                         document_removed.push(format!(
                             "    {:<7} {}  ({})",
-                            method_word(publication.method),
-                            publication.path,
+                            publication
+                                .request
+                                .http_method()
+                                .map(method_word)
+                                .unwrap_or("SIP"),
+                            publication.request.http_path().unwrap_or("<session>"),
                             publication.id
                         ));
                     }

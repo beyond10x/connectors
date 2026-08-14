@@ -111,8 +111,9 @@ fn sip_v1_is_a_closed_session_establishment_driver() {
         );
     let source = operation(&format!("effects = [\"write\", \"network\"]\n{axes}"))
         .replace("id = \"acme-read\"", "id = \"acme-call-establish\"")
-        .replace("method = \"GET\"", "method = \"POST\"")
+        .replace("method = \"GET\"\n", "")
         .replace("direction = \"read\"", "direction = \"write\"")
+        .replace("path = \"/v1/items\"\n", "")
         .replace("risk = \"low\"", "risk = \"high\"")
         .replace(
             "idempotency = \"idempotent\"",
@@ -124,7 +125,9 @@ fn sip_v1_is_a_closed_session_establishment_driver() {
         operation.interaction_shape,
         InteractionShape::SessionEstablishment
     );
-    assert_eq!(operation.protocol_driver, ProtocolDriver::SipV1);
+    assert_eq!(operation.request.driver(), ProtocolDriver::SipV1);
+    assert!(operation.request.http_method().is_none());
+    assert!(operation.request.http_path().is_none());
 
     let schema = include_str!("../../schema/provider-toml.schema.json");
     assert!(

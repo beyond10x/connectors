@@ -44,6 +44,9 @@
 //! 12. [`the_credential_requirement_agrees_with_the_auth_list`] — the stored token (S-001) is
 //!     `declared` exactly when the effective `auth` list is non-empty; the empty side carries one
 //!     of the two distinction tokens the old derivation could not tell apart.
+//! 13. [`no_sip_provider_is_advertised_before_its_atomic_catalog_change`] — the closed runtime
+//!     vocabulary can land first, but no effective connector member claims it before source,
+//!     dispatch, and generated artifacts arrive together.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -108,6 +111,31 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
             (provider.clone(), value)
         })
         .collect()
+}
+
+/// Runtime vocabulary may precede a provider, but the effective catalog may not advertise an
+/// ungrounded or undispatchable SIP member. Remove this guard only in the atomic change that adds
+/// the reviewed source/provenance, provider, generated artifacts, and serving composition.
+#[test]
+fn no_sip_provider_is_advertised_before_its_atomic_catalog_change() {
+    fn contains_string(value: &Value, expected: &str) -> bool {
+        match value {
+            Value::String(value) => value == expected,
+            Value::Array(values) => values.iter().any(|value| contains_string(value, expected)),
+            Value::Object(values) => values
+                .values()
+                .any(|value| contains_string(value, expected)),
+            Value::Null | Value::Bool(_) | Value::Number(_) => false,
+        }
+    }
+
+    let (workspace, plan) = full_plan();
+    for (provider, document) in documents(&workspace, &plan) {
+        assert!(
+            !contains_string(&document, "sip_v1"),
+            "`{provider}` advertises sip_v1 before the required atomic provider/runtime change"
+        );
+    }
 }
 
 /// S-015 is a vocabulary migration, not a behavioural edit. The digest is the pre-migration
@@ -772,7 +800,17 @@ fn spec_backed_coverage_holds_in_both_directions() {
                     .operation_specs
                     .contains_key(&operation.id)
             })
-            .map(|operation| format!("{} {}", method_word(operation.method), operation.path))
+            .map(|operation| {
+                let method = operation
+                    .request
+                    .http_method()
+                    .expect("spec-derived operations use the HTTP driver");
+                let path = operation
+                    .request
+                    .http_path()
+                    .expect("spec-derived operations use the HTTP driver");
+                format!("{} {path}", method_word(method))
+            })
             .filter(|key| !declared.contains(key))
             .collect();
         assert!(

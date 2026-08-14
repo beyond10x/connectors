@@ -2,12 +2,12 @@
 id: S-033
 title: "Neutral RTVBP bridges the call to an application channel"
 pillar: Platform
-status: backlog
+status: in-progress
 priority:
 design: docs/design/05-native-sip-and-rtvbp.md
 epic: native-voice
 areas: [domain, protocol, service, server, rtvbp-voice-endpoint]
-note: "Blocked by S-027, the released generic VoiceSession contract, and the product/Agent neutral media contracts"
+note: "Bounded endpoints and duplex SIP composition exist; complete lifecycle, placement, and release evidence remain"
 ---
 
 # Neutral RTVBP bridges the call to an application channel
@@ -27,14 +27,14 @@ without a model or Babelforce product semantics.
       conformance evidence rather than compiled into the upstream SDK.
 - [ ] The released `VoiceSession` contract contains no RTVBP type, and both endpoint adapters prove
       their method/event/media mapping against the same generic vectors.
-- [ ] Generic code boots and passes its lifecycle with `babelforce.v1` absent; attempting that
+- [x] Generic code boots and passes its lifecycle with `babelforce.v1` absent; attempting that
       product profile or omitting explicit profile negotiation at the generic endpoint refuses by
       name rather than selecting RTVBP's legacy default.
 - [ ] Memory and bounded WebSocket fixtures prove initialize, control/media channels, DTMF,
       duplex L16 mono audio, keepalive, close, cancellation, and whole-task termination.
-- [ ] The proof-bound authority binds endpoint, tenant, actor, Connection, Grant, operation,
+- [x] The proof-bound authority binds endpoint, tenant, actor, Connection, Grant, operation,
       profile, proof key, and lease; wrong audience, expiry, replay, and revocation refuse.
-- [ ] Media/frame/queue/request bounds are explicit; overflow records observable bounded loss, and
+- [x] Media/frame/queue/request bounds are explicit; overflow records observable bounded loss, and
       barge-in has one causal interruption/clear path.
 - [ ] Characterization measures the SDK's internal control/transport queues. An outer bounded queue
       alone cannot support a stable/exposed bounded-memory claim.
@@ -47,5 +47,17 @@ without a model or Babelforce product semantics.
 
 ## Progress
 
-- Architecture and implementation placement are accepted, and the final upstream SDK release now
-  exists. The generic owner contract, local RTVBP binding, and implementation prerequisites do not.
+- The exact final RTVBP Rust SDK release is pinned. The alpha generic owner bundle and separate
+  `b10x.voice.v1` binding bundle are hash-frozen in this repository.
+- The voice-side adapter uses only generic upstream envelope/transport APIs. Its memory transport
+  test performs exact profile negotiation, serving-side authority redemption, initialization, and
+  duplex 320-byte media over a fake `TelephonySession` without `babelforce.v1`.
+- Both repositories now own finite WebSocket transports instead of relying on RTVBP's unbounded
+  WebSocket queues. The application adapter independently redeems exact WSS/profile/DPoP authority
+  before media and proves bounded input/loss, output overload, interruption, close, lease, and
+  generation-drain behavior.
+- A real sipx UDP/RTP loopback crosses the neutral `TelephonySession` port and RTVBP memory transport
+  to a fake application in both directions, then observes teardown. The broader composed cases
+  (cancellation, loss, interruption, generation drain), satellite/unserved path, complete shared
+  vectors, signed owner release, and clean-room release proof remain open; support is not stable or
+  hosted.
