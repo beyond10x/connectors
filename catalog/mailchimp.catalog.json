@@ -1094,6 +1094,9 @@
   "services": [
     {
       "api_version": "3.0",
+      "audiences": [
+        "marketer"
+      ],
       "base_url": "https://{dc}.api.mailchimp.com/3.0",
       "gid": "com.mailchimp.api:3.0",
       "name": "default",

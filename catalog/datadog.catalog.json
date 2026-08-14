@@ -398,6 +398,10 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "sre",
+        "developer"
+      ],
       "base_url": "https://api.datadoghq.com",
       "name": "default",
       "tags": [

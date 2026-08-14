@@ -53,6 +53,11 @@ This refines the v1 non-goal: connectors has no arbitrary or in-process plugin r
 drivers and reviewed owned transport arms are ordinary platform implementation behind a closed
 registry.
 
+The first such arm is now the personal-local Slack Socket Mode alpha in
+[Design 06](06-personal-slack-socket-mode.md). It adds no generic handshake language: the catalog
+declares channel credential names and closed events, while reviewed Slack code owns only the fixed
+ticket exchange and transport envelope. General M3/M4 persistence and hosted serving remain open.
+
 ## 3. Connector plans are data; substrate execution is generic
 
 The canonical document carries enough information to produce a zero-I/O **connector execution

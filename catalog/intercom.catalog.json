@@ -927,6 +927,9 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "support-agent"
+      ],
       "base_url": "https://{host}",
       "name": "default",
       "tags": [

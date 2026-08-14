@@ -17,10 +17,11 @@
 //!   testing the API.
 
 use catalog::{
-    Acquisition, Approval, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
-    ConfigField, Credential, CredentialRequirement, Event, Idempotency, OAuth2, OAuthGrant,
-    OAuthRedirect, Operation, OperationDirection, OperationKey, Pair, Placement, Provider,
-    ProviderKey, Risk, Selector, SocketConnect, Subject,
+    Acquisition, Approval, Audience, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
+    ConfigField, Credential, CredentialRequirement, Discovery, DiscoveryDriver, Event, Idempotency,
+    OAuth2, OAuthGrant, OAuthRedirect, Operation, OperationDirection, OperationKey, Pair,
+    Placement, Provider, ProviderKey, Risk, RouteAdapter, Selector, Service, SocketConnect,
+    Subject,
 };
 
 /// The lookups, and every field of [`Operation`].
@@ -76,6 +77,8 @@ fn the_lookup_surface_and_every_operation_field_are_reachable() {
         vendor,
         description: pdesc,
         authority,
+        services,
+        audiences,
         base_url,
         auth,
         operations,
@@ -83,13 +86,24 @@ fn the_lookup_surface_and_every_operation_field_are_reachable() {
         verify,
         events,
         channels,
+        discoveries,
         config_choices,
         ..
     } = *provider;
     let _: (&str, &str, &str, &str) = (pid, vendor, pdesc, base_url);
     let _: Option<&str> = authority;
+    let _: (&[Service], &[Audience]) = (services, audiences);
+    for Service {
+        name,
+        base_url,
+        audiences,
+    } in services
+    {
+        let _: (&str, &str, &[Audience]) = (name, base_url, audiences);
+    }
     let _: (&[Credential], &[Operation]) = (auth, operations);
-    let _: (&[ConfigField], &[Event], &[Channel]) = (config, events, channels);
+    let _: (&[ConfigField], &[Event], &[Channel], &[Discovery]) =
+        (config, events, channels, discoveries);
     let _: (Option<&str>, &[ConfigChoices]) = (verify, config_choices);
 }
 
@@ -107,6 +121,7 @@ fn the_closed_vocabularies_match_exhaustively() {
     fn acquire(acquisition: Acquisition) -> &'static str {
         match acquisition {
             Acquisition::Static => "static",
+            Acquisition::ConnectSession => "connect_session",
             Acquisition::Minted { by: _, from: _ } => "minted",
             Acquisition::BasicJoin {
                 user_env: _,
@@ -168,6 +183,33 @@ fn the_closed_vocabularies_match_exhaustively() {
             CredentialRequirement::Withheld => requirement.as_str(),
         }
     }
+    fn audience_word(audience: Audience) -> &'static str {
+        match audience {
+            Audience::Developer
+            | Audience::Sre
+            | Audience::SecurityEngineer
+            | Audience::DataAnalyst
+            | Audience::ProductManager
+            | Audience::ProjectManager
+            | Audience::Designer
+            | Audience::SalesRep
+            | Audience::SupportAgent
+            | Audience::Marketer
+            | Audience::Finance
+            | Audience::EcommerceManager
+            | Audience::ContentManager => audience.as_str(),
+        }
+    }
+    fn discovery_driver(driver: DiscoveryDriver) -> &'static str {
+        match driver {
+            DiscoveryDriver::GrafanaDatasourceV1 => driver.as_str(),
+        }
+    }
+    fn route_adapter(adapter: RouteAdapter) -> &'static str {
+        match adapter {
+            RouteAdapter::GrafanaDatasourceProxyV1 => adapter.as_str(),
+        }
+    }
 
     // A consumer constructs a `Credential` in a test of its own placement code — documented as
     // supported, so it is exercised here.
@@ -196,8 +238,17 @@ fn the_closed_vocabularies_match_exhaustively() {
             let _ = place(credential.place);
             let _ = acquire(credential.acquire);
         }
+        for audience in provider.audiences {
+            assert!(!audience_word(*audience).is_empty());
+        }
         for channel in provider.channels {
             let _ = transport(channel);
+        }
+        for discovery in provider.discoveries {
+            let _ = discovery_driver(discovery.driver);
+            for mapping in discovery.mappings {
+                let _ = route_adapter(mapping.route_adapter);
+            }
         }
         for operation in provider.operations {
             let _ = why(operation.credential_requirement);
@@ -291,6 +342,7 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
             session,
             events,
             connect,
+            auth,
             discriminator,
             delivery_id,
             payload,
@@ -306,6 +358,7 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
         }
         let _: Option<catalog::ChannelSession> = session;
         let _: &[&str] = events;
+        let _: &[&[&str]] = auth;
         if let Some(SocketConnect {
             path,
             query,
@@ -385,6 +438,7 @@ fn the_inbound_and_configuration_surfaces_are_reachable() {
             auth: &[&["acme.token"]],
             subprotocols: &[],
         }),
+        auth: &[&["acme.token"]],
         discriminator: Some(Selector {
             source: "payload",
             name: "type",

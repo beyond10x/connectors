@@ -1,0 +1,89 @@
+{
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "authority": "io.prometheus.alertmanager.api",
+  "config": [
+    {
+      "approval": "operator",
+      "binds": "endpoint.origin",
+      "docs_url": "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml",
+      "format": "origin",
+      "help": "Required only for a direct Connection. A Grafana-mediated Connection resolves no direct origin",
+      "label": "Alertmanager origin",
+      "level": "connection",
+      "name": "origin",
+      "required": true,
+      "secret": false,
+      "service": "default"
+    }
+  ],
+  "connector": "alertmanager",
+  "description": "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Get the alerts currently visible through this Alertmanager",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Get the alerts currently visible through this Alertmanager",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "alertmanager-alerts-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/alerts"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "sre",
+        "developer",
+        "support-agent"
+      ],
+      "base_url": "{origin}/api/v2",
+      "name": "default",
+      "tags": [
+        "observability",
+        "incident-response"
+      ]
+    }
+  ],
+  "vendor": "Prometheus Alertmanager",
+  "verify": "alertmanager-alerts-list"
+}

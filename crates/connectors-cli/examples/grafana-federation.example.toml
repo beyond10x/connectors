@@ -1,0 +1,17 @@
+[owner]
+tenant_id = "tenant-local"
+agent_id = "agent-dev"
+agent_revision = 1
+authority_snapshot_id = "authority-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[grafana]
+origin = "https://grafana.monitoring.example"
+grant_ref = "grant:grafana-read"
+initiation = "b10x"
+connect_session_ttl_seconds = 300
+
+[grafana.target_grants]
+prometheus = "grant:prometheus-read"
+loki = "grant:loki-read"
+alertmanager = "grant:alertmanager-read"

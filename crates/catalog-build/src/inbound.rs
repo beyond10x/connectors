@@ -172,6 +172,7 @@ mod tests {
             transport,
             session: None,
             connect: None,
+            auth: Vec::new(),
             events: Vec::new(),
             verification,
             discriminator: None,

@@ -10,7 +10,7 @@
 //! hypotheticals. An archetype the model cannot render is an explicit failing case here, not a gap
 //! discovered when someone tries to build the form.
 
-use connector_spec::{provider, AuthScheme, Binding, Connector, Format, Level};
+use connector_spec::{provider, AuthScheme, Binding, Connector, CredentialEntry, Format, Level};
 
 use crate::shipped_provider;
 
@@ -64,6 +64,17 @@ fn bearer_paste_a_token() {
         "slack has no tenant and no declared config; when its OAuth alternative lands this must be \
          revisited deliberately rather than drifting"
     );
+}
+
+#[test]
+fn slack_socket_mode_token_enters_through_a_connect_session_and_never_ambient_env() {
+    let connector = shipped("slack");
+    let method = connector
+        .auth_method("slack.app_token")
+        .expect("slack declares its Socket Mode credential");
+    assert_eq!(method.scheme, AuthScheme::Bearer);
+    assert!(method.env.is_empty());
+    assert_eq!(method.entry, Some(CredentialEntry::ConnectSession));
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -1,0 +1,14 @@
+version = 1
+
+[[spec]]
+path = "specs/prometheus/http-api-2026-08-15.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-15"
+reviewed_at = "2026-08-15"
+sha256 = "f045ee79177b03bb75f5881a6613f194e9afa8eb723a762cd9c5f767b8b85c44"
+coverage = "exact-shipped-surface"
+purpose = "Authoritative source for the bounded Prometheus range-query operation shipped by providers/prometheus.toml."
+references = [
+  "https://prometheus.io/docs/prometheus/latest/querying/api/",
+  "https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries",
+]

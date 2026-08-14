@@ -143,7 +143,7 @@ env = ["SLACK_BOT_TOKEN"]
 # impersonating the operator" — and until C-528 there was no field to state it in, so a host reading
 # the catalogue could not tell this apart from a token that impersonates whoever installed it.
 subject = "app"
-description = "Slack bot user OAuth token (xoxb-…) with chat:write, channels:history, users:read and reactions:write"
+description = "Slack bot user OAuth token (xoxb-…) with app_mentions:read, chat:write, channels:history, users:read and reactions:write"
 
 [[auth]]
 name = "slack.signing_secret"
@@ -151,11 +151,8 @@ name = "slack.signing_secret"
 # secret is a credential like any other and appears in the manifest's credential list, rather than
 # living in a second namespace an operator would have to know about separately.
 #
-# Declared here even though the binding below uses Socket Mode and does not verify signatures, and
-# that is deliberate rather than an oversight: an operator who runs Slack over the Events API instead
-# needs exactly this credential, and the request-signing scheme (`v0:{timestamp}:{body}`, HMAC-SHA256,
-# hex, `v0=`) is the row this repository's verification matrix was derived from. It is unreferenced
-# until an `events-api` binding lands, which is why nothing yet points at it.
+# The Events API binding below references this credential. Socket Mode does not: it authenticates
+# the outbound ticket request with the distinct app-level token declared next.
 scheme = "signing"
 # C-528: `app`, and the reasoning differs from the bot token's. A signing secret never travels
 # outbound and acts as nobody — but it is issued to the *app* and is provisioned once per
@@ -164,6 +161,16 @@ scheme = "signing"
 subject = "app"
 env = ["SLACK_SIGNING_SECRET"]
 description = "Slack app signing secret, used to verify inbound Events API requests. Never sent to Slack"
+
+[[auth]]
+name = "slack.app_token"
+scheme = "bearer"
+# Socket Mode's app-level `xapp-…` token is entered once at a Connector-owned Connect Session
+# completion endpoint. There is intentionally no `env`: the receiving runtime must resolve it from
+# the Connection's owner-bound credential address and must never search ambient process state.
+entry = "connect_session"
+subject = "app"
+description = "Slack app-level token (xapp-…) with connections:write, used only to open Socket Mode"
 
 # ---------------------------------------------------------------------------------------------
 # Operations — 4 of ~200 Web API methods
@@ -182,8 +189,8 @@ description = "Slack app signing secret, used to verify inbound Events API reque
 [[services]]
 # C-153. `default` is the reserved implicit service, and a provider with one API surface
 # declares no services at all — so this entry exists for exactly one reason: a tag attaches
-# to a service, and there is no other service here to attach it to. It carries `tags` and
-# nothing else, which is what keeps `default` implicit and this file emitting the same
+# to a service, and there is no other service here to attach it to. It carries service
+# discovery metadata only, which keeps `default` implicit and this file emitting the same
 # `slack.flux` it emitted before.
 name = "default"
 tags = ["messaging"]
@@ -477,6 +484,7 @@ schema = { type = "object", properties = { type = { const = "message" }, subtype
 name = "socket"
 transport = "socket"
 description = "Socket Mode — flux opens an outbound WebSocket and Slack pushes events down it. No public URL, and no signature: the connection is authenticated by the app-level token that opened it"
+auth = [{ credentials = ["slack.app_token"] }]
 events = ["app_mention", "message"]
 # No `verification`: nothing arrives unsolicited over a socket we opened and authenticated.
 discriminator = { source = "body", name = "event.type" }
@@ -499,6 +507,18 @@ result = "text"
 [channels.reply.bind]
 channel = "channel"
 thread_ts = "thread"
+
+[channels.setup]
+docs_url = "https://docs.slack.dev/apis/events-api/using-socket-mode/"
+steps = [
+  "Open your app at api.slack.com/apps, or create one for this workspace",
+  "Under Socket Mode, enable Socket Mode",
+  "Under Basic Information, generate an app-level token with the `connections:write` scope",
+  "Under OAuth & Permissions, add `app_mentions:read`; also add `channels:history` when receiving channel messages",
+  "Under Event Subscriptions, enable events and subscribe to `app_mention`; also subscribe to `message.channels` when receiving channel messages",
+  "Install or reinstall the app to the workspace, then add it to every channel it should observe",
+  "Choose Add Slack in B10x and enter the app-level token in its protected prompt",
+]
 
 # ---------------------------------------------------------------------------------------------
 
@@ -551,8 +571,8 @@ thread_ts = "thread"
 # requires one of the two: a product that knows a callback URL and nothing about what to do with it
 # cannot finish an installation.
 #
-# The socket binding above needs none of this, which is the clearest statement of the tradeoff
-# between the two transports that this file can make.
+# The socket binding above has its own setup: it needs no Request URL or signing secret, but Slack
+# still requires Socket Mode, event subscriptions, scopes, and workspace installation.
 [channels.setup]
 docs_url = "https://docs.slack.dev/apis/events-api/"
 steps = [

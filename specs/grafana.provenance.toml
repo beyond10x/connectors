@@ -1,0 +1,21 @@
+version = 1
+
+# Grafana publishes complete Swagger/OpenAPI documents from each running instance rather than one
+# stable, version-independent download that can represent every self-hosted deployment. This small
+# repository-authored document therefore covers only the exact reviewed surface below. Each
+# operation carries its official reference in the YAML.
+
+[[spec]]
+path = "specs/grafana/http-api-2026-08-14.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-14"
+reviewed_at = "2026-08-14"
+sha256 = "f177be5b01888799fbc5aa6a7b6195958f2da0082c2f5823a23f2368524422c5"
+coverage = "exact-shipped-surface"
+purpose = "Authoritative source for the two Grafana 12+ dashboard reads and the two data-source reads shipped by providers/grafana.toml. The data-source query body is intentionally bounded to 20 read queries while preserving plugin-specific query fields."
+references = [
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/dashboard/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/",
+]

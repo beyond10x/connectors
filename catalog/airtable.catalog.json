@@ -532,6 +532,10 @@
   "services": [
     {
       "api_version": "v0",
+      "audiences": [
+        "data-analyst",
+        "project-manager"
+      ],
       "base_url": "https://api.airtable.com",
       "gid": "com.airtable.api:v0",
       "name": "default",

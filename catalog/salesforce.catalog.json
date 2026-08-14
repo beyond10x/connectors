@@ -609,6 +609,9 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "sales-rep"
+      ],
       "base_url": "https://{instance}.my.salesforce.com",
       "name": "default",
       "tags": [

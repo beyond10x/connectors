@@ -78,7 +78,7 @@ pub fn admit_voice_plan(
     sip_route: SipDeploymentRoute,
     application: VoiceApplicationRoute,
 ) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
-    validate_application(&application)?;
+    validate_voice_application_route(&application)?;
     let sip = admit_sip_plan(plan, sip_route)?;
     Ok(AdmittedVoicePlan {
         sip,
@@ -94,7 +94,7 @@ pub fn admit_voice_dial(
     sip_routes: &SipDialRouteTable,
     application: VoiceApplicationRoute,
 ) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
-    validate_application(&application)?;
+    validate_voice_application_route(&application)?;
     let sip = admit_sip_dial(plan, input, sip_routes)?;
     Ok(AdmittedVoicePlan {
         sip,
@@ -103,7 +103,10 @@ pub fn admit_voice_dial(
     })
 }
 
-fn validate_application(application: &VoiceApplicationRoute) -> Result<(), VoiceAdmissionError> {
+/// Validate a deployment-selected application route before it is joined to a call plan.
+pub fn validate_voice_application_route(
+    application: &VoiceApplicationRoute,
+) -> Result<(), VoiceAdmissionError> {
     if [
         application.actor.as_str(),
         application.audience.as_str(),

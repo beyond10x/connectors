@@ -1035,6 +1035,171 @@ impl Tag {
     }
 }
 
+/// The people a service is ordinarily useful to, for catalogue discovery only.
+///
+/// An audience is deliberately neither a permission nor a visibility rule. `Sre` means “an SRE
+/// browsing the catalogue is likely to find this useful”; it does not grant that person an
+/// operation, hide the service from anybody else, or participate in policy admission. Those remain
+/// Connection, Grant and deployment-policy decisions.
+///
+/// This lives on [`Service`] rather than [`Connector`], because one provider may expose surfaces
+/// aimed at different kinds of work. A provider-level audience is derived as the union via
+/// [`Connector::audiences`], exactly as tags are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Audience {
+    /// People building and operating software.
+    Developer,
+    /// Site reliability and production operations practitioners.
+    Sre,
+    /// People designing and reviewing security controls.
+    SecurityEngineer,
+    /// People exploring and interpreting operational or business data.
+    DataAnalyst,
+    /// People shaping product outcomes and roadmaps.
+    ProductManager,
+    /// People coordinating projects and delivery work.
+    ProjectManager,
+    /// People designing product and visual experiences.
+    Designer,
+    /// People working with prospects and customer accounts.
+    SalesRep,
+    /// People supporting customers and resolving their requests.
+    SupportAgent,
+    /// People running campaigns, audiences and lifecycle communication.
+    Marketer,
+    /// People responsible for payments and financial operations.
+    Finance,
+    /// People managing online storefronts, products and orders.
+    EcommerceManager,
+    /// People managing published content and editorial workflows.
+    ContentManager,
+}
+
+impl Audience {
+    /// Every admitted catalogue token, in the order diagnostics present them.
+    pub const ALL: [Self; 13] = [
+        Self::Developer,
+        Self::Sre,
+        Self::SecurityEngineer,
+        Self::DataAnalyst,
+        Self::ProductManager,
+        Self::ProjectManager,
+        Self::Designer,
+        Self::SalesRep,
+        Self::SupportAgent,
+        Self::Marketer,
+        Self::Finance,
+        Self::EcommerceManager,
+        Self::ContentManager,
+    ];
+
+    /// The stable public token used by catalogues and explorer filters.
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Developer => "developer",
+            Self::Sre => "sre",
+            Self::SecurityEngineer => "security-engineer",
+            Self::DataAnalyst => "data-analyst",
+            Self::ProductManager => "product-manager",
+            Self::ProjectManager => "project-manager",
+            Self::Designer => "designer",
+            Self::SalesRep => "sales-rep",
+            Self::SupportAgent => "support-agent",
+            Self::Marketer => "marketer",
+            Self::Finance => "finance",
+            Self::EcommerceManager => "ecommerce-manager",
+            Self::ContentManager => "content-manager",
+        }
+    }
+
+    /// Every audience token, comma-separated for actionable loader errors.
+    pub fn known_set() -> String {
+        Self::ALL
+            .iter()
+            .map(|audience| audience.word())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+/// The closed parser that turns one reviewed provider response into discovery observations.
+///
+/// A discovery driver may interpret only the response of [`Discovery::operation`]. It does not
+/// scan a network, follow arbitrary links, accept a caller-selected path, or create authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiscoveryDriver {
+    /// Grafana's `GET /api/datasources` response, normalized without publishing data-source URLs,
+    /// UIDs, credentials, or arbitrary proxy paths.
+    GrafanaDatasourceV1,
+}
+
+impl DiscoveryDriver {
+    /// The stable catalog token.
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::GrafanaDatasourceV1 => "grafana_datasource_v1",
+        }
+    }
+}
+
+/// The closed adapter that may execute a target Provider operation through another Connection.
+///
+/// Route adapters are implementation identities, not caller-selectable strings. Unknown adapters
+/// are refused rather than treated as direct HTTP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteAdapter {
+    /// Prefix a native backend request with Grafana's reviewed data-source proxy route, using an
+    /// opaque Connector-owned resource binding rather than a caller-provided Grafana UID.
+    GrafanaDatasourceProxyV1,
+}
+
+impl RouteAdapter {
+    /// The stable catalog and Connection token.
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::GrafanaDatasourceProxyV1 => "grafana_datasource_proxy_v1",
+        }
+    }
+}
+
+/// One closed normalization from a vendor-observed type to a native B10x Provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryMapping {
+    /// The exact normalized vendor type accepted by this mapping.
+    pub observed_type: String,
+    /// The target Provider contract whose semantics and operation catalog the candidate uses.
+    pub target_provider: String,
+    /// The reviewed adapter used if the candidate is materialized as a mediated Connection.
+    pub route_adapter: RouteAdapter,
+}
+
+/// A bounded, catalog-declared observation source.
+///
+/// Running the named operation can produce observations and Connection candidates. It can never
+/// create a Connection, inherit a Grant, or authorize an operation by itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Discovery {
+    /// Stable declaration identity within the Provider.
+    pub id: String,
+    /// Service containing the observation operation.
+    #[serde(
+        default = "default_service",
+        skip_serializing_if = "is_default_service"
+    )]
+    pub service: String,
+    /// A bounded read Operation in this same Provider.
+    pub operation: String,
+    /// Closed response normalizer.
+    pub driver: DiscoveryDriver,
+    /// Closed vendor-type to target-Provider mappings.
+    pub mappings: Vec<DiscoveryMapping>,
+}
+
 /// One API surface of a provider: the unit you address, version, select and install.
 ///
 /// `s3` and `bedrock-runtime` under AWS; `support` under Zendesk. A service is the middle level of
@@ -1106,6 +1271,12 @@ pub struct Service {
     /// `ir_sha256` in the repository and churns `connectors.lock` for a provider nobody edited.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<Tag>,
+    /// Who is likely to find this service useful — see [`Audience`].
+    ///
+    /// Discovery metadata only. It never affects operation exposure, credential resolution,
+    /// Connection ownership, Grant admission or runtime authorization.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audiences: Vec<Audience>,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -1849,6 +2020,12 @@ pub struct Connector {
     /// [`ChannelBinding`] is a composition of the two above rather than a thing of its own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub channels: Vec<ChannelBinding>,
+    /// Bounded observations this Provider can produce about target Provider instances.
+    ///
+    /// Discovery is catalog metadata over an ordinary read Operation. It is neither a callable
+    /// member kind nor authority, and therefore does not share the member namespace.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub discoveries: Vec<Discovery>,
     /// What a **human** must supply before any of the above can run — see [`crate::config`].
     ///
     /// Not a member kind in the addressing sense: a configuration field is not something a program
@@ -2020,6 +2197,20 @@ impl Connector {
         for tag in self.services.iter().flat_map(|service| &service.tags) {
             if !union.contains(tag) {
                 union.push(*tag);
+            }
+        }
+        union
+    }
+
+    /// The provider's audiences: the union of its services', deduplicated in declaration order.
+    ///
+    /// Derived rather than authored at provider level so a multi-service provider cannot contradict
+    /// its own service metadata. Consumers may use this for discovery and presentation only.
+    pub fn audiences(&self) -> Vec<Audience> {
+        let mut union: Vec<Audience> = Vec::new();
+        for audience in self.services.iter().flat_map(|service| &service.audiences) {
+            if !union.contains(audience) {
+                union.push(*audience);
             }
         }
         union
@@ -2412,6 +2603,10 @@ struct HashDomain<'a> {
     events: &'a [EventDecl],
     #[serde(skip_serializing_if = "<[ChannelBinding]>::is_empty")]
     channels: &'a [ChannelBinding],
+    /// Discovery declarations affect which target Provider candidate and route adapter a response
+    /// may produce, so changing one is compiled meaning and must move the IR hash.
+    #[serde(skip_serializing_if = "<[Discovery]>::is_empty")]
+    discoveries: &'a [Discovery],
     /// In the domain, and the reasoning is worth stating because it is not obvious: a configuration
     /// field is presentation, and presentation usually is not compiled meaning. But a field's `binds`
     /// decides *where a value goes* — a changed binding sends a token to a different place — and its
@@ -2447,6 +2642,7 @@ impl<'a> HashDomain<'a> {
             operations,
             events,
             channels,
+            discoveries,
             config,
             verify,
             graphs,
@@ -2469,6 +2665,7 @@ impl<'a> HashDomain<'a> {
             operations,
             events,
             channels,
+            discoveries,
             config,
             verify,
             graphs,

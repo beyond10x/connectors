@@ -1,0 +1,625 @@
+{
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "auth": [
+    {
+      "description": "Grafana service account token with dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller",
+      "entry": "connect_session",
+      "name": "grafana.service_account_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    }
+  ],
+  "authority": "com.grafana.api",
+  "config": [
+    {
+      "approval": "operator",
+      "binds": "endpoint.origin",
+      "docs_url": "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/",
+      "example": "https://grafana.monitoring.example",
+      "format": "origin",
+      "help": "The operator-approved HTTPS origin of this Grafana instance, without an API path. In private deployments this resolves only at the selected local or federated Connector placement",
+      "label": "Grafana origin",
+      "level": "connection",
+      "name": "origin",
+      "required": true,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "credential.grafana.service_account_token",
+      "docs_url": "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/",
+      "format": "token",
+      "help": "Supply this through the selected Connection's custody: local OS keychain, a wired secret provider, or satellite-local storage. The harness can write it but cannot read it back",
+      "label": "Grafana service account token",
+      "level": "connection",
+      "name": "service_account_token",
+      "required": true,
+      "secret": true,
+      "service": "default"
+    }
+  ],
+  "connector": "grafana",
+  "default_auth": [
+    [
+      "grafana.service_account_token"
+    ]
+  ],
+  "description": "Grafana 12+: discover and inspect dashboards, list reachable data sources, and run bounded read queries through their backends",
+  "discoveries": [
+    {
+      "driver": "grafana_datasource_v1",
+      "id": "grafana-data-sources",
+      "mappings": [
+        {
+          "observed_type": "prometheus",
+          "route_adapter": "grafana_datasource_proxy_v1",
+          "target_provider": "prometheus"
+        },
+        {
+          "observed_type": "loki",
+          "route_adapter": "grafana_datasource_proxy_v1",
+          "target_provider": "loki"
+        },
+        {
+          "observed_type": "alertmanager",
+          "route_adapter": "grafana_datasource_proxy_v1",
+          "target_provider": "alertmanager"
+        }
+      ],
+      "operation": "grafana-datasources-list",
+      "service": "default"
+    }
+  ],
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [
+        [
+          "grafana.service_account_token"
+        ]
+      ],
+      "contract": {
+        "description": "List dashboards in one Grafana organization namespace, with bounded cursor pagination",
+        "input_schema": {
+          "properties": {
+            "continue": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "namespace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "namespace",
+            "limit",
+            "continue"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List dashboards in one Grafana organization namespace, with bounded cursor pagination",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "grafana-dashboards-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Grafana organization namespace. For the default organization this is `default`.",
+          "name": "namespace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "type": "string"
+          },
+          "symbol": "namespace"
+        },
+        {
+          "description": "Maximum number of dashboards to return in this page.",
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "description": "Opaque continuation token returned by an earlier page.",
+          "name": "continue",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "continue"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "continue",
+            "value": {
+              "$param": "continue"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/apis/dashboard.grafana.app/v1/namespaces/{namespace}/dashboards"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "apiVersion": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "apiVersion": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "description": "Resource metadata. `name` is the dashboard UID and annotations include folder placement.",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "spec": {
+                  "description": "The dashboard definition, including title, tags, panels, variables and time settings.",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "metadata",
+                "spec"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "description": "List metadata, including the continuation token when another page exists.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "grafana.service_account_token"
+        ]
+      ],
+      "contract": {
+        "description": "Retrieve one dashboard resource by UID from a Grafana organization namespace",
+        "input_schema": {
+          "properties": {
+            "namespace": {
+              "type": "string"
+            },
+            "uid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "namespace",
+            "uid"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Retrieve one dashboard resource by UID from a Grafana organization namespace",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "grafana-dashboard-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Grafana organization namespace. For the default organization this is `default`.",
+          "name": "namespace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "type": "string"
+          },
+          "symbol": "namespace"
+        },
+        {
+          "description": "Dashboard UID, as returned in the resource metadata name by grafana-dashboards-list.",
+          "name": "uid",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "type": "string"
+          },
+          "symbol": "uid"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/apis/dashboard.grafana.app/v1/namespaces/{namespace}/dashboards/{uid}"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "apiVersion": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Resource metadata. `name` is the dashboard UID and annotations include folder placement.",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "resourceVersion": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "spec": {
+            "description": "The dashboard definition, including title, tags, panels, variables and time settings.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "metadata",
+          "spec"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "grafana.service_account_token"
+        ]
+      ],
+      "contract": {
+        "description": "List the data sources available to the authenticated Grafana service account. This is also the bounded connection verification read",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List the data sources available to the authenticated Grafana service account. This is also the bounded connection verification read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "grafana-datasources-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/datasources"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "access": {
+              "type": "string"
+            },
+            "id": {
+              "type": "integer"
+            },
+            "isDefault": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "readOnly": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uid": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "uid",
+            "name",
+            "type"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "grafana.service_account_token"
+        ]
+      ],
+      "contract": {
+        "description": "Execute one or more read queries through Grafana data-source backends over an explicit time range",
+        "input_schema": {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "queries": {
+              "items": {},
+              "type": "array"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "queries",
+            "to"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Execute one or more read queries through Grafana data-source backends over an explicit time range",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "grafana-datasource-query",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Start of the query range, either epoch milliseconds or a Grafana relative time such as `now-5m`.",
+          "name": "from",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "description": "Start of the query range, either epoch milliseconds or a Grafana relative time such as `now-5m`.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "from"
+        },
+        {
+          "description": "Data-source-specific read queries. Every query identifies its data source and reference id; further fields depend on that data-source plugin.",
+          "name": "queries",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "description": "Data-source-specific read queries. Every query identifies its data source and reference id; further fields depend on that data-source plugin.",
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "datasource": {
+                  "properties": {
+                    "uid": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "uid"
+                  ],
+                  "type": "object"
+                },
+                "format": {
+                  "enum": [
+                    "time_series",
+                    "table"
+                  ],
+                  "type": "string"
+                },
+                "intervalMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxDataPoints": {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "refId": {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "refId",
+                "datasource"
+              ],
+              "type": "object"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          },
+          "symbol": "queries"
+        },
+        {
+          "description": "End of the query range, either epoch milliseconds or a Grafana relative time such as `now`.",
+          "name": "to",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "description": "End of the query range, either epoch milliseconds or a Grafana relative time such as `now`.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "to"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "from": {
+              "$param": "from"
+            },
+            "queries": {
+              "$param": "queries"
+            },
+            "to": {
+              "$param": "to"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/ds/query"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "results": {
+            "description": "One data response per query reference id. Frames, series and error detail are data-source-plugin specific.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "sre",
+        "developer",
+        "data-analyst"
+      ],
+      "base_url": "{origin}",
+      "name": "default",
+      "tags": [
+        "observability"
+      ]
+    }
+  ],
+  "vendor": "Grafana",
+  "verify": "grafana-datasources-list"
+}

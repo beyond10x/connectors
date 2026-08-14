@@ -2,7 +2,7 @@
   "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
-      "description": "Slack bot user OAuth token (xoxb-…) with chat:write, channels:history, users:read and reactions:write",
+      "description": "Slack bot user OAuth token (xoxb-…) with app_mentions:read, chat:write, channels:history, users:read and reactions:write",
       "env": [
         "SLACK_BOT_TOKEN"
       ],
@@ -22,11 +22,25 @@
         "kind": "signing"
       },
       "subject": "app"
+    },
+    {
+      "description": "Slack app-level token (xapp-…) with connections:write, used only to open Socket Mode",
+      "entry": "connect_session",
+      "name": "slack.app_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
     }
   ],
   "authority": "com.slack.api",
   "channels": [
     {
+      "auth": [
+        [
+          "slack.app_token"
+        ]
+      ],
       "delivery_id": {
         "name": "event_id",
         "source": "body"
@@ -59,6 +73,18 @@
         "result": "text"
       },
       "service": "default",
+      "setup": {
+        "docs_url": "https://docs.slack.dev/apis/events-api/using-socket-mode/",
+        "steps": [
+          "Open your app at api.slack.com/apps, or create one for this workspace",
+          "Under Socket Mode, enable Socket Mode",
+          "Under Basic Information, generate an app-level token with the `connections:write` scope",
+          "Under OAuth & Permissions, add `app_mentions:read`; also add `channels:history` when receiving channel messages",
+          "Under Event Subscriptions, enable events and subscribe to `app_mention`; also subscribe to `message.channels` when receiving channel messages",
+          "Install or reinstall the app to the workspace, then add it to every channel it should observe",
+          "Choose Add Slack in B10x and enter the app-level token in its protected prompt"
+        ]
+      },
       "transport": "socket",
       "verification": {
         "kind": "connection",

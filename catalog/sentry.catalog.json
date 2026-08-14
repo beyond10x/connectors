@@ -781,6 +781,10 @@
   "services": [
     {
       "api_version": "0",
+      "audiences": [
+        "developer",
+        "sre"
+      ],
       "base_url": "https://sentry.io",
       "gid": "io.sentry.api:0",
       "name": "default",

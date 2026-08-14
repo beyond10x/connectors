@@ -634,6 +634,10 @@
   "services": [
     {
       "api_version": "v2",
+      "audiences": [
+        "content-manager",
+        "designer"
+      ],
       "base_url": "https://api.webflow.com/v2",
       "gid": "com.webflow.api:v2",
       "name": "default",

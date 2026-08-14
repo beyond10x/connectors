@@ -1723,6 +1723,9 @@
   "services": [
     {
       "api_version": "v4",
+      "audiences": [
+        "developer"
+      ],
       "base_url": "{origin}/api/v4",
       "gid": "com.gitlab.api:v4",
       "legacy": true,

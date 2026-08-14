@@ -488,6 +488,10 @@
   "services": [
     {
       "api_version": "1.0",
+      "audiences": [
+        "project-manager",
+        "product-manager"
+      ],
       "base_url": "https://app.asana.com",
       "gid": "com.asana.api:1.0",
       "name": "default",

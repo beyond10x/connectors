@@ -61,11 +61,11 @@ use crate::inbound::{
 use crate::lock::sha256_hex;
 use crate::{
     response_location_exists, AuthHazard, AuthMethod, AuthRequirement, AuthScheme, Connector,
-    ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape,
-    JsonSchema, OAuthGrant, Operation, OperationDirection, OperationRequest, OperationSpecSource,
-    Pagination, Param, ParamSet, PlacementRequirement, ProtocolDriver, Provenance, RateLimit,
-    RequiredCapability, Risk, Role, SemanticEffect, Service, Tag, DEFAULT_SERVICE,
-    MIN_REPEATABILITY_CONDITION,
+    Discovery, DiscoveryDriver, DiscoveryMapping, ErrorEnvelope, HostEffect, HttpMethod,
+    Idempotency, ImplementationForm, InteractionShape, JsonSchema, OAuthGrant, Operation,
+    OperationDirection, OperationRequest, OperationSpecSource, Pagination, Param, ParamSet,
+    PlacementRequirement, ProtocolDriver, Provenance, RateLimit, RequiredCapability, Risk, Role,
+    RouteAdapter, SemanticEffect, Service, Tag, DEFAULT_SERVICE, MIN_REPEATABILITY_CONDITION,
 };
 
 /// The documented JSON Schema for `providers/<name>.toml`.
@@ -902,6 +902,8 @@ struct ProviderFile {
     events: Vec<EventDecl>,
     #[serde(default)]
     channels: Vec<ChannelBinding>,
+    #[serde(default)]
+    discoveries: Vec<Discovery>,
     #[serde(default)]
     config: Vec<ConfigField>,
     #[serde(default)]
@@ -2482,6 +2484,7 @@ fn assemble(
             operations,
             events: file.events,
             channels: file.channels,
+            discoveries: file.discoveries,
             config: file.config,
             verify: file.verify,
             graphs: file.graphs,
@@ -2511,6 +2514,7 @@ fn implicit_service_members(source: &str) -> Vec<ImplicitServiceMember> {
         ("operations", "operation", "id"),
         ("events", "event", "name"),
         ("channels", "channel binding", "name"),
+        ("discoveries", "discovery", "id"),
         ("config", "configuration field", "name"),
         ("graphs", "graph", "name"),
     ] {
@@ -2651,6 +2655,7 @@ fn validate(
     validate_operations(connector, &mut problems);
     validate_events(connector, &mut problems);
     validate_channels(connector, &mut problems);
+    validate_discoveries(connector, &mut problems);
     validate_config(connector, &mut problems);
     validate_verify(connector, &mut problems);
     validate_graphs(connector, &mut problems);
@@ -3681,6 +3686,100 @@ fn validate_verify(connector: &Connector, problems: &mut Vec<String>) {
     }
 }
 
+/// Checks that discovery is a closed interpretation of one bounded read, never an authority or a
+/// caller-selected proxy surface.
+fn validate_discoveries(connector: &Connector, problems: &mut Vec<String>) {
+    let mut seen_ids: Vec<&str> = Vec::new();
+
+    for discovery in &connector.discoveries {
+        let id = discovery.id.as_str();
+        if let Err(reason) = crate::address::validate_member_name(id) {
+            problems.push(format!("discovery {id:?} has an invalid `id`: {reason}"));
+        } else if seen_ids.contains(&id) {
+            problems.push(format!("discovery {id:?} is declared more than once"));
+        }
+        seen_ids.push(id);
+
+        validate_member_service(connector, "discovery", id, &discovery.service, problems);
+
+        match connector.operation(&discovery.operation) {
+            None => problems.push(format!(
+                "discovery {id:?} names operation {:?}, which no `[[operations]]` block declares",
+                discovery.operation
+            )),
+            Some(operation) => {
+                if operation.service != discovery.service {
+                    problems.push(format!(
+                        "discovery {id:?} belongs to service {:?} but operation {:?} belongs to {:?}",
+                        discovery.service, discovery.operation, operation.service
+                    ));
+                }
+                if operation.direction != OperationDirection::Read
+                    || operation.interaction_shape != InteractionShape::Unary
+                    || !matches!(operation.request, OperationRequest::HttpV1 { .. })
+                    || !operation.effects.contains(&HostEffect::Read)
+                    || !operation.effects.contains(&HostEffect::Network)
+                {
+                    problems.push(format!(
+                        "discovery {id:?} operation {:?} must be a unary HTTP read with explicit read and network effects",
+                        discovery.operation
+                    ));
+                }
+            }
+        }
+
+        if discovery.mappings.is_empty() {
+            problems.push(format!(
+                "discovery {id:?} has no mappings; an observation parser with no closed target Provider mapping cannot produce a usable candidate"
+            ));
+        }
+
+        let mut observed_types: Vec<&str> = Vec::new();
+        for mapping in &discovery.mappings {
+            let observed_type = mapping.observed_type.as_str();
+            if !valid_discovery_token(observed_type) {
+                problems.push(format!(
+                    "discovery {id:?} has invalid `observed_type` {observed_type:?}; use 1..128 lowercase ASCII letters, digits, `.`, `_`, or `-`"
+                ));
+            } else if observed_types.contains(&observed_type) {
+                problems.push(format!(
+                    "discovery {id:?} maps observed type {observed_type:?} more than once"
+                ));
+            }
+            observed_types.push(observed_type);
+
+            if !valid_discovery_token(&mapping.target_provider) {
+                problems.push(format!(
+                    "discovery {id:?} has invalid target Provider {:?}",
+                    mapping.target_provider
+                ));
+            }
+
+            if !matches!(
+                (discovery.driver, mapping.route_adapter),
+                (
+                    DiscoveryDriver::GrafanaDatasourceV1,
+                    RouteAdapter::GrafanaDatasourceProxyV1
+                )
+            ) {
+                problems.push(format!(
+                    "discovery {id:?} driver {:?} is incompatible with route adapter {:?}",
+                    discovery.driver.word(),
+                    mapping.route_adapter.word()
+                ));
+            }
+        }
+    }
+}
+
+fn valid_discovery_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte)
+        })
+}
+
 /// Checks the inbound half of a service's members.
 ///
 /// Name spelling and service membership only — an event declares no behaviour of its own, so there is
@@ -3770,6 +3869,7 @@ fn validate_channels(connector: &Connector, problems: &mut Vec<String>) {
 
         validate_channel_events(connector, channel, problems);
         validate_channel_verification(connector, channel, problems);
+        validate_channel_auth(connector, channel, problems);
         validate_socket_connect(connector, channel, problems);
         validate_channel_payload(channel, problems);
         validate_channel_reply(connector, channel, problems);
@@ -3785,6 +3885,26 @@ fn validate_channels(connector: &Connector, problems: &mut Vec<String>) {
                 validate_selector(name, label, selector, problems);
             }
         }
+    }
+}
+
+fn validate_channel_auth(
+    connector: &Connector,
+    channel: &ChannelBinding,
+    problems: &mut Vec<String>,
+) {
+    validate_requirements(
+        connector,
+        &channel.auth,
+        &format!("channel binding {:?}", channel.name),
+        problems,
+    );
+    if channel.transport == Transport::Webhook && !channel.auth.is_empty() {
+        problems.push(format!(
+            "channel binding {:?} declares `auth` on a webhook. Inbound webhook trust belongs in \
+             `verification`; channel `auth` is credential custody for a host-established transport",
+            channel.name
+        ));
     }
 }
 
@@ -4054,6 +4174,7 @@ fn validate_session_binding(channel: &ChannelBinding, problems: &mut Vec<String>
 
             for (field, present) in [
                 ("connect", channel.connect.is_some()),
+                ("auth", !channel.auth.is_empty()),
                 ("events", !channel.events.is_empty()),
                 ("verification", channel.verification.is_some()),
                 ("discriminator", channel.discriminator.is_some()),
@@ -4406,19 +4527,24 @@ fn validate_channel_setup(
         ));
     }
 
-    // Registration belongs to a transport a vendor delivers to. A socket we opened has nothing to
-    // register, and a poll is driven by our own schedule.
-    for (field, present) in [
-        ("subscription", channel.subscription.is_some()),
-        ("setup", channel.setup.is_some()),
-    ] {
-        if present && channel.transport != Transport::Webhook {
-            problems.push(format!(
-                "channel binding {name:?} declares `{field}`, which only the `webhook` transport \
-                 uses. A `{}` binding has no endpoint for the vendor to register",
-                transport_word(channel.transport)
-            ));
-        }
+    // API registration names where the vendor should deliver to our webhook. An outbound socket
+    // has no callback endpoint, but may still need manual vendor-side mode, scopes, subscriptions,
+    // and installation. Poll and direct-session setup belongs to their Integration/Connection.
+    if channel.subscription.is_some() && channel.transport != Transport::Webhook {
+        problems.push(format!(
+            "channel binding {name:?} declares `subscription`, which only the `webhook` transport \
+             uses. A `{}` binding has no endpoint for the vendor to register",
+            transport_word(channel.transport)
+        ));
+    }
+    if channel.setup.is_some()
+        && !matches!(channel.transport, Transport::Webhook | Transport::Socket)
+    {
+        problems.push(format!(
+            "channel binding {name:?} declares `setup`, which only `webhook` and `socket` \
+             transports use. A `{}` binding is configured through its own runtime policy",
+            transport_word(channel.transport)
+        ));
     }
 
     if let Some(Subscription {
@@ -4970,6 +5096,7 @@ fn validate_services(connector: &Connector, problems: &mut Vec<String>) {
 
         validate_service_roles(connector, service, problems);
         validate_service_tags(service, problems);
+        validate_service_audiences(service, problems);
     }
 }
 
@@ -4997,6 +5124,29 @@ fn validate_service_tags(service: &Service, problems: &mut Vec<String>) {
     }
 }
 
+/// Checks that discovery audiences form a set on each service.
+///
+/// Unknown values are refused by serde because [`crate::Audience`] is closed. Repeats are refused
+/// here so every projection can treat the field as a set without silently normalizing author input.
+fn validate_service_audiences(service: &Service, problems: &mut Vec<String>) {
+    let name = service.name.as_str();
+    let mut seen: Vec<crate::Audience> = Vec::new();
+
+    for audience in &service.audiences {
+        let word = audience.word();
+        if seen.contains(audience) {
+            problems.push(format!(
+                "service {name:?} declares audience {word:?} more than once. An audience is a \
+                 discovery label, and a set that tolerates repeats is a list pretending to be a \
+                 set. Known audiences: {}",
+                crate::Audience::known_set()
+            ));
+            continue;
+        }
+        seen.push(*audience);
+    }
+}
+
 /// Checks the one `[[services]]` entry that may name the reserved [`DEFAULT_SERVICE`] — C-120,
 /// C-458.
 ///
@@ -5009,7 +5159,7 @@ fn validate_service_tags(service: &Service, problems: &mut Vec<String>) {
 /// shape for a published default service growing named siblings. The exceptions are scoped along
 /// two axes:
 ///
-/// 1. **What the entry may carry.** `roles` and `tags`, and nothing else. Neither has a
+/// 1. **What the entry may carry.** `roles`, `tags` and `audiences`, and nothing else. None has a
 ///    connector-level spelling, so neither has anything to contradict, while `base_url`,
 ///    `api_version` and `description` all do. `tags` joined the exception with C-153, which is what
 ///    makes the *forty-seven* single-surface providers taggable at all.
@@ -5038,7 +5188,7 @@ fn validate_default_service_entry(
             "`[[services]]` declares {DEFAULT_SERVICE:?} beside the named service {:?}. \
              Set `legacy = true` only when this is an already-published, address-elided service that \
              must retain its old GID, OIP, credential address and unsuffixed artifacts while named \
-             siblings are added. Otherwise declare the roles and tags on the named service that \
+             siblings are added. Otherwise declare the roles, tags and audiences on the named service that \
              actually has them",
             other.name
         ));
@@ -5069,9 +5219,9 @@ fn validate_default_service_entry(
         problems.push(format!(
             "`[[services]]` declares {DEFAULT_SERVICE:?} with `{}`. {DEFAULT_SERVICE:?} is \
              reserved — it is the service an operation belongs to when it names none, and it is \
-             elided from every published address — so the entry may carry `roles` and `tags`, and \
-             nothing else. A role and a tag attach to a service and a single-surface provider has \
-             nowhere else to put either; everything else is already stated at connector level, and a \
+             elided from every published address — so the entry may carry `roles`, `tags` and \
+             `audiences`, and nothing else. All three attach to a service and a single-surface \
+             provider has nowhere else to put them; everything else is already stated at connector level, and a \
              second definition could disagree with it",
             overreaching.join("`, `")
         ));
@@ -5079,12 +5229,13 @@ fn validate_default_service_entry(
         && !service.legacy
         && service.roles.is_empty()
         && service.tags.is_empty()
+        && service.audiences.is_empty()
     {
         problems.push(format!(
             "`[[services]]` declares {DEFAULT_SERVICE:?} and nothing else. {DEFAULT_SERVICE:?} is \
              reserved: it is the service an operation belongs to when it names none, and a provider \
-             with one API surface declares no services at all. The two reasons to write the entry \
-             are to carry `roles` and to carry `tags`"
+             with one API surface declares no services at all. The reasons to write the entry \
+             are to carry `roles`, `tags`, or discovery-only `audiences`"
         ));
     }
 }
@@ -5367,7 +5518,7 @@ fn validate_one_credential_acquisition(
     method: &AuthMethod,
     problems: &mut Vec<String>,
 ) {
-    if method.oauth2.is_none() {
+    if method.oauth2.is_none() && method.entry.is_none() {
         return;
     }
     let name = method.name.as_str();
@@ -5378,17 +5529,27 @@ fn validate_one_credential_acquisition(
         if produced.credential != method.name {
             continue;
         }
-        problems.push(format!(
-            "credential {name:?} declares an `[auth.oauth2]` grant, and operation {:?} declares \
-             `produces_credential` naming it. Those state two different acquisitions of one \
-             credential — the host runs a token grant, or this connector's own call mints it — and \
-             exactly one governs. An authorize or token endpoint is never a connector operation, so \
-             a credential obtained from the vendor's OAuth endpoints declares only `[auth.oauth2]` \
-             and the minting operation is removed; `produces_credential` is for a credential minted \
-             by an ordinary operation this connector declares, and such a credential declares no \
-             `[auth.oauth2]` block",
-            operation.id
-        ));
+        if method.oauth2.is_some() {
+            problems.push(format!(
+                "credential {name:?} declares an `[auth.oauth2]` grant, and operation {:?} declares \
+                 `produces_credential` naming it. Those state two different acquisitions of one \
+                 credential — the host runs a token grant, or this connector's own call mints it — and \
+                 exactly one governs. An authorize or token endpoint is never a connector operation, so \
+                 a credential obtained from the vendor's OAuth endpoints declares only `[auth.oauth2]` \
+                 and the minting operation is removed; `produces_credential` is for a credential minted \
+                 by an ordinary operation this connector declares, and such a credential declares no \
+                 `[auth.oauth2]` block",
+                operation.id
+            ));
+        }
+        if method.entry.is_some() {
+            problems.push(format!(
+                "credential {name:?} declares Connect Session `entry`, and operation {:?} declares \
+                 `produces_credential` naming it. Those state two different acquisitions of one \
+                 credential",
+                operation.id
+            ));
+        }
     }
 }
 
@@ -5592,10 +5753,25 @@ fn validate_credentials(connector: &Connector, problems: &mut Vec<String>) {
             validate_auth_prefix(connector, method, prefix, problems);
         }
 
-        // A credential resolved from no env var and minted by no grant can never produce a value.
-        if method.env.is_empty() && method.oauth2.is_none() {
+        // Connect Session entry is deliberately the only non-ambient static source.
+        if method.env.is_empty() && method.oauth2.is_none() && method.entry.is_none() {
             problems.push(format!(
-                "credential {name:?} names no `env` keys, so nothing can resolve it to a value"
+                "credential {name:?} names no `env` keys and no `entry`, so nothing can resolve it \
+                 to a value"
+            ));
+        }
+        if method.entry.is_some() && !method.env.is_empty() {
+            problems.push(format!(
+                "credential {name:?} declares Connect Session `entry` and `env` keys. Those are \
+                 two acquisition paths for one credential; a Connect Session credential is never \
+                 read from ambient process state"
+            ));
+        }
+        if method.entry.is_some() && method.oauth2.is_some() {
+            problems.push(format!(
+                "credential {name:?} declares Connect Session `entry` and OAuth2. OAuth callbacks \
+                 already complete through their own Connect Session flow; operator/API-key entry \
+                 is a different acquisition"
             ));
         }
 
@@ -6660,6 +6836,8 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("producedCredential", probe::<crate::ProducedCredential>()),
         ("event", probe::<EventDecl>()),
         ("channel", probe::<ChannelBinding>()),
+        ("discovery", probe::<Discovery>()),
+        ("discoveryMapping", probe::<DiscoveryMapping>()),
         ("sessionBinding", probe::<SessionBinding>()),
         ("socketConnect", probe::<SocketConnectSpec>()),
         ("configField", probe::<ConfigField>()),

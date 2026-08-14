@@ -12,10 +12,9 @@
 //! `Cargo.lock`, which is deliberate: the lock records the resolved graph including *optional*
 //! dependencies, so adding the edge behind a feature flag trips this too.
 //!
-//! The three buckets are reclassified for this workspace. There is **no network crate yet** — the
-//! platform family of design 02 §2 is M2's, and its `server` crate's egress module is where the one
-//! allowed socket will live. That an allow-list is currently empty is itself asserted, so the day
-//! a crate is added to it is a decision somebody wrote down.
+//! The three buckets are reclassified for this workspace. `server` is the first explicitly
+//! network-capable root member: it binds the owner-authenticated personal-local Unix socket. The
+//! SIP and RTVBP network closures remain isolated nested workspaces.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -49,11 +48,11 @@ const COMPILER_CRATES: &[&str] = &[
 /// "merely unexamined" state: a reader who finds `reqwest` in `Cargo.lock` and a passing test
 /// cannot tell whether the edge was considered.
 ///
-/// **Empty, today, and that is the state design 02 §5 describes for M1.** The one module allowed to
-/// dial a vendor is `crates/server`'s egress, and the platform family does not exist yet. A crate
-/// added here must be a **leaf** — nothing in the build path may depend on it, which
+/// `server` owns the personal-local Unix listener and is therefore network-capable even though it
+/// does not dial a provider itself. A crate added here must be a **leaf** — nothing in the build
+/// path may depend on it, which
 /// [`a_compiler_crate_cannot_reach_a_network_crate`] enforces in the direction that matters.
-const NETWORK_CRATES: &[&str] = &[];
+const NETWORK_CRATES: &[&str] = &["server"];
 
 /// The build path does not reach the secret store — asserted over the dependency graph, not by
 /// convention.
@@ -102,9 +101,6 @@ const HOST_LIBRARIES: &[&str] = &[
     // compiler-owned document types, but the compiler has no reverse edge into this runtime use
     // case.
     "service",
-    // The policy composition and authority implementation. The first network driver is deliberately
-    // a separate leaf; `server` itself still has no socket dependency.
-    "server",
     // The owner-bound secret store. Its Vault backend is an **optional** feature that is off by
     // default, and `reqwest` arrives only with it — which is exactly why the fence below reads the
     // lock rather than the feature-resolved graph: turning the feature on must not be able to put
@@ -122,8 +118,7 @@ const HOST_LIBRARIES: &[&str] = &[
 fn a_compiler_crate_cannot_reach_a_network_crate() {
     let lock = Lock::read();
 
-    // An empty allow-list is the current, deliberate state — see `NETWORK_CRATES`. The loop below
-    // asserts nothing when it is empty, which is correct: there is no allowance to bound yet.
+    // Every explicit allowance is still kept out of every compiler dependency closure.
     for network_crate in NETWORK_CRATES {
         assert!(
             lock.contains(network_crate),
@@ -307,6 +302,59 @@ fn the_voice_runtime_is_the_only_production_composition_leaf() {
             }),
             "{} is a second production SIP/RTVBP composition point",
             directory.display()
+        );
+    }
+}
+
+/// The product binary consumes the supervised leaf without feature-unifying it into the compiler.
+#[test]
+fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
+    let root = workspace_root();
+    let root_manifest =
+        std::fs::read_to_string(root.join("Cargo.toml")).expect("the workspace manifest");
+    let root_document: toml::Value = root_manifest
+        .parse()
+        .expect("the workspace manifest parses");
+    let excluded = root_document
+        .get("workspace")
+        .and_then(|workspace| workspace.get("exclude"))
+        .and_then(toml::Value::as_array)
+        .expect("`[workspace] exclude`");
+    assert!(
+        excluded
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .any(|member| member == "crates/connectors-cli"),
+        "the product binary must remain outside the deterministic compiler workspace"
+    );
+
+    let product = root.join("crates/connectors-cli");
+    let manifest_path = product.join("Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display()));
+    let document: toml::Value = manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+    assert!(
+        document.get("workspace").is_some(),
+        "the product binary must remain a nested workspace"
+    );
+    assert!(
+        product.join("Cargo.lock").is_file(),
+        "the product binary's complete dependency closure must stay locked"
+    );
+    let dependencies = document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("product dependencies");
+    assert!(
+        dependencies.contains_key("voice-runtime"),
+        "the product must consume the one supervised runtime leaf"
+    );
+    for adapter in ["driver-sip", "rtvbp-voice-endpoint"] {
+        assert!(
+            !dependencies.contains_key(adapter),
+            "the product must not form a second direct `{adapter}` composition point"
         );
     }
 }

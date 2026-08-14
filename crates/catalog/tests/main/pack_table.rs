@@ -212,3 +212,25 @@ fn every_closed_configuration_set_is_addressable() {
     }
     assert!(closed > 0, "the catalogue ships closed configuration sets");
 }
+
+#[test]
+fn grafana_discovery_is_available_as_closed_catalog_data() {
+    let grafana = catalog::provider(catalog::ProviderKey::id("grafana")).expect("Grafana provider");
+    let discovery = grafana
+        .discoveries
+        .first()
+        .expect("Grafana data-source discovery");
+    assert_eq!(discovery.operation, "grafana-datasources-list");
+    assert_eq!(
+        discovery
+            .mappings
+            .iter()
+            .map(|mapping| (mapping.observed_type, mapping.target_provider))
+            .collect::<Vec<_>>(),
+        [
+            ("prometheus", "prometheus"),
+            ("loki", "loki"),
+            ("alertmanager", "alertmanager"),
+        ]
+    );
+}

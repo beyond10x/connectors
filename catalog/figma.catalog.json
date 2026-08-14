@@ -647,6 +647,10 @@
   "services": [
     {
       "api_version": "v1",
+      "audiences": [
+        "designer",
+        "product-manager"
+      ],
       "base_url": "https://api.figma.com",
       "gid": "com.figma.api:v1",
       "name": "default",

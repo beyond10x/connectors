@@ -23800,6 +23800,9 @@
   "services": [
     {
       "api_version": "v2",
+      "audiences": [
+        "support-agent"
+      ],
       "base_url": "https://{subdomain}.zendesk.com",
       "gid": "com.zendesk.api:v2",
       "legacy": true,

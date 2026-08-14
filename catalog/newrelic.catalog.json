@@ -784,6 +784,10 @@
   "services": [
     {
       "api_version": "2",
+      "audiences": [
+        "sre",
+        "developer"
+      ],
       "base_url": "https://{host}/v2",
       "gid": "com.newrelic.api:2",
       "name": "default",

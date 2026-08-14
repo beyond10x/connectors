@@ -867,6 +867,10 @@
   "services": [
     {
       "api_version": "1",
+      "audiences": [
+        "project-manager",
+        "product-manager"
+      ],
       "base_url": "https://api.trello.com/1",
       "gid": "com.trello.api:1",
       "name": "default",

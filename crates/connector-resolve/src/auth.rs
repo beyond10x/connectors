@@ -83,7 +83,7 @@ impl std::fmt::Debug for Assembled {
 /// suffix. It is passed in rather than read here so that this stays a pure function.
 pub fn acquire(credential: &'static Credential, secret: &str, user: Option<&str>) -> String {
     match credential.acquire {
-        Acquisition::Static => secret.to_string(),
+        Acquisition::Static | Acquisition::ConnectSession => secret.to_string(),
         // Identical to `Static`, and deliberately spelled out rather than joined to it (C-136): a
         // minted credential is a stored value like any other by the time anything places it.
         Acquisition::Minted { .. } => secret.to_string(),

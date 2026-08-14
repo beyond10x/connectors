@@ -404,7 +404,8 @@ fn a_default_only_connector_hashes_no_service_fields() {
 /// fact they did not declare before. The rule this test exists for is "no churn for a provider nobody
 /// edited", not "no churn ever".
 ///
-/// So a **metadata-only** `default` entry — `name` plus `roles` and/or `tags`, and nothing else — is
+/// So a **metadata-only** `default` entry — `name` plus `roles`, `tags` and/or `audiences`, and
+/// nothing else — is
 /// admitted and stripped before the walk. Everything the walk was built to catch it still catches: a
 /// `service` key on an operation, and a `default` entry that reaches for `base_url`, `api_version` or
 /// `description`. [`Connector::is_default_only`](connector_spec::Connector::is_default_only) stays
@@ -435,8 +436,9 @@ fn every_shipped_service_is_spellable_and_a_single_service_provider_declares_non
                 panic!(
                     "providers/{name} has one API surface, so it must encode no addressing service \
                      key — otherwise its lockfile entry and every artifact keyed by it churn for a \
-                     provider nobody edited. A `default` entry carrying only `roles`/`tags` is \
-                     admitted (C-120, C-153) and was stripped before this walk, so what remains \
+                     provider nobody edited. A `default` entry carrying only \
+                     `roles`/`tags`/`audiences` is admitted (C-120, C-153) and was stripped before \
+                     this walk, so what remains \
                      reaches for something it must not. Found one at {position}:\n{encoded}"
                 );
             }
@@ -658,7 +660,7 @@ const SCHEMA_KEYS: [&str; 3] = ["schema", "response_schema", "body_schema"];
 /// anything else is **left in place on purpose** — the walk then finds it and fails, so a widening of
 /// what `default` may carry cannot slip past this test by being invisible to it.
 fn strip_metadata_only_default_service(document: &mut serde_json::Value) {
-    const METADATA_KEYS: [&str; 3] = ["name", "roles", "tags"];
+    const METADATA_KEYS: [&str; 4] = ["name", "roles", "tags", "audiences"];
 
     let Some(fields) = document.as_object_mut() else {
         return;

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::ConnectionAuthority;
+use crate::{ConnectionAuthority, RouteAdapter};
 
 /// Closed built-in driver identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -139,6 +139,19 @@ pub struct HttpPlan {
     pub url_template: String,
 }
 
+/// An inert target-Provider HTTP operation routed through a parent Connection.
+///
+/// It deliberately carries a target-relative path rather than the target Provider's direct origin,
+/// so a mediated route cannot silently fall back to direct egress.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MediatedHttpPlan {
+    pub method: String,
+    pub target_path_template: String,
+    pub parent_connection: String,
+    pub resource_binding: String,
+    pub adapter: RouteAdapter,
+}
+
 /// An inert SIP establishment plan. Destination policy and media/listener apertures are selected
 /// deployment facts; no caller-provided URI or socket appears here.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,6 +163,7 @@ pub struct SipPlan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolPlan {
     HttpV1(HttpPlan),
+    MediatedHttpV1(MediatedHttpPlan),
     SipV1(SipPlan),
 }
 
@@ -157,6 +171,7 @@ impl ProtocolPlan {
     pub const fn driver(&self) -> DriverId {
         match self {
             Self::HttpV1(_) => DriverId::HttpV1,
+            Self::MediatedHttpV1(_) => DriverId::HttpV1,
             Self::SipV1(_) => DriverId::SipV1,
         }
     }

@@ -70,6 +70,11 @@
           "description": "The ingress surfaces this connector describes. A binding composes events with the operation that replies to them, over a transport flux owns — it is not a new primitive.",
           "items": { "$ref": "#/$defs/channel" }
         },
+        "discoveries": {
+          "type": "array",
+          "description": "Bounded observation sources. Each entry interprets one declared unary HTTP read through a closed driver and maps only reviewed vendor types to target Providers and closed mediated-route adapters. Discovery creates neither a Connection nor authority.",
+          "items": { "$ref": "#/$defs/discovery" }
+        },
         "config": {
           "type": "array",
           "description": "What a human must supply before any of the above can run — the surface a settings page renders. Every other part of this file models how a credential reaches the wire; this models how it gets there in the first place.",
@@ -94,6 +99,64 @@
         "patch": {
           "$ref": "#/$defs/patch",
           "description": "Corrections applied over the ingested spec. Only meaningful alongside `[spec]`."
+        }
+      }
+    },
+
+    "discovery": {
+      "type": "object",
+      "title": "One bounded discovery observation source",
+      "description": "A closed interpretation of one existing read operation. It is not a network scan, a callable member, a Connection, or a Grant.",
+      "additionalProperties": false,
+      "required": ["id", "operation", "driver", "mappings"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable declaration identity within this Provider."
+        },
+        "service": {
+          "type": "string",
+          "description": "The service containing the observation operation. Omit for the reserved default service."
+        },
+        "operation": {
+          "type": "string",
+          "description": "A declared unary HTTP read operation in this service. Normal Connector admission still gates invoking it."
+        },
+        "driver": {
+          "enum": ["grafana_datasource_v1"],
+          "description": "Closed response normalizer. Unknown drivers are refused."
+        },
+        "mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/discoveryMapping" }
+        }
+      }
+    },
+
+    "discoveryMapping": {
+      "type": "object",
+      "title": "One observed-type to target-Provider mapping",
+      "additionalProperties": false,
+      "required": ["observed_type", "target_provider", "route_adapter"],
+      "properties": {
+        "observed_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z0-9._-]+$",
+          "description": "Exact normalized vendor type admitted by this mapping."
+        },
+        "target_provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z0-9._-]+$",
+          "description": "Target Provider whose semantics and operations the candidate uses. The Provider may arrive through deployed catalog composition; absence at materialization is a refusal, not fallback."
+        },
+        "route_adapter": {
+          "enum": ["grafana_datasource_proxy_v1"],
+          "description": "Closed implementation identity for a mediated route. It is never caller-selected."
         }
       }
     },
@@ -168,6 +231,10 @@
           "$ref": "#/$defs/socketConnect",
           "description": "The generic RFC 6455 handshake. Valid only for socket transport; absence leaves an explicitly vendor-specific transport such as Slack Socket Mode."
         },
+        "auth": {
+          "$ref": "#/$defs/authRequirements",
+          "description": "Credential-name alternatives the host resolves inside Connector custody to establish or supervise this channel. Distinct from socket `connect.auth`: a vendor-specific transport may authenticate a ticket-minting call before it has a WebSocket URL."
+        },
         "events": {
           "type": "array",
           "description": "The `[[events]]` names this binding carries, all from its own service. Required for `webhook` and `socket`; a `poll` binding may omit them, because its `cursor` operation is what it carries.",
@@ -204,7 +271,7 @@
         },
         "setup": {
           "$ref": "#/$defs/manualSetup",
-          "description": "What a human does in the vendor's dashboard, when there is no subscription API. Slack is the case: no Web API method registers an Events API endpoint."
+          "description": "Manual vendor-side setup for webhook registration or outbound socket establishment when there is no complete setup API."
         },
         "cursor": {
           "type": "string",
@@ -539,7 +606,7 @@
     "manualSetup": {
       "type": "object",
       "title": "What a human does in the vendor's dashboard",
-      "description": "For vendors with no subscription API. Slack is the case: no Web API method registers an Events API endpoint, so somebody opens api.slack.com/apps and pastes a URL. That work does not disappear because it is undeclared — it moves into a support article nobody keeps current.",
+      "description": "For channels with no complete setup API. Slack uses this for both a pasted webhook URL and Socket Mode configuration. That work does not disappear because it is undeclared — it moves into a support article nobody keeps current.",
       "additionalProperties": false,
       "required": ["steps"],
       "properties": {
@@ -549,7 +616,7 @@
         },
         "steps": {
           "type": "array",
-          "description": "The steps, in order, each one thing a person does. Rendered as a numbered list beside the callback URL the product displays.",
+          "description": "The steps, in order, each one thing a person does. Rendered beside the webhook callback URL or while establishing the socket Connection.",
           "items": { "type": "string" },
           "minItems": 1
         }
@@ -747,8 +814,34 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/tag" },
           "description": "What KIND of thing this service is, so a catalogue of 54 providers can be filtered by domain rather than scrolled.\n\nA tag is deliberately NOT a role. A role answers `can this service do X, checkably?` and carries required members the loader verifies; a tag answers `what kind of thing is this?` and carries nothing — no operation makes a service `storage`. The misread to design against is a UI inferring `this category means these capabilities`. It does not.\n\nTags attach HERE for the same reason roles do, and the case is sharper: `google` is not one kind of thing — its `gmail` is email while its `drive` is storage. A provider's tags are derived as the union of its services', and a provider-level `tags` key is an error.\n\nA service carries a SET: `twilio` is messaging and telephony at once."
+        },
+        "audiences": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/audience" },
+          "description": "Who is likely to find this service useful, for catalogue discovery and explorer filtering only. Audiences never grant an operation, hide a service, select a credential, or participate in Connection/Grant/runtime policy.\n\nAudiences attach to the service because one provider can expose surfaces intended for different work. A provider's audiences are derived as the union of its services'; a provider-level `audiences` key is therefore an error."
         }
       }
+    },
+
+    "audience": {
+      "title": "Who is likely to find a service useful",
+      "description": "A closed discovery vocabulary. These labels are presentation hints, never authorization, entitlement, visibility, or credential policy.",
+      "enum": [
+        "developer",
+        "sre",
+        "security-engineer",
+        "data-analyst",
+        "product-manager",
+        "project-manager",
+        "designer",
+        "sales-rep",
+        "support-agent",
+        "marketer",
+        "finance",
+        "ecommerce-manager",
+        "content-manager"
+      ]
     },
 
     "tag": {
@@ -1150,6 +1243,11 @@
           "type": "array",
           "description": "Environment variable KEYS to resolve the secret from, tried in order. Never a value.",
           "items": { "type": "string" }
+        },
+        "entry": {
+          "type": "string",
+          "const": "connect_session",
+          "description": "A human enters this credential at a short-lived Connector-owned Connect Session completion endpoint. Mutually exclusive with `env` and OAuth2; clients and runtimes never search ambient process state for it."
         },
         "user_env": {
           "type": "array",

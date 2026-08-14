@@ -42,8 +42,12 @@ mod credential_response;
 mod credential_subject;
 #[path = "main/determinism.rs"]
 mod determinism;
+#[path = "main/discovery.rs"]
+mod discovery;
 #[path = "main/execution_facts.rs"]
 mod execution_facts;
+#[path = "main/grafana.rs"]
+mod grafana;
 #[path = "main/graphs.rs"]
 mod graphs;
 #[path = "main/ir_roundtrip.rs"]
@@ -80,6 +84,8 @@ mod repeatability_condition_elision;
 mod response_schema_coverage;
 #[path = "main/semantic_effects.rs"]
 mod semantic_effects;
+#[path = "main/service_audiences.rs"]
+mod service_audiences;
 #[path = "main/service_partition.rs"]
 mod service_partition;
 #[path = "main/service_roles.rs"]

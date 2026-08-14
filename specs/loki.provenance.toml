@@ -1,0 +1,14 @@
+version = 1
+
+[[spec]]
+path = "specs/loki/http-api-2026-08-15.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-15"
+reviewed_at = "2026-08-15"
+sha256 = "79224c49c4befbb69a938104f249d160c5b8e773aa400dbc96943183bf35c560"
+coverage = "exact-shipped-surface"
+purpose = "Authoritative source for the bounded Loki range-query operation shipped by providers/loki.toml."
+references = [
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-logs-within-a-range-of-time",
+]

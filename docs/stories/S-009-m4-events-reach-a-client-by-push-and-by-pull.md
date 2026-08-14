@@ -47,7 +47,13 @@ first-class client API rather than a support ticket.
       delivery) and by pull (subscription), carrying the same event id and the same provenance.
 
 ## Progress
-- (not started)
+
+- 2026-08-14 — a personal-local Slack Socket Mode alpha now supervises one owned transport per
+  durable Connection, persists normalized native events before acknowledgement, deduplicates by
+  provider delivery id, and exposes bounded generic pull/replay. It is evidence for the channel,
+  event-store and pull halves, not M4 completion: generic subscriptions, signed push delivery,
+  retries, retention, operational events, audit, hosted authority, and the same-event push+pull exit
+  remain open.
 
 ## Notes
 

@@ -1,0 +1,18 @@
+# Value-free personal-local Slack Socket Mode Integration.
+#
+# No token, environment-variable name, or secret file belongs here. `connection create` returns a
+# one-use Connector completion endpoint; `connect-complete` prompts the operator on a non-echoing
+# terminal and sends the app token directly to that endpoint.
+
+[owner]
+tenant_id = "tenant-development"
+agent_id = "harness-development"
+agent_revision = 1
+authority_snapshot_id = "snapshot-development-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[slack]
+grant_ref = "grant-slack-inbound-development-1"
+initiation = "provider"
+allowed_events = ["app_mention", "message"]
+connect_session_ttl_seconds = 300

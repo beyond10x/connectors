@@ -6,8 +6,8 @@
   "voice_contract_bundle_sha256": "85993e8cfbf70441a02e8c0ec94794fd30436fa143424c67921cc33f65f2c743",
   "upstream": {
     "release": "sdk/rust/v0.1.0",
-    "commit": "ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8",
-    "crate_sha256": "76b7a79069f725e7ae13d2ca9af5b47bf8198e83839c360185ff3cb368e95469"
+    "commit": "dc0a60f7425b4899885f372152028457791b1e72",
+    "crate_sha256": "7d1d675e359016a5c8711bc0a29783ad9ce57a2f80f47ab5c77bc0152935ff9b"
   },
   "negotiation": {
     "websocket_subprotocol": "b10x.voice.v1",

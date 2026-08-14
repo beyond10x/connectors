@@ -64,9 +64,13 @@ to make unrepresentable now.
 ## Progress
 
 - 2026-08-14 — identity ownership curated before implementation. Personal-local authentication
-  remains here; hosted identity is an external owner contract. Implementation remains not started
-  and cannot claim hosted stability before the Identity owner bundle and shared negative fixtures
-  exist.
+  remains here; hosted identity is an external owner contract. Hosted stability cannot be claimed
+  before the Identity owner bundle and shared negative fixtures exist.
+- 2026-08-14 — the personal-local alpha slice now binds an owner-credentialed, mode-`0600` Unix
+  socket under an owner-only state root, serves the immutable generic Connector operation bundle,
+  and refuses worktree state in the product CLI. Zero-config mode advertises no operations. This
+  does not complete M2: non-Unix fallback, hosted Identity conformance, routes-as-data, persistence,
+  and the remaining platform skeleton criteria stay open.
 
 ## Notes
 
