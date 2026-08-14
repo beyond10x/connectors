@@ -65,6 +65,8 @@ will spawn children as each milestone is designed.
 | [S-029](S-029-substrate-events-enter-durable-delivery-with-gap-recovery.md) | Substrate events enter durable delivery with gap recovery | blocked | Platform | domain, protocol, service, server |
 | [S-030](S-030-raw-proxy-is-break-glass-not-a-model-capability.md) | Raw proxy is break-glass authority, not a model capability | backlog | Platform | domain, protocol, service, server |
 | [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | backlog | Platform | catalog, protocol, ci, docs |
+| [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | backlog | Platform | catalog, domain, service, server, driver-sip |
+| [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | backlog | Platform | domain, protocol, service, server, rtvbp-voice-endpoint |
 
 ## Epics in this seed
 
@@ -76,9 +78,10 @@ will spawn children as each milestone is designed.
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
-| `beyond-http` | S-023, S-024, S-025, S-026, S-027, S-028 | ADR 0010's delivery order: orthogonal document facts, one plan seam, satellite trust, one real driver, direct-byte establishment, and external artifacts last. |
+| `beyond-http` | S-023, S-024, S-025, S-026, S-027, S-028 | ADR 0010's delivery order: orthogonal document facts, one plan seam, satellite trust, one real driver, direct-byte establishment, and external artifacts last. SIP/RTVBP is the selected proof and is detailed by the native-voice epic. |
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-repository conformance bundles. |
+| `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
 
 ## Known gaps in this backlog
 

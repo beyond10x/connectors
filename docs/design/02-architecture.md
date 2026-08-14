@@ -172,6 +172,12 @@ treat connector admission as substrate admission.
 Structural rules, each with a fence or a type making it non-optional:
 - `crates/server`'s egress module is the **only** place a vendor socket is opened; a dependency
   fence classifies every crate as network/no-network and fails on drift.
+- **Native-voice amendment (2026-08-14):** the selected `sipx-transport` API owns its sockets and
+  performs its own `bind(Config)`. `server`/`service` remains the only admission, destination-policy,
+  credential and composition path, but the closed `driver-sip` crate is the one named exception
+  allowed to perform physical SIP/RTP binds from a non-serializable admitted plan. Every configured,
+  resolved or protocol-learned target is checked against that plan; the fence rejects any other
+  network-capable driver or direct `sipx` bind.
 - Generic v1 has no raw proxy. If S-030 later enables operator-only break-glass access, it rides the
   same path with destructive/max-effect facts plus separate method/path and destination apertures;
   it is never model-exposed or admitted by an ordinary catalog grant.

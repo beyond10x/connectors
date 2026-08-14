@@ -1,6 +1,6 @@
 # Design 03: beyond HTTP — drivers, satellites, and the byte plane
 
-**Status:** accepted v1 design; document axes landed; external runtime artifacts deferred · **Date:** 2026-08-13
+**Status:** accepted v1 design; native-voice amendment accepted; external runtime artifacts deferred · **Date:** 2026-08-13
 **Inputs:** the predecessor rich-runtime program; B10x architecture repository boundaries;
 how AMI/AGI (Sangoma Asterisk), DNS/UDP, SIP, TCP protocols and audio channels reach the connector
 model.
@@ -35,9 +35,10 @@ Request/response over a non-HTTP transport is still an **Operation**: parameters
 constructs one protocol request, and a declared result or error returns. What varies is framing and
 lifecycle, not the grant model.
 
-- The platform ships a **closed, versioned set of protocol drivers**. HTTP is driver one. Asterisk
-  AMI is the leading first non-HTTP proof; DNS is another plausible small driver. Further drivers
-  arrive only for measured provider needs.
+- The platform ships a **closed, versioned set of protocol drivers**. HTTP is driver one. SIP is the
+  selected first non-HTTP/session proof under
+  [Design 05](05-native-sip-and-rtvbp.md); Asterisk AMI remains a plausible later unary/event proof,
+  and DNS another small candidate. Further drivers arrive only for measured provider needs.
 - The catalog configures a named driver with data. An AMI action's fields, result and risk are
   declared; TCP framing, login state and `ActionID` correlation are implementation.
 - A generic raw-TCP, arbitrary-code or declarative-handshake language is refused. Such a language is
@@ -116,16 +117,26 @@ This byte-plane split covers PTYs, port forwards, raw tunnels and RTP/audio with
 credential broker into a high-volume proxy. Asterisk's ARI `externalMedia` and AudioSocket are
 concrete examples: the platform establishes the leg; the media engine carries media.
 
-## 6. Asterisk as the proving sequence
+## 6. Voice proving sequence
+
+The original design left SIP/media implementation out of scope and treated Asterisk AMI as the
+leading candidate. The cross-repository native-voice decision supersedes that choice without
+widening Connectors into a PBX:
+
+- **SIP endpoint and media termination** are now in scope as one closed built-in `sip_v1` driver,
+  backed by exact `sipx` dependencies. The driver is a user agent at the configured carrier/PBX
+  edge; it is not a SIP proxy, registrar service, arbitrary dial proxy, TURN service, video stack,
+  or tenant/product router.
+- **RTVBP** begins behind the SIP endpoint as the separately authorized direct-byte boundary. Its
+  neutral voice catalog is generic infrastructure; `babelforce.v1` stays in the downstream
+  Babelforce distribution.
 
 - **ARI** already fits the HTTP operation plus WebSocket Event/Channel model, including establishing
   audio legs through `externalMedia`.
-- **AMI** is the leading first non-HTTP driver when its operational surface is required: a TCP
+- **AMI** is a later non-HTTP driver when its operational surface is required: a TCP
   session, correlated actions as Operations, and AMI events as declared Events.
 - **FastAGI** is an inbound session transport only if legacy dialplans require it. It generalizes the
   owned inbound transport topology; it is not a reason to invent a raw framing DSL.
-- **SIP/media internals** remain out of scope. B10x is a control plane for existing media
-  systems, not a telephony implementation.
 
 ## 7. Deferred extension: attested runtime artifacts
 
@@ -165,14 +176,16 @@ platform.
 2. Establish substrate's standalone, Flux-free minimum host execution contract; do not delay built-in
    HTTP/non-HTTP drivers on substrate when no external execution is required.
 3. Design identity/cloud trust for satellite registration and federation.
-4. Prove one real non-HTTP driver—prefer AMI when demand is concrete—with unary actions, events,
-   refusal tests and no generic framing language.
-5. Add session/byte-plane establishment against a concrete terminal, tunnel or media journey.
+4. Prove the built-in SIP driver against loopback registration, inbound and outbound dialogs,
+   DTMF, bounded audio, hangup, cancellation, and refusal fixtures.
+5. Prove direct RTVBP establishment against the same call with a fake application endpoint and no
+   model, including replay, unreachable-route, bounded-loss, interruption, and drain cases.
 6. Consider external runtime artifacts only after the built-in driver seam has real pressure and the
    separate security decision is accepted.
 
-This design does not schedule an AMI implementation or accept external runtime artifacts. It fixes
-where those concerns belong so later work does not re-derive the old mixed runtime model.
+This design does not schedule an AMI implementation or accept external runtime artifacts. Native
+voice is prepared by S-032/S-033 but remains gated by the unstarted platform family, the neutral
+RTVBP catalog, the MSRV change, and released owner evidence.
 
 The ownership and five-axis model are accepted by
 [architecture ADR 0010 — Beyond HTTP is a five-axis connector model](https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
@@ -182,7 +195,8 @@ are accepted by architecture ADRs
 through
 [ADR 0019 — Foundation contracts ship as signed reproducible bundles](https://github.com/b10x/architecture/blob/main/adr/0019-contract-release-and-conformance.md).
 Delivery item 1's document facts landed in S-023. The next seam and later runtime work remain owned
-by S-024 through S-028 in the story board. The connectors-owned
+by S-024 through S-028 and the native-voice slices S-032/S-033 in the story board. The
+connectors-owned
 `fixtures/substrate-wire-0.1.0-axis-projection.json` pins substrate's owner-issued 0.1.0 bundle and
 records the non-mechanical vocabulary mapping; it is not the full provider projection or S-031's
 release machinery.
