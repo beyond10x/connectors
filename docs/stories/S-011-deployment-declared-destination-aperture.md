@@ -7,7 +7,7 @@ priority:
 design:
 epic: carried-constraints
 areas: [service, server, domain]
-note: "ported from flux-exchange X-143 and restated here as B10x authority. A deployment declares the aperture; a member, model input, Service Account, or raw-proxy request cannot widen it; matching is post-resolution"
+note: "ported from flux-exchange X-143 and restated here as B10x authority. A deployment declares the aperture; a member, model input, Identity service principal, connector Grant, or raw-proxy request cannot widen it; matching is post-resolution"
 ---
 
 # Deployment-declared destination aperture
@@ -60,6 +60,7 @@ destination selection to a model.
   where that question gets answered, so record the answer in the design series.
 - Consumed by [S-008](S-008-m3-connect-a-provider-and-invoke-it.md) (invoke), S-030 (any later raw
   proxy), and [S-009](S-009-m4-events-reach-a-client-by-push-and-by-pull.md) (channel supervisor and
-  outbound delivery worker). Delivery endpoint registration requires `delivery.manage`, persists a
-  governed destination, and rechecks the aperture post-resolution at dispatch. Private-endpoint
+  outbound delivery worker). Delivery endpoint registration requires
+  `connectors.deliveries.manage`, persists a governed destination, and rechecks the aperture
+  post-resolution at dispatch. Private-endpoint
   provider work cannot start without it.

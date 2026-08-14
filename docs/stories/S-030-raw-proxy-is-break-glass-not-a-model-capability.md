@@ -19,8 +19,9 @@ mistaken for ordinary granted catalog execution.
 
 ## Acceptance
 
-- [x] Generic v1 omits raw proxy. Any later operator-only build/config gate must expose it as a distinct
-      destructive/max-effects capability unavailable to models and ordinary Service Accounts.
+- [x] Generic v1 omits raw proxy. Any later operator-only build/config gate must expose it as a
+      distinct destructive/max-effects capability unavailable to models, ordinary Identity service
+      principals, and ordinary connector Grants.
 - [ ] A separate method/path aperture and S-011 destination policy both admit the request; neither
       request data nor a catalog grant can widen them.
 - [ ] Audit identifies break-glass authority, actor, policy rule, normalized destination hash,

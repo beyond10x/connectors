@@ -71,7 +71,7 @@ Day-one changes, from the precedents analysis and the predecessor's own stories:
 | `crates/domain` | the nouns of design 01 as types: entities, closed vocabularies (risk, effects, audit actions…), ports (traits) for every store, and the **proof-type gates** (admission → grant → dispatch). No IO, no HTTP, no persistence. |
 | `crates/protocol` | versioned wire contracts: protocol identities (`connectors.api.v1`, `connectors.invoke-request.v1`, …), request/response DTOs, strict conformance (`deny_unknown_fields`, bounded diagnostics). The single source for SDK generation later. |
 | `crates/service` | use-cases over ports: connection lifecycle, connect sessions, acquisition, grant admission and CAS mutation, invocation assembly (document → plan → placed request), event routing, delivery queues. Pure logic; testable without a socket. |
-| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, posture-selected identity (local owner / OIDC / hosted), SQLite + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. |
+| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, personal-local authentication or the released B10x Identity verifier adapter, SQLite + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. It never implements OIDC login or Identity session/service-credential storage. |
 
 The predecessor's two-crate split (host/server) was right; its failure mode was god modules
 (one 10.7k-line route file). The four-crate split above moves the pressure points (`service`,
@@ -87,7 +87,7 @@ and spend the product's name on a dev tool:
 | Binary | Crate | Audience & verbs |
 |---|---|---|
 | `catalog` | `crates/catalog-cli` — internal, **never a release artifact** | this repo's maintainers, agents and CI: `catalog build \| diff \| check \| scaffold`, `catalog sources check \| refresh \| diff \| mint` (S-016/S-017) |
-| `connectors` | `crates/connectors-cli` — the product, arrives with M2 | end users and operators, against any deployment and entirely without flux: `connectors serve`, `connectors admin org \| user \| integration \| grant \| …`, and the client verbs (login, connect, invoke, events) |
+| `connectors` | `crates/connectors-cli` — the product, arrives with M2 | end users and operators, against any deployment and entirely without flux: `connectors serve`, connector-owned administration (`integration \| connection \| grant \| channel \| delivery`), and the client verbs (`connect`, `invoke`, `events`). Hosted login, organizations, memberships, sessions, and service credentials remain Identity surfaces. |
 
 The maintenance tool links the compiler family (`connector-spec` ingest, site projection,
 `catalog-build`); the product CLI links `protocol`/`service`/`server` and **never the
@@ -100,8 +100,14 @@ mid-flight and it went sideways; the parser is not where this project spends its
 `connectors serve` with no config is the **personal posture**: prefer an owner-permissioned Unix
 socket; otherwise use a loopback listener plus a generated high-entropy token stored under the
 owner-only state root. Local reachability alone is never identity. The posture has one implicit
-organization and refuses a working-tree state path. Zero manual configuration remains the personal
-tier's contract — secure local material is generated automatically.
+deployment-local tenant namespace and refuses a working-tree state path. Zero manual configuration
+remains the personal tier's contract — secure local material is generated automatically.
+
+**2026-08-14 identity-boundary amendment.** The personal posture above remains Connectors-owned.
+Organization and hosted postures do not terminate OIDC or mint/store login or service credentials.
+They consume the released B10x Identity validated-envelope/verifier contract and apply a
+second, Connectors-owned audience-scope and Grant decision. This amendment supersedes the founding
+`local owner / OIDC / hosted` server split and every M2 reference to Connectors-owned hosted login.
 
 ## 3. Postures are configuration, not builds
 
@@ -110,42 +116,58 @@ One config document (`platform.toml`), fail-closed (unknown field = refusal by n
 ```toml
 posture = "personal" | "org" | "saas"
 
-[identity]        # org: OIDC issuer, client, hosted-domain claim; personal: absent
-[organization]    # org: the one tenant's name; operator subject allowlist
+[identity_verifier] # org/saas: pinned Identity owner bundle, audience, issuer/trust roots;
+                    # personal: absent
+[tenant_binding]    # org/saas: receiver-configured expected tenant/trust domain/deployment;
+                    # never request selected and not an Organization record
 [storage]         # state root; refuses working-tree paths
 [catalog]         # pack path override (default: embedded), later: additional sources
 [egress]          # org: the deployment-declared destination allowlist (value-free)
 ```
 
-Same binary, same features, every posture. A posture only selects the identity chain, tenancy
-mode, and bind policy (loopback-only while no real identity is armed — carried refusal).
+Same binary, same connector feature set. A posture selects local authentication versus the Identity
+verifier, the fixed tenant binding, and bind policy. A hosted listener refuses startup when its
+verifier contract, trust roots, expected audience/tenant, or connected revocation posture is absent
+or invalid. Upstream OIDC issuer/client configuration and Identity session storage never enter this
+document.
 
 ## 4. Storage
 
-- **Relational state** — organizations, users, service-account verifiers, integrations,
-  connection registry, grants (CAS-revisioned), channels, events, deliveries, audit — in **one
-  SQLite database** under the state root. WAL mode, one writer, migrations embedded.
+- **Relational state** — the stable admitted tenant/principal references required for receiver-owned
+  records, integrations, connection registry, grants (CAS-revisioned), channels, events,
+  deliveries, and connector audit — in **one SQLite database** under the state root. There is no
+  Organization, membership, Identity login-session, upstream-token, service-principal credential,
+  or reusable service-bearer verifier store. WAL mode, one writer, migrations embedded.
 - **Credentials** — never in the database. `connector-secrets` owner-bound file store (personal/
-  org), envelope-encrypted per-org for saas later; the port stays, the backend swaps.
+  org), envelope-encrypted per-tenant for saas later; the port stays, the backend swaps.
 - **Catalog** — the pack, embedded in the binary and overridable by verified `Pack::load`; a
   pack that fails verification refuses startup.
 
-The predecessor scattered state across seven owner-only JSON files plus two SQLite databases —
-each individually justified, collectively unqueryable. One database + one secret store + one
-pack is the whole inventory here. SaaS-scale Postgres is a port swap decided when saas is real,
-not before.
+The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
+databases — each individually justified, collectively unqueryable. One connector database + one
+vendor secret store + one pack is the whole Connectors-owned inventory here. Identity persistence
+is not a fourth store hidden in this process. SaaS-scale Postgres is a port swap decided when saas
+is real, not before.
 
 ## 5. The one invocation path
 
 ```
-token ─▶ principal (org inside) ─▶ effective catalogue (sealed generation)
-      ─▶ grant admission (proof types; deny>allow>predicate)
-      ─▶ connection resolution (grant names the connection, never the credential)
+presented authority ─▶ personal-local auth OR Identity verifier
+      ─▶ admitted principal (tenant inside; exact Connectors audience scopes)
+      ─▶ connector Grant admission (proof types; deny>allow>predicate)
+      ─▶ Connection resolution (Grant names the Connection, never the credential)
       ─▶ connector-resolve: document ─▶ RequestPlan {request, subjects, redactions}
       ─▶ credential placement (subjects computed BEFORE placement)
       ─▶ egress (destination policy; the only module that dials)
-      ─▶ audit (closed vocabulary)
+      ─▶ connector audit (closed vocabulary)
 ```
+
+Identity scopes and connector Grants remain distinct. The closed scope strings are owned by
+[Design 01](01-domain-model.md#grant); no token claim is proof of a receiver-owned Connection or
+Grant. A future first-party substrate provider uses a separate substrate-audience authority when it
+calls substrate. Its owner-defined scopes are exactly `observe`, `workspaces`, and `exec`;
+Connectors does not rename `exec` to `execs`, alias any of those terms into a Connectors scope, or
+treat connector admission as substrate admission.
 
 Structural rules, each with a fence or a type making it non-optional:
 - `crates/server`'s egress module is the **only** place a vendor socket is opened; a dependency
@@ -173,6 +195,22 @@ HTTP, Flux, an ambient executable or another placement.
 - **Deliveries**: durable per-endpoint queues; Svix envelope (`id`, `timestamp`, HMAC over
   `{id}.{timestamp}.{body}`, dedicated key); retries with backoff; **replay-by-id API**.
 - **Subscriptions**: one authenticated WS per client, multiplexed, gated by inbound grants.
+
+**2026-08-14 substrate-ingestion amendment.** The substrate adapter supervises one Channel per
+`(Connection, source_scope)` and commits the native identity
+`(deployment, source_scope, generation, seq)` with its delivery/high-water update. It bootstraps by
+creating and completely consuming a stable snapshot, then resumes from the snapshot's opaque
+inclusive-barrier cursor. Retention, source-scope, and generation mismatches share one
+non-oracular gap posture. Snapshot “complete” means a quota-bounded complete current set for its
+current workspace and exec kinds; operation-ledger rows and deletion-tombstone tables are excluded,
+its event-provenance window is separately bounded and may be truncated, and an empty current set is
+valid. No-cursor pull is diagnostic, not a durable bootstrap shortcut.
+
+The tuple's `deployment` is never event-selected. It comes from the Connection's authenticated,
+out-of-band substrate peer binding. Any deployment assertion carried by a frame, page, or snapshot
+must match that binding exactly. Mismatch refuses before deduplication, delivery creation, or
+high-water advancement, leaves the Channel degraded, and requires authenticated operator rebind;
+it is not routed through ordinary gap recovery.
 
 ## 7. Fence and test regime (carried as mechanism)
 
@@ -208,8 +246,8 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
 | Milestone | Content | Exit |
 |---|---|---|
 | **M1 catalog** | copy catalog dirs + family crates; `catalog-build` extracted minus emitters; schema gains C-552 fields + per-op effects; lock verifier | `catalog build/diff/check` green; one-time pack differential vs predecessor passes |
-| **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; postures + identity (personal, org-OIDC); organizations, service accounts, audit | `connectors serve` healthy in both postures; routes fence green |
-| **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, declared-operation invoke; raw proxy remains deferred to S-030 | end-to-end: sign in → connect a real provider → grant → invoke, all audited |
+| **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; personal-local authentication; hosted Identity verifier port; fixed tenant/principal projection; closed connector audience scopes, Grants, and connector audit; no Identity-owned store | personal posture is healthy; hosted conformance passes the pinned Identity owner bundle; routes/dependency fences prove Identity implementation and persistence stay absent |
+| **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, declared-operation invoke; raw proxy remains deferred to S-030 | end-to-end: admit local or Identity authority → connect a real provider → grant → invoke, all audited |
 | **M4 events** | channels, webhook terminator, event store, deliveries + replay, subscriptions | a provider event reaches a client by push and by pull, with provenance |
 | **M5 clients** | externally gated until Flux records B10x adoption; then flux re-point (embedded client + local supervise) and the first measured plugin-retirement wave (gitlab), as recorded in S-010 | downstream adoption record exists; flux invokes gitlab through the platform; the gitlab plugin is deleted |
 
@@ -221,5 +259,5 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
    catalog is public.
 3. Console timing and shape (operator SPA served by the host, per the predecessor's
    same-origin lesson) — after M3 at the earliest.
-4. SQLite encryption-at-rest for the saas posture (per-org envelope keys) — decide with the
+4. SQLite encryption-at-rest for the saas posture (per-tenant envelope keys) — decide with the
    saas design, shaped for by keeping all secret material out of the database now.

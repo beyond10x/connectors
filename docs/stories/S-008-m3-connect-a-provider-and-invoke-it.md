@@ -7,17 +7,18 @@ priority:
 design: docs/design/02-architecture.md
 epic: build-order
 areas: [domain, protocol, service, server]
-note: "architecture §9 milestone M3. Exit: end-to-end sign in → connect a real provider → grant → invoke, all audited. This is where the product exists; everything before it is scaffolding and everything after it is reach"
+note: "architecture §9 milestone M3. Exit: admit personal-local or pinned Identity authority → connect a real provider → grant → invoke, all audited. Connectors never owns the hosted login/session. This is where the product exists; everything before it is scaffolding and everything after it is reach"
 ---
 
 # M3 — connect a real provider, grant it, invoke it
 
 ## Goal
 
-Deliver the middle layer and the one invocation path: an organization configures an integration, a
-human authorizes a connection through a connect session, an operator grants authority over declared
-facts, and a client holding **one token** invokes a declared operation — with the vendor credential
-never crossing the boundary. This is the milestone at which the client contract is real.
+Deliver the middle layer and the one invocation path: a tenant configures an integration, a human
+authorizes a vendor connection through a Connect Session, a connector operator grants authority over
+declared facts, and a client presents personal-local or short-lived exact-audience Identity
+authority to invoke a declared operation. Neither the Identity credential nor the vendor credential
+changes owners. This is the milestone at which the client contract is real.
 
 ## Acceptance
 
@@ -35,31 +36,36 @@ never crossing the boundary. This is the milestone at which the client contract 
       refusal names the address and never the value.
 - [ ] **Connection lifecycle**: `created → authorized → callable`, with `degraded → reauthorize`
       repairing **in place**. Connection ids are stable across reauthorization — proven by a test in
-      which a grant and a subscription referencing a connection survive a re-auth. Multiple labelled
-      connections per integration are first-class, and both scopes (organization-shared,
-      user-owned) exist.
-- [ ] **Grants**: organization-scoped, per-provider, admitting by selector over declared facts (risk
+      which a Grant and a subscription referencing a Connection survive a re-auth. Multiple labelled
+      Connections per Integration are first-class, and both scopes (tenant-shared,
+      principal-owned) exist.
+- [ ] **Grants**: tenant-scoped, per-provider, admitting by selector over declared facts (risk
       ceiling, effects subset, idempotency) plus explicit exceptions where **deny beats allow beats
       predicate**; CAS-revisioned mutation with previewable proposals and receipts. No store bound is
       an outage (503); an empty store is a refusal (403); a refusal never names the axis that refused.
       Grants bind to connections, never to credentials.
-- [ ] **Declared invoke rides one path**: principal → effective catalogue (sealed generation) → grant
-      admission through unconstructible proof types → connection resolution → document → `RequestPlan`
-      (data) → credential placement → egress → audit. Permission subjects are computed **before**
-      placement, so a query-placed secret can never enter an approval prompt or an evidence record.
-      Generic v1 has no raw proxy; S-030 owns any later operator-only break-glass path.
+- [ ] **Declared invoke rides one path**: personal-local authentication or Identity verification →
+      admitted principal with exact Connectors audience scope → effective catalogue (sealed
+      generation) → connector Grant admission through unconstructible proof types → Connection
+      resolution → document → `RequestPlan` (data) → credential placement → egress → connector
+      audit. Permission subjects are computed **before** placement, so a query-placed secret can
+      never enter an approval prompt or an evidence record. Generic v1 has no raw proxy; S-030 owns
+      any later operator-only break-glass path.
+- [ ] Connector scopes and Grants are independently tested. Identity service principals remain
+      Identity-owned, and an Identity-carried Connection/Grant reference cannot skip receiver lookup
+      or fine-grained Grant admission.
 - [ ] Exactly **one** request-composition path exists, held by a fence: a consumer that edits a plan
       has become a second one, and that is refused by design.
-- [ ] **Exit**: one end-to-end test — sign in, connect a real provider, grant, invoke — with every
-      step audited under the closed vocabulary.
+- [ ] **Exit**: end-to-end tests for personal-local and pinned Identity authority — admit, connect a
+      real provider, grant, invoke — with every connector step audited under the closed vocabulary.
 
 ## Progress
 - (not started)
 
 ## Notes
 
-- Exit criterion, verbatim from architecture §9: *"end-to-end: sign in → connect a real provider →
-  grant → invoke, all audited."*
+- Exit criterion from the 2026-08-14 architecture amendment: *"admit local or Identity authority →
+  connect a real provider → grant → invoke, all audited."*
 - Depends on [S-007](S-007-m2-the-platform-skeleton-serves.md). Carries
   [S-011](S-011-deployment-declared-destination-aperture.md) (the egress policy the invoke path and
   channel runner share) and [S-014](S-014-auth-as-tool-result.md) (what invoke returns when the

@@ -31,17 +31,18 @@ wall mid-task, and it is a client-contract promise in the vision, not a convenie
       refusal and learns nothing about which connections exist or which integrations are configured —
       no enumeration oracle, consistent with the grant rule that a refusal never names the axis that
       refused.
-- [ ] The connect URL carries no credential and no organization secret; the session is single-purpose
+- [ ] The connect URL carries no credential and no tenant secret; the session is single-purpose
       and bound to exactly the integration the operation needs (the domain model's
       `allowed_integrations` binding), so handing the URL to a human cannot widen anything.
 - [ ] **Degraded is distinguished from missing**: a degraded connection yields a
       **reauthorize-in-place** URL and the connection id is unchanged afterwards; a missing connection
       yields a create-connection URL. A client that stored the connection id keeps it in the first
       case.
-- [ ] The client can complete the loop with the token it already holds: after the human finishes, the
-      same invocation succeeds without the client re-authenticating (authenticate once, one token) —
-      proven by an end-to-end test, including the wait/poll shape a client uses to learn the session
-      completed.
+- [ ] The client can complete the loop with the same still-valid personal-local or
+      Connectors-audience Identity authority: after the human finishes vendor authorization, the same
+      invocation succeeds without a second Identity login or local bootstrap. Identity expiry and
+      rotation remain Identity-owned. The end-to-end test includes the wait/poll shape a client uses
+      to learn the Connect Session completed.
 - [ ] The response shape is fixture-covered in `protocol` conformance, positive and adversarial
       (expired session, session completed for a different integration, session already consumed), so
       a future SDK test suite shares the fixtures verbatim.
