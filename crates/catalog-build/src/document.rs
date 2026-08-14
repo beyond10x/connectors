@@ -1701,7 +1701,7 @@ pub fn schema() -> &'static Value {
                         "repeatability_condition": { "type": "string" },
                         "semantic_effects": { "type": "array", "items": { "type": "string" } },
                         "interaction_shape": { "enum": ["unary", "stream", "subscription", "leased_session", "session_establishment"] },
-                        "protocol_driver": { "enum": ["http_v1"] },
+                        "protocol_driver": { "enum": ["http_v1", "sip_v1"] },
                         "placement_requirement": { "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"] },
                         "implementation_form": { "enum": ["built_in"] },
                         "required_capabilities": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"] } },

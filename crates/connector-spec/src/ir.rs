@@ -310,6 +310,7 @@ pub enum InteractionShape {
 #[serde(rename_all = "snake_case")]
 pub enum ProtocolDriver {
     HttpV1,
+    SipV1,
 }
 
 /// Where an operation must be served; deployment policy chooses a matching instance later.

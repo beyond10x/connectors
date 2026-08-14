@@ -897,6 +897,7 @@ fn interaction_shape(operation: &str, word: &str) -> InteractionShape {
 fn protocol_driver(operation: &str, word: &str) -> ProtocolDriver {
     match word {
         "http_v1" => ProtocolDriver::HttpV1,
+        "sip_v1" => ProtocolDriver::SipV1,
         other => panic!("operation `{operation}` declares unknown protocol driver `{other}`"),
     }
 }
@@ -1012,6 +1013,31 @@ mod tests {
         assert_eq!(
             withheld.operations[0].credential_requirement,
             CredentialRequirement::Withheld
+        );
+    }
+
+    #[test]
+    fn sip_v1_survives_the_generated_table() {
+        let document = document(
+            r#", "credential_requirement": "no-credential-required""#,
+            "[]",
+        )
+        .replace(
+            "\"interaction_shape\": \"unary\"",
+            "\"interaction_shape\": \"session_establishment\"",
+        )
+        .replace(
+            "\"protocol_driver\": \"http_v1\"",
+            "\"protocol_driver\": \"sip_v1\"",
+        );
+        let provider = build("t", &document);
+        assert_eq!(
+            provider.operations[0].interaction_shape,
+            InteractionShape::SessionEstablishment
+        );
+        assert_eq!(
+            provider.operations[0].protocol_driver,
+            ProtocolDriver::SipV1
         );
     }
 

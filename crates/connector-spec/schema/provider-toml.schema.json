@@ -938,7 +938,7 @@
     },
 
     "protocolDriver": {
-      "enum": ["http_v1"]
+      "enum": ["http_v1", "sip_v1"]
     },
 
     "placementRequirement": {

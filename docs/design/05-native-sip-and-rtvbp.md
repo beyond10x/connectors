@@ -56,6 +56,13 @@ connectors/
 │       ├── Cargo.toml
 │       ├── src/lib.rs                    # VoiceSession-to-RTVBP binding over TelephonySession
 │       └── tests/{memory,websocket}.rs
+├── specs/
+│   ├── <voice-provider>/                 # authoritative or repository-authored protocol source
+│   └── <voice-provider>.provenance.toml  # source identity, references, scope and byte pin
+├── providers/
+│   └── <voice-provider>.toml             # reviewed SIP member declarations using sip_v1
+├── catalog/
+│   └── <voice-provider>.catalog.json     # generated canonical provider document
 ├── contracts/
 │   └── voice-session/v0alpha1/           # protocol-neutral semantics and conformance vectors
 ├── fixtures/
@@ -67,7 +74,9 @@ connectors/
 ```
 
 The exact module files under the four platform crates may land only as part of their owning
-milestone; the two new workspace members do not arrive before them. No `vendor/sipx`,
+milestone; the two new workspace members do not arrive before them. The concrete provider name is
+selected only when its source and permanent authority are reviewed; angle brackets above are a
+path template, not a literal directory. No `vendor/sipx`,
 `vendor/rtvbp`, Git submodule, `voice` repository, substrate protocol module, dynamic plugin, or
 out-of-process gateway artifact is added by this plan.
 
@@ -110,13 +119,32 @@ dependencies in all other drivers/platform crates and direct `sipx` binds anywhe
 
 ## 4. Catalog and admission
 
-The first declaration uses:
+`sip_v1` is a closed catalog `protocol_driver` value. It is not itself a provider: every supported
+carrier or PBX appears as a source-grounded provider member whose generated canonical document
+declares that driver. RTVBP and `VoiceSession` are not separate providers or callable operations;
+they are the post-admission binding and semantic contract behind the SIP member.
+
+The first source-grounded declaration uses:
 
 - interaction shape `session_establishment`;
 - protocol driver `sip_v1`;
 - implementation form `built_in`;
 - deployment-selected local or satellite placement;
 - explicit public/private network, listener, port range, and secret capability facts.
+
+Its outbound call-establishment Operation has one stable provider-scoped id, `expose = false` for
+the first proof, write/network effects, reviewed high risk, and non-idempotent replay behavior. Its
+inbound call surface is a declared provider channel/session binding tied to the same Connection and
+tenant/application route; it is not an ambient listener outside the catalog. `SOURCES.toml`, the
+provider source/provenance record, `providers/<voice-provider>.toml`, the generated canonical
+document, `connectors.lock`, the packed catalog, and the web projection land atomically.
+
+The `sip_v1` vocabulary may land before the runtime so documents and consumers can represent the
+accepted closed driver. A provider member must not land until S-024's plan/dispatch seam and S-032's
+driver make that member callable: the catalog never advertises an implementation that would only
+refuse as missing. Conversely, S-032 cannot complete—and no native SIP support can be claimed—until
+at least one such canonical provider member is served and discoverable through the effective
+catalog.
 
 An outbound operation declares bounded target forms and is non-idempotent unless a narrower member
 proves otherwise. The caller cannot provide a driver, artifact, credential location, network class,

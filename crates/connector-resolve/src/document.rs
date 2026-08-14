@@ -152,6 +152,7 @@ pub enum InteractionShape {
 #[allow(missing_docs)]
 pub enum ProtocolDriver {
     HttpV1,
+    SipV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -700,6 +701,36 @@ mod tests {
         let document = Document::parse(text).expect("the fixture parses");
         let operation = document.operation("vendor-thing-list").expect("its record");
         assert_eq!(operation.caller_parameters(), ["time_start"]);
+    }
+
+    #[test]
+    fn a_sip_session_driver_survives_the_canonical_document() {
+        let text = r#"{
+            "connector": "voice-provider",
+            "services": [{"name": "default", "base_url": "sip:pbx.example.test"}],
+            "operations": [{
+                "id": "voice-provider-call-establish",
+                "service": "default",
+                "expose": false,
+                "effects": ["write", "network"],
+                "interaction_shape": "session_establishment",
+                "protocol_driver": "sip_v1",
+                "placement_requirement": "connectors_deployment",
+                "implementation_form": "built_in",
+                "required_capabilities": ["private_network"],
+                "params": [],
+                "request": {"method": "POST", "url": "{base}"}
+            }]
+        }"#;
+        let document = Document::parse(text).expect("the SIP fixture parses");
+        let operation = document
+            .operation("voice-provider-call-establish")
+            .expect("its record");
+        assert_eq!(
+            operation.interaction_shape(),
+            InteractionShape::SessionEstablishment
+        );
+        assert_eq!(operation.protocol_driver(), ProtocolDriver::SipV1);
     }
 
     #[test]

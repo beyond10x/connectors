@@ -128,8 +128,8 @@ widening Connectors into a PBX:
   edge; it is not a SIP proxy, registrar service, arbitrary dial proxy, TURN service, video stack,
   or tenant/product router.
 - **RTVBP** begins behind the SIP endpoint as the separately authorized direct-byte boundary. Its
-  neutral voice catalog is generic infrastructure; `babelforce.v1` stays in the downstream
-  Babelforce distribution.
+  local adapter binding preserves the protocol-neutral Connectors `VoiceSession` contract;
+  `babelforce.v1` stays in the downstream Babelforce distribution.
 
 - **ARI** already fits the HTTP operation plus WebSocket Event/Channel model, including establishing
   audio legs through `externalMedia`.
@@ -184,8 +184,9 @@ platform.
    separate security decision is accepted.
 
 This design does not schedule an AMI implementation or accept external runtime artifacts. Native
-voice is prepared by S-032/S-033 but remains gated by the unstarted platform family, the neutral
-RTVBP catalog, the MSRV change, and released owner evidence.
+voice is prepared by S-032/S-033 but remains gated by the unstarted platform family, an actual
+source-grounded catalog member using `sip_v1`, the generic `VoiceSession` owner contract, the local
+RTVBP binding, the MSRV change, and released owner evidence.
 
 The ownership and five-axis model are accepted by
 [architecture ADR 0010 — Beyond HTTP is a five-axis connector model](https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
