@@ -678,6 +678,7 @@ pub enum ChannelTransport {
     Webhook,
     Socket,
     Poll,
+    Session,
 }
 
 /// One event declaration, including the local/wire identity split.
@@ -712,6 +713,16 @@ pub struct Selector {
     pub name: &'static str,
 }
 
+/// Driver and capability facts for an inbound direct-byte session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChannelSession {
+    pub interaction_shape: InteractionShape,
+    pub protocol_driver: ProtocolDriver,
+    pub placement_requirement: PlacementRequirement,
+    pub implementation_form: ImplementationForm,
+    pub required_capabilities: &'static [RequiredCapability],
+}
+
 /// One generated channel binding. Verification/reply/setup remain available in the manifest and
 /// public catalogue; this embedded shape carries every fact the zero-I/O socket planner and generic
 /// event router require.
@@ -723,6 +734,7 @@ pub struct Channel {
     pub base_url: &'static str,
     pub description: &'static str,
     pub transport: ChannelTransport,
+    pub session: Option<ChannelSession>,
     pub events: &'static [&'static str],
     pub connect: Option<SocketConnect>,
     pub discriminator: Option<Selector>,

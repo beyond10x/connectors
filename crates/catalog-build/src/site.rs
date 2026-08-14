@@ -54,9 +54,9 @@ use serde::Serialize;
 use connector_spec::{
     AuthScheme, ChannelBinding, ConfigField, Connector, EventDecl, HostEffect, HttpMethod,
     Idempotency, ImplementationForm, InteractionShape, JsonSchema, Level, ManualSetup, OAuth2Spec,
-    OAuthGrant, OAuthRedirect, Operation, OperationSpecSource, Param, PlacementRequirement,
-    ProtocolDriver, Reply, RequiredCapability, Risk, Selector, SemanticEffect, SocketConnectSpec,
-    Subscription, VerificationScheme,
+    OAuthGrant, OAuthRedirect, Operation, OperationRequest, OperationSpecSource, Param,
+    PlacementRequirement, Reply, RequiredCapability, Risk, Selector, SemanticEffect,
+    SessionBinding, SocketConnectSpec, Subscription, VerificationScheme,
 };
 
 use crate::inbound;
@@ -255,8 +255,10 @@ struct ChannelEntry {
     oip: Option<String>,
     /// What the binding is for, in one line.
     description: String,
-    /// `webhook`, `socket` or `poll` — flux owns the transport, the connector owns the binding.
+    /// `webhook`, `socket`, `poll`, or `session`.
     transport: &'static str,
+    /// Closed driver/capability axes for direct-byte session establishment.
+    session: Option<SessionBinding>,
     /// Generic RFC 6455 handshake facts, or `null` for other/vendor-specific transports.
     connect: Option<SocketConnectSpec>,
     /// The [`EventEntry::name`]s this binding carries, all from the same service.
@@ -523,7 +525,10 @@ struct OperationEntry {
     /// What execution means to Flux policy. Always present; empty means none declared.
     semantic_effects: Vec<SemanticEffect>,
     interaction_shape: InteractionShape,
-    protocol_driver: ProtocolDriver,
+    /// Driver-specific fields flattened into the operation. HTTP retains the established
+    /// `protocol_driver`/`method`/`path` spelling; SIP has no fabricated HTTP fields.
+    #[serde(flatten)]
+    protocol: OperationProtocolEntry,
     placement_requirement: PlacementRequirement,
     implementation_form: ImplementationForm,
     required_capabilities: Vec<RequiredCapability>,
@@ -539,10 +544,6 @@ struct OperationEntry {
     /// Published rather than merely stored, for the same reason the rest of this document is: the
     /// claim travels to consumers, so the evidence for it has to travel with it.
     repeatable_because: Option<String>,
-    /// The HTTP method, uppercase.
-    method: HttpMethod,
-    /// The path template, relative to [`ProviderEntry::base_url`].
-    path: String,
     /// The exact vendor operation and pinned document this operation was selected from. `null` for
     /// an inline operation; repository-local paths and fetch timestamps never enter this type.
     spec_source: Option<SpecSourceEntry>,
@@ -575,6 +576,18 @@ struct OperationEntry {
     hosts: Vec<String>,
     /// Whether it currently works, and if not, why. See [`crate::status`].
     status: Status,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "protocol_driver", rename_all = "snake_case")]
+enum OperationProtocolEntry {
+    HttpV1 {
+        /// The HTTP method, uppercase.
+        method: HttpMethod,
+        /// The path template, relative to [`ProviderEntry::base_url`].
+        path: String,
+    },
+    SipV1,
 }
 
 /// The public subset of one patch-selected operation's derived provenance.
@@ -757,6 +770,7 @@ fn channel_entry(connector: &Connector, channel: &ChannelBinding) -> ChannelEntr
         oip: member_oip(connector, &channel.service, &channel.name),
         description: channel.description.clone(),
         transport: inbound::transport_token(channel.transport),
+        session: channel.session.clone(),
         connect: channel.connect.clone(),
         events: channel.events.clone(),
         verification: verification_entry(channel),
@@ -883,7 +897,13 @@ fn operation_entry(connector: &Connector, operation: &Operation, host: String) -
         effects: operation.effects.clone(),
         semantic_effects: operation.semantic_effects.clone(),
         interaction_shape: operation.interaction_shape,
-        protocol_driver: operation.protocol_driver,
+        protocol: match &operation.request {
+            OperationRequest::HttpV1 { method, path } => OperationProtocolEntry::HttpV1 {
+                method: *method,
+                path: path.clone(),
+            },
+            OperationRequest::SipV1 => OperationProtocolEntry::SipV1,
+        },
         placement_requirement: operation.placement_requirement,
         implementation_form: operation.implementation_form,
         required_capabilities: operation.required_capabilities.clone(),
@@ -891,8 +911,6 @@ fn operation_entry(connector: &Connector, operation: &Operation, host: String) -
         // claim, and a reason too short to be one never reaches here because the loader refused the
         // provider file that stated it.
         repeatable_because: operation.repeatability_condition().map(str::to_owned),
-        method: operation.method,
-        path: operation.path.clone(),
         spec_source: connector
             .provenance
             .operation_specs
@@ -1059,9 +1077,11 @@ mod tests {
         Operation {
             id: "acme-thing-list".to_string(),
             service: connector_spec::DEFAULT_SERVICE.to_string(),
-            method: HttpMethod::Get,
+            request: OperationRequest::HttpV1 {
+                method: HttpMethod::Get,
+                path: "/v2/things".to_string(),
+            },
             direction: connector_spec::OperationDirection::Read,
-            path: "/v2/things".to_string(),
             description: "List things".to_string(),
             risk: Risk::Destructive,
             idempotency: Idempotency::NonIdempotent,
@@ -1070,7 +1090,6 @@ mod tests {
                 connector_spec::HostEffect::Network,
             ],
             interaction_shape: connector_spec::InteractionShape::Unary,
-            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
             placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
             implementation_form: connector_spec::ImplementationForm::BuiltIn,
             required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],

@@ -340,8 +340,8 @@ fn changing_only_upstream_methods_before_composition_preserves_authored_directio
 
     let original_flush = operation(&original, "acme-flush-widgets");
     let changed_flush = operation(&changed, "acme-flush-widgets");
-    assert_eq!(original_flush.method, HttpMethod::Get);
-    assert_eq!(changed_flush.method, HttpMethod::Post);
+    assert_eq!(original_flush.request.http_method(), Some(HttpMethod::Get));
+    assert_eq!(changed_flush.request.http_method(), Some(HttpMethod::Post));
     assert_eq!(
         original_flush.direction,
         connector_spec::OperationDirection::Write
@@ -350,8 +350,11 @@ fn changing_only_upstream_methods_before_composition_preserves_authored_directio
 
     let original_lookup = operation(&original, "acme-lookup-widgets");
     let changed_lookup = operation(&changed, "acme-lookup-widgets");
-    assert_eq!(original_lookup.method, HttpMethod::Post);
-    assert_eq!(changed_lookup.method, HttpMethod::Get);
+    assert_eq!(
+        original_lookup.request.http_method(),
+        Some(HttpMethod::Post)
+    );
+    assert_eq!(changed_lookup.request.http_method(), Some(HttpMethod::Get));
     assert_eq!(
         original_lookup.direction,
         connector_spec::OperationDirection::Read
@@ -428,9 +431,14 @@ required_capabilities = ["public_network"]
         connector
             .operations
             .iter()
-            .all(|operation| operation.method == HttpMethod::Get
-                && operation.path.starts_with("/api/v2/agents")
-                && operation.service == "manager"),
+            .all(
+                |operation| operation.request.http_method() == Some(HttpMethod::Get)
+                    && operation
+                        .request
+                        .http_path()
+                        .is_some_and(|path| path.starts_with("/api/v2/agents"))
+                    && operation.service == "manager"
+            ),
         "a matched operation carries the vendor's own method, path and document service"
     );
 }
@@ -1325,7 +1333,7 @@ fn the_canonical_surface_is_selected_and_the_file_stays_reviewable() {
     let selected: BTreeSet<&str> = connector
         .operations
         .iter()
-        .map(|operation| operation.path.as_str())
+        .map(|operation| operation.request.http_path().expect("HTTP operation"))
         .collect();
     let reached: Vec<&str> = WITHHELD
         .into_iter()
@@ -1351,12 +1359,14 @@ fn the_canonical_surface_is_selected_and_the_file_stays_reviewable() {
         !connector
             .operations
             .iter()
-            .any(|operation| operation.path == "/api/v1/webhook/zendesk"),
+            .any(|operation| operation.request.http_path() == Some("/api/v1/webhook/zendesk")),
         "the webhook receiver is not a callable operation"
     );
     assert!(
         !connector.operations.iter().any(|operation| operation
-            .path
+            .request
+            .http_path()
+            .expect("HTTP operation")
             .split('/')
             .any(|segment| segment == "internal")),
         "no operation on an `internal` path may ever be selected"

@@ -142,14 +142,13 @@ fn the_schema_marks_the_mandatory_keys_required() {
         ("provider", &["id", "base_url"]),
         // No default for `scheme`: how a secret reaches the wire is not decided by silence.
         ("authMethod", &["name", "scheme"]),
-        // No default for direction or the request/policy fields, for the same reason.
+        // No default for direction, the driver discriminator, or policy fields. Driver-specific
+        // method/path requirements are asserted from the schema condition below.
         (
             "operation",
             &[
                 "id",
-                "method",
                 "direction",
-                "path",
                 "risk",
                 "idempotency",
                 "effects",
@@ -178,6 +177,12 @@ fn the_schema_marks_the_mandatory_keys_required() {
             "`$defs.{object}.required` does not match what the loader insists on"
         );
     }
+
+    assert_eq!(
+        schema["$defs"]["operation"]["allOf"][0]["then"]["required"],
+        serde_json::json!(["method", "path"]),
+        "http_v1 must require both HTTP request fields"
+    );
 }
 
 /// A mechanism must name at least one credential, in the schema as well as in the loader — the

@@ -54,16 +54,18 @@ use crate::config::{
 use crate::graph::{Graph, GraphNode, NodeKind, PortRef};
 use crate::inbound::{
     parse_tolerance, signed_placeholders, validate_path, validate_symbol, ChannelBinding,
-    EventDecl, FieldSource, HmacSpec, ManualSetup, Reply, Selector, SocketConnectSpec,
-    Subscription, Transport, VerificationScheme, PAYLOAD_PLACEHOLDERS, SIGNED_PLACEHOLDERS,
+    EventDecl, FieldSource, HmacSpec, ManualSetup, Reply, Selector, SessionBinding,
+    SocketConnectSpec, Subscription, Transport, VerificationScheme, PAYLOAD_PLACEHOLDERS,
+    SIGNED_PLACEHOLDERS,
 };
 use crate::lock::sha256_hex;
 use crate::{
     response_location_exists, AuthHazard, AuthMethod, AuthRequirement, AuthScheme, Connector,
     ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape,
-    JsonSchema, OAuthGrant, Operation, OperationDirection, OperationSpecSource, Pagination, Param,
-    ParamSet, PlacementRequirement, ProtocolDriver, Provenance, RateLimit, RequiredCapability,
-    Risk, Role, SemanticEffect, Service, Tag, DEFAULT_SERVICE, MIN_REPEATABILITY_CONDITION,
+    JsonSchema, OAuthGrant, Operation, OperationDirection, OperationRequest, OperationSpecSource,
+    Pagination, Param, ParamSet, PlacementRequirement, ProtocolDriver, Provenance, RateLimit,
+    RequiredCapability, Risk, Role, SemanticEffect, Service, Tag, DEFAULT_SERVICE,
+    MIN_REPEATABILITY_CONDITION,
 };
 
 /// The documented JSON Schema for `providers/<name>.toml`.
@@ -2141,6 +2143,14 @@ fn compose(
         }
     }
 
+    let request = match protocol_driver {
+        ProtocolDriver::HttpV1 => OperationRequest::HttpV1 {
+            method: spec.method,
+            path: spec.path.clone(),
+        },
+        ProtocolDriver::SipV1 => OperationRequest::SipV1,
+    };
+
     let operation = Operation {
         id,
         // **The document decides the service, not the patch's own opinion of it** — C-410. A
@@ -2149,9 +2159,8 @@ fn compose(
         // `DEFAULT_SERVICE`, which made a provider declaring named services beside a `[spec]` a loud
         // load error and a single-document one the only shape that worked.
         service: document.service.clone(),
-        method: spec.method,
+        request,
         direction,
-        path: spec.path.clone(),
         description: patch
             .and_then(|patch| patch.description.clone())
             .unwrap_or_else(|| spec.description.clone()),
@@ -2162,7 +2171,6 @@ fn compose(
             .and_then(|patch| patch.semantic_effects.clone())
             .unwrap_or_default(),
         interaction_shape,
-        protocol_driver,
         placement_requirement,
         implementation_form,
         required_capabilities,
@@ -3407,7 +3415,8 @@ fn validate_pin(
         Position::Path => {
             let carried = connector
                 .operations_of(service)
-                .any(|operation| template_variables(&operation.path).contains(&pinned));
+                .filter_map(|operation| operation.request.http_path())
+                .any(|path| template_variables(path).contains(&pinned));
             if !carried {
                 problems.push(format!(
                     "configuration field {name:?} pins `{{{pinned}}}` in the request path, which no \
@@ -3766,6 +3775,7 @@ fn validate_channels(connector: &Connector, problems: &mut Vec<String>) {
         validate_channel_reply(connector, channel, problems);
         validate_channel_transport(connector, channel, problems);
         validate_channel_setup(connector, channel, problems);
+        validate_session_binding(channel, problems);
 
         for (label, selector) in [
             ("discriminator", &channel.discriminator),
@@ -3914,7 +3924,9 @@ fn validate_channel_events(
     // A push binding that carries no events delivers nothing: the transport would connect, hold, and
     // route every arrival to a label no trigger can name. A poll binding is different — its cursor
     // operation is what it carries.
-    if channel.events.is_empty() && channel.transport != Transport::Poll {
+    if channel.events.is_empty()
+        && !matches!(channel.transport, Transport::Poll | Transport::Session)
+    {
         problems.push(format!(
             "channel binding {name:?} lists no `events`, so nothing it receives could reach a \
              trigger. A binding names the events it carries; only a `poll` binding may omit them, \
@@ -3991,6 +4003,78 @@ fn validate_channel_verification(
 
     if let Some(VerificationScheme::Hmac(hmac)) = &channel.verification {
         validate_hmac(connector, name, hmac, problems);
+    }
+}
+
+/// A direct-byte session is not an event channel with some fields omitted. Its closed driver and
+/// host-authority axes are required together, while every event-delivery-only field is refused.
+fn validate_session_binding(channel: &ChannelBinding, problems: &mut Vec<String>) {
+    let name = channel.name.as_str();
+    match (channel.transport, channel.session.as_ref()) {
+        (Transport::Session, None) => problems.push(format!(
+            "channel binding {name:?} uses the `session` transport but declares no `session` \
+             driver/capability facts"
+        )),
+        (Transport::Webhook | Transport::Socket | Transport::Poll, Some(_)) => {
+            problems.push(format!(
+            "channel binding {name:?} declares `session` facts, which only the `session` transport \
+             uses"
+        ))
+        }
+        (Transport::Session, Some(session)) => {
+            if session.interaction_shape != InteractionShape::SessionEstablishment {
+                problems.push(format!(
+                    "channel binding {name:?} declares session interaction shape {:?}; the \
+                     `session` transport requires `session_establishment`",
+                    session.interaction_shape
+                ));
+            }
+            if session.protocol_driver != ProtocolDriver::SipV1 {
+                problems.push(format!(
+                    "channel binding {name:?} selects {:?} for an inbound session; the first closed \
+                     inbound session driver is `sip_v1`",
+                    session.protocol_driver
+                ));
+            }
+            if session.required_capabilities.is_empty() {
+                problems.push(format!(
+                    "channel binding {name:?} declares no session `required_capabilities`; absence \
+                     cannot prove the endpoint may listen"
+                ));
+            }
+            for pair in session.required_capabilities.windows(2) {
+                if pair[0] >= pair[1] {
+                    problems.push(format!(
+                        "channel binding {name:?} has unsorted or duplicate session \
+                         `required_capabilities`"
+                    ));
+                    break;
+                }
+            }
+
+            for (field, present) in [
+                ("connect", channel.connect.is_some()),
+                ("events", !channel.events.is_empty()),
+                ("verification", channel.verification.is_some()),
+                ("discriminator", channel.discriminator.is_some()),
+                ("delivery_id", channel.delivery_id.is_some()),
+                ("payload", !channel.payload.is_empty()),
+                ("payload_root", channel.payload_root),
+                ("reply", channel.reply.is_some()),
+                ("cursor", channel.cursor.is_some()),
+                ("subscription", channel.subscription.is_some()),
+                ("setup", channel.setup.is_some()),
+                ("interval", channel.interval.is_some()),
+            ] {
+                if present {
+                    problems.push(format!(
+                        "channel binding {name:?} declares event field `{field}` on a `session` \
+                         transport"
+                    ));
+                }
+            }
+        }
+        (_, None) => {}
     }
 }
 
@@ -4783,6 +4867,7 @@ fn transport_word(transport: Transport) -> &'static str {
         Transport::Webhook => "webhook",
         Transport::Socket => "socket",
         Transport::Poll => "poll",
+        Transport::Session => "session",
     }
 }
 
@@ -5803,14 +5888,42 @@ fn validate_operations(connector: &Connector, problems: &mut Vec<String>) {
             }
         }
 
-        if operation.path.trim().is_empty() {
-            problems.push(format!("operation {id:?} has an empty `path`"));
-        } else if !operation.path.starts_with('/') {
-            problems.push(format!(
-                "operation {id:?} has path {:?}, which must start with `/` — it is joined onto the \
-                 connector's `base_url`",
-                operation.path
-            ));
+        match &operation.request {
+            OperationRequest::HttpV1 { path, .. } => {
+                if path.trim().is_empty() {
+                    problems.push(format!("operation {id:?} has an empty `path`"));
+                } else if !path.starts_with('/') {
+                    problems.push(format!(
+                        "operation {id:?} has path {path:?}, which must start with `/` — it is \
+                         joined onto the connector's `base_url`"
+                    ));
+                }
+                if operation.interaction_shape == InteractionShape::SessionEstablishment {
+                    problems.push(format!(
+                        "operation {id:?} selects `http_v1` with `session_establishment`; the HTTP \
+                         request shape cannot establish a direct-byte session"
+                    ));
+                }
+            }
+            OperationRequest::SipV1 => {
+                if operation.interaction_shape != InteractionShape::SessionEstablishment {
+                    problems.push(format!(
+                        "operation {id:?} selects `sip_v1` with interaction shape {:?}; SIP v1 is \
+                         admitted only as `session_establishment`",
+                        operation.interaction_shape
+                    ));
+                }
+                if !operation.params.path.is_empty()
+                    || !operation.params.query.is_empty()
+                    || !operation.params.header.is_empty()
+                    || !operation.params.const_headers.is_empty()
+                {
+                    problems.push(format!(
+                        "operation {id:?} selects `sip_v1` but declares HTTP path, query, or header \
+                         parameters; SIP call inputs must use the driver payload"
+                    ));
+                }
+            }
         }
 
         for param in operation.params.iter() {
@@ -5840,11 +5953,12 @@ fn validate_operations(connector: &Connector, problems: &mut Vec<String>) {
             // reject `{requester_id}` for a parameter a caller knows as `req_id`.
             let wire = param.wire.as_deref().unwrap_or(&param.name);
             let placeholder = format!("{{{wire}}}");
-            if !operation.path.contains(&placeholder) {
+            let path = operation.request.http_path().unwrap_or_default();
+            if !path.contains(&placeholder) {
                 problems.push(format!(
                     "operation {id:?} declares path parameter {:?}, but its path {:?} has no \
                      `{placeholder}` to interpolate it into",
-                    param.name, operation.path
+                    param.name, path
                 ));
             }
         }
@@ -6546,6 +6660,7 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("producedCredential", probe::<crate::ProducedCredential>()),
         ("event", probe::<EventDecl>()),
         ("channel", probe::<ChannelBinding>()),
+        ("sessionBinding", probe::<SessionBinding>()),
         ("socketConnect", probe::<SocketConnectSpec>()),
         ("configField", probe::<ConfigField>()),
         ("choice", probe::<crate::Choice>()),

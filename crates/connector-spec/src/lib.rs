@@ -127,15 +127,16 @@ pub use graph::{
 };
 pub use inbound::{
     ChannelBinding, Digest, Encoding, EventDecl, FieldSource, HmacSpec, ManualSetup, Reply,
-    Selector, SocketConnectSpec, Subscription, TimestampFormat, Transport, VerificationScheme,
+    Selector, SessionBinding, SocketConnectSpec, Subscription, TimestampFormat, Transport,
+    VerificationScheme,
 };
 pub use ir::{
     constrains_nothing, credential_handle_schema, response_location_exists, BodyEncoding,
     Connector, ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm,
-    InteractionShape, JsonSchema, Operation, OperationDirection, OperationSpecSource, Pagination,
-    Param, ParamSet, PlacementRequirement, ProducedCredential, ProtocolDriver, Provenance,
-    RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service, Tag,
-    CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
+    InteractionShape, JsonSchema, Operation, OperationDirection, OperationRequest,
+    OperationSpecSource, Pagination, Param, ParamSet, PlacementRequirement, ProducedCredential,
+    ProtocolDriver, Provenance, RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service,
+    Tag, CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
 };
 pub use lock::{
     sha256_hex, LockEntry, LockPack, LockSpec, Lockfile, LOCKFILE_NAME, LOCKFILE_VERSION,

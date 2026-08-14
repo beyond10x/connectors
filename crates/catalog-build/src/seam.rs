@@ -663,7 +663,10 @@ required_capabilities = ["public_network"]
         );
 
         let operation = &connector.operations[0];
-        assert_eq!(operation.path, "/v2/tickets/{ticket_id}");
+        assert_eq!(
+            operation.request.http_path(),
+            Some("/v2/tickets/{ticket_id}")
+        );
         assert_eq!(operation.description, "Show one Acme ticket.");
         let param = &operation.params.path[0];
         assert_eq!(param.name, "ticket_id");
@@ -696,7 +699,8 @@ required_capabilities = ["public_network"]
             .operation("acme-ticket-show")
             .expect("the selected operation");
         assert_eq!(
-            operation.path, "/v2/tickets/{ticket_id}",
+            operation.request.http_path(),
+            Some("/v2/tickets/{ticket_id}"),
             "the build compiled `showTicket` out of a document `[spec] path` does not name"
         );
     }

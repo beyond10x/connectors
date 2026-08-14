@@ -2,7 +2,7 @@
 id: S-027
 title: "Direct-byte session establishment is operation-scoped"
 pillar: Platform
-status: backlog
+status: in-progress
 priority:
 design: docs/design/03-beyond-http.md
 epic: beyond-http
@@ -37,5 +37,9 @@ exchange continuous bytes directly under a short-lived bounded authority.
   independent route exists.
 - Architecture ADR 0024 selects the concrete neutral RTVBP media journey and extends verification
   to the selected voice/application endpoint without widening issuer or replay semantics.
-- The architecture-owned voice-session development vectors exist. S-033 owns implementation and
-  the later signed Connectors evidence.
+- `server::authority` now issues an Ed25519 authority to the connecting voice endpoint, binds its
+  ephemeral DPoP key and exact `GET wss://…` upgrade, and gives a distinct proof type only to the
+  serving endpoint after atomic replay redemption. Audience, expiry, replay, revocation, exact URI,
+  and debug-redaction fixtures pass.
+- Satellite reachability, generation drain, durable-state inspection, and production serving
+  enforcement remain open; the repository bundle is alpha and unsigned.

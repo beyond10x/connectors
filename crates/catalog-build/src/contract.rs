@@ -202,9 +202,11 @@ mod tests {
         Operation {
             id: "vendor-thing-get".to_string(),
             service: connector_spec::DEFAULT_SERVICE.to_string(),
-            method: HttpMethod::Get,
+            request: connector_spec::OperationRequest::HttpV1 {
+                method: HttpMethod::Get,
+                path: "/thing".to_string(),
+            },
             direction: OperationDirection::Read,
-            path: "/thing".to_string(),
             description: "Get a thing.".to_string(),
             risk: Risk::Low,
             idempotency: Idempotency::Idempotent,
@@ -213,7 +215,6 @@ mod tests {
                 connector_spec::HostEffect::Network,
             ],
             interaction_shape: connector_spec::InteractionShape::Unary,
-            protocol_driver: connector_spec::ProtocolDriver::HttpV1,
             placement_requirement: connector_spec::PlacementRequirement::ConnectorsDeployment,
             implementation_form: connector_spec::ImplementationForm::BuiltIn,
             required_capabilities: vec![connector_spec::RequiredCapability::PublicNetwork],

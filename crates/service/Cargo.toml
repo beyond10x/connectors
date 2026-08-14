@@ -1,0 +1,16 @@
+[package]
+name = "service"
+description = "Pure Connectors use cases, including zero-I/O closed-driver planning."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+connector-resolve.workspace = true
+domain.workspace = true
+thiserror.workspace = true
+

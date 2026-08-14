@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/contracts/voice-session/v0alpha1/vectors.schema.json",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["case", "from", "action", "to", "outcome", "code"],
+    "properties": {
+      "case": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+      "from": { "enum": ["created", "ready", "closing", "closed"] },
+      "action": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "to": { "enum": ["created", "ready", "closing", "closed"] },
+      "outcome": { "enum": ["accepted", "degraded", "refused"] },
+      "code": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+    }
+  }
+}
+

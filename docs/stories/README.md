@@ -25,7 +25,8 @@ repository-authored specs. The coordinated catalog wave then retired the predece
 identity and `quirks` vocabulary, declared host effects, and added the five independent beyond-HTTP
 axes. What M1 still left open is tracked by the remaining `post-m1` stories: web and coverage gates.
 
-The platform families are unstarted; nothing should be scaffolded ahead of the build order in
+The first platform-family foundation and development SIP/RTVBP runtime slices are present for
+S-024/S-027/S-032/S-033. The remaining runtime and provider work still follows the build order in
 [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
 changes (architecture §2) plus the post-M1 repairs; the milestone stories M2–M5 are containers that
 will spawn children as each milestone is designed.
@@ -57,16 +58,16 @@ will spawn children as each milestone is designed.
 | [S-013](S-013-connect-session-oauth-custody-in-personal-posture.md) | Decide the connect-session ↔ OAuth-callback custody chain in personal posture | backlog | Platform | domain, service, catalog |
 | [S-014](S-014-auth-as-tool-result.md) | Not-connected is a next step: the response carries a connect URL | backlog | Platform | protocol, service, server |
 | [S-023](S-023-beyond-http-facts-enter-the-document.md) | Beyond-HTTP facts enter the connector document orthogonally | done | Catalog | catalog, catalog-build, connector-spec, connector-resolve |
-| [S-024](S-024-one-zero-io-plan-seam-selects-a-closed-driver.md) | One zero-IO plan seam selects a closed built-in driver | backlog | Platform | domain, service, server, connector-resolve |
+| [S-024](S-024-one-zero-io-plan-seam-selects-a-closed-driver.md) | One zero-IO plan seam selects a closed built-in driver | in-progress | Platform | domain, service, server, connector-resolve |
 | [S-025](S-025-satellite-federation-has-a-threat-modeled-contract.md) | Satellite federation has a threat-modeled contract | backlog | Platform | domain, protocol, service, server |
 | [S-026](S-026-one-real-non-http-driver-proves-the-model.md) | One real non-HTTP driver proves the five-axis model | backlog | Platform | catalog, domain, service, server |
-| [S-027](S-027-direct-byte-session-establishment-is-operation-scoped.md) | Direct-byte session establishment is operation-scoped | backlog | Platform | domain, protocol, service, server |
+| [S-027](S-027-direct-byte-session-establishment-is-operation-scoped.md) | Direct-byte session establishment is operation-scoped | in-progress | Platform | domain, protocol, service, server |
 | [S-028](S-028-external-driver-artifacts-stay-deferred.md) | External driver artifacts stay deferred behind attestation | blocked | Platform | domain, service, server, docs |
 | [S-029](S-029-substrate-events-enter-durable-delivery-with-gap-recovery.md) | Substrate events enter durable delivery with gap recovery | blocked | Platform | domain, protocol, service, server |
 | [S-030](S-030-raw-proxy-is-break-glass-not-a-model-capability.md) | Raw proxy is break-glass authority, not a model capability | backlog | Platform | domain, protocol, service, server |
 | [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | backlog | Platform | catalog, protocol, ci, docs |
-| [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | backlog | Platform | catalog, domain, service, server, driver-sip |
-| [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | backlog | Platform | domain, protocol, service, server, rtvbp-voice-endpoint |
+| [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | in-progress | Platform | catalog, domain, service, server, driver-sip |
+| [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint |
 
 ## Epics in this seed
 

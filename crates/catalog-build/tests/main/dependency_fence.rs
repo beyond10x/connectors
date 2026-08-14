@@ -94,6 +94,17 @@ const HOST_LIBRARIES: &[&str] = &[
     // will carry one lives in the platform family. It is not in `COMPILER_CRATES` because nothing
     // in the build path depends on it, and it is not in `NETWORK_CRATES` because it may not dial.
     "connector-resolve",
+    // Protocol-neutral proof types and their wire projection. They are shared by runtime
+    // composition, but neither belongs to the catalogue compiler nor owns I/O.
+    "domain",
+    "protocol",
+    // Admission turns a reviewed canonical operation into a zero-I/O plan. It may read the
+    // compiler-owned document types, but the compiler has no reverse edge into this runtime use
+    // case.
+    "service",
+    // The policy composition and authority implementation. The first network driver is deliberately
+    // a separate leaf; `server` itself still has no socket dependency.
+    "server",
     // The owner-bound secret store. Its Vault backend is an **optional** feature that is off by
     // default, and `reqwest` arrives only with it — which is exactly why the fence below reads the
     // lock rather than the feature-resolved graph: turning the feature on must not be able to put
@@ -182,6 +193,163 @@ fn every_workspace_member_is_classified() {
         checked > 0,
         "no workspace members were read, so this asserted nothing"
     );
+}
+
+/// RTVBP's feature closure may not participate in canonical artifact generation.
+///
+/// The final Rust SDK enables `serde_json/preserve_order`. Cargo features unify within a workspace,
+/// so making its adapter a root member changes JSON map traversal and therefore committed OpenAPI
+/// and catalogue bytes even though no compiler crate directly imports RTVBP. The adapter is a
+/// nested workspace with its own lock for exactly that reason.
+#[test]
+fn the_rtvbp_runtime_dependency_is_isolated_from_the_canonical_workspace() {
+    let root = workspace_root();
+    let root_manifest =
+        std::fs::read_to_string(root.join("Cargo.toml")).expect("the workspace manifest");
+    let root_document: toml::Value = root_manifest
+        .parse()
+        .expect("the workspace manifest parses");
+    let excluded = root_document
+        .get("workspace")
+        .and_then(|workspace| workspace.get("exclude"))
+        .and_then(toml::Value::as_array)
+        .expect("`[workspace] exclude`");
+    assert!(
+        excluded
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .any(|member| member == "crates/rtvbp-voice-endpoint"),
+        "the RTVBP adapter must remain excluded from the canonical workspace"
+    );
+    assert!(
+        !Lock::read().contains("rtvbp"),
+        "the canonical workspace lock must not resolve RTVBP's feature closure"
+    );
+
+    let adapter_manifest_path = root.join("crates/rtvbp-voice-endpoint/Cargo.toml");
+    let adapter_manifest = std::fs::read_to_string(&adapter_manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", adapter_manifest_path.display()));
+    let adapter_document: toml::Value = adapter_manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", adapter_manifest_path.display()));
+    assert!(
+        adapter_document.get("workspace").is_some(),
+        "the RTVBP adapter must remain a nested workspace with an independent feature closure"
+    );
+    assert!(
+        root.join("crates/rtvbp-voice-endpoint/Cargo.lock")
+            .is_file(),
+        "the RTVBP adapter's independently reviewed dependency graph must stay locked"
+    );
+}
+
+/// sipx owns real sockets, so its closure and bind call stay in one explicitly isolated crate.
+#[test]
+fn the_sipx_network_dependency_is_exactly_pinned_and_isolated() {
+    const SIPX_REVISION: &str = "004ac534b8b222060ad2d2308763efe6e1dedc10";
+    const SIPX_CRATES: &[&str] = &["sipx-call", "sipx-media", "sipx-sip", "sipx-transport"];
+
+    let root = workspace_root();
+    let root_manifest =
+        std::fs::read_to_string(root.join("Cargo.toml")).expect("the workspace manifest");
+    let root_document: toml::Value = root_manifest
+        .parse()
+        .expect("the workspace manifest parses");
+    let excluded = root_document
+        .get("workspace")
+        .and_then(|workspace| workspace.get("exclude"))
+        .and_then(toml::Value::as_array)
+        .expect("`[workspace] exclude`");
+    assert!(
+        excluded
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .any(|member| member == "crates/driver-sip"),
+        "the socket-capable SIP driver must remain excluded from the canonical workspace"
+    );
+    let root_lock = Lock::read();
+    for package in SIPX_CRATES {
+        assert!(
+            !root_lock.contains(package),
+            "the canonical workspace lock must not resolve `{package}`"
+        );
+    }
+
+    let driver = root.join("crates/driver-sip");
+    let manifest_path = driver.join("Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display()));
+    let document: toml::Value = manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+    assert!(
+        document.get("workspace").is_some(),
+        "the SIP driver must remain a nested workspace with an independent feature closure"
+    );
+    assert!(
+        driver.join("Cargo.lock").is_file(),
+        "the SIP driver's independently reviewed dependency graph must stay locked"
+    );
+    let dependencies = document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("driver dependencies");
+    for package in SIPX_CRATES {
+        let dependency = dependencies
+            .get(*package)
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("`{package}` must be an explicit dependency table"));
+        assert_eq!(
+            dependency.get("git").and_then(toml::Value::as_str),
+            Some("https://github.com/codewandler/sipx")
+        );
+        assert_eq!(
+            dependency.get("rev").and_then(toml::Value::as_str),
+            Some(SIPX_REVISION),
+            "`{package}` must resolve from the reviewed immutable commit"
+        );
+    }
+
+    let bind_symbol = ["sipx_transport", "::bind"].concat();
+    let driver_source = std::fs::read_to_string(driver.join("src/lib.rs"))
+        .expect("the SIP driver implementation source");
+    assert!(
+        driver_source.contains(&bind_symbol),
+        "the named network-capable driver must contain the reviewed sipx bind"
+    );
+    for source in rust_sources_below(&root.join("crates")) {
+        if source.starts_with(&driver) {
+            continue;
+        }
+        let text = std::fs::read_to_string(&source)
+            .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
+        assert!(
+            !text.contains(&bind_symbol),
+            "{} opens sipx sockets outside the sole network-capable driver",
+            source.display()
+        );
+    }
+}
+
+fn rust_sources_below(root: &Path) -> Vec<PathBuf> {
+    fn visit(directory: &Path, sources: &mut Vec<PathBuf>) {
+        let entries = std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            if path.is_dir() {
+                if path.file_name().and_then(|name| name.to_str()) != Some("target") {
+                    visit(&path, sources);
+                }
+            } else if path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
+                sources.push(path);
+            }
+        }
+    }
+
+    let mut sources = Vec::new();
+    visit(root, &mut sources);
+    sources
 }
 
 /// The resolved dependency graph, as `Cargo.lock` records it.

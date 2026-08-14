@@ -32,5 +32,5 @@ this story retains the abstraction-level acceptance.
 
 ## Progress
 
-- SIP is selected by architecture ADR 0024. Implementation remains blocked on S-024 and the
-  unstarted platform family; S-032 records the exact dependency and test gate.
+- SIP is selected by architecture ADR 0024. Implementation now has S-024's platform-family
+  foundation but remains blocked on its source fence and S-032's exact dependency/runtime gate.

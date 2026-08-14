@@ -184,7 +184,7 @@ platform.
    separate security decision is accepted.
 
 This design does not schedule an AMI implementation or accept external runtime artifacts. Native
-voice is prepared by S-032/S-033 but remains gated by the unstarted platform family, an actual
+voice is prepared by S-032/S-033 but remains gated by the platform-family source fences, an actual
 source-grounded catalog member using `sip_v1`, the generic `VoiceSession` owner contract, the local
 RTVBP binding, the MSRV change, and released owner evidence.
 

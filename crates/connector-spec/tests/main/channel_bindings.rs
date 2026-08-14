@@ -10,7 +10,8 @@
 //! why almost every test below asserts on a refusal.
 
 use connector_spec::{
-    provider, Binding, Connector, TimestampFormat, Transport, VerificationScheme,
+    provider, Binding, Connector, InteractionShape, ProtocolDriver, TimestampFormat, Transport,
+    VerificationScheme,
 };
 
 use crate::shipped_provider;
@@ -694,6 +695,62 @@ interval = "5m"
         channel.events.is_empty(),
         "a poll carries its cursor, not an event list"
     );
+}
+
+#[test]
+fn a_session_binding_loads_as_non_event_ingress_with_closed_admission_facts() {
+    let connector = load(&fixture(
+        r#"
+[[channels]]
+name = "inbound-call"
+transport = "session"
+
+[channels.session]
+interaction_shape = "session_establishment"
+protocol_driver = "sip_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+"#,
+    ));
+    let channel = connector.channel("inbound-call").expect("session loads");
+    assert_eq!(channel.transport, Transport::Session);
+    assert!(channel.events.is_empty());
+    let session = channel.session.as_ref().expect("session facts are present");
+    assert_eq!(
+        session.interaction_shape,
+        InteractionShape::SessionEstablishment
+    );
+    assert_eq!(session.protocol_driver, ProtocolDriver::SipV1);
+}
+
+#[test]
+fn session_ingress_refuses_missing_facts_and_event_only_fields() {
+    let missing = refuse(&fixture(
+        r#"
+[[channels]]
+name = "inbound-call"
+transport = "session"
+"#,
+    ));
+    assert!(missing.contains("declares no `session` driver/capability facts"));
+
+    let event_field = refuse(&fixture(
+        r#"
+[[channels]]
+name = "inbound-call"
+transport = "session"
+events = ["thing.created"]
+
+[channels.session]
+interaction_shape = "session_establishment"
+protocol_driver = "sip_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+"#,
+    ));
+    assert!(event_field.contains("event field `events` on a `session` transport"));
 }
 
 #[test]

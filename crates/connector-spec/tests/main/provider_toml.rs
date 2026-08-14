@@ -262,8 +262,11 @@ fn a_hand_authored_file_produces_a_complete_connector() {
     let show = connector
         .operation("zendesk.ticket.show")
         .expect("declared operation");
-    assert_eq!(show.method, HttpMethod::Get);
-    assert_eq!(show.path, "/api/v2/tickets/{ticket_id}.json");
+    assert_eq!(show.request.http_method(), Some(HttpMethod::Get));
+    assert_eq!(
+        show.request.http_path(),
+        Some("/api/v2/tickets/{ticket_id}.json")
+    );
     assert_eq!(show.risk, Risk::Low);
     assert_eq!(show.idempotency, Idempotency::Idempotent);
     assert_eq!(show.params.path[0].name, "ticket_id");
