@@ -14,10 +14,12 @@ note: "Externally gated: Flux must record B10x adoption in its own repository be
 
 ## Goal
 
-Prove the client contract against its first native client: flux holds one Service Account token,
-projects the effective catalogue into tools, invokes and subscribes — and the first native plugin
-retires onto the declared surface, deleted rather than deprecated. The seam keeps B10x's
-one-way dependency rule fixed; only the trust domain and release origin change.
+Prove the client contract against its first native client: Flux presents one current
+Connectors-audience Identity authority in hosted posture or the owner-held local bearer in personal
+posture, projects the effective catalogue into tools, invokes and subscribes — and the first native
+plugin retires onto the declared surface, deleted rather than deprecated. Connectors mints neither
+the hosted authority nor vendor credentials. The seam keeps B10x's one-way dependency rule
+fixed; only the trust domain and release origin change.
 
 ## Acceptance
 
@@ -40,8 +42,10 @@ one-way dependency rule fixed; only the trust domain and release origin change.
       real, `flux app run` constructs the platform client with the same fail-closed
       withdraw-on-refresh-failure semantics as the interactive path, and a credential migration path
       exists (re-acquisition is acceptable; silently copying secrets out of the local store is not).
-- [ ] A client whose token is unchanged survives a connection reauthorization and a platform restart
-      without re-authenticating — the "authenticate once" claim, proven rather than asserted.
+- [ ] A client whose still-valid presented authority is unchanged survives a vendor Connection
+      reauthorization and a platform restart without repeating Identity login or personal-local
+      bootstrap. Normal Identity expiry/rotation remains Identity-owned and does not become a
+      Connectors service-token lifecycle.
 
 ## Progress
 - Externally gated: no B10x adoption decision or story exists in Flux yet. This repository

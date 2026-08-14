@@ -19,7 +19,7 @@ exactly onto our postures:
 ```
 CATALOG  (shared text, versioned, signed)      Provider — the template
    │  enabled + configured by a deployment
-DEPLOYMENT (one posture: personal/org/saas)    Integration — the org-configured provider
+DEPLOYMENT (one posture: personal/org/saas)    Integration — the tenant-configured provider
    │  authorized by / for people
 RUNTIME  (per-user state and traffic)          Connection — the authorized instance
                                                Grant · Invocation · Event · …
@@ -31,55 +31,59 @@ We use the majority nouns; every divergence below says why.
 
 ---
 
-## Identity & tenancy
+## Identity, tenant binding, and connector authority
 
-### Organization
+**2026-08-14 identity-boundary amendment.** This section supersedes the founding vision's wording
+that assigned identity, organizations, login sessions, and one reusable client token to this
+platform. General identity belongs to `b10x/identity`; Connectors owns only personal-local
+authentication plus receiver-side admission, connector capabilities, and connector Grants.
 
-The tenant. Every principal, connection, credential, grant, event and audit record belongs to
-exactly one organization.
+### Admitted principal and tenant projection
 
-- **personal**: exactly one, implicit, owned by the machine owner. **org**: exactly one,
-  explicit, bound to the deployment's IdP. **saas**: many.
-- *Invariant:* the organization is part of every `Principal` **structurally** — no constructor
-  takes an organization separately from an identity, and no runtime operation accepts one as a
-  parameter that could stand in for the principal's. Admission compares and refuses on mismatch;
-  it never rewrites. (Proven in the predecessor; the single rule that stops a config change
-  turning one org's token into another org's authority.)
-- *Invariant:* organization ids are validated at construction (bounded length, closed character
-  set) because they lead storage paths.
+Every connection, credential, grant, event, and audit record belongs to exactly one tenant binding.
+That binding is not a Connectors-owned Organization record:
 
-### User
+- **personal:** one implicit deployment-local tenant and one local-owner subject, derived from an
+  owner-permissioned Unix peer or generated owner-held bearer;
+- **organization/hosted:** a closed validated principal from the B10x Identity verifier,
+  matched against the receiver-configured audience, tenant, deployment posture, token lifetime,
+  key generation, and revocation freshness.
 
-A human principal. Identity arrives from the posture's source: local owner (personal), OIDC with
-PKCE + signature-verified claims (org), hosted accounts (saas). Sign-in yields a session;
-sessions are process-local and cookie-bound (`__Host-`, `SameSite=Strict`).
+The initial hosted deployment is bound to one trust domain and tenant. A future multi-tenant
+Connectors process requires a separate threat model and design; a request field never selects a
+tenant or identity verifier.
 
-- *Invariant:* nothing about authority is derived from sign-in alone (see Operator).
+- *Invariant:* the accepted tenant is part of the admitted `Principal` **structurally**. No domain
+  constructor or runtime operation accepts a second tenant that could override it; admission
+  compares and refuses on mismatch rather than rewriting.
+- *Invariant:* tenant ids are validated at construction because they partition persistence, but
+  Connectors stores only the stable receiver projection needed by its own records. It does not own
+  organization membership, profiles, login identities, sessions, or general roles.
 - *Invariant:* identity resolution distinguishes "nothing presented" from "presented and bad";
   the latter is never anonymous.
 
-### Operator
+### Identity principals
 
-A **role axis, not a principal kind**: deployment-declared authority (an allowlist of immutable
-IdP subjects, or the local owner in personal posture) over management surfaces — integrations,
-grants, service accounts, channels. Being human is an identity fact; being an operator is
-deployment policy.
+In hosted posture, human, service, and deployment principals are Identity-owned facts. Connectors
+accepts only the released validated-envelope/verifier contract; it never terminates upstream OIDC,
+stores an Identity login session, accepts an upstream-provider token, validates a client assertion
+as resource authority, or mints a hosted principal.
 
-- *Invariant:* a missing or malformed operator policy admits **nobody** (fail closed).
-- Industry note: no researched platform separates this axis; dashboard access is all-or-nothing.
-  Kept from the predecessor — it is what makes org posture safe to open to every employee.
+An Identity service principal is therefore not a Connectors-owned credential class. It authenticates
+with Identity using Identity-owned asymmetric credentials and presents short-lived, exact-audience
+authority to Connectors. Connectors stores neither its private key nor a reusable bearer verifier.
 
-### Service Account
+### Connector operator capability
 
-The one token a client holds (vision: authenticate once). Minted by a signed-in human, bounded
-lifetime, revocable, auditable; the store keeps a verifier, never the token.
+Operator is a connector-specific capability axis, not a principal kind or general Identity role. A
+personal local owner receives it from the personal posture. A hosted principal receives only the
+closed connector audience scopes carried by a valid Identity result and is then narrowed by
+receiver-owned connector policy and Grants. Being authenticated, human, or an organization member
+does not itself confer connector management authority.
 
-- *Invariant:* a Service Account token grants access to **operations, never to credentials**.
-- *Invariant:* resolution takes one explicit clock reading.
-- **org** posture: members mint their own (bounded count, per-principal, audited); operator
-  authority is not required for self-service tokens.
-- Industry mapping: ≈ Merge `account_token`, Paragon user JWT — but scoped by grants, not by
-  linked-account.
+- *Invariant:* missing or malformed connector-management policy admits **nobody**.
+- *Invariant:* Identity never evaluates a Connection or Grant and Connectors never promotes an
+  Identity role into ambient operator authority.
 
 ### Connect Session
 
@@ -90,8 +94,10 @@ embeddable component, or headlessly (an agent hands the URL to a human — auth-
 
 - *Invariant:* a connect session never carries or returns credential material to its creator;
   its terminal event names the connection id, nothing else.
+- *Invariant:* a Connect Session is vendor-credential acquisition state, not an Identity login
+  session, Foundation Trust Envelope, service credential, or general client authority.
 - Industry mapping: ≈ Nango connect session, Merge link token / Magic Link, Apideck Vault
-  session. Adopted wholesale; it is the pattern that keeps org tokens out of browsers.
+  session. Adopted wholesale; it is the pattern that keeps vendor tokens out of clients.
 
 ---
 
@@ -155,10 +161,10 @@ content **generation** (monotonic). One value per process; origin is embedded-or
 
 - *Invariant:* a pack that fails verification (format, schema, digest) refuses **startup**.
 - *Invariant:* the **effective catalogue** — what one principal sees — is the intersection of
-  the served catalog with the organization's integrations and the principal's grants, sealed
+  the served catalog with the admitted tenant's integrations and the principal's Grants, sealed
   under a content-digest generation so clients can diff cheaply.
 - Later (out of v1 scope, shaped for from day one): **composition** — an ordered set of catalog
-  sources (official + organization overlays, same schema, own signing trust), collisions refused
+  sources (official + tenant overlays, same schema, own signing trust), collisions refused
   unless explicitly declared, audit recording `(source, generation)` per served operation.
 
 ---
@@ -167,7 +173,7 @@ content **generation** (monotonic). One value per process; origin is embedded-or
 
 ### Integration
 
-An organization's configured enablement of a provider — the middle layer the predecessor lacked
+A tenant's configured enablement of a provider — the middle layer the predecessor lacked
 as a first-class noun (it existed as scattered per-connector settings). Holds: enabled state,
 the deployment's OAuth registration (BYO client_id/secret as file-shaped secrets), allowed
 scopes, settings defaults, and the **destination policy** for private-host providers
@@ -181,7 +187,7 @@ grant may name a destination).
 ### Connection
 
 An authorized instance of an integration: stable id, human **label**, scope
-(`organization`-shared or `user`-owned), connection config values, and a lifecycle:
+(`tenant`-shared or `principal`-owned), connection config values, and a lifecycle:
 
 ```
 created ──authorize──▶ authorized ──verify──▶ callable
@@ -204,7 +210,7 @@ created ──authorize──▶ authorized ──verify──▶ callable
 
 Vendor secret material backing a connection: acquired through a connect session (OAuth
 authorization code, API key entry, …) or operator-entered; refreshed by the platform; stored
-owner-bound (owner-only files in personal/org; per-org envelope encryption in saas) with
+owner-bound (owner-only files in personal/org; per-tenant envelope encryption in saas) with
 prepared, atomic multi-step mutations.
 
 - *Invariant:* a credential never crosses to a client, appears in a log, an audit record, an
@@ -221,7 +227,7 @@ prepared, atomic multi-step mutations.
 
 ### Grant
 
-The unit of authority: organization-scoped, per-connector, admitting operations by **selector**
+The unit of authority: tenant-scoped, per-connector, admitting operations by **selector**
 over declared facts — risk ceiling, effects subset, idempotency — plus explicit allow/deny
 exceptions, where **deny beats allow beats predicate**. Inbound grants admit provider events as
 a **closed** event set (no wildcards). Grants bind to connections (which one a principal may
@@ -232,6 +238,25 @@ exercise), never to credentials.
 - *Invariant:* no store bound is an outage (503), an empty store is a refusal (403) — fail
   closed, and the refusal never names the axis that refused (no policy enumeration oracle).
 - *Invariant:* grant mutation is CAS-revisioned with previewable proposals and receipts.
+
+Identity access authority and connector Grants are two different gates. The closed initial
+Connectors audience-scope vocabulary is:
+
+- `connectors.catalog.read`
+- `connectors.invoke`
+- `connectors.events.read`
+- `connectors.audit.read`
+- `connectors.integrations.manage`
+- `connectors.connections.manage`
+- `connectors.grants.manage`
+- `connectors.channels.manage`
+- `connectors.deliveries.manage`
+
+Identity carries these exact audience-owner strings after its own exchange; it does not define or
+interpret their connector meaning. They admit route families only. Connectors still resolves its
+own Connection and Grant and applies the fine-grained operation/effect/risk decision. An
+Identity-carried `dl_connection` or `dl_grant` value, if present for correlation, is never proof that
+the referenced Connectors record exists or grants an operation.
 
 ### Invocation
 
@@ -255,7 +280,7 @@ including external send, write, delete, money movement, and network access. It h
 granted method/path aperture in addition to the Integration destination policy, and every use is
 audited as raw authority rather than disguised as a catalog operation.
 
-- *Invariant:* a model, ordinary Service Account, or catalog grant cannot obtain raw proxy
+- *Invariant:* a model, ordinary Identity service principal, or catalog grant cannot obtain raw proxy
   authority. Credential-bearing model calls require a declared operation whose reviewed facts are
   the execution facts. Raw access is never a premium feature (vision principle 8).
 
@@ -264,6 +289,13 @@ audited as raw authority rather than disguised as a catalog operation.
 A supervised instance of a provider's declared channel binding for one connection — the
 provider-side transport (websocket, webhook registration) the platform owns so that events flow
 without any client running. Opaque host-minted id; lifecycle owned by the platform.
+
+**2026-08-14 source-partition amendment.** A channel binding may expose an opaque source partition
+whose identity is owned by the upstream system. For substrate ingestion, the concrete Channel key
+is `(Connection, source_scope)`, not Connection alone. `source_scope` is substrate-minted and is
+stored/compared as opaque data; connectors never constructs it from an organization, principal, or
+tenant. Native deduplication uses `(deployment, source_scope, generation, seq)`. This partitions
+supervision and high-water marks without changing Connection credential custody.
 
 ### Event
 
@@ -293,8 +325,9 @@ dedicated signing key — retries with backoff, and **replay-by-id** as a first-
 (the researched category's most conspicuous gap).
 
 - *Invariant:* never sign with an API key; never canonicalize the payload before signing.
-- *Invariant:* only an authenticated tenant principal with `delivery.manage` may register or change
-  a delivery endpoint. The normalized endpoint and its post-resolution destination aperture are
+- *Invariant:* only an authenticated tenant principal with `connectors.deliveries.manage` may
+  register or change a delivery endpoint. The normalized endpoint and its post-resolution
+  destination aperture are
   stored as governed deployment configuration. Event payloads, catalog data, connection values,
   grants, and models cannot select or widen the destination. Both registration validation and the
   delivery worker apply the shared aperture immediately before opening a socket.
@@ -311,11 +344,12 @@ vocabulary, outcome, principal, request id, retention window.
 
 ## Structural invariants (cross-cutting)
 
-1. **Proof-type chains, not scanners.** Every multi-gate path (admission → grant → dispatch;
-   session → mint; proposal → apply) is chained by values with private fields and no public
+1. **Proof-type chains, not scanners.** Every multi-gate path (identity verification → audience
+   scope → grant → dispatch; connect session → vendor credential acquisition; proposal → apply) is
+   chained by values with private fields and no public
    constructor, `Default`, or `Clone`.
-2. **Organization-in-principal.** No API, port or constructor accepts a tenant beside an
-   identity.
+2. **Tenant-in-admitted-principal.** No API, port or constructor accepts a tenant beside an
+   admitted identity.
 3. **Closed vocabularies everywhere** — risk, effects, idempotency, event sets, audit actions,
    template grammar, auth schemes. Extension is a schema version, not a wildcard.
 4. **Routes as data with access on the route.** The HTTP surface is an enumerable value; guard
@@ -338,7 +372,8 @@ vocabulary, outcome, principal, request id, retention window.
 
 ## Open questions
 
-1. SaaS org lifecycle (creation, billing identity, deletion semantics) — needs its own design.
+1. Multi-tenant process topology and SaaS organization lifecycle remain Identity/Cloud plus later
+   Connectors composition work; M2 does not create an Organization store.
 2. Whether org-posture destination policy (private-host allowlist) belongs on Integration (as
    modeled here) or as a deployment-global document with per-integration references.
 3. The exact connect-session ↔ OAuth-callback custody chain in personal posture, where there is

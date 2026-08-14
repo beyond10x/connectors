@@ -77,7 +77,7 @@ will spawn children as each milestone is designed.
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
 | `beyond-http` | S-023, S-024, S-025, S-026, S-027, S-028 | ADR 0010's delivery order: orthogonal document facts, one plan seam, satellite trust, one real driver, direct-byte establishment, and external artifacts last. |
-| `substrate-integration` | S-029 | The explicit bounded-cursor to durable-delivery bridge and its gap-recovery contract. |
+| `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-repository conformance bundles. |
 
 ## Known gaps in this backlog

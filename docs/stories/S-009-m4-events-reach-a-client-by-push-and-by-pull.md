@@ -42,7 +42,7 @@ first-class client API rather than a support ticket.
       is audited, and cannot be used to reach an event the principal's inbound grants do not admit.
 - [ ] **Subscriptions**: one authenticated, multiplexed WebSocket per client, gated by inbound
       grants — every requested event must belong to the binding's **closed** declared set; an
-      ungranted subset and a cross-organization channel id share one refusal that discloses neither.
+      ungranted subset and a cross-tenant channel id share one refusal that discloses neither.
 - [ ] **Exit**: one test in which a single provider event reaches a client both by push (signed
       delivery) and by pull (subscription), carrying the same event id and the same provenance.
 
@@ -63,3 +63,7 @@ first-class client API rather than a support ticket.
   event is never presented as a vendor push. The researched category's failure here — synthesized
   "webhooks" from a polling engine, plus a documented 24h polling fallback — is the thing we are
   explicitly not doing.
+- S-029 specializes the generic per-connection Channel rule for substrate: one supervised Channel
+  per `(Connection, source_scope)`, exact native deduplication on
+  `(deployment, source_scope, generation, seq)`, and snapshot-first bootstrap. This is accepted
+  architecture only; it does not imply that the M4 platform crates or the S-029 adapter exist.

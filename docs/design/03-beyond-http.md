@@ -26,8 +26,8 @@ keeps those axes independent.
 
 None is caller input. The compiled connector document fixes the interaction shape, driver and
 required capabilities. Deployment policy resolves placement. An operator may install or admit an
-implementation, but a model, Service Account or invocation request cannot choose a driver, artifact,
-credential, destination class or worker.
+implementation, but a model, Identity service principal, connector Grant, or invocation request
+cannot choose a driver, artifact, credential, destination class, or worker.
 
 ## 2. Protocol drivers are closed platform code in v1
 
