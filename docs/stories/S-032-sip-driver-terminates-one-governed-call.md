@@ -23,8 +23,11 @@ SIP call without importing RTVBP or requiring a live carrier.
       `TelephonySession` port and only `server` selects it after admission.
 - [ ] `driver-sip` is the only named network-capable driver and calls `sipx` bind only from a
       non-serializable, proof-bearing `AdmittedSipPlan`; fence tests reject every other path.
-- [ ] Configured, DNS-resolved, SIP-learned, and SDP/RTP-learned targets plus local listener/media
-      ports are checked against the admitted destination/bind apertures before transmission.
+- [ ] Configured, DNS-resolved, SIP-learned, and SDP-learned targets plus local listener/media ports
+      are checked against the admitted destination/bind apertures before transmission.
+- [ ] A symmetric-RTP source cannot become an egress peer before media-peer admission. Loopback may
+      characterize the pinned behavior, but stable/exposed support waits for an enforceable hook,
+      supported disable switch, or independently measured network aperture.
 - [ ] The workspace explicitly moves to Rust 1.88 with its MSRV lane green, and `sipx`
       `v1.0.0-rc.23` resolves to `004ac534b8b222060ad2d2308763efe6e1dedc10` in release evidence.
 - [ ] Loopback fixtures cover registration, inbound and outbound dialogs, DTMF, bounded duplex
