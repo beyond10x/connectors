@@ -158,6 +158,7 @@ fn bare(provenance: Provenance) -> Connector {
         operations: Vec::new(),
         events: Vec::new(),
         channels: Vec::new(),
+        discoveries: Vec::new(),
         config: Vec::new(),
         verify: None,
         graphs: Vec::new(),

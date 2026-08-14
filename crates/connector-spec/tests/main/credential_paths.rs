@@ -521,6 +521,15 @@ fn slack_derives_a_path_for_each_of_its_credentials() {
         "tenants/9f3a/com.slack.api/signing_secret"
     );
 
+    let app = connector
+        .credential_ref_for("9f3a", "slack.app_token", TenantInstances::sole())
+        .expect("valid")
+        .expect("declared");
+    assert_eq!(
+        TenantLayout.render(&app),
+        "tenants/9f3a/com.slack.api/app_token"
+    );
+
     // The API version is deliberately absent: slack declares `api_version = "v1"`, and a token must
     // survive the vendor's next version rather than forcing every tenant to re-provision.
     assert_eq!(connector.api_version.as_deref(), Some("v1"));

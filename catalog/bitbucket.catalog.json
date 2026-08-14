@@ -1201,6 +1201,9 @@
   "services": [
     {
       "api_version": "2.0",
+      "audiences": [
+        "developer"
+      ],
       "base_url": "https://api.bitbucket.org/2.0",
       "gid": "org.bitbucket.api:2.0",
       "name": "default",

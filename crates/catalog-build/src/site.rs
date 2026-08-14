@@ -52,9 +52,9 @@ use anyhow::{bail, Result};
 use serde::Serialize;
 
 use connector_spec::{
-    AuthScheme, ChannelBinding, ConfigField, Connector, EventDecl, HostEffect, HttpMethod,
-    Idempotency, ImplementationForm, InteractionShape, JsonSchema, Level, ManualSetup, OAuth2Spec,
-    OAuthGrant, OAuthRedirect, Operation, OperationRequest, OperationSpecSource, Param,
+    Audience, AuthScheme, ChannelBinding, ConfigField, Connector, Discovery, EventDecl, HostEffect,
+    HttpMethod, Idempotency, ImplementationForm, InteractionShape, JsonSchema, Level, ManualSetup,
+    OAuth2Spec, OAuthGrant, OAuthRedirect, Operation, OperationRequest, OperationSpecSource, Param,
     PlacementRequirement, Reply, RequiredCapability, Risk, Selector, SemanticEffect,
     SessionBinding, SocketConnectSpec, Subscription, VerificationScheme,
 };
@@ -133,6 +133,8 @@ pub struct ProviderEntry {
     /// and is never the union, because that one is an egress claim rather than a description.
     /// Identical to the old value for a single-surface provider, whose union is its one host.
     hosts: Vec<String>,
+    /// Discovery-only union of the provider services' audiences.
+    audiences: Vec<Audience>,
     /// The provider's API surfaces (C-49). Always at least one: a provider with a single surface
     /// publishes the reserved `default` service, so a consumer can group by service unconditionally
     /// rather than special-casing the providers that have not been split.
@@ -158,6 +160,9 @@ pub struct ProviderEntry {
     /// here is a URL, a schedule or a secret: the endpoint is the operator's deployment detail and
     /// every credential is a name the host resolves.
     channels: Vec<ChannelEntry>,
+    /// Bounded observation sources. These describe possible target Provider candidates and never
+    /// Connection or Grant authority.
+    discoveries: Vec<DiscoveryEntry>,
     /// The complete configuration declaration. Stored values never appear in catalogue data.
     config: Vec<ConfigEntry>,
     /// The bounded read a settings page invokes to verify this connection, or `null` when the
@@ -170,6 +175,22 @@ pub struct ProviderEntry {
     /// C-87 later added the complete [`Self::config`] projection; this remains the indexed
     /// compatibility view for consumers that address a closed set by `(service, kind, name)`.
     config_choices: Vec<ConfigChoicesEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct DiscoveryEntry {
+    id: String,
+    service: String,
+    operation: String,
+    driver: &'static str,
+    mappings: Vec<DiscoveryMappingEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct DiscoveryMappingEntry {
+    observed_type: String,
+    target_provider: String,
+    route_adapter: &'static str,
 }
 
 /// One configuration field that permits a closed set of values, and the set (C-225).
@@ -261,6 +282,8 @@ struct ChannelEntry {
     session: Option<SessionBinding>,
     /// Generic RFC 6455 handshake facts, or `null` for other/vendor-specific transports.
     connect: Option<SocketConnectSpec>,
+    /// Credential-name requirements resolved inside Connector custody before supervision starts.
+    auth: Vec<Vec<String>>,
     /// The [`EventEntry::name`]s this binding carries, all from the same service.
     events: Vec<String>,
     /// How a delivery proves it came from the vendor. **Always present**, and always naming its
@@ -420,6 +443,8 @@ struct ServiceEntry {
     /// How many operations belong to it. The per-service counts sum to
     /// [`ProviderEntry::operation_count`], because the services partition the operation set.
     operation_count: usize,
+    /// People likely to find this service useful. Never an authorization input.
+    audiences: Vec<Audience>,
 }
 
 /// A connector's credentials: what it declares, and what it requires by default.
@@ -452,6 +477,9 @@ struct CredentialEntry {
     description: String,
     /// Environment variable **names** to resolve the secret from, tried in order.
     env: Vec<String>,
+    /// `connect_session` when a human enters this credential directly into Connector custody;
+    /// `null` for established ambient/OAuth sources.
+    entry: Option<&'static str>,
     /// For `basic`: environment variable **names** holding the username half.
     user_env: Vec<String>,
     /// For `basic`: a literal appended to the resolved user value — Zendesk's `/token` marker,
@@ -679,6 +707,10 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
             api_version: connector.api_version_of(name).map(str::to_owned),
             gid: connector.gid_of(name).map(|gid| gid.to_string()),
             operation_count: connector.operations_of(name).count(),
+            audiences: connector
+                .service(name)
+                .map(|service| service.audiences.clone())
+                .unwrap_or_default(),
         });
     }
 
@@ -690,6 +722,7 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
         base_url: connector.base_url.clone(),
         api_version: connector.api_version.clone(),
         hosts,
+        audiences: connector.audiences(),
         services,
         auth: provider_auth(connector),
         operation_count: operations.len(),
@@ -704,6 +737,7 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
             .iter()
             .map(|channel| channel_entry(connector, channel))
             .collect(),
+        discoveries: connector.discoveries.iter().map(discovery_entry).collect(),
         config: connector
             .config
             .iter()
@@ -716,6 +750,24 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
             .filter_map(config_choices_entry)
             .collect(),
     })
+}
+
+fn discovery_entry(discovery: &Discovery) -> DiscoveryEntry {
+    DiscoveryEntry {
+        id: discovery.id.clone(),
+        service: discovery.service.clone(),
+        operation: discovery.operation.clone(),
+        driver: discovery.driver.word(),
+        mappings: discovery
+            .mappings
+            .iter()
+            .map(|mapping| DiscoveryMappingEntry {
+                observed_type: mapping.observed_type.clone(),
+                target_provider: mapping.target_provider.clone(),
+                route_adapter: mapping.route_adapter.word(),
+            })
+            .collect(),
+    }
 }
 
 fn config_entry(field: &ConfigField) -> Result<ConfigEntry> {
@@ -777,6 +829,11 @@ fn channel_entry(connector: &Connector, channel: &ChannelBinding) -> ChannelEntr
         transport: inbound::transport_token(channel.transport),
         session: channel.session.clone(),
         connect: channel.connect.clone(),
+        auth: channel
+            .auth
+            .iter()
+            .map(|requirement| requirement.iter().cloned().collect())
+            .collect(),
         events: channel.events.clone(),
         verification: verification_entry(channel),
         discriminator: channel.discriminator.as_ref().map(selector_entry),
@@ -1003,6 +1060,7 @@ fn provider_auth(connector: &Connector) -> ProviderAuth {
                 },
                 description: method.description.clone(),
                 env: method.env.clone(),
+                entry: method.entry.map(|entry| entry.word()),
                 user_env: method.user_env.clone(),
                 user_suffix: method.user_suffix.clone(),
                 oauth2: method.oauth2.as_ref().map(oauth2_entry),
@@ -1151,6 +1209,7 @@ mod tests {
             operations: vec![operation()],
             events: Vec::new(),
             channels: Vec::new(),
+            discoveries: Vec::new(),
             config: Vec::new(),
             verify: None,
             graphs: Vec::new(),
@@ -1544,6 +1603,7 @@ mod tests {
                 api_version: Some("v1".to_string()),
                 roles: Vec::new(),
                 tags: Vec::new(),
+                audiences: Vec::new(),
             },
             connector_spec::Service {
                 name: "calendar".to_string(),
@@ -1553,6 +1613,7 @@ mod tests {
                 api_version: Some("v3".to_string()),
                 roles: Vec::new(),
                 tags: Vec::new(),
+                audiences: Vec::new(),
             },
         ];
         connector.operations[0].service = "mail".to_string();

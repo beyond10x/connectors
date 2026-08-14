@@ -685,6 +685,10 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "content-manager",
+        "developer"
+      ],
       "base_url": "https://cdn.contentful.com/spaces/{space_id}/environments/{environment_id}",
       "description": "Content Delivery API (CDA): read-only access to this space's published content. Authenticates with the delivery token; the management token cannot reach this surface",
       "name": "delivery",
@@ -693,6 +697,10 @@
       ]
     },
     {
+      "audiences": [
+        "content-manager",
+        "developer"
+      ],
       "base_url": "https://api.contentful.com/spaces/{space_id}/environments/{environment_id}",
       "description": "Content Management API (CMA): create and publish entries. Authenticates with the management token; the delivery token cannot reach this surface",
       "name": "management",

@@ -804,6 +804,11 @@
   "services": [
     {
       "api_version": "2",
+      "audiences": [
+        "developer",
+        "product-manager",
+        "project-manager"
+      ],
       "base_url": "https://{site}.atlassian.net",
       "gid": "com.atlassian.jira:2",
       "name": "default",

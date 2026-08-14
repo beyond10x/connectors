@@ -48,12 +48,12 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use connector_spec::{
-    AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector, ErrorEnvelope,
-    HostEffect, HttpMethod, Idempotency, ImplementationForm, InteractionShape, ManualSetup,
-    OAuthGrant, OAuthRedirect, Operation, OperationDirection, OperationRequest, Pagination, Param,
-    PlacementRequirement, RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service,
-    SessionBinding, SocketConnectSpec, Subscription, Tag, TokenEndpointWorkaround,
-    VerificationScheme, FREE_FORM_BODY,
+    Audience, AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector,
+    Discovery, ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm,
+    InteractionShape, ManualSetup, OAuthGrant, OAuthRedirect, Operation, OperationDirection,
+    OperationRequest, Pagination, Param, PlacementRequirement, RateLimit, RequiredCapability, Risk,
+    Role, SemanticEffect, Service, SessionBinding, SocketConnectSpec, Subscription, Tag,
+    TokenEndpointWorkaround, VerificationScheme, FREE_FORM_BODY,
 };
 
 use crate::seam;
@@ -108,6 +108,8 @@ struct Document<'a> {
     events: Vec<DocEvent<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     channels: Vec<DocChannel<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    discoveries: Vec<DocDiscovery<'a>>,
 }
 
 /// One service, with its base URL and API version **resolved** (the connector's as defaults) and
@@ -130,6 +132,9 @@ struct DocService<'a> {
     roles: &'a [Role],
     #[serde(skip_serializing_if = "<[Tag]>::is_empty")]
     tags: &'a [Tag],
+    /// Discovery metadata only; never read by runtime admission or authorization.
+    #[serde(skip_serializing_if = "<[Audience]>::is_empty")]
+    audiences: &'a [Audience],
 }
 
 /// One credential declaration — scheme, acquisition and placement facts, never a value.
@@ -139,6 +144,8 @@ struct DocAuth<'a> {
     scheme: DocScheme<'a>,
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     env: &'a [String],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entry: Option<&'static str>,
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     user_env: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -229,6 +236,22 @@ struct DocConfig<'a> {
 struct DocChoice<'a> {
     value: &'a str,
     label: &'a str,
+}
+
+#[derive(Serialize)]
+struct DocDiscovery<'a> {
+    id: &'a str,
+    service: &'a str,
+    operation: &'a str,
+    driver: &'a connector_spec::DiscoveryDriver,
+    mappings: Vec<DocDiscoveryMapping<'a>>,
+}
+
+#[derive(Serialize)]
+struct DocDiscoveryMapping<'a> {
+    observed_type: &'a str,
+    target_provider: &'a str,
+    route_adapter: &'a connector_spec::RouteAdapter,
 }
 
 #[derive(Serialize)]
@@ -424,6 +447,8 @@ struct DocChannel<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     connect: Option<&'a SocketConnectSpec>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth: Vec<Vec<&'a str>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     events: Vec<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cursor: Option<&'a str>,
@@ -554,6 +579,7 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
                 legacy: declared.is_some_and(|s| s.legacy),
                 roles: declared.map(|s| s.roles.as_slice()).unwrap_or(&[]),
                 tags: declared.map(|s| s.tags.as_slice()).unwrap_or(&[]),
+                audiences: declared.map(|s| s.audiences.as_slice()).unwrap_or(&[]),
             }
         })
         .collect();
@@ -598,6 +624,8 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
         .map(|channel| doc_channel(connector, channel))
         .collect();
 
+    let discoveries = connector.discoveries.iter().map(doc_discovery).collect();
+
     Ok(Document {
         schema: SCHEMA_ID,
         schema_version: SCHEMA_VERSION,
@@ -614,7 +642,26 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
         operations,
         events,
         channels,
+        discoveries,
     })
+}
+
+fn doc_discovery(discovery: &Discovery) -> DocDiscovery<'_> {
+    DocDiscovery {
+        id: &discovery.id,
+        service: &discovery.service,
+        operation: &discovery.operation,
+        driver: &discovery.driver,
+        mappings: discovery
+            .mappings
+            .iter()
+            .map(|mapping| DocDiscoveryMapping {
+                observed_type: &mapping.observed_type,
+                target_provider: &mapping.target_provider,
+                route_adapter: &mapping.route_adapter,
+            })
+            .collect(),
+    }
 }
 
 /// The OR-of-AND-groups flattening `catalog.json` already publishes.
@@ -687,6 +734,7 @@ fn doc_auth<'a>(connector: &Connector, method: &'a AuthMethod) -> Result<DocAuth
         name: &method.name,
         scheme,
         env: &method.env,
+        entry: method.entry.map(|entry| entry.word()),
         user_env: &method.user_env,
         user_suffix: method.user_suffix.as_deref(),
         description: &method.description,
@@ -742,6 +790,7 @@ fn doc_channel<'a>(connector: &Connector, channel: &'a ChannelBinding) -> DocCha
         transport: crate::inbound::transport_token(channel.transport),
         session: channel.session.as_ref(),
         connect: channel.connect.as_ref(),
+        auth: requirements(&channel.auth),
         events: channel.events.iter().map(String::as_str).collect(),
         cursor: channel.cursor.as_deref(),
         interval: channel.interval.as_deref(),
@@ -1479,13 +1528,14 @@ fn marked_placeholders(marked: &str) -> Vec<(usize, &str)> {
     found
 }
 
-/// `{origin}` followed only by a connector-declared path — the operator-approved origin base
-/// (C-508), the one URL template that intentionally contains no `://`.
+/// `{origin}` alone or followed only by a connector-declared path — the operator-approved origin
+/// base (C-508), the one URL template that intentionally contains no `://`.
 fn origin_template(literal: &str) -> Option<&str> {
     let rest = literal.strip_prefix('{')?;
     let close = rest.find('}')?;
     let variable = &rest[..close];
-    (!variable.is_empty() && rest[close + 1..].starts_with('/')).then_some(variable)
+    let suffix = &rest[close + 1..];
+    (!variable.is_empty() && (suffix.is_empty() || suffix.starts_with('/'))).then_some(variable)
 }
 
 /// **Where each endpoint-configuration variable lands** — read off the IR the way
@@ -1596,7 +1646,8 @@ pub fn schema() -> &'static Value {
                 "config": { "type": "array", "items": { "$ref": "#/$defs/config_field" } },
                 "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } },
                 "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
-                "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }
+                "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } },
+                "discoveries": { "type": "array", "items": { "$ref": "#/$defs/discovery" } }
             },
             "required": ["$schema", "schema_version", "generator", "connector", "services", "operations"],
             "additionalProperties": false,
@@ -1620,7 +1671,8 @@ pub fn schema() -> &'static Value {
                         "api_version": { "type": "string" },
                         "legacy": { "type": "boolean" },
                         "roles": { "type": "array", "items": { "enum": ["llm_catalogue"] } },
-                        "tags": { "type": "array", "items": { "type": "string" } }
+                        "tags": { "type": "array", "items": { "type": "string" } },
+                        "audiences": { "type": "array", "uniqueItems": true, "items": { "enum": ["developer", "sre", "security-engineer", "data-analyst", "product-manager", "project-manager", "designer", "sales-rep", "support-agent", "marketer", "finance", "ecommerce-manager", "content-manager"] } }
                     },
                     "required": ["name", "base_url"],
                     "additionalProperties": false
@@ -1631,6 +1683,7 @@ pub fn schema() -> &'static Value {
                         "name": { "type": "string", "minLength": 1 },
                         "scheme": { "$ref": "#/$defs/scheme" },
                         "env": { "type": "array", "items": { "type": "string" } },
+                        "entry": { "enum": ["connect_session"] },
                         "user_env": { "type": "array", "items": { "type": "string" } },
                         "user_suffix": { "type": "string" },
                         "description": { "type": "string" },
@@ -1958,6 +2011,32 @@ pub fn schema() -> &'static Value {
                             "required": ["message_pointer"],
                             "additionalProperties": false
                 },
+                "discovery": {
+                    "description": "A bounded observation source. It creates no Connection or authority; target Provider availability and route-adapter support are checked when a candidate is materialized.",
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string", "minLength": 1 },
+                        "service": { "type": "string", "minLength": 1 },
+                        "operation": { "type": "string", "minLength": 1 },
+                        "driver": { "enum": ["grafana_datasource_v1"] },
+                        "mappings": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "observed_type": { "type": "string", "pattern": "^[a-z0-9._-]+$" },
+                                    "target_provider": { "type": "string", "pattern": "^[a-z0-9._-]+$" },
+                                    "route_adapter": { "enum": ["grafana_datasource_proxy_v1"] }
+                                },
+                                "required": ["observed_type", "target_provider", "route_adapter"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["id", "service", "operation", "driver", "mappings"],
+                    "additionalProperties": false
+                },
                 "event": {
                     "type": "object",
                     "properties": {
@@ -1984,6 +2063,7 @@ pub fn schema() -> &'static Value {
                         "transport": { "enum": ["webhook", "socket", "poll", "session"] },
                         "session": { "$ref": "#/$defs/session_binding" },
                         "connect": { "type": "object" },
+                        "auth": { "$ref": "#/$defs/requirements" },
                         "events": { "type": "array", "items": { "type": "string" } },
                         "cursor": { "type": "string" },
                         "interval": { "type": "string" },
@@ -2056,6 +2136,13 @@ pub fn schema() -> &'static Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_approved_origin_may_be_the_whole_base_url() {
+        assert_eq!(origin_template("{origin}"), Some("origin"));
+        assert_eq!(origin_template("{origin}/api/v1"), Some("origin"));
+        assert_eq!(origin_template("prefix-{origin}"), None);
+    }
 
     /// A complete hand-authored connector the loader accepts, parameterised on one operation body.
     fn connector_with(operations: &str) -> Connector {

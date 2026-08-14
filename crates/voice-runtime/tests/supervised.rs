@@ -103,6 +103,7 @@ fn plan() -> ZeroIoPlan {
         ),
         &PlanningEnvironment {
             available_drivers: BTreeSet::from([DriverId::SipV1]),
+            available_route_adapters: BTreeSet::new(),
             capabilities: BTreeSet::from([Capability::PrivateNetwork]),
             permission_subjects: vec!["connection-target:asterisk-dev".to_owned()],
         },

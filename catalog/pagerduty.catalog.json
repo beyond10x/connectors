@@ -1114,6 +1114,9 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "sre"
+      ],
       "base_url": "https://api.pagerduty.com",
       "name": "default",
       "tags": [

@@ -1,0 +1,85 @@
+{
+  "contract": "b10x.connector-connection.v0alpha1",
+  "cases": [
+    {
+      "name": "connect-session-create-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-connect-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"connect_session_create","params":{"integration_ref":"slack","label":"Development Slack"}}
+      }
+    },
+    {
+      "name": "connect-session-status-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-connect-2",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"connect_session_status","params":{"connect_session_ref":"connect-session:00000000-0000-4000-8000-000000000001"}}
+      }
+    },
+    {
+      "name": "observation-search-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-observations-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"observation_search","params":{"source_connection_ref":"connection:grafana-infra","query":"prometheus","limit":32}}
+      }
+    },
+    {
+      "name": "credential-field-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-connect-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"connect_session_create","params":{"integration_ref":"slack","label":"Development Slack","token":"SENTINEL-NOT-A-REAL-SECRET"}}
+      }
+    },
+    {
+      "name": "materialize-observation-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-materialize-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"materialize","params":{"observation_ref":"observation:grafana:prometheus"}}
+      }
+    },
+    {
+      "name": "materialize-cannot-select-route-binding",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-materialize-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"materialize","params":{"observation_ref":"observation:grafana:prometheus","resource_binding":"grafana-uid","route_adapter":"caller-choice"}}
+      }
+    },
+    {
+      "name": "caller-cannot-create-connection-directly",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-connect-bad-2",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"connection_create","params":{"integration_ref":"slack","connection_ref":"chosen-by-client"}}
+      }
+    },
+    {
+      "name": "caller-cannot-select-discovered-resource-binding",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-observations-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"observation_search","params":{"source_connection_ref":"connection:grafana-infra","query":"","limit":32,"resource_binding":"grafana-uid"}}
+      }
+    }
+  ]
+}

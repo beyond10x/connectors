@@ -323,6 +323,10 @@
   "services": [
     {
       "api_version": "v1",
+      "audiences": [
+        "developer",
+        "data-analyst"
+      ],
       "base_url": "https://{project_ref}.supabase.co",
       "gid": "com.supabase.api:v1",
       "name": "default",

@@ -599,6 +599,10 @@
   "services": [
     {
       "api_version": "v3",
+      "audiences": [
+        "sales-rep",
+        "marketer"
+      ],
       "base_url": "https://api.hubapi.com",
       "gid": "com.hubspot.api:v3",
       "name": "default",

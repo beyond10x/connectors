@@ -792,6 +792,9 @@
   "services": [
     {
       "api_version": "2024-10",
+      "audiences": [
+        "ecommerce-manager"
+      ],
       "base_url": "https://{shop}.myshopify.com",
       "gid": "com.shopify.api:2024-10",
       "name": "default",

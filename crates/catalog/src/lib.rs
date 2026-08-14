@@ -392,6 +392,9 @@ pub enum Placement {
 pub enum Acquisition {
     /// The stored secret, unchanged.
     Static,
+    /// The stored secret, unchanged, entered by a human through a single-use Connector Connect
+    /// Session completion endpoint. No client or runtime may resolve it from ambient process state.
+    ConnectSession,
     /// **The stored secret, unchanged — and one of this connector's own operations put it there**
     /// (C-136).
     ///
@@ -737,6 +740,9 @@ pub struct Channel {
     pub session: Option<ChannelSession>,
     pub events: &'static [&'static str],
     pub connect: Option<SocketConnect>,
+    /// Credential-name alternatives required to establish or supervise the channel. Values stay in
+    /// Connector custody and never enter this catalog projection.
+    pub auth: &'static [&'static [&'static str]],
     pub discriminator: Option<Selector>,
     /// Stable vendor delivery identity used for deduplication, when declared.
     pub delivery_id: Option<Selector>,
@@ -802,6 +808,94 @@ impl Approval {
     }
 }
 
+/// Who is likely to find a service useful, for catalogue discovery only.
+///
+/// This is never an authorization, visibility, entitlement or credential-policy input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Audience {
+    Developer,
+    Sre,
+    SecurityEngineer,
+    DataAnalyst,
+    ProductManager,
+    ProjectManager,
+    Designer,
+    SalesRep,
+    SupportAgent,
+    Marketer,
+    Finance,
+    EcommerceManager,
+    ContentManager,
+}
+
+impl Audience {
+    /// The stable public token used by source declarations and explorer filters.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Developer => "developer",
+            Self::Sre => "sre",
+            Self::SecurityEngineer => "security-engineer",
+            Self::DataAnalyst => "data-analyst",
+            Self::ProductManager => "product-manager",
+            Self::ProjectManager => "project-manager",
+            Self::Designer => "designer",
+            Self::SalesRep => "sales-rep",
+            Self::SupportAgent => "support-agent",
+            Self::Marketer => "marketer",
+            Self::Finance => "finance",
+            Self::EcommerceManager => "ecommerce-manager",
+            Self::ContentManager => "content-manager",
+        }
+    }
+}
+
+/// Closed parser for one Provider-declared discovery observation source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiscoveryDriver {
+    /// Grafana's bounded data-source listing response.
+    GrafanaDatasourceV1,
+}
+
+impl DiscoveryDriver {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::GrafanaDatasourceV1 => "grafana_datasource_v1",
+        }
+    }
+}
+
+/// Closed implementation identity for a mediated Connection route.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RouteAdapter {
+    GrafanaDatasourceProxyV1,
+}
+
+impl RouteAdapter {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::GrafanaDatasourceProxyV1 => "grafana_datasource_proxy_v1",
+        }
+    }
+}
+
+/// One exact observed-type to target-Provider normalization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiscoveryMapping {
+    pub observed_type: &'static str,
+    pub target_provider: &'static str,
+    pub route_adapter: RouteAdapter,
+}
+
+/// One bounded observation declaration from a Provider's canonical document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Discovery {
+    pub id: &'static str,
+    pub service: &'static str,
+    pub operation: &'static str,
+    pub driver: DiscoveryDriver,
+    pub mappings: &'static [DiscoveryMapping],
+}
+
 /// One API surface a connector declares, with its base URL as the document resolves it.
 ///
 /// Not `#[non_exhaustive]`: it is two facts, and a consumer constructs one in a test of its own
@@ -814,6 +908,8 @@ pub struct Service {
     /// The base URL, templating included: `https://{subdomain}.zendesk.com`. The tenant is the
     /// operator's to choose, and a resolved value here would invent one.
     pub base_url: &'static str,
+    /// Curated discovery audiences for this service. Never a runtime-policy input.
+    pub audiences: &'static [Audience],
 }
 
 impl Service {
@@ -851,6 +947,8 @@ pub struct Provider {
     /// google reaches three. The canonical document has carried the per-service base URL all
     /// along; this is the table catching up.
     pub services: &'static [Service],
+    /// The deduplicated union of [`Service::audiences`], in service declaration order.
+    pub audiences: &'static [Audience],
     /// The API base URL, templating included — the [`DEFAULT_SERVICE`](Service::DEFAULT) surface's
     /// when the connector declares one, otherwise the first declared service's.
     ///
@@ -881,6 +979,9 @@ pub struct Provider {
     pub events: &'static [Event],
     /// Channel bindings in declaration order.
     pub channels: &'static [Channel],
+    /// Bounded observation sources. An entry produces candidates only; it grants no authority and
+    /// creates no Connection.
+    pub discoveries: &'static [Discovery],
     /// **Every configuration field whose value comes from a closed set** — C-225.
     ///
     /// Empty for most connectors. Present for the ones whose value is a *choice* rather than a

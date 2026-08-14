@@ -565,6 +565,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -943,6 +953,12 @@ name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "litemap"
@@ -1424,7 +1440,7 @@ dependencies = [
 [[package]]
 name = "rtvbp"
 version = "0.1.0"
-source = "git+https://github.com/babelforce/rtvbp?rev=ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8#ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8"
+source = "git+https://github.com/babelforce/rtvbp?rev=dc0a60f7425b4899885f372152028457791b1e72#dc0a60f7425b4899885f372152028457791b1e72"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1470,6 +1486,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf0c4a6ece9950b9abdb62b1cfcf2a68b3b67a10ba445b3bb85be2a293d0632"
 dependencies = [
  "nom",
+]
+
+[[package]]
+name = "rustix"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
+dependencies = [
+ "bitflags 2.13.1",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1598,14 +1627,18 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "base64",
  "domain",
  "ed25519-dalek",
+ "fs2",
  "protocol",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]

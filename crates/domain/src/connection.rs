@@ -2,6 +2,39 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+/// Closed implementation identity for a route through another Connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteAdapter {
+    /// Grafana's reviewed data-source proxy prefix, with the data-source identity resolved from a
+    /// Connector-owned opaque binding rather than caller input.
+    GrafanaDatasourceProxyV1,
+}
+
+impl RouteAdapter {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::GrafanaDatasourceProxyV1 => "grafana_datasource_proxy_v1",
+        }
+    }
+}
+
+/// A Connection's immutable execution route.
+///
+/// A mediated route remains a Connection of the target Provider. The parent supplies transport,
+/// not Provider semantics or Grant authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionRoute {
+    /// Resolve the target Provider's operator-approved origin directly.
+    Direct,
+    /// Execute through another authorized Connection and one opaque discovered-resource binding.
+    ViaConnection {
+        parent_connection: String,
+        resource_binding: String,
+        adapter: RouteAdapter,
+    },
+}
+
 /// Which side of a configured Connection may begin an interaction.
 ///
 /// The names are relative to the Connectors boundary. They deliberately avoid `inbound` and
@@ -77,6 +110,7 @@ impl InitiationPolicy {
 pub struct ConnectionAuthority {
     id: String,
     initiation: InitiationPolicy,
+    route: ConnectionRoute,
 }
 
 impl ConnectionAuthority {
@@ -88,7 +122,46 @@ impl ConnectionAuthority {
         if id.is_empty() {
             return Err(ConnectionAuthorityError::EmptyConnection);
         }
-        Ok(Self { id, initiation })
+        Ok(Self {
+            id,
+            initiation,
+            route: ConnectionRoute::Direct,
+        })
+    }
+
+    /// Construct a mediated Connection. The resource binding is opaque Connector-owned state; it
+    /// is not a provider UID or URL accepted from an invocation caller.
+    pub fn mediated(
+        id: impl Into<String>,
+        initiation: InitiationPolicy,
+        parent_connection: impl Into<String>,
+        resource_binding: impl Into<String>,
+        adapter: RouteAdapter,
+    ) -> Result<Self, ConnectionAuthorityError> {
+        let id = id.into();
+        let parent_connection = parent_connection.into();
+        let resource_binding = resource_binding.into();
+        validate_ref(&id)
+            .then_some(())
+            .ok_or(ConnectionAuthorityError::EmptyConnection)?;
+        if !validate_ref(&parent_connection) {
+            return Err(ConnectionAuthorityError::InvalidParentConnection);
+        }
+        if id == parent_connection {
+            return Err(ConnectionAuthorityError::RouteCycle);
+        }
+        if !validate_ref(&resource_binding) {
+            return Err(ConnectionAuthorityError::InvalidResourceBinding);
+        }
+        Ok(Self {
+            id,
+            initiation,
+            route: ConnectionRoute::ViaConnection {
+                parent_connection,
+                resource_binding,
+                adapter,
+            },
+        })
     }
 
     #[must_use]
@@ -100,6 +173,19 @@ impl ConnectionAuthority {
     pub fn initiation(&self) -> &InitiationPolicy {
         &self.initiation
     }
+
+    #[must_use]
+    pub fn route(&self) -> &ConnectionRoute {
+        &self.route
+    }
+}
+
+fn validate_ref(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 512
+        && value
+            .chars()
+            .all(|character| !character.is_whitespace() && !character.is_control())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -108,6 +194,12 @@ pub enum ConnectionAuthorityError {
     EmptyConnection,
     #[error("Connection initiation policy allows no initiator")]
     NoAllowedInitiator,
+    #[error("mediated route parent Connection identity is invalid")]
+    InvalidParentConnection,
+    #[error("mediated route resource binding is invalid")]
+    InvalidResourceBinding,
+    #[error("a Connection cannot route through itself")]
+    RouteCycle,
 }
 
 #[cfg(test)]
@@ -134,6 +226,34 @@ mod tests {
         assert_eq!(
             InitiationPolicy::new([]),
             Err(ConnectionAuthorityError::NoAllowedInitiator)
+        );
+    }
+
+    #[test]
+    fn mediated_route_is_explicit_and_cannot_self_reference() {
+        let connection = ConnectionAuthority::mediated(
+            "prometheus-via-grafana",
+            InitiationPolicy::b10x_only(),
+            "grafana-infra",
+            "observation:datasource-1",
+            RouteAdapter::GrafanaDatasourceProxyV1,
+        )
+        .expect("valid mediated route");
+        assert!(matches!(
+            connection.route(),
+            ConnectionRoute::ViaConnection { parent_connection, adapter: RouteAdapter::GrafanaDatasourceProxyV1, .. }
+                if parent_connection == "grafana-infra"
+        ));
+
+        assert_eq!(
+            ConnectionAuthority::mediated(
+                "same",
+                InitiationPolicy::b10x_only(),
+                "same",
+                "observation:1",
+                RouteAdapter::GrafanaDatasourceProxyV1,
+            ),
+            Err(ConnectionAuthorityError::RouteCycle)
         );
     }
 }

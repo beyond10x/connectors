@@ -1,6 +1,6 @@
 # Design 05: native SIP at the Connectors edge, RTVBP behind it
 
-**Status:** source-grounded `sip.dial` and development SIP/RTVBP path implemented; stable serving gated · **Date:** 2026-08-14
+**Status:** personal-local alpha operation serving and development SIP/RTVBP path implemented; stable serving gated · **Date:** 2026-08-14
 
 **Authority:**
 [architecture ADR 0024](https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
@@ -17,6 +17,12 @@ composition and one terminal result over real loopback SIP/RTP plus RTVBP WebSoc
 operation receipt at establishment. A separate operator-authorized characterization has established
 TCP SIP and an RTP echo against the dev-cluster Asterisk. Stable serving, the remaining lifecycle
 and placement matrix, and a signed release remain gated work.
+
+The released-alpha `ConnectorOperation` bundle and owner-only local daemon now project this member
+as generic `search`/`describe`/`invoke` plus session status/termination/reconciliation. The product
+binary consumes the one supervised runtime leaf; no SIP or RTVBP type crosses the client contract.
+Its initial configuration and audit journal are deliberately personal/development-only and do not
+claim M2 hosted posture or M3's general Connection/Grant stores.
 
 ## 1. Boundary
 
@@ -47,6 +53,7 @@ connectors/
 │   │   ├── src/plan.rs                   # admitted, driver-discriminated zero-I/O plans
 │   │   └── src/voice.rs                  # TelephonySession + neutral voice semantics and ports
 │   ├── protocol/
+│   │   ├── src/operation.rs              # generic owner-facing operation/session protocol
 │   │   ├── src/sip.rs                    # sip.dial alias input + establishment receipt
 │   │   └── src/voice.rs                  # alpha VoiceSession contract projection and vectors
 │   ├── service/
@@ -55,7 +62,8 @@ connectors/
 │   │   ├── src/dispatch.rs               # sole closed-driver policy composition
 │   │   ├── src/authority.rs              # proof-bound issue/present/redeem adapter
 │   │   ├── src/sip.rs                    # exact alias/transport/aperture admission proof
-│   │   └── src/voice.rs                  # SIP + application route admission proof
+│   │   ├── src/voice.rs                  # SIP + application route admission proof
+│   │   └── src/local.rs                  # owner-credentialed bounded Unix-socket daemon
 │   ├── driver-sip/                       # isolated sipx dependency/runtime workspace
 │   │   ├── Cargo.toml
 │   │   ├── src/lib.rs                    # sipx-backed TelephonySession implementation
@@ -67,11 +75,17 @@ connectors/
 │   │   ├── src/connect.rs                 # proof-bound client upgrade
 │   │   ├── src/bounded_ws.rs              # finite local semantic transport
 │   │   └── Cargo.lock                    # exact final RTVBP SDK resolution
-│   └── voice-runtime/                    # sole supervised adapter-composition leaf
-│       ├── Cargo.toml
-│       ├── src/lib.rs                    # custody, authority, pumps, lease, first-wins terminal
-│       ├── tests/supervised.rs           # real SIP/RTP + authenticated RTVBP WebSocket journey
-│       └── Cargo.lock                    # joined, independently gated runtime closure
+│   ├── voice-runtime/                    # sole supervised adapter-composition leaf
+│   │   ├── Cargo.toml
+│   │   ├── src/lib.rs                    # custody, authority, pumps, lease, first-wins terminal
+│   │   ├── tests/supervised.rs           # real SIP/RTP + authenticated RTVBP WebSocket journey
+│   │   └── Cargo.lock                    # joined, independently gated runtime closure
+│   └── connectors-cli/                   # isolated product binary/runtime consumer
+│       ├── src/main.rs                   # connectors serve + safe personal state root
+│       ├── src/sip_backend.rs            # catalog/authority/approval/session projection
+│       ├── src/runtime.rs                # VoiceRuntime launcher + exact TLS application route
+│       ├── examples/asterisk-dev.example.toml
+│       └── Cargo.lock                    # complete product dependency closure
 ├── specs/
 │   └── asterisk/
 │       ├── samples/pjsip.conf.sample     # pinned first-party SIP configuration source
@@ -82,6 +96,7 @@ connectors/
 ├── catalog/
 │   └── asterisk.catalog.json             # generated canonical provider document
 ├── contracts/
+│   ├── connector-operation/v0alpha1/     # generic clean-room operation/session contract
 │   └── voice-session/v0alpha1/           # protocol-neutral semantics and conformance vectors
 ├── fixtures/
 │   ├── sip-telephony-session/v1/         # sipx loopback and learned-peer characterization
@@ -118,6 +133,9 @@ server ───────────────▶ service ─────�
 protocol ─▶ domain identities / bounded projections only
 driver-sip ─X─▶ RTVBP
 Agent/Substrate ─X─▶ sipx or RTVBP
+
+connectors binary ─▶ server local operation port
+                  └▶ voice-runtime (never the two adapters directly)
 ```
 
 `domain::voice` separates a protocol-neutral internal `TelephonySession` from the released
@@ -150,6 +168,16 @@ credential resolution, ephemeral proof material, authority issuance, the deploym
 DNS/TCP/proxy/TLS connector port, authenticated upgrade, initialization, media/control/signal and
 keepalive pumps, lease expiry, first-wins termination, teardown, and payload-free observation. It
 owns no SIP, RTVBP, or product semantics.
+
+`connectors-cli` is a fourth nested workspace and the product composition leaf. It reads the
+canonical Asterisk member, verifies the exact personal owner snapshot, Connection initiation,
+Grant reference, description lease, external approval reference and configured alias before
+constructing an admitted voice plan. It depends on `voice-runtime`, not directly on either adapter.
+The owner-only Unix socket is in `server`; the binary owns deployment config, authority signing-key
+custody, exact TCP/TLS application routing, live session handles and a payload-free audit journal.
+No-config personal mode binds safely but advertises no operations. A held owner-only state lock
+prevents a second process from unlinking the live daemon socket, and shutdown revokes and boundedly
+joins backend-owned sessions before removing that socket.
 
 The same owner signal reaches credential lookup, SIP establishment, application connection, and
 the established supervisor. SIP admission bounds an invitation to `1..=30` seconds, and the driver
@@ -249,7 +277,7 @@ the generic contract. The upstream `L16/8000/1` label stays inside the binding. 
 `babelforce.v1` catalog includes application movement and session-variable semantics and remains
 only in the downstream Babelforce adapter.
 
-[Legacy RTVBP WebSocket negotiation](https://github.com/babelforce/rtvbp/blob/ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8/docs/designs/multi-catalog.md)
+[Legacy RTVBP WebSocket negotiation](https://github.com/babelforce/rtvbp/blob/dc0a60f7425b4899885f372152028457791b1e72/docs/designs/multi-catalog.md)
 maps an absent subprotocol to `rtvbp.v1`/`babelforce.v1`. The generic endpoint requires an explicit
 exact local binding profile and refuses a headerless offer instead of inheriting that compatibility
 default. The SDK's generated `demo.v1` profile is a multi-catalog test and is not an application
@@ -285,13 +313,13 @@ The reviewed initial identities are:
 | Dependency | Exact identity | Resolved commit | Gate |
 |---|---|---|---|
 | `codewandler/sipx` | `v1.0.0-rc.23` | `004ac534b8b222060ad2d2308763efe6e1dedc10` | development characterization only while prerelease |
-| RTVBP Rust SDK | `sdk/rust/v0.1.0` | `ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8` | final release; generic runtime baseline; local binding only |
+| RTVBP Rust SDK | `sdk/rust/v0.1.0` | `dc0a60f7425b4899885f372152028457791b1e72` | final release; generic runtime baseline; local binding only |
 
 Both declare Rust 1.88. This workspace now declares 1.88 and its pinned-MSRV lane is the release
 gate. Cargo versions are exact, the
 lockfile records the resolved graph, and release evidence records licenses, source commits, local
 binding identity, conformance results, and artifact digest. RTVBP's released crate asset is pinned
-at SHA-256 `76b7a79069f725e7ae13d2ca9af5b47bf8198e83839c360185ff3cb368e95469`.
+at SHA-256 `7d1d675e359016a5c8711bc0a29783ad9ce57a2f80f47ab5c77bc0152935ff9b`.
 Its public generic request/event traits, handler registration, transport traits, and configurable
 WebSocket subprotocols are the executable seam for the local binding. A mutable Git ref or
 compatible range is refused. The selected RTVBP runtime has internal unbounded control/transport
@@ -316,8 +344,11 @@ stable `sipx` API or a reviewed compatibility/upgrade exception.
 5. The operator-authorized non-loopback mode has completed one exact dev-cluster TCP SIP and RTP
    echo characterization. It is intentionally not a stable-network claim: the route remains
    deployment-owned, exact-aperture, and explicitly marked development.
-6. Bind the released search/describe/invoke Connector operation protocol to the coding harness and
-   supervise returned session handles across process restart and revocation.
+6. The released-alpha search/describe/invoke plus generic session contract is bound to an
+   owner-credentialed local Unix socket. The configured backend returns an `execution_ref`, keeps
+   the `VoiceRuntime` task and termination control, and reports `outcome_unknown` rather than
+   inventing ownership after restart. Clean-room harness conformance and durable hosted
+   reconciliation remain release gates.
 7. Publish a signed Connectors owner bundle and prove a clean-room application-channel consumer
    before any stable, hosted, or authoritative-writer claim.
 

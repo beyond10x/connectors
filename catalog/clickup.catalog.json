@@ -1030,6 +1030,10 @@
   "services": [
     {
       "api_version": "v2",
+      "audiences": [
+        "project-manager",
+        "product-manager"
+      ],
       "base_url": "https://api.clickup.com/api/v2",
       "gid": "com.clickup.api:v2",
       "name": "default",

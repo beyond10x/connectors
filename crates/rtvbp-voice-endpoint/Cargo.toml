@@ -18,7 +18,7 @@ async-trait = "0.1"
 domain = { version = "0.1.0", path = "../domain" }
 futures-util = "0.3"
 protocol = { version = "0.1.0", path = "../protocol" }
-rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8" }
+rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
 serde = "1"
 serde_json = "1"
 server = { version = "0.1.0", path = "../server" }

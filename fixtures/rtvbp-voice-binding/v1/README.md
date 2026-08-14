@@ -2,7 +2,7 @@
 
 This directory is the Connectors-owned adaptation of neutral
 `b10x.voice-session.v0alpha1` semantics onto RTVBP. It pins the final upstream Rust SDK
-release `sdk/rust/v0.1.0` at commit `ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8`, selects its
+release `sdk/rust/v0.1.0` at commit `dc0a60f7425b4899885f372152028457791b1e72`, selects its
 generic `classic.v1` envelope/transport APIs, and defines an explicit local profile. It neither adds
 B10x operations to RTVBP nor accepts RTVBP's product profile by default.
 

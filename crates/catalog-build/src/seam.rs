@@ -252,6 +252,12 @@ pub fn select_service(connector: &Connector, selector: &str) -> Result<Connector
         // accessor since it landed.
         events: connector.events_of(service).cloned().collect(),
         channels: connector.channels_of(service).cloned().collect(),
+        discoveries: connector
+            .discoveries
+            .iter()
+            .filter(|discovery| discovery.service == service)
+            .cloned()
+            .collect(),
         config: connector.config_of(service).cloned().collect(),
         graphs: connector.graphs_of(service).cloned().collect(),
         // `verify` is connector-level but *denotes* an operation, and an operation has exactly one

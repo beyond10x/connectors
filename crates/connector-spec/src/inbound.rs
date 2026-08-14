@@ -402,19 +402,20 @@ pub struct Subscription {
     pub callback_param: String,
 }
 
-/// What a human must do in the vendor's own dashboard, for vendors with no subscription API.
+/// What a human must do in the vendor's own dashboard, for channels with no complete setup API.
 ///
-/// Slack is the case: there is no Web API method that registers an Events API endpoint, so somebody
-/// opens `api.slack.com/apps` and pastes a URL. That work does not disappear because it is
-/// undeclared — it just moves into a support article nobody keeps current.
+/// Slack demonstrates both forms: an Events API webhook needs a pasted callback URL, while Socket
+/// Mode needs the mode, scopes, event subscriptions, and app installation configured. That work
+/// does not disappear because it is undeclared — it just moves into a support article nobody keeps
+/// current.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ManualSetup {
     /// The vendor's own page for this, so a UI can link out rather than restate it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub docs_url: Option<String>,
-    /// The steps, in order, each one thing a person does. Rendered as a numbered list beside the
-    /// callback URL the product displays.
+    /// The steps, in order, each one thing a person does. A webhook UI may render these beside its
+    /// callback URL; a socket UI renders them while establishing the Connection.
     pub steps: Vec<String>,
 }
 
@@ -448,6 +449,12 @@ pub struct ChannelBinding {
     /// and remain the consuming runtime's explicit responsibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connect: Option<SocketConnectSpec>,
+    /// Credentials the host must resolve inside Connector custody to establish or supervise this
+    /// channel. This is distinct from [`SocketConnectSpec::auth`]: a vendor-specific transport may
+    /// authenticate a ticket-minting call before it has an RFC 6455 URL at all (Slack Socket Mode).
+    /// The values are credential names only; a channel never carries a credential value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub auth: Vec<crate::AuthRequirement>,
     /// The [`EventDecl`] names this binding carries, all from the same service.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<String>,
@@ -499,7 +506,8 @@ pub struct ChannelBinding {
     /// with no instructions for what to do with it is not a configurable surface.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscription: Option<Subscription>,
-    /// What a human does in the vendor's dashboard, when there is no subscription API.
+    /// What a human does in the vendor's dashboard, when there is no complete setup API. Supported
+    /// for webhook registration and outbound socket establishment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub setup: Option<ManualSetup>,
     /// The **suggested** poll interval (`5m`), for [`Transport::Poll`] only.

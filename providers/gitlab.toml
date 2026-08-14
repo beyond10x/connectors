@@ -164,8 +164,8 @@ grants = ["authorization_code", "refresh_token"]
 [[services]]
 # C-153. `default` is the reserved implicit service, and a provider with one API surface
 # declares no services at all — so this entry exists for exactly one reason: a tag attaches
-# to a service, and there is no other service here to attach it to. It carries `tags` and
-# nothing else, which is what keeps `default` implicit and this file emitting the same
+# to a service, and there is no other service here to attach it to. It carries service
+# discovery metadata only, which keeps `default` implicit and this file emitting the same
 # `gitlab.flux` it emitted before.
 #
 # `legacy = true` (C-458) is what preserves that after `login` was added below: it keeps the
@@ -175,6 +175,7 @@ grants = ["authorization_code", "refresh_token"]
 name = "default"
 legacy = true
 tags = ["source-control", "issue-tracking"]
+audiences = ["developer"]
 
 [[services]]
 # **The vendor's OAuth2 endpoints, which are not under `/api/v4`** (C-529).

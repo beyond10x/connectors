@@ -43,6 +43,57 @@ consumers = ["providers/anthropic.toml", "catalog/anthropic.catalog.json", "crat
 note = "Two repository-authored OpenAPI 3.1/YAML documents cover the exact shipped Models and read-only Admin API surfaces. Each endpoint cites its official Anthropic reference; reviewed overlays retain stable ids, policy facts and deliberate query omissions."
 
 [[source]]
+id = "grafana-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/dashboard/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/",
+]
+refresh = "authored-review"
+pins = "specs/grafana.provenance.toml"
+consumers = ["providers/grafana.toml", "catalog/grafana.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Grafana 12+ dashboard and bounded data-source query surface. Each endpoint cites Grafana's official reference; instance-local Swagger remains the authority for deployment-specific additions."
+
+[[source]]
+id = "prometheus-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://prometheus.io/docs/prometheus/latest/querying/api/",
+  "https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries",
+]
+refresh = "authored-review"
+pins = "specs/prometheus.provenance.toml"
+consumers = ["providers/prometheus.toml", "catalog/prometheus.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Prometheus range-query contract."
+
+[[source]]
+id = "loki-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-logs-within-a-range-of-time",
+]
+refresh = "authored-review"
+pins = "specs/loki.provenance.toml"
+consumers = ["providers/loki.toml", "catalog/loki.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Loki range-query contract."
+
+[[source]]
+id = "alertmanager-openapi"
+kind = "openapi-spec"
+origin = "vendor"
+upstream = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
+refresh = "manual"
+pins = "specs/alertmanager.provenance.toml"
+consumers = ["providers/alertmanager.toml", "catalog/alertmanager.catalog.json"]
+note = "Pins Alertmanager's official v0.31.0 Swagger 2 source and the reviewed OpenAPI 3 projection of the one read operation B10x ships."
+
+[[source]]
 id = "asterisk-ari-sip"
 kind = "vendor-protocol-source"
 upstream = "https://github.com/asterisk/asterisk (tag 22.10.1)"

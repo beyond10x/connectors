@@ -1941,6 +1941,10 @@
   "services": [
     {
       "api_version": "v1",
+      "audiences": [
+        "finance",
+        "developer"
+      ],
       "base_url": "https://api.stripe.com",
       "gid": "com.stripe.api:v1",
       "name": "default",

@@ -21,8 +21,8 @@ without a model or Babelforce product semantics.
 ## Acceptance
 
 - [ ] RTVBP Rust SDK `sdk/rust/v0.1.0` resolves to
-      `ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8`, its released crate asset matches SHA-256
-      `76b7a79069f725e7ae13d2ca9af5b47bf8198e83839c360185ff3cb368e95469`, and licenses are
+      `dc0a60f7425b4899885f372152028457791b1e72`, its released crate asset matches SHA-256
+      `7d1d675e359016a5c8711bc0a29783ad9ce57a2f80f47ab5c77bc0152935ff9b`, and licenses are
       recorded; the B10x binding manifest and fixtures are locally owner-released with
       conformance evidence rather than compiled into the upstream SDK.
 - [ ] The released `VoiceSession` contract contains no RTVBP type, and both endpoint adapters prove

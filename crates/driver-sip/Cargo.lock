@@ -1938,7 +1938,7 @@ dependencies = [
 [[package]]
 name = "rtvbp"
 version = "0.1.0"
-source = "git+https://github.com/babelforce/rtvbp?rev=ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8#ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8"
+source = "git+https://github.com/babelforce/rtvbp?rev=dc0a60f7425b4899885f372152028457791b1e72#dc0a60f7425b4899885f372152028457791b1e72"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -2185,14 +2185,18 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "base64",
  "domain",
  "ed25519-dalek",
+ "fs2",
  "protocol",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]

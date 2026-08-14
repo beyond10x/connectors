@@ -60,7 +60,24 @@ changes owners. This is the milestone at which the client contract is real.
       real provider, grant, invoke — with every connector step audited under the closed vocabulary.
 
 ## Progress
-- (not started)
+
+- 2026-08-14 — a development-only vertical slice now projects the source-grounded Asterisk
+  `sip.dial` member through generic search/describe/invoke, exact personal owner snapshot,
+  Connection initiation, configured Grant/approval references, alias-only routing, live session
+  custody and payload-free local audit. It is evidence for the eventual one-path invoke design, not
+  M3 completion: general Integration/Connection/Grant persistence, credential acquisition, hosted
+  authority, lifecycle and a stable real-provider exit remain open.
+- 2026-08-14 — the personal-local Slack slice adds a value-free Integration policy, one-use
+  operator-entry Connect Session, prepared owner-only credential custody, crash-recovered durable
+  Connection metadata, and stable post-creation ids. It deliberately does not claim M3: general
+  reauthorization-in-place, multiple acquisition kinds, Grant persistence, hosted identity, audit,
+  and declared invoke through that Connection remain open.
+- 2026-08-14 — `connectors connect slack` now acts as the first-party acquisition façade: it hides
+  Connect Session references and the one-use completion endpoint, prompts without echo, follows the
+  Connection to callable, and prints only the human result. The public guide names the hosted
+  **Add Slack** equivalent. Slack's app-level token is app-wide, so moving its custody to Integration
+  and acquiring workspace Connections through OAuth remains required before a multi-workspace
+  product claim.
 
 ## Notes
 

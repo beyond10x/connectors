@@ -9024,6 +9024,9 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "developer"
+      ],
       "base_url": "https://api.github.com",
       "legacy": true,
       "name": "default",

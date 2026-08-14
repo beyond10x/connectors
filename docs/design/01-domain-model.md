@@ -90,7 +90,10 @@ does not itself confer connector management authority.
 A short-lived, server-created, single-purpose token that authorizes exactly one thing: completing
 (or repairing) one connection's authorization, optionally bound to a set of allowed integrations
 and carrying reconciliation tags (end-user id, external ids). Surfaced as a hosted URL, an
-embeddable component, or headlessly (an agent hands the URL to a human — auth-as-tool-result).
+embeddable component, or through a trusted product/control-plane surface that hands it to the
+human. It is never a model or inner-harness tool result. In personal-local operator-entry flows it
+may expose a short-lived owner-only completion socket. That completion endpoint is called once; it
+is neither the durable Connection nor an Agent Endpoint.
 
 - *Invariant:* a connect session never carries or returns credential material to its creator;
   its terminal event names the connection id, nothing else.
@@ -108,7 +111,7 @@ embeddable component, or headlessly (an agent hands the URL to a human — auth-
 The catalog template for one vendor surface: reverse-DNS **authority** (e.g. `com.gitlab.api`),
 services with base-URL templates, **operations**, the complete credential surface (schemes,
 acquisition, placement, subject, hazard, full OAuth2 spec), configuration fields, events, channel
-bindings, verification probes, and per-operation runtime traits — pagination, rate limits, error
+bindings, verification probes, curated service audiences, and per-operation runtime traits — pagination, rate limits, error
 envelopes — as **first-class named fields**. (The predecessor bagged these under `quirks`; that
 umbrella retires. A rare, precisely-scoped `workarounds` category may exist for genuine vendor
 spec deviations, each entry naming the defect it compensates — its rarity is the signal.)
@@ -130,6 +133,9 @@ canonical JSON document, hashes it in the lockfile and packs it into an offset-i
   deployment must supply), never a value. No `client_id` ever appears in the catalog.
 - *Invariant:* the request-template vocabulary is closed and total; anything outside it is a
   build error, never a degraded document.
+- *Invariant:* an audience (`sre`, `developer`, `sales-rep`, …) is service-level discovery metadata
+  only. Provider audiences are the derived union used by catalog explorers; Connection ownership,
+  Grant admission, visibility and runtime authorization never consume it.
 - *Invariant:* protocol driver, interaction shape and required capabilities are declared facts,
   never caller choices. HTTP is the first driver, not an implicit default for an unknown one.
 - *Invariant:* the authority is never repointed once published; it leads every credential path.
@@ -211,6 +217,15 @@ created ──authorize──▶ authorized ──verify──▶ callable
   reviewed member may run*.
 - *Invariant:* initiation is not the catalog operation's `direction`. `direction = write` describes
   vendor-state effect; it cannot say which side is allowed to begin a connection.
+
+**2026-08-14 route amendment.** Every Connection has one immutable route: `direct`, or
+`via_connection(parent Connection, opaque resource binding, closed route adapter)`. The mediated
+form remains governed by its target Provider contract; the parent supplies transport only. It
+does not imply direct backend access or another credential. It
+does not inherit the parent's Provider semantics, credentials, Connector Grant, or Agent Endpoint
+Grant. Discovery may propose such a Connection but never creates or authorizes one. See
+[Design 08](08-discovery-observations-and-mediated-connections.md).
+
 - Scope rationale: agent automation needs both the team's shared GitLab connection and a user's
   personal calendar; the industry models only end-user-owned connections, the predecessor only
   org-owned ones. We carry both, and grants decide who may exercise which.
@@ -223,6 +238,15 @@ Vendor secret material backing a connection: acquired through a connect session 
 authorization code, API key entry, …) or operator-entered; refreshed by the platform; stored
 owner-bound (owner-only files in personal/org; per-tenant envelope encryption in saas) with
 prepared, atomic multi-step mutations.
+
+**2026-08-14 credential-custody amendment.** Owner-bound describes an authority boundary, not a
+license to keep release credentials in plaintext files. A released personal deployment stores an
+entered value in the operating-system keychain or binds the credential slot to an operator-approved
+external secret provider. An organization deployment uses its configured encrypted credential
+store, an external secret provider, or workload identity. A development-only owner-permissioned
+file backend may prove transaction and recovery behavior, but is not a releasable credential
+posture. [Design 07](07-credential-custody-topologies.md) proposes the placement and custody matrix
+for cross-repository decision.
 
 - *Invariant:* a credential never crosses to a client, appears in a log, an audit record, an
   error, or a catalog artifact. Placement (where it goes in a request) and subject/hazard (what

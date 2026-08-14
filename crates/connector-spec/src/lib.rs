@@ -20,9 +20,10 @@
 //!                                      risk, idempotency, description,
 //!                                      auth: Option<[AuthRequirement]>, workarounds }],
 //!             events:   [EventDecl { name, service, description, when, schema }],
-//!             channels: [ChannelBinding { name, service, transport, events, verification,
+//!             channels: [ChannelBinding { name, service, transport, auth, events, verification,
 //!                                         discriminator, delivery_id, payload,
 //!                                         reply: Option<Reply>, cursor, interval }],
+//!             discoveries: [Discovery { id, service, operation, driver, mappings }],
 //!             config:   [ConfigField { name, service, label, help, example, format, required,
 //!                                      secret, docs_url, binds }],
 //!             graphs:   [Graph { name, service, description, inputs, output, nodes, edges }],
@@ -117,8 +118,8 @@ pub use connector_address::{
 };
 
 pub use auth::{
-    AuthHazard, AuthMethod, AuthRequirement, AuthScheme, AuthWorkarounds, OAuth2Spec, OAuthGrant,
-    OAuthRedirect, Subject, TokenEndpointWorkaround,
+    AuthHazard, AuthMethod, AuthRequirement, AuthScheme, AuthWorkarounds, CredentialEntry,
+    OAuth2Spec, OAuthGrant, OAuthRedirect, Subject, TokenEndpointWorkaround,
 };
 pub use config::{Approval, Binding, Choice, ConfigField, Format, Level, Pin, Position};
 pub use credential::{CredentialRef, InstanceId, Layout, TenantInstances, TenantLayout};
@@ -131,12 +132,13 @@ pub use inbound::{
     VerificationScheme,
 };
 pub use ir::{
-    constrains_nothing, credential_handle_schema, response_location_exists, BodyEncoding,
-    Connector, ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm,
-    InteractionShape, JsonSchema, Operation, OperationDirection, OperationRequest,
-    OperationSpecSource, Pagination, Param, ParamSet, PlacementRequirement, ProducedCredential,
-    ProtocolDriver, Provenance, RateLimit, RequiredCapability, Risk, Role, SemanticEffect, Service,
-    Tag, CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
+    constrains_nothing, credential_handle_schema, response_location_exists, Audience, BodyEncoding,
+    Connector, Discovery, DiscoveryDriver, DiscoveryMapping, ErrorEnvelope, HostEffect, HttpMethod,
+    Idempotency, ImplementationForm, InteractionShape, JsonSchema, Operation, OperationDirection,
+    OperationRequest, OperationSpecSource, Pagination, Param, ParamSet, PlacementRequirement,
+    ProducedCredential, ProtocolDriver, Provenance, RateLimit, RequiredCapability, Risk, Role,
+    RouteAdapter, SemanticEffect, Service, Tag, CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY,
+    MIN_REPEATABILITY_CONDITION,
 };
 pub use lock::{
     sha256_hex, LockEntry, LockPack, LockSpec, Lockfile, LOCKFILE_NAME, LOCKFILE_VERSION,

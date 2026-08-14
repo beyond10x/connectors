@@ -30,7 +30,7 @@ tokio-util = "0.7"
 connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
 ed25519-dalek = "2"
 protocol = { version = "0.1.0", path = "../protocol" }
-rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8" }
+rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
 rtvbp-voice-endpoint = { version = "0.1.0", path = "../rtvbp-voice-endpoint" }
 serde_json = "1"
 service = { version = "0.1.0", path = "../service" }

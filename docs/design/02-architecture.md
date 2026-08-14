@@ -123,6 +123,7 @@ posture = "personal" | "org" | "saas"
 [storage]         # state root; refuses working-tree paths
 [catalog]         # pack path override (default: embedded), later: additional sources
 [egress]          # org: the deployment-declared destination allowlist (value-free)
+[[credential_sources]] # closed driver + allowed placement/scope; values are forbidden
 ```
 
 Same binary, same connector feature set. A posture selects local authentication versus the Identity
@@ -130,6 +131,13 @@ verifier, the fixed tenant binding, and bind policy. A hosted listener refuses s
 verifier contract, trust roots, expected audience/tenant, or connected revocation posture is absent
 or invalid. Upstream OIDC issuer/client configuration and Identity session storage never enter this
 document.
+
+Credential-source configuration is Connectors-owned even when `platform.toml` is embedded as a
+subtree of a wider product configuration. It declares only closed backend drivers and non-secret
+placement/scope policy. Integration policy narrows which named sources may establish a Connection;
+the harness, web product, task, and invocation cannot supply or override a backend. The exact shape,
+including external-provider references and satellite generation binding, is defined by
+[Design 07](07-credential-custody-topologies.md#7-deployment-configuration-owns-available-stores).
 
 ## 4. Storage
 
@@ -143,11 +151,19 @@ document.
 - **Catalog** — the pack, embedded in the binary and overridable by verified `Pack::load`; a
   pack that fails verification refuses startup.
 
+**2026-08-14 credential-custody amendment.** The owner-bound file store is a development backend,
+not the release default. Personal release posture binds `connector-secrets` to the OS keychain or
+an operator-selected external secret provider. Organization and satellite placements bind it to a
+deployment-managed encrypted store, an external secret provider, or a workload identity that needs
+no reusable vendor secret. [Design 07](07-credential-custody-topologies.md) defines how one-use
+completion reaches the execution placement without exposing plaintext to a caller or central relay.
+
 The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
 databases — each individually justified, collectively unqueryable. One connector database + one
-vendor secret store + one pack is the whole Connectors-owned inventory here. Identity persistence
-is not a fourth store hidden in this process. SaaS-scale Postgres is a port swap decided when saas
-is real, not before.
+credential-store port + one pack is the whole Connectors-owned inventory here; the port may retain
+sealed values itself or resolve an opaque external-provider binding. Identity persistence is not a
+fourth store hidden in this process. SaaS-scale Postgres is a port swap decided when saas is real,
+not before.
 
 ## 5. The one invocation path
 

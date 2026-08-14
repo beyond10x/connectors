@@ -71,12 +71,14 @@
         "base_url",
         "api_version",
         "hosts",
+        "audiences",
         "services",
         "auth",
         "operation_count",
         "operations",
         "events",
         "channels",
+        "discoveries",
         "config",
         "verify",
         "config_choices"
@@ -102,6 +104,9 @@
         },
         "hosts": {
           "$ref": "#/$defs/string_array"
+        },
+        "audiences": {
+          "$ref": "#/$defs/audiences"
         },
         "services": {
           "type": "array",
@@ -135,6 +140,12 @@
             "$ref": "#/$defs/channel"
           }
         },
+        "discoveries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/discovery"
+          }
+        },
         "config": {
           "type": "array",
           "items": {
@@ -162,7 +173,8 @@
         "hosts",
         "api_version",
         "gid",
-        "operation_count"
+        "operation_count",
+        "audiences"
       ],
       "properties": {
         "name": {
@@ -186,7 +198,31 @@
         "operation_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "audiences": {
+          "$ref": "#/$defs/audiences"
         }
+      }
+    },
+    "audiences": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "developer",
+          "sre",
+          "security-engineer",
+          "data-analyst",
+          "product-manager",
+          "project-manager",
+          "designer",
+          "sales-rep",
+          "support-agent",
+          "marketer",
+          "finance",
+          "ecommerce-manager",
+          "content-manager"
+        ]
       }
     },
     "auth": {
@@ -225,6 +261,7 @@
         "env",
         "user_env",
         "user_suffix",
+        "entry",
         "oauth2"
       ],
       "properties": {
@@ -245,6 +282,12 @@
         },
         "user_suffix": {
           "$ref": "#/$defs/nullable_string"
+        },
+        "entry": {
+          "enum": [
+            "connect_session",
+            null
+          ]
         },
         "oauth2": {
           "oneOf": [
@@ -349,6 +392,45 @@
         },
         "label": {
           "$ref": "#/$defs/nonempty_string"
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "service",
+        "operation",
+        "driver",
+        "mappings"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonempty_string" },
+        "service": { "$ref": "#/$defs/nonempty_string" },
+        "operation": { "$ref": "#/$defs/nonempty_string" },
+        "driver": { "enum": ["grafana_datasource_v1"] },
+        "mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observed_type", "target_provider", "route_adapter"],
+            "properties": {
+              "observed_type": {
+                "type": "string",
+                "pattern": "^[a-z0-9._-]+$"
+              },
+              "target_provider": {
+                "type": "string",
+                "pattern": "^[a-z0-9._-]+$"
+              },
+              "route_adapter": {
+                "enum": ["grafana_datasource_proxy_v1"]
+              }
+            }
+          }
         }
       }
     },
@@ -538,6 +620,7 @@
         "transport",
         "session",
         "connect",
+        "auth",
         "events",
         "verification",
         "discriminator",
@@ -590,6 +673,15 @@
               "type": "null"
             }
           ]
+        },
+        "auth": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/nonempty_string"
+            }
+          }
         },
         "events": {
           "$ref": "#/$defs/string_array"

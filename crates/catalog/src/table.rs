@@ -45,11 +45,12 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{
-    Acquisition, Approval, AuthHazard, Channel, ChannelSession, ChannelTransport, Choice,
-    ConfigChoices, ConfigField, Credential, CredentialRequirement, Event, HostEffect, Idempotency,
-    ImplementationForm, InteractionShape, OAuth2, OAuthGrant, OAuthRedirect, Operation,
-    OperationDirection, Pair, Placement, PlacementRequirement, ProtocolDriver, Provider,
-    RequiredCapability, Risk, Selector, Service, SocketConnect, Subject,
+    Acquisition, Approval, Audience, AuthHazard, Channel, ChannelSession, ChannelTransport, Choice,
+    ConfigChoices, ConfigField, Credential, CredentialRequirement, Discovery, DiscoveryDriver,
+    DiscoveryMapping, Event, HostEffect, Idempotency, ImplementationForm, InteractionShape, OAuth2,
+    OAuthGrant, OAuthRedirect, Operation, OperationDirection, Pair, Placement,
+    PlacementRequirement, ProtocolDriver, Provider, RequiredCapability, Risk, RouteAdapter,
+    Selector, Service, SocketConnect, Subject,
 };
 
 /// Every provider in the embedded pack, ordered by id, built once.
@@ -127,18 +128,24 @@ struct RawDocument {
     events: Vec<RawEvent>,
     #[serde(default)]
     channels: Vec<RawChannel>,
+    #[serde(default)]
+    discoveries: Vec<RawDiscovery>,
 }
 
 #[derive(Deserialize)]
 struct RawService {
     name: String,
     base_url: String,
+    #[serde(default)]
+    audiences: Vec<String>,
 }
 
 #[derive(Deserialize)]
 struct RawAuth {
     name: String,
     scheme: RawScheme,
+    #[serde(default)]
+    entry: Option<String>,
     #[serde(default)]
     user_env: Vec<String>,
     #[serde(default)]
@@ -293,6 +300,8 @@ struct RawChannel {
     #[serde(default)]
     connect: Option<RawConnect>,
     #[serde(default)]
+    auth: Vec<Vec<String>>,
+    #[serde(default)]
     events: Vec<String>,
     #[serde(default)]
     discriminator: Option<RawSelector>,
@@ -338,6 +347,22 @@ struct RawRequirement {
 struct RawSelector {
     source: String,
     name: String,
+}
+
+#[derive(Deserialize)]
+struct RawDiscovery {
+    id: String,
+    service: String,
+    operation: String,
+    driver: String,
+    mappings: Vec<RawDiscoveryMapping>,
+}
+
+#[derive(Deserialize)]
+struct RawDiscoveryMapping {
+    observed_type: String,
+    target_provider: String,
+    route_adapter: String,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -404,6 +429,16 @@ fn build(id: &str, text: &str) -> &'static Provider {
 
     let config_choices = raw.config.iter().filter_map(build_choices).collect();
 
+    let mut provider_audiences = Vec::new();
+    for service in &raw.services {
+        for word in &service.audiences {
+            let audience = audience(&raw.connector, &service.name, word);
+            if !provider_audiences.contains(&audience) {
+                provider_audiences.push(audience);
+            }
+        }
+    }
+
     Box::leak(Box::new(Provider {
         id: leak_str(raw.connector.clone()),
         vendor: leak_str(raw.vendor.clone()),
@@ -415,9 +450,17 @@ fn build(id: &str, text: &str) -> &'static Provider {
                 .map(|service| Service {
                     name: leak_str(service.name.clone()),
                     base_url: leak_str(service.base_url.clone()),
+                    audiences: leak_slice(
+                        service
+                            .audiences
+                            .iter()
+                            .map(|word| audience(&raw.connector, &service.name, word))
+                            .collect(),
+                    ),
                 })
                 .collect(),
         ),
+        audiences: leak_slice(provider_audiences),
         base_url: leak_str(base_url),
         auth: leak_slice(
             raw.auth
@@ -456,8 +499,65 @@ fn build(id: &str, text: &str) -> &'static Provider {
                 })
                 .collect(),
         ),
+        discoveries: leak_slice(
+            raw.discoveries
+                .iter()
+                .map(|discovery| build_discovery(id, discovery))
+                .collect(),
+        ),
         config_choices: leak_slice(config_choices),
     }))
+}
+
+fn build_discovery(provider: &str, raw: &RawDiscovery) -> Discovery {
+    let driver = match raw.driver.as_str() {
+        "grafana_datasource_v1" => DiscoveryDriver::GrafanaDatasourceV1,
+        other => panic!(
+            "`{provider}` discovery `{}` has unknown driver `{other}`",
+            raw.id
+        ),
+    };
+    Discovery {
+        id: leak_str(raw.id.clone()),
+        service: leak_str(raw.service.clone()),
+        operation: leak_str(raw.operation.clone()),
+        driver,
+        mappings: leak_slice(
+            raw.mappings
+                .iter()
+                .map(|mapping| DiscoveryMapping {
+                    observed_type: leak_str(mapping.observed_type.clone()),
+                    target_provider: leak_str(mapping.target_provider.clone()),
+                    route_adapter: match mapping.route_adapter.as_str() {
+                        "grafana_datasource_proxy_v1" => RouteAdapter::GrafanaDatasourceProxyV1,
+                        other => panic!(
+                            "`{provider}` discovery `{}` has unknown route adapter `{other}`",
+                            raw.id
+                        ),
+                    },
+                })
+                .collect(),
+        ),
+    }
+}
+
+fn audience(provider: &str, service: &str, word: &str) -> Audience {
+    match word {
+        "developer" => Audience::Developer,
+        "sre" => Audience::Sre,
+        "security-engineer" => Audience::SecurityEngineer,
+        "data-analyst" => Audience::DataAnalyst,
+        "product-manager" => Audience::ProductManager,
+        "project-manager" => Audience::ProjectManager,
+        "designer" => Audience::Designer,
+        "sales-rep" => Audience::SalesRep,
+        "support-agent" => Audience::SupportAgent,
+        "marketer" => Audience::Marketer,
+        "finance" => Audience::Finance,
+        "ecommerce-manager" => Audience::EcommerceManager,
+        "content-manager" => Audience::ContentManager,
+        other => panic!("`{provider}` service `{service}` declares unknown audience `{other}`"),
+    }
 }
 
 /// The document's own JSON for one member of a top-level array, compact.
@@ -629,6 +729,12 @@ fn acquisition(name: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Acquis
         return Acquisition::BasicJoin {
             user_env: leak_strs(raw.user_env.clone()),
             user_suffix: leak_str(raw.user_suffix.clone().unwrap_or_default()),
+        };
+    }
+    if let Some(entry) = raw.entry.as_deref() {
+        return match entry {
+            "connect_session" => Acquisition::ConnectSession,
+            other => panic!("credential `{name}` declares unknown entry `{other}`"),
         };
     }
     // The minting join, read from the document (S-001): placement-wise this is `Static` — the
@@ -861,6 +967,7 @@ fn build_channel(
             ),
             subprotocols: leak_strs(connect.subprotocols.clone()),
         }),
+        auth: leak_requirements(raw.auth.clone()),
         discriminator: raw.discriminator.as_ref().map(|s| selector(&raw.name, s)),
         delivery_id: raw.delivery_id.as_ref().map(|s| selector(&raw.name, s)),
         payload: leak_pairs(raw.payload.clone()),

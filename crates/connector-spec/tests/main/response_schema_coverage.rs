@@ -281,18 +281,20 @@ fn absence_is_within_bounds(operations: usize, covered: usize) -> bool {
 }
 
 /// **The stated design, asserted rather than described.** Both halves, in the file's own words: one
-/// honest absence must not turn an unrelated provider story red on arrival, and a connector landing
-/// with nothing at all still must.
+/// honest absence must not turn an unrelated provider story red on arrival, and a multi-operation
+/// connector landing with nothing at all still must. A one-operation connector with no response
+/// shape is indistinguishable from that deliberately admitted single honest absence.
 #[test]
 fn a_connector_arriving_with_no_response_shapes_is_caught() {
     let tallies = coverage();
     let operations: usize = tallies.iter().map(|tally| tally.operations).sum();
     let covered: usize = tallies.iter().map(|tally| tally.covered).sum();
-    let smallest = tallies
+    let smallest_multi_operation_connector = tallies
         .iter()
         .map(|tally| tally.operations)
+        .filter(|operations| *operations > 1)
         .min()
-        .expect("the catalogue ships at least one provider");
+        .expect("the catalogue ships at least one multi-operation provider");
 
     assert!(
         absence_is_within_bounds(operations + 1, covered),
@@ -301,11 +303,12 @@ fn a_connector_arriving_with_no_response_shapes_is_caught() {
         table(&tallies)
     );
     assert!(
-        !absence_is_within_bounds(operations + smallest, covered),
-        "a connector the size of the smallest already shipped ({smallest} operations) could land \
+        !absence_is_within_bounds(operations + smallest_multi_operation_connector, covered),
+        "a connector the size of the smallest multi-operation provider already shipped \
+         ({smallest_multi_operation_connector} operations) could land \
          carrying no response shapes at all — {covered} of {} — and this guard would stay green. \
          That arrival is the one thing it exists to catch.\n{}",
-        operations + smallest,
+        operations + smallest_multi_operation_connector,
         table(&tallies)
     );
 }

@@ -451,6 +451,7 @@ mod tests {
             operations: vec![operation("acme-thing-list")],
             events: Vec::new(),
             channels: Vec::new(),
+            discoveries: Vec::new(),
             config: Vec::new(),
             verify: None,
             graphs: Vec::new(),

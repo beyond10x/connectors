@@ -384,6 +384,25 @@ fn verification_on_a_transport_that_cannot_use_it_is_refused() {
     );
 }
 
+#[test]
+fn a_socket_binding_may_declare_manual_vendor_side_setup() {
+    let source = fixture(&GOOD.replace(
+        "[channels.payload]",
+        "[channels.setup]\nsteps = [\"Enable the vendor socket mode\"]\n\n[channels.payload]",
+    ));
+    let connector = load(&source);
+    assert_eq!(
+        connector
+            .channel("hook")
+            .expect("socket binding loads")
+            .setup
+            .as_ref()
+            .expect("manual setup is preserved")
+            .steps,
+        ["Enable the vendor socket mode"]
+    );
+}
+
 /// Slack's own published parameters, which is the point: the matrix is filled from vendor
 /// documentation rather than from a shape this repository invented.
 const HMAC: &str = r#"
@@ -881,6 +900,15 @@ fn the_shipped_slack_bindings_describe_both_of_slacks_real_transports() {
 
     assert_eq!(socket.transport, Transport::Socket);
     assert_eq!(events_api.transport, Transport::Webhook);
+    assert_eq!(socket.auth.len(), 1);
+    assert!(socket.auth[0].contains("slack.app_token"));
+    assert!(socket.setup.as_ref().is_some_and(|setup| {
+        setup
+            .steps
+            .iter()
+            .any(|step| step.contains("protected prompt"))
+    }));
+    assert!(events_api.auth.is_empty());
 
     // Same events, same payload map, same reply — two transports. That is what makes "inbound is an
     // abstraction over transports" a claim this repository demonstrates rather than asserts.

@@ -833,6 +833,10 @@
   "services": [
     {
       "api_version": "v1",
+      "audiences": [
+        "sre",
+        "support-agent"
+      ],
       "base_url": "https://api.statuspage.io/v1/pages/{page_id}",
       "gid": "io.statuspage.api:v1",
       "name": "default",

@@ -5,14 +5,17 @@ use connector_resolve::document::{
     RequiredCapability,
 };
 use domain::{
-    AdmittedOperation, Capability, ConnectionInitiator, DriverId, HttpPlan, Implementation,
-    Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
+    AdmittedOperation, Capability, ConnectionInitiator, ConnectionRoute, DriverId, HttpPlan,
+    Implementation, Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan,
+    RouteAdapter, SipPlan, ZeroIoPlan,
 };
 
 /// Deployment facts consulted during pure planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanningEnvironment {
     pub available_drivers: BTreeSet<DriverId>,
+    /// Closed mediated-route adapters installed at this placement.
+    pub available_route_adapters: BTreeSet<RouteAdapter>,
     pub capabilities: BTreeSet<Capability>,
     /// Reviewed, deployment-selected egress/listener subjects. Caller input never populates this.
     pub permission_subjects: Vec<String>,
@@ -33,6 +36,12 @@ pub enum PlanError {
     PermissionSubjectMissing,
     #[error("Connection does not permit B10x to initiate operations")]
     ConnectionInitiationRefused,
+    #[error("mediated route adapter `{0}` is not available in this deployment")]
+    RouteAdapterUnavailable(&'static str),
+    #[error("a mediated Connection cannot execute this protocol driver")]
+    MediatedRouteDriverMismatch,
+    #[error("a mediated HTTP operation has no target-relative request path")]
+    MediatedTargetPathInvalid,
 }
 
 /// Produce the complete inert plan after grant admission and before credentials or I/O.
@@ -83,14 +92,43 @@ pub fn plan_operation(
         return Err(PlanError::PermissionSubjectMissing);
     }
 
-    let protocol = match &operation.request {
-        ProtocolRequestTemplate::HttpV1(request) => ProtocolPlan::HttpV1(HttpPlan {
-            method: request.method.clone(),
-            url_template: request.url.clone(),
-        }),
-        ProtocolRequestTemplate::SipV1 => ProtocolPlan::SipV1(SipPlan {
+    let protocol = match (admission.connection_authority().route(), &operation.request) {
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::HttpV1(request)) => {
+            ProtocolPlan::HttpV1(HttpPlan {
+                method: request.method.clone(),
+                url_template: request.url.clone(),
+            })
+        }
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::SipV1) => ProtocolPlan::SipV1(SipPlan {
             connection: admission.connection().to_owned(),
         }),
+        (
+            ConnectionRoute::ViaConnection {
+                parent_connection,
+                resource_binding,
+                adapter,
+            },
+            ProtocolRequestTemplate::HttpV1(request),
+        ) => {
+            if !environment.available_route_adapters.contains(adapter) {
+                return Err(PlanError::RouteAdapterUnavailable(adapter.as_str()));
+            }
+            let target_path_template = request
+                .url
+                .strip_prefix("{base}")
+                .filter(|path| path.starts_with('/'))
+                .ok_or(PlanError::MediatedTargetPathInvalid)?;
+            ProtocolPlan::MediatedHttpV1(MediatedHttpPlan {
+                method: request.method.clone(),
+                target_path_template: target_path_template.to_owned(),
+                parent_connection: parent_connection.clone(),
+                resource_binding: resource_binding.clone(),
+                adapter: *adapter,
+            })
+        }
+        (ConnectionRoute::ViaConnection { .. }, ProtocolRequestTemplate::SipV1) => {
+            return Err(PlanError::MediatedRouteDriverMismatch);
+        }
     };
     let facts = OperationFacts {
         provider: provider.to_owned(),
@@ -202,6 +240,7 @@ mod tests {
     fn environment(driver: DriverId) -> PlanningEnvironment {
         PlanningEnvironment {
             available_drivers: BTreeSet::from([driver]),
+            available_route_adapters: BTreeSet::new(),
             capabilities: BTreeSet::from([Capability::PublicNetwork]),
             permission_subjects: vec!["public:api.example".to_owned()],
         }
@@ -261,5 +300,48 @@ mod tests {
         )
         .expect("B10x is one allowed initiator");
         assert_eq!(plan.admission().grant(), "grant-1");
+    }
+
+    #[test]
+    fn mediated_http_plan_has_no_direct_origin_and_requires_the_closed_adapter() {
+        let document = document(
+            "http_v1",
+            "unary",
+            r#"{"method":"GET","url":"{base}/api/v1/query","headers":{},"query":[]}"#,
+        );
+        let operation = document.operation("acme-call").expect("operation");
+        let admission = AdmittedOperation::from_grant_decision(
+            "acme",
+            "acme-call",
+            "org-1",
+            "principal-1",
+            "child-grant",
+            ConnectionAuthority::mediated(
+                "prometheus-via-grafana",
+                InitiationPolicy::b10x_only(),
+                "grafana-infra",
+                "observation:datasource-1",
+                RouteAdapter::GrafanaDatasourceProxyV1,
+            )
+            .unwrap(),
+        );
+        let mut environment = environment(DriverId::HttpV1);
+        assert_eq!(
+            plan_operation("acme", operation, admission.clone(), &environment),
+            Err(PlanError::RouteAdapterUnavailable(
+                "grafana_datasource_proxy_v1"
+            ))
+        );
+
+        environment
+            .available_route_adapters
+            .insert(RouteAdapter::GrafanaDatasourceProxyV1);
+        let plan = plan_operation("acme", operation, admission, &environment).unwrap();
+        let ProtocolPlan::MediatedHttpV1(http) = plan.protocol() else {
+            panic!("expected a mediated HTTP plan")
+        };
+        assert_eq!(http.target_path_template, "/api/v1/query");
+        assert_eq!(http.parent_connection, "grafana-infra");
+        assert!(!format!("{http:?}").contains("prometheus.example"));
     }
 }

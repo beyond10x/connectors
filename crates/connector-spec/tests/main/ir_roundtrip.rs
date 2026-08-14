@@ -125,6 +125,7 @@ fn babelforce() -> Connector {
         ],
         events: Vec::new(),
         channels: Vec::new(),
+        discoveries: Vec::new(),
         config: Vec::new(),
         verify: None,
         graphs: Vec::new(),

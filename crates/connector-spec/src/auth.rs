@@ -386,6 +386,25 @@ impl AuthHazard {
     }
 }
 
+/// How a non-OAuth, non-minted credential enters Connector custody when it is not read from an
+/// environment key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CredentialEntry {
+    /// A human submits the value directly to a short-lived, single-purpose Connect Session
+    /// completion endpoint. Clients and runtimes must not search ambient process state for it.
+    ConnectSession,
+}
+
+impl CredentialEntry {
+    /// Stable catalog spelling.
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::ConnectSession => "connect_session",
+        }
+    }
+}
+
 /// **What a connector's authentication surface does that its own document does not say** (C-440).
 ///
 /// The word and its discipline are already here — `workarounds.pagination` and `workarounds.rate_limit` are
@@ -479,6 +498,10 @@ pub struct AuthMethod {
     /// Env-var **keys** to resolve the secret from, tried in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<String>,
+    /// Explicit non-ambient operator entry. Mutually exclusive with `env`, OAuth2, and an
+    /// operation-produced credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<CredentialEntry>,
     /// For [`AuthScheme::Basic`]: env-var keys holding the username half, tried in order. These are
     /// config rather than a gated secret, so they resolve directly from declared env.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

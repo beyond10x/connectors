@@ -28,12 +28,14 @@ jobs:
           cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
       - name: Build
         run: |
           cargo build --workspace --locked
           cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
       - name: Validate every JSON document and schema
         run: |
           cargo test --locked -p catalog-build --test main json_governance::
@@ -43,18 +45,21 @@ jobs:
           cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked
       - name: Clippy
         run: |
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/driver-sip/Cargo.toml --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/voice-runtime/Cargo.toml --all-targets --locked -- -D warnings
+          cargo clippy --manifest-path crates/connectors-cli/Cargo.toml --all-targets --locked -- -D warnings
       - name: Format
         run: |
           cargo fmt --all --check
           cargo fmt --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all --check
           cargo fmt --manifest-path crates/driver-sip/Cargo.toml --all --check
           cargo fmt --manifest-path crates/voice-runtime/Cargo.toml --all --check
+          cargo fmt --manifest-path crates/connectors-cli/Cargo.toml --all --check
       - name: Verify catalog lock inputs and artifacts
         run: cargo run --locked --offline -p catalog-cli -- check
       - name: Rebuild canonical catalogue
@@ -79,15 +84,18 @@ jobs:
           cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
       - name: Build on declared MSRV
         run: |
           cargo build --workspace --locked
           cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
       - name: Test on declared MSRV
         run: |
           cargo test --workspace --locked --no-fail-fast
           cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
           cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
+          cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked

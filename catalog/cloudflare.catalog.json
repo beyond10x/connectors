@@ -720,6 +720,11 @@
   "services": [
     {
       "api_version": "v4",
+      "audiences": [
+        "sre",
+        "security-engineer",
+        "developer"
+      ],
       "base_url": "https://api.cloudflare.com/client/v4",
       "gid": "com.cloudflare.api:v4",
       "name": "default",

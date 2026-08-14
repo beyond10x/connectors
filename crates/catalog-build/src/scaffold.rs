@@ -1613,6 +1613,7 @@ impl Plan {
                 api_version: None,
                 roles: Vec::new(),
                 tags: Vec::new(),
+                audiences: Vec::new(),
             })
             .collect()
     }
@@ -1670,6 +1671,7 @@ impl Plan {
             operations: Vec::new(),
             events: Vec::new(),
             channels: Vec::new(),
+            discoveries: Vec::new(),
             config: Vec::new(),
             graphs: Vec::new(),
             provenance: connector_spec::Provenance::default(),

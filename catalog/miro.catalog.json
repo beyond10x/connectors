@@ -1093,6 +1093,10 @@
   "services": [
     {
       "api_version": "v2",
+      "audiences": [
+        "designer",
+        "product-manager"
+      ],
       "base_url": "https://api.miro.com/v2",
       "gid": "com.miro.api:v2",
       "name": "default",

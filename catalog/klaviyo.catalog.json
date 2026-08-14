@@ -1029,6 +1029,9 @@
   "schema_version": 2,
   "services": [
     {
+      "audiences": [
+        "marketer"
+      ],
       "base_url": "https://a.klaviyo.com/api",
       "name": "default",
       "tags": [

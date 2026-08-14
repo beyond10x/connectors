@@ -817,6 +817,7 @@ description = "App-scoped Zendesk Messaging API key id and secret"
 name = "default"
 legacy = true
 tags = ["support"]
+audiences = ["support-agent"]
 
 [[services]]
 name = "help-center"

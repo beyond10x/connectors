@@ -6,6 +6,11 @@
         "description": {
           "type": "string"
         },
+        "entry": {
+          "enum": [
+            "connect_session"
+          ]
+        },
         "env": {
           "items": {
             "type": "string"
@@ -171,6 +176,9 @@
         }
       ],
       "properties": {
+        "auth": {
+          "$ref": "#/$defs/requirements"
+        },
         "connect": {
           "type": "object"
         },
@@ -403,6 +411,65 @@
       "required": [
         "description",
         "input_schema"
+      ],
+      "type": "object"
+    },
+    "discovery": {
+      "additionalProperties": false,
+      "description": "A bounded observation source. It creates no Connection or authority; target Provider availability and route-adapter support are checked when a candidate is materialized.",
+      "properties": {
+        "driver": {
+          "enum": [
+            "grafana_datasource_v1"
+          ]
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mappings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "observed_type": {
+                "pattern": "^[a-z0-9._-]+$",
+                "type": "string"
+              },
+              "route_adapter": {
+                "enum": [
+                  "grafana_datasource_proxy_v1"
+                ]
+              },
+              "target_provider": {
+                "pattern": "^[a-z0-9._-]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "observed_type",
+              "target_provider",
+              "route_adapter"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "operation": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "service": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "service",
+        "operation",
+        "driver",
+        "mappings"
       ],
       "type": "object"
     },
@@ -1016,6 +1083,27 @@
         "api_version": {
           "type": "string"
         },
+        "audiences": {
+          "items": {
+            "enum": [
+              "developer",
+              "sre",
+              "security-engineer",
+              "data-analyst",
+              "product-manager",
+              "project-manager",
+              "designer",
+              "sales-rep",
+              "support-agent",
+              "marketer",
+              "finance",
+              "ecommerce-manager",
+              "content-manager"
+            ]
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
         "base_url": {
           "minLength": 1,
           "type": "string"
@@ -1179,6 +1267,12 @@
     },
     "description": {
       "type": "string"
+    },
+    "discoveries": {
+      "items": {
+        "$ref": "#/$defs/discovery"
+      },
+      "type": "array"
     },
     "events": {
       "items": {

@@ -36,6 +36,24 @@ path = "contracts/artifact-bundle.schema.json"
 path = "contracts/voice-session/v0alpha1/vectors.schema.json"
 
 [[schema]]
+path = "contracts/connector-operation/v0alpha1/connector-operation.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha1/connector-connection.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-event/v0alpha1/connector-event.schema.json"
+
+[[schema]]
+path = "contracts/connector-event/v0alpha1/vectors.schema.json"
+
+[[schema]]
 path = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
 
 [[schema]]
@@ -63,6 +81,30 @@ schema = "contracts/voice-session/v0alpha1/vectors.schema.json"
 
 [[document]]
 path = "contracts/voice-session/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha1/vectors.json"
+schema = "contracts/connector-operation/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha1/vectors.json"
+schema = "contracts/connector-connection/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-event/v0alpha1/vectors.json"
+schema = "contracts/connector-event/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-event/v0alpha1/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"
 
 [[document]]

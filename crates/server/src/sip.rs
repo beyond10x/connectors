@@ -264,6 +264,27 @@ pub fn admit_sip_plan(
     if sip.connection != route.connection || plan.admission().connection() != route.connection {
         return Err(SipAdmissionError::ConnectionMismatch);
     }
+    validate_sip_deployment_route(&route)?;
+    Ok(AdmittedSipPlan {
+        provider: plan.facts().provider.clone(),
+        operation: plan.facts().operation.clone(),
+        organization: plan.admission().organization().to_owned(),
+        principal: plan.admission().principal().to_owned(),
+        grant: plan.admission().grant().to_owned(),
+        route,
+        _proof: AdmissionProof,
+    })
+}
+
+/// Validate deployment-owned SIP network facts without constructing driver evidence.
+pub fn validate_sip_deployment_route(route: &SipDeploymentRoute) -> Result<(), SipAdmissionError> {
+    if route.connection.is_empty()
+        || route.sent_by.is_empty()
+        || route.to_uri.is_empty()
+        || route.from_uri.is_empty()
+    {
+        return Err(SipAdmissionError::InvalidIdentity);
+    }
     if route.dial_timeout.is_zero() || route.dial_timeout > MAX_SIP_DIAL_TIMEOUT {
         return Err(SipAdmissionError::InvalidDeadline);
     }
@@ -304,15 +325,7 @@ pub fn admit_sip_plan(
     {
         return Err(SipAdmissionError::MediaAdvertisedRefused);
     }
-    Ok(AdmittedSipPlan {
-        provider: plan.facts().provider.clone(),
-        operation: plan.facts().operation.clone(),
-        organization: plan.admission().organization().to_owned(),
-        principal: plan.admission().principal().to_owned(),
-        grant: plan.admission().grant().to_owned(),
-        route,
-        _proof: AdmissionProof,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
