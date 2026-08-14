@@ -71,15 +71,20 @@ fn the_derived_operation_facts_agree_with_the_documents() {
         for operation in provider.operations {
             assert_eq!(operation.provider, provider.id);
 
-            // `hosts` is derived from the operation's own service's base URL, templating intact.
-            assert_eq!(
-                operation.hosts.len(),
-                1,
-                "`{}` should reach exactly one declared host",
-                operation.id
-            );
-            let host = operation.hosts[0];
-            assert!(!host.is_empty() && !host.contains("://") && !host.contains('/'));
+            // HTTP reaches its own service host. SIP destinations come from admitted Connection
+            // aliases and must not inherit the provider's unrelated HTTP base URL.
+            if operation.protocol_driver == catalog::ProtocolDriver::SipV1 {
+                assert!(operation.hosts.is_empty());
+            } else {
+                assert_eq!(
+                    operation.hosts.len(),
+                    1,
+                    "`{}` should reach exactly one declared host",
+                    operation.id
+                );
+                let host = operation.hosts[0];
+                assert!(!host.is_empty() && !host.contains("://") && !host.contains('/'));
+            }
 
             // `credential_requirement` is the derivation `table.rs` documents: declared exactly
             // when the effective mechanism list is non-empty.

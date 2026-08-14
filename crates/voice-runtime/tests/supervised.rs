@@ -4,11 +4,12 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use connector_resolve::document::Document;
 use domain::{
-    AdmittedOperation, Capability, Implementation, Interaction, OperationFacts, Placement,
-    ProtocolPlan, SipPlan, ZeroIoPlan,
+    AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ZeroIoPlan,
 };
 use futures_util::{SinkExt as _, StreamExt as _};
+use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION};
 use protocol::voice::{Acknowledged, Close, Ready, Terminated};
 use rtvbp::{ControlFrame, Envelope as _, FrameKind};
 use rtvbp_voice_endpoint::{CLOSE_METHOD, INITIALIZE_METHOD, PROFILE, TERMINATED_EVENT};
@@ -17,9 +18,10 @@ use server::authority::{
     ProofKey, RedemptionRequest, AUTHORIZATION_SCHEME, DPOP_HEADER,
 };
 use server::{
-    admit_voice_plan, AdmittedVoicePlan, CredentialSet, SipDeploymentRoute, SocketAperture,
-    VoiceApplicationRoute,
+    admit_voice_dial, AdmittedVoicePlan, CredentialSet, SipDeploymentRoute, SipDialRouteTable,
+    SipNetworkMode, SipSignalingTransport, SocketAperture, VoiceApplicationRoute,
 };
+use service::{plan_operation, PlanningEnvironment};
 use sipx_call::Codecs;
 use sipx_transport::Config;
 use tokio::io::DuplexStream;
@@ -28,9 +30,9 @@ use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
 use tokio_tungstenite::tungstenite::http::{header, HeaderValue};
 use tokio_tungstenite::tungstenite::Message;
 use voice_runtime::{
-    ApplicationConnector, ApplicationStream, CredentialSource, DependencyError, NoopObserver,
-    RuntimeConfig, SessionMaterial, SessionMaterialSource, SystemClock, TerminalSource,
-    VoiceRuntime, VoiceSessionControl,
+    dial_establishment_channel, ApplicationConnector, ApplicationStream, CredentialSource,
+    DependencyError, RuntimeConfig, SessionMaterial, SessionMaterialSource, SystemClock,
+    TerminalSource, VoiceRuntime, VoiceSessionControl,
 };
 
 const ENDPOINT: &str = "wss://application.example/voice";
@@ -83,29 +85,29 @@ fn loopback() -> IpAddr {
 }
 
 fn plan() -> ZeroIoPlan {
-    ZeroIoPlan::new(
-        OperationFacts {
-            provider: "loopback-pbx".to_owned(),
-            operation: "loopback-call-establish".to_owned(),
-            service: "voice".to_owned(),
-            interaction: Interaction::SessionEstablishment,
-            placement: Placement::ConnectorsDeployment,
-            implementation: Implementation::BuiltIn,
-            required_capabilities: BTreeSet::from([Capability::PrivateNetwork]),
-            permission_subjects: vec!["loopback:127.0.0.1".to_owned()],
-        },
+    let document = Document::parse(include_str!("../../../catalog/asterisk.catalog.json"))
+        .expect("canonical Asterisk catalog parses");
+    let operation = document
+        .operation(SIP_DIAL_OPERATION)
+        .expect("sip.dial is published");
+    plan_operation(
+        "asterisk",
+        operation,
         AdmittedOperation::from_grant_decision(
-            "loopback-pbx",
-            "loopback-call-establish",
+            "asterisk",
+            SIP_DIAL_OPERATION,
             "org-1",
             "principal-1",
             "grant-1",
-            "connection-1",
+            ConnectionAuthority::new("connection-1", InitiationPolicy::b10x_only()).unwrap(),
         ),
-        ProtocolPlan::SipV1(SipPlan {
-            connection: "connection-1".to_owned(),
-        }),
+        &PlanningEnvironment {
+            available_drivers: BTreeSet::from([DriverId::SipV1]),
+            capabilities: BTreeSet::from([Capability::PrivateNetwork]),
+            permission_subjects: vec!["connection-target:asterisk-dev".to_owned()],
+        },
     )
+    .expect("published sip.dial plans through the closed SIP driver")
 }
 
 fn application_route() -> VoiceApplicationRoute {
@@ -131,7 +133,7 @@ fn expected_authority() -> ExpectedAuthority {
         connection: "connection-1".to_owned(),
         grant: "grant-1".to_owned(),
         resource: "channel-1".to_owned(),
-        operation: "loopback-call-establish".to_owned(),
+        operation: SIP_DIAL_OPERATION.to_owned(),
         channel_kind: "voice".to_owned(),
         protocol: PROFILE.to_owned(),
         endpoint: ENDPOINT.to_owned(),
@@ -146,22 +148,34 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
             .await
             .unwrap();
     let aperture = SocketAperture::new(loopback(), 1..=u16::MAX).unwrap();
-    let admitted = admit_voice_plan(
+    let sip_routes = SipDialRouteTable::new(
+        "connection-1",
+        [(
+            "asterisk-dev".to_owned(),
+            SipDeploymentRoute {
+                connection: "connection-1".to_owned(),
+                signaling_bind: SocketAddr::new(loopback(), 0),
+                sent_by: "127.0.0.1".to_owned(),
+                target: callee.local_addr(),
+                signaling_transport: SipSignalingTransport::Udp,
+                to_uri: format!("sip:callee@{}", callee.local_addr()),
+                from_uri: "sip:caller@127.0.0.1".to_owned(),
+                media_advertised: loopback(),
+                media_bind: loopback(),
+                signaling_apertures: vec![aperture.clone()],
+                media_apertures: vec![aperture],
+                dial_timeout: Duration::from_secs(5),
+                network_mode: SipNetworkMode::Loopback,
+            },
+        )],
+    )
+    .unwrap();
+    let admitted = admit_voice_dial(
         &plan(),
-        SipDeploymentRoute {
-            connection: "connection-1".to_owned(),
-            signaling_bind: SocketAddr::new(loopback(), 0),
-            sent_by: "127.0.0.1".to_owned(),
-            target: callee.local_addr(),
-            to_uri: format!("sip:callee@{}", callee.local_addr()),
-            from_uri: "sip:caller@127.0.0.1".to_owned(),
-            media_advertised: loopback(),
-            media_bind: loopback(),
-            signaling_apertures: vec![aperture.clone()],
-            media_apertures: vec![aperture],
-            dial_timeout: Duration::from_secs(5),
-            development_loopback_only: true,
+        &SipDialInput {
+            target: "asterisk-dev".to_owned(),
         },
+        &sip_routes,
         application_route(),
     )
     .unwrap();
@@ -302,13 +316,14 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
         assert!(closed.is_close());
     });
 
+    let (establishment_observer, establishment_waiter) = dial_establishment_channel();
     let runtime = VoiceRuntime::new(
         &issuer,
         &EmptyCredentials,
         &connector,
         &SystemClock,
         &FixedMaterial,
-        &NoopObserver,
+        &establishment_observer,
         RuntimeConfig::default(),
     );
     let media_roundtrip = async move {
@@ -321,10 +336,16 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
         output_seen_tx.send(()).unwrap();
         recorded
     };
-    let (result, recorded) = tokio::join!(
+    let (result, recorded, established) = tokio::join!(
         runtime.run_outbound(&admitted, VoiceSessionControl::new()),
         media_roundtrip,
+        establishment_waiter.wait(),
     );
+    let established = established.unwrap();
+    assert_eq!(established.state, protocol::sip::SipDialState::Established);
+    assert!(established.call.starts_with("sip-call-"));
+    assert!(established.session.starts_with("sip-session-"));
+    assert!(established.channel.starts_with("sip-channel-"));
     let result = result.unwrap();
     assert_eq!(result.reason, domain::voice::TerminationReason::Completed);
     assert_eq!(result.source, TerminalSource::Application);

@@ -66,6 +66,10 @@ without a model or Babelforce product semantics.
   application routes before I/O; admitted tenant identity comes only from grant evidence, while the
   runtime alone owns credential custody, ephemeral proof material, authority timing, liveness/lease
   supervision, and first-wins termination.
+- The runtime exposes a one-shot `sip.dial` establishment observer. It returns the catalog response
+  only after both the SIP dialog and authenticated RTVBP application binding are ready; any earlier
+  terminal outcome becomes a typed closed refusal while the supervisor continues owning the live
+  session after the receipt.
 - A real sipx UDP/RTP loopback crosses the neutral `TelephonySession` port, a serving-side-redeemed
   WebSocket authority, exact RTVBP initialization, duplex PCM, application close acknowledgement,
   terminal event, and observed SIP/transport teardown. The broader composed cases

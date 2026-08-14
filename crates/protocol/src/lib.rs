@@ -3,4 +3,5 @@
 
 //! Strict versioned Connectors wire contracts.
 
+pub mod sip;
 pub mod voice;

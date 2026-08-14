@@ -3,9 +3,13 @@
 use std::time::Duration;
 
 use domain::ZeroIoPlan;
+use protocol::sip::SipDialInput;
 
 use crate::authority::{validate_endpoint, MAX_AUTHORITY_LIFETIME_SECONDS};
-use crate::{admit_sip_plan, AdmittedSipPlan, SipAdmissionError, SipDeploymentRoute};
+use crate::{
+    admit_sip_dial, admit_sip_plan, AdmittedSipPlan, SipAdmissionError, SipDeploymentRoute,
+    SipDialRouteTable,
+};
 
 /// Exact RTVBP binding selected by the server-owned voice composition path.
 pub const VOICE_APPLICATION_PROFILE: &str = "b10x.voice.v1";
@@ -74,6 +78,32 @@ pub fn admit_voice_plan(
     sip_route: SipDeploymentRoute,
     application: VoiceApplicationRoute,
 ) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
+    validate_application(&application)?;
+    let sip = admit_sip_plan(plan, sip_route)?;
+    Ok(AdmittedVoicePlan {
+        sip,
+        application,
+        _proof: VoiceAdmissionProof,
+    })
+}
+
+/// Resolve a `sip.dial` alias and join it to the exact application route before network I/O.
+pub fn admit_voice_dial(
+    plan: &ZeroIoPlan,
+    input: &SipDialInput,
+    sip_routes: &SipDialRouteTable,
+    application: VoiceApplicationRoute,
+) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
+    validate_application(&application)?;
+    let sip = admit_sip_dial(plan, input, sip_routes)?;
+    Ok(AdmittedVoicePlan {
+        sip,
+        application,
+        _proof: VoiceAdmissionProof,
+    })
+}
+
+fn validate_application(application: &VoiceApplicationRoute) -> Result<(), VoiceAdmissionError> {
     if [
         application.actor.as_str(),
         application.audience.as_str(),
@@ -97,12 +127,7 @@ pub fn admit_voice_plan(
     {
         return Err(VoiceAdmissionError::InvalidSessionLease);
     }
-    let sip = admit_sip_plan(plan, sip_route)?;
-    Ok(AdmittedVoicePlan {
-        sip,
-        application,
-        _proof: VoiceAdmissionProof,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
@@ -111,8 +136,8 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use domain::{
-        AdmittedOperation, Capability, Implementation, Interaction, OperationFacts, Placement,
-        ProtocolPlan, SipPlan,
+        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan,
     };
 
     use super::*;
@@ -136,7 +161,8 @@ mod tests {
                 "org",
                 "principal",
                 "grant",
-                "connection",
+                ConnectionAuthority::new("connection", InitiationPolicy::b10x_only())
+                    .unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),
@@ -152,6 +178,7 @@ mod tests {
             signaling_bind: SocketAddr::new(loopback, 0),
             sent_by: "127.0.0.1".to_owned(),
             target: SocketAddr::new(loopback, 5_060),
+            signaling_transport: crate::SipSignalingTransport::Udp,
             to_uri: "sip:callee@127.0.0.1:5060".to_owned(),
             from_uri: "sip:caller@127.0.0.1".to_owned(),
             media_advertised: loopback,
@@ -159,7 +186,7 @@ mod tests {
             signaling_apertures: vec![aperture.clone()],
             media_apertures: vec![aperture],
             dial_timeout: Duration::from_secs(5),
-            development_loopback_only: true,
+            network_mode: crate::SipNetworkMode::Loopback,
         }
     }
 

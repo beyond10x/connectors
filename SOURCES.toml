@@ -43,12 +43,13 @@ consumers = ["providers/anthropic.toml", "catalog/anthropic.catalog.json", "crat
 note = "Two repository-authored OpenAPI 3.1/YAML documents cover the exact shipped Models and read-only Admin API surfaces. Each endpoint cites its official Anthropic reference; reviewed overlays retain stable ids, policy facts and deliberate query omissions."
 
 [[source]]
-id = "asterisk-ari"
-kind = "openapi-spec"
+id = "asterisk-ari-sip"
+kind = "vendor-protocol-source"
 upstream = "https://github.com/asterisk/asterisk (tag 22.10.1)"
 refresh = "scripts/vendor-asterisk-ari.py"
 pins = "specs/asterisk/provenance.toml"
-consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json"]
+consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json", "crates/driver-sip/"]
+note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sample configurations. The authored sip.dial member uses the samples only as first-party protocol/deployment evidence; its wire implementation is the independently pinned sipx driver."
 
 [[source]]
 id = "babelforce-openapi"

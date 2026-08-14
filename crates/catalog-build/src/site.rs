@@ -647,8 +647,13 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
         let operation = surface::operation_for(connector, &declared.id)?;
         // The host the call actually reaches, which is the operation's **service**'s — not the
         // provider's, which for a multi-service provider is a different host entirely.
-        let host = surface::host_of(connector.base_url_of(&operation.service))?.to_string();
-        operations.push(operation_entry(connector, operation, host));
+        let hosts = match operation.request {
+            OperationRequest::HttpV1 { .. } => {
+                vec![surface::host_of(connector.base_url_of(&operation.service))?.to_string()]
+            }
+            OperationRequest::SipV1 => Vec::new(),
+        };
+        operations.push(operation_entry(connector, operation, hosts));
     }
 
     let mut services = Vec::new();
@@ -885,7 +890,11 @@ pub fn document(providers: Vec<ProviderEntry>) -> Result<String> {
     Ok(format!("{}\n", serde_json::to_string_pretty(&document)?))
 }
 
-fn operation_entry(connector: &Connector, operation: &Operation, host: String) -> OperationEntry {
+fn operation_entry(
+    connector: &Connector,
+    operation: &Operation,
+    hosts: Vec<String>,
+) -> OperationEntry {
     OperationEntry {
         id: operation.id.clone(),
         provider: connector.id.clone(),
@@ -929,7 +938,7 @@ fn operation_entry(connector: &Connector, operation: &Operation, host: String) -
             .into_iter()
             .map(|mechanism| mechanism.into_iter().map(str::to_string).collect())
             .collect(),
-        hosts: vec![host],
+        hosts,
         status: status::of(connector, operation),
     }
 }

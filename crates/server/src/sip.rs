@@ -1,13 +1,33 @@
 //! Server-owned admission of the exact network facts a SIP driver may consume.
 
+use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
 use std::ops::RangeInclusive;
 use std::time::Duration;
 
 use domain::{DriverId, Interaction, ProtocolPlan, ZeroIoPlan};
+use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION};
 
 /// Maximum time an admitted outbound invitation may remain unanswered.
 pub const MAX_SIP_DIAL_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Clear signaling transports supported by the first native SIP driver profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SipSignalingTransport {
+    /// SIP over UDP.
+    Udp,
+    /// SIP over TCP with Content-Length framing.
+    Tcp,
+}
+
+/// Deployment-selected maturity boundary for SIP routes outside loopback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SipNetworkMode {
+    /// Every signaling and media address must be loopback.
+    Loopback,
+    /// An operator explicitly admitted exact non-loopback apertures for development characterization.
+    OperatorAuthorizedDevelopment,
+}
 
 /// One exact IP and bounded port interval admitted for a socket role.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +62,7 @@ pub struct SipDeploymentRoute {
     pub signaling_bind: SocketAddr,
     pub sent_by: String,
     pub target: SocketAddr,
+    pub signaling_transport: SipSignalingTransport,
     pub to_uri: String,
     pub from_uri: String,
     pub media_advertised: IpAddr,
@@ -49,7 +70,7 @@ pub struct SipDeploymentRoute {
     pub signaling_apertures: Vec<SocketAperture>,
     pub media_apertures: Vec<SocketAperture>,
     pub dial_timeout: Duration,
-    pub development_loopback_only: bool,
+    pub network_mode: SipNetworkMode,
 }
 
 /// Failure before the socket-capable crate receives a plan.
@@ -69,10 +90,81 @@ pub enum SipAdmissionError {
     SignalingBindRefused,
     #[error("SIP media listener is outside its admitted aperture")]
     MediaBindRefused,
-    #[error("the first sipx integration is restricted to explicit loopback development")]
-    StableNetworkNotYetSupported,
+    #[error("SIP advertised media address is outside its admitted aperture")]
+    MediaAdvertisedRefused,
+    #[error("SIP route addresses do not satisfy their declared network mode")]
+    NetworkModeMismatch,
     #[error("SIP route has an invalid finite deadline")]
     InvalidDeadline,
+    #[error("sip.dial target is not a valid Connection-owned alias")]
+    InvalidTargetAlias,
+    #[error("sip.dial target alias is not configured on this Connection")]
+    UnknownTargetAlias,
+    #[error("SIP target table contains a duplicate alias")]
+    DuplicateTargetAlias,
+}
+
+/// Deployment-owned alias table. Callers can select a name but cannot construct any route field.
+#[derive(Debug, Clone)]
+pub struct SipDialRouteTable {
+    connection: String,
+    routes: BTreeMap<String, SipDeploymentRoute>,
+}
+
+impl SipDialRouteTable {
+    pub fn new<I>(connection: impl Into<String>, routes: I) -> Result<Self, SipAdmissionError>
+    where
+        I: IntoIterator<Item = (String, SipDeploymentRoute)>,
+    {
+        let connection = connection.into();
+        let mut admitted = BTreeMap::new();
+        for (alias, route) in routes {
+            SipDialInput {
+                target: alias.clone(),
+            }
+            .validate()
+            .map_err(|_| SipAdmissionError::InvalidTargetAlias)?;
+            if route.connection != connection {
+                return Err(SipAdmissionError::ConnectionMismatch);
+            }
+            if admitted.insert(alias, route).is_some() {
+                return Err(SipAdmissionError::DuplicateTargetAlias);
+            }
+        }
+        Ok(Self {
+            connection,
+            routes: admitted,
+        })
+    }
+
+    #[must_use]
+    pub fn connection(&self) -> &str {
+        &self.connection
+    }
+
+    fn resolve(&self, input: &SipDialInput) -> Result<SipDeploymentRoute, SipAdmissionError> {
+        input
+            .validate()
+            .map_err(|_| SipAdmissionError::InvalidTargetAlias)?;
+        self.routes
+            .get(&input.target)
+            .cloned()
+            .ok_or(SipAdmissionError::UnknownTargetAlias)
+    }
+}
+
+/// Resolve the caller's opaque alias and produce socket-opening evidence for `sip.dial` only.
+pub fn admit_sip_dial(
+    plan: &ZeroIoPlan,
+    input: &SipDialInput,
+    routes: &SipDialRouteTable,
+) -> Result<AdmittedSipPlan, SipAdmissionError> {
+    if plan.facts().operation != SIP_DIAL_OPERATION
+        || plan.admission().connection() != routes.connection()
+    {
+        return Err(SipAdmissionError::WrongOperation);
+    }
+    admit_sip_plan(plan, routes.resolve(input)?)
 }
 
 /// Non-serializable evidence handed only to the socket-capable `driver-sip` crate.
@@ -175,13 +267,13 @@ pub fn admit_sip_plan(
     if route.dial_timeout.is_zero() || route.dial_timeout > MAX_SIP_DIAL_TIMEOUT {
         return Err(SipAdmissionError::InvalidDeadline);
     }
-    if !route.development_loopback_only
-        || !route.target.ip().is_loopback()
-        || !route.signaling_bind.ip().is_loopback()
-        || !route.media_advertised.is_loopback()
-        || !route.media_bind.is_loopback()
+    if route.network_mode == SipNetworkMode::Loopback
+        && (!route.target.ip().is_loopback()
+            || !route.signaling_bind.ip().is_loopback()
+            || !route.media_advertised.is_loopback()
+            || !route.media_bind.is_loopback())
     {
-        return Err(SipAdmissionError::StableNetworkNotYetSupported);
+        return Err(SipAdmissionError::NetworkModeMismatch);
     }
     if !route
         .signaling_apertures
@@ -205,6 +297,13 @@ pub fn admit_sip_plan(
     {
         return Err(SipAdmissionError::MediaBindRefused);
     }
+    if !route
+        .media_apertures
+        .iter()
+        .any(|aperture| aperture.contains_ip(route.media_advertised))
+    {
+        return Err(SipAdmissionError::MediaAdvertisedRefused);
+    }
     Ok(AdmittedSipPlan {
         provider: plan.facts().provider.clone(),
         operation: plan.facts().operation.clone(),
@@ -222,7 +321,8 @@ mod tests {
     use std::net::{Ipv4Addr, SocketAddrV4};
 
     use domain::{
-        AdmittedOperation, Capability, Implementation, OperationFacts, Placement, SipPlan,
+        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        OperationFacts, Placement, SipPlan,
     };
 
     use super::*;
@@ -231,7 +331,7 @@ mod tests {
         ZeroIoPlan::new(
             OperationFacts {
                 provider: "loopback-pbx".to_owned(),
-                operation: "call-establish".to_owned(),
+                operation: SIP_DIAL_OPERATION.to_owned(),
                 service: "voice".to_owned(),
                 interaction: Interaction::SessionEstablishment,
                 placement: Placement::ConnectorsDeployment,
@@ -241,11 +341,12 @@ mod tests {
             },
             AdmittedOperation::from_grant_decision(
                 "loopback-pbx",
-                "call-establish",
+                SIP_DIAL_OPERATION,
                 organization,
                 "principal",
                 "grant",
-                "connection",
+                ConnectionAuthority::new("connection", InitiationPolicy::b10x_only())
+                    .unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),
@@ -264,6 +365,7 @@ mod tests {
             signaling_bind: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into(),
             sent_by: "127.0.0.1".to_owned(),
             target: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 5_060).into(),
+            signaling_transport: SipSignalingTransport::Udp,
             to_uri: "sip:callee@127.0.0.1:5060".to_owned(),
             from_uri: "sip:caller@127.0.0.1".to_owned(),
             media_advertised: loopback,
@@ -271,7 +373,7 @@ mod tests {
             signaling_apertures: vec![SocketAperture::new(loopback, 1..=u16::MAX).unwrap()],
             media_apertures: vec![SocketAperture::new(loopback, 1..=u16::MAX).unwrap()],
             dial_timeout: Duration::from_secs(5),
-            development_loopback_only: true,
+            network_mode: SipNetworkMode::Loopback,
         }
     }
 
@@ -279,19 +381,59 @@ mod tests {
     fn exact_loopback_route_produces_non_serializable_driver_evidence() {
         let admitted = admit_sip_plan(&plan(), route()).unwrap();
         assert_eq!(admitted.provider(), "loopback-pbx");
-        assert_eq!(admitted.operation(), "call-establish");
+        assert_eq!(admitted.operation(), SIP_DIAL_OPERATION);
         assert!(admitted.admits_signaling(([127, 0, 0, 1], 5_060).into()));
         assert!(admitted.admits_media(([127, 0, 0, 1], 16_384).into()));
     }
 
     #[test]
+    fn sip_dial_resolves_only_an_exact_connection_owned_alias() {
+        let routes =
+            SipDialRouteTable::new("connection", [("asterisk-dev".to_owned(), route())]).unwrap();
+        let admitted = admit_sip_dial(
+            &plan(),
+            &SipDialInput {
+                target: "asterisk-dev".to_owned(),
+            },
+            &routes,
+        )
+        .unwrap();
+        assert_eq!(admitted.route().target.port(), 5_060);
+
+        for target in ["missing", "sip:echo@127.0.0.1:5062", "127.0.0.1:5062"] {
+            assert!(admit_sip_dial(
+                &plan(),
+                &SipDialInput {
+                    target: target.to_owned(),
+                },
+                &routes,
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
     fn stable_network_and_aperture_widening_refuse_before_the_driver() {
         let mut stable = route();
-        stable.development_loopback_only = false;
+        stable.network_mode = SipNetworkMode::Loopback;
+        stable.target = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 5_060).into();
+        stable.signaling_apertures =
+            vec![
+                SocketAperture::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 5_060..=5_060).unwrap(),
+            ];
         assert!(matches!(
             admit_sip_plan(&plan(), stable),
-            Err(SipAdmissionError::StableNetworkNotYetSupported)
+            Err(SipAdmissionError::NetworkModeMismatch)
         ));
+
+        let mut characterized = route();
+        characterized.network_mode = SipNetworkMode::OperatorAuthorizedDevelopment;
+        characterized.target = SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 5_060).into();
+        characterized.signaling_apertures =
+            vec![
+                SocketAperture::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 5_060..=5_060).unwrap(),
+            ];
+        assert!(admit_sip_plan(&plan(), characterized).is_ok());
 
         let mut outside = route();
         outside.signaling_apertures =
@@ -299,6 +441,13 @@ mod tests {
         assert!(matches!(
             admit_sip_plan(&plan(), outside),
             Err(SipAdmissionError::SignalingTargetRefused)
+        ));
+
+        let mut advertised_outside = route();
+        advertised_outside.media_advertised = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2));
+        assert!(matches!(
+            admit_sip_plan(&plan(), advertised_outside),
+            Err(SipAdmissionError::MediaAdvertisedRefused)
         ));
     }
 

@@ -514,9 +514,13 @@ fn build_operation(
         ),
         credentials: leak_requirements(raw.auth.clone()),
         credential_requirement: credential_requirement(raw),
-        // Per operation, through its service: a multi-service provider reaches a different host per
-        // service, and the union would be a wider egress claim than any single call makes.
-        hosts: leak_slice(vec![leak_str(host_of(&raw.id, base_url))]),
+        // HTTP reaches the operation's service host. SIP has no HTTP destination: its exact
+        // signaling/media apertures are selected from the Connection only after admission.
+        hosts: if raw.protocol_driver == "sip_v1" {
+            &[]
+        } else {
+            leak_slice(vec![leak_str(host_of(&raw.id, base_url))])
+        },
         contract_description: leak_str(
             raw.contract
                 .as_ref()

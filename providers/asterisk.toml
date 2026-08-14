@@ -388,6 +388,40 @@ required_capabilities = ["public_network"]
 select = "sounds-list"
 expose = true
 
+# Native SIP is not an ARI endpoint. This authored member is grounded in the pinned first-party
+# `samples/pjsip.conf.sample` and `samples/rtp.conf.sample` files vendored beside the ARI sources.
+# A caller supplies only a deployment-owned destination alias. The Connection resolves that alias
+# to the exact SIP URI, signaling transport/address, From identity, RTP address aperture, and
+# optional digest credentials after Grant and initiation-authority admission. No URI or socket
+# destination crosses this operation boundary.
+[[operations]]
+service = "default"
+id = "sip-dial"
+direction = "write"
+description = "Start one native SIP voice session to a destination configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, phone number, host, or port. Establishing a call is externally visible and may ring or answer a real endpoint"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["send_external", "human_visible"]
+interaction_shape = "session_establishment"
+protocol_driver = "sip_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+auth = []
+expose = true
+
+[[operations.params.body]]
+name = "target"
+description = "Opaque destination alias configured by an operator on this Connection, for example `asterisk-dev`; the alias cannot contain a SIP URI or network address"
+required = true
+schema = { type = "string", pattern = "^[A-Za-z][A-Za-z0-9_-]{0,63}$", minLength = 1, maxLength = 64 }
+
+[operations.response_schema]
+type = "object"
+required = ["call", "session", "channel", "state"]
+properties = { call = { type = "string", description = "Opaque call reference" }, session = { type = "string", description = "Opaque voice-session reference" }, channel = { type = "string", description = "Opaque application-channel reference" }, state = { type = "string", enum = ["established"], description = "The SIP dialog and voice application binding are established" } }
+
 [[auth]]
 name = "asterisk.password"
 scheme = "basic"

@@ -1,6 +1,6 @@
 # Design 05: native SIP at the Connectors edge, RTVBP behind it
 
-**Status:** development SIP/RTVBP path implemented; provider and stable support gated · **Date:** 2026-08-14
+**Status:** source-grounded `sip.dial` and development SIP/RTVBP path implemented; stable serving gated · **Date:** 2026-08-14
 
 **Authority:**
 [architecture ADR 0024](https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
@@ -10,11 +10,13 @@
 
 This document turns the accepted cross-repository boundary into a Connectors implementation shape.
 The platform-family plan/dispatch seam, alpha `VoiceSession` owner bundle, one-shot authority, and
-memory RTVBP endpoint now exist. The exact `sipx` driver, proof-bearing loopback admission, locally
+memory RTVBP endpoint now exist. The exact `sipx` driver, proof-bearing admission, locally
 bounded WebSocket endpoints, application adapter, and a supervised runtime leaf now also exist.
-That leaf proves authenticated model-free duplex composition and one terminal result over real
-loopback SIP/RTP plus RTVBP WebSocket. Catalog provider grounding, the remaining lifecycle and
-placement matrix, and stable signed release remain gated work.
+That leaf resolves the generated Asterisk `sip-dial` member, proves authenticated model-free duplex
+composition and one terminal result over real loopback SIP/RTP plus RTVBP WebSocket, and returns an
+operation receipt at establishment. A separate operator-authorized characterization has established
+TCP SIP and an RTP echo against the dev-cluster Asterisk. Stable serving, the remaining lifecycle
+and placement matrix, and a signed release remain gated work.
 
 ## 1. Boundary
 
@@ -41,19 +43,23 @@ The implemented foundation and remaining planned additions are:
 connectors/
 ├── crates/
 │   ├── domain/
+│   │   ├── src/connection.rs             # protocol-neutral initiation authority
 │   │   ├── src/plan.rs                   # admitted, driver-discriminated zero-I/O plans
 │   │   └── src/voice.rs                  # TelephonySession + neutral voice semantics and ports
 │   ├── protocol/
+│   │   ├── src/sip.rs                    # sip.dial alias input + establishment receipt
 │   │   └── src/voice.rs                  # alpha VoiceSession contract projection and vectors
 │   ├── service/
 │   │   └── src/planning.rs               # pure catalog/admission/capability planning
 │   ├── server/
 │   │   ├── src/dispatch.rs               # sole closed-driver policy composition
 │   │   ├── src/authority.rs              # proof-bound issue/present/redeem adapter
+│   │   ├── src/sip.rs                    # exact alias/transport/aperture admission proof
 │   │   └── src/voice.rs                  # SIP + application route admission proof
 │   ├── driver-sip/                       # isolated sipx dependency/runtime workspace
 │   │   ├── Cargo.toml
 │   │   ├── src/lib.rs                    # sipx-backed TelephonySession implementation
+│   │   ├── examples/sip_dial_characterize.rs # exact operator-authorized PBX proof
 │   │   └── Cargo.lock                    # exact prerelease source resolution
 │   ├── rtvbp-voice-endpoint/
 │   │   ├── Cargo.toml
@@ -67,12 +73,14 @@ connectors/
 │       ├── tests/supervised.rs           # real SIP/RTP + authenticated RTVBP WebSocket journey
 │       └── Cargo.lock                    # joined, independently gated runtime closure
 ├── specs/
-│   ├── <voice-provider>/                 # authoritative or repository-authored protocol source
-│   └── <voice-provider>.provenance.toml  # source identity, references, scope and byte pin
+│   └── asterisk/
+│       ├── samples/pjsip.conf.sample     # pinned first-party SIP configuration source
+│       ├── samples/rtp.conf.sample       # pinned first-party RTP configuration source
+│       └── provenance.toml               # source identity, scope and byte pins
 ├── providers/
-│   └── <voice-provider>.toml             # lands with dispatchable S-032 provider support
+│   └── asterisk.toml                     # ARI plus exposed native sip-dial member
 ├── catalog/
-│   └── <voice-provider>.catalog.json     # generated canonical provider document
+│   └── asterisk.catalog.json             # generated canonical provider document
 ├── contracts/
 │   └── voice-session/v0alpha1/           # protocol-neutral semantics and conformance vectors
 ├── fixtures/
@@ -83,8 +91,9 @@ connectors/
     └── S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md
 ```
 
-The concrete provider name is selected only when its source and permanent authority are reviewed;
-angle brackets above are a path template, not a literal directory. No `vendor/sipx`,
+The first concrete provider is Asterisk. Its permanent provider authority remains
+`org.asterisk.ari`; the native member is additionally grounded in Asterisk's pinned first-party SIP
+and RTP configuration sources. No `vendor/sipx`,
 `vendor/rtvbp`, Git submodule, `voice` repository, substrate protocol module, dynamic plugin, or
 out-of-process gateway artifact is added by this plan.
 
@@ -186,7 +195,7 @@ carrier or PBX appears as a source-grounded provider member whose generated cano
 declares that driver. RTVBP and `VoiceSession` are not separate providers or callable operations;
 they are the post-admission binding and semantic contract behind the SIP member.
 
-The first source-grounded declaration uses:
+The source-grounded Asterisk declaration uses:
 
 - interaction shape `session_establishment`;
 - protocol driver `sip_v1`;
@@ -194,8 +203,13 @@ The first source-grounded declaration uses:
 - deployment-selected local or satellite placement;
 - explicit public/private network, listener, port range, and secret capability facts.
 
-Its outbound call-establishment Operation has one stable provider-scoped id, `expose = false` for
-the first proof, write/network effects, reviewed high risk, and non-idempotent replay behavior. Its
+Its outbound call-establishment Operation has the stable catalog id `sip-dial`, projected to the
+harness as `sip.dial`, with `expose = true`, write/network and external-send effects, reviewed high
+risk, and non-idempotent replay behavior. Its only caller field is `target`: a 1..=64 byte opaque
+alias that the selected Connection maps to the exact SIP identity, clear transport, signaling
+address, From identity, media address aperture, and optional credentials. A URI, host, port,
+credential location, placement, network class, tenant, or protocol cannot cross that caller
+boundary. Its
 inbound call surface is a declared provider channel/session binding tied to the same Connection and
 tenant/application route; it is not an ambient listener outside the catalog. `SOURCES.toml`, the
 provider source/provenance record, `providers/<voice-provider>.toml`, the generated canonical
@@ -208,9 +222,9 @@ refuse as missing. Conversely, S-032 cannot complete—and no native SIP support
 at least one such canonical provider member is served and discoverable through the effective
 catalog.
 
-An outbound operation declares bounded target forms and is non-idempotent unless a narrower member
-proves otherwise. The caller cannot provide a driver, artifact, credential location, network class,
-placement, arbitrary SIP URI, tenant, or profile. Inbound dialogs match exactly one configured
+The Connection separately declares whether `b10x`, `provider`, or both may initiate. A
+B10x/harness call must pass both that Connection gate and the operation Grant; neither is a
+substitute for the other. Inbound dialogs match exactly one configured
 Connection plus tenant/application-channel binding; zero or multiple matches refuse before product
 work. SIP credentials and SRTP material never enter protocol DTOs, RTVBP frames, events, audit,
 fixtures, or Agent input.
@@ -297,11 +311,14 @@ stable `sipx` API or a reviewed compatibility/upgrade exception.
 3. Complete S-033's cross-repository lifecycle vectors, including lease, revocation, generation
    drain, and an outward satellite/unserved fixture. The local WebSocket now proves immediate
    causal overload and bounded joined teardown even when writes never progress.
-4. Select and review one authoritative or repository-authored carrier/PBX source; only then land its
-   provider declaration, generated catalog member, lock row, pack, and web projection atomically.
-5. Characterize that explicitly authorized real PBX/trunk and satellite outward path without
-   weakening the development-only socket aperture.
-6. Publish a signed Connectors owner bundle and prove a clean-room application-channel consumer
+4. Asterisk is selected and source-grounded; its provider declaration, generated `sip-dial` member,
+   lock row, pack, and web projection land atomically with the runtime proof.
+5. The operator-authorized non-loopback mode has completed one exact dev-cluster TCP SIP and RTP
+   echo characterization. It is intentionally not a stable-network claim: the route remains
+   deployment-owned, exact-aperture, and explicitly marked development.
+6. Bind the released search/describe/invoke Connector operation protocol to the coding harness and
+   supervise returned session handles across process restart and revocation.
+7. Publish a signed Connectors owner bundle and prove a clean-room application-channel consumer
    before any stable, hosted, or authoritative-writer claim.
 
 The Babelforce compatibility adapter is a downstream follow-on. It neither blocks the generic

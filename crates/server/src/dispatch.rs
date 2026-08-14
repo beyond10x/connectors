@@ -140,8 +140,8 @@ mod tests {
     use std::sync::Mutex;
 
     use domain::{
-        AdmittedOperation, Capability, Implementation, Interaction, OperationFacts, Placement,
-        ProtocolPlan, SipPlan,
+        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan,
     };
 
     use super::*;
@@ -205,7 +205,8 @@ mod tests {
                 "org",
                 "principal",
                 "grant",
-                "connection",
+                ConnectionAuthority::new("connection", InitiationPolicy::b10x_only())
+                    .unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),

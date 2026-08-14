@@ -12,9 +12,10 @@ pub use dispatch::{
     Dispatcher, SensitiveValue,
 };
 pub use sip::{
-    admit_sip_plan, AdmittedSipPlan, SipAdmissionError, SipDeploymentRoute, SocketAperture,
+    admit_sip_dial, admit_sip_plan, AdmittedSipPlan, SipAdmissionError, SipDeploymentRoute,
+    SipDialRouteTable, SipNetworkMode, SipSignalingTransport, SocketAperture,
 };
 pub use voice::{
-    admit_voice_plan, AdmittedVoicePlan, VoiceAdmissionError, VoiceApplicationRoute,
-    VOICE_APPLICATION_PROFILE,
+    admit_voice_dial, admit_voice_plan, AdmittedVoicePlan, VoiceAdmissionError,
+    VoiceApplicationRoute, VOICE_APPLICATION_PROFILE,
 };

@@ -39,6 +39,8 @@ DOCUMENTS = (
 SOURCE_PATHS = (
     "COPYING",
     "resources.json",
+    "samples/pjsip.conf.sample",
+    "samples/rtp.conf.sample",
     *(f"api-docs/{name}" for name in DOCUMENTS),
 )
 
@@ -54,6 +56,8 @@ def sha256(data: bytes) -> str:
 def upstream_path(relative: str) -> str:
     if relative == "COPYING":
         return relative
+    if relative.startswith("samples/"):
+        return f"configs/{relative}"
     return f"rest-api/{relative}"
 
 
@@ -132,6 +136,7 @@ def provenance(stage: Path, normalized: bytes) -> bytes:
         f'source_url = "{RAW_BASE}"',
         'upstream_license = "GPL-2.0-only"',
         "raw_document_count = 11",
+        "sip_sample_count = 2",
         "source_path_count = 76",
         "source_operation_count = 109",
         "rest_operation_count = 108",
