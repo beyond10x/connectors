@@ -611,7 +611,8 @@
         },
         "protocol_driver": {
           "enum": [
-            "http_v1"
+            "http_v1",
+            "sip_v1"
           ]
         },
         "rate_limit": {

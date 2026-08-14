@@ -203,6 +203,7 @@ pub enum InteractionShape {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProtocolDriver {
     HttpV1,
+    SipV1,
 }
 
 /// Placement requirement before deployment selection.

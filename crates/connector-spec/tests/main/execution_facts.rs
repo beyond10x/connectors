@@ -1,6 +1,8 @@
 //! Required host effects and the five beyond-HTTP axes are closed declaration facts.
 
-use connector_spec::{provider, HostEffect, OperationDirection, SemanticEffect};
+use connector_spec::{
+    provider, HostEffect, InteractionShape, OperationDirection, ProtocolDriver, SemanticEffect,
+};
 
 fn operation(facts: &str) -> String {
     format!(
@@ -94,6 +96,41 @@ fn a_seeded_write_remains_write_and_carries_write_effects() {
     let operation = &loaded.connector.operations[0];
     assert_eq!(operation.direction, OperationDirection::Write);
     assert_eq!(operation.effects, [HostEffect::Write, HostEffect::Network]);
+}
+
+#[test]
+fn sip_v1_is_a_closed_session_establishment_driver() {
+    let axes = AXES
+        .replace(
+            "interaction_shape = \"unary\"",
+            "interaction_shape = \"session_establishment\"",
+        )
+        .replace(
+            "protocol_driver = \"http_v1\"",
+            "protocol_driver = \"sip_v1\"",
+        );
+    let source = operation(&format!("effects = [\"write\", \"network\"]\n{axes}"))
+        .replace("id = \"acme-read\"", "id = \"acme-call-establish\"")
+        .replace("method = \"GET\"", "method = \"POST\"")
+        .replace("direction = \"read\"", "direction = \"write\"")
+        .replace("risk = \"low\"", "risk = \"high\"")
+        .replace(
+            "idempotency = \"idempotent\"",
+            "idempotency = \"non_idempotent\"",
+        );
+    let loaded = provider::load("providers/acme.toml", &source).expect("SIP operation loads");
+    let operation = &loaded.connector.operations[0];
+    assert_eq!(
+        operation.interaction_shape,
+        InteractionShape::SessionEstablishment
+    );
+    assert_eq!(operation.protocol_driver, ProtocolDriver::SipV1);
+
+    let schema = include_str!("../../schema/provider-toml.schema.json");
+    assert!(
+        schema.contains(r#""enum": ["http_v1", "sip_v1"]"#),
+        "the authored-provider schema must admit the same closed driver vocabulary"
+    );
 }
 
 #[test]

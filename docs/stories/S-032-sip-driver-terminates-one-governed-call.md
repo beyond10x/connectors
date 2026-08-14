@@ -21,6 +21,15 @@ SIP call without importing RTVBP or requiring a live carrier.
 
 - [ ] S-024 and the platform-family ports exist; the driver implements the neutral
       `TelephonySession` port and only `server` selects it after admission.
+- [ ] The closed catalog vocabulary represents `sip_v1` without accepting arbitrary driver names;
+      canonical-document and consumer round-trip tests preserve it exactly.
+- [ ] At least one authoritative or repository-authored carrier/PBX source with registered
+      provenance produces a reviewed provider declaration and generated canonical catalog member
+      whose interaction shape is `session_establishment`, driver is `sip_v1`, implementation is
+      `built_in`, initial model exposure is false, and capability/risk/idempotency facts are exact.
+- [ ] The source, provenance, provider declaration, canonical document, lock row, pack, and web
+      projection land atomically; the effective catalog exposes the member only where the selected
+      deployment can actually dispatch `sip_v1`.
 - [ ] `driver-sip` is the only named network-capable driver and calls `sipx` bind only from a
       non-serializable, proof-bearing `AdmittedSipPlan`; fence tests reject every other path.
 - [ ] Configured, DNS-resolved, SIP-learned, and SDP-learned targets plus local listener/media ports
@@ -43,4 +52,5 @@ SIP call without importing RTVBP or requiring a live carrier.
 
 ## Progress
 
-- Architecture and implementation placement are accepted; prerequisites are not started.
+- Architecture and implementation placement are accepted. The catalog now recognizes the closed
+  `sip_v1` value, but no provider member claims it before S-024 and the actual driver exist.
