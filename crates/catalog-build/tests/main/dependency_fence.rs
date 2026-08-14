@@ -243,6 +243,74 @@ fn the_rtvbp_runtime_dependency_is_isolated_from_the_canonical_workspace() {
     );
 }
 
+/// The supervised leaf deliberately joins both isolated runtime closures, and nowhere else does.
+#[test]
+fn the_voice_runtime_is_the_only_production_composition_leaf() {
+    let root = workspace_root();
+    let root_manifest =
+        std::fs::read_to_string(root.join("Cargo.toml")).expect("the workspace manifest");
+    let root_document: toml::Value = root_manifest
+        .parse()
+        .expect("the workspace manifest parses");
+    let excluded = root_document
+        .get("workspace")
+        .and_then(|workspace| workspace.get("exclude"))
+        .and_then(toml::Value::as_array)
+        .expect("`[workspace] exclude`");
+    assert!(
+        excluded
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .any(|member| member == "crates/voice-runtime"),
+        "the runtime leaf must remain excluded from the deterministic compiler workspace"
+    );
+
+    let runtime = root.join("crates/voice-runtime");
+    let manifest_path = runtime.join("Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display()));
+    let document: toml::Value = manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+    assert!(
+        document.get("workspace").is_some(),
+        "the voice runtime must remain a nested workspace"
+    );
+    assert!(
+        runtime.join("Cargo.lock").is_file(),
+        "the voice runtime's joined dependency closure must stay locked"
+    );
+    let dependencies = document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("voice runtime dependencies");
+    for adapter in ["driver-sip", "rtvbp-voice-endpoint"] {
+        assert!(
+            dependencies.contains_key(adapter),
+            "the supervised runtime must compose `{adapter}` explicitly"
+        );
+    }
+
+    for entry in std::fs::read_dir(root.join("crates")).expect("crate directories") {
+        let directory = entry.expect("crate directory").path();
+        if directory == runtime || !directory.join("Cargo.toml").is_file() {
+            continue;
+        }
+        let manifest = std::fs::read_to_string(directory.join("Cargo.toml"))
+            .expect("crate manifest is readable");
+        let document: toml::Value = manifest.parse().expect("crate manifest parses");
+        let dependencies = document.get("dependencies").and_then(toml::Value::as_table);
+        assert!(
+            !dependencies.is_some_and(|dependencies| {
+                dependencies.contains_key("driver-sip")
+                    && dependencies.contains_key("rtvbp-voice-endpoint")
+            }),
+            "{} is a second production SIP/RTVBP composition point",
+            directory.display()
+        );
+    }
+}
+
 /// sipx owns real sockets, so its closure and bind call stay in one explicitly isolated crate.
 #[test]
 fn the_sipx_network_dependency_is_exactly_pinned_and_isolated() {
@@ -317,15 +385,16 @@ fn the_sipx_network_dependency_is_exactly_pinned_and_isolated() {
         driver_source.contains(&bind_symbol),
         "the named network-capable driver must contain the reviewed sipx bind"
     );
+    let supervised_fixture = root.join("crates/voice-runtime/tests");
     for source in rust_sources_below(&root.join("crates")) {
-        if source.starts_with(&driver) {
+        if source.starts_with(&driver) || source.starts_with(&supervised_fixture) {
             continue;
         }
         let text = std::fs::read_to_string(&source)
             .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
         assert!(
             !text.contains(&bind_symbol),
-            "{} opens sipx sockets outside the sole network-capable driver",
+            "{} opens sipx sockets outside the driver or its supervised loopback fixture",
             source.display()
         );
     }

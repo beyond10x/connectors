@@ -6,8 +6,8 @@ status: in-progress
 priority:
 design: docs/design/05-native-sip-and-rtvbp.md
 epic: native-voice
-areas: [domain, protocol, service, server, rtvbp-voice-endpoint]
-note: "Bounded endpoints and duplex SIP composition exist; complete lifecycle, placement, and release evidence remain"
+areas: [domain, protocol, service, server, rtvbp-voice-endpoint, voice-runtime]
+note: "Supervised authenticated SIP/RTVBP composition exists; complete lifecycle, placement, and release evidence remain"
 ---
 
 # Neutral RTVBP bridges the call to an application channel
@@ -56,8 +56,12 @@ without a model or Babelforce product semantics.
   WebSocket queues. The application adapter independently redeems exact WSS/profile/DPoP authority
   before media and proves bounded input/loss, output overload, interruption, close, lease, and
   generation-drain behavior.
-- A real sipx UDP/RTP loopback crosses the neutral `TelephonySession` port and RTVBP memory transport
-  to a fake application in both directions, then observes teardown. The broader composed cases
+- Connectors now has one nested `voice-runtime` leaf. Server admission joins the exact SIP and
+  application routes before I/O; the runtime alone owns credential custody, ephemeral proof
+  material, authority timing, liveness/lease supervision, and first-wins termination.
+- A real sipx UDP/RTP loopback crosses the neutral `TelephonySession` port, a serving-side-redeemed
+  WebSocket authority, exact RTVBP initialization, duplex PCM, application close acknowledgement,
+  terminal event, and observed SIP/transport teardown. The broader composed cases
   (cancellation, loss, interruption, generation drain), satellite/unserved path, complete shared
   vectors, signed owner release, and clean-room release proof remain open; support is not stable or
   hosted.

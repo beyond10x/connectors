@@ -52,6 +52,8 @@ pub enum BindingError {
     Control(String),
     #[error("RTVBP transport failed: {0}")]
     Transport(String),
+    #[error("bounded RTVBP media queue overloaded")]
+    MediaOverload,
     #[error(transparent)]
     Voice(#[from] VoiceError),
 }
@@ -69,7 +71,17 @@ pub fn negotiate_profile(offered: Option<&str>) -> Result<(), BindingError> {
 enum State {
     Created,
     Ready,
+    Closing,
     Closed,
+}
+
+/// Observable result of one application-to-voice control request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlOutcome {
+    /// The session remains ready after an acknowledged control.
+    Continue,
+    /// The application requested the single terminal transition.
+    Close(TerminationReason),
 }
 
 /// Voice-side endpoint over one brokered transport.
@@ -152,37 +164,47 @@ impl<T: TelephonySession + ?Sized> VoiceEndpoint<T> {
     }
 
     /// Handle one bounded application-to-voice control request.
-    pub async fn serve_control_once(&self) -> Result<(), BindingError> {
+    pub async fn serve_control_once(&self) -> Result<ControlOutcome, BindingError> {
         let frame = self.receive().await?;
         if frame.kind != FrameKind::Request {
             return Err(BindingError::Control("expected request".to_owned()));
         }
-        let response = match frame.method.as_str() {
+        let (response, outcome) = match frame.method.as_str() {
             INTERRUPT_METHOD if self.is_ready()? => {
                 let _: InterruptOutput = decode_payload(&frame)?;
                 self.telephony.interrupt_output().await?;
-                ControlFrame::response(
-                    frame.id,
-                    Some(serde_json::to_value(Acknowledged::default()).map_err(control_error)?),
-                    None,
+                (
+                    ControlFrame::response(
+                        frame.id,
+                        Some(serde_json::to_value(Acknowledged::default()).map_err(control_error)?),
+                        None,
+                    ),
+                    ControlOutcome::Continue,
                 )
             }
             CLOSE_METHOD if self.is_ready()? => {
                 let close: Close = decode_payload(&frame)?;
-                self.telephony.terminate(close.reason).await?;
-                *self.state.lock().map_err(lock_error)? = State::Closed;
-                ControlFrame::response(
-                    frame.id,
-                    Some(serde_json::to_value(Acknowledged::default()).map_err(control_error)?),
-                    None,
+                *self.state.lock().map_err(lock_error)? = State::Closing;
+                (
+                    ControlFrame::response(
+                        frame.id,
+                        Some(serde_json::to_value(Acknowledged::default()).map_err(control_error)?),
+                        None,
+                    ),
+                    ControlOutcome::Close(close.reason),
                 )
             }
-            INTERRUPT_METHOD | CLOSE_METHOD => {
-                error_response(frame.id, INVALID_STATE, "invalid_state")
-            }
-            _ => error_response(frame.id, INVALID_PAYLOAD, "unknown_method"),
+            INTERRUPT_METHOD | CLOSE_METHOD => (
+                error_response(frame.id, INVALID_STATE, "invalid_state"),
+                ControlOutcome::Continue,
+            ),
+            _ => (
+                error_response(frame.id, INVALID_PAYLOAD, "unknown_method"),
+                ControlOutcome::Continue,
+            ),
         };
-        self.send(response).await
+        self.send(response).await?;
+        Ok(outcome)
     }
 
     /// Forward one admitted telephony input frame to the application media channel.
@@ -217,6 +239,23 @@ impl<T: TelephonySession + ?Sized> VoiceEndpoint<T> {
         Ok(())
     }
 
+    /// Forward one optional neutral telephony signal as an RTVBP binding event.
+    pub async fn forward_signal_once(&self) -> Result<bool, BindingError> {
+        if !self.is_ready()? {
+            return Err(BindingError::Control("invalid_state".to_owned()));
+        }
+        let Some(signal) = self.telephony.next_signal().await? else {
+            return Ok(false);
+        };
+        signal.validate()?;
+        self.send_event(
+            SIGNAL_EVENT,
+            serde_json::to_value(voice::Signal { signal }).map_err(control_error)?,
+        )
+        .await?;
+        Ok(true)
+    }
+
     /// Close transport and telephony exactly once with the supplied neutral reason.
     pub async fn terminate(&self, reason: TerminationReason) -> Result<(), BindingError> {
         {
@@ -226,8 +265,24 @@ impl<T: TelephonySession + ?Sized> VoiceEndpoint<T> {
             }
             *state = State::Closed;
         }
-        self.telephony.terminate(reason).await?;
-        self.transport.close().await.map_err(transport_error)
+        let terminal_event = self
+            .send_event(
+                TERMINATED_EVENT,
+                serde_json::to_value(voice::Terminated { reason }).map_err(control_error)?,
+            )
+            .await;
+        let (telephony, transport) = tokio::join!(
+            async {
+                self.telephony
+                    .terminate(reason)
+                    .await
+                    .map_err(BindingError::from)
+            },
+            async { self.transport.close().await.map_err(transport_error) },
+        );
+        terminal_event?;
+        telephony?;
+        transport
     }
 
     fn is_ready(&self) -> Result<bool, BindingError> {
@@ -255,6 +310,19 @@ impl<T: TelephonySession + ?Sized> VoiceEndpoint<T> {
             .send(bytes)
             .await
             .map_err(transport_error)
+    }
+
+    async fn send_event(
+        &self,
+        event: &str,
+        payload: serde_json::Value,
+    ) -> Result<(), BindingError> {
+        let event_id = format!(
+            "voice-{}",
+            self.request_sequence.fetch_add(1, Ordering::Relaxed)
+        );
+        self.send(ControlFrame::event(event_id, event, Some(payload)))
+            .await
     }
 
     async fn receive(&self) -> Result<ControlFrame, BindingError> {
@@ -302,8 +370,13 @@ fn control_error(error: impl std::fmt::Display) -> BindingError {
     BindingError::Control(error.to_string())
 }
 
-fn transport_error(error: impl std::fmt::Display) -> BindingError {
-    BindingError::Transport(error.to_string())
+fn transport_error(error: rtvbp::Error) -> BindingError {
+    match error {
+        rtvbp::Error::Transport(message) if message.contains("media queue overloaded") => {
+            BindingError::MediaOverload
+        }
+        other => BindingError::Transport(other.to_string()),
+    }
 }
 
 fn lock_error<T>(error: std::sync::PoisonError<T>) -> BindingError {
@@ -330,6 +403,7 @@ mod tests {
         descriptor: VoiceSessionDescriptor,
         input: Mutex<VecDeque<AudioFrame>>,
         output: Mutex<Vec<AudioFrame>>,
+        signals: Mutex<VecDeque<ChannelSignal>>,
         interrupts: AtomicU64,
         terminal: Mutex<Option<TerminationReason>>,
     }
@@ -350,7 +424,7 @@ mod tests {
         }
 
         async fn next_signal(&self) -> Result<Option<ChannelSignal>, VoiceError> {
-            Ok(None)
+            Ok(self.signals.lock().unwrap().pop_front())
         }
 
         async fn interrupt_output(&self) -> Result<(), VoiceError> {
@@ -385,6 +459,9 @@ mod tests {
                 AudioFrame::new(1, vec![1; 320], &media).unwrap()
             ])),
             output: Mutex::new(Vec::new()),
+            signals: Mutex::new(VecDeque::from([ChannelSignal::Dtmf {
+                digits: "5".to_owned(),
+            }])),
             interrupts: AtomicU64::new(0),
             terminal: Mutex::new(None),
         })
@@ -502,6 +579,102 @@ mod tests {
         endpoint.forward_output_once().await.unwrap();
         application.await.unwrap();
         assert_eq!(telephony.output.lock().unwrap()[0].bytes, vec![2; 320]);
+    }
+
+    #[tokio::test]
+    async fn signal_application_close_and_terminal_event_are_serialized() {
+        let telephony = telephony();
+        let (voice_transport, application_transport) =
+            MemoryTransport::pair(Config { media: true });
+        let (issued, _) = authority_pair();
+        let endpoint = VoiceEndpoint::new(
+            Arc::clone(&telephony),
+            voice_transport,
+            Some(PROFILE),
+            &issued,
+        )
+        .unwrap();
+        let application = async move {
+            let envelope = rtvbp::envelope::v1classic::Envelope;
+            let initialize = application_transport.control().recv().await.unwrap();
+            let initialize = envelope.decode(&initialize.data).unwrap();
+            application_transport
+                .control()
+                .send(
+                    envelope
+                        .encode(&ControlFrame::response(
+                            initialize.id,
+                            Some(
+                                serde_json::to_value(Ready {
+                                    contract: voice::CONTRACT.to_owned(),
+                                })
+                                .unwrap(),
+                            ),
+                            None,
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let _media = application_transport.accept_media().await.unwrap();
+            let signal = application_transport.control().recv().await.unwrap();
+            let signal = envelope.decode(&signal.data).unwrap();
+            assert_eq!(signal.kind, FrameKind::Event);
+            assert_eq!(signal.method, SIGNAL_EVENT);
+            let signal: voice::Signal = serde_json::from_value(signal.payload.unwrap()).unwrap();
+            assert_eq!(
+                signal.signal,
+                ChannelSignal::Dtmf {
+                    digits: "5".to_owned()
+                }
+            );
+            application_transport
+                .control()
+                .send(
+                    envelope
+                        .encode(&ControlFrame::request(
+                            "close-1",
+                            CLOSE_METHOD,
+                            Some(
+                                serde_json::to_value(Close {
+                                    reason: TerminationReason::Completed,
+                                })
+                                .unwrap(),
+                            ),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let acknowledged = application_transport.control().recv().await.unwrap();
+            let acknowledged = envelope.decode(&acknowledged.data).unwrap();
+            assert_eq!(acknowledged.kind, FrameKind::Response);
+            assert_eq!(acknowledged.correlation_id, "close-1");
+            let terminal = application_transport.control().recv().await.unwrap();
+            let terminal = envelope.decode(&terminal.data).unwrap();
+            assert_eq!(terminal.kind, FrameKind::Event);
+            assert_eq!(terminal.method, TERMINATED_EVENT);
+            let terminal: voice::Terminated =
+                serde_json::from_value(terminal.payload.unwrap()).unwrap();
+            assert_eq!(terminal.reason, TerminationReason::Completed);
+        };
+        let voice = async {
+            endpoint.initialize_application().await.unwrap();
+            assert!(endpoint.forward_signal_once().await.unwrap());
+            assert_eq!(
+                endpoint.serve_control_once().await.unwrap(),
+                ControlOutcome::Close(TerminationReason::Completed)
+            );
+            endpoint
+                .terminate(TerminationReason::Completed)
+                .await
+                .unwrap();
+        };
+        tokio::join!(application, voice);
+        assert_eq!(
+            *telephony.terminal.lock().unwrap(),
+            Some(TerminationReason::Completed)
+        );
     }
 
     #[test]
