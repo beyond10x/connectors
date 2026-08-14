@@ -4,12 +4,14 @@
 
 **Authority:**
 [architecture ADR 0024](https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
+[architecture ADR 0026](https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md) ·
 [architecture RFC 0009](https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md) ·
 [development vectors](https://github.com/b10x/architecture/blob/main/specifications/draft/voice-session-v1/README.md)
 
 This document turns the accepted cross-repository boundary into a Connectors implementation shape.
-It deliberately creates no workspace member yet: the platform family is unstarted, S-024's common
-zero-I/O plan does not exist, and the generic RTVBP catalog is not released.
+It deliberately creates no workspace member yet: the platform family is unstarted and S-024's
+common zero-I/O plan does not exist. The B10x RTVBP binding is no longer an upstream catalog
+prerequisite; it is implemented only after the generic `VoiceSession` semantics exist.
 
 ## 1. Boundary
 
@@ -19,7 +21,8 @@ session-authority issuance, and audit. A built-in `sip_v1` driver terminates SIP
 using pinned [`codewandler/sipx`](https://github.com/codewandler/sipx) crates.
 
 RTVBP is not the trunk protocol. It begins behind that SIP endpoint and carries typed call control
-plus duplex media directly to an application-channel endpoint. Connectors ordinary invoke/event
+plus duplex media directly to an application-channel endpoint. It is one binding of the
+Connectors-owned, protocol-neutral `VoiceSession` contract. Connectors ordinary invoke/event
 delivery and satellite federation do not carry those continuous bytes.
 
 The endpoint is a SIP user agent, not a proxy, registrar service, PBX, arbitrary dial proxy, TURN
@@ -35,9 +38,9 @@ The eventual Connectors additions are:
 connectors/
 ├── crates/
 │   ├── domain/
-│   │   └── src/voice.rs                  # neutral call/session ids, plans, bounds and ports
+│   │   └── src/voice.rs                  # TelephonySession + VoiceSession semantics and ports
 │   ├── protocol/
-│   │   └── src/voice.rs                  # establishment DTOs; never media frames
+│   │   └── src/voice.rs                  # released VoiceSession contract projection
 │   ├── service/
 │   │   └── src/voice.rs                  # admission, routing, authority and lifecycle use cases
 │   ├── server/
@@ -51,10 +54,13 @@ connectors/
 │   │   └── tests/loopback.rs             # no external PBX or credentials
 │   └── rtvbp-voice-endpoint/
 │       ├── Cargo.toml
-│       ├── src/lib.rs                    # neutral RTVBP voice role over TelephonySession
+│       ├── src/lib.rs                    # VoiceSession-to-RTVBP binding over TelephonySession
 │       └── tests/{memory,websocket}.rs
+├── contracts/
+│   └── voice-session/v0alpha1/           # protocol-neutral semantics and conformance vectors
 ├── fixtures/
-│   └── voice-session-v1/                 # pinned owner vectors once released
+│   ├── sip-telephony-session/v1/         # sipx loopback and learned-peer characterization
+│   └── rtvbp-voice-binding/v1/           # local mapping plus memory/WebSocket fixtures
 └── docs/stories/
     ├── S-032-sip-driver-terminates-one-governed-call.md
     └── S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md
@@ -65,6 +71,10 @@ milestone; the two new workspace members do not arrive before them. No `vendor/s
 `vendor/rtvbp`, Git submodule, `voice` repository, substrate protocol module, dynamic plugin, or
 out-of-process gateway artifact is added by this plan.
 
+The owner contract directory never contains SIP or RTVBP cases. The two fixture directories prove
+their respective adapter bindings against that contract; they are released as evidence alongside
+the contract but remain distinct artifacts.
+
 ## 3. Dependency graph
 
 ```text
@@ -72,17 +82,18 @@ server ───────────────▶ service ─────�
   ├──▶ driver-sip ────────────────────────────▶ domain
   │       └──▶ exact sipx crates
   └──▶ rtvbp-voice-endpoint ──────────────────▶ domain
-          └──▶ exact neutral RTVBP Rust SDK
+          └──▶ exact generic RTVBP Rust SDK
 
 protocol ─▶ domain identities / bounded projections only
 driver-sip ─X─▶ RTVBP
 Agent/Substrate ─X─▶ sipx or RTVBP
 ```
 
-`domain::voice` names a protocol-neutral `TelephonySession` port. `driver-sip` implements it.
-`rtvbp-voice-endpoint` consumes it and implements the neutral RTVBP voice role. Only `server` may
-select and compose both after `service` returns a proof-bearing admitted plan. No catalog document,
-wire request, model, or caller names a Rust crate or upstream implementation.
+`domain::voice` separates a protocol-neutral internal `TelephonySession` from the released
+cross-repository `VoiceSession` semantics. `driver-sip` implements the first.
+`rtvbp-voice-endpoint` maps the second onto the generic RTVBP runtime while consuming the first.
+Only `server` may select and compose them after `service` returns a proof-bearing admitted plan. No
+domain request, model, or caller names a Rust crate, RTVBP method, or upstream implementation.
 
 Design 02's original literal socket-opener rule is refined because the pinned
 [`sipx-transport` API](https://github.com/codewandler/sipx/blob/004ac534b8b222060ad2d2308763efe6e1dedc10/crates/sipx-transport/src/lib.rs)
@@ -92,10 +103,10 @@ network-classified driver and may call `sipx` bind only with a non-serializable,
 `AdmittedSipPlan` returned by that path. Catalog data, a wire DTO, and a caller cannot construct it.
 
 The admitted plan fixes local signaling/media listener apertures and the destination policy applied
-to configured, DNS-resolved, SIP-learned, and SDP/RTP-learned targets before transmission. Fence
-tests reject socket-capable dependencies in all other drivers/platform crates and direct `sipx`
-binds anywhere else. If `sipx` later exposes injected pre-bound sockets, this adapter may narrow
-without changing `TelephonySession`.
+to configured, DNS-resolved, SIP-learned, and SDP-learned targets before transmission. Because the
+selected media runtime can learn a symmetric-RTP source internally, stable evidence must separately
+prove that source admitted before it becomes an egress peer. Fence tests reject socket-capable
+dependencies in all other drivers/platform crates and direct `sipx` binds anywhere else.
 
 ## 4. Catalog and admission
 
@@ -114,36 +125,29 @@ Connection plus tenant/application-channel binding; zero or multiple matches ref
 work. SIP credentials and SRTP material never enter protocol DTOs, RTVBP frames, events, audit,
 fixtures, or Agent input.
 
-## 5. RTVBP profiles
+## 5. Generic contract and RTVBP binding
 
-RTVBP provides reusable envelope/runtime/transport machinery, but a catalog owns payload meaning:
+`VoiceSession` is the canonical semantic contract. It has opaque call/session/channel references,
+explicitly untrusted participant context, bounded media negotiation and duplex frames, optional
+channel signals, output interruption, observable loss, and typed termination. It has no SIP, RTP,
+RTVBP, carrier, credential, IVR, recording, transcript, tool, or Agent-lifecycle type.
 
-- Generic voice requires a released neutral catalog such as `b10x.voice.v1`, generated by
-  the upstream RTVBP pipeline. Its vocabulary is limited to neutral call/session/media lifecycle.
-- The frozen `babelforce.v1` catalog includes application movement and session-variable semantics.
-  It is implemented only by the downstream Babelforce distribution adapter, never by
-  `rtvbp-voice-endpoint` or another generic crate.
+RTVBP provides reusable envelope/runtime/transport machinery. `rtvbp-voice-endpoint` owns the
+voice-side mapping from `VoiceSession` to an exact B10x profile such as
+`b10x.voice.v1`; the AI Agent Platform owns an independently implemented application-side
+mapping. The binding manifest and fixtures ship with the Connectors owner bundle and both adapters
+must pass the same generic semantic vectors. No B10x catalog needs to be compiled into the
+upstream SDK.
 
-The neutral catalog release is a hard prerequisite, not a locally copied schema. Its generated SDK
-identity and conformance fixtures are pinned into the Connectors owner bundle. The initial transport
-proof uses in-memory peers and bounded WebSocket control/media with L16 mono audio; WebRTC is a
-later additive browser/NAT journey.
-
-The initial catalog is limited to `session.initialize`, `session.terminate`, `call.hangup`,
-`audio.buffer.clear`, and `ping`; events `session.updated`, `call.hangup`, `dtmf`,
-`audio.speech.started`, and bounded `audio.info`; plus the existing binary media channels.
-Initialization has closed session/call/channel references, explicitly untrusted remote-party
-context, and bounded format offers. It has no free-form metadata/session variables, tenant
-authority, credentials, IVR node, recording command, Agent tool event, or transcript projection.
-
-The hand-authored upstream source belongs in
-`spec/crates/rtvbp-spec-b10x-voice-v1/src/catalog.rs`; its manifest and Rust/Go catalog modules
-are generator output. The exact profile/subprotocol name is accepted and emitted upstream rather
-than aliased locally.
+The first implementation profile maps signed 16-bit little-endian PCM at 8 kHz, mono, 20 ms and
+320 bytes per frame. This is one negotiated `VoiceSession` descriptor rather than the identity of
+the generic contract. The upstream `L16/8000/1` label stays inside the binding. The frozen
+`babelforce.v1` catalog includes application movement and session-variable semantics and remains
+only in the downstream Babelforce adapter.
 
 [Legacy RTVBP WebSocket negotiation](https://github.com/babelforce/rtvbp/blob/ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8/docs/designs/multi-catalog.md)
 maps an absent subprotocol to `rtvbp.v1`/`babelforce.v1`. The generic endpoint requires an explicit
-exact neutral profile and refuses a headerless offer instead of inheriting that compatibility
+exact local binding profile and refuses a headerless offer instead of inheriting that compatibility
 default. The SDK's generated `demo.v1` profile is a multi-catalog test and is not an application
 contract.
 
@@ -172,25 +176,31 @@ The reviewed initial identities are:
 | Dependency | Exact identity | Resolved commit | Gate |
 |---|---|---|---|
 | `codewandler/sipx` | `v1.0.0-rc.23` | `004ac534b8b222060ad2d2308763efe6e1dedc10` | development characterization only while prerelease |
-| RTVBP Rust SDK | `sdk/rust/v0.1.0` | `ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8` | runtime baseline; neutral catalog still required |
+| RTVBP Rust SDK | `sdk/rust/v0.1.0` | `ee73c2f3ce13ffcfdd188ed2068ef79aea1b2fa8` | final release; generic runtime baseline; local binding only |
 
 Both declare Rust 1.88. This workspace currently declares 1.87, so one explicit workspace-wide
 MSRV change and a green pinned-MSRV lane precede either dependency. Cargo versions are exact, the
-lockfile records the resolved graph, and release evidence records licenses, source commits,
-generated catalog identity, conformance results, and artifact digest. A mutable Git ref or compatible
-range is refused. A stable Connectors voice claim additionally requires a stable `sipx` API or a
-reviewed compatibility/upgrade exception.
+lockfile records the resolved graph, and release evidence records licenses, source commits, local
+binding identity, conformance results, and artifact digest. RTVBP's released crate asset is pinned
+at SHA-256 `76b7a79069f725e7ae13d2ca9af5b47bf8198e83839c360185ff3cb368e95469`.
+Its public generic request/event traits, handler registration, transport traits, and configurable
+WebSocket subprotocols are the executable seam for the local binding. A mutable Git ref or
+compatible range is refused. The selected RTVBP runtime has internal unbounded control/transport
+queues; stable or exposed support requires bounded configuration/change, a bounded replacement of
+those layers, or measured process containment. A stable Connectors voice claim also requires a
+stable `sipx` API or a reviewed compatibility/upgrade exception.
 
 ## 8. Implementation sequence and exit evidence
 
 1. Complete S-024 and the `domain`/`protocol`/`service`/`server` family.
 2. Characterize the pinned `sipx` API, admitted-plan/destination-policy seam, feature closure,
    licenses, and MSRV; make the reviewed Rust 1.88 change.
-3. Release and pin the neutral RTVBP catalog and generated Rust surface upstream.
+3. Release the protocol-neutral `VoiceSession` contract and binding-neutral conformance vectors.
 4. Implement S-032 against loopback SIP only: registration, inbound/outbound, DTMF, bounded media,
    hangup, cancellation, target refusal, credential non-disclosure, and task teardown.
-5. Implement S-033 independently over memory and WebSocket with a fake application peer: profile
-   negotiation, issue/redeem/replay, bounds, loss, interruption, close, and generation drain.
+5. Implement the local RTVBP binding in S-033 independently over memory and WebSocket with a fake
+   application peer: semantic mapping, profile negotiation, issue/redeem/replay, bounds, loss,
+   interruption, close, and generation drain.
 6. Compose a model-free loopback call end to end and pass the architecture development vectors.
 7. Only then characterize one explicitly authorized real PBX/trunk and satellite outward path.
 8. Publish a signed Connectors owner bundle and prove a clean-room application-channel consumer
