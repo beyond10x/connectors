@@ -163,6 +163,8 @@ pub trait TelephonySession: Send + Sync {
     async fn read_input(&self) -> Result<Option<AudioFrame>, VoiceError>;
     async fn write_output(&self, frame: AudioFrame) -> Result<(), VoiceError>;
     async fn next_signal(&self) -> Result<Option<ChannelSignal>, VoiceError>;
+    /// Wait for the driver's first terminal fact without guessing from media or signal EOF.
+    async fn wait_terminated(&self) -> Result<TerminationReason, VoiceError>;
     async fn interrupt_output(&self) -> Result<(), VoiceError>;
     async fn terminate(&self, reason: TerminationReason) -> Result<(), VoiceError>;
 }

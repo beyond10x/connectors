@@ -6,6 +6,9 @@ use std::time::Duration;
 
 use domain::{DriverId, Interaction, ProtocolPlan, ZeroIoPlan};
 
+/// Maximum time an admitted outbound invitation may remain unanswered.
+pub const MAX_SIP_DIAL_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// One exact IP and bounded port interval admitted for a socket role.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SocketAperture {
@@ -54,6 +57,8 @@ pub struct SipDeploymentRoute {
 pub enum SipAdmissionError {
     #[error("operation is not an admitted SIP session establishment")]
     WrongOperation,
+    #[error("admitted SIP identity is incomplete")]
+    InvalidIdentity,
     #[error("deployment SIP route belongs to another Connection")]
     ConnectionMismatch,
     #[error("SIP route has an invalid socket aperture")]
@@ -74,6 +79,7 @@ pub enum SipAdmissionError {
 pub struct AdmittedSipPlan {
     provider: String,
     operation: String,
+    organization: String,
     principal: String,
     grant: String,
     route: SipDeploymentRoute,
@@ -91,6 +97,11 @@ impl AdmittedSipPlan {
     #[must_use]
     pub fn operation(&self) -> &str {
         &self.operation
+    }
+
+    #[must_use]
+    pub fn organization(&self) -> &str {
+        &self.organization
     }
 
     #[must_use]
@@ -131,6 +142,7 @@ impl std::fmt::Debug for AdmittedSipPlan {
             .debug_struct("AdmittedSipPlan")
             .field("provider", &self.provider)
             .field("operation", &self.operation)
+            .field("organization", &self.organization)
             .field("principal", &self.principal)
             .field("grant", &self.grant)
             .field("route", &self.route)
@@ -151,10 +163,16 @@ pub fn admit_sip_plan(
     {
         return Err(SipAdmissionError::WrongOperation);
     }
+    if plan.admission().organization().is_empty()
+        || plan.admission().principal().is_empty()
+        || plan.admission().grant().is_empty()
+    {
+        return Err(SipAdmissionError::InvalidIdentity);
+    }
     if sip.connection != route.connection || plan.admission().connection() != route.connection {
         return Err(SipAdmissionError::ConnectionMismatch);
     }
-    if route.dial_timeout.is_zero() {
+    if route.dial_timeout.is_zero() || route.dial_timeout > MAX_SIP_DIAL_TIMEOUT {
         return Err(SipAdmissionError::InvalidDeadline);
     }
     if !route.development_loopback_only
@@ -190,6 +208,7 @@ pub fn admit_sip_plan(
     Ok(AdmittedSipPlan {
         provider: plan.facts().provider.clone(),
         operation: plan.facts().operation.clone(),
+        organization: plan.admission().organization().to_owned(),
         principal: plan.admission().principal().to_owned(),
         grant: plan.admission().grant().to_owned(),
         route,
@@ -208,7 +227,7 @@ mod tests {
 
     use super::*;
 
-    fn plan() -> ZeroIoPlan {
+    fn plan_for_organization(organization: &str) -> ZeroIoPlan {
         ZeroIoPlan::new(
             OperationFacts {
                 provider: "loopback-pbx".to_owned(),
@@ -223,6 +242,7 @@ mod tests {
             AdmittedOperation::from_grant_decision(
                 "loopback-pbx",
                 "call-establish",
+                organization,
                 "principal",
                 "grant",
                 "connection",
@@ -231,6 +251,10 @@ mod tests {
                 connection: "connection".to_owned(),
             }),
         )
+    }
+
+    fn plan() -> ZeroIoPlan {
+        plan_for_organization("org")
     }
 
     fn route() -> SipDeploymentRoute {
@@ -275,6 +299,33 @@ mod tests {
         assert!(matches!(
             admit_sip_plan(&plan(), outside),
             Err(SipAdmissionError::SignalingTargetRefused)
+        ));
+    }
+
+    #[test]
+    fn zero_or_excessive_dial_deadlines_refuse_before_the_driver() {
+        for dial_timeout in [
+            Duration::ZERO,
+            MAX_SIP_DIAL_TIMEOUT + Duration::from_secs(1),
+        ] {
+            let mut invalid = route();
+            invalid.dial_timeout = dial_timeout;
+            assert!(matches!(
+                admit_sip_plan(&plan(), invalid),
+                Err(SipAdmissionError::InvalidDeadline)
+            ));
+        }
+
+        let mut exact_maximum = route();
+        exact_maximum.dial_timeout = MAX_SIP_DIAL_TIMEOUT;
+        assert!(admit_sip_plan(&plan(), exact_maximum).is_ok());
+    }
+
+    #[test]
+    fn missing_organization_in_grant_evidence_refuses_before_the_driver() {
+        assert!(matches!(
+            admit_sip_plan(&plan_for_organization(""), route()),
+            Err(SipAdmissionError::InvalidIdentity)
         ));
     }
 }

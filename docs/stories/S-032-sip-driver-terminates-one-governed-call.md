@@ -53,10 +53,17 @@ SIP call without importing RTVBP or requiring a live carrier.
 ## Progress
 
 - The exact sipx-backed outbound driver now consumes only a proof-bearing, non-serializable server
-  plan. Admission rejects non-loopback deployments and aperture widening before the driver can bind.
+  plan. Admission rejects non-loopback deployments, aperture widening, incomplete admitted
+  identity, and dial deadlines outside `1..=30` seconds before the driver can bind. Organization is
+  structurally copied from grant evidence; no application route can supply a competing tenant.
 - A real UDP SIP/RTP loopback test normalizes G.711 to the neutral 8 kHz/20 ms PCM profile, crosses
   RTVBP to a fake application in both directions, and observes whole-task teardown without a model,
-  external PBX, or credentials.
+  external PBX, or credentials. A separate ringing-peer test proves runtime cancellation reaches
+  sipx's cancellation-safe dial and the peer observes SIP CANCEL before the driver returns.
+- `TelephonySession::wait_terminated` exposes the driver's first typed terminal cause to the
+  supervisor. Media/signal EOF is no longer reclassified as remote hangup; a sipx timeout remains
+  `transport_lost` through the neutral port. Session teardown joins the sipx owner task through
+  endpoint shutdown, while dropping an abandoned session aborts that owner.
 - CI builds/tests/lints the isolated exact lock, and a dependency fence keeps sipx out of the
   canonical compiler closure. No provider member is advertised yet: the authoritative source,
   generated artifacts, remaining conformance matrix, and stable learned-peer enforcement are open.

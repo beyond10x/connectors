@@ -396,6 +396,7 @@ mod tests {
         AuthorityIssuer, AuthorityRedeemer, ExpectedAuthority, InMemoryReplayStore, IssueRequest,
         IssuedAuthority, NoRevocations, ProofKey, RedeemedAuthority,
     };
+    use tokio::sync::Notify;
 
     use super::*;
 
@@ -406,6 +407,7 @@ mod tests {
         signals: Mutex<VecDeque<ChannelSignal>>,
         interrupts: AtomicU64,
         terminal: Mutex<Option<TerminationReason>>,
+        terminal_ready: Notify,
     }
 
     #[async_trait::async_trait]
@@ -427,6 +429,16 @@ mod tests {
             Ok(self.signals.lock().unwrap().pop_front())
         }
 
+        async fn wait_terminated(&self) -> Result<TerminationReason, VoiceError> {
+            loop {
+                let notified = self.terminal_ready.notified();
+                if let Some(reason) = *self.terminal.lock().unwrap() {
+                    return Ok(reason);
+                }
+                notified.await;
+            }
+        }
+
         async fn interrupt_output(&self) -> Result<(), VoiceError> {
             self.interrupts.fetch_add(1, Ordering::Relaxed);
             Ok(())
@@ -436,6 +448,8 @@ mod tests {
             let mut terminal = self.terminal.lock().unwrap();
             if terminal.is_none() {
                 *terminal = Some(reason);
+                drop(terminal);
+                self.terminal_ready.notify_waiters();
             }
             Ok(())
         }
@@ -464,6 +478,7 @@ mod tests {
             }])),
             interrupts: AtomicU64::new(0),
             terminal: Mutex::new(None),
+            terminal_ready: Notify::new(),
         })
     }
 

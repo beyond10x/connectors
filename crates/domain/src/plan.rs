@@ -68,13 +68,14 @@ pub struct OperationFacts {
 
 /// Evidence that authentication and the exact Connector Grant were admitted before planning.
 ///
-/// Fields are private so downstream code cannot reinterpret a principal or grant after the plan is
-/// built. The service layer constructs this from its admission result and checks all three catalog
-/// identities again while planning.
+/// Fields are private so downstream code cannot reinterpret a tenant, principal, or grant after
+/// the plan is built. The service layer constructs this from its admission result and checks the
+/// catalog identities again while planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedOperation {
     provider: String,
     operation: String,
+    organization: String,
     principal: String,
     grant: String,
     connection: String,
@@ -85,6 +86,7 @@ impl AdmittedOperation {
     pub fn from_grant_decision(
         provider: impl Into<String>,
         operation: impl Into<String>,
+        organization: impl Into<String>,
         principal: impl Into<String>,
         grant: impl Into<String>,
         connection: impl Into<String>,
@@ -92,6 +94,7 @@ impl AdmittedOperation {
         Self {
             provider: provider.into(),
             operation: operation.into(),
+            organization: organization.into(),
             principal: principal.into(),
             grant: grant.into(),
             connection: connection.into(),
@@ -104,6 +107,10 @@ impl AdmittedOperation {
 
     pub fn operation(&self) -> &str {
         &self.operation
+    }
+
+    pub fn organization(&self) -> &str {
+        &self.organization
     }
 
     pub fn principal(&self) -> &str {
