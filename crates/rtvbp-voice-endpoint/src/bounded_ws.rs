@@ -11,7 +11,8 @@ use rtvbp::{
     ControlChannel, KeepalivePolicy, MediaChannel, MediaFormat, MediaFrame, Received, Transport,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, Mutex as AsyncMutex, Notify};
+use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 use tokio_tungstenite::WebSocketStream;
@@ -25,7 +26,7 @@ pub struct Bounds {
     pub incoming_control: usize,
     /// Outgoing complete control envelopes, including keepalive.
     pub outgoing_control: usize,
-    /// Incoming audio frames; saturation drops oldest and increments owned loss.
+    /// Incoming application-to-call audio; the first dropped frame terminates as media overload.
     pub incoming_media: usize,
     /// Outgoing audio frames; saturation fails instead of silently dropping speech.
     pub outgoing_media: usize,
@@ -200,14 +201,21 @@ pub struct BoundedWsTransport {
     outgoing_control: mpsc::Sender<Message>,
     outgoing_media: mpsc::Sender<Message>,
     terminal: Mutex<Option<Terminal>>,
-    done: Notify,
+    done: Arc<Notify>,
     closing: AtomicBool,
-    close_requested: Notify,
+    close_requested: Arc<Notify>,
     media_claimed: AtomicBool,
     incoming_media_loss: AtomicU64,
+    media_loss_ready: Notify,
     pongs: Arc<Inbox<Vec<u8>>>,
     keepalive_claimed: AtomicBool,
     ping_serial: AtomicU64,
+    pumps: AsyncMutex<Option<PumpHandles>>,
+}
+
+struct PumpHandles {
+    writer: JoinHandle<()>,
+    reader: JoinHandle<()>,
 }
 
 impl BoundedWsTransport {
@@ -240,23 +248,35 @@ impl BoundedWsTransport {
             outgoing_control: control_tx,
             outgoing_media: media_tx,
             terminal: Mutex::new(None),
-            done: Notify::new(),
+            done: Arc::new(Notify::new()),
             closing: AtomicBool::new(false),
-            close_requested: Notify::new(),
+            close_requested: Arc::new(Notify::new()),
             media_claimed: AtomicBool::new(false),
             incoming_media_loss: AtomicU64::new(0),
+            media_loss_ready: Notify::new(),
             pongs: Arc::new(Inbox::new(1)),
             keepalive_claimed: AtomicBool::new(false),
             ping_serial: AtomicU64::new(0),
+            pumps: AsyncMutex::new(None),
         });
         let (writer, reader) = stream.split();
-        tokio::spawn(write_pump(
-            Arc::clone(&transport),
+        let writer = tokio::spawn(write_pump(
+            Arc::downgrade(&transport),
             control_rx,
             media_rx,
             writer,
         ));
-        tokio::spawn(read_pump(Arc::clone(&transport), reader));
+        let reader = tokio::spawn(read_pump(Arc::downgrade(&transport), reader));
+        match transport.pumps.try_lock() {
+            Ok(mut pumps) => *pumps = Some(PumpHandles { writer, reader }),
+            Err(_) => {
+                writer.abort();
+                reader.abort();
+                return Err(rtvbp::Error::Configuration(
+                    "WebSocket pump ownership was unavailable during startup".to_owned(),
+                ));
+            }
+        }
         Ok(transport)
     }
 
@@ -272,9 +292,16 @@ impl BoundedWsTransport {
         }
     }
 
-    /// Return and reset loss newly observed by this receiver.
-    pub fn take_incoming_media_loss(&self) -> u64 {
-        self.incoming_media_loss.swap(0, Ordering::AcqRel)
+    /// Wait for the first incoming media loss, reported directly by the owning read pump.
+    pub async fn wait_incoming_media_loss(&self) -> u64 {
+        loop {
+            let notified = self.media_loss_ready.notified();
+            let loss = self.incoming_media_loss.load(Ordering::Acquire);
+            if loss > 0 {
+                return loss;
+            }
+            notified.await;
+        }
     }
 
     fn finish(&self, terminal: Terminal) {
@@ -312,6 +339,34 @@ impl BoundedWsTransport {
             }
             notified.await;
         }
+    }
+
+    async fn stop_and_join_pumps(&self, force_abort: bool) {
+        let mut pumps = self.pumps.lock().await;
+        let Some(handles) = pumps.as_mut() else {
+            return;
+        };
+        if force_abort {
+            handles.writer.abort();
+            handles.reader.abort();
+        }
+        let joined = async {
+            let _ = (&mut handles.writer).await;
+            let _ = (&mut handles.reader).await;
+        };
+        if tokio::time::timeout(self.bounds.close_deadline, joined)
+            .await
+            .is_err()
+        {
+            handles.writer.abort();
+            handles.reader.abort();
+            let _ = tokio::time::timeout(self.bounds.close_deadline, async {
+                let _ = (&mut handles.writer).await;
+                let _ = (&mut handles.reader).await;
+            })
+            .await;
+        }
+        *pumps = None;
     }
 
     fn claim_media(&self) -> Result<Arc<dyn MediaChannel>, rtvbp::Error> {
@@ -446,15 +501,23 @@ impl Transport for BoundedWsTransport {
     }
 
     async fn close(&self) -> Result<(), rtvbp::Error> {
-        if let Some(terminal) = lock(&self.terminal).clone() {
-            return terminal.result();
-        }
-        if !self.closing.swap(true, Ordering::AcqRel) {
-            self.close_requested.notify_waiters();
-        }
-        tokio::time::timeout(self.bounds.close_deadline, self.wait_closed())
-            .await
-            .map_err(|_| rtvbp::Error::Timeout)?
+        let existing_terminal = lock(&self.terminal).clone();
+        let (result, force_abort) = if let Some(terminal) = existing_terminal {
+            (terminal.result(), false)
+        } else {
+            if !self.closing.swap(true, Ordering::AcqRel) {
+                self.close_requested.notify_waiters();
+            }
+            match tokio::time::timeout(self.bounds.close_deadline, self.wait_closed()).await {
+                Ok(result) => (result, false),
+                Err(_) => {
+                    self.finish(Terminal::Failed("WebSocket close timed out".to_owned()));
+                    (Err(rtvbp::Error::Timeout), true)
+                }
+            }
+        };
+        self.stop_and_join_pumps(force_abort).await;
+        result
     }
 
     fn supports_keepalive(&self) -> bool {
@@ -504,8 +567,17 @@ impl Transport for BoundedWsTransport {
     }
 }
 
+impl Drop for BoundedWsTransport {
+    fn drop(&mut self) {
+        if let Some(handles) = self.pumps.get_mut().take() {
+            handles.writer.abort();
+            handles.reader.abort();
+        }
+    }
+}
+
 async fn write_pump<S>(
-    transport: Arc<BoundedWsTransport>,
+    transport: Weak<BoundedWsTransport>,
     mut control: mpsc::Receiver<Message>,
     mut media: mpsc::Receiver<Message>,
     mut writer: S,
@@ -513,13 +585,24 @@ async fn write_pump<S>(
     S: Sink<Message, Error = WebSocketError> + Unpin,
 {
     loop {
-        if transport.closing.load(Ordering::Acquire) {
+        let Some(owner) = transport.upgrade() else {
+            return;
+        };
+        let close_requested = Arc::clone(&owner.close_requested);
+        let close_notification = close_requested.notified_owned();
+        tokio::pin!(close_notification);
+        close_notification.as_mut().enable();
+        let closing = owner.closing.load(Ordering::Acquire);
+        drop(owner);
+        if closing {
             // Control acknowledgements and the single terminal event were accepted before close.
             // Flush that finite queue in order; queued media is deliberately abandoned once the
             // terminal transition wins.
             while let Ok(message) = control.try_recv() {
                 if let Err(error) = writer.send(message).await {
-                    transport.finish(Terminal::Failed(error.to_string()));
+                    if let Some(owner) = transport.upgrade() {
+                        owner.finish(Terminal::Failed(error.to_string()));
+                    }
                     return;
                 }
             }
@@ -530,84 +613,252 @@ async fn write_pump<S>(
                 })))
                 .await;
             let _ = writer.close().await;
-            transport.finish(match result {
-                Ok(()) => Terminal::Orderly,
-                Err(error) => Terminal::Failed(error.to_string()),
-            });
+            if let Some(owner) = transport.upgrade() {
+                owner.finish(match result {
+                    Ok(()) => Terminal::Orderly,
+                    Err(error) => Terminal::Failed(error.to_string()),
+                });
+            }
             return;
         }
         let message = tokio::select! {
             biased;
-            () = transport.close_requested.notified() => continue,
+            () = close_notification.as_mut() => continue,
             message = control.recv() => message,
             message = media.recv() => message,
         };
         let Some(message) = message else {
-            transport.finish(Terminal::Orderly);
+            if let Some(owner) = transport.upgrade() {
+                owner.finish(Terminal::Orderly);
+            }
             return;
         };
         if let Err(error) = writer.send(message).await {
-            transport.finish(Terminal::Failed(error.to_string()));
+            if let Some(owner) = transport.upgrade() {
+                owner.finish(Terminal::Failed(error.to_string()));
+            }
             return;
         }
     }
 }
 
-async fn read_pump<S>(transport: Arc<BoundedWsTransport>, mut reader: S)
+async fn read_pump<S>(transport: Weak<BoundedWsTransport>, mut reader: S)
 where
     S: Stream<Item = Result<Message, WebSocketError>> + Unpin,
 {
     while let Some(message) = reader.next().await {
+        let Some(owner) = transport.upgrade() else {
+            return;
+        };
         let result = match message {
             Ok(Message::Text(text)) => {
-                if text.len() > transport.bounds.control_frame_bytes {
+                if text.len() > owner.bounds.control_frame_bytes {
                     Err(rtvbp::Error::Transport(
                         "control frame exceeds the configured bound".to_owned(),
                     ))
                 } else {
-                    transport.control.incoming.push_strict(Received {
+                    owner.control.incoming.push_strict(Received {
                         data: text.as_bytes().to_vec(),
                         received_at: SystemTime::now(),
                     })
                 }
             }
-            Ok(Message::Binary(data)) => match transport.format.frame_bytes() {
-                Ok(expected) if data.len() == expected => transport
+            Ok(Message::Binary(data)) => match owner.format.frame_bytes() {
+                Ok(expected) if data.len() == expected => match owner
                     .media
                     .incoming
                     .push_drop_oldest(MediaFrame::untimed(data.to_vec()))
-                    .map(|dropped| {
-                        if dropped {
-                            transport.incoming_media_loss.fetch_add(1, Ordering::AcqRel);
-                        }
-                    }),
+                {
+                    Ok(true) => {
+                        owner.incoming_media_loss.fetch_add(1, Ordering::AcqRel);
+                        owner.media_loss_ready.notify_waiters();
+                        Err(rtvbp::Error::Transport(
+                            "bounded incoming media queue overloaded".to_owned(),
+                        ))
+                    }
+                    Ok(false) => Ok(()),
+                    Err(error) => Err(error),
+                },
                 Ok(_) => Err(rtvbp::Error::InvalidMediaFormat(
                     "media frame does not match negotiated fixed width".to_owned(),
                 )),
                 Err(error) => Err(error),
             },
-            Ok(Message::Pong(data)) => transport.pongs.push_drop_oldest(data.to_vec()).map(drop),
+            Ok(Message::Pong(data)) => owner.pongs.push_drop_oldest(data.to_vec()).map(drop),
             Ok(Message::Ping(_) | Message::Frame(_)) => Ok(()),
             Ok(Message::Close(_)) => {
-                transport.finish(Terminal::Orderly);
+                owner.finish(Terminal::Orderly);
                 return;
             }
             Err(WebSocketError::ConnectionClosed | WebSocketError::AlreadyClosed) => {
-                transport.finish(Terminal::Orderly);
+                owner.finish(Terminal::Orderly);
                 return;
             }
             Err(error) => Err(rtvbp::Error::Transport(error.to_string())),
         };
         if let Err(error) = result {
-            transport.finish(Terminal::Failed(error.to_string()));
+            owner.finish(Terminal::Failed(error.to_string()));
             return;
         }
     }
-    transport.finish(Terminal::Orderly);
+    if let Some(owner) = transport.upgrade() {
+        owner.finish(Terminal::Orderly);
+    }
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::pin::Pin;
+    use std::sync::atomic::AtomicBool;
+    use std::task::{Context, Poll};
+
+    use futures_util::SinkExt as _;
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+    use tokio_tungstenite::tungstenite::protocol::Role;
+
+    use super::*;
+
+    struct StalledIo {
+        dropped: Arc<AtomicBool>,
+    }
+
+    impl Drop for StalledIo {
+        fn drop(&mut self) {
+            self.dropped.store(true, Ordering::Release);
+        }
+    }
+
+    impl AsyncRead for StalledIo {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+            _buffer: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for StalledIo {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+            _buffer: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Poll::Pending
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Pending
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Pending
+        }
+    }
+
+    fn short_bounds() -> Bounds {
+        Bounds {
+            incoming_control: 2,
+            outgoing_control: 2,
+            incoming_media: 1,
+            outgoing_media: 2,
+            control_frame_bytes: MAX_CONTROL_FRAME_BYTES,
+            close_deadline: Duration::from_millis(25),
+        }
+    }
+
+    #[tokio::test]
+    async fn close_aborts_and_joins_pumps_when_async_write_never_progresses() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let stream = WebSocketStream::from_raw_socket(
+            StalledIo {
+                dropped: Arc::clone(&dropped),
+            },
+            Role::Client,
+            None,
+        )
+        .await;
+        let transport = BoundedWsTransport::start(stream, short_bounds(), crate::media_format())
+            .expect("transport starts");
+
+        assert!(matches!(
+            transport.close().await,
+            Err(rtvbp::Error::Timeout)
+        ));
+        assert!(
+            dropped.load(Ordering::Acquire),
+            "close returned while a stalled pump still owned the WebSocket stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelling_an_outer_close_timeout_does_not_detach_stalled_pumps() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let stream = WebSocketStream::from_raw_socket(
+            StalledIo {
+                dropped: Arc::clone(&dropped),
+            },
+            Role::Client,
+            None,
+        )
+        .await;
+        let mut bounds = short_bounds();
+        bounds.close_deadline = Duration::from_secs(1);
+        let transport = BoundedWsTransport::start(stream, bounds, crate::media_format())
+            .expect("transport starts");
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), transport.close())
+                .await
+                .is_err()
+        );
+        drop(transport);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !dropped.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("dropping the transport aborts pumps retained after outer cancellation");
+    }
+
+    #[tokio::test]
+    async fn an_earlier_media_overload_cannot_be_hidden_by_a_later_control_close() {
+        let (voice_io, application_io) = tokio::io::duplex(8_192);
+        let voice = WebSocketStream::from_raw_socket(voice_io, Role::Client, None).await;
+        let mut application =
+            WebSocketStream::from_raw_socket(application_io, Role::Server, None).await;
+        let transport = BoundedWsTransport::start(voice, short_bounds(), crate::media_format())
+            .expect("transport starts");
+        let frame = vec![0_u8; crate::media_format().frame_bytes().unwrap()];
+
+        application
+            .feed(Message::Binary(frame.clone().into()))
+            .await
+            .unwrap();
+        application
+            .feed(Message::Binary(frame.into()))
+            .await
+            .unwrap();
+        let _ = application.feed(Message::Text("later-close".into())).await;
+        let _ = application.flush().await;
+
+        let loss =
+            tokio::time::timeout(Duration::from_secs(1), transport.wait_incoming_media_loss())
+                .await
+                .expect("media loss is signalled immediately");
+        assert_eq!(loss, 1);
+        assert_eq!(transport.evidence().incoming_control, 0);
+        let control_error = transport.control().recv().await.unwrap_err();
+        assert!(control_error.to_string().contains("media queue overloaded"));
+        let close_error = transport.close().await.unwrap_err();
+        assert!(close_error.to_string().contains("media queue overloaded"));
+    }
 }

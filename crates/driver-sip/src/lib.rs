@@ -17,6 +17,8 @@ use sipx_media::{Interrupt, MediaSession, Playback};
 use sipx_sip::{Host, Uri};
 use sipx_transport::{Config, Target};
 use tokio::sync::{mpsc, Notify};
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 const SAMPLES_PER_FRAME: usize = 160;
 const SIGNAL_CAPACITY: usize = 16;
@@ -40,6 +42,9 @@ pub enum DriverError {
     /// Call establishment failed.
     #[error("sipx call establishment failed: {0}")]
     Establish(String),
+    /// The owning runtime cancelled establishment and sipx withdrew the invitation.
+    #[error("sipx call establishment was cancelled")]
+    Cancelled,
     /// Contact or route-set state learned from SIP escaped the admitted aperture.
     #[error("SIP-learned dialog target escaped the admitted aperture")]
     LearnedSignalingTarget,
@@ -63,13 +68,18 @@ pub enum DriverError {
 pub async fn establish_outbound(
     admitted: &AdmittedSipPlan,
     credentials: &CredentialSet,
+    cancelled: CancellationToken,
 ) -> Result<Arc<dyn TelephonySession>, DriverError> {
     let route = admitted.route();
     let mut config = Config::new(route.signaling_bind);
     config.sent_by = route.sent_by.clone();
-    let (endpoint, mut incoming) = sipx_transport::bind(config)
-        .await
-        .map_err(|error| DriverError::Bind(error.to_string()))?;
+    let (endpoint, mut incoming) = tokio::select! {
+        biased;
+        () = cancelled.cancelled() => return Err(DriverError::Cancelled),
+        result = sipx_transport::bind(config) => {
+            result.map_err(|error| DriverError::Bind(error.to_string()))?
+        }
+    };
     if !admitted.admits_signaling(endpoint.local_addr()) {
         endpoint.shutdown().await;
         return Err(DriverError::BindAperture);
@@ -95,13 +105,35 @@ pub async fn establish_outbound(
         }
     }
     let target = Target::udp(route.target);
-    let mut call = match sipx_call::dial(&endpoint, target, &to, &options).await {
+    if cancelled.is_cancelled() {
+        endpoint.shutdown().await;
+        return Err(DriverError::Cancelled);
+    }
+    let mut call = match sipx_call::dial_until(
+        &endpoint,
+        target,
+        &to,
+        &options,
+        cancelled.clone().cancelled_owned(),
+    )
+    .await
+    {
         Ok(call) => call,
         Err(error) => {
             endpoint.shutdown().await;
-            return Err(DriverError::Establish(error.to_string()));
+            return if cancelled.is_cancelled() {
+                Err(DriverError::Cancelled)
+            } else {
+                Err(DriverError::Establish(error.to_string()))
+            };
         }
     };
+
+    if cancelled.is_cancelled() {
+        let _ = call.hang_up().await;
+        endpoint.shutdown().await;
+        return Err(DriverError::Cancelled);
+    }
 
     if !admitted.admits_media(call.peer_media_address()) {
         let _ = call.hang_up().await;
@@ -147,10 +179,11 @@ pub async fn establish_outbound(
         active_playback: Mutex::new(None),
         terminate: terminate_tx,
         shared: Arc::clone(&shared),
+        owner: tokio::sync::Mutex::new(None),
     });
 
     let endpoint_owner = endpoint.clone();
-    tokio::spawn(async move {
+    let owner = tokio::spawn(async move {
         let event_shared = Arc::clone(&shared);
         let work = move |_media: Arc<MediaSession>,
                          stopped: tokio_util::sync::CancellationToken| {
@@ -172,6 +205,7 @@ pub async fn establish_outbound(
         shared.finish(reason);
         endpoint_owner.shutdown().await;
     });
+    *session.owner.lock().await = Some(owner);
     Ok(session as Arc<dyn TelephonySession>)
 }
 
@@ -230,6 +264,7 @@ struct SipTelephonySession {
     active_playback: Mutex<Option<Playback>>,
     terminate: mpsc::Sender<()>,
     shared: Arc<Shared>,
+    owner: tokio::sync::Mutex<Option<JoinHandle<()>>>,
 }
 
 #[async_trait]
@@ -298,6 +333,10 @@ impl TelephonySession for SipTelephonySession {
         Ok(self.signals.lock().await.recv().await)
     }
 
+    async fn wait_terminated(&self) -> Result<TerminationReason, VoiceError> {
+        Ok(self.shared.wait_terminal().await)
+    }
+
     async fn interrupt_output(&self) -> Result<(), VoiceError> {
         if let Some(playback) = self.active_playback.lock().map_err(lock_error)?.take() {
             playback.stop();
@@ -319,7 +358,21 @@ impl TelephonySession for SipTelephonySession {
             }
         }
         let _winner = self.shared.wait_terminal().await;
+        let owner = self.owner.lock().await.take();
+        if let Some(owner) = owner {
+            owner
+                .await
+                .map_err(|error| VoiceError::Endpoint(error.to_string()))?;
+        }
         Ok(())
+    }
+}
+
+impl Drop for SipTelephonySession {
+    fn drop(&mut self) {
+        if let Some(owner) = self.owner.get_mut().take() {
+            owner.abort();
+        }
     }
 }
 
@@ -416,6 +469,7 @@ mod tests {
             AdmittedOperation::from_grant_decision(
                 "loopback-pbx",
                 "loopback-call-establish",
+                "org",
                 "principal-1",
                 "grant-1",
                 "connection-1",
@@ -468,9 +522,13 @@ mod tests {
             callee_owner.shutdown().await;
         });
 
-        let session = establish_outbound(&admitted, &CredentialSet::default())
-            .await
-            .unwrap();
+        let session = establish_outbound(
+            &admitted,
+            &CredentialSet::default(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
         let callee_media = ready_rx.await.unwrap();
         let (voice_transport, application_transport) =
             rtvbp::transport::memory::MemoryTransport::pair(RtvbpConfig { media: true });
@@ -587,5 +645,104 @@ mod tests {
         .unwrap()
         .unwrap();
         callee_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancellation_while_ringing_withdraws_the_invite_before_returning() {
+        let (callee, mut callee_incoming) =
+            sipx_transport::bind(Config::new(SocketAddr::new(loopback(), 0)))
+                .await
+                .unwrap();
+        let all_loopback_ports = SocketAperture::new(loopback(), 1..=u16::MAX).unwrap();
+        let admitted = admit_sip_plan(
+            &zero_io_plan(),
+            SipDeploymentRoute {
+                connection: "connection-1".to_owned(),
+                signaling_bind: SocketAddr::new(loopback(), 0),
+                sent_by: "127.0.0.1".to_owned(),
+                target: callee.local_addr(),
+                to_uri: format!("sip:callee@{}", callee.local_addr()),
+                from_uri: "sip:caller@127.0.0.1".to_owned(),
+                media_advertised: loopback(),
+                media_bind: loopback(),
+                signaling_apertures: vec![all_loopback_ports.clone()],
+                media_apertures: vec![all_loopback_ports],
+                dial_timeout: Duration::from_secs(5),
+                development_loopback_only: true,
+            },
+        )
+        .unwrap();
+        let (ringing_tx, ringing_rx) = oneshot::channel();
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        let callee_owner = callee.clone();
+        let callee_task = tokio::spawn(async move {
+            let invitation = callee_incoming.recv().await.unwrap();
+            assert_eq!(invitation.request.method, sipx_sip::Method::Invite);
+            let ringing = sipx_sip::build::ResponseBuilder::to_request(
+                &invitation.request,
+                sipx_sip::StatusCode::new(180).unwrap(),
+                "Ringing",
+            )
+            .unwrap()
+            .build();
+            callee_owner
+                .respond(&invitation.key, ringing)
+                .await
+                .unwrap();
+            ringing_tx.send(()).unwrap();
+
+            let cancellation = callee_incoming.recv().await.unwrap();
+            assert_eq!(cancellation.request.method, sipx_sip::Method::Cancel);
+            let cancel_ok = sipx_sip::build::ResponseBuilder::to_request(
+                &cancellation.request,
+                sipx_sip::StatusCode::new(200).unwrap(),
+                "OK",
+            )
+            .unwrap()
+            .build();
+            callee_owner
+                .respond(&cancellation.key, cancel_ok)
+                .await
+                .unwrap();
+            let withdrawn = sipx_sip::build::ResponseBuilder::to_request(
+                &invitation.request,
+                sipx_sip::StatusCode::new(487).unwrap(),
+                "Request Terminated",
+            )
+            .unwrap()
+            .build();
+            callee_owner
+                .respond(&invitation.key, withdrawn)
+                .await
+                .unwrap();
+            cancel_tx.send(()).unwrap();
+            callee_owner.shutdown().await;
+        });
+        let cancelled = CancellationToken::new();
+        let cancellation = cancelled.clone();
+        let cancel_when_ringing = async move {
+            ringing_rx.await.unwrap();
+            cancellation.cancel();
+        };
+        let credentials = CredentialSet::default();
+
+        let (established, ()) = tokio::join!(
+            establish_outbound(&admitted, &credentials, cancelled),
+            cancel_when_ringing,
+        );
+        assert!(matches!(established, Err(DriverError::Cancelled)));
+        tokio::time::timeout(Duration::from_secs(2), cancel_rx)
+            .await
+            .expect("the callee receives CANCEL before driver return")
+            .unwrap();
+        callee_task.await.unwrap();
+    }
+
+    #[test]
+    fn transport_timeout_is_preserved_as_a_neutral_terminal_reason() {
+        assert_eq!(
+            remote_reason(EndCause::Timeout),
+            TerminationReason::TransportLost
+        );
     }
 }

@@ -17,6 +17,7 @@ use server::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute, VOICE_APPL
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::Notify;
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
 const SESSION_ID_BYTES: usize = 16;
 const MAX_SESSION_ID_BYTES: usize = 128;
@@ -184,6 +185,7 @@ pub struct VoiceSessionControl {
 struct TerminalCell {
     selection: Mutex<Option<TerminalSelection>>,
     ready: Notify,
+    cancelled: CancellationToken,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -209,6 +211,7 @@ impl VoiceSessionControl {
             source: TerminalSource::External,
         });
         drop(selected);
+        self.terminal.cancelled.cancel();
         self.terminal.ready.notify_waiters();
         true
     }
@@ -225,7 +228,15 @@ impl VoiceSessionControl {
 
     fn select(&self, reason: TerminationReason, source: TerminalSource) -> TerminalSelection {
         let mut selected = lock(&self.terminal.selection);
-        *selected.get_or_insert(TerminalSelection { reason, source })
+        if let Some(selected) = *selected {
+            return selected;
+        }
+        let selected_value = TerminalSelection { reason, source };
+        *selected = Some(selected_value);
+        drop(selected);
+        self.terminal.cancelled.cancel();
+        self.terminal.ready.notify_waiters();
+        selected_value
     }
 }
 
@@ -330,7 +341,7 @@ impl<'a> VoiceRuntime<'a> {
             audience: route.audience.clone(),
             subject: admitted.sip().principal().to_owned(),
             actor: route.actor.clone(),
-            organization: route.organization.clone(),
+            organization: admitted.sip().organization().to_owned(),
             deployment: route.deployment.clone(),
             connection: admitted.sip().route().connection.clone(),
             grant: admitted.sip().grant().to_owned(),
@@ -351,10 +362,24 @@ impl<'a> VoiceRuntime<'a> {
                 .ok_or(RuntimeError::InvalidDeadline)?,
         })?;
 
-        // sipx owns a finite dial deadline. Do not drop this future midway: its current API has no
-        // cancellation guard around the bound UDP endpoint. A pending terminal request wins as
-        // soon as establishment returns, and the resulting session is then closed normally.
-        let telephony = driver_sip::establish_outbound(admitted.sip(), &credentials).await?;
+        // sipx owns both the finite answer deadline and protocol-correct cancellation. When the
+        // runtime terminal wins, `dial_until` withdraws an outstanding INVITE before returning.
+        let telephony = match driver_sip::establish_outbound(
+            admitted.sip(),
+            &credentials,
+            control.terminal.cancelled.clone(),
+        )
+        .await
+        {
+            Ok(telephony) => telephony,
+            Err(driver_sip::DriverError::Cancelled) => {
+                let selected = control.selected().unwrap_or_else(|| {
+                    control.select(TerminationReason::Cancelled, TerminalSource::External)
+                });
+                return Ok(self.pre_session_terminal(selected));
+            }
+            Err(error) => return Err(RuntimeError::Telephony(error)),
+        };
         let descriptor = telephony.descriptor().clone();
         if let Some(selected) = control.selected() {
             return Ok(self.finish_raw(telephony, descriptor, selected).await);
@@ -455,15 +480,25 @@ impl<'a> VoiceRuntime<'a> {
         let input = input_pump(Arc::clone(&endpoint));
         let output = output_pump(Arc::clone(&endpoint));
         let signals = signal_pump(Arc::clone(&endpoint));
+        let telephony_terminal = telephony_terminal_pump(Arc::clone(&telephony));
         let controls = control_pump(Arc::clone(&endpoint));
         let keepalive = keepalive_pump(Arc::clone(&transport), self.config.keepalive);
         let media_loss = media_loss_monitor(Arc::clone(&transport));
-        tokio::pin!(input, output, signals, controls, keepalive, media_loss);
+        tokio::pin!(
+            input,
+            output,
+            signals,
+            telephony_terminal,
+            controls,
+            keepalive,
+            media_loss
+        );
         let candidate = tokio::select! {
             selected = control.wait() => selected,
             terminal = &mut input => TerminalSelection { reason: terminal.0, source: terminal.1 },
             terminal = &mut output => TerminalSelection { reason: terminal.0, source: terminal.1 },
             terminal = &mut signals => TerminalSelection { reason: terminal.0, source: terminal.1 },
+            terminal = &mut telephony_terminal => terminal,
             terminal = &mut controls => TerminalSelection { reason: terminal.0, source: terminal.1 },
             terminal = &mut keepalive => terminal,
             terminal = &mut media_loss => terminal,
@@ -548,7 +583,10 @@ async fn input_pump(
     loop {
         match endpoint.forward_input_once().await {
             Ok(true) => {}
-            Ok(false) => return (TerminationReason::RemoteHangup, TerminalSource::Telephony),
+            Ok(false) => return std::future::pending().await,
+            Err(error) if waits_for_telephony_terminal(&error) => {
+                return std::future::pending().await;
+            }
             Err(error) => return binding_terminal(&error),
         }
     }
@@ -558,8 +596,12 @@ async fn output_pump(
     endpoint: Arc<VoiceEndpoint<dyn domain::voice::TelephonySession>>,
 ) -> (TerminationReason, TerminalSource) {
     loop {
-        if let Err(error) = endpoint.forward_output_once().await {
-            return binding_terminal(&error);
+        match endpoint.forward_output_once().await {
+            Ok(()) => {}
+            Err(error) if waits_for_telephony_terminal(&error) => {
+                return std::future::pending().await;
+            }
+            Err(error) => return binding_terminal(&error),
         }
     }
 }
@@ -570,9 +612,31 @@ async fn signal_pump(
     loop {
         match endpoint.forward_signal_once().await {
             Ok(true) => {}
-            Ok(false) => return (TerminationReason::RemoteHangup, TerminalSource::Telephony),
+            Ok(false) => return std::future::pending().await,
+            Err(error) if waits_for_telephony_terminal(&error) => {
+                return std::future::pending().await;
+            }
             Err(error) => return binding_terminal(&error),
         }
+    }
+}
+
+async fn telephony_terminal_pump(
+    telephony: Arc<dyn domain::voice::TelephonySession>,
+) -> TerminalSelection {
+    match telephony.wait_terminated().await {
+        Ok(reason) => telephony_terminal(reason),
+        Err(_) => TerminalSelection {
+            reason: TerminationReason::TransportLost,
+            source: TerminalSource::Telephony,
+        },
+    }
+}
+
+fn telephony_terminal(reason: TerminationReason) -> TerminalSelection {
+    TerminalSelection {
+        reason,
+        source: TerminalSource::Telephony,
     }
 }
 
@@ -583,6 +647,9 @@ async fn control_pump(
         match endpoint.serve_control_once().await {
             Ok(ControlOutcome::Continue) => {}
             Ok(ControlOutcome::Close(reason)) => return (reason, TerminalSource::Application),
+            Err(error) if waits_for_telephony_terminal(&error) => {
+                return std::future::pending().await;
+            }
             Err(error) => return binding_terminal(&error),
         }
     }
@@ -605,27 +672,27 @@ async fn keepalive_pump(
 async fn media_loss_monitor(
     transport: Arc<rtvbp_voice_endpoint::bounded_ws::BoundedWsTransport>,
 ) -> TerminalSelection {
-    loop {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        if transport.take_incoming_media_loss() > 0 {
-            return TerminalSelection {
-                reason: TerminationReason::MediaOverload,
-                source: TerminalSource::Media,
-            };
-        }
+    let _loss = transport.wait_incoming_media_loss().await;
+    TerminalSelection {
+        reason: TerminationReason::MediaOverload,
+        source: TerminalSource::Media,
     }
 }
 
 fn binding_terminal(error: &BindingError) -> (TerminationReason, TerminalSource) {
     match error {
-        BindingError::Voice(domain::voice::VoiceError::Terminated) => {
-            (TerminationReason::RemoteHangup, TerminalSource::Telephony)
-        }
         BindingError::Voice(_) => (TerminationReason::TransportLost, TerminalSource::Telephony),
         BindingError::Transport(_) => (TerminationReason::TransportLost, TerminalSource::Transport),
         BindingError::MediaOverload => (TerminationReason::MediaOverload, TerminalSource::Media),
         _ => (TerminationReason::ProtocolError, TerminalSource::Protocol),
     }
+}
+
+fn waits_for_telephony_terminal(error: &BindingError) -> bool {
+    matches!(
+        error,
+        BindingError::Voice(domain::voice::VoiceError::Terminated)
+    )
 }
 
 fn transport_terminal(error: &rtvbp::Error) -> (TerminationReason, TerminalSource) {
@@ -664,4 +731,31 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn telephony_terminal_reason_is_not_reclassified_from_stream_eof() {
+        assert_eq!(
+            telephony_terminal(TerminationReason::TransportLost),
+            TerminalSelection {
+                reason: TerminationReason::TransportLost,
+                source: TerminalSource::Telephony,
+            }
+        );
+        assert!(waits_for_telephony_terminal(&BindingError::Voice(
+            domain::voice::VoiceError::Terminated,
+        )));
+    }
+
+    #[test]
+    fn selecting_a_terminal_cancels_pre_session_establishment() {
+        let control = VoiceSessionControl::new();
+        assert!(!control.terminal.cancelled.is_cancelled());
+        assert!(control.terminate(TerminationReason::AuthorityRevoked));
+        assert!(control.terminal.cancelled.is_cancelled());
+    }
 }

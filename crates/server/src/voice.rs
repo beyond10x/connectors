@@ -13,7 +13,6 @@ pub const VOICE_APPLICATION_PROFILE: &str = "b10x.voice.v1";
 /// Deployment-selected application route. None of these values comes from a call or model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoiceApplicationRoute {
-    pub organization: String,
     pub actor: String,
     pub audience: String,
     pub deployment: String,
@@ -76,7 +75,6 @@ pub fn admit_voice_plan(
     application: VoiceApplicationRoute,
 ) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
     if [
-        application.organization.as_str(),
         application.actor.as_str(),
         application.audience.as_str(),
         application.deployment.as_str(),
@@ -135,6 +133,7 @@ mod tests {
             AdmittedOperation::from_grant_decision(
                 "loopback-pbx",
                 "call-establish",
+                "org",
                 "principal",
                 "grant",
                 "connection",
@@ -166,7 +165,6 @@ mod tests {
 
     fn application_route() -> VoiceApplicationRoute {
         VoiceApplicationRoute {
-            organization: "org".to_owned(),
             actor: "connectors".to_owned(),
             audience: "application".to_owned(),
             deployment: "application-1".to_owned(),
@@ -181,6 +179,7 @@ mod tests {
     fn one_proof_joins_exact_sip_and_application_routes() {
         let admitted = admit_voice_plan(&plan(), sip_route(), application_route()).unwrap();
         assert_eq!(admitted.sip().route().connection, "connection");
+        assert_eq!(admitted.sip().organization(), "org");
         assert_eq!(
             admitted.application().endpoint,
             "wss://application.example/voice"

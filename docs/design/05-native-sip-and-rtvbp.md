@@ -119,6 +119,11 @@ non-serializable `AdmittedVoicePlan`. `voice-runtime` alone consumes that proof 
 adapters. No domain request, model, or caller names a Rust crate, RTVBP method, endpoint, or upstream
 implementation.
 
+Tenant identity is carried inside the private `AdmittedOperation` grant evidence and projected into
+`AdmittedSipPlan`. `VoiceApplicationRoute` deliberately has no organization/tenant field: the
+runtime can only issue application authority for the organization admitted with the principal and
+Grant, so a deployment route cannot accidentally or maliciously substitute a second tenant.
+
 `rtvbp-voice-endpoint` is a nested Cargo workspace rather than a member of the deterministic
 catalog/compiler workspace. The final SDK enables `serde_json/preserve_order`; Cargo feature
 unification would otherwise change OpenAPI object traversal and canonical artifact bytes. CI builds,
@@ -137,6 +142,18 @@ DNS/TCP/proxy/TLS connector port, authenticated upgrade, initialization, media/c
 keepalive pumps, lease expiry, first-wins termination, teardown, and payload-free observation. It
 owns no SIP, RTVBP, or product semantics.
 
+The same owner signal reaches credential lookup, SIP establishment, application connection, and
+the established supervisor. SIP admission bounds an invitation to `1..=30` seconds, and the driver
+passes cancellation to sipx's `dial_until`: an outstanding INVITE is withdrawn with CANCEL before
+the driver returns, including sipx's crossed-success ACK/BYE cleanup. The neutral telephony port
+also exposes the driver's first typed terminal fact; media or signal EOF never guesses
+`remote_hangup` and therefore cannot erase `transport_lost` or another exact cause.
+
+An established sipx call task is likewise owned by its `TelephonySession`: termination waits for
+the driver task through endpoint shutdown, and dropping the last session aborts a remaining owner.
+The typed terminal observation may arrive before that join, but runtime teardown does not report
+clean completion until the socket-owning task has ended.
+
 Design 02's original literal socket-opener rule is refined because the pinned
 [`sipx-transport` API](https://github.com/codewandler/sipx/blob/004ac534b8b222060ad2d2308763efe6e1dedc10/crates/sipx-transport/src/lib.rs)
 owns sockets and performs `bind(Config)`. `server`/`service` remains the sole admission and
@@ -151,6 +168,16 @@ selected media runtime can learn a symmetric-RTP source internally, stable evide
 prove that source admitted before it becomes an egress peer. Fence tests reject socket-capable
 dependencies in all other production drivers/platform crates and direct production `sipx` binds
 anywhere else.
+
+The application WebSocket transport owns both pump task handles. Normal close gives its finite
+control queue one bounded deadline and joins completed pumps; timeout or a straggling terminal pump
+is aborted and boundedly joined before `close()` returns. Dropping the last transport handle also
+aborts them, including when an outer timeout cancels `close()`, so a stalled `AsyncWrite` cannot
+retain the split stream. Application-to-call media
+saturation is the binding's `output_overload` case: the read pump records loss, selects
+`media_overload`, stops reading later wire frames, and wakes the supervisor immediately. A later
+application close consequently cannot replace an earlier overload merely because a polling
+interval elapsed.
 
 ## 4. Catalog and admission
 
@@ -231,9 +258,11 @@ direct route produces `session_unserved`.
 
 Each call task belongs to one gateway/application generation until hangup or the bounded drain
 deadline. New calls move to a ready successor; a live SIP dialog and its media are never migrated.
-Media/frame/queue/request limits are finite. Overflow records typed loss/degradation instead of
-blocking without bound. Application-side speech detection owns a barge-in request; the voice
-endpoint clears bounded playback, while Agent steering/cancellation remains a separate fact.
+Media/frame/queue/request limits are finite. Caller-to-application input loss remains the generic
+bounded-loss/degradation case. Saturating the voice-side application-to-call queue cannot silently
+drop synthesized speech, so that binding selects typed `media_overload` and closes. Application-side
+speech detection owns a barge-in request; the voice endpoint clears bounded playback, while Agent
+steering/cancellation remains a separate fact.
 
 ## 7. Dependency baseline and release gates
 
@@ -262,10 +291,12 @@ stable `sipx` API or a reviewed compatibility/upgrade exception.
    SIP dialog, G.711-to-neutral PCM normalization, bounded RTVBP transports, independent application
    adapter, and a supervised authenticated duplex SIP → RTVBP → fake-application test with one
    terminal event and whole-task teardown.
-2. Complete S-032's remaining loopback matrix: registration, inbound dialog, DTMF, cancellation,
-   authentication refusal, reconnect, learned-peer refusal, and overload/interruption teardown.
-3. Complete S-033's cross-repository WebSocket and lifecycle vectors, including loss, lease,
-   revocation, generation drain, and an outward satellite/unserved fixture.
+2. Complete S-032's remaining loopback matrix: registration, inbound dialog, DTMF, authentication
+   refusal, reconnect, learned-peer refusal, and overload/interruption teardown. Outbound ringing
+   cancellation, including observed SIP CANCEL, is now covered.
+3. Complete S-033's cross-repository lifecycle vectors, including lease, revocation, generation
+   drain, and an outward satellite/unserved fixture. The local WebSocket now proves immediate
+   causal overload and bounded joined teardown even when writes never progress.
 4. Select and review one authoritative or repository-authored carrier/PBX source; only then land its
    provider declaration, generated catalog member, lock row, pack, and web projection atomically.
 5. Characterize that explicitly authorized real PBX/trunk and satellite outward path without

@@ -97,6 +97,7 @@ fn plan() -> ZeroIoPlan {
         AdmittedOperation::from_grant_decision(
             "loopback-pbx",
             "loopback-call-establish",
+            "org-1",
             "principal-1",
             "grant-1",
             "connection-1",
@@ -109,7 +110,6 @@ fn plan() -> ZeroIoPlan {
 
 fn application_route() -> VoiceApplicationRoute {
     VoiceApplicationRoute {
-        organization: "org-1".to_owned(),
         actor: "connectors-voice".to_owned(),
         audience: "application-voice".to_owned(),
         deployment: "application-1".to_owned(),

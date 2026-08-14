@@ -56,9 +56,16 @@ without a model or Babelforce product semantics.
   WebSocket queues. The application adapter independently redeems exact WSS/profile/DPoP authority
   before media and proves bounded input/loss, output overload, interruption, close, lease, and
   generation-drain behavior.
+- The Connectors WebSocket transport retains both pump handles, aborts and boundedly joins them on
+  close/timeout, and aborts them when the last owner is dropped. Stalled-writer regressions prove
+  both its own close deadline and cancellation by an outer deadline release the stream.
+- Voice-side application-to-call overflow is reported directly by the read pump, selects typed
+  `media_overload`, and stops admitting later wire frames. A regression proves a later application
+  close cannot hide that earlier terminal fact; the supervisor has no polling window.
 - Connectors now has one nested `voice-runtime` leaf. Server admission joins the exact SIP and
-  application routes before I/O; the runtime alone owns credential custody, ephemeral proof
-  material, authority timing, liveness/lease supervision, and first-wins termination.
+  application routes before I/O; admitted tenant identity comes only from grant evidence, while the
+  runtime alone owns credential custody, ephemeral proof material, authority timing, liveness/lease
+  supervision, and first-wins termination.
 - A real sipx UDP/RTP loopback crosses the neutral `TelephonySession` port, a serving-side-redeemed
   WebSocket authority, exact RTVBP initialization, duplex PCM, application close acknowledgement,
   terminal event, and observed SIP/transport teardown. The broader composed cases
