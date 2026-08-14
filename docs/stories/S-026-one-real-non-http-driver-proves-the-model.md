@@ -7,27 +7,30 @@ priority:
 design: docs/design/03-beyond-http.md
 epic: beyond-http
 areas: [catalog, domain, service, server]
-note: "ADR 0010 delivery item 4; AMI is the leading candidate only when concrete demand and destination policy exist"
+note: "ADR 0024 selects SIP as the first proof; S-032 carries the implementation slice"
 ---
 
 # One real non-HTTP driver proves the five-axis model
 
 ## Goal
 
-Prove the abstraction against one real built-in protocol, preferably Asterisk AMI when demand is
-concrete, without a generic framing language or external runtime artifact.
+Prove the abstraction against one real built-in protocol: SIP through the bounded `sip_v1` driver,
+without a generic framing language or external runtime artifact. S-032 owns the concrete slice;
+this story retains the abstraction-level acceptance.
 
 ## Acceptance
 
-- [ ] One provider declares unary actions, closed events, credentials, risk/effects, driver, shape,
-      and capability requirements as reviewed data.
+- [ ] One SIP provider declares session establishment, closed call events, credentials,
+      risk/effects, driver, placement-independent shape, and capability requirements as reviewed
+      data.
 - [ ] The built-in driver consumes the common zero-IO plan and shared egress/audit composition.
-- [ ] Authentication failure, protocol refusal, reconnect, event provenance, bounded buffering, and
-      unsupported capability cases have fixtures.
+- [ ] Authentication failure, protocol refusal, reconnect, event provenance, bounded buffering,
+      call cancellation, and unsupported capability cases have fixtures.
 - [ ] No caller chooses an executable, arbitrary protocol string, credential destination, or
       placement.
 - [ ] The proof records which abstraction pressure is real before any second driver is planned.
 
 ## Progress
 
-- (not started)
+- SIP is selected by architecture ADR 0024. Implementation remains blocked on S-024 and the
+  unstarted platform family; S-032 records the exact dependency and test gate.
