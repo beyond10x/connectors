@@ -406,6 +406,35 @@ pub struct RedemptionRequest {
     pub dpop: SensitiveCompact,
 }
 
+impl RedemptionRequest {
+    /// Parse the two sensitive upgrade headers without exposing compact material to application
+    /// code. The HTTP server supplies the exact externally admitted URI, not a reconstructed path.
+    pub fn from_wire(
+        method: impl Into<String>,
+        uri: impl Into<String>,
+        authorization: &str,
+        dpop: &str,
+    ) -> Result<Self, AuthorityError> {
+        let prefix = format!("{AUTHORIZATION_SCHEME} ");
+        let Some(authority) = authorization.strip_prefix(&prefix) else {
+            return Err(AuthorityError::Malformed);
+        };
+        if authority.is_empty()
+            || dpop.is_empty()
+            || authority.bytes().any(|byte| byte.is_ascii_whitespace())
+            || dpop.bytes().any(|byte| byte.is_ascii_whitespace())
+        {
+            return Err(AuthorityError::Malformed);
+        }
+        Ok(Self {
+            method: method.into(),
+            uri: uri.into(),
+            authority: SensitiveCompact::new(authority.to_owned()),
+            dpop: SensitiveCompact::new(dpop.to_owned()),
+        })
+    }
+}
+
 impl std::fmt::Debug for RedemptionRequest {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -554,7 +583,7 @@ fn check_binding(name: &'static str, actual: &str, expected: &str) -> Result<(),
     }
 }
 
-fn validate_endpoint(uri: &str) -> Result<(), AuthorityError> {
+pub(crate) fn validate_endpoint(uri: &str) -> Result<(), AuthorityError> {
     let Some(rest) = uri.strip_prefix("wss://") else {
         return Err(AuthorityError::InvalidEndpoint);
     };

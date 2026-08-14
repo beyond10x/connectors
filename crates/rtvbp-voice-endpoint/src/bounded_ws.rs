@@ -514,6 +514,15 @@ async fn write_pump<S>(
 {
     loop {
         if transport.closing.load(Ordering::Acquire) {
+            // Control acknowledgements and the single terminal event were accepted before close.
+            // Flush that finite queue in order; queued media is deliberately abandoned once the
+            // terminal transition wins.
+            while let Ok(message) = control.try_recv() {
+                if let Err(error) = writer.send(message).await {
+                    transport.finish(Terminal::Failed(error.to_string()));
+                    return;
+                }
+            }
             let result = writer
                 .send(Message::Close(Some(CloseFrame {
                     code: CloseCode::Normal,

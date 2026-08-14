@@ -36,7 +36,11 @@ members = [
 # Runtime adapter dependency closures are intentionally isolated from the deterministic compiler
 # workspace. RTVBP enables `serde_json/preserve_order`; feature-unifying it here changes OpenAPI and
 # JSON object ordering and therefore canonical artifacts. CI builds this nested workspace directly.
-exclude = ["crates/driver-sip", "crates/rtvbp-voice-endpoint"]
+exclude = [
+    "crates/driver-sip",
+    "crates/rtvbp-voice-endpoint",
+    "crates/voice-runtime",
+]
 
 [workspace.package]
 edition = "2021"

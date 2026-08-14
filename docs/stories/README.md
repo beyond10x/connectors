@@ -25,8 +25,8 @@ repository-authored specs. The coordinated catalog wave then retired the predece
 identity and `quirks` vocabulary, declared host effects, and added the five independent beyond-HTTP
 axes. What M1 still left open is tracked by the remaining `post-m1` stories: web and coverage gates.
 
-The first platform-family foundation and development SIP/RTVBP runtime slices are present for
-S-024/S-027/S-032/S-033. The remaining runtime and provider work still follows the build order in
+The first platform-family foundation and a supervised development SIP/RTVBP runtime are present for
+S-024/S-027/S-032/S-033. The remaining lifecycle matrix and provider work still follow the build order in
 [02-architecture.md §9](../design/02-architecture.md). The `ready` stories are the catalog's day-one
 changes (architecture §2) plus the post-M1 repairs; the milestone stories M2–M5 are containers that
 will spawn children as each milestone is designed.
@@ -67,7 +67,7 @@ will spawn children as each milestone is designed.
 | [S-030](S-030-raw-proxy-is-break-glass-not-a-model-capability.md) | Raw proxy is break-glass authority, not a model capability | backlog | Platform | domain, protocol, service, server |
 | [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | backlog | Platform | catalog, protocol, ci, docs |
 | [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | in-progress | Platform | catalog, domain, service, server, driver-sip |
-| [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint |
+| [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint, voice-runtime |
 
 ## Epics in this seed
 
