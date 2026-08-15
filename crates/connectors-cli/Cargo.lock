@@ -564,7 +564,9 @@ dependencies = [
  "async-trait",
  "connector-address",
  "fs2",
+ "reqwest",
  "rustix",
+ "serde_json",
  "thiserror 2.0.20",
  "windows-sys 0.61.2",
  "zeroize",
@@ -603,6 +605,7 @@ dependencies = [
 name = "connectors-config"
 version = "0.1.0"
 dependencies = [
+ "connector-address",
  "domain",
  "protocol",
  "rustix",
@@ -623,6 +626,7 @@ dependencies = [
  "connectors-config",
  "futures-util",
  "hex",
+ "hosted-vault",
  "identity-http",
  "integration-kubernetes",
  "integration-monitoring",
@@ -1423,6 +1427,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "hosted-vault"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "connector-secrets",
+ "connectors-config",
+ "futures-util",
+ "reqwest",
+ "rustix",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "http"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1750,6 +1772,7 @@ dependencies = [
  "async-trait",
  "catalog",
  "connector-resolve",
+ "connector-secrets",
  "connectors-config",
  "domain",
  "ed25519-dalek",
@@ -4016,9 +4039,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.24.0"
+version = "1.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf3923a6f5c4c6382e0b653c4117f48d631ea17f38ed86e2a828e6f7412f5239"
+checksum = "2cefc03fd367c0c6d4305de1b312cf00248c4114f4a0418ce6a6af769e3b0bd9"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
