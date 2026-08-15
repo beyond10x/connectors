@@ -40,6 +40,8 @@
 //! *credential*, because that describes what the value identifies rather than why someone wanted
 //! it.
 
+use std::collections::BTreeMap;
+
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -634,6 +636,20 @@ impl AuthMethod {
 pub struct AuthRequirement {
     #[serde(deserialize_with = "deserialize_canonical_credentials")]
     credentials: IndexSet<String>,
+    /// Credential name -> alternative scope sets. A credential satisfies this requirement when it
+    /// has every scope in at least one inner set (OR-of-AND), in addition to being present.
+    ///
+    /// The map key is deliberately a credential name rather than a loose operation-level list:
+    /// one auth mechanism may carry several credentials, and scopes granted to one must never be
+    /// credited to another. Slack makes that boundary concrete: `slack.app_token` may carry
+    /// `connections:write`, while `slack.bot_token` carries `chat:write`; combining those into one
+    /// bag would let the transport token appear to authorize message posting.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "deserialize_canonical_scopes"
+    )]
+    scopes: BTreeMap<String, Vec<Vec<String>>>,
 }
 
 impl AuthRequirement {
@@ -646,6 +662,7 @@ impl AuthRequirement {
     {
         Self {
             credentials: canonicalize(credentials.into_iter().map(Into::into)),
+            scopes: BTreeMap::new(),
         }
     }
 
@@ -668,6 +685,27 @@ impl AuthRequirement {
     /// Whether the mechanism names the given credential.
     pub fn contains(&self, credential: &str) -> bool {
         self.credentials.contains(credential)
+    }
+
+    /// The scope expressions attached to credentials in this mechanism.
+    ///
+    /// Each map value is OR-of-AND: one inner list must be a subset of the credential's proven
+    /// granted scopes. An absent credential key means presence alone is sufficient.
+    pub fn scopes(&self) -> &BTreeMap<String, Vec<Vec<String>>> {
+        &self.scopes
+    }
+
+    /// Adds a scope expression for one credential, retaining canonical set and alternative order.
+    /// Provider validation refuses a credential not named by this mechanism and empty expressions.
+    pub fn with_scopes<I, A, S>(mut self, credential: impl Into<String>, alternatives: I) -> Self
+    where
+        I: IntoIterator<Item = A>,
+        A: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let alternatives = canonicalize_scope_alternatives(alternatives);
+        self.scopes.insert(credential.into(), alternatives);
+        self
     }
 
     /// How many credentials must be satisfied together.
@@ -701,6 +739,43 @@ fn canonicalize<I: IntoIterator<Item = String>>(credentials: I) -> IndexSet<Stri
     sorted.sort_unstable();
     sorted.dedup();
     sorted.into_iter().collect()
+}
+
+/// Canonicalizes both set-valued levels of a scope expression. Scope order and alternative order
+/// carry no meaning, so equal requirements serialize and hash identically.
+fn canonicalize_scope_alternatives<I, A, S>(alternatives: I) -> Vec<Vec<String>>
+where
+    I: IntoIterator<Item = A>,
+    A: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let mut canonical: Vec<Vec<String>> = alternatives
+        .into_iter()
+        .map(|set| {
+            let mut set: Vec<String> = set.into_iter().map(Into::into).collect();
+            set.sort();
+            set.dedup();
+            set
+        })
+        .collect();
+    canonical.sort();
+    canonical.dedup();
+    canonical
+}
+
+fn deserialize_canonical_scopes<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<String, Vec<Vec<String>>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let scopes = BTreeMap::<String, Vec<Vec<String>>>::deserialize(deserializer)?;
+    Ok(scopes
+        .into_iter()
+        .map(|(credential, alternatives)| {
+            (credential, canonicalize_scope_alternatives(alternatives))
+        })
+        .collect())
 }
 
 /// Deserializes credential names through [`canonicalize`], so a hand-authored TOML that lists them

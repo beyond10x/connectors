@@ -98,7 +98,7 @@ Slack app token: [hidden]
 
 Slack is connected and ready to receive messages.
 Connection: Development Slack
-Events: app_mention, message
+Events: app_mention, message.channels
 ```
 
 The low-level Connect Session verbs remain hidden diagnostic surfaces for protocol tests and

@@ -256,6 +256,18 @@ for cross-repository decision.
 - *Invariant:* `token_response_metadata`-style extraction (extra OAuth response fields such as a
   webhook URL or bot user id) lands in **connection metadata**, never in the credential store.
 
+**2026-08-15 credential-capability amendment.** Credential presence is not operation authority.
+Each scope-bearing credential generation has value-free capability evidence on its Connection:
+subject, proven granted scopes, required provider installation context, observation source, and
+freshness. Catalog requirements associate scopes with their exact credential purpose; discovery
+and invocation apply the same fail-closed predicate. Requested scopes, configuration, token
+prefixes, and caller assertions are not evidence. See
+[Design 09](09-curation-and-credential-capability-admission.md).
+
+- *Invariant:* scope sets from different credentials on one Connection are never unioned.
+- *Invariant:* missing or stale capability evidence hides the member and refuses dispatch; every
+  cache is bound to the credential generation that produced the evidence.
+
 ---
 
 ## Runtime side

@@ -50,6 +50,36 @@
         "type": "string"
       }
     },
+    "auth_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentials"
+      ],
+      "properties": {
+        "credentials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonempty_string"
+          }
+        },
+        "scopes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/nonempty_string"
+              }
+            }
+          }
+        }
+      }
+    },
     "json_schema": {
       "oneOf": [
         {
@@ -566,6 +596,12 @@
         "oip": {
           "$ref": "#/$defs/nullable_string"
         },
+        "auth": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auth_requirement"
+          }
+        },
         "description": {
           "$ref": "#/$defs/string"
         },
@@ -681,6 +717,12 @@
             "items": {
               "$ref": "#/$defs/nonempty_string"
             }
+          }
+        },
+        "auth_requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auth_requirement"
           }
         },
         "events": {
@@ -1112,6 +1154,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/string_array"
+          }
+        },
+        "auth_requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auth_requirement"
           }
         },
         "hosts": {

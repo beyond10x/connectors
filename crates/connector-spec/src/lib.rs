@@ -92,6 +92,7 @@
 //! file byte for byte — see the [`lock`] module docs for what is hashed, what is deliberately not,
 //! and why no timestamp appears anywhere in it.
 
+pub mod asyncapi;
 mod auth;
 pub mod config;
 pub mod graph;
@@ -145,9 +146,9 @@ pub use lock::{
 };
 pub use openapi::{Diagnostic, Ingested, Server, ServerVariable, SpecOperation};
 pub use provider::{
-    IngestedDocument, LoadedProvider, Naming, NamingRule, OperationPatch, OperationSelector,
-    ParamOmission, ParamPatch, ParamPosition, Patch, SpecDocument, SpecSource,
-    PROVIDER_TOML_JSON_SCHEMA,
+    EventPatch, IngestedDocument, IngestedEventDocument, LoadedProvider, Naming, NamingRule,
+    OperationPatch, OperationSelector, ParamOmission, ParamPatch, ParamPosition, Patch,
+    SpecDocument, SpecKind, SpecSource, PROVIDER_TOML_JSON_SCHEMA,
 };
 
 /// Everything that can go wrong turning a provider definition into a [`Connector`].

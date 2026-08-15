@@ -102,6 +102,8 @@ struct Document<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     default_auth: Vec<Vec<&'a str>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    default_auth_requirements: Vec<DocAuthRequirement<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     config: Vec<DocConfig<'a>>,
     operations: Vec<DocOperation<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -282,6 +284,10 @@ struct DocOperation<'a> {
     /// The **effective** requirement — the inheritance rule already resolved, so a consumer never
     /// re-implements it.
     auth: Vec<Vec<&'a str>>,
+    /// Scope-bearing form of `auth`. Empty when credential presence is the whole requirement, so
+    /// existing documents retain their bytes; when present it carries every alternative in full.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth_requirements: Vec<DocAuthRequirement<'a>>,
     /// What the effective `auth` list cannot say when it is empty (S-001): whether the connector
     /// **declared** that nothing is required (`auth = []`, `no-credential-required`) or simply
     /// declared nothing anywhere (`no-credential`, the fail-closed reading). Published as data —
@@ -422,6 +428,10 @@ struct DocEvent<'a> {
     oip: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     wire_value: Option<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth: Vec<Vec<&'a str>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth_requirements: Vec<DocAuthRequirement<'a>>,
     #[serde(skip_serializing_if = "str::is_empty")]
     description: &'a str,
     default: bool,
@@ -449,6 +459,8 @@ struct DocChannel<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     auth: Vec<Vec<&'a str>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth_requirements: Vec<DocAuthRequirement<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     events: Vec<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cursor: Option<&'a str>,
@@ -469,6 +481,13 @@ struct DocChannel<'a> {
     subscription: Option<&'a Subscription>,
     #[serde(skip_serializing_if = "Option::is_none")]
     setup: Option<&'a ManualSetup>,
+}
+
+#[derive(Serialize)]
+struct DocAuthRequirement<'a> {
+    credentials: Vec<&'a str>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    scopes: BTreeMap<&'a str, Vec<Vec<&'a str>>>,
 }
 
 #[derive(Serialize)]
@@ -610,6 +629,8 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
             service: &event.service,
             oip: member_oip(connector, &event.service, &event.name),
             wire_value: event.wire_value.as_deref(),
+            auth: requirements(connector.effective_event_auth(event)),
+            auth_requirements: detailed_requirements(connector.effective_event_auth(event)),
             description: &event.description,
             default: event.default,
             group: &event.group,
@@ -638,6 +659,7 @@ fn lower<'a>(connector: &'a Connector) -> Result<Document<'a>> {
         services,
         auth,
         default_auth: requirements(&connector.default_auth),
+        default_auth_requirements: detailed_requirements(&connector.default_auth),
         config,
         operations,
         events,
@@ -669,6 +691,39 @@ fn requirements(declared: &[connector_spec::AuthRequirement]) -> Vec<Vec<&str>> 
     declared
         .iter()
         .map(|requirement| requirement.iter().map(String::as_str).collect())
+        .collect()
+}
+
+/// Publishes the credential-associated scope facts without moving every existing catalog byte.
+/// When one mechanism carries scopes, the complete alternatives list is returned: omitting an
+/// unscoped sibling would change OR semantics for a consumer of the detailed form.
+fn detailed_requirements(
+    declared: &[connector_spec::AuthRequirement],
+) -> Vec<DocAuthRequirement<'_>> {
+    if !declared
+        .iter()
+        .any(|requirement| !requirement.scopes().is_empty())
+    {
+        return Vec::new();
+    }
+    declared
+        .iter()
+        .map(|requirement| DocAuthRequirement {
+            credentials: requirement.iter().map(String::as_str).collect(),
+            scopes: requirement
+                .scopes()
+                .iter()
+                .map(|(credential, alternatives)| {
+                    (
+                        credential.as_str(),
+                        alternatives
+                            .iter()
+                            .map(|set| set.iter().map(String::as_str).collect())
+                            .collect(),
+                    )
+                })
+                .collect(),
+        })
         .collect()
 }
 
@@ -791,6 +846,7 @@ fn doc_channel<'a>(connector: &Connector, channel: &'a ChannelBinding) -> DocCha
         session: channel.session.as_ref(),
         connect: channel.connect.as_ref(),
         auth: requirements(&channel.auth),
+        auth_requirements: detailed_requirements(&channel.auth),
         events: channel.events.iter().map(String::as_str).collect(),
         cursor: channel.cursor.as_deref(),
         interval: channel.interval.as_deref(),
@@ -887,6 +943,7 @@ fn doc_operation<'a>(
         required_capabilities: &operation.required_capabilities,
         expose: operation.expose,
         auth: requirements(connector.effective_auth(operation)),
+        auth_requirements: detailed_requirements(connector.effective_auth(operation)),
         credential_requirement: credential_requirement(connector, operation),
         contract: DocContract {
             description: contract.description,
@@ -1643,6 +1700,7 @@ pub fn schema() -> &'static Value {
                 "services": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/service" } },
                 "auth": { "type": "array", "items": { "$ref": "#/$defs/auth" } },
                 "default_auth": { "$ref": "#/$defs/requirements" },
+                "default_auth_requirements": { "$ref": "#/$defs/auth_requirements" },
                 "config": { "type": "array", "items": { "$ref": "#/$defs/config_field" } },
                 "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } },
                 "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
@@ -1660,6 +1718,27 @@ pub fn schema() -> &'static Value {
                     "description": "Auth alternatives: OR of AND-groups of declared credential names.",
                     "type": "array",
                     "items": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+                },
+                "auth_requirements": {
+                    "description": "Non-lossy auth alternatives with credential-local OR-of-AND granted-scope requirements.",
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/auth_requirement" }
+                },
+                "auth_requirement": {
+                    "type": "object",
+                    "properties": {
+                        "credentials": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+                        "scopes": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+                            }
+                        }
+                    },
+                    "required": ["credentials"],
+                    "additionalProperties": false
                 },
                 "service": {
                     "type": "object",
@@ -1793,6 +1872,7 @@ pub fn schema() -> &'static Value {
                         "contract": { "$ref": "#/$defs/contract" },
                         "expose": { "type": "boolean" },
                         "auth": { "$ref": "#/$defs/requirements" },
+                        "auth_requirements": { "$ref": "#/$defs/auth_requirements" },
                         "credential_requirement": {
                             "description": "What the effective `auth` list cannot say when it is empty (S-001): whether the connector declared that nothing is required (`no-credential-required`) or declared nothing anywhere (`no-credential`, the fail-closed reading). C-206's published tokens, carried as data so no consumer resolves the connector default to reconstruct the distinction.",
                             "enum": ["declared", "no-credential-required", "no-credential"]
@@ -2044,6 +2124,8 @@ pub fn schema() -> &'static Value {
                         "service": { "type": "string", "minLength": 1 },
                         "oip": { "type": "string" },
                         "wire_value": { "type": "string" },
+                        "auth": { "$ref": "#/$defs/requirements" },
+                        "auth_requirements": { "$ref": "#/$defs/auth_requirements" },
                         "description": { "type": "string" },
                         "default": { "type": "boolean" },
                         "group": { "type": "string" },
@@ -2064,6 +2146,7 @@ pub fn schema() -> &'static Value {
                         "session": { "$ref": "#/$defs/session_binding" },
                         "connect": { "type": "object" },
                         "auth": { "$ref": "#/$defs/requirements" },
+                        "auth_requirements": { "$ref": "#/$defs/auth_requirements" },
                         "events": { "type": "array", "items": { "type": "string" } },
                         "cursor": { "type": "string" },
                         "interval": { "type": "string" },

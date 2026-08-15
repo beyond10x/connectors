@@ -2108,6 +2108,19 @@ impl Connector {
         }
     }
 
+    /// The auth alternatives that admit an inbound event for a Connection.
+    ///
+    /// Unlike operation auth, event auth does not inherit `default_auth`: that default describes
+    /// outbound requests, while an inbound subscription is an independent vendor capability. A
+    /// channel's auth and verification establish how bytes arrive; an event's declared auth proves
+    /// that the Connection credential was granted the capability required to subscribe to it.
+    pub fn effective_event_auth<'a>(&'a self, event: &'a EventDecl) -> &'a [AuthRequirement] {
+        match event.auth.as_deref() {
+            Some(declared) => declared,
+            None => &[],
+        }
+    }
+
     /// The declared credential of that name, or `None` when nothing declares it.
     ///
     /// A requirement naming an undeclared credential is an authoring error the loader rejects
