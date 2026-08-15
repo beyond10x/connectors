@@ -38,7 +38,11 @@
 //! supplies one by constructing a new store, or wraps this one.
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::Value;
+use zeroize::Zeroizing;
+
+#[cfg(test)]
+use serde_json::json;
 
 use crate::{
     CredentialRef, CredentialScope, Layout, Secret, SecretBatch, SecretStore, StoreError,
@@ -55,6 +59,12 @@ pub const DEFAULT_MOUNT: &str = "secret";
 /// give two places to disagree. One conventional field, overridable for a store that inherited a
 /// different convention.
 pub const DEFAULT_FIELD: &str = "value";
+
+/// Maximum Vault response envelope retained in process memory.
+pub const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+
+/// Maximum one credential value accepted from or sent to Vault.
+pub const MAX_VALUE_BYTES: usize = 64 * 1024;
 
 /// The HTTP methods this client uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -82,7 +92,6 @@ impl Method {
 ///
 /// The token is a [`Secret`] and stays one all the way to the transport, which is the point: it is
 /// never a `String` in a header map that some `Debug` could print.
-#[derive(Debug)]
 pub struct VaultRequest<'a> {
     /// The method.
     pub method: Method,
@@ -91,30 +100,80 @@ pub struct VaultRequest<'a> {
     /// The value for the `X-Vault-Token` header.
     pub token: &'a Secret,
     /// A JSON body, for [`Method::Post`].
-    pub body: Option<String>,
+    pub body: Option<Zeroizing<String>>,
+}
+
+impl std::fmt::Debug for VaultRequest<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("VaultRequest")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("token", &"<redacted>")
+            .field("body", &self.body.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 /// Vault's answer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct VaultResponse {
-    /// The HTTP status.
-    pub status: u16,
-    /// The response body, which Vault always renders as JSON when it renders anything.
-    pub body: String,
+    status: u16,
+    body: Zeroizing<Vec<u8>>,
+}
+
+impl VaultResponse {
+    /// Construct a response from a transport or transcript. [`VaultStore`] independently enforces
+    /// [`MAX_RESPONSE_BYTES`] before parsing it.
+    pub fn new(status: u16, body: impl Into<Vec<u8>>) -> Self {
+        Self {
+            status,
+            body: Zeroizing::new(body.into()),
+        }
+    }
+
+    /// HTTP status returned by Vault.
+    pub fn status(&self) -> u16 {
+        self.status
+    }
+
+    /// Sensitive response bytes for the KV protocol parser.
+    pub fn expose_secret_body(&self) -> &[u8] {
+        &self.body
+    }
+}
+
+impl std::fmt::Debug for VaultResponse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("VaultResponse")
+            .field("status", &self.status)
+            .field("body", &"<redacted>")
+            .finish()
+    }
 }
 
 /// A transport failed to obtain any answer at all.
 ///
 /// Deliberately narrow: it means *the request did not complete*, which is what
 /// [`StoreError::Unreachable`] is for. A `403` is an answer and is not this.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("{0}")]
-pub struct TransportError(String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum TransportError {
+    /// No usable response was obtained.
+    #[error("Vault transport is unavailable")]
+    Unavailable,
+    /// The response stream failed after a response began.
+    #[error("Vault response could not be read")]
+    ResponseUnreadable,
+    /// The response exceeded [`MAX_RESPONSE_BYTES`].
+    #[error("Vault response exceeded the configured bound")]
+    ResponseTooLarge,
+}
 
 impl TransportError {
-    /// Wrap whatever the underlying client said.
-    pub fn new(reason: impl std::fmt::Display) -> Self {
-        Self(reason.to_string())
+    /// Convert an underlying transport failure without retaining its possibly sensitive text.
+    pub fn new(_reason: impl std::fmt::Display) -> Self {
+        Self::Unavailable
     }
 }
 
@@ -235,9 +294,10 @@ impl<T: VaultTransport, L: Layout> VaultStore<T, L> {
         method: Method,
         url: String,
         path: &str,
-        body: Option<String>,
+        body: Option<Zeroizing<String>>,
     ) -> Result<VaultResponse, StoreError> {
-        self.transport
+        let response = self
+            .transport
             .send(VaultRequest {
                 method,
                 url,
@@ -245,18 +305,35 @@ impl<T: VaultTransport, L: Layout> VaultStore<T, L> {
                 body,
             })
             .await
-            .map_err(|error| StoreError::Unreachable {
+            .map_err(|error| match error {
+                TransportError::ResponseTooLarge => StoreError::Backend {
+                    path: path.to_owned(),
+                    reason: error.to_string(),
+                },
+                TransportError::Unavailable | TransportError::ResponseUnreadable => {
+                    StoreError::Unreachable {
+                        path: path.to_owned(),
+                        reason: error.to_string(),
+                    }
+                }
+            })?;
+        if response.expose_secret_body().len() > MAX_RESPONSE_BYTES {
+            return Err(StoreError::Backend {
                 path: path.to_owned(),
-                reason: error.to_string(),
-            })
+                reason: "the Vault response exceeds the configured bound".to_owned(),
+            });
+        }
+        Ok(response)
     }
 }
 
 /// Map a status Vault answered with onto the error it means.
 ///
 /// Only reached for statuses the caller did not already handle as success or as a meaningful `404`.
-fn status_error(status: u16, path: &str, body: &str) -> StoreError {
-    let reason = vault_errors(body).unwrap_or_else(|| format!("HTTP {status}"));
+fn status_error(status: u16, path: &str) -> StoreError {
+    // Vault and intermediaries may echo submitted material. Upstream body text is therefore never
+    // promoted into an error whose contract permits logging.
+    let reason = format!("Vault returned HTTP {status}");
     match status {
         // Vault answers 400 for a malformed request, which for this client means the path or body
         // it built was wrong — retrying will not help.
@@ -281,15 +358,6 @@ fn status_error(status: u16, path: &str, body: &str) -> StoreError {
     }
 }
 
-/// Vault renders its failures as `{"errors": ["…"]}`. Recover that text when it is there, so an
-/// operator reads the server's own words rather than a status number.
-fn vault_errors(body: &str) -> Option<String> {
-    let document: Value = serde_json::from_str(body).ok()?;
-    let errors = document.get("errors")?.as_array()?;
-    let joined: Vec<&str> = errors.iter().filter_map(Value::as_str).collect();
-    (!joined.is_empty()).then(|| joined.join("; "))
-}
-
 #[async_trait]
 impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L> {
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
@@ -299,17 +367,19 @@ impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L
 
         // A KV v2 read answers 404 both for "never written" and for "deleted but not destroyed".
         // Both are "nothing is stored here", which is the distinction the caller cares about.
-        if response.status == 404 {
+        if response.status() == 404 {
             return Err(StoreError::NotFound { path });
         }
-        if response.status != 200 {
-            return Err(status_error(response.status, &path, &response.body));
+        if response.status() != 200 {
+            return Err(status_error(response.status(), &path));
         }
 
         let document: Value =
-            serde_json::from_str(&response.body).map_err(|error| StoreError::Backend {
-                path: path.clone(),
-                reason: format!("the response is not JSON: {error}"),
+            serde_json::from_slice(response.expose_secret_body()).map_err(|_| {
+                StoreError::Backend {
+                    path: path.clone(),
+                    reason: "the Vault response is not valid JSON".to_owned(),
+                }
             })?;
 
         // A version that was deleted but not destroyed answers 200 with `data.data: null` and a
@@ -331,7 +401,11 @@ impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L
         }
 
         match value.get(&self.field).and_then(Value::as_str) {
-            Some(secret) => Ok(Secret::new(secret)),
+            Some(secret) if secret.len() <= MAX_VALUE_BYTES => Ok(Secret::new(secret)),
+            Some(_) => Err(StoreError::Backend {
+                path,
+                reason: format!("the credential value exceeds the {MAX_VALUE_BYTES}-byte limit"),
+            }),
             // The entry exists but carries no `value` field, or carries one that is not a string.
             // Both are a store somebody else wrote in a shape this client does not understand, and
             // both are worth naming rather than reporting as "not found".
@@ -348,20 +422,27 @@ impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L
 
     async fn put(&self, reference: &CredentialRef, secret: &Secret) -> Result<(), StoreError> {
         let path = self.layout.render(reference);
+        if secret.expose_secret().len() > MAX_VALUE_BYTES {
+            return Err(StoreError::Backend {
+                path,
+                reason: format!("the credential value exceeds the {MAX_VALUE_BYTES}-byte limit"),
+            });
+        }
         let url = self.data_url(&path);
-        // The one place a value is serialised, and it goes straight out on the wire. Built as a map
-        // rather than through a literal, because the field name is configurable.
-        let mut fields = serde_json::Map::new();
-        fields.insert(
-            self.field.clone(),
-            Value::String(secret.expose_secret().to_owned()),
+        // Keep both the JSON string literal and complete request body in zeroising owners. reqwest
+        // necessarily owns a transport copy after this boundary; the source copies remain bounded
+        // and are erased when the request completes.
+        let field = serde_json::to_string(&self.field).expect("a String is always JSON encodable");
+        let encoded = Zeroizing::new(
+            serde_json::to_string(secret.expose_secret())
+                .expect("a UTF-8 credential is always JSON encodable"),
         );
-        let body = json!({ "data": Value::Object(fields) }).to_string();
+        let body = Zeroizing::new(format!(r#"{{"data":{{{field}:{}}}}}"#, encoded.as_str()));
         let response = self.send(Method::Post, url, &path, Some(body)).await?;
 
-        match response.status {
+        match response.status() {
             200 | 204 => Ok(()),
-            status => Err(status_error(status, &path, &response.body)),
+            status => Err(status_error(status, &path)),
         }
     }
 
@@ -373,11 +454,11 @@ impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L
         let url = self.metadata_url(&path);
         let response = self.send(Method::Delete, url, &path, None).await?;
 
-        match response.status {
+        match response.status() {
             // Idempotent by the trait's contract, and by Vault's: a metadata delete answers 204
             // whether or not anything was there. 404 is folded in for the same reason.
             200 | 204 | 404 => Ok(()),
-            status => Err(status_error(status, &path, &response.body)),
+            status => Err(status_error(status, &path)),
         }
     }
 
@@ -460,16 +541,41 @@ impl VaultTransport for HttpTransport {
         if let Some(body) = request.body {
             builder = builder
                 .header("Content-Type", "application/json")
-                .body(body);
+                .body(body.as_str().to_owned());
         }
 
         let response = builder.send().await.map_err(TransportError::new)?;
         let status = response.status().as_u16();
-        // A body that cannot be read is still an answer with a status; report the status rather
-        // than losing it to a transport error that would be read as "unreachable".
-        let body = response.text().await.unwrap_or_default();
+        let body = bounded_response(response).await?;
         Ok(VaultResponse { status, body })
     }
+}
+
+async fn bounded_response(
+    mut response: reqwest::Response,
+) -> Result<Zeroizing<Vec<u8>>, TransportError> {
+    if response.content_length().is_some_and(|length| {
+        length > u64::try_from(MAX_RESPONSE_BYTES).expect("bound fits in u64")
+    }) {
+        return Err(TransportError::ResponseTooLarge);
+    }
+    let capacity = response
+        .content_length()
+        .and_then(|length| usize::try_from(length).ok())
+        .unwrap_or(0)
+        .min(MAX_RESPONSE_BYTES);
+    let mut body = Zeroizing::new(Vec::with_capacity(capacity));
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| TransportError::ResponseUnreadable)?
+    {
+        if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
+            return Err(TransportError::ResponseTooLarge);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 #[cfg(test)]
@@ -477,6 +583,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use std::sync::Mutex;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     /// Obviously not a credential. Nothing in this repository commits a value shaped like a real
     /// token — a plausible placeholder has tripped GitHub push protection here before.
@@ -503,15 +610,26 @@ mod tests {
     }
 
     /// One request the transcript saw, as the assertions want to read it.
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Clone, PartialEq, Eq)]
     struct Exchange {
         method: Method,
         url: String,
-        body: Option<String>,
+        body: Option<Zeroizing<String>>,
         /// The token the store handed the transport, which is what would become
-        /// `X-Vault-Token`. A `String` here rather than a `Secret` so a failing assertion can
-        /// actually show what went out — this is a sentinel, in a test.
-        token: String,
+        /// `X-Vault-Token`. It remains a redacting [`Secret`] even in a transcript assertion.
+        token: Secret,
+    }
+
+    impl std::fmt::Debug for Exchange {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Exchange")
+                .field("method", &self.method)
+                .field("url", &self.url)
+                .field("body", &self.body.as_ref().map(|_| "<redacted>"))
+                .field("token", &"<redacted>")
+                .finish()
+        }
     }
 
     impl Recorded {
@@ -529,10 +647,7 @@ mod tests {
         fn reply(mut self, method: Method, url: &str, status: u16, body: &str) -> Self {
             self.replies.insert(
                 (method, url.to_owned()),
-                VaultResponse {
-                    status,
-                    body: body.to_owned(),
-                },
+                VaultResponse::new(status, body.as_bytes().to_vec()),
             );
             self
         }
@@ -552,21 +667,16 @@ mod tests {
                     method: request.method,
                     url: request.url.clone(),
                     body: request.body.clone(),
-                    token: request.token.expose_secret().to_owned(),
+                    token: request.token.clone(),
                 });
             if let Some(reason) = &self.offline {
-                return Err(TransportError::new(reason));
+                let _ = reason;
+                return Err(TransportError::Unavailable);
             }
             self.replies
                 .get(&(request.method, request.url.clone()))
                 .cloned()
-                .ok_or_else(|| {
-                    TransportError::new(format!(
-                        "the transcript has no {} {}",
-                        request.method.as_str(),
-                        request.url
-                    ))
-                })
+                .ok_or_else(|| TransportError::Unavailable)
         }
     }
 
@@ -600,6 +710,32 @@ mod tests {
         VaultStore::new(transport, BASE, Secret::new(SENTINEL_TOKEN))
     }
 
+    async fn http_transport_answer(
+        wire_response: Vec<u8>,
+    ) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind transcript server");
+        let address = listener.local_addr().expect("transcript address");
+        let task = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accept request");
+            let mut request = Vec::new();
+            loop {
+                let mut chunk = [0_u8; 1024];
+                let read = stream.read(&mut chunk).await.expect("read request");
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..read]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let _ = stream.write_all(&wire_response).await;
+        });
+        (format!("http://{address}/v1/secret/data/test"), task)
+    }
+
     #[tokio::test]
     async fn a_read_takes_the_kv_v2_data_path_and_unwraps_the_envelope() {
         let store =
@@ -613,7 +749,8 @@ mod tests {
         assert_eq!(requests[0].method, Method::Get);
         assert_eq!(requests[0].url, DATA_URL, "KV v2 reads go through `/data/`");
         assert_eq!(
-            requests[0].token, SENTINEL_TOKEN,
+            requests[0].token.expose_secret(),
+            SENTINEL_TOKEN,
             "the token reaches the transport for `X-Vault-Token`"
         );
     }
@@ -666,7 +803,7 @@ mod tests {
             .await
             .expect_err("a transport failure is not a missing secret");
         assert!(
-            matches!(down, StoreError::Unreachable { ref reason, .. } if reason.contains("connection refused")),
+            matches!(down, StoreError::Unreachable { ref reason, .. } if reason == "Vault transport is unavailable"),
             "got {down:?}"
         );
         assert!(!down.is_not_found());
@@ -686,7 +823,7 @@ mod tests {
         .await
         .expect_err("503");
         assert!(
-            matches!(sealed, StoreError::Unreachable { ref reason, .. } if reason == "Vault is sealed"),
+            matches!(sealed, StoreError::Unreachable { ref reason, .. } if reason == "Vault returned HTTP 503"),
             "got {sealed:?}"
         );
 
@@ -700,7 +837,7 @@ mod tests {
         .await
         .expect_err("403");
         assert!(
-            matches!(denied, StoreError::Denied { ref reason, .. } if reason == "permission denied"),
+            matches!(denied, StoreError::Denied { ref reason, .. } if reason == "Vault returned HTTP 403"),
             "got {denied:?}"
         );
     }
@@ -851,7 +988,7 @@ mod tests {
         let requests = store.transport.requests();
         assert_eq!(requests[0].method, Method::Get);
         assert_eq!(requests[0].url, flat_url);
-        assert_eq!(requests[0].token, SENTINEL_TOKEN);
+        assert_eq!(requests[0].token.expose_secret(), SENTINEL_TOKEN);
         assert_eq!(
             store.path(&reference()),
             "flux/com.zendesk.api/9f3a4b2c/support/api_token"
@@ -863,6 +1000,140 @@ mod tests {
         let rendered = format!("{:?}", store(Recorded::new()));
         assert!(!rendered.contains(SENTINEL_TOKEN), "{rendered}");
         assert!(rendered.contains("<redacted>"), "{rendered}");
+    }
+
+    #[test]
+    fn request_response_and_transcript_debug_redact_complete_envelopes() {
+        let token = Secret::new(SENTINEL_TOKEN);
+        let request = VaultRequest {
+            method: Method::Post,
+            url: DATA_URL.to_owned(),
+            token: &token,
+            body: Some(Zeroizing::new(SENTINEL.to_owned())),
+        };
+        let response = VaultResponse::new(200, SENTINEL.as_bytes().to_vec());
+        let exchange = Exchange {
+            method: Method::Post,
+            url: DATA_URL.to_owned(),
+            body: request.body.clone(),
+            token: token.clone(),
+        };
+        for rendered in [
+            format!("{request:?}"),
+            format!("{response:?}"),
+            format!("{exchange:?}"),
+        ] {
+            assert!(!rendered.contains(SENTINEL), "{rendered}");
+            assert!(!rendered.contains(SENTINEL_TOKEN), "{rendered}");
+            assert!(rendered.contains("<redacted>"), "{rendered}");
+        }
+    }
+
+    #[tokio::test]
+    async fn upstream_error_text_never_reaches_a_store_error() {
+        let error = store(Recorded::new().reply(Method::Get, DATA_URL, 400, SENTINEL))
+            .get(&reference())
+            .await
+            .expect_err("400 is a backend refusal");
+        let rendered = format!("{error:?} {error}");
+        assert!(!rendered.contains(SENTINEL), "{rendered}");
+        assert!(rendered.contains("Vault returned HTTP 400"), "{rendered}");
+    }
+
+    #[tokio::test]
+    async fn oversized_values_are_refused_in_both_directions() {
+        let oversized = "x".repeat(MAX_VALUE_BYTES + 1);
+        let read_error =
+            store(Recorded::new().reply(Method::Get, DATA_URL, 200, &read_envelope(&oversized)))
+                .get(&reference())
+                .await
+                .expect_err("oversized read value");
+        assert!(
+            matches!(read_error, StoreError::Backend { ref reason, .. } if reason.contains("exceeds")),
+            "{read_error:?}"
+        );
+
+        let write_error = store(Recorded::new())
+            .put(&reference(), &Secret::new(oversized))
+            .await
+            .expect_err("oversized write value");
+        assert!(
+            matches!(write_error, StoreError::Backend { ref reason, .. } if reason.contains("exceeds")),
+            "{write_error:?}"
+        );
+
+        let oversized_response = "x".repeat(MAX_RESPONSE_BYTES + 1);
+        let response_error =
+            store(Recorded::new().reply(Method::Get, DATA_URL, 200, &oversized_response))
+                .get(&reference())
+                .await
+                .expect_err("oversized response envelope");
+        assert!(
+            matches!(response_error, StoreError::Backend { ref reason, .. } if reason.contains("response exceeds")),
+            "{response_error:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn http_transport_bounds_declared_chunked_and_close_delimited_bodies() {
+        let declared = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            MAX_RESPONSE_BYTES + 1
+        )
+        .into_bytes();
+        let (url, server) = http_transport_answer(declared).await;
+        let token = Secret::new(SENTINEL_TOKEN);
+        let error = HttpTransport::new(std::time::Duration::from_secs(5))
+            .expect("transport")
+            .send(VaultRequest {
+                method: Method::Get,
+                url,
+                token: &token,
+                body: None,
+            })
+            .await
+            .expect_err("declared oversized response");
+        assert_eq!(error, TransportError::ResponseTooLarge);
+        server.await.expect("declared server");
+
+        let payload = vec![b'x'; MAX_RESPONSE_BYTES + 1];
+        let mut chunked = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:X}\r\n",
+            payload.len()
+        )
+        .into_bytes();
+        chunked.extend_from_slice(&payload);
+        chunked.extend_from_slice(b"\r\n0\r\n\r\n");
+        let (url, server) = http_transport_answer(chunked).await;
+        let error = HttpTransport::new(std::time::Duration::from_secs(5))
+            .expect("transport")
+            .send(VaultRequest {
+                method: Method::Get,
+                url,
+                token: &token,
+                body: None,
+            })
+            .await
+            .expect_err("chunked oversized response");
+        assert_eq!(error, TransportError::ResponseTooLarge);
+        server.await.expect("chunked server");
+
+        let mut close_delimited = b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n".to_vec();
+        close_delimited.extend_from_slice(b"{}");
+        let (url, server) = http_transport_answer(close_delimited).await;
+        let response = HttpTransport::new(std::time::Duration::from_secs(5))
+            .expect("transport")
+            .send(VaultRequest {
+                method: Method::Get,
+                url,
+                token: &token,
+                body: None,
+            })
+            .await
+            .expect("bounded close-delimited response");
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.expose_secret_body(), b"{}");
+        server.await.expect("close-delimited server");
     }
 
     #[test]

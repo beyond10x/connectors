@@ -8,6 +8,7 @@ use base64::Engine as _;
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
+use zeroize::Zeroizing;
 
 pub const AUTHORITY_TYPE: &str = "dl-session+jwt";
 pub const DPOP_TYPE: &str = "dpop+jwt";
@@ -20,15 +21,15 @@ pub const CLOCK_SKEW_SECONDS: u64 = 5;
 
 /// Compact signed material that never reveals itself through `Debug`.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SensitiveCompact(String);
+pub struct SensitiveCompact(Zeroizing<String>);
 
 impl SensitiveCompact {
     fn new(value: String) -> Self {
-        Self(value)
+        Self(Zeroizing::new(value))
     }
 
     /// Borrow the compact value only at an explicit wire boundary.
-    pub fn as_wire_value(&self) -> &str {
+    pub fn expose_secret(&self) -> &str {
         &self.0
     }
 }
@@ -330,7 +331,7 @@ impl ProofKey {
             htm: method.to_owned(),
             iat: issued_at,
             jti: proof_id.into(),
-            ath: hash_b64(authority.compact().as_wire_value().as_bytes()),
+            ath: hash_b64(authority.compact().expose_secret().as_bytes()),
         };
         sign_compact(&header, &claims, &self.0).map(SensitiveCompact::new)
     }
@@ -485,7 +486,7 @@ impl<'a> AuthorityRedeemer<'a> {
         }
 
         let (header, claims): (AuthorityHeader, SessionAuthorityClaims) =
-            verify_compact(request.authority.as_wire_value(), &self.trusted_key)?;
+            verify_compact(request.authority.expose_secret(), &self.trusted_key)?;
         if header.typ != AUTHORITY_TYPE
             || header.alg != "EdDSA"
             || header.kid != self.trusted_key_id
@@ -541,7 +542,7 @@ impl<'a> AuthorityRedeemer<'a> {
         check_binding("endpoint", &claims.dl_endpoint, &expected.endpoint)?;
 
         let (dpop_header, dpop): (DpopHeader, DpopClaims) =
-            decode_compact(request.dpop.as_wire_value())?;
+            decode_compact(request.dpop.expose_secret())?;
         if dpop_header.typ != DPOP_TYPE
             || dpop_header.alg != "EdDSA"
             || dpop_header.jwk.kty != "OKP"
@@ -550,7 +551,7 @@ impl<'a> AuthorityRedeemer<'a> {
             return Err(AuthorityError::UnsupportedSignature);
         }
         let proof_key = verifying_key(&dpop_header.jwk)?;
-        verify_signature(request.dpop.as_wire_value(), &proof_key)?;
+        verify_signature(request.dpop.expose_secret(), &proof_key)?;
         if jwk_thumbprint(&dpop_header.jwk) != claims.cnf.jkt {
             return Err(AuthorityError::DpopKeyMismatch);
         }
@@ -560,7 +561,7 @@ impl<'a> AuthorityRedeemer<'a> {
         if now.abs_diff(dpop.iat) > CLOCK_SKEW_SECONDS {
             return Err(AuthorityError::DpopNotFresh);
         }
-        if dpop.ath != hash_b64(request.authority.as_wire_value().as_bytes()) {
+        if dpop.ath != hash_b64(request.authority.expose_secret().as_bytes()) {
             return Err(AuthorityError::DpopAuthorityMismatch);
         }
 
@@ -893,8 +894,8 @@ mod tests {
     #[test]
     fn debug_never_prints_authority_or_proof() {
         let (_, _, expected, authority, proof) = fixture();
-        let authority_raw = authority.compact().as_wire_value().to_owned();
-        let proof_raw = proof.as_wire_value().to_owned();
+        let authority_raw = authority.compact().expose_secret().to_owned();
+        let proof_raw = proof.expose_secret().to_owned();
         let issued_printed = format!("{authority:?}");
         let request = authority.presentation("GET", expected.endpoint, proof);
         let printed = format!("{request:?}");

@@ -7,15 +7,16 @@
 //! already rejected.
 
 use crate::request::Request;
+use zeroize::Zeroizing;
 
 /// Text that may contain credential material and therefore never reveals itself through `Debug`.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SensitiveText(String);
+pub struct SensitiveText(Zeroizing<String>);
 
 impl SensitiveText {
     /// Declare that `text` is secret-bearing.
     pub fn new(text: impl Into<String>) -> Self {
-        Self(text.into())
+        Self(Zeroizing::new(text.into()))
     }
 
     /// Deliberately expose the value. Every call site is a place a reviewer should stop at.

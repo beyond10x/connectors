@@ -1,11 +1,21 @@
 # Design 07: credential custody follows execution placement
 
-**Status:** draft for cross-repository decision; implementation open · **Date:** 2026-08-14
+**Status:** central managed-store subset accepted; remaining topologies deferred · **Date:** 2026-08-14
 
 **Inputs:** [Design 01](01-domain-model.md) · [Design 02](02-architecture.md) ·
 [Design 06](06-personal-slack-socket-mode.md) ·
 [`b10x/architecture` RFC 0004](https://github.com/b10x/architecture/blob/main/rfcs/0004-satellite-federation.md) ·
-[`b10x/architecture` proposed RFC 0013](https://github.com/b10x/architecture/blob/main/rfcs/0013-credential-custody-follows-connector-placement.md)
+[`b10x/architecture` RFC 0013](https://github.com/b10x/architecture/blob/main/rfcs/0013-credential-custody-follows-connector-placement.md) ·
+[`b10x/architecture` ADR 0032](https://github.com/b10x/architecture/blob/main/adr/0032-central-managed-credential-custody-is-bounded.md)
+
+**2026-08-15 decision boundary.** ADR 0032 accepts only the central Connector-managed Vault KV v2
+topology, its ownership and server-derived binding, value-free projection, no-retrieval, no-fallback,
+and no-migration rules. Personal OS-keychain release support, external secret providers,
+target-sealed satellite completion, browser pairing, and production store operations remain design
+material, not accepted or implemented capability.
+
+Except where a section explicitly names the accepted central subset, the multi-topology flows and
+configuration below are future design constraints. They do not describe a current public contract.
 
 This design fixes how a Connection can use an entered secret, an external secret provider, or no
 reusable secret across personal, central, and satellite deployments. The result stays one generic
@@ -48,8 +58,10 @@ deployment may bind that port in three ways:
 | `managed_store` | an entered or acquired credential sealed by a Connector-owned backend | OS keychain for personal-local; deployment-managed encrypted store for central or satellite |
 | `secret_provider` | an opaque binding to a credential held by an external system such as 1Password | secret remains in that provider; the executing Connector holds only its constrained binding and provider-session custody |
 
-The public term is **credential source**. `SecretStore` and secret-provider adapter are
-implementation terms. They are not new model-callable provider operations.
+In the deferred multi-topology design, the control-plane term is **credential source**.
+`SecretStore` and secret-provider adapter are implementation terms. They are not new
+model-callable provider operations. The currently accepted Connection contract exposes no source
+or topology field at all.
 
 A secret provider may be configured through the ordinary Integration and Connect Session
 experience: for example, a user connects 1Password, then selects one approved item field as the
@@ -77,9 +89,10 @@ value. It means:
 - a secret-provider locator is itself hidden behind an opaque binding reference because vault,
   item, or field names may disclose sensitive metadata.
 
-Connection search and describe may report only a non-secret custody summary such as
-`workload identity`, `local keychain`, `external provider`, or `deployment store`, plus health and
-reauthorization state.
+The deferred multi-topology contract may eventually report only a non-secret custody summary such
+as `workload identity`, `local keychain`, `external provider`, or `deployment store`, plus health
+and reauthorization state. Under the accepted central subset, Connection search and describe omit
+custody topology and expose only generic lifecycle state.
 
 ## 4. Supported topologies
 
@@ -266,7 +279,7 @@ admits its driver, placement, scope, and destination aperture.
 
 ## 9. Delivery slices
 
-The hosted managed-store foundation is implemented: Cloud deploys internal TLS Vault KV v2, binds
+The accepted central managed-store development foundation is implemented: Cloud deploys internal TLS Vault KV v2, binds
 the Connectors ServiceAccount through Kubernetes auth to one tenant prefix, and the hosted
 Connector composes that store with fail-closed startup plus in-memory token refresh. This does not
 complete external secret-provider Connections, remote target-sealed entry, or the browser product
@@ -287,3 +300,8 @@ becoming an inert wrapper or a misleading readiness claim.
    workload-identity Integration.
 5. Add provider-declared OAuth custody compatibility and exercise local and satellite token
    exchange without changing the Connection contract.
+
+The complete production exit—including KMS/seal custody, HA and recovery, released lifecycle
+management, personal/external backends, satellite sealing, workload secret delivery, and family
+leakage evidence—is tracked by architecture's phase-8 production credential closure and
+[S-034](../stories/S-034-production-credential-custody-closes.md).

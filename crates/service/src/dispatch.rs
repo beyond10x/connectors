@@ -1,12 +1,13 @@
 use domain::{DriverId, ZeroIoPlan};
+use zeroize::Zeroizing;
 
 /// One value that may contain credential material and never reveals itself through `Debug`.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SensitiveValue(String);
+pub struct SensitiveValue(Zeroizing<String>);
 
 impl SensitiveValue {
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self(Zeroizing::new(value.into()))
     }
 
     pub fn expose_secret(&self) -> &str {

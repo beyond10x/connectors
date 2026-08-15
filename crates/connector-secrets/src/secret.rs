@@ -1,6 +1,7 @@
 //! The value a store hands back, in a wrapper that resists reaching a place it should not.
 
 use std::fmt;
+use zeroize::Zeroizing;
 
 /// A credential value.
 ///
@@ -36,17 +37,17 @@ use std::fmt;
 ///
 /// # What this is not
 ///
-/// It is not zeroised on drop, and it does not claim to be: doing that honestly needs control over
-/// every buffer the value was ever copied into, which a `String` does not give. It also carries no
-/// expiry — managing or refreshing an expiring token is out of scope for this crate, and flux
-/// already owns that machinery.
+/// Its owned buffer is zeroised on drop. That does not claim control over copies made by a protocol
+/// library or kernel buffer; callers still minimize exposure and register every travelling form
+/// with their redactor. It also carries no expiry — managing or refreshing an expiring token is out
+/// of scope for this crate.
 #[derive(Clone)]
-pub struct Secret(String);
+pub struct Secret(Zeroizing<String>);
 
 impl Secret {
     /// Wrap a value.
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self(Zeroizing::new(value.into()))
     }
 
     /// The value.
@@ -65,7 +66,7 @@ impl Secret {
     /// [`expose_secret`](Self::expose_secret) — this one exists for the caller that must hand the
     /// value to an API taking `String`, and cloning to do it would only make a second copy nothing
     /// tracks.
-    pub fn expose_secret_owned(self) -> String {
+    pub fn expose_secret_owned(self) -> Zeroizing<String> {
         self.0
     }
 
@@ -80,13 +81,13 @@ impl Secret {
 
 impl From<String> for Secret {
     fn from(value: String) -> Self {
-        Self(value)
+        Self(Zeroizing::new(value))
     }
 }
 
 impl From<&str> for Secret {
     fn from(value: &str) -> Self {
-        Self(value.to_owned())
+        Self(Zeroizing::new(value.to_owned()))
     }
 }
 
@@ -149,7 +150,10 @@ mod tests {
     #[test]
     fn the_value_is_readable_through_one_conspicuous_call() {
         assert_eq!(Secret::new(SENTINEL).expose_secret(), SENTINEL);
-        assert_eq!(Secret::new(SENTINEL).expose_secret_owned(), SENTINEL);
+        assert_eq!(
+            Secret::new(SENTINEL).expose_secret_owned().as_str(),
+            SENTINEL
+        );
         assert!(Secret::new("").is_empty());
         assert!(!Secret::new(SENTINEL).is_empty());
     }

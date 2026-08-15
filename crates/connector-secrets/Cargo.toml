@@ -39,6 +39,7 @@ connector-address.workspace = true
 async-trait.workspace = true
 fs2.workspace = true
 thiserror.workspace = true
+zeroize.workspace = true
 
 reqwest = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
@@ -58,7 +59,7 @@ windows-sys = { version = "0.61.2", features = [
 
 [dev-dependencies]
 # A runtime to drive the async trait in tests. `rt` + `macros` only: nothing here needs threads.
-tokio = { workspace = true, features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros", "net", "io-util"] }
 # Used by one `compile_fail` doctest, which is how "`Secret` has no `Serialize`" is asserted rather
 # than merely stated.
 serde.workspace = true

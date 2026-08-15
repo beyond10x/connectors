@@ -1,6 +1,16 @@
 # Vision: b10x/connectors
 
-**Status:** founding document · **Date:** 2026-08-13
+**Status:** historical founding document; superseded where noted below · **Date:** 2026-08-13
+
+> [!IMPORTANT]
+> This document preserves the repository's founding intent, not its current ownership model.
+> [Design 01](design/01-domain-model.md) and
+> [`b10x/architecture` ADR 0003](https://github.com/b10x/architecture/blob/main/adr/0003-identity-and-connectors-are-separate-domains.md)
+> move general identity, organizations, login sessions, and foundation access credentials to
+> Identity. [Design 07](design/07-credential-custody-topologies.md) and
+> [`b10x/architecture` ADR 0032](https://github.com/b10x/architecture/blob/main/adr/0032-central-managed-credential-custody-is-bounded.md)
+> replace the owner-file/identical-posture credential language with the bounded current custody
+> decision. Read the current domain and architecture before using the historical text below.
 
 ## What this is
 

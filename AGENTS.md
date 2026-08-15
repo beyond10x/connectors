@@ -4,9 +4,10 @@ Orientation for agents (and humans) working in this repository.
 
 ## Status
 
-Pre-v1, design phase: **the documents are the product**. Read, in order:
-[docs/VISION.md](docs/VISION.md) → [docs/design/01-domain-model.md](docs/design/01-domain-model.md)
-→ [docs/design/02-architecture.md](docs/design/02-architecture.md). The research corpus
+Pre-v1, design phase: **the documents are the product**. Read current authority in order:
+[docs/design/01-domain-model.md](docs/design/01-domain-model.md) →
+[docs/design/02-architecture.md](docs/design/02-architecture.md) →
+[docs/VISION.md](docs/VISION.md) (historical founding intent). The research corpus
 ([docs/research/](docs/research/)) grounds both; vendored third-party artifacts live under
 `docs/research/vendor/` with provenance and are never edited.
 

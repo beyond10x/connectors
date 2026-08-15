@@ -4,6 +4,12 @@
 Connections and short-lived Connect Sessions. It deliberately has no field capable of carrying a
 vendor credential, credential address, provider URL, or transport ticket.
 
+Credential custody follows the deployment-selected Connector placement under architecture ADR
+0032. This contract exposes only generic Connection lifecycle state: no request can select a
+credential source, store, Vault address, mount, role, item, or fallback, and no response can reveal
+one. Credential read-back, export, value listing, and generic provider-secret retrieval are not
+methods in this protocol.
+
 `connect_session_create` returns a pending session with a short-lived `completion_endpoint`. That
 endpoint belongs to Connectors, accepts one credential-acquisition completion, and disappears. It
 is not the durable Connection and it is not the harness's reusable Endpoint. The creator polls

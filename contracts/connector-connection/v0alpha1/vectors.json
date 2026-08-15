@@ -100,6 +100,36 @@
         "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
         "request": {"method":"observation_search","params":{"source_connection_ref":"connection:grafana-infra","query":"","limit":32,"resource_binding":"grafana-uid"}}
       }
+    },
+    {
+      "name": "connect-session-cannot-select-custody-topology",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-connect-bad-custody-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"connect_session_create","params":{"integration_ref":"slack","label":"Development Slack","credential_source":"organization-vault","vault_path":"tenants/other/value"}}
+      }
+    },
+    {
+      "name": "credential-value-retrieval-is-not-a-method",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-credential-get-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"credential_get","params":{"connection_ref":"connection:slack-dev"}}
+      }
+    },
+    {
+      "name": "connection-summary-cannot-reveal-custody-topology",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-search-bad-custody-1",
+        "status": "ok",
+        "response": {"result":"search","value":{"connections":[{"connection_ref":"connection:slack-dev","integration_ref":"slack","label":"Development Slack","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"credential_source":"organization-vault","vault_address":"https://vault.invalid"}]}}
+      }
     }
   ]
 }

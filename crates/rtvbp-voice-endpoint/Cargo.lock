@@ -295,6 +295,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "zeroize",
 ]
 
 [[package]]
@@ -307,6 +308,7 @@ dependencies = [
  "rustix",
  "thiserror 2.0.20",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -1682,6 +1684,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+ "zeroize",
 ]
 
 [[package]]
