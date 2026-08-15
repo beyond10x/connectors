@@ -39,8 +39,16 @@ Provider-declared discovery read under normal operation admission.
 `materialize` is the explicit control-plane transition from one recognized observation to one
 mediated Connection. Its request carries only `observation_ref`. The Connector resolves the stored
 target Provider, resource binding, parent Connection and closed route adapter; callers cannot
-select or override any of them. Repeating the request for an already-materialized observation is
-idempotent and returns the same Connection.
+select or override any of them. The closed adapter set currently contains
+`grafana_datasource_proxy_v1` and `kubernetes_service_proxy_v1`; neither accepts a caller-selected
+target, port, or path. Repeating the request for an already-materialized observation is idempotent
+and returns the same Connection.
+
+The Kubernetes adapter executes only reviewed target-provider operations through the API server's
+exact bound Service proxy. The Connector rechecks `get` on the selected Service and `get` on its
+`services/proxy` subresource, then verifies the Service UID, provider, and selected port still
+match the observation before dispatch. A discovered Grafana Service is not credentialless and is
+therefore refused until an explicit Grafana credential source is connected.
 
 The personal-local binding multiplexes this contract with Operation and Event frames on the
 owner-only Connector Unix socket. The completion endpoint is a separate single-use owner-only

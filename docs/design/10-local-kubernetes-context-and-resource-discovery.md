@@ -1,6 +1,7 @@
 # Design 10: local Kubernetes context and resource discovery
 
-**Status:** accepted; personal-local context activation and bounded Service discovery implemented ·
+**Status:** accepted; personal-local context activation, bounded Service discovery, closed
+Service-proxy materialization, and pre-invocation identity/RBAC revalidation implemented ·
 **Date:** 2026-08-15
 
 **Inputs:** [Design 07](07-credential-custody-topologies.md) ·
@@ -101,17 +102,17 @@ process environment.
 ## 4. Route and topology boundary
 
 A Kubernetes Service is a stable resource identity, but it is not itself an HTTP route from a
-personal-local process. Materializing it requires a closed adapter with a fixed Service binding.
-For a local Connector the intended adapter is Kubernetes-mediated transport (API-server Service
-proxy or a reconciled Service-to-Pod port-forward); request input may not choose namespaces, Service
-names, Pods, ports, or proxy suffixes. For an in-cluster satellite, a deployment-owned direct
-service DNS route can be selected instead.
+personal-local process. Materializing it requires the closed `kubernetes_service_proxy_v1` adapter
+with a fixed Service and port binding. Request input cannot choose namespaces, Service names, Pods,
+ports, or proxy suffixes. The adapter resolves only reviewed Prometheus, Loki, or Alertmanager
+operations, requires `get` on `services/proxy` for that exact namespace and Service at invocation
+time, and sends the target-relative GET through the selected API server. There is no direct-egress
+fallback.
 
-This release implements context activation and observation, and refuses `materialize` for these
-observations with `unavailable` because that route adapter is not installed yet. It does not label a
-partially wired Grafana target callable. Grafana reached directly in a satellite may continue to
-discover its Prometheus/Loki/Alertmanager data sources through the existing one-hop Grafana adapter.
-The initial one-mediated-hop invariant remains: personal local must not build
+Grafana remains fail-closed because its provider contract requires a service-account credential;
+discovering a Grafana Service does not mint or inherit one. For an in-cluster satellite, a future
+deployment-owned service-DNS adapter can avoid the API-server proxy, but it remains a separate
+route choice. The initial one-mediated-hop invariant also remains: personal local does not build
 Kubernetes → Grafana → Prometheus as two opaque nested mediated routes.
 
 ## 5. Harness integration
@@ -133,6 +134,11 @@ Harness settings UI       Connector                         Kubernetes
       ├──────────────────────►│                                  │
       │ supported services    │                                  │
       ◄───────────────────────┤                                  │
+ user selects service        │                                  │
+      │ materialize           │ exact Service/port binding       │
+      ├──────────────────────►│                                  │
+      │ callable child Connection                                │
+      ◄───────────────────────┤                                  │
 ```
 
 Candidate enumeration belongs in user settings/setup, not the Agent tool surface. The chooser may
@@ -140,7 +146,16 @@ filter by Integration and label and stores only opaque candidate/Connection refe
 must be a visible user action because it can contact a cluster, refresh cloud credentials, or run an
 explicitly permitted auth helper. Resource observations can then feed the normal Explorer filters.
 An observation becomes an Agent Endpoint only after target materialization, a current target
-Connector Grant, and the Harness's separate Endpoint Grant.
+Connector Grant, and the Harness's separate Endpoint Grant. The implemented Zwirn slice persists
+only the Connector config/socket paths and opaque selected Connection references in an owner-only
+file. At each startup it refreshes those selections through the Connector and compiles the
+value-free facts into the immutable session capability profile; it does not persist a description
+lease, route binding, kubeconfig field, or credential.
+
+Immediately before provider I/O, the Connector separately proves `get` on the exact Service and
+`get` on that Service's `proxy` subresource, reads the current Service, and refuses if its UID,
+recognized provider, or selected port differs from the materialized observation. Only then does it
+append the catalog-owned relative GET path beneath the API-server Service proxy route.
 
 ## 6. Personal-local configuration and UX
 
@@ -151,5 +166,7 @@ credential value, server URL, context name, or resource binding.
 `connectors connect kubernetes` lists detected contexts when selection is ambiguous and performs no
 cluster request. `connectors connect kubernetes --context NAME` activates the exact label, verifies
 identity/RBAC, creates the Kubernetes Connection, and prints the stored supported Service
-observations. Generic clients can use `connection candidates`, `connection activate`, and
-`connection observations` over the same credential-free protocol.
+observations. The user then materializes an observation explicitly; only Prometheus, Loki, and
+Alertmanager become callable through the Service proxy in this slice. Generic clients can use
+`connection candidates`, `connection activate`, `connection observations`, and `connection
+materialize` over the same credential-free protocol.

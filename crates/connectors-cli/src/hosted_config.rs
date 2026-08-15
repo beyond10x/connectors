@@ -16,6 +16,8 @@ pub struct HostedServerConfig {
     pub identity: HostedIdentityConfig,
     pub storage: HostedStorageConfig,
     pub kubernetes: HostedKubernetesConfig,
+    #[serde(default)]
+    pub vault: HostedVaultConfig,
     pub sip: HostedSipConfig,
 }
 
@@ -61,6 +63,35 @@ pub struct HostedSipConfig {
     pub deployment_config: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedVaultConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub address: Option<String>,
+    #[serde(default = "default_vault_mount")]
+    pub mount: String,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub token_file: Option<PathBuf>,
+    #[serde(default)]
+    pub ca_file: Option<PathBuf>,
+}
+
+impl Default for HostedVaultConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            address: None,
+            mount: default_vault_mount(),
+            role: None,
+            token_file: None,
+            ca_file: None,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum HostedServerConfigError {
     #[error("hosted Connector configuration could not be read")]
@@ -87,6 +118,14 @@ impl HostedServerConfig {
     }
 
     fn validate(&self) -> Result<(), HostedServerConfigError> {
+        let vault_complete = self.vault.address.is_some()
+            && self.vault.role.is_some()
+            && self.vault.token_file.is_some()
+            && self.vault.ca_file.is_some();
+        let vault_empty = self.vault.address.is_none()
+            && self.vault.role.is_none()
+            && self.vault.token_file.is_none()
+            && self.vault.ca_file.is_none();
         if !valid_ref(&self.tenant_id, 256)
             || self.identity.origin.len() > 2_048
             || !valid_base_path(&self.server.base_path)
@@ -99,6 +138,9 @@ impl HostedServerConfig {
                 .any(|namespace| !valid_dns_label(namespace, 63))
             || (self.sip.enabled
                 != (self.sip.listen.is_some() && self.sip.deployment_config.is_some()))
+            || (self.vault.enabled && !vault_complete)
+            || (!self.vault.enabled && !vault_empty)
+            || !valid_dns_label(&self.vault.mount, 63)
         {
             return Err(HostedServerConfigError::Invalid);
         }
@@ -110,6 +152,10 @@ impl HostedServerConfig {
         }
         Ok(())
     }
+}
+
+fn default_vault_mount() -> String {
+    "secret".to_owned()
 }
 
 fn default_kubernetes_token_file() -> PathBuf {
@@ -207,5 +253,48 @@ listen = "0.0.0.0:5060"
         )
         .unwrap();
         assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn hosted_vault_is_all_or_nothing() {
+        let enabled: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+"#,
+        )
+        .unwrap();
+        enabled.validate().unwrap();
+
+        let mut inconsistent = enabled;
+        inconsistent.vault.enabled = false;
+        assert!(inconsistent.validate().is_err());
+
+        inconsistent.vault.address = None;
+        inconsistent.vault.role = None;
+        inconsistent.vault.ca_file = None;
+        assert!(
+            inconsistent.validate().is_err(),
+            "a disabled Vault cannot retain even one runtime identity field"
+        );
+        inconsistent.vault.token_file = None;
+        inconsistent.validate().unwrap();
     }
 }

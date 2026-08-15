@@ -131,6 +131,7 @@ pub enum ChannelState {
 #[serde(rename_all = "snake_case")]
 pub enum RouteAdapter {
     GrafanaDatasourceProxyV1,
+    KubernetesServiceProxyV1,
 }
 
 /// Value-free projection of a Connection's immutable route.

@@ -7,7 +7,7 @@ priority:
 design: docs/design/02-architecture.md
 epic: substrate-integration
 areas: [domain, protocol, service, server]
-note: "architecture closed by ADR 0017 and substrate phase 3 is green; implementation remains blocked on an owner-signed substrate bundle and the not-yet-created platform crates"
+note: "architecture closed by ADR 0017 and substrate phase 3 is green; implementation remains blocked on an owner-signed substrate bundle"
 ---
 
 # Substrate events enter durable delivery with gap recovery
@@ -49,5 +49,6 @@ without pretending those guarantees are identical.
   state, and honest bounded provenance are fixed.
 - Substrate phase 3 now provides the independently reviewed source-scoped, snapshot-first 0.2
   development behavior and shared vector authority. No S-029 implementation exists yet: the
-  required platform crates are not present, and stable adoption still requires an owner-signed
-  substrate bundle. It is not blocked on an architectural owner or recovery decision.
+  required platform crates now exist, but stable adoption still requires an owner-signed Substrate
+  bundle before the bridge is implemented. It is not blocked on an architectural owner or recovery
+  decision.

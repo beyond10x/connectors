@@ -23,12 +23,13 @@ axum = { version = "0.8", features = ["json", "tokio"] }
 catalog = { version = "0.1.0", path = "../catalog" }
 clap = { version = "4", features = ["derive"] }
 connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
-connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
+connector-secrets = { version = "0.1.0", path = "../connector-secrets", features = ["vault"] }
 domain = { version = "0.1.0", path = "../domain" }
 ed25519-dalek = "2"
 getrandom = "0.3"
 hex = "0.4"
 futures-util = "0.3"
+http = "1"
 k8s-openapi = { version = "0.28", features = ["v1_32"] }
 kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring"] }
 protocol = { version = "0.1.0", path = "../protocol" }

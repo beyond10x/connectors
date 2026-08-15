@@ -266,6 +266,12 @@ admits its driver, placement, scope, and destination aperture.
 
 ## 9. Delivery slices
 
+The hosted managed-store foundation is implemented: Cloud deploys internal TLS Vault KV v2, binds
+the Connectors ServiceAccount through Kubernetes auth to one tenant prefix, and the hosted
+Connector composes that store with fail-closed startup plus in-memory token refresh. This does not
+complete external secret-provider Connections, remote target-sealed entry, or the browser product
+flow below.
+
 1. Replace the development `FileStore` release path with an OS-keychain backend while preserving
    the existing prepared transaction and crash-recovery contract.
 2. Add credential-source bindings and one constrained mock secret-provider adapter; prove no

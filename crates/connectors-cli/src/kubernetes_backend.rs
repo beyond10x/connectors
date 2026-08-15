@@ -8,6 +8,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use protocol::connection::{
+    ConnectionDescription as ControlConnectionDescription, ConnectionError, ConnectionErrorCode,
+    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
+    ConnectionSummary as ControlConnectionSummary, DescribeRequest as ConnectionDescribeRequest,
+};
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
@@ -187,6 +192,18 @@ impl KubernetesStatusBackend {
         }
     }
 
+    fn require_connection_owner(&self, context: &OwnerContext) -> Result<(), ConnectionError> {
+        if context.tenant_id == self.expected_tenant {
+            Ok(())
+        } else {
+            Err(ConnectionError::new(
+                ConnectionErrorCode::NotGranted,
+                "Connector tenant binding refused the request",
+                false,
+            ))
+        }
+    }
+
     fn description(&self, context: &OwnerContext) -> OperationDescription {
         OperationDescription {
             operation_ref: OPERATION.to_owned(),
@@ -289,6 +306,45 @@ impl OperationBackend for KubernetesStatusBackend {
                 false,
             )),
         }
+    }
+
+    async fn handle_connection(
+        &self,
+        context: &OwnerContext,
+        request: ConnectionRequest,
+    ) -> Result<ConnectionResult, ConnectionError> {
+        self.require_connection_owner(context)?;
+        match request {
+            ConnectionRequest::Search(search) => {
+                let query = search.query.to_ascii_lowercase();
+                let connections = (query.is_empty()
+                    || ["kubernetes", "development", "cluster", "read-only"]
+                        .iter()
+                        .any(|term| query.contains(term)))
+                .then(control_connection)
+                .into_iter()
+                .take(usize::from(search.limit))
+                .collect();
+                Ok(ConnectionResult::Search { connections })
+            }
+            ConnectionRequest::Describe(ConnectionDescribeRequest { connection_ref })
+                if connection_ref == CONNECTION =>
+            {
+                Ok(ConnectionResult::Describe(ControlConnectionDescription {
+                    summary: control_connection(),
+                    channels: Vec::new(),
+                }))
+            }
+            _ => Err(ConnectionError::new(
+                ConnectionErrorCode::NotFound,
+                "Kubernetes Integration Connection was not found",
+                false,
+            )),
+        }
+    }
+
+    fn supports_connections(&self) -> bool {
+        true
     }
 }
 
@@ -448,6 +504,17 @@ fn connection() -> ConnectionSummary {
     }
 }
 
+fn control_connection() -> ControlConnectionSummary {
+    ControlConnectionSummary {
+        connection_ref: CONNECTION.to_owned(),
+        integration_ref: "kubernetes".to_owned(),
+        label: "Development cluster (read-only)".to_owned(),
+        state: ConnectionState::Callable,
+        initiation: vec![ConnectionInitiator::B10x],
+        route: ConnectionRoute::Direct,
+    }
+}
+
 fn description_ref(context: &OwnerContext) -> String {
     let digest = Sha256::digest(format!(
         "{OPERATION}\0{}\0{}\0v1",
@@ -567,6 +634,40 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(refused.code, OperationErrorCode::NotGranted);
+    }
+
+    #[tokio::test]
+    async fn hosted_connection_projection_is_value_free_and_tenant_bound() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            vec!["b10x".to_owned()],
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let ConnectionResult::Search { connections } = backend
+            .handle_connection(
+                &owner("tenant-dev"),
+                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                    query: String::new(),
+                    limit: 16,
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("Connection search result expected");
+        };
+        assert_eq!(connections, vec![control_connection()]);
+        assert!(backend
+            .handle_connection(
+                &owner("tenant-other"),
+                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                    query: String::new(),
+                    limit: 16,
+                }),
+            )
+            .await
+            .is_err());
     }
 
     #[test]

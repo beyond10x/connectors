@@ -4,8 +4,8 @@
   "stability": "alpha",
   "files": [
     {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
-    {"path":"contracts/connector-connection/v0alpha1/README.md","bytes":3423,"sha256":"2c0a897ae70e79da3fbbe756334c5ecd1c0e94e410cd30b8f1c1ca11506a72e8"},
-    {"path":"contracts/connector-connection/v0alpha1/connector-connection.schema.json","bytes":10934,"sha256":"fe8ff57c8e8694eb703d56ccefb9eff789f704024210e34be781c2b3b2561e34"},
+    {"path":"contracts/connector-connection/v0alpha1/README.md","bytes":4051,"sha256":"6bed7bcca382311a3ae730c6da3840164f8abc36f39c8acf3d9e539b7a5c3e06"},
+    {"path":"contracts/connector-connection/v0alpha1/connector-connection.schema.json","bytes":10965,"sha256":"a4c21118527ba276997a3d481c15c752910daf0ab621619eafed0b913fa2ec8e"},
     {"path":"contracts/connector-connection/v0alpha1/vectors.schema.json","bytes":719,"sha256":"e5806bca415ad53f88ac5f89ae03df62bfdbc87350cb853182942541ad76ca74"},
     {"path":"contracts/connector-connection/v0alpha1/vectors.json","bytes":5956,"sha256":"11e32cebacf5654dd1607a3c4f3622c23c02a6d48d30ea089fed7db471546251"}
   ]
