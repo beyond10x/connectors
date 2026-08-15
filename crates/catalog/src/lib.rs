@@ -508,6 +508,12 @@ pub struct OAuth2 {
     pub token_path: &'static str,
     /// The scopes the grant requests.
     pub scopes: &'static [&'static str],
+    /// How multiple scopes are delimited on the authorization request and in a returned `scope`
+    /// value. OAuth defaults to spaces; Slack OAuth v2 uses commas.
+    pub scope_separator: OAuthScopeSeparator,
+    /// JSON Pointer into a successful token response locating the granted scope list. Always
+    /// explicit here; `/scope` is the OAuth default.
+    pub scope_response_pointer: &'static str,
     /// The grants a host may run for this credential. A grant absent from this list is one the
     /// connector does not allow, not one the host may try anyway.
     pub grants: &'static [OAuthGrant],
@@ -518,6 +524,15 @@ pub struct OAuth2 {
     /// secret an operator supplies. A public client needs a client id but no secret, so a host
     /// must not require one.
     pub public_client: bool,
+}
+
+/// A provider's scope-list delimiter. Mirrors `connector_spec::OAuthScopeSeparator`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OAuthScopeSeparator {
+    /// RFC 6749's space-delimited scope list.
+    Space,
+    /// A comma-delimited scope list.
+    Comma,
 }
 
 /// One token grant an [`OAuth2`] credential allows. Mirrors `connector_spec::OAuthGrant`.

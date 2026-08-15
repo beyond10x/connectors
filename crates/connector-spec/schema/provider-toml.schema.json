@@ -1412,6 +1412,15 @@
           "description": "Requested scopes.",
           "items": { "type": "string" }
         },
+        "scope_separator": {
+          "enum": ["space", "comma"],
+          "description": "How multiple scopes are separated on the authorization request and in a returned scope value. Defaults to OAuth's space-delimited form; Slack OAuth v2 uses comma."
+        },
+        "scope_response_pointer": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "JSON Pointer into a successful token response locating the granted scope list. Omit for the conventional top-level `/scope`; declare a nonstandard path such as Slack's `/authed_user/scope`."
+        },
         "grants": {
           "type": "array",
           "description": "The grants the host may run for this credential.",

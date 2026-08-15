@@ -682,6 +682,16 @@
           ],
           "type": "object"
         },
+        "scope_response_pointer": {
+          "pattern": "^/",
+          "type": "string"
+        },
+        "scope_separator": {
+          "enum": [
+            "space",
+            "comma"
+          ]
+        },
         "scopes": {
           "items": {
             "type": "string"

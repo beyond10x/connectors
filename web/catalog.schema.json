@@ -288,6 +288,8 @@
         "name",
         "scheme",
         "description",
+        "subject",
+        "hazard",
         "env",
         "user_env",
         "user_suffix",
@@ -303,6 +305,19 @@
         },
         "description": {
           "$ref": "#/$defs/string"
+        },
+        "subject": {
+          "enum": [
+            "unstated",
+            "app",
+            "user"
+          ]
+        },
+        "hazard": {
+          "enum": [
+            "resource_owner_secret_shared",
+            null
+          ]
         },
         "env": {
           "$ref": "#/$defs/string_array"
@@ -356,15 +371,22 @@
       "additionalProperties": false,
       "required": [
         "endpoint",
+        "token_endpoint",
         "authorize_path",
         "token_path",
         "client_id",
         "scopes",
+        "scope_separator",
+        "scope_response_pointer",
         "grants",
-        "redirect"
+        "redirect",
+        "public_client"
       ],
       "properties": {
         "endpoint": {
+          "$ref": "#/$defs/string"
+        },
+        "token_endpoint": {
           "$ref": "#/$defs/string"
         },
         "authorize_path": {
@@ -378,6 +400,16 @@
         },
         "scopes": {
           "$ref": "#/$defs/string_array"
+        },
+        "scope_separator": {
+          "enum": [
+            "space",
+            "comma"
+          ]
+        },
+        "scope_response_pointer": {
+          "type": "string",
+          "pattern": "^/"
         },
         "grants": {
           "$ref": "#/$defs/string_array"
@@ -406,6 +438,9 @@
               }
             }
           ]
+        },
+        "public_client": {
+          "type": "boolean"
         }
       }
     },

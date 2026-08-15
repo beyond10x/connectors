@@ -43,16 +43,18 @@ Connection. Neither an agent nor its harness receives the credential or the one-
 endpoint.
 
 For this personal-local alpha, the person configuring the deployment also owns the Slack app and
-the command currently collects only the app-level Socket Mode token. The ordinary bot, delegated
-user, and Enterprise Admin Web API surfaces are catalogued but their general OAuth/scope-aware
-Connection runtime is not claimed yet.
+the command currently collects only the app-level Socket Mode token. The catalog now declares the
+ordinary bot installation and the separate delegated-user OAuth flow exactly, including their
+scope-gated operations, but the general OAuth/scope-aware Connection runtime is M3 work and is not
+claimed by the current CLI.
 
 The finished product asks only for credentials required by the chosen features:
 
 - **Receive over Socket Mode:** app-level token (`xapp`) for the socket plus bot authorization for
   the selected events and replies.
-- **Act as a person:** a separate delegated user OAuth connection; never silently substituted for
-  the bot.
+- **Act as a person:** a separate principal-owned delegated user OAuth Connection, using Slack's
+  user-centric consent flow. Zwirn may use it only through an explicit Grant; Slack sees and audits
+  the consenting user. The shared bot token is never silently substituted.
 - **Read Enterprise administration:** a separate organization-wide OAuth installation completed by
   an Enterprise Org Admin or Owner. Slack grants the selected `admin.*` scopes on a user token;
   there is no magic admin token type inferred from its prefix.

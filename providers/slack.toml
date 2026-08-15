@@ -12,7 +12,7 @@ vendor = "Slack"
 authority = "com.slack.api"
 api_version = "v1"
 base_url = "https://slack.com"
-description = "Slack messaging, inbound events, and a curated read-only Enterprise Admin surface"
+description = "Slack messaging as the installed Zwirn bot or as a consenting user, inbound events, and a curated read-only Enterprise Admin surface"
 default_auth = [{ credentials = ["slack.bot_token"] }]
 verify = "slack-users-info"
 
@@ -27,6 +27,11 @@ name = "admin"
 description = "Curated read-only Enterprise organization administration"
 tags = ["identity", "messaging"]
 audiences = ["sre", "security-engineer"]
+
+[[services]]
+name = "login"
+description = "Slack OAuth v2 authorization and token endpoints. The host uses this service only while creating or refreshing a Connection"
+base_url = "https://slack.com"
 
 [[spec]]
 service = "default"
@@ -60,16 +65,34 @@ sha256 = "9a967daeabf79901ce5df35244d8e25647b0b8a1026372b001b61d2ea5c49052"
 [[auth]]
 name = "slack.bot_token"
 scheme = "bearer"
-entry = "connect_session"
 subject = "app"
-description = "Slack bot user OAuth token for app-authority Web API operations and event subscriptions"
+description = "Workspace bot token obtained when a person installs the Zwirn Slack app. Calls are attributed to the app's bot, not to the installer"
+
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/oauth/v2/authorize"
+token_path = "/api/oauth.v2.access"
+scopes = ["app_mentions:read", "channels:history", "chat:write", "reactions:write", "users:read"]
+scope_separator = "comma"
+grants = ["authorization_code", "refresh_token"]
 
 [[auth]]
 name = "slack.user_token"
 scheme = "bearer"
-entry = "connect_session"
 subject = "user"
-description = "Slack user OAuth token for explicitly delegated user-authority operations; no such operation is selected initially"
+description = "Delegated OAuth token for the consenting Slack member. Zwirn may invoke an admitted operation through this principal-owned Connection, and Slack attributes it to that user"
+
+# Slack's user-centric OAuth flow is intentionally separate from app installation. It returns the
+# user access token at the standard top-level `access_token`, so one Connection receives exactly one
+# credential and there is no hidden bot-token side effect to assign to a different owner.
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/oauth/v2_user/authorize"
+token_path = "/api/oauth.v2.user.access"
+scopes = ["channels:history", "chat:write", "reactions:write", "users:read"]
+scope_separator = "comma"
+scope_response_pointer = "/authed_user/scope"
+grants = ["authorization_code", "refresh_token"]
 
 [[auth]]
 name = "slack.admin_token"
@@ -111,7 +134,10 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 expose = true
-auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["chat:write"]] } }]
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["chat:write"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["chat:write"]] } },
+]
 omit.body = ["as_user", "attachments", "blocks", "icon_emoji", "icon_url", "link_names", "mrkdwn", "parse", "reply_broadcast", "unfurl_links", "unfurl_media", "username"]
 error_envelope = { message_pointer = "/error" }
 
@@ -144,7 +170,10 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 expose = true
-auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:history"]] } }]
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:history"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["channels:history"]] } },
+]
 omit.query = ["inclusive"]
 pagination = { cursor = { cursor_param = "cursor", next_cursor_pointer = "/response_metadata/next_cursor", max_pages = 10 } }
 error_envelope = { message_pointer = "/error" }
@@ -185,7 +214,10 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 expose = true
-auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["users:read"]] } }]
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["users:read"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["users:read"]] } },
+]
 error_envelope = { message_pointer = "/error" }
 
 [[patch.operations]]
@@ -203,7 +235,10 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 expose = true
-auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["reactions:write"]] } }]
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["reactions:write"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["reactions:write"]] } },
+]
 error_envelope = { message_pointer = "/error" }
 
 # Agent curation: four read-only Admin API operations. No `admin.*` write is selected or callable.
@@ -381,3 +416,38 @@ steps = [
   "Enter the signing secret in the protected completion flow",
   "Install or reinstall the app so subscription and scope changes take effect",
 ]
+
+# One Slack app registration backs both OAuth Connection choices. These are operator-level slots:
+# the end user sees Slack's consent screen but never sees or supplies the product's client secret.
+
+[[config]]
+name = "oauth_client_id"
+service = "default"
+label = "Slack application client id"
+help = "The client id of the Slack app users install or authorize. Supplied once by the deployment operator, not by an end user"
+format = "text"
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.client_id"
+
+[[config]]
+name = "oauth_redirect_uri"
+service = "default"
+label = "Slack OAuth redirect URI"
+help = "The exact callback URI served by this deployment and registered under the Slack app's OAuth & Permissions settings"
+example = "https://connectors.example/api/oauth/callback"
+format = "url"
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.redirect_uri"
+
+[[config]]
+name = "oauth_client_secret"
+service = "default"
+label = "Slack application client secret"
+help = "The Slack app's client secret. Supplied once by the deployment operator and never exposed to the person authorizing a Connection"
+format = "token"
+secret = true
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.client_secret"

@@ -181,6 +181,12 @@ export interface Credential {
    */
   scheme: { kind: string; name: string | null; prefix: string }
   description: string
+  /** How a non-OAuth credential enters custody, or `null` for OAuth/ambient acquisition. */
+  entry: 'connect_session' | null
+  /** Whose authority the vendor observes when this credential is used. */
+  subject: 'unstated' | 'app' | 'user'
+  /** A named acquisition weakness, or `null` when none is declared. */
+  hazard: 'resource_owner_secret_shared' | null
   env: string[]
   user_env: string[]
   user_suffix: string | null
@@ -196,12 +202,16 @@ export interface OAuthRedirect {
 /** The complete OAuth2 declaration; no authorize URL needs to be reconstructed from a boolean. */
 export interface OAuth2 {
   endpoint: string
+  token_endpoint: string
   authorize_path: string
   token_path: string
   client_id: string
   scopes: string[]
+  scope_separator: 'space' | 'comma'
+  scope_response_pointer: string
   grants: string[]
   redirect: OAuthRedirect | null
+  public_client: boolean
 }
 
 /** One permitted value for a configuration field whose input is closed (C-225, C-453). */

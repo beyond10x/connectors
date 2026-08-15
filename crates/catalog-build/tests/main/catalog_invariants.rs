@@ -168,19 +168,19 @@ fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
 
     for operation in operations {
         let service = operation["service"].as_str().expect("service");
-        let requirement = operation["auth_requirements"]
+        let requirements = operation["auth_requirements"]
             .as_array()
-            .and_then(|requirements| requirements.first())
             .expect("every selected Slack operation has scoped auth");
-        let credential = requirement["credentials"][0]
-            .as_str()
-            .expect("one credential");
-        let scopes = requirement["scopes"][credential]
-            .as_array()
-            .expect("credential-local scope alternatives");
-        assert!(!scopes.is_empty());
 
         if service == "admin" {
+            assert_eq!(requirements.len(), 1);
+            let requirement = &requirements[0];
+            let credential = requirement["credentials"][0]
+                .as_str()
+                .expect("one credential");
+            let scopes = requirement["scopes"][credential]
+                .as_array()
+                .expect("credential-local scope alternatives");
             assert_eq!(operation["direction"], "read");
             assert_eq!(operation["risk"], "low");
             assert_eq!(credential, "slack.admin_token");
@@ -193,13 +193,30 @@ fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
                             .as_str()
                             .is_some_and(|scope| scope.starts_with("admin."))))
                 ));
-        } else {
-            assert_eq!(service, "default");
-            assert_eq!(credential, "slack.bot_token");
+            assert_ne!(credential, "slack.app_token");
+            assert_ne!(credential, "slack.user_token");
+            continue;
         }
 
-        assert_ne!(credential, "slack.app_token");
-        assert_ne!(credential, "slack.user_token");
+        assert_eq!(service, "default");
+        assert_eq!(requirements.len(), 2);
+        let expected_scope = match operation["id"].as_str().expect("operation id") {
+            "slack-chat-post-message" => "chat:write",
+            "slack-conversations-history" => "channels:history",
+            "slack-users-info" => "users:read",
+            "slack-reactions-add" => "reactions:write",
+            other => panic!("unexpected curated Slack operation {other}"),
+        };
+        for (requirement, expected_credential) in requirements
+            .iter()
+            .zip(["slack.bot_token", "slack.user_token"])
+        {
+            assert_eq!(requirement["credentials"][0], expected_credential);
+            assert_eq!(
+                requirement["scopes"][expected_credential][0][0],
+                expected_scope
+            );
+        }
     }
 
     assert_eq!(
@@ -231,6 +248,59 @@ fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
         socket["auth_requirements"][0]["scopes"]["slack.app_token"][0][0],
         "connections:write"
     );
+}
+
+/// GitLab is the proving provider for the other half of delegated authority: a person-owned OAuth
+/// or PAT Connection and three automation Connection kinds share one API surface, but never one
+/// credential identity. Reads admit `read_api` or `api`; writes admit only `api`.
+#[test]
+fn gitlab_user_and_automation_connections_are_distinct_and_scope_gated() {
+    let (workspace, plan) = full_plan();
+    let mut all = documents(&workspace, &plan);
+    let gitlab = all.remove("gitlab").expect("GitLab ships");
+
+    let credentials = gitlab["auth"].as_array().expect("credentials");
+    let subjects: BTreeMap<_, _> = credentials
+        .iter()
+        .map(|credential| {
+            (
+                credential["name"].as_str().expect("credential name"),
+                credential["subject"].as_str().expect("credential subject"),
+            )
+        })
+        .collect();
+    assert_eq!(subjects["gitlab.oauth_token"], "user");
+    assert_eq!(subjects["gitlab.token"], "user");
+    for name in [
+        "gitlab.service_account_token",
+        "gitlab.group_access_token",
+        "gitlab.project_access_token",
+    ] {
+        assert_eq!(subjects[name], "app");
+    }
+
+    for operation in gitlab["operations"].as_array().expect("operations") {
+        let requirements = operation["auth_requirements"]
+            .as_array()
+            .expect("GitLab operation auth");
+        assert_eq!(requirements.len(), 5);
+        for requirement in requirements {
+            let credential = requirement["credentials"][0]
+                .as_str()
+                .expect("one actor credential");
+            let alternatives = requirement["scopes"][credential]
+                .as_array()
+                .expect("credential-local scopes");
+            if operation["id"] == "gitlab-issue-create" {
+                assert_eq!(alternatives, &[serde_json::json!(["api"])]);
+            } else {
+                assert_eq!(
+                    alternatives,
+                    &[serde_json::json!(["api"]), serde_json::json!(["read_api"]),]
+                );
+            }
+        }
+    }
 }
 
 /// S-015 is a vocabulary migration, not a behavioural edit. The digest began as the pre-migration
@@ -738,6 +808,8 @@ fn no_input_or_artifact_carries_a_credential_shaped_value() {
         "authorize_path",
         "token_path",
         "scopes",
+        "scope_separator",
+        "scope_response_pointer",
         "grants",
         "redirect",
         "public_client",

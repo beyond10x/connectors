@@ -2,15 +2,40 @@
   "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
-      "description": "GitLab personal access token sent as a bearer. A token scoped to read_api is enough for every read below; the api scope is required for gitlab-issue-create",
-      "env": [
-        "GITLAB_TOKEN"
-      ],
+      "description": "Personal access token entered once through a protected Connect Session. Acts as the person who created it; choose read_api for reads or api for writes",
+      "entry": "connect_session",
       "name": "gitlab.token",
       "scheme": {
         "kind": "bearer"
       },
       "subject": "user"
+    },
+    {
+      "description": "Personal access token belonging to a dedicated GitLab service account. Acts as that non-human automation identity and is limited by its memberships, role, scope, and expiry",
+      "entry": "connect_session",
+      "name": "gitlab.service_account_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    },
+    {
+      "description": "Group access token entered once through a protected Connect Session. Acts as GitLab's group bot user and reaches only its group and projects, bounded by role, scope, and expiry",
+      "entry": "connect_session",
+      "name": "gitlab.group_access_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    },
+    {
+      "description": "Project access token entered once through a protected Connect Session. Acts as GitLab's project bot user and reaches only its project, bounded by role, scope, and expiry",
+      "entry": "connect_session",
+      "name": "gitlab.project_access_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
     },
     {
       "description": "GitLab OAuth2 access token obtained on behalf of a signed-in user. Bounded by that user's own permissions, never by the application's",
@@ -23,9 +48,7 @@
           "refresh_token"
         ],
         "scopes": [
-          "read_api",
-          "read_user",
-          "read_repository"
+          "api"
         ],
         "token_path": "/oauth/token"
       },
@@ -95,19 +118,6 @@
       "required": false,
       "secret": true,
       "service": "default"
-    },
-    {
-      "approval": "none",
-      "binds": "credential.gitlab.token",
-      "docs_url": "https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html",
-      "format": "token",
-      "help": "Create one in the selected GitLab installation's User Settings -> Access Tokens. Grant read_api for every read below, or api if you also want gitlab-issue-create to work",
-      "label": "GitLab personal access token",
-      "level": "connection",
-      "name": "token",
-      "required": true,
-      "secret": true,
-      "service": "default"
     }
   ],
   "connector": "gitlab",
@@ -117,9 +127,95 @@
     ],
     [
       "gitlab.token"
+    ],
+    [
+      "gitlab.service_account_token"
+    ],
+    [
+      "gitlab.group_access_token"
+    ],
+    [
+      "gitlab.project_access_token"
     ]
   ],
-  "description": "GitLab: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only",
+  "default_auth_requirements": [
+    {
+      "credentials": [
+        "gitlab.oauth_token"
+      ],
+      "scopes": {
+        "gitlab.oauth_token": [
+          [
+            "api"
+          ],
+          [
+            "read_api"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "gitlab.token"
+      ],
+      "scopes": {
+        "gitlab.token": [
+          [
+            "api"
+          ],
+          [
+            "read_api"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "gitlab.service_account_token"
+      ],
+      "scopes": {
+        "gitlab.service_account_token": [
+          [
+            "api"
+          ],
+          [
+            "read_api"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "gitlab.group_access_token"
+      ],
+      "scopes": {
+        "gitlab.group_access_token": [
+          [
+            "api"
+          ],
+          [
+            "read_api"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "gitlab.project_access_token"
+      ],
+      "scopes": {
+        "gitlab.project_access_token": [
+          [
+            "api"
+          ],
+          [
+            "read_api"
+          ]
+        ]
+      }
+    }
+  ],
+  "description": "GitLab for people and automation identities: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only",
   "generator": "connectors 0.1.0",
   "operations": [
     {
@@ -129,7 +225,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Get the currently authenticated user. Takes no parameters; used as the verify read to prove a token resolves",
@@ -171,6 +353,10 @@
             "format": "uri",
             "type": "string"
           },
+          "bot": {
+            "description": "Whether GitLab classifies the effective actor as a bot. A protected Connect Session uses this to refuse a human token selected as automation, or a bot token selected as a person",
+            "type": "boolean"
+          },
           "id": {
             "description": "The user's global id",
             "type": "integer"
@@ -193,7 +379,8 @@
         "required": [
           "id",
           "username",
-          "state"
+          "state",
+          "bot"
         ],
         "type": "object"
       },
@@ -208,7 +395,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List the groups the authenticated user is a member of, optionally narrowed by a search term",
@@ -391,7 +664,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List projects the authenticated user can reach, optionally narrowed by a search term — this is how a caller obtains the numeric project id every other operation requires",
@@ -625,7 +984,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List issues in a project, optionally filtered by state, newest activity first",
@@ -848,7 +1293,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Get one issue by its project-scoped number (iid), not its global id",
@@ -1013,7 +1544,78 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Open a new issue on a project. Visible immediately to everyone with access to the project (the whole world, if the project is public) and notifies its watchers",
@@ -1192,7 +1794,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List merge requests in a project, optionally filtered by state, newest activity first",
@@ -1412,7 +2100,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Get one CI/CD pipeline's status and timing by its id",
@@ -1569,7 +2343,93 @@
         ],
         [
           "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List a project's repository branches",
