@@ -13,6 +13,7 @@ workspace = "../connectors-runtime"
 [dependencies]
 async-trait = "0.1"
 catalog = { version = "0.1.0", path = "../catalog" }
+connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
 connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
 domain = { version = "0.1.0", path = "../domain" }

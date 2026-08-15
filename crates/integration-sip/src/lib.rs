@@ -6,4 +6,4 @@ mod backend;
 mod runtime;
 
 pub use backend::{LaunchError, LaunchedSession, SessionLauncher, SipOperationBackend};
-pub use runtime::{load_authority_issuer, RuntimeLauncher};
+pub use runtime::{load_authority_issuer, RuntimeLauncher, StoredSipCredentials};

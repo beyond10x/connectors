@@ -220,12 +220,20 @@ pub enum ConfigError {
 impl PersonalConfig {
     /// Read one strict TOML configuration.
     pub fn read(path: &Path) -> Result<Self, ConfigError> {
-        let text = read_trusted_config(path, MAX_CONFIG_BYTES, TrustedOwner::CurrentUser).map_err(
-            |error| match error {
+        Self::read_with_owner(path, TrustedOwner::CurrentUser)
+    }
+
+    /// Read strict deployment configuration installed by root for a non-root hosted process.
+    pub fn read_hosted(path: &Path) -> Result<Self, ConfigError> {
+        Self::read_with_owner(path, TrustedOwner::CurrentUserOrRoot)
+    }
+
+    fn read_with_owner(path: &Path, owner: TrustedOwner) -> Result<Self, ConfigError> {
+        let text =
+            read_trusted_config(path, MAX_CONFIG_BYTES, owner).map_err(|error| match error {
                 TrustedConfigReadError::Io(error) => ConfigError::Read(error),
                 TrustedConfigReadError::Unsafe => ConfigError::Invalid,
-            },
-        )?;
+            })?;
         let config: Self = toml::from_str(&text).map_err(ConfigError::Parse)?;
         config.validate()?;
         Ok(config)

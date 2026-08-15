@@ -239,6 +239,12 @@ an inert store. The binding described above becomes active only when a configure
 Integration explicitly receives and consumes the `SecretStore` capability; readiness may not
 advertise it before then.
 
+**2026-08-15 SIP credential activation.** Hosted SIP digest authentication now consumes that
+capability. Configuration contains only the authority, service, and distinct username/password
+credential leaf names. The runtime constructs tenant-pinned `CredentialRef`s, initializes Vault
+before readiness, and injects the resulting `CredentialSource` into the SIP session launcher;
+unauthenticated SIP remains possible only when both the credential binding and Vault are disabled.
+
 The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
 databases — each individually justified, collectively unqueryable. One connector database + one
 credential-store port + one pack is the whole Connectors-owned inventory here; the port may retain

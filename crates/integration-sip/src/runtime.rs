@@ -8,11 +8,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use connector_secrets::{CredentialRef, SecretStore, StoreError};
 use ed25519_dalek::SigningKey;
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, RootCertStore};
 use service::authority::AuthorityIssuer;
-use service::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute};
+use service::{AdmittedVoicePlan, CredentialSet, SensitiveValue, VoiceApplicationRoute};
 use tokio::net::TcpStream;
 use tokio::sync::watch;
 use tokio_rustls::TlsConnector;
@@ -22,7 +23,7 @@ use voice_runtime::{
     VoiceSessionControl,
 };
 
-use connectors_config::AuthorityConfig;
+use connectors_config::{AuthorityConfig, HostedSipCredentialConfig};
 
 use crate::backend::{LaunchError, LaunchedSession, SessionLauncher};
 
@@ -30,6 +31,7 @@ use crate::backend::{LaunchError, LaunchedSession, SessionLauncher};
 pub struct RuntimeLauncher {
     issuer: Arc<AuthorityIssuer>,
     application: Arc<TlsApplicationConnector>,
+    credentials: Arc<dyn CredentialSource>,
 }
 
 impl RuntimeLauncher {
@@ -40,6 +42,24 @@ impl RuntimeLauncher {
         connect_address: SocketAddr,
         tls_server_name: String,
     ) -> Self {
+        Self::with_credential_source(
+            issuer,
+            endpoint,
+            connect_address,
+            tls_server_name,
+            Arc::new(EmptyCredentials),
+        )
+    }
+
+    /// Construct a launcher with an explicit post-admission credential capability.
+    #[must_use]
+    pub fn with_credential_source(
+        issuer: Arc<AuthorityIssuer>,
+        endpoint: String,
+        connect_address: SocketAddr,
+        tls_server_name: String,
+        credentials: Arc<dyn CredentialSource>,
+    ) -> Self {
         Self {
             issuer,
             application: Arc::new(TlsApplicationConnector::new(
@@ -47,6 +67,7 @@ impl RuntimeLauncher {
                 connect_address,
                 tls_server_name,
             )),
+            credentials,
         }
     }
 }
@@ -58,13 +79,13 @@ impl SessionLauncher for RuntimeLauncher {
         let task_control = control.clone();
         let issuer = Arc::clone(&self.issuer);
         let application = Arc::clone(&self.application);
+        let credentials = Arc::clone(&self.credentials);
         let (observer, waiter) = dial_establishment_channel();
         let (completion_sender, completion) = watch::channel(None);
         tokio::spawn(async move {
-            let credentials = EmptyCredentials;
             let runtime = VoiceRuntime::new(
                 issuer.as_ref(),
-                &credentials,
+                credentials.as_ref(),
                 application.as_ref(),
                 &SystemClock,
                 &OsSessionMaterial,
@@ -86,6 +107,101 @@ impl SessionLauncher for RuntimeLauncher {
             control,
             completion,
         })
+    }
+}
+
+/// Tenant-pinned SIP digest credential source over an injected secret store.
+pub struct StoredSipCredentials {
+    store: Arc<dyn SecretStore>,
+    tenant: String,
+    username: CredentialRef,
+    password: CredentialRef,
+}
+
+impl StoredSipCredentials {
+    /// Validate and bind value-free credential addresses before any call is admitted.
+    pub fn new(
+        store: Arc<dyn SecretStore>,
+        tenant: impl Into<String>,
+        config: &HostedSipCredentialConfig,
+    ) -> Result<Self, LaunchError> {
+        let tenant = tenant.into();
+        let username = CredentialRef::new(
+            &tenant,
+            &config.authority,
+            &config.service,
+            &config.username_credential,
+        )
+        .map_err(|_| LaunchError::new("sip_credential_address_invalid"))?;
+        let password = CredentialRef::new(
+            &tenant,
+            &config.authority,
+            &config.service,
+            &config.password_credential,
+        )
+        .map_err(|_| LaunchError::new("sip_credential_address_invalid"))?;
+        if username == password {
+            return Err(LaunchError::new("sip_credential_addresses_overlap"));
+        }
+        Ok(Self {
+            store,
+            tenant,
+            username,
+            password,
+        })
+    }
+
+    async fn resolve_for_organization(
+        &self,
+        organization: &str,
+    ) -> Result<CredentialSet, DependencyError> {
+        if organization != self.tenant {
+            return Err(DependencyError::new("sip_credential_tenant_mismatch"));
+        }
+        let username = self
+            .store
+            .get(&self.username)
+            .await
+            .map_err(credential_store_error)?;
+        let password = self
+            .store
+            .get(&self.password)
+            .await
+            .map_err(credential_store_error)?;
+        if username.is_empty()
+            || password.is_empty()
+            || username.expose_secret().len() > 1_024
+            || password.expose_secret().len() > 1_024
+        {
+            return Err(DependencyError::new("sip_credentials_invalid"));
+        }
+        Ok(CredentialSet::new(vec![
+            SensitiveValue::new(username.expose_secret().to_owned()),
+            SensitiveValue::new(password.expose_secret().to_owned()),
+        ]))
+    }
+}
+
+#[async_trait]
+impl CredentialSource for StoredSipCredentials {
+    async fn resolve(
+        &self,
+        admitted: &AdmittedVoicePlan,
+    ) -> Result<CredentialSet, DependencyError> {
+        self.resolve_for_organization(admitted.sip().organization())
+            .await
+    }
+}
+
+fn credential_store_error(error: StoreError) -> DependencyError {
+    match error {
+        StoreError::NotFound { .. } => DependencyError::new("sip_credentials_not_configured"),
+        StoreError::Denied { .. } => DependencyError::new("sip_credentials_access_denied"),
+        StoreError::Unreachable { .. } => DependencyError::new("sip_credentials_unavailable"),
+        StoreError::Backend { .. }
+        | StoreError::Layout { .. }
+        | StoreError::Conflict { .. }
+        | StoreError::Unsupported { .. } => DependencyError::new("sip_credentials_invalid"),
     }
 }
 
@@ -230,6 +346,8 @@ fn termination(
 mod tests {
     use std::os::unix::fs::{symlink, PermissionsExt as _};
 
+    use connector_secrets::{MemoryStore, Secret};
+
     use super::*;
 
     fn config(path: &Path) -> AuthorityConfig {
@@ -258,5 +376,70 @@ mod tests {
         let link = root.path().join("authority-link.key");
         symlink(&key, &link).unwrap();
         assert!(load_authority_issuer(&config(&link)).is_err());
+    }
+
+    fn credential_config() -> HostedSipCredentialConfig {
+        HostedSipCredentialConfig {
+            authority: "org.asterisk.ari".to_owned(),
+            service: "default".to_owned(),
+            username_credential: "sip_username".to_owned(),
+            password_credential: "sip_password".to_owned(),
+        }
+    }
+
+    #[tokio::test]
+    async fn stored_credentials_are_tenant_scoped_ordered_and_redacted() {
+        let store = Arc::new(MemoryStore::new());
+        let username =
+            CredentialRef::new("tenant-1", "org.asterisk.ari", "default", "sip_username").unwrap();
+        let password =
+            CredentialRef::new("tenant-1", "org.asterisk.ari", "default", "sip_password").unwrap();
+        store
+            .put(&username, &Secret::new("caller-1"))
+            .await
+            .unwrap();
+        store
+            .put(&password, &Secret::new("SENTINEL-SIP-PASSWORD"))
+            .await
+            .unwrap();
+        let source = StoredSipCredentials::new(
+            store as Arc<dyn SecretStore>,
+            "tenant-1",
+            &credential_config(),
+        )
+        .unwrap();
+        let credentials = source.resolve_for_organization("tenant-1").await.unwrap();
+        assert_eq!(credentials.values()[0].expose_secret(), "caller-1");
+        assert_eq!(
+            credentials.values()[1].expose_secret(),
+            "SENTINEL-SIP-PASSWORD"
+        );
+        assert!(!format!("{credentials:?}").contains("SENTINEL"));
+        assert_eq!(
+            source
+                .resolve_for_organization("tenant-2")
+                .await
+                .unwrap_err()
+                .code(),
+            "sip_credential_tenant_mismatch"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_sip_credentials_fail_closed() {
+        let source = StoredSipCredentials::new(
+            Arc::new(MemoryStore::new()),
+            "tenant-1",
+            &credential_config(),
+        )
+        .unwrap();
+        assert_eq!(
+            source
+                .resolve_for_organization("tenant-1")
+                .await
+                .unwrap_err()
+                .code(),
+            "sip_credentials_not_configured"
+        );
     }
 }
