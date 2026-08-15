@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use server::authority::{
+use service::authority::{
     AuthorityError, IssuedAuthority, ProofKey, AUTHORIZATION_SCHEME, DPOP_HEADER,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -99,7 +99,7 @@ mod tests {
     use ed25519_dalek::SigningKey;
     use futures_util::SinkExt as _;
     use rtvbp::Transport as _;
-    use server::authority::{AuthorityIssuer, IssueRequest};
+    use service::authority::{AuthorityIssuer, IssueRequest};
     use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
     use tokio_tungstenite::tungstenite::Message;
 

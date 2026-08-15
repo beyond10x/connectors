@@ -52,7 +52,12 @@ const COMPILER_CRATES: &[&str] = &[
 /// does not dial a provider itself. A crate added here must be a **leaf** — nothing in the build
 /// path may depend on it, which
 /// [`a_compiler_crate_cannot_reach_a_network_crate`] enforces in the direction that matters.
-const NETWORK_CRATES: &[&str] = &["server"];
+const NETWORK_CRATES: &[&str] = &[
+    "server",
+    // Reusable local/hosted wire client. It may open the selected Connectors transport, but the
+    // compiler family may never use it as a shortcut to runtime data.
+    "connectors-client",
+];
 
 /// The build path does not reach the secret store — asserted over the dependency graph, not by
 /// convention.
@@ -306,7 +311,7 @@ fn the_voice_runtime_is_the_only_production_composition_leaf() {
     }
 }
 
-/// The product binary consumes the supervised leaf without feature-unifying it into the compiler.
+/// The thin product consumes the reusable runtime, which alone reaches the supervised voice leaf.
 #[test]
 fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
     let root = workspace_root();
@@ -348,15 +353,50 @@ fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
         .and_then(toml::Value::as_table)
         .expect("product dependencies");
     assert!(
-        dependencies.contains_key("voice-runtime"),
-        "the product must consume the one supervised runtime leaf"
+        dependencies.contains_key("connectors-runtime"),
+        "the product must delegate composition to the reusable runtime"
     );
-    for adapter in ["driver-sip", "rtvbp-voice-endpoint"] {
+    for runtime_internal in [
+        "integration-sip",
+        "voice-runtime",
+        "driver-sip",
+        "rtvbp-voice-endpoint",
+    ] {
         assert!(
-            !dependencies.contains_key(adapter),
-            "the product must not form a second direct `{adapter}` composition point"
+            !dependencies.contains_key(runtime_internal),
+            "the product must not form a direct `{runtime_internal}` composition point"
         );
     }
+
+    let runtime_manifest_path = root.join("crates/connectors-runtime/Cargo.toml");
+    let runtime_manifest = std::fs::read_to_string(&runtime_manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", runtime_manifest_path.display()));
+    let runtime_document: toml::Value = runtime_manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", runtime_manifest_path.display()));
+    let runtime_dependencies = runtime_document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("runtime dependencies");
+    assert!(
+        runtime_dependencies.contains_key("integration-sip"),
+        "the reusable runtime must explicitly compose the focused SIP Integration"
+    );
+
+    let sip_manifest_path = root.join("crates/integration-sip/Cargo.toml");
+    let sip_manifest = std::fs::read_to_string(&sip_manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", sip_manifest_path.display()));
+    let sip_document: toml::Value = sip_manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", sip_manifest_path.display()));
+    let sip_dependencies = sip_document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("SIP Integration dependencies");
+    assert!(
+        sip_dependencies.contains_key("voice-runtime"),
+        "the focused SIP Integration must consume the one supervised voice runtime"
+    );
 }
 
 /// sipx owns real sockets, so its closure and bind call stay in one explicitly isolated crate.

@@ -272,6 +272,12 @@ Connector composes that store with fail-closed startup plus in-memory token refr
 complete external secret-provider Connections, remote target-sealed entry, or the browser product
 flow below.
 
+**2026-08-15 hosted-consumer correction.** The adapter, authentication, and deployment foundation
+exist, but the current hosted Integrations do not consume a reusable provider credential. Runtime
+composition now refuses a Vault-enabled configuration until such an Integration is selected and
+the store can be injected into that exact consumer. This keeps an available custody mechanism from
+becoming an inert wrapper or a misleading readiness claim.
+
 1. Replace the development `FileStore` release path with an OS-keychain backend while preserving
    the existing prepared transaction and crash-recovery contract.
 2. Add credential-source bindings and one constrained mock secret-provider adapter; prove no

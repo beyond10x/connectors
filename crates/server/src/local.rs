@@ -10,17 +10,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use fs2::FileExt as _;
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, ConnectionRequest, ConnectionResult,
-};
-use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
-use protocol::operation::{
-    OperationError, OperationRequest, OperationResult, OwnerContext, RequestEnvelope,
-    ResponseEnvelope, MAX_FRAME_BYTES,
-};
+use protocol::operation::{RequestEnvelope, ResponseEnvelope, MAX_FRAME_BYTES};
 use serde::Deserialize;
+use service::{ConnectorBackend, PrincipalContext};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::task::JoinSet;
@@ -28,55 +21,6 @@ use tokio::task::JoinSet;
 const MAX_LOCAL_CLIENTS: usize = 64;
 const FRAME_READ_DEADLINE: Duration = Duration::from_secs(5);
 const BACKEND_SHUTDOWN_DEADLINE: Duration = Duration::from_secs(15);
-
-/// Connectors-owned implementation boundary. Implementations re-evaluate every owner fact and
-/// never return credential-bearing values. Connection and event methods default to a typed
-/// unavailable refusal so operation-only compositions remain closed without pretending support.
-#[async_trait]
-pub trait OperationBackend: Send + Sync + 'static {
-    async fn handle(
-        &self,
-        context: &OwnerContext,
-        request: OperationRequest,
-    ) -> Result<OperationResult, OperationError>;
-
-    async fn handle_connection(
-        &self,
-        _context: &OwnerContext,
-        _request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
-        Err(ConnectionError::new(
-            ConnectionErrorCode::Unavailable,
-            "connection management is not configured",
-            false,
-        ))
-    }
-
-    async fn handle_event(
-        &self,
-        _context: &OwnerContext,
-        _request: EventRequest,
-    ) -> Result<EventResult, EventError> {
-        Err(EventError::new(
-            EventErrorCode::Unavailable,
-            "event delivery is not configured",
-            false,
-        ))
-    }
-
-    /// Whether this backend owns any Connection control routes.
-    fn supports_connections(&self) -> bool {
-        false
-    }
-
-    /// Whether this backend owns any durable data-event routes.
-    fn supports_events(&self) -> bool {
-        false
-    }
-
-    /// Terminate and join backend-owned work before the personal-local endpoint disappears.
-    async fn shutdown(&self) {}
-}
 
 /// Bound personal-local daemon. Binding completes before this value is returned, so callers can
 /// publish readiness without racing the accept loop.
@@ -104,7 +48,7 @@ pub enum LocalDaemonError {
     Io(#[from] io::Error),
 }
 
-impl<B: OperationBackend + ?Sized> LocalOperationDaemon<B> {
+impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
     /// Bind an owner-only Unix socket, refusing symlinks, foreign ownership, broad permissions, and
     /// an existing non-socket object.
     pub async fn bind(
@@ -170,7 +114,7 @@ impl<B: OperationBackend + ?Sized> LocalOperationDaemon<B> {
     }
 }
 
-async fn serve_client<B: OperationBackend + ?Sized>(
+async fn serve_client<B: ConnectorBackend + ?Sized>(
     mut stream: UnixStream,
     owner_uid: u32,
     backend: Arc<B>,
@@ -207,7 +151,7 @@ struct ProtocolProbe {
     protocol: String,
 }
 
-async fn dispatch_frame<B: OperationBackend + ?Sized>(
+async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
     frame: &[u8],
     protocol_name: &str,
     backend: Arc<B>,
@@ -221,8 +165,12 @@ async fn dispatch_frame<B: OperationBackend + ?Sized>(
             if request.validate().is_err() {
                 return Ok(None);
             }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(context) => context,
+                Err(_) => return Ok(None),
+            };
             let request_id = request.request_id;
-            let response = match backend.handle(&request.context, request.request).await {
+            let response = match backend.handle(&context, request.request).await {
                 Ok(response) => ResponseEnvelope::success(&request_id, response),
                 Err(error) => ResponseEnvelope::failure(&request_id, error),
             };
@@ -241,11 +189,12 @@ async fn dispatch_frame<B: OperationBackend + ?Sized>(
             if request.validate().is_err() {
                 return Ok(None);
             }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(context) => context,
+                Err(_) => return Ok(None),
+            };
             let request_id = request.request_id;
-            let response = match backend
-                .handle_connection(&request.context, request.request)
-                .await
-            {
+            let response = match backend.handle_connection(&context, request.request).await {
                 Ok(response) => {
                     protocol::connection::ResponseEnvelope::success(&request_id, response)
                 }
@@ -265,11 +214,12 @@ async fn dispatch_frame<B: OperationBackend + ?Sized>(
             if request.validate().is_err() {
                 return Ok(None);
             }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(context) => context,
+                Err(_) => return Ok(None),
+            };
             let request_id = request.request_id;
-            let response = match backend
-                .handle_event(&request.context, request.request)
-                .await
-            {
+            let response = match backend.handle_event(&context, request.request).await {
                 Ok(response) => protocol::event::ResponseEnvelope::success(&request_id, response),
                 Err(error) => protocol::event::ResponseEnvelope::failure(&request_id, error),
             };
@@ -386,8 +336,12 @@ fn remove_owned_stale_socket(path: &Path, owner_uid: u32) -> Result<(), LocalDae
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+    use async_trait::async_trait;
+    use protocol::connection::{ConnectionError, ConnectionRequest, ConnectionResult};
+    use protocol::event::{EventError, EventRequest, EventResult};
     use protocol::operation::{
-        ApprovalPosture, EffectClass, OperationSummary, ResponseStatus, SearchRequest,
+        ApprovalPosture, EffectClass, OperationError, OperationRequest, OperationResult,
+        OperationSummary, OwnerContext, ResponseStatus, SearchRequest,
     };
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _};
     use tokio::sync::oneshot;
@@ -404,10 +358,10 @@ mod tests {
     }
 
     #[async_trait]
-    impl OperationBackend for SyntheticBackend {
+    impl ConnectorBackend for SyntheticBackend {
         async fn handle(
             &self,
-            _context: &OwnerContext,
+            _context: &PrincipalContext,
             request: OperationRequest,
         ) -> Result<OperationResult, OperationError> {
             assert!(matches!(
@@ -427,7 +381,7 @@ mod tests {
 
         async fn handle_connection(
             &self,
-            _context: &OwnerContext,
+            _context: &PrincipalContext,
             request: ConnectionRequest,
         ) -> Result<ConnectionResult, ConnectionError> {
             assert!(matches!(request, ConnectionRequest::Search(_)));
@@ -439,7 +393,7 @@ mod tests {
 
         async fn handle_event(
             &self,
-            _context: &OwnerContext,
+            _context: &PrincipalContext,
             request: EventRequest,
         ) -> Result<EventResult, EventError> {
             assert!(matches!(request, EventRequest::Search(_)));

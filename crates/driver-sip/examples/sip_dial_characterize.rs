@@ -9,7 +9,7 @@ use connector_resolve::document::Document;
 use domain::voice::{AudioFrame, TerminationReason};
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy};
 use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_TOOL_REF};
-use server::{
+use service::{
     admit_sip_dial, CredentialSet, SipDeploymentRoute, SipDialRouteTable, SipNetworkMode,
     SipSignalingTransport, SocketAperture,
 };

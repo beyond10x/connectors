@@ -1,6 +1,8 @@
 //! Hosted Vault credential custody authenticated by the pod's projected Kubernetes identity.
 
-use std::fs;
+use std::fs::OpenOptions;
+use std::io::Read as _;
+use std::os::unix::fs::OpenOptionsExt as _;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -14,7 +16,7 @@ use tokio::sync::Mutex;
 use url::Url;
 use zeroize::Zeroizing;
 
-use crate::hosted_config::HostedVaultConfig;
+use connectors_config::HostedVaultConfig;
 
 const MAX_PROJECTED_TOKEN_BYTES: u64 = 32 * 1024;
 const MAX_CA_BYTES: u64 = 1024 * 1024;
@@ -263,11 +265,16 @@ fn auth_store_error(error: HostedVaultError) -> StoreError {
 }
 
 fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, std::io::Error> {
-    let metadata = fs::metadata(path)?;
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(rustix::fs::OFlags::NONBLOCK.bits() as i32)
+        .open(path)?;
+    let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() > limit {
         return Err(std::io::Error::other("bounded regular file required"));
     }
-    let bytes = fs::read(path)?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    (&mut file).take(limit + 1).read_to_end(&mut bytes)?;
     if bytes.len() as u64 > limit {
         return Err(std::io::Error::other("file exceeded bound"));
     }

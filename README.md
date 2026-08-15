@@ -81,16 +81,13 @@ listen = "0.0.0.0:5060"
 Kubernetes is enabled if and only if its namespace set is non-empty. SIP is enabled if and only if
 both `listen` and `deployment_config` are present; that deployment config uses the existing strict
 personal voice schema, and every SIP target must bind the configured listen address. See
-[`crates/connectors-cli/examples/hosted-dev.example.toml`](crates/connectors-cli/examples/hosted-dev.example.toml).
+[`crates/connectors-config/examples/hosted-dev.example.toml`](crates/connectors-config/examples/hosted-dev.example.toml).
 
-The cluster chart enables Vault only after Vault is initialized and its Kubernetes-auth role is
-bound to the Connectors ServiceAccount. Hosted startup then authenticates with the projected pod
-identity over internal TLS and refuses readiness while Vault is sealed, unreachable, or rejects
-that identity. Vault tokens and stored credential values remain inside the Connector process; the
-public Operation and Connection responses contain references and status only. The store is now a
-composed runtime dependency available to credential-owning hosted Integrations. The current
-Kubernetes Deployment-status Integration needs no provider secret and continues to use its bounded
-ServiceAccount RBAC directly.
+The Vault adapter is implemented and tested, but hosted startup refuses a configuration that
+enables it until a configured hosted Integration actually consumes the credential-store port. This
+prevents an initialized but semantically inert custody wrapper from advertising readiness. The
+current Kubernetes Deployment-status Integration needs no provider secret and continues to use its
+bounded ServiceAccount RBAC directly.
 
 A local Zwirn client can use the hosted placement after Identity login:
 

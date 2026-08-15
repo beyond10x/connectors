@@ -1,4 +1,4 @@
-//! Server-owned admission for one SIP-to-application voice session.
+//! Application-layer admission for one SIP-to-application voice session.
 
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ use crate::{
     SipDialRouteTable,
 };
 
-/// Exact RTVBP binding selected by the server-owned voice composition path.
+/// Exact RTVBP binding selected by the application-layer voice composition path.
 pub const VOICE_APPLICATION_PROFILE: &str = "b10x.voice.v1";
 
 /// Deployment-selected application route. None of these values comes from a call or model.
@@ -31,7 +31,7 @@ pub struct VoiceApplicationRoute {
 pub enum VoiceAdmissionError {
     #[error(transparent)]
     Sip(#[from] SipAdmissionError),
-    #[error("voice application route contains an empty server identity")]
+    #[error("voice application route contains an empty application identity")]
     EmptyIdentity,
     #[error("voice application endpoint is not an exact absolute wss URI")]
     InvalidEndpoint,

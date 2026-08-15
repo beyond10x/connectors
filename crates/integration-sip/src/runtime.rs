@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use ed25519_dalek::SigningKey;
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, RootCertStore};
-use server::authority::AuthorityIssuer;
-use server::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute};
+use service::authority::AuthorityIssuer;
+use service::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute};
 use tokio::net::TcpStream;
 use tokio::sync::watch;
 use tokio_rustls::TlsConnector;
@@ -22,8 +22,9 @@ use voice_runtime::{
     VoiceSessionControl,
 };
 
-use crate::config::AuthorityConfig;
-use crate::sip_backend::{LaunchError, LaunchedSession, SessionLauncher};
+use connectors_config::AuthorityConfig;
+
+use crate::backend::{LaunchError, LaunchedSession, SessionLauncher};
 
 /// Runtime launcher backed by the pinned sipx driver and RTVBP endpoint.
 pub struct RuntimeLauncher {

@@ -11,7 +11,7 @@ use domain::voice::{
     AudioFrame, ChannelSignal, ContextTrust, MediaDescriptor, ParticipantContext, TelephonySession,
     TerminationReason, VoiceError, VoiceRef,
 };
-use server::{AdmittedSipPlan, CredentialSet, SipSignalingTransport};
+use service::{AdmittedSipPlan, CredentialSet, SipSignalingTransport};
 use sipx_call::{CallEvent, Codecs, DialOptions, EndCause, Served};
 use sipx_media::{Interrupt, MediaSession, Playback};
 use sipx_sip::{Host, Uri};
@@ -30,8 +30,8 @@ pub enum DriverError {
     /// Credentials must be exactly username then password.
     #[error("SIP credentials are incomplete")]
     Credentials,
-    /// A server-selected SIP URI is invalid.
-    #[error("server-selected SIP identity or target URI is invalid")]
+    /// An application-admitted SIP URI is invalid.
+    #[error("application-admitted SIP identity or target URI is invalid")]
     InvalidUri,
     /// sipx could not bind the admitted endpoint.
     #[error("sipx signaling bind failed: {0}")]
@@ -448,8 +448,8 @@ mod tests {
     use rtvbp::transport::memory::Config as RtvbpConfig;
     use rtvbp::{ControlFrame, Envelope as _, Transport as _};
     use rtvbp_voice_endpoint::{VoiceEndpoint, INITIALIZE_METHOD, PROFILE};
-    use server::authority::{AuthorityIssuer, IssueRequest, ProofKey};
-    use server::{admit_sip_plan, SipDeploymentRoute, SocketAperture};
+    use service::authority::{AuthorityIssuer, IssueRequest, ProofKey};
+    use service::{admit_sip_plan, SipDeploymentRoute, SocketAperture};
     use tokio::sync::oneshot;
 
     use super::*;
@@ -507,7 +507,7 @@ mod tests {
                 signaling_apertures: vec![all_loopback_ports.clone()],
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
-                network_mode: server::SipNetworkMode::Loopback,
+                network_mode: service::SipNetworkMode::Loopback,
             },
         )
         .unwrap();
@@ -675,7 +675,7 @@ mod tests {
                 signaling_apertures: vec![all_loopback_ports.clone()],
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
-                network_mode: server::SipNetworkMode::Loopback,
+                network_mode: service::SipNetworkMode::Loopback,
             },
         )
         .unwrap();

@@ -13,8 +13,8 @@ use rtvbp::{KeepalivePolicy, Transport as _};
 use rtvbp_voice_endpoint::bounded_ws::Bounds;
 use rtvbp_voice_endpoint::connect::connect_authenticated;
 use rtvbp_voice_endpoint::{BindingError, ControlOutcome, VoiceEndpoint, PROFILE};
-use server::authority::{AuthorityIssuer, IssueRequest, ProofKey};
-use server::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute, VOICE_APPLICATION_PROFILE};
+use service::authority::{AuthorityIssuer, IssueRequest, ProofKey};
+use service::{AdmittedVoicePlan, CredentialSet, VoiceApplicationRoute, VOICE_APPLICATION_PROFILE};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{oneshot, Notify};
 use tokio::time::Instant;
@@ -159,7 +159,7 @@ impl VoiceObserver for NoopObserver {
 #[error("sip.dial ended before the voice session was established")]
 pub struct DialEstablishmentError;
 
-/// One-shot observer used by an operation server to return `sip.dial` as soon as both sides bind.
+/// One-shot observer used by an operation backend to return `sip.dial` as soon as both sides bind.
 pub struct DialEstablishmentObserver {
     result: Mutex<Option<oneshot::Sender<Result<SipDialEstablished, DialEstablishmentError>>>>,
 }
@@ -315,7 +315,7 @@ pub enum RuntimeError {
     #[error("session authority or lease deadline is not representable")]
     InvalidDeadline,
     #[error("session authority could not be issued: {0}")]
-    Authority(#[from] server::authority::AuthorityError),
+    Authority(#[from] service::authority::AuthorityError),
     #[error("sipx telephony establishment failed: {0}")]
     Telephony(#[from] driver_sip::DriverError),
 }

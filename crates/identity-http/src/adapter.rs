@@ -142,12 +142,17 @@ impl IdentityVerifier for IdentityHttpVerifier {
         {
             return Err(IdentityVerificationError::Unavailable);
         }
-        let bytes = response
-            .bytes()
+        let mut response = response;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
             .await
-            .map_err(|_| IdentityVerificationError::Unavailable)?;
-        if bytes.len() > MAX_IDENTITY_RESPONSE_BYTES {
-            return Err(IdentityVerificationError::Unavailable);
+            .map_err(|_| IdentityVerificationError::Unavailable)?
+        {
+            if bytes.len().saturating_add(chunk.len()) > MAX_IDENTITY_RESPONSE_BYTES {
+                return Err(IdentityVerificationError::Unavailable);
+            }
+            bytes.extend_from_slice(&chunk);
         }
         let admitted: VerificationResponse =
             serde_json::from_slice(&bytes).map_err(|_| IdentityVerificationError::Unavailable)?;

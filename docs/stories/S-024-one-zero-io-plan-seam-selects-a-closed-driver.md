@@ -31,5 +31,5 @@ recompose grants, credentials, egress, redaction, and audit independently.
 - `domain::plan` carries a driver-discriminated, inert plan plus private admission evidence.
 - `service::plan_operation` checks exact catalog identity, available driver, capabilities, and
   deployment-selected permission subjects without credentials or IO.
-- `server::Dispatcher` is the closed HTTP/SIP composition point and orders egress, redaction,
+- `service::Dispatcher` is the closed HTTP/SIP application composition point and orders egress, redaction,
   audit, driver execution, and completion audit. Remaining work is the source/dependency fence.

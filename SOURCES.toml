@@ -109,7 +109,7 @@ references = [
 ]
 refresh = "scripts/vendor-slack-spec.py"
 pins = "specs/slack.provenance.toml"
-consumers = ["providers/slack.toml", "catalog/slack.catalog.json", "crates/connectors-cli/src/slack_backend.rs"]
+consumers = ["providers/slack.toml", "catalog/slack.catalog.json", "crates/integration-slack/src/backend.rs"]
 note = "Pins Slack's exact live Swagger 2 bytes and deterministic curated OpenAPI 3 projections for four workspace and four read-only Admin operations. Slack publishes no maintained Events AsyncAPI document, so the exact two-event AsyncAPI source is repository-authored from current official references and is explicitly marked as such."
 
 [[source]]

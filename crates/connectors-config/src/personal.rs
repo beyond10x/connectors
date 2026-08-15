@@ -1,21 +1,21 @@
 //! Strict, value-free deployment-owned configuration for personal-local Connectors.
 
 use std::collections::BTreeMap;
-use std::fs::OpenOptions;
-use std::io::Read as _;
 use std::net::{IpAddr, SocketAddr};
 use std::ops::RangeInclusive;
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::Path;
 use std::time::Duration;
 
 use domain::InitiationPolicy;
 use protocol::operation::OwnerContext;
 use serde::{Deserialize, Serialize};
-use server::{
+use service::PrincipalContext;
+use service::{
     SipDeploymentRoute, SipDialRouteTable, SipNetworkMode, SipSignalingTransport, SocketAperture,
     VoiceApplicationRoute,
 };
+
+use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 
@@ -81,7 +81,7 @@ pub struct ConnectionConfig {
 }
 
 /// Closed Connection initiation policy.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InitiationConfig {
     B10x,
@@ -220,27 +220,12 @@ pub enum ConfigError {
 impl PersonalConfig {
     /// Read one strict TOML configuration.
     pub fn read(path: &Path) -> Result<Self, ConfigError> {
-        let mut file = OpenOptions::new()
-            .read(true)
-            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
-            .open(path)
-            .map_err(ConfigError::Read)?;
-        let metadata = file.metadata().map_err(ConfigError::Read)?;
-        if !metadata.file_type().is_file()
-            || metadata.uid() != rustix::process::geteuid().as_raw()
-            || metadata.permissions().mode() & 0o022 != 0
-            || metadata.len() > MAX_CONFIG_BYTES
-        {
-            return Err(ConfigError::Invalid);
-        }
-        let mut text = String::new();
-        (&mut file)
-            .take(MAX_CONFIG_BYTES + 1)
-            .read_to_string(&mut text)
-            .map_err(ConfigError::Read)?;
-        if text.len() as u64 > MAX_CONFIG_BYTES {
-            return Err(ConfigError::Invalid);
-        }
+        let text = read_trusted_config(path, MAX_CONFIG_BYTES, TrustedOwner::CurrentUser).map_err(
+            |error| match error {
+                TrustedConfigReadError::Io(error) => ConfigError::Read(error),
+                TrustedConfigReadError::Unsafe => ConfigError::Invalid,
+            },
+        )?;
         let config: Self = toml::from_str(&text).map_err(ConfigError::Parse)?;
         config.validate()?;
         Ok(config)
@@ -256,6 +241,11 @@ impl PersonalConfig {
             authority_snapshot_id: self.owner.authority_snapshot_id.clone(),
             authority_snapshot_sha256: self.owner.authority_snapshot_sha256.clone(),
         }
+    }
+
+    /// Exact admitted application principal accepted by configured personal-local backends.
+    pub fn principal_context(&self) -> Result<PrincipalContext, ConfigError> {
+        PrincipalContext::local(&self.owner_context()).map_err(|_| ConfigError::Invalid)
     }
 
     /// Return voice configuration only when the complete group is present.
@@ -433,6 +423,11 @@ impl PersonalVoiceConfig {
         }
     }
 
+    /// Exact admitted application principal accepted by the voice backend.
+    pub fn principal_context(&self) -> Result<PrincipalContext, ConfigError> {
+        PrincipalContext::local(&self.owner_context()).map_err(|_| ConfigError::Invalid)
+    }
+
     /// Build the non-wire initiation policy.
     #[must_use]
     pub fn initiation_policy(&self) -> InitiationPolicy {
@@ -473,7 +468,7 @@ impl PersonalVoiceConfig {
                         }
                     },
                 };
-                server::validate_sip_deployment_route(&route).map_err(|_| ConfigError::Invalid)?;
+                service::validate_sip_deployment_route(&route).map_err(|_| ConfigError::Invalid)?;
                 Ok((target.alias.clone(), route))
             })
             .collect::<Result<Vec<_>, ConfigError>>()?;
@@ -542,7 +537,7 @@ impl PersonalVoiceConfig {
             return Err(ConfigError::Invalid);
         }
         self.sip_routes()?;
-        server::validate_voice_application_route(&self.application_route())
+        service::validate_voice_application_route(&self.application_route())
             .map_err(|_| ConfigError::Invalid)?;
         Ok(())
     }

@@ -1,7 +1,7 @@
 # driver-sip
 
 The only Connectors crate allowed to open SIP/RTP sockets. It consumes a non-serializable
-`server::AdmittedSipPlan` and implements the protocol-neutral `domain::TelephonySession` port with
+`service::AdmittedSipPlan` and implements the protocol-neutral `domain::TelephonySession` port with
 the exact `codewandler/sipx` `v1.0.0-rc.23` source commit.
 
 This implementation admits loopback by default. An operator can select the explicit
