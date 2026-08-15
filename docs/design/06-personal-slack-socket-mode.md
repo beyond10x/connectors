@@ -36,8 +36,14 @@ value-free Slack Integration policy
   -> per-Connection Slack Socket Mode Channel supervisor
   -> durable normalized Connector Event, then Slack acknowledgement
   -> generic Event receive/replay contract
-  -> later: product projects Connection/Channel as opaque harness Endpoint + datasource
+  -> later: product projects Connection/Channel as opaque harness Endpoint + admitted operations
 ```
+
+**2026-08-15 capability-vocabulary amendment.** The earlier `Endpoint + datasource` wording used
+datasource for a generic Agent context node. Under architecture ADR 0031, the materialized Slack
+Connection projects as an Endpoint and its operations target that Endpoint directly. A datasource
+is added only if an owner separately declares a read-only record surface and concrete binding; a
+Connection or Channel does not manufacture one.
 
 Agent's endpoint grant remains independent from the Connector Grant. Effective access is the
 intersection of both owner decisions. Provider initiation on the Connection admits Slack starting
