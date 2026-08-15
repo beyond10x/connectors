@@ -5,6 +5,7 @@ implemented; first explicit Agent Endpoint-Grant projection implemented · **Dat
 
 **Inputs:** [Design 01](01-domain-model.md) · [Design 02](02-architecture.md) ·
 [Design 07](07-credential-custody-topologies.md) ·
+[ADR 0031](https://github.com/b10x/architecture/blob/main/adr/0031-capability-resources-and-datasources-are-distinct.md) ·
 [Grafana data-source HTTP API](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/) ·
 [Grafana data sources](https://grafana.com/docs/grafana/latest/datasources/) ·
 [Grafana Alertmanager data source](https://grafana.com/docs/grafana/latest/datasources/alertmanager/)
@@ -23,8 +24,9 @@ core nouns is Grafana-specific.
 | **Connection candidate** | A normalized possible target Provider contract plus a proposed fixed route. | No; still unusable. |
 | **Route** | How a Connection executes: directly, or through one parent Connection and a closed adapter. | No; it cannot replace a Grant. |
 | **Connection** | A durable authorized instance of one Provider, with one fixed route and lifecycle. | Only together with a current independent Grant. |
-| **Agent Endpoint** | The Harness projection of an admitted Connection under an Agent Endpoint Grant. | Agent-owned projection, not a Connector route. |
-| **Datasource** | Worker-facing context selected after Agent admission. Use **Grafana data source** only for Grafana's vendor object. | No authority by itself. |
+| **Agent Endpoint** | The value-free Harness projection of a materialized Connection. An Endpoint Grant separately controls run visibility. | Agent-owned projection, not a Connector route or replacement Grant. |
+| **Capability resource** | A broad Agent graph node such as a workspace, repository, cluster, database, or execution environment. | No authority by itself. |
+| **Datasource** | A named, declared, read-only record/entity surface with an explicit access mode and a concrete binding. Use **Grafana data source** only for Grafana's vendor object. | No authority by itself. |
 | **Federation** | B10x central-to-satellite topology. | Separate from mediated routing. |
 
 “Host discovery” retires for this use. A discovered Grafana data source can name a logical cluster,
@@ -37,6 +39,12 @@ Connection exists. It has the same no-authority lifecycle but no proposed mediat
 activation creates the direct source Connection. Observations remain facts behind an existing
 Connection. The two origins share the candidate noun and never share the transition that produced
 it.
+
+**2026-08-15 capability-vocabulary amendment:** ADR 0031 replaces the earlier broad Agent
+`Datasource` usage. A Connection candidate remains Connector-only. Only a materialized Connection
+may be projected as an Agent Endpoint; the grant controls whether that Endpoint is visible to a
+run, not whether the Endpoint identity exists. Connector operations target that Endpoint directly.
+No adapter invents a capability resource or datasource merely because an operation exists.
 
 ## 2. The flow is deliberately not collapsed
 
@@ -170,20 +178,38 @@ explicitly out of model.
 ## 7. Harness projection
 
 Connectors owns observations, candidates, Connections, route execution, credential custody, and
-Connector Grants. The Agent/Harness owns Endpoint discovery, Endpoint Grants, Datasources, and tool
-admission. The integration adapter therefore projects only released value-free facts:
+Connector Grants. The Agent/Harness owns Endpoint observations and grants, capability-resource
+observations, operation-provider routing, and per-run operation admission. A datasource is projected
+only when an owner truthfully declares a read-only record surface and its binding. The integration
+adapter therefore projects only released value-free facts:
 
 ```text
-Connector Connection/candidate      Agent/Harness
-────────────────────────────────    ─────────────────────────────
-target Provider                  -> ProviderRef
-Connection/candidate ref         -> EndpointRef (opaque)
-Connection placement             -> BoundaryRef
-safe label + normalized kind     -> EndpointDescriptor
-evidence generation + digest     -> EvidenceRef / observation generation
-Connection lifecycle             -> ConnectionState
-admitted target operation set    -> Datasource + OperationDescription
+Connector fact                         Agent/Harness
+────────────────────────────────────   ────────────────────────────────────────
+target Provider                     -> OperationProviderRef (qualified Agent identity)
+materialized Connection ref         -> EndpointRef (opaque)
+Connection candidate                -> no Agent projection
+Connection placement                -> BoundaryRef
+safe label + normalized kind        -> EndpointDescriptor
+evidence generation + digest        -> EvidenceRef / observation generation
+callable owner generation + digest  -> OwnerSnapshotRef
+admitted target operation set       -> endpoint-targeted OperationDescription
+declared broad owner resource       -> optional CapabilityResourceObservation
+declared read-only record surface   -> future DatasourceDefinition + DatasourceBinding
+owner result-to-entity mapping      -> future DatasourceProjection + pinned ValueProjection
 ```
+
+**2026-08-15 projection-reuse clarification:** the future datasource projection is owner-declared
+and applies only after an admitted Connector read. It unwraps the vendor envelope, selects and
+renames stable fields, and emits compact list/search rows or normalized get/detail records before
+the result crosses to Agent. It cannot be a caller-supplied JSONPath, script, raw-response fallback,
+or new authority surface. The standard datasource envelope retains applicable cursor, completeness,
+freshness, typed error, and provenance facts.
+
+The underlying `ValueProjection` is a generic, deterministic, I/O-free transformation contract,
+not a Connector or datasource execution API. It remains reusable by a future Workflows
+input/output modifier node over ordinary artifacts; Connector-specific datasource declarations add
+only entity, binding, read, paging, and provenance semantics around that shared IR.
 
 The Agent never receives the parent credential, resource binding, Grafana UID, backend URL, or
 proxy path. Its passive discovery reads stored observations through the value-free
@@ -195,11 +221,12 @@ The first integrated Agent adapter sends the current owner snapshot and opaque
 operation/Connection references over the owner-only local socket; it has no credential field or
 provider transport. `zwirn connect kubernetes` persists only the selected Connection references.
 On startup, Zwirn refreshes their current callable descriptions and feeds value-free Endpoint,
-Datasource, owner-fact, and Operation observations plus session-scoped Endpoint Grants through the
-normal capability compiler. Description leases remain inside the adapter and are refreshed again
-immediately before invocation. This is not a claim that Connector observations became Agent
-authority: an observation is absent from the Agent catalog until a person materializes its
-Connection and the Harness independently grants that Endpoint.
+Operation, and owner-snapshot facts plus session-scoped Endpoint Grants through the normal
+capability compiler. It emits no synthetic capability resource or datasource. Description leases
+remain inside the adapter and are refreshed again immediately before invocation. This is not a
+claim that Connector observations became Agent authority: an observation is absent from the Agent
+catalog until a person materializes its Connection and the Harness independently grants that
+Endpoint.
 
 ## 8. Implemented personal-local slice
 
