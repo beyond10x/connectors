@@ -63,6 +63,55 @@ fn with(patch: &str) -> String {
     format!("{POINTER}{patch}")
 }
 
+const EVENT_PATH: &str = "specs/acme/events.asyncapi.yaml";
+const EVENT_DOCUMENT: &str = r#"
+asyncapi: 3.0.0
+info:
+  title: Acme events
+  version: "1"
+components:
+  messages:
+    mentioned:
+      name: app_mention
+      summary: The app was mentioned.
+      payload:
+        type: object
+        required: [type, text]
+        properties:
+          type: { const: app_mention }
+          text: { type: string }
+    broad_message:
+      name: message
+      summary: A broad message event.
+      payload:
+        type: object
+        properties:
+          type: { const: message }
+"#;
+
+fn event_cache() -> Vec<SpecDocument<'static>> {
+    vec![SpecDocument {
+        path: EVENT_PATH,
+        document: EVENT_DOCUMENT,
+    }]
+}
+
+const EVENT_POINTER: &str = r#"
+id = "acme"
+vendor = "Acme"
+base_url = "https://api.acme.test"
+
+[[auth]]
+name = "acme.bot_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+
+[[spec]]
+kind = "asyncapi"
+path = "specs/acme/events.asyncapi.yaml"
+"#;
+
 // ---------------------------------------------------------------------------------------------
 // Selection is opt-in
 // ---------------------------------------------------------------------------------------------
@@ -88,6 +137,51 @@ fn a_spec_backed_provider_with_no_patch_publishes_nothing() {
             .collect::<Vec<_>>()
     );
     assert_eq!(connector.base_url, "https://acme.zendesk.com");
+}
+
+#[test]
+fn asyncapi_ingest_makes_messages_available_but_selects_none() {
+    let loaded = provider::load_with_spec("providers/acme.toml", EVENT_POINTER, &event_cache())
+        .expect("the AsyncAPI document loads");
+    assert!(loaded.connector.events.is_empty());
+    assert_eq!(loaded.ingested_events.len(), 1);
+    assert_eq!(
+        loaded.ingested_events[0]
+            .ingested
+            .events
+            .iter()
+            .map(|event| event.message_id.as_str())
+            .collect::<Vec<_>>(),
+        ["broad_message", "mentioned"]
+    );
+}
+
+#[test]
+fn an_exact_asyncapi_event_patch_carries_stable_name_schema_and_scoped_auth() {
+    let definition = format!(
+        r#"{EVENT_POINTER}
+[[patch.events]]
+select = "broad_message"
+rename = "message.channels"
+wire_value = "message"
+when = {{ channel_type = {{ const = "channel" }} }}
+auth = [{{ credentials = ["acme.bot_token"], scopes = {{ "acme.bot_token" = [["channels:history"]] }} }}]
+"#
+    );
+    let connector = provider::load_with_spec("providers/acme.toml", &definition, &event_cache())
+        .expect("one exact event is selected")
+        .connector;
+
+    assert_eq!(connector.events.len(), 1);
+    let event = connector.event("message.channels").expect("stable name");
+    assert_eq!(event.wire_value.as_deref(), Some("message"));
+    assert!(event.schema.is_some(), "the source payload schema travels");
+    assert_eq!(
+        connector.effective_event_auth(event)[0]
+            .scopes()
+            .get("acme.bot_token"),
+        Some(&vec![vec!["channels:history".to_owned()]])
+    );
 }
 
 /// The whole document is kept available to patch, including the operations nothing selected. That

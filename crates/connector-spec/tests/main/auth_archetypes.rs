@@ -10,7 +10,9 @@
 //! hypotheticals. An archetype the model cannot render is an explicit failing case here, not a gap
 //! discovered when someone tries to build the form.
 
-use connector_spec::{provider, AuthScheme, Binding, Connector, CredentialEntry, Format, Level};
+use connector_spec::{
+    provider, AuthScheme, Binding, Connector, CredentialEntry, Format, Level, Subject,
+};
 
 use crate::shipped_provider;
 
@@ -40,29 +42,36 @@ fn form(connector: &Connector) -> Vec<(&str, bool, Level)> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Archetype 1 — prefixed header (`Authorization: Bearer`). Drawn from slack.
+// Archetype 1 — prefixed header (`Authorization: Bearer`). Drawn from Slack.
 //
-// The most common archetype there is, and the one whose form is a single masked input. Note what the
-// model does NOT say: nothing distinguishes a bearer a user pastes from a bearer OAuth mints, so the
-// form is derivable only because the config field says so explicitly.
+// The most common wire archetype there is. Acquisition and subject remain separate axes: each Slack
+// bearer enters through a Connect Session and declares whose authority it carries.
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-fn bearer_paste_a_token() {
+fn slack_bearers_keep_bot_user_admin_and_app_purposes_separate() {
     let connector = shipped("slack");
-    let method = connector
-        .auth_method("slack.bot_token")
-        .expect("slack declares a bot token");
-    assert_eq!(method.scheme, AuthScheme::Bearer);
-    assert_eq!(method.env, ["SLACK_BOT_TOKEN"]);
 
-    // Slack's host is literal, so its form has no tenant field — the whole connection is one secret.
-    // It declares no `[[config]]` today, which is legitimate and is exactly what the OAuth story will
-    // change; asserted so that the change is visible when it happens.
+    for (name, subject) in [
+        ("slack.bot_token", Subject::App),
+        ("slack.user_token", Subject::User),
+        ("slack.admin_token", Subject::User),
+        ("slack.app_token", Subject::App),
+    ] {
+        let method = connector
+            .auth_method(name)
+            .unwrap_or_else(|| panic!("slack declares {name}"));
+        assert_eq!(method.scheme, AuthScheme::Bearer);
+        assert_eq!(method.subject, subject);
+        assert!(method.env.is_empty(), "{name} must never use ambient env");
+        assert_eq!(method.entry, Some(CredentialEntry::ConnectSession));
+    }
+
+    // Slack's host is literal and credential acquisition is owned by the Connect Session, so there
+    // is no ordinary configuration form or ambient secret source.
     assert!(
         connector.config.is_empty(),
-        "slack has no tenant and no declared config; when its OAuth alternative lands this must be \
-         revisited deliberately rather than drifting"
+        "Slack connection acquisition must not degrade into provider config fields"
     );
 }
 
@@ -75,6 +84,7 @@ fn slack_socket_mode_token_enters_through_a_connect_session_and_never_ambient_en
     assert_eq!(method.scheme, AuthScheme::Bearer);
     assert!(method.env.is_empty());
     assert_eq!(method.entry, Some(CredentialEntry::ConnectSession));
+    assert_eq!(method.subject, Subject::App);
 }
 
 // ---------------------------------------------------------------------------------------------

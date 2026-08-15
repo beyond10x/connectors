@@ -288,7 +288,7 @@ impl SlackIntegrationConfig {
             || events.is_empty()
             || events
                 .iter()
-                .any(|event| !matches!(event.as_str(), "app_mention" | "message"))
+                .any(|event| !matches!(event.as_str(), "app_mention" | "message.channels"))
             || !(30..=900).contains(&self.connect_session_ttl_seconds)
         {
             return Err(ConfigError::Invalid);
@@ -553,7 +553,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 [slack]
 grant_ref = "grant:slack-inbound"
 initiation = "provider"
-allowed_events = ["app_mention", "message"]
+allowed_events = ["app_mention", "message.channels"]
 "#,
         )
         .unwrap();

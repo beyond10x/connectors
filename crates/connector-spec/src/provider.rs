@@ -114,6 +114,9 @@ pub struct LoadedProvider {
     /// Empty for a hand-authored connector, and also for a spec-backed one loaded through plain
     /// [`load`], which is given no document to ingest.
     pub ingested: Vec<IngestedDocument>,
+    /// AsyncAPI component messages made available by event-source documents. Like OpenAPI ingest,
+    /// this is the complete selectable set, not only the events a patch published.
+    pub ingested_events: Vec<IngestedEventDocument>,
     /// Members whose TOML table omitted `service` before serde normalized that omission to
     /// [`DEFAULT_SERVICE`]. Needed only for C-458's mixed legacy-default shape, where explicit
     /// `service = "default"` and omission must remain different authoring decisions.
@@ -150,6 +153,13 @@ impl LoadedProvider {
             .iter()
             .find(|document| document.service == service)
     }
+
+    /// The AsyncAPI ingest that joined `service`, if one was supplied.
+    pub fn ingested_events_for(&self, service: &str) -> Option<&IngestedEventDocument> {
+        self.ingested_events
+            .iter()
+            .find(|document| document.service == service)
+    }
 }
 
 /// One vendored document, ingested, and the service its operations join — C-410.
@@ -164,6 +174,36 @@ pub struct IngestedDocument {
     pub service: String,
     /// Everything the document declares.
     pub ingested: crate::openapi::Ingested,
+}
+
+/// One AsyncAPI document and the service its selected messages join.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IngestedEventDocument {
+    pub path: String,
+    pub service: String,
+    pub ingested: crate::asyncapi::Ingested,
+}
+
+/// Which pure front-end parses a pinned source document.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpecKind {
+    #[default]
+    Openapi,
+    Asyncapi,
+}
+
+impl SpecKind {
+    const fn is_openapi(&self) -> bool {
+        matches!(self, Self::Openapi)
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Openapi => "OpenAPI",
+            Self::Asyncapi => "AsyncAPI",
+        }
+    }
 }
 
 /// Where one vendor document for this connector lives, and which service it becomes.
@@ -186,6 +226,9 @@ pub struct SpecSource {
     /// The vendored spec file, relative to the repository root
     /// (`specs/babelforce/manager-2026-07-10.openapi.yaml`).
     pub path: String,
+    /// The source grammar. Omitted means OpenAPI for every previously published provider.
+    #[serde(default, skip_serializing_if = "SpecKind::is_openapi")]
+    pub kind: SpecKind,
     /// The [`Service`] this document's selected operations join — C-410.
     ///
     /// Absent means the reserved [`DEFAULT_SERVICE`](crate::DEFAULT_SERVICE), which is what a single
@@ -266,6 +309,10 @@ pub struct Patch {
     /// The operations selected one at a time, each with its corrections.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub operations: Vec<OperationPatch>,
+    /// AsyncAPI component messages selected one at a time. There is deliberately no bulk event
+    /// selector: an inbound firehose deserves an exact reviewed subscription inventory.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<EventPatch>,
 }
 
 impl Patch {
@@ -275,6 +322,7 @@ impl Patch {
             && self.naming.is_none()
             && self.directions.is_empty()
             && self.operations.is_empty()
+            && self.events.is_empty()
     }
 
     /// How to spell the block an author would go and edit, for a refusal about a patch set with no
@@ -288,12 +336,42 @@ impl Patch {
             "[patch.directions]"
         } else if !self.operations.is_empty() {
             "[[patch.operations]]"
+        } else if !self.events.is_empty() {
+            "[[patch.events]]"
         } else if !self.select.is_empty() {
             "[[patch.select]]"
         } else {
             "[patch.naming]"
         }
     }
+}
+
+/// One exact event selected from an AsyncAPI component message.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventPatch {
+    /// Service of the AsyncAPI source document. Required when more than one source is pinned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+    /// Component-message key in `components.messages`.
+    pub select: String,
+    /// Stable catalog event name. Absent keeps the message's declared `name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rename: Option<String>,
+    /// Exact transport discriminator value when it differs from the stable event name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire_value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub when: BTreeMap<String, JsonSchema>,
+    /// Credential capability requirements, independent of channel transport auth/verification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<Vec<AuthRequirement>>,
 }
 
 /// One statement that selects a **set** of operations — C-411.
@@ -1219,6 +1297,16 @@ fn ingest_specs(
 ) {
     let specs = loaded.specs.clone();
     let many = specs.len() > 1;
+    let openapi_specs: Vec<SpecSource> = specs
+        .iter()
+        .filter(|spec| spec.kind == SpecKind::Openapi)
+        .cloned()
+        .collect();
+    let asyncapi_specs: Vec<SpecSource> = specs
+        .iter()
+        .filter(|spec| spec.kind == SpecKind::Asyncapi)
+        .cloned()
+        .collect();
 
     // **The pin, resolved — once per entry.** `specs/<provider>/` ordinarily holds more files than a
     // connector compiles: versions of one document beside the documents of another service. Only a
@@ -1226,6 +1314,7 @@ fn ingest_specs(
     // sort last is precisely the defect `Provider::spec()` carried, and it compiled an operation out
     // of a document the provider file never named, successfully and silently.
     let mut ingested: Vec<IngestedDocument> = Vec::new();
+    let mut ingested_events: Vec<IngestedEventDocument> = Vec::new();
     for spec in &specs {
         let path = spec.path.clone();
         let Some(found) = documents
@@ -1266,31 +1355,125 @@ fn ingest_specs(
             }
         }
 
-        match crate::openapi::ingest(document) {
-            Ok(document) => ingested.push(IngestedDocument {
-                path,
-                service: spec.service().to_owned(),
-                ingested: document,
-            }),
-            Err(error) => problems.push(format!("`{} path = {path:?}`: {error}", block(many))),
+        match spec.kind {
+            SpecKind::Openapi => match crate::openapi::ingest(document) {
+                Ok(document) => ingested.push(IngestedDocument {
+                    path,
+                    service: spec.service().to_owned(),
+                    ingested: document,
+                }),
+                Err(error) => problems.push(format!("`{} path = {path:?}`: {error}", block(many))),
+            },
+            SpecKind::Asyncapi => match crate::asyncapi::ingest(document) {
+                Ok(document) => ingested_events.push(IngestedEventDocument {
+                    path,
+                    service: spec.service().to_owned(),
+                    ingested: document,
+                }),
+                Err(error) => problems.push(format!("`{} path = {path:?}`: {error}", block(many))),
+            },
         }
     }
 
     let (selected, operation_specs) = publish(
         &loaded.patch,
-        &specs,
+        &openapi_specs,
         &ingested,
         documents,
         &loaded.connector.config,
         problems,
     );
     loaded.connector.operations.extend(selected);
+    let selected_events = publish_events(
+        &loaded.patch.events,
+        &asyncapi_specs,
+        &ingested_events,
+        problems,
+    );
+    loaded.connector.events.extend(selected_events);
     loaded
         .connector
         .provenance
         .operation_specs
         .extend(operation_specs);
     loaded.ingested = ingested;
+    loaded.ingested_events = ingested_events;
+}
+
+/// Exact AsyncAPI message selection. Source payload schemas are authoritative; every admission
+/// fact remains an explicit overlay.
+fn publish_events(
+    patches: &[EventPatch],
+    specs: &[SpecSource],
+    ingested: &[IngestedEventDocument],
+    problems: &mut Vec<String>,
+) -> Vec<EventDecl> {
+    let mut published = Vec::new();
+    let mut selected: Vec<(&str, &str)> = Vec::new();
+    for patch in patches {
+        let document = match patch.service.as_deref().map(str::trim) {
+            Some(service) => ingested.iter().find(|document| document.service == service),
+            None if specs.len() == 1 => ingested.first(),
+            None => {
+                problems.push(format!(
+                    "`[[patch.events]] select = {:?}` states no `service`, but this connector \
+                     declares {} AsyncAPI documents; name the event source explicitly",
+                    patch.select,
+                    specs.len()
+                ));
+                None
+            }
+        };
+        let Some(document) = document else {
+            if patch.service.is_some() {
+                problems.push(format!(
+                    "`[[patch.events]] select = {:?}` names service {:?}, which no AsyncAPI \
+                     `[[spec]]` entry declares",
+                    patch.select, patch.service
+                ));
+            }
+            continue;
+        };
+        let key = (document.service.as_str(), patch.select.as_str());
+        if selected.contains(&key) {
+            problems.push(format!(
+                "`[[patch.events]]` selects {:?} more than once from service {:?}",
+                patch.select, document.service
+            ));
+            continue;
+        }
+        selected.push(key);
+        let Some(source) = document.ingested.event(&patch.select) else {
+            problems.push(format!(
+                "`[[patch.events]] select = {:?}` names no component message in {}. Available: {}",
+                patch.select,
+                document.path,
+                document
+                    .ingested
+                    .events
+                    .iter()
+                    .map(|event| event.message_id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            continue;
+        };
+        published.push(EventDecl {
+            name: patch.rename.clone().unwrap_or_else(|| source.name.clone()),
+            wire_value: patch.wire_value.clone(),
+            service: document.service.clone(),
+            auth: patch.auth.clone(),
+            description: patch
+                .description
+                .clone()
+                .unwrap_or_else(|| source.description.clone()),
+            default: patch.default.unwrap_or(true),
+            group: patch.group.clone().unwrap_or_default(),
+            when: patch.when.clone(),
+            schema: Some(source.payload.clone()),
+        });
+    }
+    published
 }
 
 /// How to spell the block an author would go and edit — `[spec]` or `[[spec]]`.
@@ -2494,6 +2677,7 @@ fn assemble(
         patch: file.patch,
         // Filled by `ingest_specs` when documents were supplied; assembling reads the TOML alone.
         ingested: Vec::new(),
+        ingested_events: Vec::new(),
         implicit_service_members,
     }
 }
@@ -2682,7 +2866,7 @@ fn validate_specs(loaded: &LoadedProvider, problems: &mut Vec<String>) {
     let many = loaded.specs.len() > 1;
     let available = loaded.connector.service_names();
     let mut seen_paths: Vec<&str> = Vec::new();
-    let mut seen_services: Vec<&str> = Vec::new();
+    let mut seen_services: Vec<(SpecKind, &str)> = Vec::new();
 
     for spec in &loaded.specs {
         let path = spec.path.trim();
@@ -2739,15 +2923,16 @@ fn validate_specs(loaded: &LoadedProvider, problems: &mut Vec<String>) {
                 )
             });
         }
-        if seen_services.contains(&service) {
+        if seen_services.contains(&(spec.kind, service)) {
             problems.push(format!(
-                "`{}` gives service {service:?} two documents. A service is one name namespace, so \
-                 two documents joining it could declare one `operationId` twice with nothing to \
-                 tell them apart — give each document its own service",
-                block(many)
+                "`{}` gives service {service:?} two documents of kind {}. One source grammar may have \
+                 only one document per service, or component/operation identity becomes \
+                 ambiguous — give each document its own service",
+                block(many),
+                spec.kind.label()
             ));
         } else {
-            seen_services.push(service);
+            seen_services.push((spec.kind, service));
         }
     }
 }
@@ -3806,6 +3991,12 @@ fn validate_events(connector: &Connector, problems: &mut Vec<String>) {
             problems.push(format!("event {name:?} has an invalid `name`: {reason}"));
         }
         validate_member_service(connector, "event", name, &event.service, problems);
+        validate_requirements(
+            connector,
+            connector.effective_event_auth(event),
+            &format!("event {name:?}"),
+            problems,
+        );
     }
 }
 
@@ -6636,15 +6827,55 @@ fn validate_requirements(
                     "{context}: auth mechanism {index} names credential {credential:?}, which no \
                      `[[auth]]` block declares"
                 )),
-                // The complement of the rule in `validate_hmac`: a signing secret has no placement
-                // on an outgoing request, so an operation naming one is asking the host to inject a
-                // value that has nowhere to go — and to spend an inbound secret outbound.
+                // The complement of the rule in `validate_hmac`: a signing secret establishes
+                // transport provenance and never represents a vendor capability grant. Operations,
+                // events and channel establishment therefore cannot use it as ordinary auth.
                 Some(method) if method.scheme == AuthScheme::Signing => problems.push(format!(
                     "{context}: auth mechanism {index} names credential {credential:?}, which is \
                      declared `scheme = \"signing\"`. A signing secret verifies an inbound request \
-                     and is never placed in an outgoing one, so no operation can authenticate with it"
+                     and is never placed in an outgoing one or treated as capability evidence"
                 )),
                 Some(_) => {}
+            }
+        }
+        for (credential, alternatives) in mechanism.scopes() {
+            if !mechanism.contains(credential) {
+                problems.push(format!(
+                    "{context}: auth mechanism {index} attaches scopes to credential \
+                     {credential:?}, but that mechanism does not name it in `credentials`. Scope \
+                     evidence is credential-local and cannot authorize a different credential"
+                ));
+            }
+            if alternatives.is_empty() {
+                problems.push(format!(
+                    "{context}: auth mechanism {index} gives credential {credential:?} an empty \
+                     scope-alternatives list. Omit the `scopes` entry when presence alone is \
+                     sufficient; an explicit scope expression must name at least one alternative"
+                ));
+                continue;
+            }
+            for (alternative, scopes) in alternatives.iter().enumerate() {
+                if scopes.is_empty() {
+                    problems.push(format!(
+                        "{context}: auth mechanism {index} gives credential {credential:?} an \
+                         empty scope set at alternative {alternative}. That alternative is always \
+                         true and would silently bypass every scoped alternative beside it"
+                    ));
+                }
+                for scope in scopes {
+                    if scope.is_empty()
+                        || scope.len() > 256
+                        || scope
+                            .bytes()
+                            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+                    {
+                        problems.push(format!(
+                            "{context}: auth mechanism {index} declares invalid scope {scope:?} \
+                             for credential {credential:?}. A scope is 1..=256 non-whitespace, \
+                             non-control bytes"
+                        ));
+                    }
+                }
             }
         }
     }
@@ -6658,15 +6889,19 @@ fn validate_patch(loaded: &LoadedProvider, inline: &[String], problems: &mut Vec
     // only a repeat *within* one document is the duplicate this refuses.
     let mut selected: Vec<(&str, &str)> = Vec::new();
     let mut renamed: Vec<&str> = Vec::new();
+    let openapi_specs: Vec<&SpecSource> = loaded
+        .specs
+        .iter()
+        .filter(|spec| spec.kind == SpecKind::Openapi)
+        .collect();
 
     for patch in &loaded.patch.operations {
         let select = patch.select.as_str();
         let service = patch.service.as_deref().map(str::trim).unwrap_or_else(|| {
-            loaded
-                .specs
+            openapi_specs
                 .first()
-                .filter(|_| loaded.specs.len() == 1)
-                .map_or(DEFAULT_SERVICE, SpecSource::service)
+                .filter(|_| openapi_specs.len() == 1)
+                .map_or(DEFAULT_SERVICE, |source| source.service())
         });
         if select.trim().is_empty() {
             problems.push(
@@ -6724,6 +6959,56 @@ fn validate_patch(loaded: &LoadedProvider, inline: &[String], problems: &mut Vec
                     "patch for {select:?} omits a `{position:?}` parameter with an empty `name`"
                 ));
             }
+        }
+    }
+
+    let mut selected_events: Vec<(&str, &str)> = Vec::new();
+    let mut renamed_events: Vec<&str> = Vec::new();
+    let asyncapi_specs: Vec<&SpecSource> = loaded
+        .specs
+        .iter()
+        .filter(|spec| spec.kind == SpecKind::Asyncapi)
+        .collect();
+    for patch in &loaded.patch.events {
+        let service = patch.service.as_deref().map(str::trim).unwrap_or_else(|| {
+            asyncapi_specs
+                .first()
+                .filter(|_| asyncapi_specs.len() == 1)
+                .map_or(DEFAULT_SERVICE, |source| source.service())
+        });
+        if patch.select.trim().is_empty() {
+            problems.push(
+                "a `[[patch.events]]` entry has an empty `select`; it names an AsyncAPI component \
+                 message"
+                    .to_owned(),
+            );
+        } else if selected_events.contains(&(service, patch.select.as_str())) {
+            problems.push(format!(
+                "`[[patch.events]]` selects {:?} more than once from service {service:?}",
+                patch.select
+            ));
+        }
+        selected_events.push((service, patch.select.as_str()));
+        if let Some(rename) = patch.rename.as_deref() {
+            if rename.trim().is_empty() {
+                problems.push(format!(
+                    "event patch for {:?} has an empty `rename`",
+                    patch.select
+                ));
+            } else if renamed_events.contains(&rename) {
+                problems.push(format!(
+                    "`[[patch.events]]` renames two events to {rename:?}"
+                ));
+            }
+            renamed_events.push(rename);
+        }
+        if let Some(alternatives) = &patch.auth {
+            validate_requirements(
+                &loaded.connector,
+                alternatives,
+                &format!("event patch for {:?}", patch.select),
+                problems,
+            );
         }
     }
 
@@ -6821,6 +7106,7 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("operationSelector", probe::<OperationSelector>()),
         ("naming", probe::<Naming>()),
         ("operationPatch", probe::<OperationPatch>()),
+        ("eventPatch", probe::<EventPatch>()),
         ("paramPatch", probe::<ParamPatch>()),
         ("paramOmission", probe::<ParamOmission>()),
         ("authMethod", probe::<AuthMethod>()),

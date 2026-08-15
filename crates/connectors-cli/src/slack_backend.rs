@@ -1077,7 +1077,14 @@ fn project_data_event(
     }
     let event = payload.get("event")?.as_object()?;
     let event_type = event.get("type")?.as_str()?;
-    if !allowed_events.iter().any(|allowed| allowed == event_type) {
+    let kind = match event_type {
+        "app_mention" => "app_mention",
+        "message" if event.get("channel_type").and_then(Value::as_str) == Some("channel") => {
+            "message.channels"
+        }
+        _ => return None,
+    };
+    if !allowed_events.iter().any(|allowed| allowed == kind) {
         return None;
     }
     if event_type == "message" && (event.contains_key("bot_id") || event.contains_key("subtype")) {
@@ -1089,7 +1096,7 @@ fn project_data_event(
     {
         return None;
     }
-    Some((delivery_id.to_owned(), event_type.to_owned(), projected))
+    Some((delivery_id.to_owned(), kind.to_owned(), projected))
 }
 
 fn event_channel_summary(connection: &StoredConnection) -> EventChannelSummary {
@@ -1406,6 +1413,7 @@ mod tests {
             "event_id": "Ev01",
             "event": {
                 "type": "message",
+                "channel_type": "channel",
                 "channel": "C01",
                 "user": "U01",
                 "text": "hello",
@@ -1413,8 +1421,8 @@ mod tests {
             }
         });
         let (_, kind, projected) =
-            project_data_event(Some(&payload), &["message".to_owned()]).unwrap();
-        assert_eq!(kind, "message");
+            project_data_event(Some(&payload), &["message.channels".to_owned()]).unwrap();
+        assert_eq!(kind, "message.channels");
         let encoded = serde_json::to_string(&projected).unwrap();
         assert!(!encoded.contains(SENTINEL));
         assert!(projected.get("event").is_none());
@@ -1425,14 +1433,14 @@ mod tests {
     fn message_loop_guards_and_closed_event_grants_are_applied_before_storage() {
         let bot = serde_json::json!({
             "event_id": "Ev02",
-            "event": {"type": "message", "bot_id": "B01", "text": "own"}
+            "event": {"type": "message", "channel_type": "channel", "bot_id": "B01", "text": "own"}
         });
-        assert!(project_data_event(Some(&bot), &["message".to_owned()]).is_none());
+        assert!(project_data_event(Some(&bot), &["message.channels".to_owned()]).is_none());
         let unknown = serde_json::json!({
             "event_id": "Ev03",
             "event": {"type": "reaction_added"}
         });
-        assert!(project_data_event(Some(&unknown), &["message".to_owned()]).is_none());
+        assert!(project_data_event(Some(&unknown), &["message.channels".to_owned()]).is_none());
     }
 
     #[test]
@@ -1458,7 +1466,7 @@ mod tests {
         SlackIntegrationConfig {
             grant_ref: "grant:slack-inbound".to_owned(),
             initiation: InitiationConfig::Provider,
-            allowed_events: vec!["app_mention".to_owned(), "message".to_owned()],
+            allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
             connect_session_ttl_seconds: 30,
         }
     }
@@ -1562,14 +1570,14 @@ mod tests {
             label: "Development Slack".to_owned(),
             grant_ref: "grant:slack-inbound".to_owned(),
             initiation: InitiationConfig::Provider,
-            allowed_events: vec!["message".to_owned()],
+            allowed_events: vec!["message.channels".to_owned()],
         };
         let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
         store
-            .append(&connection, "Ev01", "message", payload.clone())
+            .append(&connection, "Ev01", "message.channels", payload.clone())
             .unwrap();
         store
-            .append(&connection, "Ev01", "message", payload)
+            .append(&connection, "Ev01", "message.channels", payload)
             .unwrap();
         let (events, cursor) = store
             .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)

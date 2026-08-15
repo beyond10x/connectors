@@ -60,6 +60,45 @@
       ],
       "type": "object"
     },
+    "auth_requirement": {
+      "additionalProperties": false,
+      "properties": {
+        "credentials": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "scopes": {
+          "additionalProperties": {
+            "items": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "type": "object"
+    },
+    "auth_requirements": {
+      "description": "Non-lossy auth alternatives with credential-local OR-of-AND granted-scope requirements.",
+      "items": {
+        "$ref": "#/$defs/auth_requirement"
+      },
+      "type": "array"
+    },
     "body": {
       "oneOf": [
         {
@@ -178,6 +217,9 @@
       "properties": {
         "auth": {
           "$ref": "#/$defs/requirements"
+        },
+        "auth_requirements": {
+          "$ref": "#/$defs/auth_requirements"
         },
         "connect": {
           "type": "object"
@@ -491,6 +533,12 @@
     "event": {
       "additionalProperties": false,
       "properties": {
+        "auth": {
+          "$ref": "#/$defs/requirements"
+        },
+        "auth_requirements": {
+          "$ref": "#/$defs/auth_requirements"
+        },
         "default": {
           "type": "boolean"
         },
@@ -688,6 +736,9 @@
       "properties": {
         "auth": {
           "$ref": "#/$defs/requirements"
+        },
+        "auth_requirements": {
+          "$ref": "#/$defs/auth_requirements"
         },
         "contract": {
           "$ref": "#/$defs/contract"
@@ -1264,6 +1315,9 @@
     },
     "default_auth": {
       "$ref": "#/$defs/requirements"
+    },
+    "default_auth_requirements": {
+      "$ref": "#/$defs/auth_requirements"
     },
     "description": {
       "type": "string"

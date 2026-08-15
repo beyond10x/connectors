@@ -902,6 +902,11 @@ fn the_shipped_slack_bindings_describe_both_of_slacks_real_transports() {
     assert_eq!(events_api.transport, Transport::Webhook);
     assert_eq!(socket.auth.len(), 1);
     assert!(socket.auth[0].contains("slack.app_token"));
+    assert_eq!(
+        socket.auth[0].scopes().get("slack.app_token"),
+        Some(&vec![vec!["connections:write".to_owned()]]),
+        "the app-level token is transport authority only"
+    );
     assert!(socket.setup.as_ref().is_some_and(|setup| {
         setup
             .steps
@@ -928,6 +933,24 @@ fn the_shipped_slack_bindings_describe_both_of_slacks_real_transports() {
     assert_eq!(reply.operation, "slack-chat-post-message");
     assert!(connector.operation(&reply.operation).is_some());
     assert_eq!(reply.result.as_deref(), Some("text"));
+
+    let app_mention = connector.event("app_mention").expect("selected event");
+    assert_eq!(
+        connector.effective_event_auth(app_mention)[0]
+            .scopes()
+            .get("slack.bot_token"),
+        Some(&vec![vec!["app_mentions:read".to_owned()]])
+    );
+    let messages = connector
+        .event("message.channels")
+        .expect("stable narrowed public-channel event");
+    assert_eq!(messages.wire_value.as_deref(), Some("message"));
+    assert_eq!(
+        connector.effective_event_auth(messages)[0]
+            .scopes()
+            .get("slack.bot_token"),
+        Some(&vec![vec!["channels:history".to_owned()]])
+    );
 }
 
 /// The three member kinds share one address form, so the `#` fragment needs no kind discriminator.

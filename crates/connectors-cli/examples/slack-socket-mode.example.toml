@@ -14,5 +14,5 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 [slack]
 grant_ref = "grant-slack-inbound-development-1"
 initiation = "provider"
-allowed_events = ["app_mention", "message"]
+allowed_events = ["app_mention", "message.channels"]
 connect_session_ttl_seconds = 300

@@ -148,8 +148,94 @@ fn sip_catalog_surface_is_the_bounded_dial_member() {
     assert!(operation["request"].get("path").is_none());
 }
 
-/// S-015 is a vocabulary migration, not a behavioural edit. The digest is the pre-migration
-/// inventory of all 151 non-empty operation trait sets, normalized without the old umbrella key.
+/// Slack is the first provider whose bearer credentials have materially different capability
+/// domains. Pin the curated boundary in the canonical document: a source refresh may update schemas
+/// but may not turn the app-level Socket Mode token into bot/admin authority or import Admin writes.
+#[test]
+fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
+    let (workspace, plan) = full_plan();
+    let mut all = documents(&workspace, &plan);
+    let slack = all.remove("slack").expect("Slack ships");
+    let operations = slack["operations"].as_array().expect("operations");
+    assert_eq!(
+        operations.len(),
+        8,
+        "Slack's initial callable surface is exact"
+    );
+    assert!(operations
+        .iter()
+        .all(|operation| operation["expose"] == true));
+
+    for operation in operations {
+        let service = operation["service"].as_str().expect("service");
+        let requirement = operation["auth_requirements"]
+            .as_array()
+            .and_then(|requirements| requirements.first())
+            .expect("every selected Slack operation has scoped auth");
+        let credential = requirement["credentials"][0]
+            .as_str()
+            .expect("one credential");
+        let scopes = requirement["scopes"][credential]
+            .as_array()
+            .expect("credential-local scope alternatives");
+        assert!(!scopes.is_empty());
+
+        if service == "admin" {
+            assert_eq!(operation["direction"], "read");
+            assert_eq!(operation["risk"], "low");
+            assert_eq!(credential, "slack.admin_token");
+            assert!(scopes
+                .iter()
+                .all(
+                    |scope_set| scope_set
+                        .as_array()
+                        .is_some_and(|scope_set| scope_set.iter().all(|scope| scope
+                            .as_str()
+                            .is_some_and(|scope| scope.starts_with("admin."))))
+                ));
+        } else {
+            assert_eq!(service, "default");
+            assert_eq!(credential, "slack.bot_token");
+        }
+
+        assert_ne!(credential, "slack.app_token");
+        assert_ne!(credential, "slack.user_token");
+    }
+
+    assert_eq!(
+        slack["events"]
+            .as_array()
+            .expect("events")
+            .iter()
+            .map(|event| event["name"].as_str().expect("event name"))
+            .collect::<Vec<_>>(),
+        ["app_mention", "message.channels"]
+    );
+    assert!(slack["events"]
+        .as_array()
+        .expect("events")
+        .iter()
+        .all(|event| event["auth_requirements"][0]["credentials"][0] == "slack.bot_token"));
+
+    let socket = slack["channels"]
+        .as_array()
+        .expect("channels")
+        .iter()
+        .find(|channel| channel["name"] == "socket")
+        .expect("Socket Mode channel");
+    assert_eq!(
+        socket["auth_requirements"][0]["credentials"][0],
+        "slack.app_token"
+    );
+    assert_eq!(
+        socket["auth_requirements"][0]["scopes"]["slack.app_token"][0][0],
+        "connections:write"
+    );
+}
+
+/// S-015 is a vocabulary migration, not a behavioural edit. The digest began as the pre-migration
+/// inventory of 151 non-empty operation trait sets, normalized without the old umbrella key, and
+/// advances only when a new operation deliberately adds one of those promoted traits.
 #[test]
 fn promoted_operation_traits_equal_the_pre_migration_inventory() {
     let (workspace, plan) = full_plan();
@@ -178,11 +264,11 @@ fn promoted_operation_traits_equal_the_pre_migration_inventory() {
             fact["id"].as_str().unwrap()
         )
     });
-    assert_eq!(facts.len(), 151);
+    assert_eq!(facts.len(), 155);
     let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
     assert_eq!(
         digest,
-        "ca7de6c5f45fbd87f078b82d2505f8045c4d5bad5a5c1278ce88fc9ac8c5d2d5"
+        "6eed985b7216819fc694c099ea38b3f3708b134f0373f78f196ccdbd961b0746"
     );
 }
 
@@ -750,9 +836,11 @@ fn method_word(method: connector_spec::HttpMethod) -> &'static str {
 ///   declares. This is what would catch a connector accreting a hand-authored operation beside a
 ///   spec-backed surface, where it would look reviewed and be unbacked.
 /// - **Nothing silently dropped.** Every `[[patch.operations]]` entry names an `operationId` the
-///   ingest really carries, and lands as a published operation — unless it declares `defer`, in
-///   which case it must *not* be published. A selector that matches nothing is a coverage claim
-///   that quietly failed, which is the failure the per-provider allow-lists existed to catch.
+///   OpenAPI ingest really carries, and lands as a published operation — unless it declares
+///   `defer`, in which case it must *not* be published. Every exact `[[patch.events]]` selection
+///   likewise names an AsyncAPI component message and lands with its source payload schema. A
+///   selector that matches nothing is a coverage claim that quietly failed, which is the failure
+///   the per-provider allow-lists existed to catch.
 #[test]
 fn spec_backed_coverage_holds_in_both_directions() {
     let workspace = Workspace::new(repo_root());
@@ -765,7 +853,7 @@ fn spec_backed_coverage_holds_in_both_directions() {
             .unwrap_or_else(|error| panic!("read `{}`: {error:#}", provider.name));
         let loaded = catalog_build::seam::load_full(&inputs)
             .unwrap_or_else(|error| panic!("load `{}`: {error:#}", provider.name));
-        if loaded.ingested.is_empty() {
+        if loaded.ingested.is_empty() && loaded.ingested_events.is_empty() {
             continue;
         }
         spec_backed += 1;
@@ -861,6 +949,46 @@ fn spec_backed_coverage_holds_in_both_directions() {
                     patch.select
                 ),
             }
+        }
+
+        for patch in &loaded.patch.events {
+            let document = match patch.service.as_deref() {
+                Some(service) => loaded
+                    .ingested_events
+                    .iter()
+                    .find(|document| document.service == service),
+                None if loaded.ingested_events.len() == 1 => loaded.ingested_events.first(),
+                None => None,
+            }
+            .unwrap_or_else(|| {
+                panic!(
+                    "`{name}` selects AsyncAPI event `{}` without one unambiguous source document",
+                    patch.select
+                )
+            });
+            let source = document.ingested.event(&patch.select).unwrap_or_else(|| {
+                panic!(
+                    "`{name}` selects AsyncAPI event `{}`, which its source does not declare",
+                    patch.select
+                )
+            });
+            let published_name = patch.rename.as_deref().unwrap_or(&source.name);
+            let event = loaded
+                .connector
+                .events
+                .iter()
+                .find(|event| {
+                    event.service == document.service && event.name == published_name
+                })
+                .unwrap_or_else(|| panic!(
+                    "`{name}` selects AsyncAPI event `{}` but publishes no `{published_name}` event",
+                    patch.select
+                ));
+            assert_eq!(
+                event.schema.as_ref(),
+                Some(&source.payload),
+                "`{name}` event `{published_name}` must retain the selected AsyncAPI payload schema"
+            );
         }
     }
 

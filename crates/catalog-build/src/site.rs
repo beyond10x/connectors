@@ -250,6 +250,9 @@ struct EventEntry {
     /// no authority or no API version. Events, operations and bindings share one namespace per
     /// service, so they share one address form and the `#` fragment carries no kind tag.
     oip: Option<String>,
+    /// Effective credential alternatives and their credential-local granted-scope requirements.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth: Vec<AuthRequirementEntry>,
     /// What the event means, in one line.
     description: String,
     /// Whether a product should offer this event **on** when a user connects. Slack's `message` is
@@ -284,6 +287,8 @@ struct ChannelEntry {
     connect: Option<SocketConnectSpec>,
     /// Credential-name requirements resolved inside Connector custody before supervision starts.
     auth: Vec<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth_requirements: Vec<AuthRequirementEntry>,
     /// The [`EventEntry::name`]s this binding carries, all from the same service.
     events: Vec<String>,
     /// How a delivery proves it came from the vendor. **Always present**, and always naming its
@@ -600,10 +605,22 @@ struct OperationEntry {
     /// The credentials required, as alternatives (OR) of mechanisms (AND) — the IR's own shape.
     /// `[["a", "b"]]` is one mechanism needing both, not two ways to authenticate.
     credentials: Vec<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    auth_requirements: Vec<AuthRequirementEntry>,
     /// The hosts a call reaches.
     hosts: Vec<String>,
     /// Whether it currently works, and if not, why. See [`crate::status`].
     status: Status,
+}
+
+/// One OR alternative in its non-lossy form. `credentials` remains present beside this on
+/// operations/channels for compatibility; this form associates scope evidence with the credential
+/// it actually belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct AuthRequirementEntry {
+    credentials: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    scopes: BTreeMap<String, Vec<Vec<String>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -811,6 +828,7 @@ fn event_entry(connector: &Connector, event: &EventDecl) -> EventEntry {
         wire_value: event.wire_value.clone(),
         service: event.service.clone(),
         oip: member_oip(connector, &event.service, &event.name),
+        auth: auth_requirement_entries(connector.effective_event_auth(event), false),
         description: event.description.clone(),
         default: event.default,
         group: event.group.clone(),
@@ -834,6 +852,7 @@ fn channel_entry(connector: &Connector, channel: &ChannelBinding) -> ChannelEntr
             .iter()
             .map(|requirement| requirement.iter().cloned().collect())
             .collect(),
+        auth_requirements: auth_requirement_entries(&channel.auth, true),
         events: channel.events.clone(),
         verification: verification_entry(channel),
         discriminator: channel.discriminator.as_ref().map(selector_entry),
@@ -995,9 +1014,30 @@ fn operation_entry(
             .into_iter()
             .map(|mechanism| mechanism.into_iter().map(str::to_string).collect())
             .collect(),
+        auth_requirements: auth_requirement_entries(connector.effective_auth(operation), true),
         hosts,
         status: status::of(connector, operation),
     }
+}
+
+fn auth_requirement_entries(
+    requirements: &[connector_spec::AuthRequirement],
+    omit_when_unscoped: bool,
+) -> Vec<AuthRequirementEntry> {
+    if omit_when_unscoped
+        && !requirements
+            .iter()
+            .any(|requirement| !requirement.scopes().is_empty())
+    {
+        return Vec::new();
+    }
+    requirements
+        .iter()
+        .map(|requirement| AuthRequirementEntry {
+            credentials: requirement.iter().cloned().collect(),
+            scopes: requirement.scopes().clone(),
+        })
+        .collect()
 }
 
 /// Every named parameter, flattened into one list that carries its own position.

@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "88e44eb82a447dbfe4065b6a14ab91650b3864f98be9636998ebe2a505f8376f"
+sha256 = "139886bda44a65089a16e83b384decf13dae544236acc1f30c163a9d3f1b1846"
 
 [[provider]]
 id = "airtable"
@@ -551,11 +551,31 @@ ir_sha256 = "f3c4aa8d851678564f424fdbdbfa47559f7a4a79a340ff02a6d491e3f0fd2478"
 [[provider]]
 id = "slack"
 generator = "connectors 0.1.0"
-toml_sha256 = "e22ffa9588ff5a0eff7ee5e20fdc6a02b4b885d7b42d67337624654316e5eece"
-ir_sha256 = "6d6c458eb0a7a03aee8cba8a1ed0a44dbc2fe8f2f0e1c5530d0af1264bb7aa01"
+toml_sha256 = "19f74e7cbe64f94309bbc1d441fe7d432a0140468718d8d12f5a66c8fa11adca"
+ir_sha256 = "8151c6e62500db5fdf99dd735d41c585a281963feb9396339005c3e5b10f582f"
+
+[[provider.specs]]
+path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
+service = "default"
+source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+upstream_version = "1.7.0"
+sha256 = "951705a5eee2911ff60ccc3a7a613fb7c96dbcfe554463829d288bb8951cafba"
+
+[[provider.specs]]
+path = "specs/slack/admin-api-selected-1.7.0-2026-08-15.openapi.json"
+service = "admin"
+source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+upstream_version = "1.7.0"
+sha256 = "cdf527e2ee12c99869faf00748d8f3ae044f8e137783bdfefd1c9e0f11ffda1b"
+
+[[provider.specs]]
+path = "specs/slack/events-selected-2026-08-15.asyncapi.yaml"
+service = "default"
+upstream_version = "2026-08-15"
+sha256 = "9a967daeabf79901ce5df35244d8e25647b0b8a1026372b001b61d2ea5c49052"
 
 [provider.artifacts]
-"catalog/slack.catalog.json" = "49039450e5f6adaffb472c544d91594d82ae90ec1de13de5e9bbfd05e5cc2786"
+"catalog/slack.catalog.json" = "d50c91905c4dcc9d5d8b0a4d74bd91283138d7d99718c0888c262631ca9d80a3"
 
 [[provider]]
 id = "statuspage"

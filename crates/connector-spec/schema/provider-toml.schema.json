@@ -180,6 +180,11 @@
           "type": "string",
           "description": "The `[[services]]` entry this event belongs to. Omit it for a provider with a single API surface."
         },
+        "auth": {
+          "type": "array",
+          "description": "Credential and granted-scope alternatives that admit this event for a Connection. Omit when no event-specific capability claim has been reviewed; write an empty list to explicitly require none. Event auth does not inherit outbound `default_auth` and is separate from channel transport authentication and webhook verification.",
+          "items": { "$ref": "#/$defs/authRequirement" }
+        },
         "description": {
           "type": "string",
           "description": "What the event means, in one line."
@@ -900,6 +905,11 @@
           "type": "string",
           "description": "The vendored spec file relative to the repository root, e.g. `specs/babelforce/manager-2026-07-10.openapi.yaml`."
         },
+        "kind": {
+          "enum": ["openapi", "asyncapi"],
+          "default": "openapi",
+          "description": "Pure source front-end used for this document. Omit for OpenAPI; `asyncapi` makes component messages available to exact `[[patch.events]]` selection."
+        },
         "service": {
           "type": "string",
           "description": "The service this document's selected operations join. Omit it to join the reserved `default` service, which is what a single `[spec]` block means. A named value must be one a `[[services]]` entry declares: a document joins a service, it does not declare one. Two documents may not join the same service, because a service is one name namespace and two vendor documents can declare the same `operationId`."
@@ -950,6 +960,11 @@
           "type": "array",
           "description": "One entry per operation selected from the spec by name.",
           "items": { "$ref": "#/$defs/operationPatch" }
+        },
+        "events": {
+          "type": "array",
+          "description": "Exact component messages selected from AsyncAPI sources. Event selection has no bulk form: inbound subscriptions are always a closed reviewed inventory.",
+          "items": { "$ref": "#/$defs/eventPatch" }
         }
       }
     },
@@ -1161,6 +1176,28 @@
           "type": "boolean",
           "description": "Overrides whether this operation reaches a model as a tool. The counterpart of a selector's `expose`, and the reason both exist: a selector states the rule for a set (`expose = false` over 388 operations) and a block states the exception (`expose = true` on the curated nine). Omit it for whatever the selector that matched this operation said, and exposed if none did.",
           "examples": [true]
+        }
+      }
+    },
+
+    "eventPatch": {
+      "type": "object",
+      "title": "AsyncAPI event selection and admission overlay",
+      "additionalProperties": false,
+      "required": ["select"],
+      "properties": {
+        "service": { "type": "string", "description": "Service of the AsyncAPI source document. Required when more than one AsyncAPI source is pinned." },
+        "select": { "type": "string", "description": "Exact key in the source document's `components.messages` mapping." },
+        "rename": { "type": "string", "description": "Stable catalog event name. Omit to retain the message's declared name." },
+        "wire_value": { "type": "string", "description": "Exact transport discriminator when it differs from the stable event name." },
+        "description": { "type": "string" },
+        "default": { "type": "boolean", "description": "Whether products offer this subscription on by default." },
+        "group": { "type": "string" },
+        "when": { "type": "object", "description": "Field equalities narrowing a coarse wire event into this catalog event." },
+        "auth": {
+          "type": "array",
+          "description": "Credential capability alternatives required to surface this event for a Connection; separate from channel auth and verification.",
+          "items": { "$ref": "#/$defs/authRequirement" }
         }
       }
     },
@@ -1461,6 +1498,20 @@
           "minItems": 1,
           "description": "Names of credentials declared in `[[auth]]`. Order carries no meaning — all of them travel on one request — and is normalised on load.",
           "items": { "type": "string" }
+        },
+        "scopes": {
+          "type": "object",
+          "description": "Credential name to OR-of-AND granted-scope sets. The key must also appear in this mechanism's `credentials`. A Connection satisfies the entry when the named credential has every scope in at least one inner list; missing or stale scope evidence fails closed.",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+$" }
+            }
+          }
         }
       }
     },

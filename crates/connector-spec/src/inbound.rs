@@ -320,6 +320,18 @@ pub struct EventDecl {
         skip_serializing_if = "is_default_service"
     )]
     pub service: String,
+    /// Credential alternatives whose proven capabilities admit this event for a Connection.
+    ///
+    /// `None` carries no event-specific credential capability claim, `Some([])` explicitly requires
+    /// no credential, and a non-empty list is OR-of-auth-mechanisms exactly like
+    /// [`Operation::auth`](crate::Operation::auth). It does not inherit operation auth: an inbound
+    /// subscription and an outbound request are independent vendor capabilities.
+    /// This is admission metadata, not webhook verification: Slack's `app_mention` requires a bot
+    /// token carrying `app_mentions:read`, while the sibling channel independently verifies an
+    /// inbound HTTP delivery with the signing secret or authenticates Socket Mode with an app
+    /// token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<Vec<crate::AuthRequirement>>,
     /// What the event means, in one line.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,

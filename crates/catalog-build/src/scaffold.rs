@@ -1321,6 +1321,7 @@ impl Plan {
                 .selected_documents()
                 .map(|document| SpecSource {
                     path: document.path.clone(),
+                    kind: connector_spec::SpecKind::Openapi,
                     service: document.names_service.then(|| document.service.clone()),
                     source_url: document.source_url.clone(),
                     upstream_version: document.upstream_version.clone(),

@@ -94,6 +94,25 @@ consumers = ["providers/alertmanager.toml", "catalog/alertmanager.catalog.json"]
 note = "Pins Alertmanager's official v0.31.0 Swagger 2 source and the reviewed OpenAPI 3 projection of the one read operation B10x ships."
 
 [[source]]
+id = "slack-web-and-events"
+kind = "api-spec"
+origin = "mixed-vendor-and-repository-authored"
+upstream = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+references = [
+  "https://docs.slack.dev/authentication/tokens/",
+  "https://docs.slack.dev/apis/events-api/",
+  "https://docs.slack.dev/reference/scopes/connections.write/",
+  "https://docs.slack.dev/reference/events/app_mention/",
+  "https://docs.slack.dev/reference/events/message.channels/",
+  "https://docs.slack.dev/reference/scopes/admin.apps.read/",
+  "https://docs.slack.dev/reference/methods/admin.teams.list/",
+]
+refresh = "scripts/vendor-slack-spec.py"
+pins = "specs/slack.provenance.toml"
+consumers = ["providers/slack.toml", "catalog/slack.catalog.json", "crates/connectors-cli/src/slack_backend.rs"]
+note = "Pins Slack's exact live Swagger 2 bytes and deterministic curated OpenAPI 3 projections for four workspace and four read-only Admin operations. Slack publishes no maintained Events AsyncAPI document, so the exact two-event AsyncAPI source is repository-authored from current official references and is explicitly marked as such."
+
+[[source]]
 id = "asterisk-ari-sip"
 kind = "vendor-protocol-source"
 upstream = "https://github.com/asterisk/asterisk (tag 22.10.1)"

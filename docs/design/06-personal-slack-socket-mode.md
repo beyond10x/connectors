@@ -63,10 +63,18 @@ calls a user must copy between terminals.
 
 ## 2. Acquisition and durable state
 
+**2026-08-15 token-role amendment.** The initial document described only the credential already
+implemented by the personal alpha. Slack's catalog now distinguishes all reviewed credential
+purposes and their credential-local scope requirements.
+
 `slack.app_token` is declared with `entry = "connect_session"` and no `env`. Channel binding
-`com.slack.api:v1#socket` names that credential in its channel-level `auth` requirement. The field
-is distinct from generic RFC 6455 `connect.auth`: Slack authenticates a fixed HTTPS ticket-minting
-call before a WebSocket URL exists.
+`com.slack.api:v1#socket` names that credential in its channel-level `auth` requirement and requires
+`connections:write`. It is an app-level `xapp` token used only to mint Socket Mode tickets—not the
+bot token that subscribes to events or calls `chat.postMessage`, not a user/admin OAuth token, and
+not Slack's short-lived App Manifest configuration token. The field is distinct from generic RFC
+6455 `connect.auth`: Slack authenticates a fixed HTTPS ticket-minting call before a WebSocket URL
+exists. [Design 09](09-curation-and-credential-capability-admission.md) fixes the generic
+credential-purpose and scope-admission boundary.
 
 Slack defines an app-level token as representing the app across organizations, whereas an installed
 bot token belongs to a workspace installation. Consequently, storing one `xapp` token on each
@@ -79,7 +87,8 @@ Connection and Grant. The generic Connection and Event contracts do not change f
 
 The personal-local daemon creates one Unix socket below `<state>/connect-sessions/`, mode `0600`
 inside an owner-only directory. It accepts one same-UID peer, removes the socket before processing,
-bounds and validates one newline-terminated app token, and returns only `accepted: true|false`.
+bounds and validates one newline-terminated app-level token, and returns only
+`accepted: true|false`.
 Expiry or the first completion attempt makes the endpoint terminal. The ordinary Connection
 protocol cannot spell a credential field; adversarial unknown fields are refused before backend
 work.
@@ -136,6 +145,11 @@ acknowledged before it is durable. If the bounded event store is full or unavail
 supervisor does not acknowledge and Slack can redeliver. Deduplication uses Slack's `event_id` per
 Connection. The outer envelope's legacy `token` and every other transport field are absent from the
 stored/client payload.
+
+The alpha verifies the `xapp` credential on the fixed Socket Mode path but does not yet acquire a
+bot credential or persist general granted-scope evidence. Consequently it proves secure transport
+custody and event normalization, not the future generic claim that Web/Admin operations and event
+subscriptions are dynamically surfaced from a Connection's current Slack scopes.
 
 ## 4. Client and harness boundary
 
