@@ -19,6 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 async-trait = "0.1"
+axum = { version = "0.8", features = ["json", "tokio"] }
 catalog = { version = "0.1.0", path = "../catalog" }
 clap = { version = "4", features = ["derive"] }
 connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
