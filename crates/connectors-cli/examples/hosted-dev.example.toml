@@ -2,6 +2,7 @@ tenant_id = "tenant-dev"
 
 [server]
 listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
 
 [identity]
 origin = "https://identity.dev.b10x.example"

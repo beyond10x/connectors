@@ -23,6 +23,8 @@ pub struct HostedServerConfig {
 #[serde(deny_unknown_fields)]
 pub struct HostedListenerConfig {
     pub listen: SocketAddr,
+    #[serde(default = "default_base_path")]
+    pub base_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,6 +89,7 @@ impl HostedServerConfig {
     fn validate(&self) -> Result<(), HostedServerConfigError> {
         if !valid_ref(&self.tenant_id, 256)
             || self.identity.origin.len() > 2_048
+            || !valid_base_path(&self.server.base_path)
             || !self.storage.state_root.is_absolute()
             || (self.kubernetes.enabled != !self.kubernetes.namespaces.is_empty())
             || self
@@ -111,6 +114,23 @@ impl HostedServerConfig {
 
 fn default_kubernetes_token_file() -> PathBuf {
     PathBuf::from("/var/run/secrets/kubernetes.io/serviceaccount/token")
+}
+
+fn default_base_path() -> String {
+    "/".to_owned()
+}
+
+fn valid_base_path(value: &str) -> bool {
+    value == "/"
+        || (value.starts_with('/')
+            && !value.ends_with('/')
+            && value.len() <= 128
+            && value.split('/').skip(1).all(|segment| {
+                !segment.is_empty()
+                    && segment.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
+                    })
+            }))
 }
 
 fn default_kubernetes_ca_file() -> PathBuf {
@@ -149,6 +169,7 @@ tenant_id = "tenant-dev"
 
 [server]
 listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
 
 [identity]
 origin = "https://identity.example.test"

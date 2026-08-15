@@ -368,13 +368,20 @@ async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
             "ready": true,
             "protocol": protocol::operation::CONTRACT,
             "listen": config.server.listen,
+            "base_path": config.server.base_path,
             "identity_audience": server::hosted::CONNECTORS_AUDIENCE,
             "kubernetes_enabled": config.kubernetes.enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
         })
     );
-    axum::serve(listener, server::hosted::router(verifier, backend))
+    let connector_router = server::hosted::router(verifier, backend);
+    let application = if config.server.base_path == "/" {
+        connector_router
+    } else {
+        axum::Router::new().nest(&config.server.base_path, connector_router)
+    };
+    axum::serve(listener, application)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
         })
