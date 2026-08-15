@@ -1,0 +1,20 @@
+tenant_id = "tenant-dev"
+
+[server]
+listen = "0.0.0.0:8080"
+
+[identity]
+origin = "https://identity.dev.b10x.example"
+
+[storage]
+state_root = "/var/lib/b10x-connectors"
+
+[kubernetes]
+enabled = true
+namespaces = ["b10x"]
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+[sip]
+enabled = false
+listen = "0.0.0.0:5060"

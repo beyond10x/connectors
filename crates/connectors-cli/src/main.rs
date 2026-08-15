@@ -10,7 +10,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Parser, Subcommand};
 use connectors_cli::{
-    load_authority_issuer, MonitoringBackend, PersonalConfig, RefusingBackend, RuntimeLauncher,
+    load_authority_issuer, CompositeBackend, HostedServerConfig, HostedServerConfigError,
+    IdentityHttpVerifier, IdentityVerifierConfigError, KubernetesBackendError,
+    KubernetesStatusBackend, MonitoringBackend, PersonalConfig, RefusingBackend, RuntimeLauncher,
     SipOperationBackend, SlackBackend,
 };
 use protocol::connection::{
@@ -52,6 +54,12 @@ enum Command {
         /// Owner-only state root. Defaults below XDG_STATE_HOME (or ~/.local/state).
         #[arg(long)]
         state_root: Option<PathBuf>,
+    },
+    /// Serve the Identity-authenticated hosted operation API.
+    ServeHosted {
+        /// Strict value-free server and Integration configuration.
+        #[arg(long)]
+        config: PathBuf,
     },
     /// Add a provider through one guided, secret-safe flow.
     Connect {
@@ -253,6 +261,12 @@ enum MainError {
     #[error(transparent)]
     Monitoring(#[from] connectors_cli::MonitoringError),
     #[error(transparent)]
+    IdentityVerifier(#[from] IdentityVerifierConfigError),
+    #[error(transparent)]
+    HostedConfig(#[from] HostedServerConfigError),
+    #[error(transparent)]
+    Kubernetes(#[from] KubernetesBackendError),
+    #[error(transparent)]
     Daemon(#[from] server::local::LocalDaemonError),
     #[error("local Connector request failed: {0}")]
     Io(#[from] io::Error),
@@ -278,6 +292,7 @@ enum MainError {
 async fn main() -> Result<(), MainError> {
     match Cli::parse().command {
         Command::Serve { config, state_root } => serve(config, state_root).await,
+        Command::ServeHosted { config } => serve_hosted(&config).await,
         Command::Connect {
             provider,
             config,
@@ -292,6 +307,79 @@ async fn main() -> Result<(), MainError> {
         Command::Event { command } => event(command).await,
         Command::Operation { command } => operation(command).await,
     }
+}
+
+async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
+    let config = HostedServerConfig::read(config_path)?;
+    let identity_origin = url::Url::parse(&config.identity.origin)
+        .map_err(|_| IdentityVerifierConfigError::InvalidIdentityOrigin)?;
+    let verifier = Arc::new(IdentityHttpVerifier::new(
+        identity_origin,
+        config.tenant_id.clone(),
+    )?);
+    let mut backends = Vec::<Arc<dyn OperationBackend>>::new();
+    if config.kubernetes.enabled {
+        backends.push(Arc::new(KubernetesStatusBackend::in_cluster(
+            config.tenant_id.clone(),
+            config.kubernetes.namespaces.clone(),
+            config.kubernetes.token_file.clone(),
+            &config.kubernetes.ca_file,
+        )?));
+    }
+    if config.sip.enabled {
+        let deployment_config = config
+            .sip
+            .deployment_config
+            .as_deref()
+            .ok_or(HostedServerConfigError::Invalid)?;
+        let personal = PersonalConfig::read(deployment_config)?;
+        let voice = personal.voice()?.ok_or(HostedServerConfigError::Invalid)?;
+        if voice.owner.tenant_id != config.tenant_id
+            || voice
+                .sip
+                .targets
+                .iter()
+                .any(|target| Some(target.signaling_bind) != config.sip.listen)
+        {
+            return Err(HostedServerConfigError::Invalid.into());
+        }
+        let issuer = Arc::new(load_authority_issuer(&voice.authority)?);
+        let launcher = Arc::new(RuntimeLauncher::new(
+            issuer,
+            voice.application.endpoint.clone(),
+            voice.application.connect_address,
+            voice.application.tls_server_name.clone(),
+        ));
+        backends.push(Arc::new(SipOperationBackend::new(
+            voice,
+            launcher,
+            &config.storage.state_root,
+        )?));
+    }
+    let backend: Arc<dyn OperationBackend> = match backends.len() {
+        0 => Arc::new(RefusingBackend),
+        1 => backends.pop().expect("one configured backend"),
+        _ => Arc::new(CompositeBackend::new(backends)),
+    };
+    let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "ready": true,
+            "protocol": protocol::operation::CONTRACT,
+            "listen": config.server.listen,
+            "identity_audience": server::hosted::CONNECTORS_AUDIENCE,
+            "kubernetes_enabled": config.kubernetes.enabled,
+            "sip_enabled": config.sip.enabled,
+            "sip_listen": config.sip.listen,
+        })
+    );
+    axum::serve(listener, server::hosted::router(verifier, backend))
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
+    Ok(())
 }
 
 async fn connect(

@@ -4,6 +4,7 @@
 
 pub mod authority;
 mod dispatch;
+pub mod hosted;
 #[cfg(unix)]
 pub mod local;
 mod sip;

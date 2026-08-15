@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+axum.workspace = true
 base64.workspace = true
 domain.workspace = true
 protocol.workspace = true
@@ -25,3 +26,4 @@ tokio = { workspace = true, features = ["io-util", "macros", "net", "rt", "sync"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
+tower = { version = "0.5", features = ["util"] }
