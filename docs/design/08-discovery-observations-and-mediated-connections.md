@@ -31,6 +31,13 @@ core nouns is Grafana-specific.
 proxy, service, or hosted backend rather than one host. “Endpoint discovery” is also too early:
 Endpoint is the Agent projection after a Connection exists.
 
+**2026-08-15 clarification:** [Design 10](10-local-kubernetes-context-and-resource-discovery.md)
+also permits a Connection candidate to come from trusted local configuration before a source
+Connection exists. It has the same no-authority lifecycle but no proposed mediated route yet:
+activation creates the direct source Connection. Observations remain facts behind an existing
+Connection. The two origins share the candidate noun and never share the transition that produced
+it.
+
 ## 2. The flow is deliberately not collapsed
 
 ```text

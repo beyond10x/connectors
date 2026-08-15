@@ -14,6 +14,14 @@ nothing else from acquisition.
 Initiation answers which side may start; it does not replace a Connector Grant or an Agent endpoint
 grant. Local transport identity and the request's exact owner context remain independent gates.
 
+`candidate_search` is the pre-Connection discovery phase for trusted local configuration. It is
+passive: no provider request, credential helper, or login may run. Results expose an opaque
+`candidate_ref`, Integration, human label, lifecycle, evidence digest, and optional activated
+Connection only. `candidate_activate` is the explicit boundary that permits the Connector to
+resolve the candidate's private credential source, verify the provider identity and authority, and
+create a direct Connection. The caller cannot submit a kubeconfig path, server URL, user binding,
+credential helper, token, or resulting Connection identity.
+
 A route is either `direct` or `via_connection`. The mediated form names only the parent Connection
 and one closed route-adapter identity. The Connector-owned discovered-resource binding, provider
 URL, Grafana data-source UID, proxy path, and credentials never cross this contract. The child is a

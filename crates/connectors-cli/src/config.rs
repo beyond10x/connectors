@@ -38,6 +38,8 @@ pub struct PersonalConfig {
     pub slack: Option<SlackIntegrationConfig>,
     #[serde(default)]
     pub grafana: Option<GrafanaIntegrationConfig>,
+    #[serde(default)]
+    pub kubernetes: Option<KubernetesIntegrationConfig>,
 }
 
 /// Complete deployment selection needed to make the development `sip.dial` member callable.
@@ -140,6 +142,25 @@ pub struct GrafanaIntegrationConfig {
     pub target_grants: BTreeMap<String, String>,
     #[serde(default = "default_connect_session_ttl_seconds")]
     pub connect_session_ttl_seconds: u64,
+}
+
+/// Value-free personal-local Kubernetes discovery policy. Authentication remains in the user's
+/// standard kubeconfig credential source and is resolved only after a candidate is activated.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KubernetesIntegrationConfig {
+    pub grant_ref: String,
+    pub initiation: InitiationConfig,
+    /// Empty means cluster-wide discovery when the selected identity is allowed to list Services.
+    #[serde(default)]
+    pub namespaces: Vec<String>,
+    /// Independent grants for monitoring Connections recognized behind Kubernetes Services.
+    pub target_grants: BTreeMap<String, String>,
+    /// Exec and legacy auth-provider plugins can run local credential helpers and require opt-in.
+    #[serde(default)]
+    pub allow_exec_auth: bool,
+    #[serde(default = "default_kubernetes_resource_limit")]
+    pub resource_limit: u16,
 }
 
 /// One opaque alias mapped to an exact driver route.
@@ -270,7 +291,14 @@ impl PersonalConfig {
         if let Some(grafana) = &self.grafana {
             grafana.validate()?;
         }
-        if voice.is_none() && self.slack.is_none() && self.grafana.is_none() {
+        if let Some(kubernetes) = &self.kubernetes {
+            kubernetes.validate()?;
+        }
+        if voice.is_none()
+            && self.slack.is_none()
+            && self.grafana.is_none()
+            && self.kubernetes.is_none()
+        {
             return Err(ConfigError::Invalid);
         }
         Ok(())
@@ -333,6 +361,59 @@ impl GrafanaIntegrationConfig {
     pub fn canonical_origin(&self) -> String {
         self.origin.trim_end_matches('/').to_owned()
     }
+}
+
+impl KubernetesIntegrationConfig {
+    fn validate(&self) -> Result<(), ConfigError> {
+        let mut namespaces = self.namespaces.clone();
+        namespaces.sort();
+        namespaces.dedup();
+        if !config_ref(&self.grant_ref, 512)
+            || matches!(self.initiation, InitiationConfig::Provider)
+            || namespaces != self.namespaces
+            || self
+                .namespaces
+                .iter()
+                .any(|namespace| !dns_label(namespace))
+            || self.target_grants.is_empty()
+            || self.target_grants.iter().any(|(provider, grant)| {
+                !matches!(
+                    provider.as_str(),
+                    "grafana" | "prometheus" | "loki" | "alertmanager"
+                ) || !config_ref(grant, 512)
+            })
+            || !(1..=512).contains(&self.resource_limit)
+        {
+            return Err(ConfigError::Invalid);
+        }
+        Ok(())
+    }
+
+    /// Independent grant selected for one recognized target Provider.
+    #[must_use]
+    pub fn target_grant(&self, provider: &str) -> Option<&str> {
+        self.target_grants.get(provider).map(String::as_str)
+    }
+}
+
+const fn default_kubernetes_resource_limit() -> u16 {
+    256
+}
+
+fn dns_label(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 63
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value
+            .as_bytes()
+            .last()
+            .is_some_and(u8::is_ascii_alphanumeric)
 }
 
 const fn default_connect_session_ttl_seconds() -> u64 {
@@ -574,6 +655,27 @@ allowed_events = ["app_mention", "message.channels"]
         assert_eq!(grafana.target_grant("loki"), Some("grant:loki-read"));
 
         let encoded = toml::to_string(&grafana).unwrap();
+        assert!(!encoded.contains("token"));
+        assert!(!encoded.contains("password"));
+        assert!(!encoded.contains("secret"));
+    }
+
+    #[test]
+    fn kubernetes_configuration_is_policy_only() {
+        let config: PersonalConfig = toml::from_str(include_str!(
+            "../examples/kubernetes-discovery.example.toml"
+        ))
+        .unwrap();
+        config.validate().unwrap();
+        let kubernetes = config.kubernetes.unwrap();
+        assert_eq!(kubernetes.namespaces, ["monitoring"]);
+        assert_eq!(
+            kubernetes.target_grant("grafana"),
+            Some("grant:grafana:cluster-service")
+        );
+        let encoded = toml::to_string(&kubernetes).unwrap();
+        assert!(!encoded.contains("kubeconfig"));
+        assert!(!encoded.contains("server_url"));
         assert!(!encoded.contains("token"));
         assert!(!encoded.contains("password"));
         assert!(!encoded.contains("secret"));

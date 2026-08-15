@@ -12,15 +12,15 @@ use clap::{Parser, Subcommand};
 use connectors_cli::{
     load_authority_issuer, CompositeBackend, HostedServerConfig, HostedServerConfigError,
     IdentityHttpVerifier, IdentityVerifierConfigError, KubernetesBackendError,
-    KubernetesStatusBackend, MonitoringBackend, PersonalConfig, RefusingBackend, RuntimeLauncher,
-    SipOperationBackend, SlackBackend,
+    KubernetesLocalBackend, KubernetesLocalError, KubernetesStatusBackend, MonitoringBackend,
+    PersonalConfig, RefusingBackend, RuntimeLauncher, SipOperationBackend, SlackBackend,
 };
 use protocol::connection::{
-    ConnectSessionCreateRequest, ConnectSessionState, ConnectSessionStatusRequest,
-    ConnectionDescription, ConnectionRequest, ConnectionResult, DiscoveryObservationState,
-    MaterializeRequest, ObservationSearchRequest, RequestEnvelope as ConnectionEnvelope,
-    ResponseEnvelope as ConnectionResponseEnvelope, ResponseStatus as ConnectionResponseStatus,
-    SearchRequest as ConnectionSearchRequest,
+    CandidateActivateRequest, CandidateSearchRequest, ConnectSessionCreateRequest,
+    ConnectSessionState, ConnectSessionStatusRequest, ConnectionDescription, ConnectionRequest,
+    ConnectionResult, DiscoveryObservationState, MaterializeRequest, ObservationSearchRequest,
+    RequestEnvelope as ConnectionEnvelope, ResponseEnvelope as ConnectionResponseEnvelope,
+    ResponseStatus as ConnectionResponseStatus, SearchRequest as ConnectionSearchRequest,
 };
 use protocol::event::{
     EventRequest, ReceiveRequest, ReplayRequest, RequestEnvelope as EventEnvelope,
@@ -63,7 +63,7 @@ enum Command {
     },
     /// Add a provider through one guided, secret-safe flow.
     Connect {
-        /// Provider to add. The personal-local alpha supports `slack` and `grafana`.
+        /// Provider to add. The personal-local alpha supports `slack`, `grafana`, and `kubernetes`.
         provider: String,
         /// Strict value-free deployment configuration.
         #[arg(long)]
@@ -71,6 +71,9 @@ enum Command {
         /// Human label for the resulting Connection.
         #[arg(long)]
         label: Option<String>,
+        /// Exact detected kubeconfig context when connecting Kubernetes.
+        #[arg(long)]
+        context: Option<String>,
         /// Owner-only state root used by the running Connector.
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -104,6 +107,30 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum ConnectionCommand {
+    /// Passively list potential direct Connections without contacting their providers.
+    Candidates {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        integration: String,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 64)]
+        limit: u16,
+        #[arg(long)]
+        state_root: Option<PathBuf>,
+    },
+    /// Explicitly contact and activate one opaque direct-Connection candidate.
+    Activate {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        candidate: String,
+        #[arg(long)]
+        label: String,
+        #[arg(long)]
+        state_root: Option<PathBuf>,
+    },
     /// Create a short-lived, single-use credential acquisition session.
     #[command(hide = true)]
     Create {
@@ -267,6 +294,8 @@ enum MainError {
     #[error(transparent)]
     Kubernetes(#[from] KubernetesBackendError),
     #[error(transparent)]
+    KubernetesLocal(#[from] KubernetesLocalError),
+    #[error(transparent)]
     Daemon(#[from] server::local::LocalDaemonError),
     #[error("local Connector request failed: {0}")]
     Io(#[from] io::Error),
@@ -297,8 +326,9 @@ async fn main() -> Result<(), MainError> {
             provider,
             config,
             label,
+            context,
             state_root,
-        } => connect(provider, config, label, state_root).await,
+        } => connect(provider, config, label, context, state_root).await,
         Command::Connection { command } => connection(command).await,
         Command::ConnectComplete {
             completion_endpoint,
@@ -393,9 +423,10 @@ async fn connect(
     provider: String,
     config_path: Option<PathBuf>,
     label: Option<String>,
+    context: Option<String>,
     state_root: Option<PathBuf>,
 ) -> Result<(), MainError> {
-    if !matches!(provider.as_str(), "slack" | "grafana") {
+    if !matches!(provider.as_str(), "slack" | "grafana" | "kubernetes") {
         return Err(MainError::UnsupportedProvider(provider));
     }
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
@@ -404,6 +435,10 @@ async fn connect(
     validate_state_root(&state_root)?;
     let socket = state_root.join("connectors.sock");
     let owner = config.owner_context();
+
+    if provider == "kubernetes" {
+        return connect_kubernetes(&socket, &owner, label, context).await;
+    }
 
     let display_name = match provider.as_str() {
         "slack" => "Slack",
@@ -533,6 +568,93 @@ async fn connect(
     Ok(())
 }
 
+async fn connect_kubernetes(
+    socket: &Path,
+    owner: &protocol::operation::OwnerContext,
+    label: Option<String>,
+    context: Option<String>,
+) -> Result<(), MainError> {
+    let result = send_connection_request(
+        socket,
+        owner,
+        ConnectionRequest::CandidateSearch(CandidateSearchRequest {
+            integration_ref: "kubernetes".to_owned(),
+            query: context.clone().unwrap_or_default(),
+            limit: protocol::connection::MAX_SEARCH_RESULTS,
+        }),
+    )
+    .await?;
+    let ConnectionResult::CandidateSearch { candidates } = result else {
+        return Err(MainError::InvalidConnectionResponse);
+    };
+    if context.is_none() && candidates.len() != 1 {
+        if candidates.is_empty() {
+            println!("No kubeconfig contexts were detected.");
+        } else {
+            println!("Detected kubeconfig contexts:");
+            for candidate in candidates {
+                println!("  {}", candidate.title);
+            }
+            println!();
+            println!("Choose one with: connectors connect kubernetes --context <name>");
+        }
+        return Ok(());
+    }
+    let candidate = if let Some(context) = context {
+        candidates
+            .into_iter()
+            .find(|candidate| candidate.title == context)
+            .ok_or_else(|| {
+                MainError::ConnectionRefused("the exact kubeconfig context was not detected".into())
+            })?
+    } else {
+        candidates
+            .into_iter()
+            .next()
+            .ok_or(MainError::InvalidConnectionResponse)?
+    };
+    println!("Connect Kubernetes context {}", candidate.title);
+    println!("The Connector will now authenticate and perform read-only identity/RBAC checks.");
+    let result = send_connection_request(
+        socket,
+        owner,
+        ConnectionRequest::CandidateActivate(CandidateActivateRequest {
+            candidate_ref: candidate.candidate_ref,
+            label: label.unwrap_or_else(|| candidate.title.clone()),
+        }),
+    )
+    .await?;
+    let ConnectionResult::CandidateActivate(connection) = result else {
+        return Err(MainError::InvalidConnectionResponse);
+    };
+    let result = send_connection_request(
+        socket,
+        owner,
+        ConnectionRequest::ObservationSearch(ObservationSearchRequest {
+            source_connection_ref: connection.summary.connection_ref.clone(),
+            query: String::new(),
+            limit: protocol::connection::MAX_SEARCH_RESULTS,
+        }),
+    )
+    .await?;
+    let ConnectionResult::ObservationSearch { observations } = result else {
+        return Err(MainError::InvalidConnectionResponse);
+    };
+    println!(
+        "Kubernetes is connected: {}",
+        connection.summary.connection_ref
+    );
+    if observations.is_empty() {
+        println!("No supported monitoring Services were visible in the admitted namespace scope.");
+    } else {
+        println!("Discovered monitoring Services:");
+        for observation in observations {
+            println!("  {} -> {}", observation.title, observation.observation_ref);
+        }
+    }
+    Ok(())
+}
+
 async fn wait_for_callable(
     socket: &Path,
     owner: &protocol::operation::OwnerContext,
@@ -558,16 +680,20 @@ async fn wait_for_callable(
     Err(MainError::ConnectionNotCallable)
 }
 
+struct PersonalComposition {
+    backend: Arc<dyn OperationBackend>,
+    verifying_key: Option<String>,
+    slack_connections: Option<usize>,
+    monitoring_connections: Option<usize>,
+    kubernetes_candidates: Option<usize>,
+    kubernetes_connections: Option<usize>,
+}
+
 async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Result<(), MainError> {
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
     let socket_path = state_root.join("connectors.sock");
-    let (backend, verifying_key, slack_connections, monitoring_connections): (
-        Arc<dyn OperationBackend>,
-        Option<String>,
-        Option<usize>,
-        Option<usize>,
-    ) = if let Some(config_path) = config_path {
+    let composition = if let Some(config_path) = config_path {
         let config = PersonalConfig::read(&config_path)?;
         let owner = config.owner_context();
         let (mut backend, verifying_key): (Arc<dyn OperationBackend>, Option<String>) =
@@ -604,16 +730,40 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
         } else {
             None
         };
-        (
+        let (kubernetes_candidates, kubernetes_connections) =
+            if let Some(kubernetes) = config.kubernetes.clone() {
+                let kubernetes = KubernetesLocalBackend::open(
+                    config.owner_context(),
+                    kubernetes,
+                    &state_root,
+                    backend,
+                )?;
+                let candidates = kubernetes.candidate_count();
+                let connections = kubernetes.connection_count();
+                backend = Arc::new(kubernetes);
+                (Some(candidates), Some(connections))
+            } else {
+                (None, None)
+            };
+        PersonalComposition {
             backend,
             verifying_key,
             slack_connections,
             monitoring_connections,
-        )
+            kubernetes_candidates,
+            kubernetes_connections,
+        }
     } else {
-        (Arc::new(RefusingBackend), None, None, None)
+        PersonalComposition {
+            backend: Arc::new(RefusingBackend),
+            verifying_key: None,
+            slack_connections: None,
+            monitoring_connections: None,
+            kubernetes_candidates: None,
+            kubernetes_connections: None,
+        }
     };
-    let daemon = LocalOperationDaemon::bind(&socket_path, backend).await?;
+    let daemon = LocalOperationDaemon::bind(&socket_path, composition.backend).await?;
     println!(
         "{}",
         serde_json::json!({
@@ -625,12 +775,15 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
                 protocol::event::CONTRACT,
             ],
             "socket": daemon.socket_path(),
-            "sip_dial_configured": verifying_key.is_some(),
-            "voice_authority_verifying_key": verifying_key,
-            "slack_configured": slack_connections.is_some(),
-            "slack_connections": slack_connections,
-            "grafana_configured": monitoring_connections.is_some(),
-            "monitoring_connections": monitoring_connections,
+            "sip_dial_configured": composition.verifying_key.is_some(),
+            "voice_authority_verifying_key": composition.verifying_key,
+            "slack_configured": composition.slack_connections.is_some(),
+            "slack_connections": composition.slack_connections,
+            "grafana_configured": composition.monitoring_connections.is_some(),
+            "monitoring_connections": composition.monitoring_connections,
+            "kubernetes_configured": composition.kubernetes_candidates.is_some(),
+            "kubernetes_candidates": composition.kubernetes_candidates,
+            "kubernetes_connections": composition.kubernetes_connections,
         })
     );
     daemon
@@ -643,6 +796,34 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
 
 async fn connection(command: ConnectionCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
+        ConnectionCommand::Candidates {
+            config,
+            integration,
+            query,
+            limit,
+            state_root,
+        } => (
+            config,
+            state_root,
+            ConnectionRequest::CandidateSearch(CandidateSearchRequest {
+                integration_ref: integration,
+                query,
+                limit,
+            }),
+        ),
+        ConnectionCommand::Activate {
+            config,
+            candidate,
+            label,
+            state_root,
+        } => (
+            config,
+            state_root,
+            ConnectionRequest::CandidateActivate(CandidateActivateRequest {
+                candidate_ref: candidate,
+                label,
+            }),
+        ),
         ConnectionCommand::Create {
             config,
             integration,
@@ -1036,6 +1217,7 @@ mod tests {
             provider,
             config,
             label,
+            context,
             state_root,
         } = cli.command
         else {
@@ -1043,6 +1225,7 @@ mod tests {
         };
         assert_eq!(provider, "slack");
         assert!(label.is_none());
+        assert!(context.is_none());
         assert!(config.is_none());
         assert!(state_root.is_none());
     }
@@ -1058,5 +1241,25 @@ mod tests {
         };
         assert_eq!(provider, "grafana");
         assert!(label.is_none());
+    }
+
+    #[test]
+    fn kubernetes_connect_accepts_an_exact_context_selection() {
+        let cli = Cli::try_parse_from([
+            "connectors",
+            "connect",
+            "kubernetes",
+            "--context",
+            "dev-cluster",
+        ])
+        .unwrap();
+        let Command::Connect {
+            provider, context, ..
+        } = cli.command
+        else {
+            panic!("guided connect command was not parsed");
+        };
+        assert_eq!(provider, "kubernetes");
+        assert_eq!(context.as_deref(), Some("dev-cluster"));
     }
 }

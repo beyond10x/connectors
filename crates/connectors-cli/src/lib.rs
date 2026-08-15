@@ -7,6 +7,7 @@ mod config;
 mod hosted;
 mod hosted_config;
 mod kubernetes_backend;
+mod kubernetes_local_backend;
 mod monitoring_backend;
 mod runtime;
 mod sip_backend;
@@ -14,12 +15,13 @@ mod slack_backend;
 
 pub use composite_backend::CompositeBackend;
 pub use config::{
-    AuthorityConfig, ConfigError, GrafanaIntegrationConfig, InitiationConfig, PersonalConfig,
-    PersonalVoiceConfig, SlackIntegrationConfig,
+    AuthorityConfig, ConfigError, GrafanaIntegrationConfig, InitiationConfig,
+    KubernetesIntegrationConfig, PersonalConfig, PersonalVoiceConfig, SlackIntegrationConfig,
 };
 pub use hosted::{IdentityHttpVerifier, IdentityVerifierConfigError};
 pub use hosted_config::{HostedServerConfig, HostedServerConfigError};
 pub use kubernetes_backend::{KubernetesBackendError, KubernetesStatusBackend};
+pub use kubernetes_local_backend::{KubernetesLocalBackend, KubernetesLocalError};
 pub use monitoring_backend::{MonitoringBackend, MonitoringError};
 pub use runtime::{load_authority_issuer, RuntimeLauncher};
 pub use sip_backend::{

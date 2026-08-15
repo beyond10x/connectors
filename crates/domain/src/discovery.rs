@@ -28,12 +28,72 @@ struct DiscoveryTarget {
 /// materializes a durable Connection and an independent Connector Grant admits an operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectionCandidate {
-    pub observation: String,
+    pub source: ConnectionCandidateSource,
     pub target_provider: String,
     pub title: String,
     pub evidence_generation: u64,
     pub evidence_sha256: String,
     pub route: ConnectionRoute,
+}
+
+/// Closed origin of one unusable Connection candidate. Local configuration precedes a direct
+/// source Connection; an observation follows an existing source Connection and proposes mediation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionCandidateSource {
+    LocalConfiguration { candidate_binding: String },
+    Observation { observation: String },
+}
+
+impl ConnectionCandidate {
+    /// Construct a candidate detected in trusted local configuration. The binding remains private
+    /// Connector state and activation still has to verify provider identity and authority.
+    pub fn direct(
+        candidate_binding: impl Into<String>,
+        target_provider: impl Into<String>,
+        title: impl Into<String>,
+        evidence_generation: u64,
+        evidence_sha256: impl Into<String>,
+    ) -> Result<Self, DiscoveryError> {
+        let candidate = Self {
+            source: ConnectionCandidateSource::LocalConfiguration {
+                candidate_binding: candidate_binding.into(),
+            },
+            target_provider: target_provider.into(),
+            title: title.into(),
+            evidence_generation,
+            evidence_sha256: evidence_sha256.into(),
+            route: ConnectionRoute::Direct,
+        };
+        candidate.validate()?;
+        Ok(candidate)
+    }
+
+    fn validate(&self) -> Result<(), DiscoveryError> {
+        let source_valid = match &self.source {
+            ConnectionCandidateSource::LocalConfiguration { candidate_binding } => {
+                valid_ref(candidate_binding) && matches!(self.route, ConnectionRoute::Direct)
+            }
+            ConnectionCandidateSource::Observation { observation } => {
+                valid_ref(observation)
+                    && matches!(self.route, ConnectionRoute::ViaConnection { .. })
+            }
+        };
+        if !source_valid
+            || !valid_ref(&self.target_provider)
+            || self.title.trim().is_empty()
+            || self.title.len() > 256
+            || self.title.chars().any(char::is_control)
+            || self.evidence_generation == 0
+            || self.evidence_sha256.len() != 64
+            || !self
+                .evidence_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(DiscoveryError::InvalidCandidate);
+        }
+        Ok(())
+    }
 }
 
 impl DiscoveryObservation {
@@ -166,7 +226,9 @@ impl DiscoveryObservation {
     pub fn candidate(&self) -> Option<ConnectionCandidate> {
         let target = self.target.as_ref()?;
         Some(ConnectionCandidate {
-            observation: self.id.clone(),
+            source: ConnectionCandidateSource::Observation {
+                observation: self.id.clone(),
+            },
             target_provider: target.provider.clone(),
             title: self.title.clone(),
             evidence_generation: self.evidence_generation,
@@ -192,6 +254,8 @@ fn valid_ref(value: &str) -> bool {
 pub enum DiscoveryError {
     #[error("discovery observation is invalid")]
     InvalidObservation,
+    #[error("connection candidate is invalid")]
+    InvalidCandidate,
 }
 
 #[cfg(test)]
@@ -241,5 +305,22 @@ mod tests {
         .unwrap();
         assert_eq!(observation.observed_type(), "vendor-private-plugin");
         assert_eq!(observation.candidate(), None);
+    }
+
+    #[test]
+    fn trusted_local_candidate_proposes_only_a_direct_route() {
+        let candidate = ConnectionCandidate::direct(
+            "binding:kubeconfig-context",
+            "kubernetes",
+            "development",
+            1,
+            digest(),
+        )
+        .unwrap();
+        assert!(matches!(
+            candidate.source,
+            ConnectionCandidateSource::LocalConfiguration { .. }
+        ));
+        assert_eq!(candidate.route, ConnectionRoute::Direct);
     }
 }
