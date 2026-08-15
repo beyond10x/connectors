@@ -48,7 +48,7 @@ use crate::{
     Acquisition, Approval, Audience, AuthHazard, Channel, ChannelSession, ChannelTransport, Choice,
     ConfigChoices, ConfigField, Credential, CredentialRequirement, Discovery, DiscoveryDriver,
     DiscoveryMapping, Event, HostEffect, Idempotency, ImplementationForm, InteractionShape, OAuth2,
-    OAuthGrant, OAuthRedirect, Operation, OperationDirection, Pair, Placement,
+    OAuthGrant, OAuthRedirect, OAuthScopeSeparator, Operation, OperationDirection, Pair, Placement,
     PlacementRequirement, ProtocolDriver, Provider, RequiredCapability, Risk, RouteAdapter,
     Selector, Service, SocketConnect, Subject,
 };
@@ -179,12 +179,24 @@ struct RawOAuth2 {
     token_path: String,
     #[serde(default)]
     scopes: Vec<String>,
+    #[serde(default = "default_scope_separator")]
+    scope_separator: String,
+    #[serde(default = "default_scope_response_pointer")]
+    scope_response_pointer: String,
     #[serde(default)]
     grants: Vec<String>,
     #[serde(default)]
     redirect: Option<RawRedirect>,
     #[serde(default)]
     public_client: bool,
+}
+
+fn default_scope_separator() -> String {
+    "space".to_string()
+}
+
+fn default_scope_response_pointer() -> String {
+    "/scope".to_string()
 }
 
 #[derive(Deserialize)]
@@ -711,6 +723,8 @@ fn acquisition(name: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Acquis
             authorize_path: leak_str(oauth2.authorize_path.clone()),
             token_path: leak_str(oauth2.token_path.clone()),
             scopes: leak_strs(oauth2.scopes.clone()),
+            scope_separator: oauth_scope_separator(name, &oauth2.scope_separator),
+            scope_response_pointer: leak_str(oauth2.scope_response_pointer.clone()),
             grants: leak_slice(
                 oauth2
                     .grants
@@ -746,6 +760,16 @@ fn acquisition(name: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Acquis
         };
     }
     Acquisition::Static
+}
+
+fn oauth_scope_separator(name: &str, separator: &str) -> OAuthScopeSeparator {
+    match separator {
+        "space" => OAuthScopeSeparator::Space,
+        "comma" => OAuthScopeSeparator::Comma,
+        other => panic!(
+            "credential `{name}` declares unknown OAuth scope separator `{other}` in the embedded catalog"
+        ),
+    }
 }
 
 fn oauth_grant(credential: &str, word: &str) -> OAuthGrant {

@@ -84,14 +84,18 @@ api_version = "v4"
 # vendor's REST prefix after policy has selected either the reviewed default or an approved pin.
 base_url = "{origin}/api/v4"
 
-description = "GitLab: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only"
+description = "GitLab for people and automation identities: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only"
 
-# Either credential authenticates every operation, and the two are alternatives rather than a pair
-# (C-530): a deployment provisions one static token org-wide, or each user completes an OAuth2 grant
-# and acts as themselves. A host picks; this file only says both are valid.
+# One Connection chooses exactly one effective actor. OAuth and a personal access token carry a
+# person's authority; service-account, group, and project access tokens carry automation authority.
+# The alternatives are never combined. Read operations accept `read_api` or `api`; the one selected
+# write below replaces this default with `api` only.
 default_auth = [
-  { credentials = ["gitlab.oauth_token"] },
-  { credentials = ["gitlab.token"] },
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["read_api"], ["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["read_api"], ["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["read_api"], ["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["read_api"], ["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["read_api"], ["api"]] } },
 ]
 
 # The "Test connection" button. `GET /user` takes no parameters and cannot do anything except prove
@@ -107,18 +111,33 @@ verify = "gitlab-user-get"
 [[auth]]
 name = "gitlab.token"
 scheme = "bearer"
-# The sole credential. Gated and registered with flux's redactor by the host; its value is never
-# read here and never reaches a generated artifact.
-#
-# A GitLab personal access token travels as `Authorization: Bearer <token>` (GitLab also accepts the
-# older `PRIVATE-TOKEN: <token>` header, but the bearer form is documented, is what GitLab's own
-# OAuth2-flavoured docs lead with, and is what the story specifies).
-env = ["GITLAB_TOKEN"]
+entry = "connect_session"
 # C-528: a GitLab personal access token acts as **the person who created it** — every call is
 # attributed to that user and bounded by their permissions. It is not an integration identity, and a
 # host that stored one at a tenant-wide address would let any member act as its creator.
 subject = "user"
-description = "GitLab personal access token sent as a bearer. A token scoped to read_api is enough for every read below; the api scope is required for gitlab-issue-create"
+description = "Personal access token entered once through a protected Connect Session. Acts as the person who created it; choose read_api for reads or api for writes"
+
+[[auth]]
+name = "gitlab.service_account_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Personal access token belonging to a dedicated GitLab service account. Acts as that non-human automation identity and is limited by its memberships, role, scope, and expiry"
+
+[[auth]]
+name = "gitlab.group_access_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Group access token entered once through a protected Connect Session. Acts as GitLab's group bot user and reaches only its group and projects, bounded by role, scope, and expiry"
+
+[[auth]]
+name = "gitlab.project_access_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Project access token entered once through a protected Connect Session. Acts as GitLab's project bot user and reaches only its project, bounded by role, scope, and expiry"
 
 [[auth]]
 # **The delegated credential: an operator registers one OAuth application, and each person grants it**
@@ -144,11 +163,9 @@ description = "GitLab OAuth2 access token obtained on behalf of a signed-in user
 endpoint = "login"
 authorize_path = "/oauth/authorize"
 token_path = "/oauth/token"
-# `read_repository` is here for a reason worth stating: it is what lets the resulting token clone
-# over HTTPS. Cloning is not a connector operation — git speaks its own wire protocol — but the
-# credential a git client is handed is this one, and a scope absent from this list is one the
-# connector does not request.
-scopes = ["read_api", "read_user", "read_repository"]
+# The current curated surface includes a write (`gitlab-issue-create`), so this Connection asks for
+# `api`. Repository transport is not a connector operation and no repository scope is requested.
+scopes = ["api"]
 # `refresh_token` is not optional in practice. A GitLab OAuth access token expires in two hours by
 # default, and an unattended fleet outlives that; without the refresh grant the connection dies mid-run.
 grants = ["authorization_code", "refresh_token"]
@@ -211,8 +228,8 @@ idempotency = "idempotent"
 
 [operations.response_schema]
 type = "object"
-required = ["id", "username", "state"]
-properties = { id = { type = "integer", description = "The user's global id" }, username = { type = "string" }, name = { type = "string" }, state = { type = "string", description = "`active`, `blocked`, or one of GitLab's other account states" }, web_url = { type = "string", format = "uri" }, avatar_url = { type = "string", format = "uri" } }
+required = ["id", "username", "state", "bot"]
+properties = { id = { type = "integer", description = "The user's global id" }, username = { type = "string" }, name = { type = "string" }, state = { type = "string", description = "`active`, `blocked`, or one of GitLab's other account states" }, bot = { type = "boolean", description = "Whether GitLab classifies the effective actor as a bot. A protected Connect Session uses this to refuse a human token selected as automation, or a bot token selected as a person" }, web_url = { type = "string", format = "uri" }, avatar_url = { type = "string", format = "uri" } }
 
 # ---------------------------------------------------------------------------------------------
 # DISCOVERY — the two reads that answer "what can this token reach?" (C-527)
@@ -432,6 +449,13 @@ implementation_form = "built_in"
 required_capabilities = ["public_network"]
 service = "default"
 id = "gitlab-issue-create"
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
 method = "POST"
 direction = "write"
 path = "/projects/{project_id}/issues"
@@ -594,8 +618,10 @@ items = { type = "object", required = ["name", "commit"], properties = { name = 
 # ---------------------------------------------------------------------------------------------
 # Configuration — what a human supplies before any of the above runs
 #
-# One field, because one value is all this connector needs: gitlab.com is a fixed host with no
-# tenant subdomain and no OAuth app to register.
+# The origin and one operator-owned OAuth application registration are configuration. User and
+# automation token values never enter configuration: the person completing a Connection submits
+# one through its protected, one-use Connect Session and the Connector stores it without returning
+# it to the harness.
 # ---------------------------------------------------------------------------------------------
 
 [[config]]
@@ -661,13 +687,3 @@ secret = true
 required = false
 docs_url = "https://docs.gitlab.com/integration/oauth_provider/"
 binds = "oauth.client_secret"
-
-[[config]]
-name = "token"
-service = "default"
-label = "GitLab personal access token"
-help = "Create one in the selected GitLab installation's User Settings -> Access Tokens. Grant read_api for every read below, or api if you also want gitlab-issue-create to work"
-format = "token"
-secret = true
-docs_url = "https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html"
-binds = "credential.gitlab.token"

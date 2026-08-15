@@ -14,7 +14,7 @@
 //! Both cannot be how the value arrives. Silently preferring one — which is what an emitter must
 //! otherwise do — publishes an acquisition the author did not choose.
 
-use connector_spec::{Connector, OAuthGrant};
+use connector_spec::{Connector, OAuthGrant, OAuthScopeSeparator};
 
 /// A minimal well-formed provider with `body` spliced in after the connector-level keys.
 fn provider(body: &str) -> String {
@@ -70,6 +70,8 @@ authorize_path = "/oauth/authorize"
 token_path = "/oauth/token"
 client_id = "acme-client"
 scopes = ["read:thing", "write:thing"]
+scope_separator = "comma"
+scope_response_pointer = "/granted/scopes"
 grants = ["authorization_code", "refresh_token"]
 
 [auth.oauth2.redirect]
@@ -108,6 +110,8 @@ fn an_oauth2_credential_loads_with_every_field_intact() {
     assert_eq!(spec.token_path, "/oauth/token");
     assert_eq!(spec.client_id, "acme-client");
     assert_eq!(spec.scopes, ["read:thing", "write:thing"]);
+    assert_eq!(spec.scope_separator, OAuthScopeSeparator::Comma);
+    assert_eq!(spec.scope_response_pointer, "/granted/scopes");
     assert_eq!(
         spec.grants,
         [OAuthGrant::AuthorizationCode, OAuthGrant::RefreshToken]
@@ -115,6 +119,34 @@ fn an_oauth2_credential_loads_with_every_field_intact() {
     let redirect = spec.redirect.as_ref().expect("the redirect must survive");
     assert_eq!(redirect.port, 8976);
     assert_eq!(redirect.path, "/callback");
+}
+
+#[test]
+fn a_scope_response_location_must_be_a_json_pointer() {
+    let invalid = OAUTH2.replace(
+        "scope_response_pointer = \"/granted/scopes\"",
+        "scope_response_pointer = \"granted/scopes\"",
+    );
+    let source = provider(&format!("{}{READ}", credential(&invalid)));
+    let error = refusal(&source);
+    assert!(
+        error.contains("scope_response_pointer") && error.contains("JSON Pointer"),
+        "the refusal must name the malformed capability-evidence location: {error}"
+    );
+}
+
+#[test]
+fn a_scope_response_location_cannot_name_credential_material() {
+    let invalid = OAUTH2.replace(
+        "scope_response_pointer = \"/granted/scopes\"",
+        "scope_response_pointer = \"/access_token\"",
+    );
+    let source = provider(&format!("{}{READ}", credential(&invalid)));
+    let error = refusal(&source);
+    assert!(
+        error.contains("scope_response_pointer") && error.contains("credential material"),
+        "the refusal must distinguish scope evidence from a token extraction path: {error}"
+    );
 }
 
 /// A credential with no `[auth.oauth2]` block stays a plain env-to-secret credential.

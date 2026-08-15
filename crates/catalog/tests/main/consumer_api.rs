@@ -19,9 +19,9 @@
 use catalog::{
     Acquisition, Approval, Audience, AuthHazard, Channel, ChannelTransport, Choice, ConfigChoices,
     ConfigField, Credential, CredentialRequirement, Discovery, DiscoveryDriver, Event, Idempotency,
-    OAuth2, OAuthGrant, OAuthRedirect, Operation, OperationDirection, OperationKey, Pair,
-    Placement, Provider, ProviderKey, Risk, RouteAdapter, Selector, Service, SocketConnect,
-    Subject,
+    OAuth2, OAuthGrant, OAuthRedirect, OAuthScopeSeparator, Operation, OperationDirection,
+    OperationKey, Pair, Placement, Provider, ProviderKey, Risk, RouteAdapter, Selector, Service,
+    SocketConnect, Subject,
 };
 
 /// The lookups, and every field of [`Operation`].
@@ -134,10 +134,16 @@ fn the_closed_vocabularies_match_exhaustively() {
                     authorize_path: _,
                     token_path: _,
                     scopes: _,
+                    scope_separator,
+                    scope_response_pointer: _,
                     grants,
                     redirect,
                     public_client: _,
                 } = *spec;
+                match scope_separator {
+                    OAuthScopeSeparator::Space => {}
+                    OAuthScopeSeparator::Comma => {}
+                }
                 for grant in grants {
                     match grant {
                         OAuthGrant::AuthorizationCode => {}

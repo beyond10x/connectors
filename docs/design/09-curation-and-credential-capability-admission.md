@@ -9,9 +9,9 @@ This document fixes two related boundaries exposed by the Slack connector:
 2. possession of a credential is not proof that the credential can perform every operation that
    accepts its wire format.
 
-The rules are generic. Slack is the proving provider because its Web API, Events API, Admin API,
-Socket Mode, and app-management surfaces use several superficially similar bearer credentials with
-different subjects and scopes.
+The rules are generic. Slack proves delegated-user versus bot authority across Web API, Events API,
+Admin API, and Socket Mode. GitLab proves that a user OAuth/PAT Connection and several automation
+token kinds can share one API surface without sharing an effective actor.
 
 ## 1. Source, catalog, exposure, and admission are separate decisions
 
@@ -75,7 +75,7 @@ Operation, event, and channel requirements are independent:
 | Connector credential purpose | Slack credential kind | Subject | Initial authority |
 |---|---|---|---|
 | `slack.bot_token` | bot OAuth token, commonly `xoxb-…` | app/bot | curated ordinary Web API operations and bot event subscriptions |
-| `slack.user_token` | delegated user OAuth token, commonly `xoxp-…` | user | none selected initially; reserved for explicitly reviewed act-as-user operations |
+| `slack.user_token` | delegated user OAuth token, commonly `xoxp-…` | user | the four reviewed ordinary Web API operations, performed as the consenting user |
 | `slack.admin_token` | **user OAuth token** from an Enterprise organization-wide Admin/Owner install | user | the selected read-only `admin.*` methods whose scopes are proven |
 | `slack.app_token` | app-level token, `xapp-…` | app | Socket Mode ticket creation only, with `connections:write` |
 | `slack.signing_secret` | app signing secret, not an API token | app | Events API HMAC verification only |
@@ -95,7 +95,66 @@ it is never folded into `slack.app_token` or `slack.admin_token`.
 Token prefixes are useful input diagnostics, not authority. Admission never infers subject, scope,
 Enterprise installation, or allowed operation from a prefix.
 
-## 4. Capability evidence belongs to the Connection, not the catalog
+### 3.1 A Zwirn caller is not a Slack credential subject
+
+“The bot does something on behalf of me” describes two separate facts. Zwirn is the authenticated
+B10x caller. Slack sees whichever credential belongs to the selected Connection:
+
+```text
+Zwirn caller ── Grant ──▶ tenant-shared Slack bot Connection ── xoxb ──▶ Slack sees the app bot
+             └─ Grant ──▶ principal-owned Slack user Connection ─ xoxp ─▶ Slack sees that user
+```
+
+The second route is delegated execution; it is not impersonation and the bot token never becomes a
+user token. Slack's dedicated user-centric flow (`/oauth/v2_user/authorize` followed by
+`/api/oauth.v2.user.access`) lets one consent create one principal-owned user Connection with one
+credential. The ordinary app-install flow creates the app-subject bot Connection separately. Both
+use the same operator-owned Slack app registration. Slack's documented comma-separated scope wire
+form is declared as `scope_separator = "comma"`; the host must not encode the list as one
+space-delimited value by assumption. Its user-token response locates the actual grant at
+`scope_response_pointer = "/authed_user/scope"`; this generic JSON Pointer prevents Slack-specific
+token parsing in the host. The loader refuses a pointer naming obvious credential material, and the
+runtime normalizes only the resulting scope list into generation-bound capability evidence.
+
+The four ordinary operations have explicit bot and user auth alternatives with the same named
+scope. Their reach still differs because Slack evaluates bot membership for the bot token and the
+member's own visibility for the user token. Events remain bot-only; Socket Mode remains app-token
+only; Enterprise Admin remains its dedicated org-wide user credential purpose.
+
+## 4. GitLab credential roles
+
+| Connector credential purpose | GitLab credential kind | Subject | Reach |
+|---|---|---|---|
+| `gitlab.oauth_token` | OAuth access token | user | consenting user's memberships and permissions |
+| `gitlab.token` | personal access token | user | token creator's memberships and permissions |
+| `gitlab.service_account_token` | PAT belonging to a service account | app | the non-human account's memberships and role |
+| `gitlab.group_access_token` | group bot-user token | app | its group and projects, bounded by role |
+| `gitlab.project_access_token` | project bot-user token | app | its project, bounded by role |
+
+All five are bearer-compatible, and GitLab deliberately gives personal, service-account, group,
+and project access tokens the same `glpat-` prefix. The protected Connect Session therefore asks
+which credential purpose is being connected; neither prefix inspection nor a successful request may
+reclassify it. OAuth requests `api` because the curated surface includes issue creation. Pasted
+tokens may carry `read_api` for reads or `api` for reads and writes. Every read declares
+`read_api OR api` on each exact credential purpose; the write declares only `api`.
+
+A developer normally chooses **As myself** (OAuth, with PAT as the explicit alternative). A
+B10x or babelforce automation normally chooses **As automation**, then supplies a service
+account, group, or project token according to the intended resource boundary. No client-credentials
+grant is invented: GitLab does not offer one for this use case.
+
+The selection is not accepted as proof of subject or scope. During the protected Connect Session,
+the Connector calls `GET /user`: `bot = false` is required for a pasted personal token and
+`bot = true` for every automation purpose. It observes classic PAT scopes and expiry through
+`GET /personal_access_tokens/self`; an OAuth Connection instead uses GitLab's
+`GET /oauth/token/info`, whose `scope` and `resource_owner_id` are bound to the granted token. The
+group/project/service-account distinction is acquisition provenance, not a claim inferred from the
+shared token prefix; GitLab remains the enforcement point for its resource reach. Fine-grained PATs
+are not admitted by the initial classic-scope predicate: their operation/resource permission model
+needs a separate reviewed requirement axis rather than pretending a granular permission is an OAuth
+scope.
+
+## 5. Capability evidence belongs to the Connection, not the catalog
 
 The provider declares requirements. A Connection records what its current credential generation
 has actually been granted, as value-free metadata:
@@ -126,11 +185,15 @@ Evidence sources are deliberately closed:
   members do not surface.
 - The app-level token's capability is recorded only after its protected acquisition and a bounded
   `apps.connections.open` verification path; it is never treated as a Web API bot/user token.
+- A pasted GitLab token is observed through `/user` and `/personal_access_tokens/self`; OAuth uses
+  `/user` and `/oauth/token/info`. Subject, granted classic scopes, expiry, and resource associations
+  are recorded from those authenticated responses. An unprovable actor kind or a fine-grained-only
+  permission set remains connected-but-not-callable for the affected operations.
 
 Configuration, a human assertion, a model claim, a token prefix, or the set of scopes the
 Integration requested are not granted-scope evidence.
 
-## 5. One predicate at discovery and dispatch
+## 6. One predicate at discovery and dispatch
 
 For each auth alternative, runtime admission requires:
 
@@ -148,7 +211,7 @@ This is fail-closed in both places. Filtering only at invocation leaks unusable 
 and creates predictable failures. Filtering only at discovery leaves a time-of-check/time-of-use
 authorization gap.
 
-## 6. Slack source and initial curated surface
+## 7. Slack source and initial curated surface
 
 Slack's hosted Swagger 2 Web API document is retained byte-for-byte as source evidence. A
 deterministic script derives two reference-closed OpenAPI 3 projections:
@@ -172,20 +235,24 @@ authority differs: Socket Mode requires the app-level token with `connections:wr
 requires the signing secret for HMAC verification. Both event subscriptions independently require
 the bot token scopes declared on their events.
 
-## 7. Implementation boundary
+## 8. Implementation boundary
 
 Implemented here:
 
 - exact Slack source vendoring and deterministic curated projections;
 - minimal AsyncAPI 3 component-message ingestion with select-none defaults;
 - credential-local scope requirements on operations, events, and channels;
+- separate Slack bot-install and delegated-user OAuth declarations, including Slack's comma scope
+  encoding, nonstandard granted-scope response pointer, and user-centric endpoint;
+- explicit GitLab user and automation credential purposes with read/write scope requirements;
 - canonical document, site catalog, schema, lock, and pack propagation;
 - stable `message.channels` normalization in the personal Socket Mode runtime.
 
 Still required in the generic M3 Connection runtime before claiming scope-aware Web/Admin
 invocation:
 
-- protected multi-credential Slack acquisition, including OAuth and admin installation context;
+- protected multi-credential Slack and GitLab acquisition, including OAuth callback custody and
+  Slack admin installation context;
 - persisted value-free `CredentialCapabilityEvidence` tied to credential generations;
 - one shared capability-admission predicate wired into discovery and dispatch;
 - reauthorization/refresh invalidation and authenticated scope drift handling.

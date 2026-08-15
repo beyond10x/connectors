@@ -54,9 +54,9 @@ use serde::Serialize;
 use connector_spec::{
     Audience, AuthScheme, ChannelBinding, ConfigField, Connector, Discovery, EventDecl, HostEffect,
     HttpMethod, Idempotency, ImplementationForm, InteractionShape, JsonSchema, Level, ManualSetup,
-    OAuth2Spec, OAuthGrant, OAuthRedirect, Operation, OperationRequest, OperationSpecSource, Param,
-    PlacementRequirement, Reply, RequiredCapability, Risk, Selector, SemanticEffect,
-    SessionBinding, SocketConnectSpec, Subscription, VerificationScheme,
+    OAuth2Spec, OAuthGrant, OAuthRedirect, OAuthScopeSeparator, Operation, OperationRequest,
+    OperationSpecSource, Param, PlacementRequirement, Reply, RequiredCapability, Risk, Selector,
+    SemanticEffect, SessionBinding, SocketConnectSpec, Subscription, VerificationScheme,
 };
 
 use crate::inbound;
@@ -480,6 +480,10 @@ struct CredentialEntry {
     scheme: SchemeEntry,
     /// What the credential is, for the prompt that asks an operator to supply it.
     description: String,
+    /// Whose authority the vendor observes when this credential is placed.
+    subject: &'static str,
+    /// A named acquisition weakness, or `null` when none is declared.
+    hazard: Option<&'static str>,
     /// Environment variable **names** to resolve the secret from, tried in order.
     env: Vec<String>,
     /// `connect_session` when a human enters this credential directly into Connector custody;
@@ -503,12 +507,16 @@ struct CredentialEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct OAuth2Entry {
     endpoint: String,
+    token_endpoint: String,
     authorize_path: String,
     token_path: String,
     client_id: String,
     scopes: Vec<String>,
+    scope_separator: OAuthScopeSeparator,
+    scope_response_pointer: String,
     grants: Vec<OAuthGrant>,
     redirect: Option<OAuthRedirect>,
+    public_client: bool,
 }
 
 /// An [`AuthScheme`], flattened to a fixed three-key shape.
@@ -1099,6 +1107,8 @@ fn provider_auth(connector: &Connector) -> ProviderAuth {
                     prefix: scheme_prefix(&method.scheme),
                 },
                 description: method.description.clone(),
+                subject: method.subject.word(),
+                hazard: method.hazard.as_ref().map(|hazard| hazard.word()),
                 env: method.env.clone(),
                 entry: method.entry.map(|entry| entry.word()),
                 user_env: method.user_env.clone(),
@@ -1117,12 +1127,16 @@ fn provider_auth(connector: &Connector) -> ProviderAuth {
 fn oauth2_entry(spec: &OAuth2Spec) -> OAuth2Entry {
     OAuth2Entry {
         endpoint: spec.endpoint.clone(),
+        token_endpoint: spec.token_endpoint.clone(),
         authorize_path: spec.authorize_path.clone(),
         token_path: spec.token_path.clone(),
         client_id: spec.client_id.clone(),
         scopes: spec.scopes.clone(),
+        scope_separator: spec.scope_separator,
+        scope_response_pointer: spec.effective_scope_response_pointer().to_string(),
         grants: spec.grants.clone(),
         redirect: spec.redirect.clone(),
+        public_client: spec.public_client,
     }
 }
 

@@ -218,6 +218,20 @@ created ──authorize──▶ authorized ──verify──▶ callable
 - *Invariant:* initiation is not the catalog operation's `direction`. `direction = write` describes
   vendor-state effect; it cannot say which side is allowed to begin a connection.
 
+**2026-08-15 delegated-actor amendment.** Three identities remain separate on every invocation:
+
+1. the authenticated caller (a person, harness, or agent such as Zwirn);
+2. the Connection owner (`tenant`-shared or `principal`-owned); and
+3. the credential subject the vendor observes (`app` or `user`).
+
+An agent may be granted use of a principal-owned user Connection, but that does not turn the app's
+bot credential into a user credential. The host selects the user Connection, evaluates its Grant,
+and places only that Connection's user-subject credential; the vendor therefore attributes the
+operation to the consenting user. A tenant-shared app Connection remains a different Connection and
+never serves as fallback. Audit records identify caller, Connection, and declared credential
+subject without containing the credential. Slack and GitLab prove the two paths in
+[Design 09](09-curation-and-credential-capability-admission.md).
+
 **2026-08-14 route amendment.** Every Connection has one immutable route: `direct`, or
 `via_connection(parent Connection, opaque resource binding, closed route adapter)`. The mediated
 form remains governed by its target Provider contract; the parent supplies transport only. It

@@ -45,18 +45,19 @@ fn form(connector: &Connector) -> Vec<(&str, bool, Level)> {
 // Archetype 1 — prefixed header (`Authorization: Bearer`). Drawn from Slack.
 //
 // The most common wire archetype there is. Acquisition and subject remain separate axes: each Slack
-// bearer enters through a Connect Session and declares whose authority it carries.
+// bearer declares whose authority it carries. Bot and delegated-user credentials are obtained by
+// OAuth; admin and app-level credentials still enter through a protected Connect Session.
 // ---------------------------------------------------------------------------------------------
 
 #[test]
 fn slack_bearers_keep_bot_user_admin_and_app_purposes_separate() {
     let connector = shipped("slack");
 
-    for (name, subject) in [
-        ("slack.bot_token", Subject::App),
-        ("slack.user_token", Subject::User),
-        ("slack.admin_token", Subject::User),
-        ("slack.app_token", Subject::App),
+    for (name, subject, oauth) in [
+        ("slack.bot_token", Subject::App, true),
+        ("slack.user_token", Subject::User, true),
+        ("slack.admin_token", Subject::User, false),
+        ("slack.app_token", Subject::App, false),
     ] {
         let method = connector
             .auth_method(name)
@@ -64,14 +65,49 @@ fn slack_bearers_keep_bot_user_admin_and_app_purposes_separate() {
         assert_eq!(method.scheme, AuthScheme::Bearer);
         assert_eq!(method.subject, subject);
         assert!(method.env.is_empty(), "{name} must never use ambient env");
-        assert_eq!(method.entry, Some(CredentialEntry::ConnectSession));
+        assert_eq!(method.oauth2.is_some(), oauth, "{name}'s acquisition");
+        assert_eq!(
+            method.entry,
+            (!oauth).then_some(CredentialEntry::ConnectSession),
+            "{name}'s direct-entry boundary"
+        );
     }
 
-    // Slack's host is literal and credential acquisition is owned by the Connect Session, so there
-    // is no ordinary configuration form or ambient secret source.
-    assert!(
-        connector.config.is_empty(),
-        "Slack connection acquisition must not degrade into provider config fields"
+    // The OAuth app registration belongs to the deployment operator. A Connection's user never
+    // supplies these fields and no token value is one of them.
+    assert_eq!(
+        form(&connector),
+        vec![
+            ("Slack application client id", false, Level::Operator),
+            ("Slack OAuth redirect URI", false, Level::Operator),
+            ("Slack application client secret", true, Level::Operator),
+        ]
+    );
+}
+
+#[test]
+fn slack_has_distinct_bot_install_and_delegated_user_oauth_flows() {
+    let connector = shipped("slack");
+    let bot = connector
+        .auth_method("slack.bot_token")
+        .and_then(|method| method.oauth2.as_ref())
+        .expect("the bot is installed through OAuth");
+    let user = connector
+        .auth_method("slack.user_token")
+        .and_then(|method| method.oauth2.as_ref())
+        .expect("the user delegates through OAuth");
+
+    assert_eq!(bot.authorize_path, "/oauth/v2/authorize");
+    assert_eq!(bot.token_path, "/api/oauth.v2.access");
+    assert_eq!(user.authorize_path, "/oauth/v2_user/authorize");
+    assert_eq!(user.token_path, "/api/oauth.v2.user.access");
+    assert_eq!(
+        bot.scope_separator,
+        connector_spec::OAuthScopeSeparator::Comma
+    );
+    assert_eq!(
+        user.scope_separator,
+        connector_spec::OAuthScopeSeparator::Comma
     );
 }
 

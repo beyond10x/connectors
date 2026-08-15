@@ -5780,6 +5780,53 @@ fn validate_one_credential_token_endpoint(
     ));
 }
 
+/// A nonstandard OAuth granted-scope location is a JSON Pointer to capability evidence, never a
+/// second way to extract credential material. The token response has no schema in this repository,
+/// so the loader can prove syntax and refuse the credential-field spellings that would turn a
+/// capability slot into a secret-export slot; the runtime still treats the resolved value only as
+/// a scope list and never as connection metadata.
+fn validate_one_credential_scope_response_pointer(method: &AuthMethod, problems: &mut Vec<String>) {
+    let Some(spec) = &method.oauth2 else {
+        return;
+    };
+    let pointer = spec.scope_response_pointer.as_str();
+    if pointer.is_empty() {
+        return;
+    }
+    if !pointer.starts_with('/')
+        || pointer.split('/').skip(1).any(|segment| {
+            let bytes = segment.as_bytes();
+            bytes.iter().enumerate().any(|(index, byte)| {
+                *byte == b'~' && !matches!(bytes.get(index + 1), Some(b'0' | b'1'))
+            })
+        })
+    {
+        problems.push(format!(
+            "credential {:?} declares scope_response_pointer {:?}, which is not an RFC 6901 JSON Pointer",
+            method.name, pointer
+        ));
+        return;
+    }
+
+    let forbidden = [
+        "access_token",
+        "refresh_token",
+        "client_secret",
+        "client_assertion",
+    ];
+    if let Some(segment) = pointer
+        .split('/')
+        .skip(1)
+        .map(|segment| segment.replace("~1", "/").replace("~0", "~"))
+        .find(|segment| forbidden.contains(&segment.as_str()))
+    {
+        problems.push(format!(
+            "credential {:?} declares scope_response_pointer {:?}, whose segment {:?} names credential material rather than granted scopes",
+            method.name, pointer, segment
+        ));
+    }
+}
+
 /// **A grant that carries a declared weakness must declare it** (C-440).
 ///
 /// The closed [`AuthHazard`] vocabulary is only worth having if a connector cannot opt out of it by
@@ -5968,6 +6015,7 @@ fn validate_credentials(connector: &Connector, problems: &mut Vec<String>) {
 
         validate_one_credential_acquisition(connector, method, problems);
         validate_one_credential_token_endpoint(connector, method, problems);
+        validate_one_credential_scope_response_pointer(method, problems);
         validate_one_credential_hazard(method, problems);
         validate_one_credential_workarounds(method, problems);
         for key in method.env.iter().chain(&method.user_env) {

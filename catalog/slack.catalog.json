@@ -2,18 +2,50 @@
   "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
     {
-      "description": "Slack bot user OAuth token for app-authority Web API operations and event subscriptions",
-      "entry": "connect_session",
+      "description": "Workspace bot token obtained when a person installs the Zwirn Slack app. Calls are attributed to the app's bot, not to the installer",
       "name": "slack.bot_token",
+      "oauth2": {
+        "authorize_path": "/oauth/v2/authorize",
+        "endpoint": "login",
+        "grants": [
+          "authorization_code",
+          "refresh_token"
+        ],
+        "scope_separator": "comma",
+        "scopes": [
+          "app_mentions:read",
+          "channels:history",
+          "chat:write",
+          "reactions:write",
+          "users:read"
+        ],
+        "token_path": "/api/oauth.v2.access"
+      },
       "scheme": {
         "kind": "bearer"
       },
       "subject": "app"
     },
     {
-      "description": "Slack user OAuth token for explicitly delegated user-authority operations; no such operation is selected initially",
-      "entry": "connect_session",
+      "description": "Delegated OAuth token for the consenting Slack member. Zwirn may invoke an admitted operation through this principal-owned Connection, and Slack attributes it to that user",
       "name": "slack.user_token",
+      "oauth2": {
+        "authorize_path": "/oauth/v2_user/authorize",
+        "endpoint": "login",
+        "grants": [
+          "authorization_code",
+          "refresh_token"
+        ],
+        "scope_response_pointer": "/authed_user/scope",
+        "scope_separator": "comma",
+        "scopes": [
+          "channels:history",
+          "chat:write",
+          "reactions:write",
+          "users:read"
+        ],
+        "token_path": "/api/oauth.v2.user.access"
+      },
       "scheme": {
         "kind": "bearer"
       },
@@ -182,13 +214,55 @@
       }
     }
   ],
+  "config": [
+    {
+      "approval": "none",
+      "binds": "oauth.client_id",
+      "docs_url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+      "format": "text",
+      "help": "The client id of the Slack app users install or authorize. Supplied once by the deployment operator, not by an end user",
+      "label": "Slack application client id",
+      "level": "operator",
+      "name": "oauth_client_id",
+      "required": false,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "oauth.redirect_uri",
+      "docs_url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+      "example": "https://connectors.example/api/oauth/callback",
+      "format": "url",
+      "help": "The exact callback URI served by this deployment and registered under the Slack app's OAuth & Permissions settings",
+      "label": "Slack OAuth redirect URI",
+      "level": "operator",
+      "name": "oauth_redirect_uri",
+      "required": false,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "oauth.client_secret",
+      "docs_url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+      "format": "token",
+      "help": "The Slack app's client secret. Supplied once by the deployment operator and never exposed to the person authorizing a Connection",
+      "label": "Slack application client secret",
+      "level": "operator",
+      "name": "oauth_client_secret",
+      "required": false,
+      "secret": true,
+      "service": "default"
+    }
+  ],
   "connector": "slack",
   "default_auth": [
     [
       "slack.bot_token"
     ]
   ],
-  "description": "Slack messaging, inbound events, and a curated read-only Enterprise Admin surface",
+  "description": "Slack messaging as the installed Zwirn bot or as a consenting user, inbound events, and a curated read-only Enterprise Admin surface",
   "events": [
     {
       "auth": [
@@ -326,6 +400,9 @@
       "auth": [
         [
           "slack.bot_token"
+        ],
+        [
+          "slack.user_token"
         ]
       ],
       "auth_requirements": [
@@ -335,6 +412,18 @@
           ],
           "scopes": {
             "slack.bot_token": [
+              [
+                "chat:write"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "slack.user_token"
+          ],
+          "scopes": {
+            "slack.user_token": [
               [
                 "chat:write"
               ]
@@ -1580,6 +1669,9 @@
       "auth": [
         [
           "slack.bot_token"
+        ],
+        [
+          "slack.user_token"
         ]
       ],
       "auth_requirements": [
@@ -1589,6 +1681,18 @@
           ],
           "scopes": {
             "slack.bot_token": [
+              [
+                "channels:history"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "slack.user_token"
+          ],
+          "scopes": {
+            "slack.user_token": [
               [
                 "channels:history"
               ]
@@ -2908,6 +3012,9 @@
       "auth": [
         [
           "slack.bot_token"
+        ],
+        [
+          "slack.user_token"
         ]
       ],
       "auth_requirements": [
@@ -2917,6 +3024,18 @@
           ],
           "scopes": {
             "slack.bot_token": [
+              [
+                "users:read"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "slack.user_token"
+          ],
+          "scopes": {
+            "slack.user_token": [
               [
                 "users:read"
               ]
@@ -4057,6 +4176,9 @@
       "auth": [
         [
           "slack.bot_token"
+        ],
+        [
+          "slack.user_token"
         ]
       ],
       "auth_requirements": [
@@ -4066,6 +4188,18 @@
           ],
           "scopes": {
             "slack.bot_token": [
+              [
+                "reactions:write"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "slack.user_token"
+          ],
+          "scopes": {
+            "slack.user_token": [
               [
                 "reactions:write"
               ]
@@ -6265,6 +6399,13 @@
         "identity",
         "messaging"
       ]
+    },
+    {
+      "api_version": "v1",
+      "base_url": "https://slack.com",
+      "description": "Slack OAuth v2 authorization and token endpoints. The host uses this service only while creating or refreshing a Connection",
+      "gid": "com.slack.api/login:v1",
+      "name": "login"
     }
   ],
   "vendor": "Slack",

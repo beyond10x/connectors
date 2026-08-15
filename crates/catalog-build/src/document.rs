@@ -50,10 +50,10 @@ use serde_json::{json, Value};
 use connector_spec::{
     Audience, AuthMethod, AuthScheme, BodyEncoding, ChannelBinding, ConfigField, Connector,
     Discovery, ErrorEnvelope, HostEffect, HttpMethod, Idempotency, ImplementationForm,
-    InteractionShape, ManualSetup, OAuthGrant, OAuthRedirect, Operation, OperationDirection,
-    OperationRequest, Pagination, Param, PlacementRequirement, RateLimit, RequiredCapability, Risk,
-    Role, SemanticEffect, Service, SessionBinding, SocketConnectSpec, Subscription, Tag,
-    TokenEndpointWorkaround, VerificationScheme, FREE_FORM_BODY,
+    InteractionShape, ManualSetup, OAuthGrant, OAuthRedirect, OAuthScopeSeparator, Operation,
+    OperationDirection, OperationRequest, Pagination, Param, PlacementRequirement, RateLimit,
+    RequiredCapability, Risk, Role, SemanticEffect, Service, SessionBinding, SocketConnectSpec,
+    Subscription, Tag, TokenEndpointWorkaround, VerificationScheme, FREE_FORM_BODY,
 };
 
 use crate::seam;
@@ -195,6 +195,13 @@ struct DocOAuth2<'a> {
     token_path: &'a str,
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     scopes: &'a [String],
+    /// OAuth defaults to a space-delimited list. Only providers whose wire format differs publish
+    /// this discriminator, preserving every existing canonical document.
+    #[serde(skip_serializing_if = "OAuthScopeSeparator::is_space")]
+    scope_separator: OAuthScopeSeparator,
+    /// Nonstandard granted-scope location. Absence means OAuth's top-level `/scope`.
+    #[serde(skip_serializing_if = "str::is_empty")]
+    scope_response_pointer: &'a str,
     #[serde(skip_serializing_if = "<[OAuthGrant]>::is_empty")]
     grants: &'a [OAuthGrant],
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -778,6 +785,8 @@ fn doc_auth<'a>(connector: &Connector, method: &'a AuthMethod) -> Result<DocAuth
                 authorize_path: &spec.authorize_path,
                 token_path: &spec.token_path,
                 scopes: &spec.scopes,
+                scope_separator: spec.scope_separator,
+                scope_response_pointer: &spec.scope_response_pointer,
                 grants: &spec.grants,
                 redirect: spec.redirect.as_ref(),
                 public_client: spec.public_client,
@@ -1793,6 +1802,8 @@ pub fn schema() -> &'static Value {
                         "authorize_path": { "type": "string" },
                         "token_path": { "type": "string" },
                         "scopes": { "type": "array", "items": { "type": "string" } },
+                        "scope_separator": { "enum": ["space", "comma"] },
+                        "scope_response_pointer": { "type": "string", "pattern": "^/" },
                         "grants": { "type": "array", "items": { "enum": ["authorization_code", "password", "refresh_token", "client_credentials"] } },
                         "public_client": { "type": "boolean" },
                         "redirect": {

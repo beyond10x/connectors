@@ -143,11 +143,11 @@ pub enum AuthScheme {
 ///
 /// This is the "on behalf of" axis, and it is independent of every other one. [`AuthScheme`] says
 /// where the value goes; [`OAuth2Spec`] says how it is obtained; this says *who the vendor thinks is
-/// acting* once it arrives. Slack is the case that forces it: one OAuth v2 grant returns two tokens
-/// in one response — `access_token` is the workspace's bot (`xoxb-`) and
-/// `authed_user.access_token` is the signed-in person (`xoxp-`). They are placed identically, they
-/// are acquired by the same grant, and they differ in nothing an existing axis can express, while
-/// differing in **who they can act as and how much they can reach**.
+/// acting* once it arrives. Slack is the case that forces it: its normal OAuth v2 install can return
+/// both the workspace bot (`xoxb-`) and the signed-in person (`xoxp-`). They are placed identically
+/// and differ in nothing an existing axis can express, while differing in **who they can act as and
+/// how much they can reach**. The shipped Slack declaration deliberately uses Slack's separate
+/// user-centric OAuth endpoint instead, so each Connection acquires exactly one effective actor.
 ///
 /// Three consequences ride on it, which is why it is a declaration rather than a host convention:
 ///
@@ -220,6 +220,30 @@ pub enum OAuthGrant {
     ClientCredentials,
 }
 
+/// How a provider separates multiple OAuth scopes on the authorization request and in the
+/// `scope` value returned by its token endpoint.
+///
+/// OAuth 2.0 specifies a space-delimited value. Slack's OAuth v2 endpoints are the shipped reason
+/// this is an explicit, closed axis: their documented wire form is comma-delimited. Treating the
+/// separator as presentation would make the host request one invalid compound scope while the
+/// catalog still appeared to list several valid ones.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthScopeSeparator {
+    /// RFC 6749's `scope-token *( SP scope-token)` form.
+    #[default]
+    Space,
+    /// A comma-delimited scope list, as used by Slack OAuth v2.
+    Comma,
+}
+
+impl OAuthScopeSeparator {
+    /// Whether this is the OAuth default, used to preserve existing provider and artifact bytes.
+    pub const fn is_space(&self) -> bool {
+        matches!(self, Self::Space)
+    }
+}
+
 /// The loopback redirect an `authorization_code` login binds. Mirrors
 /// `flux_plugin_protocol::OAuthRedirect`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -234,9 +258,9 @@ pub struct OAuthRedirect {
 /// Declares that an [`AuthMethod`] is OAuth2-backed: the host runs every token grant and injects
 /// only a fresh bearer, so nothing this repo generates ever performs OAuth itself.
 ///
-/// Mirrors `flux_plugin_protocol::OAuth2Spec` field for field, including its all-defaulted shape —
-/// a credential with no `oauth2` block is a plain env-to-secret credential and must round-trip
-/// unchanged.
+/// Extends the host protocol's all-defaulted OAuth shape with catalog-owned scope encoding and
+/// evidence-location metadata. A credential with no `oauth2` block is a plain env-to-secret
+/// credential and must round-trip unchanged.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OAuth2Spec {
@@ -281,6 +305,18 @@ pub struct OAuth2Spec {
     /// Requested scopes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scopes: Vec<String>,
+    /// The delimiter used to encode [`scopes`](Self::scopes) on the authorization request and to
+    /// split a returned `scope` value. Defaults to OAuth's space-delimited form.
+    #[serde(default, skip_serializing_if = "OAuthScopeSeparator::is_space")]
+    pub scope_separator: OAuthScopeSeparator,
+    /// JSON Pointer into a successful token response locating the granted scope list when the
+    /// provider does not return it at OAuth's conventional top-level `/scope` field.
+    ///
+    /// Empty is the default and means `/scope`. This names capability evidence only; it can never
+    /// name an access or refresh token, and a host stores the normalized strings with the current
+    /// credential generation rather than exposing the token response.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub scope_response_pointer: String,
     /// The grants the host may run for this credential.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub grants: Vec<OAuthGrant>,
@@ -304,6 +340,17 @@ pub struct OAuth2Spec {
     /// axis, independent of grant, placement and subject.
     #[serde(default, skip_serializing_if = "is_false")]
     pub public_client: bool,
+}
+
+impl OAuth2Spec {
+    /// The effective JSON Pointer a host reads for granted scopes.
+    pub fn effective_scope_response_pointer(&self) -> &str {
+        if self.scope_response_pointer.is_empty() {
+            "/scope"
+        } else {
+            &self.scope_response_pointer
+        }
+    }
 }
 
 /// `skip_serializing_if` for a `bool` that defaults to `false`, so a confidential OAuth2 client — the
