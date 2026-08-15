@@ -65,13 +65,13 @@ where
         HeaderValue::from_str(&format!(
             "{} {}",
             AUTHORIZATION_SCHEME,
-            authority.compact().as_wire_value()
+            authority.compact().expose_secret()
         ))
         .map_err(|_| ConnectError::InvalidPresentation)?,
     );
     request.headers_mut().insert(
         DPOP_HEADER,
-        HeaderValue::from_str(proof.as_wire_value())
+        HeaderValue::from_str(proof.expose_secret())
             .map_err(|_| ConnectError::InvalidPresentation)?,
     );
     request.headers_mut().insert(

@@ -9,9 +9,10 @@ and an optional one-line `note`. Status is one of `backlog | ready | in-progress
 commands, which render Now / Next / Blocked / Backlog from story frontmatter into a generated region)
 arrives with the track scaffolding later; until then, edit this table when you add or move a story.
 
-Context these stories assume, read in order: [../VISION.md](../VISION.md) →
+Context these stories assume, read current authority in order:
 [../design/01-domain-model.md](../design/01-domain-model.md) →
-[../design/02-architecture.md](../design/02-architecture.md), grounded by
+[../design/02-architecture.md](../design/02-architecture.md) →
+[../VISION.md](../VISION.md) (historical founding intent), grounded by
 [../research/](../research/). Repository housing is governed by
 [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
@@ -68,6 +69,7 @@ will spawn children as each milestone is designed.
 | [S-031](S-031-contract-bundles-are-versioned-and-pinned.md) | Connector contract bundles are versioned, signed, and pinned | backlog | Platform | catalog, protocol, ci, docs |
 | [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | in-progress | Platform | catalog, domain, service, server, driver-sip |
 | [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint, voice-runtime |
+| [S-034](S-034-production-credential-custody-closes.md) | Production credential custody closes with owner evidence | backlog | Platform | connector-secrets, service, protocol, ci, docs |
 
 ## Epics in this seed
 
@@ -83,6 +85,7 @@ will spawn children as each milestone is designed.
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-repository conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
+| `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 
 ## Known gaps in this backlog
 
