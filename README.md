@@ -33,7 +33,8 @@ those codebases proved and what they got wrong.
 
 ## Hosted server
 
-`connectors serve-hosted --config PATH` serves `POST /v0alpha1/operations` and verifies each opaque
+`connectors serve-hosted --config PATH` serves `POST /api/connectors/v1/operations` with the
+documented development base path and verifies each opaque
 session with Identity for the exact `b10x.connectors` audience. The initial Kubernetes
 Integration is intentionally one operation: `kubernetes.deployment.status`. It performs one
 `GET /apis/apps/v1/namespaces/{namespace}/deployments/{name}` and projects the Deployment status;
@@ -48,6 +49,7 @@ tenant_id = "tenant-dev"
 
 [server]
 listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
 
 [identity]
 origin = "https://identity.code.dev.babelforce.com"

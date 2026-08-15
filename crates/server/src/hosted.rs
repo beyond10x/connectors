@@ -55,7 +55,7 @@ struct ErrorBody {
 pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn OperationBackend>) -> Router {
     Router::new()
         .route("/healthz", get(health))
-        .route("/v0alpha1/operations", post(operation))
+        .route("/operations", post(operation))
         .layer(DefaultBodyLimit::max(MAX_FRAME_BYTES))
         .with_state(HostedState { verifier, backend })
 }
@@ -184,7 +184,7 @@ mod tests {
     #[tokio::test]
     async fn hosted_route_requires_identity_and_exact_tenant_binding() {
         let app = router(Arc::new(Verifier), Arc::new(Backend));
-        let request = Request::post("/v0alpha1/operations")
+        let request = Request::post("/operations")
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(
                 serde_json::to_vec(&envelope("tenant-dev")).unwrap(),
@@ -195,7 +195,7 @@ mod tests {
             StatusCode::UNAUTHORIZED
         );
 
-        let request = Request::post("/v0alpha1/operations")
+        let request = Request::post("/operations")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::AUTHORIZATION, "Bearer session")
             .body(Body::from(serde_json::to_vec(&envelope("other")).unwrap()))
@@ -205,7 +205,7 @@ mod tests {
             StatusCode::FORBIDDEN
         );
 
-        let request = Request::post("/v0alpha1/operations")
+        let request = Request::post("/operations")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::AUTHORIZATION, "Bearer session")
             .body(Body::from(
