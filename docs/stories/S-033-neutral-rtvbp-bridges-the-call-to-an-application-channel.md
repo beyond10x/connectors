@@ -44,6 +44,9 @@ without a model or Babelforce product semantics.
       including hangup, cancellation, loss, interruption, and one-generation drain.
 - [ ] A signed Connectors owner bundle and clean-room consumer proof precede any stable or hosted
       support claim.
+- [ ] The `RUSTSEC-2025-0141` maintenance warning is closed by replacing RTVBP's
+      `webrtc 0.14.0` → `dtls 0.13.0` → `bincode 1.3.3` closure or by pinning and reviewing a
+      maintained fork before stable or exposed support.
 
 ## Progress
 

@@ -393,6 +393,14 @@ impl OperationBackend for SlackBackend {
         }
         self.operation.shutdown().await;
     }
+
+    fn supports_connections(&self) -> bool {
+        true
+    }
+
+    fn supports_events(&self) -> bool {
+        true
+    }
 }
 
 impl SlackInner {

@@ -9,12 +9,17 @@ pub enum RouteAdapter {
     /// Grafana's reviewed data-source proxy prefix, with the data-source identity resolved from a
     /// Connector-owned opaque binding rather than caller input.
     GrafanaDatasourceProxyV1,
+    /// Kubernetes API Service proxy for one Connector-owned namespace, Service, and port
+    /// binding. Invocation callers can supply only catalog parameters; they cannot supply any
+    /// Kubernetes resource identity or proxy path.
+    KubernetesServiceProxyV1,
 }
 
 impl RouteAdapter {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::GrafanaDatasourceProxyV1 => "grafana_datasource_proxy_v1",
+            Self::KubernetesServiceProxyV1 => "kubernetes_service_proxy_v1",
         }
     }
 }

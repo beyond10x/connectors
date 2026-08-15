@@ -10,10 +10,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Parser, Subcommand};
 use connectors_cli::{
-    load_authority_issuer, CompositeBackend, HostedServerConfig, HostedServerConfigError,
-    IdentityHttpVerifier, IdentityVerifierConfigError, KubernetesBackendError,
-    KubernetesLocalBackend, KubernetesLocalError, KubernetesStatusBackend, MonitoringBackend,
-    PersonalConfig, RefusingBackend, RuntimeLauncher, SipOperationBackend, SlackBackend,
+    load_authority_issuer, CompositeBackend, CredentialStoreBackend, HostedServerConfig,
+    HostedServerConfigError, HostedVaultError, HostedVaultStore, IdentityHttpVerifier,
+    IdentityVerifierConfigError, KubernetesBackendError, KubernetesLocalBackend,
+    KubernetesLocalError, KubernetesStatusBackend, MonitoringBackend, PersonalConfig,
+    RefusingBackend, RuntimeLauncher, SipOperationBackend, SlackBackend,
 };
 use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectSessionCreateRequest,
@@ -55,7 +56,7 @@ enum Command {
         #[arg(long)]
         state_root: Option<PathBuf>,
     },
-    /// Serve the Identity-authenticated hosted operation API.
+    /// Serve the Identity-authenticated hosted Operation and Connection APIs.
     ServeHosted {
         /// Strict value-free server and Integration configuration.
         #[arg(long)]
@@ -296,6 +297,8 @@ enum MainError {
     #[error(transparent)]
     KubernetesLocal(#[from] KubernetesLocalError),
     #[error(transparent)]
+    Vault(#[from] HostedVaultError),
+    #[error(transparent)]
     Daemon(#[from] server::local::LocalDaemonError),
     #[error("local Connector request failed: {0}")]
     Io(#[from] io::Error),
@@ -386,11 +389,16 @@ async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
             &config.storage.state_root,
         )?));
     }
-    let backend: Arc<dyn OperationBackend> = match backends.len() {
+    let mut backend: Arc<dyn OperationBackend> = match backends.len() {
         0 => Arc::new(RefusingBackend),
         1 => backends.pop().expect("one configured backend"),
         _ => Arc::new(CompositeBackend::new(backends)),
     };
+    if config.vault.enabled {
+        let vault = Arc::new(HostedVaultStore::new(&config.vault)?);
+        vault.initialize().await?;
+        backend = Arc::new(CredentialStoreBackend::new(backend, vault));
+    }
     let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
     println!(
         "{}",
@@ -401,6 +409,7 @@ async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
             "base_path": config.server.base_path,
             "identity_audience": server::hosted::CONNECTORS_AUDIENCE,
             "kubernetes_enabled": config.kubernetes.enabled,
+            "vault_enabled": config.vault.enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
         })

@@ -118,6 +118,45 @@ fn connector_connection_vectors_match_the_strict_reader() {
 }
 
 #[test]
+fn kubernetes_service_route_round_trips_through_the_connection_response() {
+    let response: protocol::connection::ResponseEnvelope =
+        serde_json::from_value(serde_json::json!({
+            "protocol": "b10x.connector-connection.v0alpha1",
+            "request_id": "request-materialize-kubernetes-1",
+            "status": "ok",
+            "response": {
+                "result": "materialize",
+                "value": {
+                    "connection_ref": "connection:prometheus:opaque",
+                    "integration_ref": "prometheus",
+                    "label": "monitoring/prometheus (prometheus)",
+                    "state": "callable",
+                    "initiation": ["b10x"],
+                    "route": {
+                        "kind": "via_connection",
+                        "parent_connection_ref": "connection:kubernetes:opaque",
+                        "route_adapter": "kubernetes_service_proxy_v1"
+                    },
+                    "channels": []
+                }
+            }
+        }))
+        .unwrap();
+    response.validate().unwrap();
+    let Some(protocol::connection::ConnectionResult::Materialize(description)) = response.response
+    else {
+        panic!("materialize response required");
+    };
+    assert!(matches!(
+        description.summary.route,
+        protocol::connection::ConnectionRoute::ViaConnection {
+            route_adapter: protocol::connection::RouteAdapter::KubernetesServiceProxyV1,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn connector_event_vectors_match_the_strict_reader() {
     let path = root().join("contracts/connector-event/v0alpha1/vectors.json");
     let vectors: OperationVectors =

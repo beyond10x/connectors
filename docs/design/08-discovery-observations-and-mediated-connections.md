@@ -1,7 +1,7 @@
 # Design 08: discovery observations and mediated Connections
 
-**Status:** accepted Connector model; first personal-local Grafana reconciliation, materialization,
-and mediated execution slice implemented · **Date:** 2026-08-15
+**Status:** accepted Connector model; personal-local Grafana and Kubernetes Service mediation
+implemented; first explicit Agent Endpoint-Grant projection implemented · **Date:** 2026-08-15
 
 **Inputs:** [Design 01](01-domain-model.md) · [Design 02](02-architecture.md) ·
 [Design 07](07-credential-custody-topologies.md) ·
@@ -191,12 +191,15 @@ proxy path. Its passive discovery reads stored observations through the value-fr
 operation and requires Agent discovery authority *and* Connector-side admission; the Agent's
 `DiscoveryGrant` does not become a Connector Grant.
 
-The first Agent adapter is a standalone consumer of the released operation protocol. It sends the
-current owner snapshot and opaque operation/Connection references over the owner-only local socket;
-it has no credential field or provider transport. The Harness's separately pinned Connector tools
-profile presents generic search/describe/invoke and keeps description leases inside the adapter.
-This is a development path, not a claim that Connector observations have become Agent authority:
-the normal capability-compiler rollout still projects Connections through explicit Endpoint Grants.
+The first integrated Agent adapter sends the current owner snapshot and opaque
+operation/Connection references over the owner-only local socket; it has no credential field or
+provider transport. `zwirn connect kubernetes` persists only the selected Connection references.
+On startup, Zwirn refreshes their current callable descriptions and feeds value-free Endpoint,
+Datasource, owner-fact, and Operation observations plus session-scoped Endpoint Grants through the
+normal capability compiler. Description leases remain inside the adapter and are refreshed again
+immediately before invocation. This is not a claim that Connector observations became Agent
+authority: an observation is absent from the Agent catalog until a person materializes its
+Connection and the Harness independently grants that Endpoint.
 
 ## 8. Implemented personal-local slice
 

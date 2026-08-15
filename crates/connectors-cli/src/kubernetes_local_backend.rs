@@ -5,11 +5,19 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
+use connector_resolve::document::ProtocolDriver;
+use connector_resolve::resolve;
+use domain::{
+    AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
+    RouteAdapter as DomainRouteAdapter,
+};
+use futures_util::AsyncReadExt as _;
+use http::{Method, Request as HttpRequest};
 use k8s_openapi::api::authentication::v1::SelfSubjectReview;
 use k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
 };
-use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::api::core::v1::{Service, ServicePort};
 use kube::api::{ListParams, PostParams};
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Api, Client, Config};
@@ -17,18 +25,26 @@ use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectionCandidateState,
     ConnectionCandidateSummary, ConnectionDescription, ConnectionError, ConnectionErrorCode,
     ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
-    ConnectionSummary, DiscoveryObservationState, DiscoveryObservationSummary,
-    ObservationSearchRequest,
+    ConnectionSummary, DiscoveryObservationState, DiscoveryObservationSummary, MaterializeRequest,
+    ObservationSearchRequest, RouteAdapter,
 };
 use protocol::event::{EventError, EventRequest, EventResult};
-use protocol::operation::{OperationError, OperationRequest, OperationResult, OwnerContext};
+use protocol::operation::{
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
+    InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
+    OperationRequest, OperationResult, OperationSummary, OwnerContext,
+};
+use serde_json::Value;
 use server::local::OperationBackend;
+use service::{plan_operation, PlanningEnvironment};
 use sha2::{Digest as _, Sha256};
 
 use crate::{InitiationConfig, KubernetesIntegrationConfig};
 
 const KUBERNETES: &str = "kubernetes";
 const DISCOVERY_REF: &str = "discovery:kubernetes-service-v1";
+const TARGET_BASE: &str = "https://mediated-target.invalid";
+const MAX_PROXY_RESULT_BYTES: usize = protocol::operation::MAX_RESULT_BYTES;
 
 /// Setup refusal for the personal-local Kubernetes backend. Details deliberately do not include
 /// kubeconfig contents, credential helpers, endpoints, or paths.
@@ -45,11 +61,39 @@ struct CandidateBinding {
     evidence_material: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct KubernetesState {
     connections: BTreeMap<String, ConnectionDescription>,
     candidate_connections: BTreeMap<String, String>,
-    observations: BTreeMap<String, Vec<DiscoveryObservationSummary>>,
+    clients: BTreeMap<String, Client>,
+    observations: BTreeMap<String, StoredServiceObservation>,
+    children: BTreeMap<String, KubernetesServiceConnection>,
+}
+
+#[derive(Debug, Clone)]
+struct StoredServiceObservation {
+    summary: DiscoveryObservationSummary,
+    namespace: String,
+    service: String,
+    resource_uid: String,
+    port: String,
+    provider: String,
+    resource_binding: String,
+}
+
+#[derive(Debug, Clone)]
+struct KubernetesServiceConnection {
+    connection_ref: String,
+    label: String,
+    provider: String,
+    grant_ref: String,
+    parent_connection_ref: String,
+    observation_ref: String,
+    namespace: String,
+    service: String,
+    resource_uid: String,
+    port: String,
+    resource_binding: String,
 }
 
 /// Personal-local backend which passively detects kubeconfig contexts, then contacts a cluster
@@ -87,7 +131,7 @@ impl KubernetesLocalBackend {
     /// Number of activated Kubernetes source Connections in this daemon generation.
     #[must_use]
     pub fn connection_count(&self) -> usize {
-        lock(&self.state).connections.len()
+        lock(&self.state).candidate_connections.len()
     }
 
     /// Number of passively detected context candidates.
@@ -105,6 +149,18 @@ impl KubernetesLocalBackend {
             ));
         }
         Ok(())
+    }
+
+    fn check_operation_context(&self, context: &OwnerContext) -> Result<(), OperationError> {
+        if context == &self.owner {
+            Ok(())
+        } else {
+            Err(OperationError::new(
+                OperationErrorCode::StaleAuthority,
+                "owner context does not match this Connector generation",
+                false,
+            ))
+        }
     }
 
     fn search_candidates(
@@ -205,7 +261,7 @@ impl KubernetesLocalBackend {
         config.proxy_url = None;
         let client = Client::try_from(config).map_err(|_| connection_unavailable())?;
         verify_identity(client.clone()).await?;
-        let services = discover_services(client, &self.policy).await?;
+        let services = discover_services(client.clone(), &self.policy).await?;
 
         let connection_ref = opaque_ref(
             "connection:kubernetes:",
@@ -230,9 +286,12 @@ impl KubernetesLocalBackend {
         state
             .candidate_connections
             .insert(request.candidate_ref, connection_ref.clone());
-        state
-            .observations
-            .insert(connection_ref.clone(), observations);
+        state.clients.insert(connection_ref.clone(), client);
+        for observation in observations {
+            state
+                .observations
+                .insert(observation.summary.observation_ref.clone(), observation);
+        }
         state
             .connections
             .insert(connection_ref, description.clone());
@@ -244,25 +303,313 @@ impl KubernetesLocalBackend {
         request: &ObservationSearchRequest,
     ) -> Option<Vec<DiscoveryObservationSummary>> {
         let query = request.query.to_ascii_lowercase();
-        lock(&self.state)
-            .observations
-            .get(&request.source_connection_ref)
-            .map(|observations| {
-                observations
-                    .iter()
-                    .filter(|observation| observation.title.to_ascii_lowercase().contains(&query))
-                    .take(usize::from(request.limit))
-                    .cloned()
-                    .collect()
-            })
+        let state = lock(&self.state);
+        if !state
+            .connections
+            .contains_key(&request.source_connection_ref)
+        {
+            return None;
+        }
+        Some(
+            state
+                .observations
+                .values()
+                .filter(|observation| {
+                    observation.summary.source_connection_ref == request.source_connection_ref
+                        && observation
+                            .summary
+                            .title
+                            .to_ascii_lowercase()
+                            .contains(&query)
+                })
+                .take(usize::from(request.limit))
+                .map(|observation| observation.summary.clone())
+                .collect(),
+        )
     }
 
-    fn has_observation(&self, observation_ref: &str) -> bool {
-        lock(&self.state)
-            .observations
+    fn observation(&self, observation_ref: &str) -> Option<StoredServiceObservation> {
+        lock(&self.state).observations.get(observation_ref).cloned()
+    }
+
+    fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
+        let provider = crate::monitoring_backend::provider_for_operation(operation_ref);
+        if !kubernetes_route_operation(operation_ref) {
+            return Vec::new();
+        }
+        let state = lock(&self.state);
+        state
+            .children
             .values()
-            .flatten()
-            .any(|observation| observation.observation_ref == observation_ref)
+            .filter(|child| child.provider == provider && child_is_current(&state, child))
+            .map(|child| OperationConnectionSummary {
+                connection_ref: child.connection_ref.clone(),
+                label: child.label.clone(),
+                provider: child.provider.clone(),
+                audiences: crate::monitoring_backend::audiences_for_operation(operation_ref),
+            })
+            .collect()
+    }
+
+    fn child_is_current(&self, child: &KubernetesServiceConnection) -> bool {
+        let state = lock(&self.state);
+        child_is_current(&state, child)
+    }
+
+    fn operation_summary(&self, operation_ref: &str) -> Option<OperationSummary> {
+        let connections = self.connections_for_operation(operation_ref);
+        (!connections.is_empty()).then(|| OperationSummary {
+            operation_ref: operation_ref.to_owned(),
+            title: crate::monitoring_backend::title(operation_ref).to_owned(),
+            effect: EffectClass::ReadOnly,
+            approval: ApprovalPosture::NotRequired,
+            connections,
+        })
+    }
+
+    fn operation_description(
+        &self,
+        context: &OwnerContext,
+        operation_ref: &str,
+    ) -> Result<OperationDescription, OperationError> {
+        let operation = crate::monitoring_backend::operation_document(operation_ref)
+            .ok_or_else(operation_not_found)?;
+        let connections = self.connections_for_operation(operation_ref);
+        if connections.is_empty() {
+            return Err(operation_not_found());
+        }
+        Ok(OperationDescription {
+            operation_ref: operation_ref.to_owned(),
+            title: crate::monitoring_backend::title(operation_ref).to_owned(),
+            description: operation.contract_description().to_owned(),
+            input_schema: operation.input_schema().clone(),
+            output_schema: crate::monitoring_backend::response_schema(
+                crate::monitoring_backend::provider_for_operation(operation_ref),
+                operation_ref,
+            )?,
+            effect: EffectClass::ReadOnly,
+            approval: ApprovalPosture::NotRequired,
+            connections,
+            description_ref: self.operation_description_ref(context, operation_ref),
+        })
+    }
+
+    fn operation_description_ref(&self, context: &OwnerContext, operation_ref: &str) -> String {
+        let mut hash = Sha256::new();
+        hash.update(serde_json::to_vec(context).expect("owner context serializes"));
+        hash.update(b"\0kubernetes_service_proxy_v1\0");
+        hash.update(operation_ref.as_bytes());
+        for connection in self.connections_for_operation(operation_ref) {
+            hash.update(b"\0");
+            hash.update(connection.connection_ref.as_bytes());
+        }
+        format!("description-sha256-{:x}", hash.finalize())
+    }
+
+    fn materialize(
+        &self,
+        request: &MaterializeRequest,
+    ) -> Result<ConnectionDescription, ConnectionError> {
+        let observation = self
+            .observation(&request.observation_ref)
+            .ok_or_else(connection_not_found)?;
+        if observation.provider == crate::monitoring_backend::GRAFANA {
+            return Err(ConnectionError::new(
+                ConnectionErrorCode::NotGranted,
+                "the discovered Grafana Service requires an explicit credential source",
+                false,
+            ));
+        }
+        let grant_ref = self
+            .policy
+            .target_grant(&observation.provider)
+            .ok_or_else(|| {
+                ConnectionError::new(
+                    ConnectionErrorCode::NotGranted,
+                    "target Provider has no independent Connector Grant",
+                    false,
+                )
+            })?
+            .to_owned();
+        let mut state = lock(&self.state);
+        if let Some(connection_ref) = observation.summary.connection_ref.as_deref() {
+            return state
+                .connections
+                .get(connection_ref)
+                .cloned()
+                .ok_or_else(connection_protocol);
+        }
+        if !state
+            .clients
+            .contains_key(&observation.summary.source_connection_ref)
+        {
+            return Err(ConnectionError::new(
+                ConnectionErrorCode::Conflict,
+                "source Kubernetes Connection is no longer active",
+                false,
+            ));
+        }
+        let connection_ref = opaque_ref(
+            &format!("connection:{}:", observation.provider),
+            &format!(
+                "{}\0{}",
+                observation.summary.observation_ref, observation.resource_binding
+            ),
+        );
+        let child = KubernetesServiceConnection {
+            connection_ref: connection_ref.clone(),
+            label: observation.summary.title.clone(),
+            provider: observation.provider,
+            grant_ref,
+            parent_connection_ref: observation.summary.source_connection_ref,
+            observation_ref: observation.summary.observation_ref.clone(),
+            namespace: observation.namespace,
+            service: observation.service,
+            resource_uid: observation.resource_uid,
+            port: observation.port,
+            resource_binding: observation.resource_binding,
+        };
+        let description = ConnectionDescription {
+            summary: ConnectionSummary {
+                connection_ref: connection_ref.clone(),
+                integration_ref: child.provider.clone(),
+                label: child.label.clone(),
+                state: ConnectionState::Callable,
+                initiation: vec![ConnectionInitiator::B10x],
+                route: ConnectionRoute::ViaConnection {
+                    parent_connection_ref: child.parent_connection_ref.clone(),
+                    route_adapter: RouteAdapter::KubernetesServiceProxyV1,
+                },
+            },
+            channels: Vec::new(),
+        };
+        let stored = state
+            .observations
+            .get_mut(&request.observation_ref)
+            .ok_or_else(connection_not_found)?;
+        stored.summary.state = DiscoveryObservationState::Materialized;
+        stored.summary.connection_ref = Some(connection_ref.clone());
+        state.children.insert(connection_ref.clone(), child);
+        state
+            .connections
+            .insert(connection_ref, description.clone());
+        Ok(description)
+    }
+
+    async fn invoke_service(
+        &self,
+        context: &OwnerContext,
+        request: InvokeRequest,
+    ) -> Result<OperationResult, OperationError> {
+        if !kubernetes_route_operation(&request.operation_ref)
+            || request.description_ref
+                != self.operation_description_ref(context, &request.operation_ref)
+            || request.approval_evidence_ref.is_some()
+        {
+            return Err(operation_not_granted());
+        }
+        crate::monitoring_backend::validate_input(&request.operation_ref, &request.input)?;
+        let child = lock(&self.state)
+            .children
+            .get(&request.connection_ref)
+            .cloned()
+            .ok_or_else(operation_not_granted)?;
+        if child.provider
+            != crate::monitoring_backend::provider_for_operation(&request.operation_ref)
+            || !self.child_is_current(&child)
+        {
+            return Err(operation_not_granted());
+        }
+        let operation = crate::monitoring_backend::operation_document(&request.operation_ref)
+            .ok_or_else(operation_not_found)?;
+        if operation.protocol_driver() != ProtocolDriver::HttpV1 {
+            return Err(operation_unavailable());
+        }
+        let connection = ConnectionAuthority::mediated(
+            &child.connection_ref,
+            InitiationPolicy::b10x_only(),
+            &child.parent_connection_ref,
+            &child.resource_binding,
+            DomainRouteAdapter::KubernetesServiceProxyV1,
+        )
+        .map_err(|_| operation_not_granted())?;
+        let admission = AdmittedOperation::from_grant_decision(
+            &child.provider,
+            &operation.id,
+            &context.tenant_id,
+            &context.agent_id,
+            &child.grant_ref,
+            connection,
+        );
+        let plan = plan_operation(
+            &child.provider,
+            operation,
+            admission,
+            &PlanningEnvironment {
+                available_drivers: BTreeSet::from([DriverId::HttpV1]),
+                available_route_adapters: BTreeSet::from([
+                    DomainRouteAdapter::KubernetesServiceProxyV1,
+                ]),
+                capabilities: BTreeSet::from([Capability::PrivateNetwork]),
+                permission_subjects: vec![child.resource_binding.clone()],
+            },
+        )
+        .map_err(|_| operation_not_granted())?;
+        let ProtocolPlan::MediatedHttpV1(mediated) = plan.protocol() else {
+            return Err(operation_unavailable());
+        };
+        if mediated.parent_connection != child.parent_connection_ref
+            || mediated.resource_binding != child.resource_binding
+            || mediated.adapter != DomainRouteAdapter::KubernetesServiceProxyV1
+        {
+            return Err(operation_not_granted());
+        }
+        let resolved = resolve(
+            operation,
+            TARGET_BASE,
+            &request.input,
+            &BTreeMap::new(),
+            &[],
+        )
+        .map_err(|_| operation_invalid())?;
+        let relative = resolved
+            .request
+            .url
+            .strip_prefix(TARGET_BASE)
+            .filter(|path| path.starts_with('/'))
+            .ok_or_else(operation_not_granted)?;
+        if resolved.request.method != "GET" || resolved.request.body.is_some() {
+            return Err(operation_not_granted());
+        }
+        let client = lock(&self.state)
+            .clients
+            .get(&child.parent_connection_ref)
+            .cloned()
+            .ok_or_else(operation_not_granted)?;
+        if !can_get_service(client.clone(), &child.namespace, &child.service).await?
+            || !service_is_current(client.clone(), &child).await?
+        {
+            return Err(operation_not_granted());
+        }
+        if !can_proxy_service(client.clone(), &child.namespace, &child.service).await? {
+            return Err(operation_not_granted());
+        }
+        let output = proxy_json(client, &child, relative).await?;
+        Ok(OperationResult::Invoke(InvocationResult {
+            operation_ref: request.operation_ref.clone(),
+            output,
+            connector_audit_ref: opaque_ref(
+                "audit:kubernetes-service:",
+                &format!(
+                    "{}\0{}\0{}\0{}",
+                    context.authority_snapshot_sha256,
+                    request.operation_ref,
+                    child.connection_ref,
+                    child.resource_binding
+                ),
+            ),
+            execution_ref: None,
+        }))
     }
 }
 
@@ -273,7 +620,59 @@ impl OperationBackend for KubernetesLocalBackend {
         context: &OwnerContext,
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
-        self.operation.handle(context, request).await
+        self.check_operation_context(context)?;
+        match request {
+            OperationRequest::Search(search) => {
+                let mut operations = match self
+                    .operation
+                    .handle(context, OperationRequest::Search(search.clone()))
+                    .await
+                {
+                    Ok(OperationResult::Search { operations }) => operations,
+                    Err(error)
+                        if matches!(
+                            error.code,
+                            OperationErrorCode::NotFound | OperationErrorCode::Unavailable
+                        ) =>
+                    {
+                        Vec::new()
+                    }
+                    Ok(_) => return Err(operation_protocol()),
+                    Err(error) => return Err(error),
+                };
+                let query = search.query.to_ascii_lowercase();
+                operations.extend(
+                    kubernetes_route_operations()
+                        .into_iter()
+                        .filter(|operation_ref| {
+                            query.is_empty()
+                                || operation_ref.contains(&query)
+                                || crate::monitoring_backend::provider_for_operation(operation_ref)
+                                    .contains(&query)
+                        })
+                        .filter_map(|operation_ref| self.operation_summary(operation_ref)),
+                );
+                operations.sort_by(|left, right| left.operation_ref.cmp(&right.operation_ref));
+                operations.dedup_by(|left, right| left.operation_ref == right.operation_ref);
+                operations.truncate(usize::from(search.limit));
+                Ok(OperationResult::Search { operations })
+            }
+            OperationRequest::Describe(DescribeRequest { operation_ref })
+                if kubernetes_route_operation(&operation_ref)
+                    && !self.connections_for_operation(&operation_ref).is_empty() =>
+            {
+                self.operation_description(context, &operation_ref)
+                    .map(OperationResult::Describe)
+            }
+            OperationRequest::Invoke(request)
+                if lock(&self.state)
+                    .children
+                    .contains_key(&request.connection_ref) =>
+            {
+                self.invoke_service(context, request).await
+            }
+            other => self.operation.handle(context, other).await,
+        }
     }
 
     async fn handle_connection(
@@ -346,13 +745,10 @@ impl OperationBackend for KubernetesLocalBackend {
                 }
             }
             ConnectionRequest::Materialize(request)
-                if self.has_observation(&request.observation_ref) =>
+                if self.observation(&request.observation_ref).is_some() =>
             {
-                Err(ConnectionError::new(
-                    ConnectionErrorCode::Unavailable,
-                    "the Kubernetes Service route adapter is not installed in this release",
-                    false,
-                ))
+                self.materialize(&request)
+                    .map(ConnectionResult::Materialize)
             }
             other => self.operation.handle_connection(context, other).await,
         }
@@ -368,6 +764,14 @@ impl OperationBackend for KubernetesLocalBackend {
 
     async fn shutdown(&self) {
         self.operation.shutdown().await;
+    }
+
+    fn supports_connections(&self) -> bool {
+        true
+    }
+
+    fn supports_events(&self) -> bool {
+        true
     }
 }
 
@@ -581,10 +985,135 @@ async fn can_list_services(
     Ok(reviewed.status.is_some_and(|status| status.allowed))
 }
 
+async fn can_proxy_service(
+    client: Client,
+    namespace: &str,
+    service: &str,
+) -> Result<bool, OperationError> {
+    let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
+    let review = SelfSubjectAccessReview {
+        spec: SelfSubjectAccessReviewSpec {
+            resource_attributes: Some(ResourceAttributes {
+                group: Some(String::new()),
+                namespace: Some(namespace.to_owned()),
+                resource: Some("services".to_owned()),
+                subresource: Some("proxy".to_owned()),
+                name: Some(service.to_owned()),
+                verb: Some("get".to_owned()),
+                version: Some("v1".to_owned()),
+                ..ResourceAttributes::default()
+            }),
+            ..SelfSubjectAccessReviewSpec::default()
+        },
+        ..SelfSubjectAccessReview::default()
+    };
+    let reviewed = reviews
+        .create(&PostParams::default(), &review)
+        .await
+        .map_err(|_| operation_unavailable())?;
+    Ok(reviewed.status.is_some_and(|status| status.allowed))
+}
+
+async fn can_get_service(
+    client: Client,
+    namespace: &str,
+    service: &str,
+) -> Result<bool, OperationError> {
+    let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
+    let review = SelfSubjectAccessReview {
+        spec: SelfSubjectAccessReviewSpec {
+            resource_attributes: Some(ResourceAttributes {
+                group: Some(String::new()),
+                namespace: Some(namespace.to_owned()),
+                resource: Some("services".to_owned()),
+                name: Some(service.to_owned()),
+                verb: Some("get".to_owned()),
+                version: Some("v1".to_owned()),
+                ..ResourceAttributes::default()
+            }),
+            ..SelfSubjectAccessReviewSpec::default()
+        },
+        ..SelfSubjectAccessReview::default()
+    };
+    let reviewed = reviews
+        .create(&PostParams::default(), &review)
+        .await
+        .map_err(|_| operation_unavailable())?;
+    Ok(reviewed.status.is_some_and(|status| status.allowed))
+}
+
+async fn service_is_current(
+    client: Client,
+    child: &KubernetesServiceConnection,
+) -> Result<bool, OperationError> {
+    let services: Api<Service> = Api::namespaced(client, &child.namespace);
+    let current = services
+        .get(&child.service)
+        .await
+        .map_err(|_| operation_unavailable())?;
+    let Some(provider) = recognize_service(&current) else {
+        return Ok(false);
+    };
+    let Some(uid) = current.metadata.uid.as_deref() else {
+        return Ok(false);
+    };
+    let Some(port) = current
+        .spec
+        .as_ref()
+        .and_then(|spec| spec.ports.as_deref())
+        .and_then(|ports| select_service_port(provider, ports))
+    else {
+        return Ok(false);
+    };
+    let binding = format!(
+        "{}\0{}\0{}\0{}\0{}\0{}",
+        child.parent_connection_ref, child.namespace, child.service, port, uid, provider
+    );
+    Ok(provider == child.provider
+        && uid == child.resource_uid
+        && port == child.port
+        && opaque_ref("binding:kubernetes-service:", &binding) == child.resource_binding)
+}
+
+async fn proxy_json(
+    client: Client,
+    child: &KubernetesServiceConnection,
+    relative: &str,
+) -> Result<Value, OperationError> {
+    let route = format!(
+        "/api/v1/namespaces/{}/services/{}:{}/proxy{}",
+        child.namespace, child.service, child.port, relative
+    );
+    let request = HttpRequest::builder()
+        .method(Method::GET)
+        .uri(route)
+        .header(http::header::ACCEPT, "application/json")
+        .body(Vec::new())
+        .map_err(|_| operation_invalid())?;
+    let stream = client
+        .request_stream(request)
+        .await
+        .map_err(|_| operation_unavailable())?;
+    let mut bytes = Vec::new();
+    stream
+        .take((MAX_PROXY_RESULT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(|_| operation_unavailable())?;
+    if bytes.len() > MAX_PROXY_RESULT_BYTES {
+        return Err(OperationError::new(
+            OperationErrorCode::ResultTooLarge,
+            "Kubernetes Service proxy result exceeded the Connector bound",
+            false,
+        ));
+    }
+    serde_json::from_slice(&bytes).map_err(|_| operation_unavailable())
+}
+
 fn normalize_services(
     source_connection_ref: &str,
     services: Vec<Service>,
-) -> Vec<DiscoveryObservationSummary> {
+) -> Vec<StoredServiceObservation> {
     let mut seen = BTreeSet::new();
     let mut observations = services
         .into_iter()
@@ -592,29 +1121,118 @@ fn normalize_services(
             let provider = recognize_service(&service)?;
             let namespace = service.metadata.namespace.as_deref()?;
             let name = service.metadata.name.as_deref()?;
-            let uid = service.metadata.uid.as_deref().unwrap_or("");
+            let uid = service.metadata.uid.as_deref()?;
+            let port = select_service_port(provider, service.spec.as_ref()?.ports.as_deref()?)?;
             let binding =
-                format!("{source_connection_ref}\0{namespace}\0{name}\0{uid}\0{provider}");
+                format!("{source_connection_ref}\0{namespace}\0{name}\0{port}\0{uid}\0{provider}");
             if !seen.insert(binding.clone()) {
                 return None;
             }
             let title = format!("{namespace}/{name} ({provider})");
-            Some(DiscoveryObservationSummary {
-                observation_ref: opaque_ref("observation:kubernetes:", &binding),
-                discovery_ref: DISCOVERY_REF.to_owned(),
-                source_connection_ref: source_connection_ref.to_owned(),
-                observed_type: "kubernetes_service".to_owned(),
-                title,
-                state: DiscoveryObservationState::Observed,
-                evidence_generation: 1,
-                evidence_sha256: digest(&binding),
-                target_provider_ref: Some(provider.to_owned()),
-                connection_ref: None,
+            Some(StoredServiceObservation {
+                summary: DiscoveryObservationSummary {
+                    observation_ref: opaque_ref("observation:kubernetes:", &binding),
+                    discovery_ref: DISCOVERY_REF.to_owned(),
+                    source_connection_ref: source_connection_ref.to_owned(),
+                    observed_type: "kubernetes_service".to_owned(),
+                    title,
+                    state: DiscoveryObservationState::Observed,
+                    evidence_generation: 1,
+                    evidence_sha256: digest(&binding),
+                    target_provider_ref: Some(provider.to_owned()),
+                    connection_ref: None,
+                },
+                namespace: namespace.to_owned(),
+                service: name.to_owned(),
+                resource_uid: uid.to_owned(),
+                port,
+                provider: provider.to_owned(),
+                resource_binding: opaque_ref("binding:kubernetes-service:", &binding),
             })
         })
         .collect::<Vec<_>>();
-    observations.sort_by(|left, right| left.title.cmp(&right.title));
+    observations.sort_by(|left, right| left.summary.title.cmp(&right.summary.title));
     observations
+}
+
+fn select_service_port(provider: &str, ports: &[ServicePort]) -> Option<String> {
+    let candidates = ports
+        .iter()
+        .filter(|port| {
+            port.protocol
+                .as_deref()
+                .is_none_or(|protocol| protocol == "TCP")
+        })
+        .collect::<Vec<_>>();
+    let known_number = match provider {
+        "grafana" => 3000,
+        "prometheus" => 9090,
+        "loki" => 3100,
+        "alertmanager" => 9093,
+        _ => return None,
+    };
+    let preferred = candidates
+        .iter()
+        .copied()
+        .find(|port| port.port == known_number)
+        .or_else(|| {
+            candidates.iter().copied().find(|port| {
+                port.name.as_deref().is_some_and(|name| {
+                    matches!(
+                        name,
+                        "http"
+                            | "http-web"
+                            | "web"
+                            | "service"
+                            | "grafana"
+                            | "prometheus"
+                            | "loki"
+                            | "alertmanager"
+                    )
+                })
+            })
+        })
+        .or_else(|| (candidates.len() == 1).then_some(candidates[0]))?;
+    preferred
+        .name
+        .as_ref()
+        .filter(|name| valid_dns_label(name, 63))
+        .cloned()
+        .or_else(|| {
+            (1..=65_535)
+                .contains(&preferred.port)
+                .then(|| preferred.port.to_string())
+        })
+}
+
+fn child_is_current(state: &KubernetesState, child: &KubernetesServiceConnection) -> bool {
+    state
+        .observations
+        .get(&child.observation_ref)
+        .is_some_and(|observation| {
+            observation.summary.state == DiscoveryObservationState::Materialized
+                && observation.summary.connection_ref.as_deref()
+                    == Some(child.connection_ref.as_str())
+                && observation.resource_binding == child.resource_binding
+                && observation.summary.source_connection_ref == child.parent_connection_ref
+                && state.clients.contains_key(&child.parent_connection_ref)
+        })
+}
+
+fn valid_dns_label(value: &str, maximum: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= maximum
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value
+            .as_bytes()
+            .last()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 fn recognize_service(service: &Service) -> Option<&'static str> {
@@ -650,6 +1268,18 @@ fn recognize_service(service: &Service) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+fn kubernetes_route_operations() -> [&'static str; 3] {
+    [
+        crate::monitoring_backend::PROMETHEUS_QUERY_RANGE,
+        crate::monitoring_backend::LOKI_QUERY_RANGE,
+        crate::monitoring_backend::ALERTMANAGER_ALERTS_LIST,
+    ]
+}
+
+fn kubernetes_route_operation(operation_ref: &str) -> bool {
+    kubernetes_route_operations().contains(&operation_ref)
 }
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
@@ -697,6 +1327,46 @@ fn connection_protocol() -> ConnectionError {
     ConnectionError::new(
         ConnectionErrorCode::Protocol,
         "the Connection backend returned an invalid response",
+        false,
+    )
+}
+
+fn operation_not_found() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::NotFound,
+        "Kubernetes-mediated monitoring operation was not found",
+        false,
+    )
+}
+
+fn operation_not_granted() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::NotGranted,
+        "operation is not granted for this Kubernetes Service Connection",
+        false,
+    )
+}
+
+fn operation_invalid() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::InvalidInput,
+        "operation input is outside the catalog contract",
+        false,
+    )
+}
+
+fn operation_unavailable() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::Unavailable,
+        "Kubernetes Service route is unavailable",
+        true,
+    )
+}
+
+fn operation_protocol() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::Protocol,
+        "operation backend returned an incompatible response",
         false,
     )
 }
@@ -769,6 +1439,45 @@ users:
             ..Service::default()
         };
         assert_eq!(recognize_service(&unrelated), None);
+    }
+
+    #[test]
+    fn service_observation_pins_uid_and_one_closed_tcp_port() {
+        let service = Service {
+            metadata: kube::core::ObjectMeta {
+                name: Some("prometheus".to_owned()),
+                namespace: Some("monitoring".to_owned()),
+                uid: Some("uid-prometheus-1".to_owned()),
+                ..Default::default()
+            },
+            spec: Some(k8s_openapi::api::core::v1::ServiceSpec {
+                ports: Some(vec![
+                    ServicePort {
+                        name: Some("metrics".to_owned()),
+                        port: 9090,
+                        protocol: Some("TCP".to_owned()),
+                        ..ServicePort::default()
+                    },
+                    ServicePort {
+                        name: Some("udp".to_owned()),
+                        port: 9090,
+                        protocol: Some("UDP".to_owned()),
+                        ..ServicePort::default()
+                    },
+                ]),
+                ..Default::default()
+            }),
+            ..Service::default()
+        };
+
+        let observations = normalize_services("connection:kubernetes:dev", vec![service]);
+        let [observation] = observations.as_slice() else {
+            panic!("one supported Service must be normalized");
+        };
+        assert_eq!(observation.provider, "prometheus");
+        assert_eq!(observation.resource_uid, "uid-prometheus-1");
+        assert_eq!(observation.port, "metrics");
+        assert!(!observation.resource_binding.contains("uid-prometheus-1"));
     }
 
     #[test]

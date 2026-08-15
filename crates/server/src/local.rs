@@ -64,6 +64,16 @@ pub trait OperationBackend: Send + Sync + 'static {
         ))
     }
 
+    /// Whether this backend owns any Connection control routes.
+    fn supports_connections(&self) -> bool {
+        false
+    }
+
+    /// Whether this backend owns any durable data-event routes.
+    fn supports_events(&self) -> bool {
+        false
+    }
+
     /// Terminate and join backend-owned work before the personal-local endpoint disappears.
     async fn shutdown(&self) {}
 }

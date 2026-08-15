@@ -48,7 +48,7 @@
     "connection_route": {
       "oneOf": [
         {"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"const":"direct"}}},
-        {"type":"object","additionalProperties":false,"required":["kind","parent_connection_ref","route_adapter"],"properties":{"kind":{"const":"via_connection"},"parent_connection_ref":{"$ref":"#/$defs/ref"},"route_adapter":{"const":"grafana_datasource_proxy_v1"}}}
+        {"type":"object","additionalProperties":false,"required":["kind","parent_connection_ref","route_adapter"],"properties":{"kind":{"const":"via_connection"},"parent_connection_ref":{"$ref":"#/$defs/ref"},"route_adapter":{"enum":["grafana_datasource_proxy_v1","kubernetes_service_proxy_v1"]}}}
       ]
     },
     "connection_summary": {

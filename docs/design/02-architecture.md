@@ -129,8 +129,9 @@ posture = "personal" | "org" | "saas"
 Same binary, same connector feature set. A posture selects local authentication versus the Identity
 verifier, the fixed tenant binding, and bind policy. A hosted listener refuses startup when its
 verifier contract, trust roots, expected audience/tenant, or connected revocation posture is absent
-or invalid. Upstream OIDC issuer/client configuration and Identity session storage never enter this
-document.
+or invalid. Upstream OIDC issuer/client configuration and Identity login-session storage never
+enter this document or process; hosted requests carry only exact-audience short-lived access
+authority.
 
 Credential-source configuration is Connectors-owned even when `platform.toml` is embedded as a
 subtree of a wider product configuration. It declares only closed backend drivers and non-secret
@@ -157,6 +158,16 @@ an operator-selected external secret provider. Organization and satellite placem
 deployment-managed encrypted store, an external secret provider, or a workload identity that needs
 no reusable vendor secret. [Design 07](07-credential-custody-topologies.md) defines how one-use
 completion reaches the execution placement without exposing plaintext to a caller or central relay.
+
+**2026-08-15 hosted binding.** The first organization deployment binds the existing
+`SecretStore` port to Vault KV v2. The hosted process authenticates over internal TLS with its
+projected Kubernetes identity, retains only a short-lived Vault token in memory, refreshes it before
+expiry, and fails startup if the store is unusable. The default `TenantLayout` keeps every
+`CredentialRef` below `tenants/<tenant>/`; Vault policy independently restricts the workload to the
+installation tenant. This is the managed-store topology, not a model-visible Vault Integration or
+a generic secret-reading operation. The first hosted Kubernetes Integration itself continues to
+use workload identity and therefore does not manufacture a reusable credential merely because a
+store is present.
 
 The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
 databases — each individually justified, collectively unqueryable. One connector database + one

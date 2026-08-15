@@ -327,6 +327,11 @@ queues; stable or exposed support requires bounded configuration/change, a bound
 those layers, or measured process containment. A stable Connectors voice claim also requires a
 stable `sipx` API or a reviewed compatibility/upgrade exception.
 
+`cargo audit` reports no known vulnerability in this locked voice graph, but it reports the
+unmaintained `bincode 1.3.3` through RTVBP's `webrtc 0.14.0` → `dtls 0.13.0` closure
+(`RUSTSEC-2025-0141`). Stable or exposed voice support additionally requires an upstream
+replacement or a reviewed maintained fork and a repinned owner bundle.
+
 ## 8. Implementation sequence and exit evidence
 
 1. The development baseline is implemented: exact dependency pins, admitted loopback plan, outbound

@@ -42,15 +42,15 @@ use zeroize::Zeroizing;
 
 use crate::{GrafanaIntegrationConfig, InitiationConfig};
 
-const GRAFANA: &str = "grafana";
+pub(crate) const GRAFANA: &str = "grafana";
 const GRAFANA_CREDENTIAL: &str = "grafana.service_account_token";
 const DISCOVERY_REF: &str = "grafana-data-sources";
 const GRAFANA_DATASOURCES_LIST: &str = "grafana-datasources-list";
 const GRAFANA_DASHBOARDS_LIST: &str = "grafana-dashboards-list";
 const GRAFANA_DASHBOARD_GET: &str = "grafana-dashboard-get";
-const PROMETHEUS_QUERY_RANGE: &str = "prometheus-query-range";
-const LOKI_QUERY_RANGE: &str = "loki-query-range";
-const ALERTMANAGER_ALERTS_LIST: &str = "alertmanager-alerts-list";
+pub(crate) const PROMETHEUS_QUERY_RANGE: &str = "prometheus-query-range";
+pub(crate) const LOKI_QUERY_RANGE: &str = "loki-query-range";
+pub(crate) const ALERTMANAGER_ALERTS_LIST: &str = "alertmanager-alerts-list";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_TOKEN_BYTES: usize = 8 * 1024;
@@ -434,6 +434,14 @@ impl OperationBackend for MonitoringBackend {
         }
         *lock(&self.inner.token) = None;
         self.operation.shutdown().await;
+    }
+
+    fn supports_connections(&self) -> bool {
+        true
+    }
+
+    fn supports_events(&self) -> bool {
+        true
     }
 }
 
@@ -1270,11 +1278,11 @@ fn operation_ids() -> [&'static str; 6] {
     ]
 }
 
-fn supported_operation(operation: &str) -> bool {
+pub(crate) fn supported_operation(operation: &str) -> bool {
     operation_ids().contains(&operation)
 }
 
-fn provider_for_operation(operation: &str) -> &'static str {
+pub(crate) fn provider_for_operation(operation: &str) -> &'static str {
     match operation {
         GRAFANA_DASHBOARDS_LIST | GRAFANA_DASHBOARD_GET | GRAFANA_DATASOURCES_LIST => GRAFANA,
         PROMETHEUS_QUERY_RANGE => "prometheus",
@@ -1294,11 +1302,13 @@ fn document_text(provider: &str) -> &'static str {
     }
 }
 
-fn operation_document(operation: &str) -> Option<&'static connector_resolve::document::Operation> {
+pub(crate) fn operation_document(
+    operation: &str,
+) -> Option<&'static connector_resolve::document::Operation> {
     connector_resolve::document::provider(provider_for_operation(operation))?.operation(operation)
 }
 
-fn audiences_for_operation(operation: &str) -> Vec<String> {
+pub(crate) fn audiences_for_operation(operation: &str) -> Vec<String> {
     let Some(operation) = catalog::operation(catalog::OperationKey::id(operation)) else {
         return Vec::new();
     };
@@ -1315,7 +1325,7 @@ fn audiences_for_operation(operation: &str) -> Vec<String> {
         .collect()
 }
 
-fn response_schema(provider: &str, operation: &str) -> Result<Value, OperationError> {
+pub(crate) fn response_schema(provider: &str, operation: &str) -> Result<Value, OperationError> {
     let value: Value =
         serde_json::from_str(document_text(provider)).map_err(|_| operation_unavailable())?;
     value["operations"]
@@ -1355,7 +1365,7 @@ fn grafana_credential(token: &Secret) -> Result<Assembled, OperationError> {
     ))
 }
 
-fn validate_input(operation: &str, input: &Value) -> Result<(), OperationError> {
+pub(crate) fn validate_input(operation: &str, input: &Value) -> Result<(), OperationError> {
     if serde_json::to_vec(input).map_or(true, |bytes| {
         bytes.len() > protocol::operation::MAX_ARGUMENT_BYTES
     }) {
@@ -1464,7 +1474,7 @@ fn effect(effects: &[HostEffect]) -> EffectClass {
     }
 }
 
-fn title(operation: &str) -> &'static str {
+pub(crate) fn title(operation: &str) -> &'static str {
     match operation {
         GRAFANA_DASHBOARDS_LIST => "List Grafana dashboards",
         GRAFANA_DASHBOARD_GET => "Get a Grafana dashboard",

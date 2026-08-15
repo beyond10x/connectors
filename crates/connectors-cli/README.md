@@ -33,6 +33,31 @@ stale socket is removed only when it is an owner-owned Unix socket.
 The deployment file must be a real owner-owned file and cannot be writable by group or other. Its
 size and field set are bounded. It carries references and routes but no credential value.
 
+## Connect a local Kubernetes Service
+
+The end-user path lives in Zwirn because selecting a Service also creates the separate Harness
+Endpoint Grant:
+
+```sh
+zwirn connect kubernetes
+zwirn connect kubernetes --context dev-cluster
+zwirn connect kubernetes --context dev-cluster --service monitoring/prometheus
+```
+
+The first command reads context labels only and contacts no cluster. Explicit context activation
+may authenticate and run an admitted kubeconfig helper; explicit Service selection materializes
+only a recognized Prometheus, Loki, or Alertmanager target with an independent Connector Grant.
+Invocation uses the API server's exact `services/proxy` route after fresh, resource-specific
+`services` and `services/proxy` RBAC checks and a Service UID/port/provider revalidation. Zwirn
+stores only absolute local Connector paths and opaque Connection references, then
+compiles a session-scoped Endpoint Grant on startup. It never reads kubeconfig or a provider
+credential. `zwirn connect reset` revokes those local selections without deleting Connector-owned
+Connections.
+
+The lower-level `connectors connect kubernetes` and generic `connection` commands remain available
+for Connector diagnostics and contract clients. See the
+[Kubernetes guide](../../docs/guides/connect-kubernetes.md).
+
 ## Query monitoring through Grafana
 
 The same daemon can connect an HTTPS Grafana instance, discover its configured Prometheus, Loki,
