@@ -1,4 +1,4 @@
-//! Server-owned admission of the exact network facts a SIP driver may consume.
+//! Application-layer admission of the exact network facts a SIP driver may consume.
 
 use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};

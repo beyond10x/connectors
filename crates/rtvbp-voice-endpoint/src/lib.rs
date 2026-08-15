@@ -16,7 +16,7 @@ use protocol::voice::{self, Acknowledged, Close, InterruptOutput, Ready};
 use rtvbp::{
     ControlFrame, Envelope as _, FrameKind, MediaChannel, MediaFormat, Transport, WireError,
 };
-use server::authority::IssuedAuthority;
+use service::authority::IssuedAuthority;
 
 /// Exact WebSocket subprotocol/profile token. Headerless negotiation is never accepted.
 pub const PROFILE: &str = "b10x.voice.v1";
@@ -392,7 +392,7 @@ mod tests {
         VoiceSessionDescriptor,
     };
     use rtvbp::transport::memory::{Config, MemoryTransport};
-    use server::authority::{
+    use service::authority::{
         AuthorityIssuer, AuthorityRedeemer, ExpectedAuthority, InMemoryReplayStore, IssueRequest,
         IssuedAuthority, NoRevocations, ProofKey, RedeemedAuthority,
     };

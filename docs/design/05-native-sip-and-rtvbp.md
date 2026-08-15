@@ -359,3 +359,13 @@ replacement or a reviewed maintained fork and a repinned owner bundle.
 
 The Babelforce compatibility adapter is a downstream follow-on. It neither blocks the generic
 loopback proof nor changes the ownership of `babelforce.v1`.
+
+**2026-08-15 composition-boundary amendment.** The repository tree and dependency narrative in
+sections 2 and 3 predate the reusable runtime split. `service` now owns authority, dispatch, SIP,
+and voice application logic; `server` owns only inbound local and hosted transports. The focused
+`integration-sip` adapter joins that application logic to `voice-runtime`, while
+`connectors-runtime` validates configuration and builds the exact adapter registry. The
+`connectors` binary is only a command-line surface over `connectors-client` and
+`connectors-runtime`; it no longer owns SIP policy, session state, runtime launch, or deployment
+composition. Examples live with `connectors-config`. This amendment supersedes the older physical
+paths without changing the protocol-neutral voice or exact-driver dependency fences.

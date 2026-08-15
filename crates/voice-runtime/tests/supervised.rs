@@ -13,11 +13,11 @@ use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION};
 use protocol::voice::{Acknowledged, Close, Ready, Terminated};
 use rtvbp::{ControlFrame, Envelope as _, FrameKind};
 use rtvbp_voice_endpoint::{CLOSE_METHOD, INITIALIZE_METHOD, PROFILE, TERMINATED_EVENT};
-use server::authority::{
+use service::authority::{
     AuthorityIssuer, AuthorityRedeemer, ExpectedAuthority, InMemoryReplayStore, NoRevocations,
     ProofKey, RedemptionRequest, AUTHORIZATION_SCHEME, DPOP_HEADER,
 };
-use server::{
+use service::{
     admit_voice_dial, AdmittedVoicePlan, CredentialSet, SipDeploymentRoute, SipDialRouteTable,
     SipNetworkMode, SipSignalingTransport, SocketAperture, VoiceApplicationRoute,
 };

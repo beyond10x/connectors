@@ -1,7 +1,7 @@
 # Connect local Kubernetes contexts
 
 Enable Kubernetes policy in the personal-local Connector configuration; the complete example is
-[`kubernetes-discovery.example.toml`](../../crates/connectors-cli/examples/kubernetes-discovery.example.toml).
+[`kubernetes-discovery.example.toml`](../../crates/connectors-config/examples/kubernetes-discovery.example.toml).
 No kubeconfig path or credential is copied into this file. The Connector uses the user's standard
 merged kubeconfig privately.
 

@@ -37,7 +37,7 @@ exchange continuous bytes directly under a short-lived bounded authority.
   independent route exists.
 - Architecture ADR 0024 selects the concrete neutral RTVBP media journey and extends verification
   to the selected voice/application endpoint without widening issuer or replay semantics.
-- `server::authority` now issues an Ed25519 authority to the connecting voice endpoint, binds its
+- `service::authority` now issues an Ed25519 authority to the connecting voice endpoint, binds its
   ephemeral DPoP key and exact `GET wss://…` upgrade, and gives a distinct proof type only to the
   serving endpoint after atomic replay redemption. Audience, expiry, replay, revocation, exact URI,
   and debug-redaction fixtures pass.

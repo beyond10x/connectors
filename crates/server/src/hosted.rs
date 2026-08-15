@@ -18,8 +18,7 @@ use protocol::operation::{
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::Serialize;
-
-use crate::local::OperationBackend;
+use service::{ConnectorBackend, PrincipalContext};
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
 
@@ -40,14 +39,14 @@ impl HostedPrincipal {
         self.scopes.contains(scope)
     }
 
-    fn owner_context(&self) -> protocol::operation::OwnerContext {
-        protocol::operation::OwnerContext {
-            tenant_id: self.tenant_id.clone(),
-            agent_id: self.actor_subject.clone(),
-            agent_revision: 0,
-            authority_snapshot_id: self.token_id.clone(),
-            authority_snapshot_sha256: self.authority_snapshot_sha256.clone(),
-        }
+    fn principal_context(&self) -> Result<PrincipalContext, service::PrincipalContextError> {
+        PrincipalContext::hosted(
+            self.tenant_id.clone(),
+            self.subject.clone(),
+            self.actor_subject.clone(),
+            self.token_id.clone(),
+            self.authority_snapshot_sha256.clone(),
+        )
     }
 }
 
@@ -73,7 +72,7 @@ pub trait IdentityVerifier: Send + Sync + 'static {
 #[derive(Clone)]
 struct HostedState {
     verifier: Arc<dyn IdentityVerifier>,
-    backend: Arc<dyn OperationBackend>,
+    backend: Arc<dyn ConnectorBackend>,
 }
 
 #[derive(Debug, Serialize)]
@@ -82,7 +81,7 @@ struct ErrorBody {
     error: &'static str,
 }
 
-pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn OperationBackend>) -> Router {
+pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn ConnectorBackend>) -> Router {
     Router::new()
         .route("/livez", get(liveness))
         .route("/readyz", get(readiness))
@@ -159,7 +158,10 @@ async fn connection(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = principal.owner_context();
+    let owner = match principal.principal_context() {
+        Ok(owner) => owner,
+        Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
+    };
     let response = match state
         .backend
         .handle_connection(&owner, request.request)
@@ -238,7 +240,10 @@ async fn operation(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = principal.owner_context();
+    let owner = match principal.principal_context() {
+        Ok(owner) => owner,
+        Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
+    };
     let response = match state.backend.handle(&owner, request.request).await {
         Ok(result) => ResponseEnvelope::success(&request.request_id, result),
         Err(error) => ResponseEnvelope::failure(&request.request_id, error),
@@ -316,20 +321,24 @@ mod tests {
     struct Backend;
 
     #[async_trait]
-    impl OperationBackend for Backend {
+    impl ConnectorBackend for Backend {
         async fn handle(
             &self,
-            _context: &OwnerContext,
+            context: &PrincipalContext,
             _request: OperationRequest,
         ) -> Result<OperationResult, OperationError> {
+            assert_eq!(context.subject(), "person:test");
+            assert_eq!(context.actor_subject(), "person:test");
+            assert_eq!(context.agent_revision(), None);
             Ok(OperationResult::Search { operations: vec![] })
         }
 
         async fn handle_connection(
             &self,
-            _context: &OwnerContext,
+            context: &PrincipalContext,
             _request: ConnectionRequest,
         ) -> Result<ConnectionResult, ConnectionError> {
+            assert_eq!(context.agent_revision(), None);
             Ok(ConnectionResult::Search {
                 connections: Vec::new(),
             })

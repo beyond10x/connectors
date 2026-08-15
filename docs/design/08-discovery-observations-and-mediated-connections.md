@@ -220,3 +220,11 @@ The first alpha deliberately does not persist that credential. Restarting the da
 requires `connectors connect grafana` again. OS-keychain, wired secret-provider, and satellite-local
 write-only custody remain the persistence/topology implementations specified by Design 07; no
 plaintext file fallback is allowed while they are absent.
+
+**2026-08-15 client/runtime boundary amendment.** Recognition and materialization admission remain
+Connector policy. `connectors-client` may generically enumerate observations and request
+materialization for each one, but it has no Grafana type list or target-Grant configuration and
+counts typed `not_granted` refusals without weakening them. `integration-monitoring` alone maps a
+recognized observation to a target Provider and requires that Provider's independently configured
+Grant. `connectors-runtime` injects an in-memory credential capability for this alpha, so the CLI
+does not own monitoring policy or credential lifetime.

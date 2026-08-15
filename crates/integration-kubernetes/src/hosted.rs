@@ -16,7 +16,7 @@ use protocol::connection::{
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
-    OperationResult, OperationSummary, OwnerContext,
+    OperationResult, OperationSummary,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -24,7 +24,7 @@ use sha2::{Digest as _, Sha256};
 use url::Url;
 use zeroize::Zeroizing;
 
-use server::local::OperationBackend;
+use service::{BackendCapabilities, ConnectorBackend, PrincipalContext};
 
 const OPERATION: &str = "kubernetes.deployment.status";
 const CONNECTION: &str = "connection:kubernetes:in-cluster";
@@ -184,16 +184,16 @@ impl KubernetesStatusBackend {
         })
     }
 
-    fn require_owner(&self, context: &OwnerContext) -> Result<(), OperationError> {
-        if context.tenant_id == self.expected_tenant {
+    fn require_owner(&self, context: &PrincipalContext) -> Result<(), OperationError> {
+        if context.tenant_id() == self.expected_tenant {
             Ok(())
         } else {
             Err(not_granted("Connector tenant binding refused the request"))
         }
     }
 
-    fn require_connection_owner(&self, context: &OwnerContext) -> Result<(), ConnectionError> {
-        if context.tenant_id == self.expected_tenant {
+    fn require_connection_owner(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+        if context.tenant_id() == self.expected_tenant {
             Ok(())
         } else {
             Err(ConnectionError::new(
@@ -204,7 +204,7 @@ impl KubernetesStatusBackend {
         }
     }
 
-    fn description(&self, context: &OwnerContext) -> OperationDescription {
+    fn description(&self, context: &PrincipalContext) -> OperationDescription {
         OperationDescription {
             operation_ref: OPERATION.to_owned(),
             title: "Read Kubernetes deployment status".to_owned(),
@@ -239,7 +239,7 @@ impl KubernetesStatusBackend {
 
     async fn invoke(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         if request.operation_ref != OPERATION
@@ -274,10 +274,35 @@ impl KubernetesStatusBackend {
 }
 
 #[async_trait]
-impl OperationBackend for KubernetesStatusBackend {
+impl ConnectorBackend for KubernetesStatusBackend {
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities {
+            operations: true,
+            connections: true,
+            events: false,
+        }
+    }
+
+    fn owns_operation(&self, request: &OperationRequest) -> bool {
+        match request {
+            OperationRequest::Describe(request) => request.operation_ref == OPERATION,
+            OperationRequest::Invoke(request) => {
+                request.operation_ref == OPERATION && request.connection_ref == CONNECTION
+            }
+            OperationRequest::Search(_)
+            | OperationRequest::SessionStatus(_)
+            | OperationRequest::SessionTerminate(_)
+            | OperationRequest::SessionReconcile(_) => false,
+        }
+    }
+
+    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+        matches!(request, ConnectionRequest::Describe(request) if request.connection_ref == CONNECTION)
+    }
+
     async fn handle(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         self.require_owner(context)?;
@@ -310,7 +335,7 @@ impl OperationBackend for KubernetesStatusBackend {
 
     async fn handle_connection(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: ConnectionRequest,
     ) -> Result<ConnectionResult, ConnectionError> {
         self.require_connection_owner(context)?;
@@ -341,10 +366,6 @@ impl OperationBackend for KubernetesStatusBackend {
                 false,
             )),
         }
-    }
-
-    fn supports_connections(&self) -> bool {
-        true
     }
 }
 
@@ -515,18 +536,22 @@ fn control_connection() -> ControlConnectionSummary {
     }
 }
 
-fn description_ref(context: &OwnerContext) -> String {
+fn description_ref(context: &PrincipalContext) -> String {
     let digest = Sha256::digest(format!(
         "{OPERATION}\0{}\0{}\0v1",
-        context.authority_snapshot_id, context.authority_snapshot_sha256
+        context.authority_snapshot_id(),
+        context.authority_snapshot_sha256()
     ));
     format!("description:kubernetes:{}", hex::encode(&digest[..16]))
 }
 
-fn audit_ref(context: &OwnerContext, input: &DeploymentInput) -> String {
+fn audit_ref(context: &PrincipalContext, input: &DeploymentInput) -> String {
     let digest = Sha256::digest(format!(
         "{}\0{}\0{}\0{}",
-        context.tenant_id, context.agent_id, input.namespace, input.name
+        context.tenant_id(),
+        context.actor_subject(),
+        input.namespace,
+        input.name
     ));
     format!("audit:kubernetes:{}", hex::encode(&digest[..16]))
 }
@@ -571,14 +596,15 @@ mod tests {
         }
     }
 
-    fn owner(tenant: &str) -> OwnerContext {
-        OwnerContext {
-            tenant_id: tenant.to_owned(),
-            agent_id: "agent-dev".to_owned(),
-            agent_revision: 1,
-            authority_snapshot_id: "snapshot-dev".to_owned(),
-            authority_snapshot_sha256: "a".repeat(64),
-        }
+    fn owner(tenant: &str) -> PrincipalContext {
+        PrincipalContext::hosted(
+            tenant.to_owned(),
+            "person:owner".to_owned(),
+            "agent-dev".to_owned(),
+            "snapshot-dev".to_owned(),
+            "a".repeat(64),
+        )
+        .unwrap()
     }
 
     #[tokio::test]

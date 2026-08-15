@@ -1,0 +1,28 @@
+[package]
+name = "hosted-vault"
+description = "Kubernetes-workload-authenticated Vault credential-store adapter."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+workspace = "../connectors-runtime"
+
+[dependencies]
+async-trait = "0.1"
+connector-secrets = { version = "0.1.0", path = "../connector-secrets", features = ["vault"] }
+connectors-config = { version = "0.1.0", path = "../connectors-config" }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+rustix = { version = "1.1.4", features = ["fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["sync"] }
+url = "2"
+zeroize = "1"
+
+[dev-dependencies]
+tempfile = "3"

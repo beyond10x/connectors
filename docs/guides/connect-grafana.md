@@ -8,7 +8,7 @@ it does not mean a direct Prometheus network route.
 ## What you provide
 
 Create an owner-only config from
-`crates/connectors-cli/examples/grafana-federation.example.toml`. Set the HTTPS Grafana origin and
+`crates/connectors-config/examples/grafana-federation.example.toml`. Set the HTTPS Grafana origin and
 the independent Connector Grant references already approved for Grafana and each target Provider.
 The file contains no token, password, backend URL, Grafana data-source UID, or secret path.
 
@@ -22,7 +22,7 @@ Start the Connector:
 
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
-  serve --config crates/connectors-cli/examples/grafana-federation.example.toml \
+  serve --config crates/connectors-config/examples/grafana-federation.example.toml \
   --state-root /absolute/owner-only/state/root
 ```
 
@@ -31,7 +31,7 @@ In another terminal, use the guided flow:
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
   connect grafana \
-  --config crates/connectors-cli/examples/grafana-federation.example.toml \
+  --config crates/connectors-config/examples/grafana-federation.example.toml \
   --state-root /absolute/owner-only/state/root \
   --label "Infrastructure Grafana"
 ```

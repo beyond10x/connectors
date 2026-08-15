@@ -21,6 +21,7 @@ members = [
     "crates/catalog",
     "crates/connector-resolve",
     "crates/connector-secrets",
+    "crates/connectors-client",
     "crates/catalog-build",
     # The repository-maintenance CLI. Workspace-internal: it is how the catalogue is rebuilt and
     # reviewed here, and it is never a release artifact. The product's own binary, `connectors`, is
@@ -41,6 +42,16 @@ exclude = [
     "crates/driver-sip",
     "crates/rtvbp-voice-endpoint",
     "crates/voice-runtime",
+    "crates/connectors-config",
+    "crates/connect-session-transport",
+    "crates/connectors-runtime",
+    "crates/hosted-vault",
+    "crates/identity-http",
+    "crates/integration-kubernetes",
+    "crates/integration-monitoring",
+    "crates/integration-sip",
+    "crates/integration-slack",
+    "crates/monitoring-model",
     "crates/connectors-cli",
 ]
 
@@ -68,6 +79,7 @@ catalog-reader = { version = "0.1.0", path = "crates/catalog-reader" }
 catalog = { version = "0.1.0", path = "crates/catalog" }
 connector-resolve = { version = "0.1.0", path = "crates/connector-resolve" }
 connector-secrets = { version = "0.1.0", path = "crates/connector-secrets" }
+connectors-client = { version = "0.1.0", path = "crates/connectors-client" }
 catalog-build = { version = "0.1.0", path = "crates/catalog-build" }
 domain = { version = "0.1.0", path = "crates/domain" }
 protocol = { version = "0.1.0", path = "crates/protocol" }
@@ -103,6 +115,7 @@ jsonschema = { version = "0.49.2", default-features = false }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tokio = { version = "1", default-features = false }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
+url = "2"
 # Dependencies at opt-level 2 even in dev: the test suites' cost is parse-dominated (21 MB of
 # vendored specs through serde per whole-catalogue sweep), and debug-mode serde made one
 # conformance test alone take 200 s. Workspace members stay at opt-level 0 for fast incremental

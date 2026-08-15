@@ -1,0 +1,37 @@
+[package]
+name = "integration-sip"
+description = "SIP operation projection and isolated voice-runtime composition adapter."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+workspace = "../connectors-runtime"
+
+[dependencies]
+async-trait = "0.1"
+catalog = { version = "0.1.0", path = "../catalog" }
+connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
+connectors-config = { version = "0.1.0", path = "../connectors-config" }
+domain = { version = "0.1.0", path = "../domain" }
+ed25519-dalek = "2"
+getrandom = "0.3"
+hex = "0.4"
+protocol = { version = "0.1.0", path = "../protocol" }
+rustls = "0.23"
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+service = { version = "0.1.0", path = "../service" }
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-rustls = "0.26"
+voice-runtime = { version = "0.1.0", path = "../voice-runtime" }
+webpki-roots = "1"
+
+[dev-dependencies]
+tempfile = "3"
+toml = "0.8"

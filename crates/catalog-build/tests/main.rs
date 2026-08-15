@@ -15,12 +15,14 @@
 //! - **[`catalog_invariants`]** — every catalogue invariant, iterated over the whole catalogue.
 //!   There is no per-provider test file here and there will not be one: a rule about connectors is
 //!   stated once and parameterised, so the next connector is covered the moment it exists.
-//! - **The workspace fences** — [`dependency_fence`], [`engine_free`], [`msrv_fence`],
-//!   [`json_governance`], [`no_network`]. Each is about the *workspace*, not about the catalogue,
-//!   and each is its own argument.
+//! - **The workspace fences** — [`architecture_fence`], [`dependency_fence`], [`engine_free`],
+//!   [`msrv_fence`], [`json_governance`], [`no_network`]. Each is about the *workspace*, not about
+//!   the catalogue, and each is its own argument.
 
 mod common;
 
+#[path = "main/architecture_fence.rs"]
+mod architecture_fence;
 #[path = "main/catalog_invariants.rs"]
 mod catalog_invariants;
 #[path = "main/dependency_fence.rs"]

@@ -21,7 +21,7 @@ protocol = { version = "0.1.0", path = "../protocol" }
 rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
 serde = "1"
 serde_json = "1"
-server = { version = "0.1.0", path = "../server" }
+service = { version = "0.1.0", path = "../service" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }

@@ -109,6 +109,68 @@ They consume the released B10x Identity validated-envelope/verifier contract and
 second, Connectors-owned audience-scope and Grant decision. This amendment supersedes the founding
 `local owner / OIDC / hosted` server split and every M2 reference to Connectors-owned hosted login.
 
+**2026-08-15 composition-boundary amendment.** The platform family and binary descriptions above
+name responsibilities correctly but put too much composition in `server` and the product package.
+The following physical boundary supersedes those parts of the table:
+
+- `service` owns the transport-neutral `ConnectorBackend` port and its request/result/error
+  contract. `server` implements only personal-local and hosted transports around that port; it may
+  not define the port, select an Integration, open a credential source, or contain a provider
+  adapter.
+- `connectors-client` is the reusable typed control client used by the CLI and future products. It
+  owns transport selection, bounded request/response exchange, protocol-version refusal, and
+  provider-neutral Connection workflows such as candidate activation and Connect Session
+  completion. It owns no command-line parsing, runtime composition, admission policy, provider
+  adapter, or credential custody.
+- `connectors-runtime` is the reusable composition package. It validates deployment configuration,
+  constructs the transport, credential-source, and focused Integration adapters, and installs an
+  exact dispatch registry. The product binary delegates `serve` to this package instead of being a
+  second composition root.
+- Each Integration family is a focused adapter package (for example Slack, monitoring, Kubernetes,
+  or SIP). It implements `service::ConnectorBackend` and translates only its owned provider or
+  protocol family. Adapter implementation modules do not live in `connectors-cli`, `server`, or
+  the composition root.
+- `connectors-cli` is a thin clap-and-presentation frontend. It may map typed arguments to protocol
+  DTOs and render typed results; it does not implement backends, supervise services, load Vault,
+  initialize Kubernetes or voice transports, or hold business rules. Its direct runtime edges are
+  the reusable client and runtime packages, never `server`, `service`, voice drivers, secret-store
+  implementations, or Integration adapters.
+
+Dispatch is exact, not an ordered search. `service::ConnectorBackend` exposes explicit
+`owns_operation`, `owns_connection`, and `owns_event` claims, and on startup the runtime constructs a
+`BackendRegistry` from configured Integration identity and the immutable Connection/provider
+ownership it loads. Discovery/search requests may deliberately fan out and deterministically merge
+results. A Describe may merge compatible contributions when multiple route adapters deliberately
+expose the same provider operation; incompatible contributions refuse as a protocol error. Every
+other targeted request (`operation_ref` plus `connection_ref`, `integration_ref`, `candidate_ref`,
+`observation_ref`, `connect_session_ref`, `channel_ref`, or `execution_ref`) resolves its
+method-specific ownership claim to exactly one registered adapter before invocation. Zero matches is
+`not_found`; more than one is a protocol/configuration error; an adapter's `not_found` never means
+“try the next backend.” The selected Connection, catalog operation provider, and registered adapter
+identity must agree before credential placement. This prevents backend ordering from becoming an
+authorization or routing mechanism.
+
+Credential and session ownership remains split along protocol authority. Only credential-source
+implementations inside the runtime custody vendor credentials; CLI arguments, client DTOs,
+transport servers, Integration metadata, and logs remain value-free. During local one-use
+completion, the CLI may read hidden terminal input and `connectors-client` may carry those bytes to
+the validated owner-only completion endpoint; neither persists, interprets, logs, or reuses them. A
+connector **Connect Session** is a short-lived flow for creating or repairing a Connection, while an
+operation's `execution_ref` identifies a direct byte/session operation. Neither is an Identity login
+session, and Connectors never accepts, stores, refreshes, or exposes Identity login-session cookies
+or service credentials. Hosted transport accepts only the released exact-audience validated
+authority described by the identity-boundary amendment.
+
+The nested workspaces are intentional architectural isolation, not Cargo-layout accidents.
+`connectors-runtime` owns the feature-unified adapter/composition graph; `connectors-cli` owns the
+release binary closure; `voice-runtime` is the sole SIP/RTVBP composition leaf; `driver-sip` owns the
+reviewed `sipx` socket closure; and `rtvbp-voice-endpoint` owns RTVBP's
+`serde_json/preserve_order` closure. Each has an independently reviewed lockfile and a one-way edge
+toward the narrower packages it composes. None is admitted to the canonical catalog workspace,
+whose feature set and artifact bytes must remain unchanged by runtime dependencies. The dependency
+and module-size fences in `catalog-build` mechanically assert these boundaries, including the
+1,500-line module cap and every temporary named waiver.
+
 ## 3. Postures are configuration, not builds
 
 One config document (`platform.toml`), fail-closed (unknown field = refusal by name):
@@ -168,6 +230,14 @@ installation tenant. This is the managed-store topology, not a model-visible Vau
 a generic secret-reading operation. The first hosted Kubernetes Integration itself continues to
 use workload identity and therefore does not manufacture a reusable credential merely because a
 store is present.
+
+**2026-08-15 hosted-consumer correction.** The Vault capability and its deployment configuration
+are implemented, but the current hosted adapter set contains no provider-credential consumer:
+Kubernetes status uses workload identity and SIP resolves operation-scoped deployment material.
+`connectors-runtime` therefore refuses `vault.enabled = true` instead of initializing and parking
+an inert store. The binding described above becomes active only when a configured hosted
+Integration explicitly receives and consumes the `SecretStore` capability; readiness may not
+advertise it before then.
 
 The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
 databases — each individually justified, collectively unqueryable. One connector database + one

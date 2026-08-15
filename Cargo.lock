@@ -398,6 +398,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-client"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "protocol",
+ "reqwest",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -563,6 +579,12 @@ dependencies = [
  "regex-automata",
  "regex-syntax",
 ]
+
+[[package]]
+name = "fastrand"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "fiat-crypto"
@@ -1695,15 +1717,12 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
- "base64",
- "domain",
- "ed25519-dalek",
  "fs2",
  "protocol",
  "rustix",
  "serde",
  "serde_json",
- "sha2",
+ "service",
  "thiserror",
  "tokio",
  "tower",
@@ -1713,8 +1732,15 @@ dependencies = [
 name = "service"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "base64",
  "connector-resolve",
  "domain",
+ "ed25519-dalek",
+ "protocol",
+ "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
 ]
 
@@ -1855,6 +1881,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+dependencies = [
+ "fastrand",
+ "getrandom 0.4.3",
+ "once_cell",
+ "rustix",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

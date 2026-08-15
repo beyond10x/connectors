@@ -3,63 +3,60 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
-use std::os::unix::fs::{
-    FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _,
-};
+use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use connect_session_transport::{
+    remove_endpoint, BoundCompletionEndpoint, CompletionTransportError,
+};
 use connector_resolve::auth::{acquire, Assembled};
-use connector_resolve::document::{HostEffect, ProtocolDriver};
+use connector_resolve::document::ProtocolDriver;
 use connector_resolve::{resolve, Request};
-use connector_secrets::Secret;
+use connector_secrets::{CredentialRef, Secret, SecretStore};
 use domain::{
     AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
 };
 use protocol::connection::{
-    ConnectSessionState, ConnectSessionStatus, ConnectionDescription, ConnectionError,
-    ConnectionErrorCode, ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute,
-    ConnectionState, ConnectionSummary as ControlConnectionSummary, DiscoveryObservationState,
+    ConnectSessionStatus, ConnectionDescription, ConnectionError, ConnectionErrorCode,
+    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
+    ConnectionSummary as ControlConnectionSummary, DiscoveryObservationState,
     DiscoveryObservationSummary, RouteAdapter,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
-    InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
-    OperationResult, OperationSummary, OwnerContext,
+    ApprovalPosture, ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest,
+    OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
+    OperationSummary,
 };
 use reqwest::redirect::Policy;
 use serde_json::Value;
-use server::local::OperationBackend;
-use service::{plan_operation, PlanningEnvironment};
+use service::{
+    plan_operation, BackendCapabilities, ConnectSessionLifecycle, ConnectSessionTerminal,
+    ConnectorBackend, PlanningEnvironment, PrincipalContext,
+};
 use sha2::{Digest as _, Sha256};
-use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
-use tokio::net::{UnixListener, UnixStream};
 use tokio::task::JoinHandle;
-use zeroize::Zeroizing;
 
-use crate::{GrafanaIntegrationConfig, InitiationConfig};
+use connectors_config::{GrafanaIntegrationConfig, InitiationConfig};
+use monitoring_model::{
+    audiences_for_operation, document_text, effect, operation_document, operation_ids,
+    provider_for_operation, response_schema, supported_operation, target_provider, title,
+    validate_input, DISCOVERY_REF, GRAFANA, GRAFANA_DATASOURCES_LIST,
+};
 
-pub(crate) const GRAFANA: &str = "grafana";
+use crate::errors::*;
+
 const GRAFANA_CREDENTIAL: &str = "grafana.service_account_token";
-const DISCOVERY_REF: &str = "grafana-data-sources";
-const GRAFANA_DATASOURCES_LIST: &str = "grafana-datasources-list";
-const GRAFANA_DASHBOARDS_LIST: &str = "grafana-dashboards-list";
-const GRAFANA_DASHBOARD_GET: &str = "grafana-dashboard-get";
-pub(crate) const PROMETHEUS_QUERY_RANGE: &str = "prometheus-query-range";
-pub(crate) const LOKI_QUERY_RANGE: &str = "loki-query-range";
-pub(crate) const ALERTMANAGER_ALERTS_LIST: &str = "alertmanager-alerts-list";
+const GRAFANA_AUTHORITY: &str = "com.grafana.api";
+const GRAFANA_CREDENTIAL_LEAF: &str = "service_account_token";
+const DEFAULT_SERVICE: &str = "default";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_TOKEN_BYTES: usize = 8 * 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
-
-const GRAFANA_DOCUMENT: &str = include_str!("../../../catalog/grafana.catalog.json");
-const PROMETHEUS_DOCUMENT: &str = include_str!("../../../catalog/prometheus.catalog.json");
-const LOKI_DOCUMENT: &str = include_str!("../../../catalog/loki.catalog.json");
-const ALERTMANAGER_DOCUMENT: &str = include_str!("../../../catalog/alertmanager.catalog.json");
 
 /// Redaction-safe monitoring runtime failure.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -145,25 +142,26 @@ impl HttpExecutor for ReqwestExecutor {
     }
 }
 
-/// Composition backend: monitoring requests terminate here and everything else is delegated.
+/// Standalone monitoring Integration adapter.
 pub struct MonitoringBackend {
-    operation: Arc<dyn OperationBackend>,
     inner: Arc<MonitoringInner>,
 }
 
 struct MonitoringInner {
-    owner: OwnerContext,
+    owner: PrincipalContext,
     policy: GrafanaIntegrationConfig,
     state_root: PathBuf,
     state: Mutex<MonitoringState>,
-    sessions: Mutex<BTreeMap<String, SessionRecord>>,
-    token: Mutex<Option<Secret>>,
+    sessions: Mutex<ConnectSessionLifecycle>,
+    completion: tokio::sync::Mutex<()>,
+    credential_store: Arc<dyn SecretStore>,
+    credential_ref: CredentialRef,
     tasks: Mutex<Vec<JoinHandle<()>>>,
     executor: Arc<dyn HttpExecutor>,
     audit: Mutex<()>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct MonitoringState {
     parent: Option<ParentConnection>,
     observations: BTreeMap<String, StoredObservation>,
@@ -202,15 +200,6 @@ struct ChildConnection {
     resource_binding: String,
 }
 
-#[derive(Clone)]
-struct SessionRecord {
-    label: String,
-    state: ConnectSessionState,
-    expires_at_unix_ms: u64,
-    endpoint: Option<PathBuf>,
-    connection_ref: Option<String>,
-}
-
 #[derive(serde::Serialize)]
 struct AuditEvent<'a> {
     audit_ref: &'a str,
@@ -224,15 +213,15 @@ struct AuditEvent<'a> {
 }
 
 impl MonitoringBackend {
-    /// Construct a Grafana monitoring backend. Credentials remain absent until a Connect Session
-    /// completes, and are held in memory until an OS-keychain backend replaces this alpha store.
+    /// Construct a Grafana monitoring adapter over caller-owned credential custody.
     pub fn open(
-        owner: OwnerContext,
+        owner: PrincipalContext,
         policy: GrafanaIntegrationConfig,
         state_root: &Path,
-        operation: Arc<dyn OperationBackend>,
+        credential_store: Arc<dyn SecretStore>,
     ) -> Result<Self, MonitoringError> {
         ensure_owner_directory(state_root)?;
+        let credential_ref = grafana_credential_ref(&owner)?;
         let client = reqwest::Client::builder()
             .redirect(Policy::none())
             .no_proxy()
@@ -245,27 +234,33 @@ impl MonitoringBackend {
             owner,
             policy,
             state_root,
-            operation,
+            credential_store,
+            credential_ref,
             Arc::new(ReqwestExecutor { client }),
         ))
     }
 
     fn with_executor<E: HttpExecutor>(
-        owner: OwnerContext,
+        owner: PrincipalContext,
         policy: GrafanaIntegrationConfig,
         state_root: &Path,
-        operation: Arc<dyn OperationBackend>,
+        credential_store: Arc<dyn SecretStore>,
+        credential_ref: CredentialRef,
         executor: Arc<E>,
     ) -> Self {
         Self {
-            operation,
             inner: Arc::new(MonitoringInner {
                 owner,
                 policy,
                 state_root: state_root.to_path_buf(),
                 state: Mutex::new(MonitoringState::default()),
-                sessions: Mutex::new(BTreeMap::new()),
-                token: Mutex::new(None),
+                sessions: Mutex::new(
+                    ConnectSessionLifecycle::new(GRAFANA, MAX_CONNECT_SESSIONS)
+                        .expect("static Connect Session policy is valid"),
+                ),
+                completion: tokio::sync::Mutex::new(()),
+                credential_store,
+                credential_ref,
                 tasks: Mutex::new(Vec::new()),
                 executor,
                 audit: Mutex::new(()),
@@ -282,35 +277,57 @@ impl MonitoringBackend {
 }
 
 #[async_trait]
-impl OperationBackend for MonitoringBackend {
+impl ConnectorBackend for MonitoringBackend {
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities {
+            operations: true,
+            connections: true,
+            events: false,
+        }
+    }
+
+    fn owns_operation(&self, request: &OperationRequest) -> bool {
+        match request {
+            OperationRequest::Describe(request) => supported_operation(&request.operation_ref),
+            OperationRequest::Invoke(request) => {
+                supported_operation(&request.operation_ref)
+                    && self.inner.owns_connection_ref(&request.connection_ref)
+            }
+            OperationRequest::Search(_) => false,
+            _ => false,
+        }
+    }
+
+    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+        match request {
+            ConnectionRequest::Describe(request) => {
+                self.inner.owns_connection_ref(&request.connection_ref)
+            }
+            ConnectionRequest::ObservationSearch(request) => {
+                self.inner.is_parent(&request.source_connection_ref)
+            }
+            ConnectionRequest::Materialize(request) => {
+                self.inner.has_observation(&request.observation_ref)
+            }
+            ConnectionRequest::ConnectSessionCreate(request) => request.integration_ref == GRAFANA,
+            ConnectionRequest::ConnectSessionStatus(request) => {
+                self.inner.has_session(&request.connect_session_ref)
+            }
+            ConnectionRequest::Search(_) => false,
+            _ => false,
+        }
+    }
+
     async fn handle(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         self.inner.check_operation_context(context)?;
         match request {
             OperationRequest::Search(request) => {
-                let mut operations = match self
-                    .operation
-                    .handle(context, OperationRequest::Search(request.clone()))
-                    .await
-                {
-                    Ok(OperationResult::Search { operations }) => operations,
-                    Err(error)
-                        if matches!(
-                            error.code,
-                            OperationErrorCode::NotFound | OperationErrorCode::Unavailable
-                        ) =>
-                    {
-                        Vec::new()
-                    }
-                    Ok(_) => return Err(operation_protocol()),
-                    Err(error) => return Err(error),
-                };
-                operations.extend(self.inner.search_operations(&request.query));
+                let mut operations = self.inner.search_operations(&request.query);
                 operations.sort_by(|left, right| left.operation_ref.cmp(&right.operation_ref));
-                operations.dedup_by(|left, right| left.operation_ref == right.operation_ref);
                 operations.truncate(usize::from(request.limit));
                 Ok(OperationResult::Search { operations })
             }
@@ -320,73 +337,43 @@ impl OperationBackend for MonitoringBackend {
             OperationRequest::Invoke(request) if supported_operation(&request.operation_ref) => {
                 self.inner.invoke(context, request).await
             }
-            other => self.operation.handle(context, other).await,
+            _ => Err(operation_not_found()),
         }
     }
 
     async fn handle_connection(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: ConnectionRequest,
     ) -> Result<ConnectionResult, ConnectionError> {
         self.inner.check_connection_context(context)?;
         match request {
             ConnectionRequest::Search(request) => {
-                let mut connections = match self
-                    .operation
-                    .handle_connection(context, ConnectionRequest::Search(request.clone()))
-                    .await
-                {
-                    Ok(ConnectionResult::Search { connections }) => connections,
-                    Err(error)
-                        if matches!(
-                            error.code,
-                            ConnectionErrorCode::NotFound | ConnectionErrorCode::Unavailable
-                        ) =>
-                    {
-                        Vec::new()
-                    }
-                    Ok(_) => return Err(connection_protocol()),
-                    Err(error) => return Err(error),
-                };
-                connections.extend(self.inner.search_connections(&request.query));
+                let mut connections = self.inner.search_connections(&request.query);
                 connections.sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
-                connections.dedup_by(|left, right| left.connection_ref == right.connection_ref);
                 connections.truncate(usize::from(request.limit));
                 Ok(ConnectionResult::Search { connections })
             }
-            ConnectionRequest::Describe(request) => {
-                if let Some(description) = self.inner.describe_connection(&request.connection_ref) {
-                    Ok(ConnectionResult::Describe(description))
-                } else {
-                    self.operation
-                        .handle_connection(context, ConnectionRequest::Describe(request))
-                        .await
-                }
+            ConnectionRequest::Describe(request) => self
+                .inner
+                .describe_connection(&request.connection_ref)
+                .map(ConnectionResult::Describe)
+                .ok_or_else(connection_not_found),
+            ConnectionRequest::ObservationSearch(request)
+                if self.inner.is_parent(&request.source_connection_ref) =>
+            {
+                Ok(ConnectionResult::ObservationSearch {
+                    observations: self
+                        .inner
+                        .search_observations(&request.query, request.limit),
+                })
             }
-            ConnectionRequest::ObservationSearch(request) => {
-                if self.inner.is_parent(&request.source_connection_ref) {
-                    Ok(ConnectionResult::ObservationSearch {
-                        observations: self
-                            .inner
-                            .search_observations(&request.query, request.limit),
-                    })
-                } else {
-                    self.operation
-                        .handle_connection(context, ConnectionRequest::ObservationSearch(request))
-                        .await
-                }
-            }
-            ConnectionRequest::Materialize(request) => {
-                if self.inner.has_observation(&request.observation_ref) {
-                    self.inner
-                        .materialize(&request.observation_ref)
-                        .map(ConnectionResult::Materialize)
-                } else {
-                    self.operation
-                        .handle_connection(context, ConnectionRequest::Materialize(request))
-                        .await
-                }
+            ConnectionRequest::Materialize(request)
+                if self.inner.has_observation(&request.observation_ref) =>
+            {
+                self.inner
+                    .materialize(&request.observation_ref)
+                    .map(ConnectionResult::Materialize)
             }
             ConnectionRequest::ConnectSessionCreate(request)
                 if request.integration_ref == GRAFANA =>
@@ -404,27 +391,11 @@ impl OperationBackend for MonitoringBackend {
                     .map(ConnectionResult::ConnectSessionStatus)
                     .ok_or_else(connection_not_found)
             }
-            other => self.operation.handle_connection(context, other).await,
+            _ => Err(connection_not_found()),
         }
-    }
-
-    async fn handle_event(
-        &self,
-        context: &OwnerContext,
-        request: protocol::event::EventRequest,
-    ) -> Result<protocol::event::EventResult, protocol::event::EventError> {
-        self.operation.handle_event(context, request).await
     }
 
     async fn shutdown(&self) {
-        for session in lock(&self.inner.sessions).values_mut() {
-            if let Some(endpoint) = session.endpoint.take() {
-                let _ = remove_owned_socket(&endpoint);
-            }
-            if session.state == ConnectSessionState::Pending {
-                session.state = ConnectSessionState::Failed;
-            }
-        }
         let tasks = std::mem::take(&mut *lock(&self.inner.tasks));
         for task in &tasks {
             task.abort();
@@ -432,21 +403,14 @@ impl OperationBackend for MonitoringBackend {
         for task in tasks {
             let _ = task.await;
         }
-        *lock(&self.inner.token) = None;
-        self.operation.shutdown().await;
-    }
-
-    fn supports_connections(&self) -> bool {
-        true
-    }
-
-    fn supports_events(&self) -> bool {
-        true
+        for endpoint in lock(&self.inner.sessions).fail_pending() {
+            let _ = remove_endpoint(Path::new(&endpoint));
+        }
     }
 }
 
 impl MonitoringInner {
-    fn check_operation_context(&self, actual: &OwnerContext) -> Result<(), OperationError> {
+    fn check_operation_context(&self, actual: &PrincipalContext) -> Result<(), OperationError> {
         if actual == &self.owner {
             Ok(())
         } else {
@@ -458,7 +422,7 @@ impl MonitoringInner {
         }
     }
 
-    fn check_connection_context(&self, actual: &OwnerContext) -> Result<(), ConnectionError> {
+    fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
         if actual == &self.owner {
             Ok(())
         } else {
@@ -499,7 +463,7 @@ impl MonitoringInner {
 
     fn describe(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: DescribeRequest,
     ) -> Result<OperationResult, OperationError> {
         let operation =
@@ -526,7 +490,7 @@ impl MonitoringInner {
 
     async fn invoke(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         if request.description_ref != self.description_ref(context, &request.operation_ref) {
@@ -553,9 +517,7 @@ impl MonitoringInner {
                 .clone()
                 .filter(|parent| parent.connection_ref == request.connection_ref)
                 .ok_or_else(operation_not_granted)?;
-            let token = lock(&self.token)
-                .clone()
-                .ok_or_else(operation_not_granted)?;
+            let token = self.load_credential().await?;
             let value = self
                 .execute_direct(context, &parent, &token, operation, request.input)
                 .await?;
@@ -573,9 +535,7 @@ impl MonitoringInner {
             if !child_is_current(&lock(&self.state), &child) {
                 return Err(operation_not_granted());
             }
-            let token = lock(&self.token)
-                .clone()
-                .ok_or_else(operation_not_granted)?;
+            let token = self.load_credential().await?;
             let value = self
                 .execute_mediated(context, &child, &token, operation, request.input)
                 .await?;
@@ -595,8 +555,8 @@ impl MonitoringInner {
             connection_ref: &request.connection_ref,
             parent_connection_ref: parent_ref.as_deref(),
             route_adapter: adapter,
-            tenant_id: &context.tenant_id,
-            agent_id: &context.agent_id,
+            tenant_id: context.tenant_id(),
+            agent_id: context.actor_subject(),
             outcome: "completed",
         })
         .map_err(|_| operation_unavailable())?;
@@ -608,9 +568,17 @@ impl MonitoringInner {
         }))
     }
 
+    async fn load_credential(&self) -> Result<Secret, OperationError> {
+        match self.credential_store.get(&self.credential_ref).await {
+            Ok(secret) => Ok(secret),
+            Err(error) if error.is_not_found() => Err(operation_not_granted()),
+            Err(_) => Err(operation_unavailable()),
+        }
+    }
+
     async fn execute_direct(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         parent: &ParentConnection,
         token: &Secret,
         operation: &'static connector_resolve::document::Operation,
@@ -624,8 +592,8 @@ impl MonitoringInner {
         let admission = AdmittedOperation::from_grant_decision(
             GRAFANA,
             &operation.id,
-            &context.tenant_id,
-            &context.agent_id,
+            context.tenant_id(),
+            context.actor_subject(),
             &self.policy.grant_ref,
             connection,
         );
@@ -667,7 +635,7 @@ impl MonitoringInner {
 
     async fn execute_mediated(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         child: &ChildConnection,
         token: &Secret,
         operation: &'static connector_resolve::document::Operation,
@@ -684,8 +652,8 @@ impl MonitoringInner {
         let admission = AdmittedOperation::from_grant_decision(
             &child.provider,
             &operation.id,
-            &context.tenant_id,
-            &context.agent_id,
+            context.tenant_id(),
+            context.actor_subject(),
             &child.grant_ref,
             connection,
         );
@@ -748,7 +716,6 @@ impl MonitoringInner {
             return state
                 .parent
                 .as_ref()
-                .filter(|_| lock(&self.token).is_some())
                 .map(|parent| {
                     vec![ConnectionSummary {
                         connection_ref: parent.connection_ref.clone(),
@@ -772,7 +739,7 @@ impl MonitoringInner {
             .collect()
     }
 
-    fn description_ref(&self, context: &OwnerContext, operation_ref: &str) -> String {
+    fn description_ref(&self, context: &PrincipalContext, operation_ref: &str) -> String {
         let mut digest = Sha256::new();
         digest.update(document_text(provider_for_operation(operation_ref)).as_bytes());
         digest.update(b"\0");
@@ -835,11 +802,7 @@ impl MonitoringInner {
             connection_ref: parent.connection_ref.clone(),
             integration_ref: GRAFANA.to_owned(),
             label: parent.label.clone(),
-            state: if lock(&self.token).is_some() {
-                ConnectionState::Callable
-            } else {
-                ConnectionState::Degraded
-            },
+            state: ConnectionState::Callable,
             initiation: initiation(self.policy.initiation),
             route: ConnectionRoute::Direct,
         }
@@ -854,7 +817,7 @@ impl MonitoringInner {
             connection_ref: child.connection_ref.clone(),
             integration_ref: child.provider.clone(),
             label: child.label.clone(),
-            state: if child_is_current(state, child) && lock(&self.token).is_some() {
+            state: if child_is_current(state, child) {
                 ConnectionState::Callable
             } else {
                 ConnectionState::Degraded
@@ -874,12 +837,21 @@ impl MonitoringInner {
             .is_some_and(|parent| parent.connection_ref == connection_ref)
     }
 
+    fn owns_connection_ref(&self, connection_ref: &str) -> bool {
+        let state = lock(&self.state);
+        state
+            .parent
+            .as_ref()
+            .is_some_and(|parent| parent.connection_ref == connection_ref)
+            || state.children.contains_key(connection_ref)
+    }
+
     fn has_observation(&self, observation_ref: &str) -> bool {
         lock(&self.state).observations.contains_key(observation_ref)
     }
 
     fn has_session(&self, session_ref: &str) -> bool {
-        lock(&self.sessions).contains_key(session_ref)
+        lock(&self.sessions).owns(session_ref)
     }
 
     fn search_observations(&self, query: &str, limit: u16) -> Vec<DiscoveryObservationSummary> {
@@ -985,144 +957,95 @@ impl MonitoringInner {
                 false,
             ));
         }
-        if lock(&self.sessions)
-            .values()
-            .filter(|session| session.state == ConnectSessionState::Pending)
-            .count()
-            >= MAX_CONNECT_SESSIONS
-        {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::Conflict,
-                "too many Connect Sessions are pending",
-                true,
-            ));
-        }
         let id = random_uuid().map_err(|_| connection_unavailable())?;
         let session_ref = format!("connect-session:{id}");
         let directory = self.state_root.join("connect-sessions");
-        ensure_owner_directory(&directory).map_err(|_| connection_unavailable())?;
-        let endpoint = directory.join(format!("{id}.sock"));
-        refuse_existing_path(&endpoint).map_err(|_| connection_unavailable())?;
-        let listener = UnixListener::bind(&endpoint).map_err(|_| connection_unavailable())?;
-        fs::set_permissions(&endpoint, fs::Permissions::from_mode(0o600))
-            .map_err(|_| connection_unavailable())?;
+        let endpoint =
+            BoundCompletionEndpoint::bind(&directory, &id).map_err(|_| connection_unavailable())?;
+        let endpoint_path = endpoint.path().to_path_buf();
         let expires_at_unix_ms = now_ms()
             .and_then(|now| {
                 now.checked_add(self.policy.connect_session_ttl_seconds.saturating_mul(1000))
             })
             .ok_or_else(connection_unavailable)?;
-        lock(&self.sessions).insert(
+        let status = match lock(&self.sessions).reserve(
             session_ref.clone(),
-            SessionRecord {
-                label,
-                state: ConnectSessionState::Pending,
-                expires_at_unix_ms,
-                endpoint: Some(endpoint.clone()),
-                connection_ref: None,
-            },
-        );
-        let status = self
-            .session_status(&session_ref)
-            .expect("session was inserted before projection");
+            label,
+            expires_at_unix_ms,
+            endpoint_path.display().to_string(),
+        ) {
+            Ok(status) => status,
+            Err(error) => {
+                drop(endpoint);
+                return Err(connect_session_error(error));
+            }
+        };
         let inner = Arc::clone(self);
         let task_session = session_ref;
         lock(&self.tasks).push(tokio::spawn(async move {
-            inner
-                .serve_completion(listener, task_session, endpoint)
-                .await;
+            inner.serve_completion(endpoint, task_session).await;
         }));
         Ok(status)
     }
 
     fn session_status(&self, session_ref: &str) -> Option<ConnectSessionStatus> {
-        let session = lock(&self.sessions).get(session_ref)?.clone();
-        Some(ConnectSessionStatus {
-            connect_session_ref: session_ref.to_owned(),
-            integration_ref: GRAFANA.to_owned(),
-            state: session.state,
-            expires_at_unix_ms: session.expires_at_unix_ms,
-            completion_endpoint: session
-                .endpoint
-                .as_ref()
-                .map(|path| path.display().to_string()),
-            connection_ref: session.connection_ref,
-        })
+        lock(&self.sessions).status(session_ref)
     }
 
     async fn serve_completion(
         self: Arc<Self>,
-        listener: UnixListener,
+        endpoint: BoundCompletionEndpoint,
         session_ref: String,
-        endpoint: PathBuf,
     ) {
-        let accepted = tokio::time::timeout(
-            Duration::from_secs(self.policy.connect_session_ttl_seconds),
-            accept_owner(listener),
-        )
-        .await;
-        let _ = remove_owned_socket(&endpoint);
-        let (result, mut stream) = match accepted {
-            Ok(Ok(stream)) => match read_submitted_secret(stream).await {
-                Ok((secret, stream)) => {
-                    let result = self.complete_connection(&session_ref, secret).await;
-                    (result, Some(stream))
-                }
-                Err(error) => (Err(error), None),
-            },
-            Ok(Err(error)) => (Err(error), None),
+        let submission = match endpoint
+            .receive(
+                Duration::from_secs(self.policy.connect_session_ttl_seconds),
+                Duration::from_secs(30),
+                MAX_TOKEN_BYTES,
+            )
+            .await
+        {
+            Ok(submission) => submission,
+            Err(CompletionTransportError::Expired) => {
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Expired);
+                return;
+            }
             Err(_) => {
-                self.finish_session(&session_ref, ConnectSessionState::Expired, None);
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Failed);
                 return;
             }
         };
+        let result = self
+            .complete_connection(&session_ref, submission.secret())
+            .await;
         let accepted = match result {
             Ok(connection_ref) => {
-                self.finish_session(
+                let _ = lock(&self.sessions).finish(
                     &session_ref,
-                    ConnectSessionState::Completed,
-                    Some(connection_ref),
+                    ConnectSessionTerminal::Completed { connection_ref },
                 );
                 true
             }
             Err(_) => {
-                self.finish_session(&session_ref, ConnectSessionState::Failed, None);
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Failed);
                 false
             }
         };
-        if let Some(stream) = stream.as_mut() {
-            let response = if accepted {
-                b"{\"accepted\":true}\n".as_slice()
-            } else {
-                b"{\"accepted\":false}\n".as_slice()
-            };
-            let _ = stream.write_all(response).await;
-            let _ = stream.shutdown().await;
-        }
-    }
-
-    fn finish_session(
-        &self,
-        session_ref: &str,
-        state: ConnectSessionState,
-        connection_ref: Option<String>,
-    ) {
-        if let Some(session) = lock(&self.sessions).get_mut(session_ref) {
-            session.state = state;
-            session.endpoint = None;
-            session.connection_ref = connection_ref;
-        }
+        let _ = submission.respond(accepted).await;
     }
 
     async fn complete_connection(
         &self,
         session_ref: &str,
-        secret: Secret,
+        secret: &Secret,
     ) -> Result<String, MonitoringError> {
+        let _completion = self.completion.lock().await;
+        if lock(&self.state).parent.is_some() {
+            return Err(MonitoringError::new("connection-conflict"));
+        }
         let label = lock(&self.sessions)
-            .get(session_ref)
-            .filter(|session| session.state == ConnectSessionState::Pending)
-            .map(|session| session.label.clone())
-            .ok_or_else(|| MonitoringError::new("connect-session"))?;
+            .pending_label(session_ref)
+            .map_err(|_| MonitoringError::new("connect-session"))?;
         let instance_id = random_uuid()?;
         let parent = ParentConnection {
             connection_ref: format!("connection:grafana:{instance_id}"),
@@ -1134,15 +1057,29 @@ impl MonitoringInner {
             .execute_direct(
                 &self.owner,
                 &parent,
-                &secret,
+                secret,
                 operation,
                 serde_json::json!({}),
             )
             .await
             .map_err(|_| MonitoringError::new("verification"))?;
-        self.reconcile_observations(&parent.connection_ref, &output)
-            .map_err(|_| MonitoringError::new("discovery"))?;
-        *lock(&self.token) = Some(secret);
+        let prior = lock(&self.state).clone();
+        if self
+            .reconcile_observations(&parent.connection_ref, &output)
+            .is_err()
+        {
+            *lock(&self.state) = prior;
+            return Err(MonitoringError::new("discovery"));
+        }
+        if self
+            .credential_store
+            .put(&self.credential_ref, secret)
+            .await
+            .is_err()
+        {
+            *lock(&self.state) = prior;
+            return Err(MonitoringError::new("credential-store"));
+        }
         let connection_ref = parent.connection_ref.clone();
         lock(&self.state).parent = Some(parent);
         Ok(connection_ref)
@@ -1267,91 +1204,6 @@ impl MonitoringInner {
     }
 }
 
-fn operation_ids() -> [&'static str; 6] {
-    [
-        GRAFANA_DASHBOARDS_LIST,
-        GRAFANA_DASHBOARD_GET,
-        GRAFANA_DATASOURCES_LIST,
-        PROMETHEUS_QUERY_RANGE,
-        LOKI_QUERY_RANGE,
-        ALERTMANAGER_ALERTS_LIST,
-    ]
-}
-
-pub(crate) fn supported_operation(operation: &str) -> bool {
-    operation_ids().contains(&operation)
-}
-
-pub(crate) fn provider_for_operation(operation: &str) -> &'static str {
-    match operation {
-        GRAFANA_DASHBOARDS_LIST | GRAFANA_DASHBOARD_GET | GRAFANA_DATASOURCES_LIST => GRAFANA,
-        PROMETHEUS_QUERY_RANGE => "prometheus",
-        LOKI_QUERY_RANGE => "loki",
-        ALERTMANAGER_ALERTS_LIST => "alertmanager",
-        _ => "",
-    }
-}
-
-fn document_text(provider: &str) -> &'static str {
-    match provider {
-        GRAFANA => GRAFANA_DOCUMENT,
-        "prometheus" => PROMETHEUS_DOCUMENT,
-        "loki" => LOKI_DOCUMENT,
-        "alertmanager" => ALERTMANAGER_DOCUMENT,
-        _ => "{}",
-    }
-}
-
-pub(crate) fn operation_document(
-    operation: &str,
-) -> Option<&'static connector_resolve::document::Operation> {
-    connector_resolve::document::provider(provider_for_operation(operation))?.operation(operation)
-}
-
-pub(crate) fn audiences_for_operation(operation: &str) -> Vec<String> {
-    let Some(operation) = catalog::operation(catalog::OperationKey::id(operation)) else {
-        return Vec::new();
-    };
-    let Some(provider) = catalog::provider(catalog::ProviderKey::id(operation.provider)) else {
-        return Vec::new();
-    };
-    provider
-        .services
-        .iter()
-        .find(|service| service.name == operation.service)
-        .map_or(provider.audiences, |service| service.audiences)
-        .iter()
-        .map(|audience| audience.as_str().to_owned())
-        .collect()
-}
-
-pub(crate) fn response_schema(provider: &str, operation: &str) -> Result<Value, OperationError> {
-    let value: Value =
-        serde_json::from_str(document_text(provider)).map_err(|_| operation_unavailable())?;
-    value["operations"]
-        .as_array()
-        .and_then(|operations| {
-            operations
-                .iter()
-                .find(|candidate| candidate["id"] == operation)
-        })
-        .and_then(|operation| operation.get("response_schema"))
-        .cloned()
-        .ok_or_else(operation_unavailable)
-}
-
-fn target_provider(observed_type: &str) -> Option<&'static str> {
-    let provider = catalog::provider(catalog::ProviderKey::id(GRAFANA))?;
-    provider
-        .discoveries
-        .iter()
-        .find(|discovery| discovery.id == DISCOVERY_REF)?
-        .mappings
-        .iter()
-        .find(|mapping| mapping.observed_type == observed_type)
-        .map(|mapping| mapping.target_provider)
-}
-
 fn grafana_credential(token: &Secret) -> Result<Assembled, OperationError> {
     let provider =
         catalog::provider(catalog::ProviderKey::id(GRAFANA)).ok_or_else(operation_unavailable)?;
@@ -1365,65 +1217,14 @@ fn grafana_credential(token: &Secret) -> Result<Assembled, OperationError> {
     ))
 }
 
-pub(crate) fn validate_input(operation: &str, input: &Value) -> Result<(), OperationError> {
-    if serde_json::to_vec(input).map_or(true, |bytes| {
-        bytes.len() > protocol::operation::MAX_ARGUMENT_BYTES
-    }) {
-        return Err(operation_invalid());
-    }
-    let object = input.as_object().ok_or_else(operation_invalid)?;
-    let expected = operation_document(operation)
-        .ok_or_else(operation_not_found)?
-        .caller_parameters()
-        .into_iter()
-        .collect::<BTreeSet<_>>();
-    if object.len() != expected.len() || object.keys().any(|key| !expected.contains(key.as_str())) {
-        return Err(operation_invalid());
-    }
-    let string = |name: &str, maximum: usize| {
-        object
-            .get(name)
-            .and_then(Value::as_str)
-            .is_some_and(|value| {
-                !value.is_empty() && value.len() <= maximum && !value.contains('\0')
-            })
-    };
-    let valid = match operation {
-        GRAFANA_DASHBOARDS_LIST => {
-            string("namespace", 256)
-                && object
-                    .get("limit")
-                    .and_then(Value::as_u64)
-                    .is_some_and(|limit| (1..=1000).contains(&limit))
-                && object
-                    .get("continue")
-                    .and_then(Value::as_str)
-                    .is_some_and(|value| value.len() <= 4096 && !value.contains('\0'))
-        }
-        GRAFANA_DASHBOARD_GET => string("namespace", 256) && string("uid", 256),
-        GRAFANA_DATASOURCES_LIST | ALERTMANAGER_ALERTS_LIST => object.is_empty(),
-        PROMETHEUS_QUERY_RANGE => {
-            string("query", 16 * 1024)
-                && string("start", 64)
-                && string("end", 64)
-                && string("step", 64)
-        }
-        LOKI_QUERY_RANGE => {
-            string("query", 16 * 1024)
-                && string("start", 64)
-                && string("end", 64)
-                && object
-                    .get("limit")
-                    .and_then(Value::as_u64)
-                    .is_some_and(|limit| (1..=5000).contains(&limit))
-                && object
-                    .get("direction")
-                    .and_then(Value::as_str)
-                    .is_some_and(|direction| matches!(direction, "forward" | "backward"))
-        }
-        _ => false,
-    };
-    valid.then_some(()).ok_or_else(operation_invalid)
+fn grafana_credential_ref(owner: &PrincipalContext) -> Result<CredentialRef, MonitoringError> {
+    CredentialRef::new(
+        owner.tenant_id(),
+        GRAFANA_AUTHORITY,
+        DEFAULT_SERVICE,
+        GRAFANA_CREDENTIAL_LEAF,
+    )
+    .map_err(|_| MonitoringError::new("credential-reference"))
 }
 
 fn observation_summary(observation: &StoredObservation) -> DiscoveryObservationSummary {
@@ -1464,26 +1265,6 @@ fn child_is_current(state: &MonitoringState, child: &ChildConnection) -> bool {
                 && observation.source_connection_ref == child.parent_connection_ref
                 && observation.resource_binding == child.resource_binding
         })
-}
-
-fn effect(effects: &[HostEffect]) -> EffectClass {
-    if effects.contains(&HostEffect::Write) {
-        EffectClass::Mutating
-    } else {
-        EffectClass::ReadOnly
-    }
-}
-
-pub(crate) fn title(operation: &str) -> &'static str {
-    match operation {
-        GRAFANA_DASHBOARDS_LIST => "List Grafana dashboards",
-        GRAFANA_DASHBOARD_GET => "Get a Grafana dashboard",
-        GRAFANA_DATASOURCES_LIST => "Refresh Grafana datasource discovery",
-        PROMETHEUS_QUERY_RANGE => "Query Prometheus metrics over a time range",
-        LOKI_QUERY_RANGE => "Query Loki logs over a time range",
-        ALERTMANAGER_ALERTS_LIST => "List Alertmanager alerts",
-        _ => "Unknown operation",
-    }
 }
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
@@ -1552,58 +1333,6 @@ fn now_ms() -> Option<u64> {
         .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }
 
-async fn accept_owner(listener: UnixListener) -> Result<UnixStream, MonitoringError> {
-    loop {
-        let (stream, _) = listener
-            .accept()
-            .await
-            .map_err(|_| MonitoringError::new("connect-session-accept"))?;
-        let credential = stream
-            .peer_cred()
-            .map_err(|_| MonitoringError::new("connect-session-peer"))?;
-        if credential.uid() == rustix::process::geteuid().as_raw() {
-            return Ok(stream);
-        }
-    }
-}
-
-async fn read_submitted_secret(
-    mut stream: UnixStream,
-) -> Result<(Secret, UnixStream), MonitoringError> {
-    let mut bytes = Zeroizing::new(Vec::with_capacity(256));
-    {
-        let reader = BufReader::new(&mut stream);
-        let mut bounded = reader.take((MAX_TOKEN_BYTES + 3) as u64);
-        tokio::time::timeout(
-            Duration::from_secs(30),
-            bounded.read_until(b'\n', &mut bytes),
-        )
-        .await
-        .map_err(|_| MonitoringError::new("connect-session-timeout"))?
-        .map_err(|_| MonitoringError::new("connect-session-read"))?;
-    }
-    if bytes.last() != Some(&b'\n') || bytes.len() > MAX_TOKEN_BYTES + 2 {
-        return Err(MonitoringError::new("credential-shape"));
-    }
-    bytes.pop();
-    if bytes.last() == Some(&b'\r') {
-        bytes.pop();
-    }
-    let value =
-        std::str::from_utf8(&bytes).map_err(|_| MonitoringError::new("credential-shape"))?;
-    if value.is_empty()
-        || value.len() > MAX_TOKEN_BYTES
-        || value
-            .bytes()
-            .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
-    {
-        return Err(MonitoringError::new("credential-shape"));
-    }
-    let bytes = std::mem::take(&mut *bytes);
-    let value = String::from_utf8(bytes).expect("credential bytes were validated as UTF-8");
-    Ok((Secret::new(value), stream))
-}
-
 fn ensure_owner_directory(path: &Path) -> Result<(), MonitoringError> {
     if !path.exists() {
         fs::create_dir_all(path).map_err(|_| MonitoringError::new("owner-state-directory"))?;
@@ -1622,268 +1351,4 @@ fn ensure_owner_directory(path: &Path) -> Result<(), MonitoringError> {
     Ok(())
 }
 
-fn refuse_existing_path(path: &Path) -> Result<(), MonitoringError> {
-    match fs::symlink_metadata(path) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        _ => Err(MonitoringError::new("connect-session-path")),
-    }
-}
-
-fn remove_owned_socket(path: &Path) -> Result<(), MonitoringError> {
-    let metadata = match fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(_) => return Err(MonitoringError::new("connect-session-path")),
-    };
-    if !metadata.file_type().is_socket() || metadata.uid() != rustix::process::geteuid().as_raw() {
-        return Err(MonitoringError::new("connect-session-path"));
-    }
-    fs::remove_file(path).map_err(|_| MonitoringError::new("connect-session-path"))
-}
-
-fn connection_unavailable() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Unavailable,
-        "connection management is temporarily unavailable",
-        true,
-    )
-}
-
-fn connection_not_found() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::NotFound,
-        "connection, observation, or Connect Session was not found",
-        false,
-    )
-}
-
-fn connection_protocol() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Protocol,
-        "connection backend returned an incompatible response",
-        false,
-    )
-}
-
-fn operation_unavailable() -> OperationError {
-    OperationError::new(
-        OperationErrorCode::Unavailable,
-        "monitoring connector runtime is unavailable",
-        true,
-    )
-}
-
-fn operation_not_found() -> OperationError {
-    OperationError::new(
-        OperationErrorCode::NotFound,
-        "monitoring operation was not found",
-        false,
-    )
-}
-
-fn operation_not_granted() -> OperationError {
-    OperationError::new(
-        OperationErrorCode::NotGranted,
-        "operation is not granted for this Connection",
-        false,
-    )
-}
-
-fn operation_invalid() -> OperationError {
-    OperationError::new(
-        OperationErrorCode::InvalidInput,
-        "operation input is outside the catalog contract",
-        false,
-    )
-}
-
-fn operation_protocol() -> OperationError {
-    OperationError::new(
-        OperationErrorCode::Protocol,
-        "operation backend returned an incompatible response",
-        false,
-    )
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| {
-        mutex.clear_poison();
-        poisoned.into_inner()
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::RefusingBackend;
-
-    #[derive(Default)]
-    struct FakeExecutor {
-        requests: Mutex<Vec<Request>>,
-    }
-
-    #[async_trait]
-    impl HttpExecutor for FakeExecutor {
-        async fn execute(&self, request: Request) -> Result<Value, MonitoringError> {
-            let output = if request.url.contains("/api/datasources")
-                && !request.url.contains("/proxy/")
-            {
-                serde_json::json!([
-                    {"id":1,"uid":"prom-main","name":"Metrics","type":"prometheus"},
-                    {"id":2,"uid":"loki-main","name":"Logs","type":"loki"},
-                    {"id":3,"uid":"private-main","name":"Private plugin","type":"vendor-private"}
-                ])
-            } else {
-                serde_json::json!({"status":"success","data":{"result":[]}})
-            };
-            lock(&self.requests).push(request);
-            Ok(output)
-        }
-    }
-
-    fn owner() -> OwnerContext {
-        OwnerContext {
-            tenant_id: "tenant-local".to_owned(),
-            agent_id: "agent-dev".to_owned(),
-            agent_revision: 1,
-            authority_snapshot_id: "authority-1".to_owned(),
-            authority_snapshot_sha256: "a".repeat(64),
-        }
-    }
-
-    fn policy() -> GrafanaIntegrationConfig {
-        toml::from_str(
-            r#"
-origin = "https://grafana.example"
-grant_ref = "grant:grafana"
-initiation = "b10x"
-connect_session_ttl_seconds = 300
-
-[target_grants]
-prometheus = "grant:prometheus"
-loki = "grant:loki"
-alertmanager = "grant:alertmanager"
-"#,
-        )
-        .unwrap()
-    }
-
-    #[tokio::test]
-    async fn discovery_materialization_and_query_stay_on_the_grafana_route() {
-        let root = tempfile::tempdir().unwrap();
-        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let executor = Arc::new(FakeExecutor::default());
-        let backend = MonitoringBackend::with_executor(
-            owner(),
-            policy(),
-            root.path(),
-            Arc::new(RefusingBackend),
-            Arc::clone(&executor),
-        );
-        let parent = ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
-            label: "Infrastructure Grafana".to_owned(),
-        };
-        let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
-        let output = backend
-            .inner
-            .execute_direct(
-                &owner(),
-                &parent,
-                &token,
-                operation_document(GRAFANA_DATASOURCES_LIST).unwrap(),
-                serde_json::json!({}),
-            )
-            .await
-            .unwrap();
-        backend
-            .inner
-            .reconcile_observations(&parent.connection_ref, &output)
-            .unwrap();
-        lock(&backend.inner.state).parent = Some(parent);
-        *lock(&backend.inner.token) = Some(token);
-
-        let observations = backend.inner.search_observations("", 64);
-        assert_eq!(observations.len(), 3);
-        assert!(observations.iter().any(|observation| {
-            observation.observed_type == "vendor-private"
-                && observation.state == DiscoveryObservationState::Unsupported
-        }));
-        let prometheus = observations
-            .iter()
-            .find(|observation| observation.observed_type == "prometheus")
-            .unwrap();
-        let child = backend
-            .inner
-            .materialize(&prometheus.observation_ref)
-            .unwrap();
-        assert!(matches!(
-            child.summary.route,
-            ConnectionRoute::ViaConnection {
-                route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
-                ..
-            }
-        ));
-
-        let described = backend
-            .handle(
-                &owner(),
-                OperationRequest::Describe(DescribeRequest {
-                    operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
-                }),
-            )
-            .await
-            .unwrap();
-        let OperationResult::Describe(description) = described else {
-            panic!("expected description")
-        };
-        let child_ref = child.summary.connection_ref.clone();
-        backend
-            .handle(
-                &owner(),
-                OperationRequest::Invoke(InvokeRequest {
-                    operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
-                    connection_ref: child_ref.clone(),
-                    description_ref: description.description_ref,
-                    input: serde_json::json!({
-                        "query":"up",
-                        "start":"now-5m",
-                        "end":"now",
-                        "step":"30s"
-                    }),
-                    approval_evidence_ref: None,
-                }),
-            )
-            .await
-            .unwrap();
-
-        let requests = lock(&executor.requests);
-        let query = requests.last().unwrap();
-        assert!(query.url.starts_with(
-            "https://grafana.example/api/datasources/proxy/uid/prom-main/api/v1/query_range?"
-        ));
-        assert!(!query.url.contains("mediated-target.invalid"));
-        assert!(!format!("{query:?}").contains("SENTINEL"));
-
-        let observation_ref = prometheus.observation_ref.clone();
-        lock(&backend.inner.state)
-            .observations
-            .get_mut(&observation_ref)
-            .unwrap()
-            .target_provider = Some("loki".to_owned());
-        assert!(backend
-            .inner
-            .connections_for_operation(PROMETHEUS_QUERY_RANGE)
-            .is_empty());
-        assert_eq!(
-            backend
-                .inner
-                .describe_connection(&child_ref)
-                .unwrap()
-                .summary
-                .state,
-            ConnectionState::Degraded
-        );
-        assert!(backend.inner.materialize(&observation_ref).is_err());
-    }
-}
+include!("backend_tests.rs");

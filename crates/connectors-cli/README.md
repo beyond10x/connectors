@@ -1,10 +1,9 @@
 # `connectors` personal-local daemon
 
-This nested workspace builds the product binary without feature-unifying the SIP/RTVBP runtime
-closure into the deterministic catalog compiler. It serves one newline-delimited JSON request per
-owner-authenticated Unix-socket connection using the credential-free Connection, Operation, and
-Event contracts. Credential acquisition uses a separate, short-lived completion socket that
-accepts exactly one owner submission.
+This nested workspace builds a thin product frontend without feature-unifying the runtime closure
+into the deterministic catalog compiler. Reusable wire behavior lives in `connectors-client` and
+daemon assembly lives in `connectors-runtime`; this package owns clap parsing, hidden terminal
+input, and presentation only.
 
 ```text
 clean-room client
@@ -20,7 +19,7 @@ deployment file enables the development-gated Asterisk `sip.dial` member:
 
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
-  serve --config crates/connectors-cli/examples/asterisk-dev.example.toml
+  serve --config crates/connectors-config/examples/asterisk-dev.example.toml
 ```
 
 The state root defaults to `$XDG_STATE_HOME/b10x/connectors`, or
@@ -71,8 +70,9 @@ connectors connect grafana \
 ```
 
 It asks for the Grafana service-account token through hidden terminal input, verifies the instance,
-and materializes only recognized targets with configured independent Grants. The token remains in
-daemon memory and must be submitted again after restart; no plaintext persistence fallback exists.
+and materializes only recognized targets with configured independent Grants. The token is kept in
+an injected in-memory store until durable monitoring metadata exists, so restart requires the
+guided action again; it never enters configuration or metadata.
 See the [Grafana guide](../../docs/guides/connect-grafana.md) for CLI invocation and Harness use.
 
 ## Receive Slack messages
@@ -92,7 +92,7 @@ with the value-free development policy:
 
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
-  serve --config crates/connectors-cli/examples/slack-socket-mode.example.toml
+  serve --config crates/connectors-config/examples/slack-socket-mode.example.toml
 ```
 
 Then run the guided action in an operator terminal:
@@ -100,7 +100,7 @@ Then run the guided action in an operator terminal:
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
   connect slack \
-  --config crates/connectors-cli/examples/slack-socket-mode.example.toml \
+  --config crates/connectors-config/examples/slack-socket-mode.example.toml \
   --state-root /absolute/owner-only/state/root \
   --label "Development Slack"
 ```
@@ -126,8 +126,8 @@ Connection: Development Slack
 Events: app_mention, message.channels
 ```
 
-The low-level Connect Session verbs remain hidden diagnostic surfaces for protocol tests and
-support tooling; they are not an onboarding flow. See the
+Connect Session endpoints remain protocol surfaces for reusable clients; the product CLI does not
+expose raw session verbs as an onboarding flow. See the
 [public-facing guide](../../docs/guides/connect-slack.md) for the product wording.
 
 After connection, the product delivers admitted messages to the harness automatically. Until that

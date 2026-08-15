@@ -1,10 +1,11 @@
 //! Strict, value-free hosted server configuration.
 
-use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 
@@ -104,14 +105,11 @@ pub enum HostedServerConfigError {
 
 impl HostedServerConfig {
     pub fn read(path: &Path) -> Result<Self, HostedServerConfigError> {
-        let metadata = fs::metadata(path).map_err(|_| HostedServerConfigError::Read)?;
-        if !metadata.is_file() || metadata.len() > MAX_CONFIG_BYTES {
-            return Err(HostedServerConfigError::Invalid);
-        }
-        let text = fs::read_to_string(path).map_err(|_| HostedServerConfigError::Read)?;
-        if text.len() as u64 > MAX_CONFIG_BYTES {
-            return Err(HostedServerConfigError::Invalid);
-        }
+        let text = read_trusted_config(path, MAX_CONFIG_BYTES, TrustedOwner::CurrentUserOrRoot)
+            .map_err(|error| match error {
+                TrustedConfigReadError::Io(_) => HostedServerConfigError::Read,
+                TrustedConfigReadError::Unsafe => HostedServerConfigError::Invalid,
+            })?;
         let config: Self = toml::from_str(&text).map_err(|_| HostedServerConfigError::Parse)?;
         config.validate()?;
         Ok(config)
@@ -205,6 +203,9 @@ fn valid_dns_label(value: &str, maximum: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::os::unix::fs::{symlink, PermissionsExt as _};
+
     use super::*;
 
     #[test]
@@ -296,5 +297,38 @@ enabled = false
         );
         inconsistent.vault.token_file = None;
         inconsistent.validate().unwrap();
+    }
+
+    #[test]
+    fn hosted_configuration_uses_same_handle_and_refuses_mutable_or_symlinked_files() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("hosted.toml");
+        let text = r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "127.0.0.1:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[sip]
+enabled = false
+"#;
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        HostedServerConfig::read(&path).unwrap();
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o620)).unwrap();
+        assert!(matches!(
+            HostedServerConfig::read(&path),
+            Err(HostedServerConfigError::Invalid)
+        ));
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let link = root.path().join("hosted-link.toml");
+        symlink(&path, &link).unwrap();
+        assert!(HostedServerConfig::read(&link).is_err());
     }
 }

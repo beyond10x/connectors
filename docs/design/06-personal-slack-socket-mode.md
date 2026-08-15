@@ -194,3 +194,13 @@ connectors/
 
 No Slack code, secret accessor, token source, or Socket Mode dependency is added to Agent. The
 runtime closure stays in the isolated product workspace, outside the deterministic compiler graph.
+
+**2026-08-15 composition-boundary amendment.** The repository shape above records the original
+slice, not its reusable boundary. Slack custody, recovery, and supervision now live in the focused
+`integration-slack` adapter. Generic Connect Session state lives in `service`, its owner-only
+one-use socket transport lives in `connect-session-transport`, strict value-free configuration and
+examples live in `connectors-config`, and `connectors-runtime` injects the credential capability
+and installs the adapter in an exact registry. Provider-neutral guided workflows live in
+`connectors-client`; `connectors-cli` only parses and renders them. Durable Slack metadata is
+admitted against the current configured Grant, initiation policy, and event set before it can be
+searched, described, supervised, or used for event delivery.

@@ -9,35 +9,39 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use connect_session_transport::{
+    remove_endpoint, BoundCompletionEndpoint, CompletionTransportError,
+};
 use connector_secrets::{
-    CredentialRef, CredentialScope, FileStore, PreparedSecretStore, Secret, SecretBatch,
-    SecretProposalDigest, SecretStore, SecretTransactionGeneration, SecretTransactionId,
-    SecretTransactionState,
+    CredentialRef, CredentialScope, Layout, PreparedSecretStore, Secret, SecretBatch,
+    SecretProposalDigest, SecretTransactionGeneration, SecretTransactionId, SecretTransactionState,
+    TenantLayout,
 };
 use futures_util::{SinkExt as _, StreamExt as _};
 use protocol::connection::{
-    ChannelState, ChannelSummary as ConnectionChannelSummary, ConnectSessionState,
-    ConnectSessionStatus, ConnectionDescription, ConnectionError, ConnectionErrorCode,
-    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionState, ConnectionSummary,
+    ChannelState, ChannelSummary as ConnectionChannelSummary, ConnectSessionStatus,
+    ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
+    ConnectionRequest, ConnectionResult, ConnectionState, ConnectionSummary,
 };
 use protocol::event::{
     ChannelSummary as EventChannelSummary, DataEvent, EventError, EventErrorCode, EventProvenance,
     EventRequest, EventResult,
 };
-use protocol::operation::{OperationError, OperationRequest, OperationResult, OwnerContext};
+use protocol::operation::{OperationError, OperationErrorCode, OperationRequest, OperationResult};
 use reqwest::redirect::Policy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
-use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
-use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{watch, Notify};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use zeroize::Zeroizing;
 
-use crate::{InitiationConfig, SlackIntegrationConfig};
-use server::local::OperationBackend;
+use connectors_config::{InitiationConfig, SlackIntegrationConfig};
+use service::{
+    BackendCapabilities, ConnectSessionLifecycle, ConnectSessionLifecycleError,
+    ConnectSessionTerminal, ConnectorBackend, PrincipalContext,
+};
 
 const INTEGRATION_REF: &str = "slack";
 const AUTHORITY: &str = "com.slack.api";
@@ -66,20 +70,18 @@ impl SlackError {
     }
 }
 
-/// Composition backend: operation calls stay on the existing backend while Connection and Event
-/// calls terminate here.
+/// Standalone Slack Connection and Event adapter.
 pub struct SlackBackend {
-    operation: Arc<dyn OperationBackend>,
     inner: Arc<SlackInner>,
 }
 
 struct SlackInner {
-    owner: OwnerContext,
+    owner: PrincipalContext,
     policy: SlackIntegrationConfig,
     state_root: PathBuf,
-    credential_store: Arc<FileStore>,
+    credential_store: Arc<dyn PreparedSecretStore>,
     metadata: Mutex<StateFile>,
-    sessions: Mutex<BTreeMap<String, SessionRecord>>,
+    sessions: Mutex<ConnectSessionLifecycle>,
     event_store: Arc<EventStore>,
     channel_states: Mutex<BTreeMap<String, ChannelState>>,
     started_supervisors: Mutex<BTreeSet<String>>,
@@ -127,15 +129,6 @@ struct PendingCommit {
     connection: StoredConnection,
 }
 
-#[derive(Clone)]
-struct SessionRecord {
-    label: String,
-    state: ConnectSessionState,
-    expires_at_unix_ms: u64,
-    endpoint: Option<PathBuf>,
-    connection_ref: Option<String>,
-}
-
 struct EventStore {
     path: PathBuf,
     events: Mutex<Vec<StoredEvent>>,
@@ -175,25 +168,21 @@ impl SlackBackend {
     /// callable Slack Connection. The configuration contains policy only; no ambient secret source
     /// is consulted.
     pub async fn open(
-        owner: OwnerContext,
+        owner: PrincipalContext,
         policy: SlackIntegrationConfig,
         state_root: &Path,
-        operation: Arc<dyn OperationBackend>,
+        credential_store: Arc<dyn PreparedSecretStore>,
     ) -> Result<Self, SlackError> {
-        Self::open_with_supervision(owner, policy, state_root, operation, true).await
+        Self::open_with_supervision(owner, policy, state_root, credential_store, true).await
     }
 
     async fn open_with_supervision(
-        owner: OwnerContext,
+        owner: PrincipalContext,
         policy: SlackIntegrationConfig,
         state_root: &Path,
-        operation: Arc<dyn OperationBackend>,
+        credential_store: Arc<dyn PreparedSecretStore>,
         supervision_enabled: bool,
     ) -> Result<Self, SlackError> {
-        let credential_store = Arc::new(
-            FileStore::open(state_root.join("credentials.store"))
-                .map_err(|_| SlackError::new("credential-store"))?,
-        );
         let metadata = read_state(&state_root.join("connections.json"))?;
         let event_store = Arc::new(EventStore::open(state_root.join("events.jsonl"))?);
         let http = reqwest::Client::builder()
@@ -211,7 +200,10 @@ impl SlackBackend {
             state_root: state_root.to_path_buf(),
             credential_store,
             metadata: Mutex::new(metadata),
-            sessions: Mutex::new(BTreeMap::new()),
+            sessions: Mutex::new(
+                ConnectSessionLifecycle::new(INTEGRATION_REF, MAX_CONNECT_SESSIONS)
+                    .map_err(|_| SlackError::new("connect-session-lifecycle"))?,
+            ),
             event_store,
             channel_states: Mutex::new(BTreeMap::new()),
             started_supervisors: Mutex::new(BTreeSet::new()),
@@ -222,49 +214,100 @@ impl SlackBackend {
         });
         inner.recover_pending().await?;
         for connection in lock(&inner.metadata).connections.clone() {
-            inner.start_supervisor(connection);
+            if inner.connection_is_admitted(&connection) {
+                inner.start_supervisor(connection);
+            }
         }
-        Ok(Self { operation, inner })
+        Ok(Self { inner })
     }
 
     #[must_use]
     pub fn connection_count(&self) -> usize {
-        lock(&self.inner.metadata).connections.len()
+        lock(&self.inner.metadata)
+            .connections
+            .iter()
+            .filter(|connection| self.inner.connection_is_admitted(connection))
+            .count()
     }
 }
 
 #[async_trait]
-impl OperationBackend for SlackBackend {
+impl ConnectorBackend for SlackBackend {
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities {
+            operations: false,
+            connections: true,
+            events: true,
+        }
+    }
+
+    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+        match request {
+            ConnectionRequest::ConnectSessionCreate(request) => {
+                request.integration_ref == INTEGRATION_REF
+            }
+            ConnectionRequest::ConnectSessionStatus(request) => {
+                lock(&self.inner.sessions).owns(&request.connect_session_ref)
+            }
+            ConnectionRequest::Describe(request) => lock(&self.inner.metadata)
+                .connections
+                .iter()
+                .any(|connection| {
+                    connection.connection_ref == request.connection_ref
+                        && self.inner.connection_is_admitted(connection)
+                }),
+            ConnectionRequest::Search(_) => false,
+            ConnectionRequest::CandidateSearch(_)
+            | ConnectionRequest::CandidateActivate(_)
+            | ConnectionRequest::ObservationSearch(_)
+            | ConnectionRequest::Materialize(_) => false,
+        }
+    }
+
+    fn owns_event(&self, request: &EventRequest) -> bool {
+        match request {
+            EventRequest::Receive(request) => self.inner.has_channel(&request.channel_ref),
+            EventRequest::Replay(request) => self
+                .inner
+                .event_store
+                .replay(&request.event_ref)
+                .is_some_and(|event| self.inner.has_channel(&event.channel_ref)),
+            EventRequest::Search(_) => false,
+        }
+    }
+
     async fn handle(
         &self,
-        context: &OwnerContext,
-        request: OperationRequest,
+        _context: &PrincipalContext,
+        _request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
-        self.operation.handle(context, request).await
+        Err(OperationError::new(
+            OperationErrorCode::NotFound,
+            "Slack Integration does not provide operations",
+            false,
+        ))
     }
 
     async fn handle_connection(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: ConnectionRequest,
     ) -> Result<ConnectionResult, ConnectionError> {
         self.inner.check_connection_context(context)?;
         match request {
-            ConnectionRequest::CandidateSearch(request) => {
-                self.operation
-                    .handle_connection(context, ConnectionRequest::CandidateSearch(request))
-                    .await
-            }
-            ConnectionRequest::CandidateActivate(request) => {
-                self.operation
-                    .handle_connection(context, ConnectionRequest::CandidateActivate(request))
-                    .await
-            }
+            ConnectionRequest::CandidateSearch(_)
+            | ConnectionRequest::CandidateActivate(_)
+            | ConnectionRequest::Materialize(_) => Err(ConnectionError::new(
+                ConnectionErrorCode::NotFound,
+                "Slack Integration does not own this connection request",
+                false,
+            )),
             ConnectionRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
                 let stored = lock(&self.inner.metadata).connections.clone();
                 let mut connections = stored
                     .into_iter()
+                    .filter(|connection| self.inner.connection_is_admitted(connection))
                     .filter(|connection| {
                         query.is_empty()
                             || connection.label.to_ascii_lowercase().contains(&query)
@@ -279,7 +322,10 @@ impl OperationBackend for SlackBackend {
                 let connection = lock(&self.inner.metadata)
                     .connections
                     .iter()
-                    .find(|connection| connection.connection_ref == request.connection_ref)
+                    .find(|connection| {
+                        connection.connection_ref == request.connection_ref
+                            && self.inner.connection_is_admitted(connection)
+                    })
                     .cloned()
                     .ok_or_else(connection_not_found)?;
                 Ok(ConnectionResult::Describe(self.inner.describe(&connection)))
@@ -287,11 +333,6 @@ impl OperationBackend for SlackBackend {
             ConnectionRequest::ObservationSearch(_) => Ok(ConnectionResult::ObservationSearch {
                 observations: Vec::new(),
             }),
-            ConnectionRequest::Materialize(request) => {
-                self.operation
-                    .handle_connection(context, ConnectionRequest::Materialize(request))
-                    .await
-            }
             ConnectionRequest::ConnectSessionCreate(request) => {
                 if request.integration_ref != INTEGRATION_REF {
                     return Err(ConnectionError::new(
@@ -315,7 +356,7 @@ impl OperationBackend for SlackBackend {
 
     async fn handle_event(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: EventRequest,
     ) -> Result<EventResult, EventError> {
         self.inner.check_event_context(context)?;
@@ -325,6 +366,7 @@ impl OperationBackend for SlackBackend {
                 let mut channels = lock(&self.inner.metadata)
                     .connections
                     .iter()
+                    .filter(|connection| self.inner.connection_is_admitted(connection))
                     .filter(|connection| {
                         query.is_empty()
                             || connection.label.to_ascii_lowercase().contains(&query)
@@ -376,14 +418,6 @@ impl OperationBackend for SlackBackend {
 
     async fn shutdown(&self) {
         let _ = self.inner.shutdown.send(true);
-        for session in lock(&self.inner.sessions).values_mut() {
-            if let Some(endpoint) = session.endpoint.take() {
-                let _ = remove_owned_socket(&endpoint);
-            }
-            if session.state == ConnectSessionState::Pending {
-                session.state = ConnectSessionState::Failed;
-            }
-        }
         let tasks = std::mem::take(&mut *lock(&self.inner.tasks));
         for task in &tasks {
             task.abort();
@@ -391,20 +425,24 @@ impl OperationBackend for SlackBackend {
         for task in tasks {
             let _ = task.await;
         }
-        self.operation.shutdown().await;
-    }
-
-    fn supports_connections(&self) -> bool {
-        true
-    }
-
-    fn supports_events(&self) -> bool {
-        true
+        for endpoint in lock(&self.inner.sessions).fail_pending() {
+            let _ = remove_endpoint(Path::new(&endpoint));
+        }
     }
 }
 
 impl SlackInner {
-    fn check_connection_context(&self, actual: &OwnerContext) -> Result<(), ConnectionError> {
+    fn connection_is_admitted(&self, connection: &StoredConnection) -> bool {
+        connection.grant_ref == self.policy.grant_ref
+            && connection.initiation == self.policy.initiation
+            && connection.allowed_events.len() == self.policy.allowed_events.len()
+            && connection
+                .allowed_events
+                .iter()
+                .all(|event| self.policy.allowed_events.contains(event))
+    }
+
+    fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
         if actual == &self.owner {
             Ok(())
         } else {
@@ -416,7 +454,7 @@ impl SlackInner {
         }
     }
 
-    fn check_event_context(&self, actual: &OwnerContext) -> Result<(), EventError> {
+    fn check_event_context(&self, actual: &PrincipalContext) -> Result<(), EventError> {
         if actual == &self.owner {
             Ok(())
         } else {
@@ -468,141 +506,103 @@ impl SlackInner {
         lock(&self.metadata)
             .connections
             .iter()
-            .find(|connection| channel_ref(connection) == requested)
+            .find(|connection| {
+                channel_ref(connection) == requested && self.connection_is_admitted(connection)
+            })
             .cloned()
             .ok_or_else(event_not_found)
+    }
+
+    fn has_channel(&self, requested: &str) -> bool {
+        lock(&self.metadata).connections.iter().any(|connection| {
+            channel_ref(connection) == requested && self.connection_is_admitted(connection)
+        })
     }
 
     async fn create_session(
         self: &Arc<Self>,
         label: String,
     ) -> Result<ConnectSessionStatus, ConnectionError> {
-        if lock(&self.sessions)
-            .values()
-            .filter(|session| session.state == ConnectSessionState::Pending)
-            .count()
-            >= MAX_CONNECT_SESSIONS
-        {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::Conflict,
-                "too many Connect Sessions are pending",
-                true,
-            ));
-        }
         let id = random_uuid().map_err(|_| connection_unavailable())?;
         let session_ref = format!("connect-session:{id}");
         let directory = self.state_root.join("connect-sessions");
-        ensure_owner_directory(&directory).map_err(|_| connection_unavailable())?;
-        let endpoint = directory.join(format!("{id}.sock"));
-        refuse_existing_path(&endpoint).map_err(|_| connection_unavailable())?;
-        let listener = UnixListener::bind(&endpoint).map_err(|_| connection_unavailable())?;
-        fs::set_permissions(&endpoint, fs::Permissions::from_mode(0o600))
-            .map_err(|_| connection_unavailable())?;
+        let endpoint =
+            BoundCompletionEndpoint::bind(&directory, &id).map_err(|_| connection_unavailable())?;
+        let endpoint_path = endpoint.path().to_path_buf();
         let expires_at_unix_ms = now_ms()
             .and_then(|now| {
                 now.checked_add(self.policy.connect_session_ttl_seconds.saturating_mul(1000))
             })
             .ok_or_else(connection_unavailable)?;
-        lock(&self.sessions).insert(
+        let status = match lock(&self.sessions).reserve(
             session_ref.clone(),
-            SessionRecord {
-                label,
-                state: ConnectSessionState::Pending,
-                expires_at_unix_ms,
-                endpoint: Some(endpoint.clone()),
-                connection_ref: None,
-            },
-        );
-        let status = self
-            .session_status(&session_ref)
-            .expect("session was inserted before projection");
+            label,
+            expires_at_unix_ms,
+            endpoint_path.display().to_string(),
+        ) {
+            Ok(status) => status,
+            Err(error) => {
+                drop(endpoint);
+                return Err(connect_session_error(error));
+            }
+        };
         let inner = Arc::clone(self);
         let task_session_ref = session_ref;
         lock(&self.tasks).push(tokio::spawn(async move {
-            inner
-                .serve_completion(listener, task_session_ref, endpoint)
-                .await;
+            inner.serve_completion(endpoint, task_session_ref).await;
         }));
         Ok(status)
     }
 
     fn session_status(&self, session_ref: &str) -> Option<ConnectSessionStatus> {
-        let session = lock(&self.sessions).get(session_ref)?.clone();
-        Some(ConnectSessionStatus {
-            connect_session_ref: session_ref.to_owned(),
-            integration_ref: INTEGRATION_REF.to_owned(),
-            state: session.state,
-            expires_at_unix_ms: session.expires_at_unix_ms,
-            completion_endpoint: session
-                .endpoint
-                .as_ref()
-                .map(|path| path.display().to_string()),
-            connection_ref: session.connection_ref,
-        })
+        lock(&self.sessions).status(session_ref)
     }
 
     async fn serve_completion(
         self: Arc<Self>,
-        listener: UnixListener,
+        endpoint: BoundCompletionEndpoint,
         session_ref: String,
-        endpoint: PathBuf,
     ) {
-        let accepted = tokio::time::timeout(
-            Duration::from_secs(self.policy.connect_session_ttl_seconds),
-            accept_owner(listener),
-        )
-        .await;
-        let _ = remove_owned_socket(&endpoint);
-        let (result, mut stream) = match accepted {
-            Ok(Ok(stream)) => match read_submitted_secret(stream).await {
-                Ok((secret, stream)) => {
-                    let result = self.complete_connection(&session_ref, secret).await;
-                    (result, Some(stream))
-                }
-                Err(error) => (Err(error), None),
-            },
-            Ok(Err(error)) => (Err(error), None),
+        let submission = match endpoint
+            .receive(
+                Duration::from_secs(self.policy.connect_session_ttl_seconds),
+                Duration::from_secs(30),
+                MAX_APP_TOKEN_BYTES,
+            )
+            .await
+        {
+            Ok(submission) => submission,
+            Err(CompletionTransportError::Expired) => {
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Expired);
+                return;
+            }
             Err(_) => {
-                self.finish_session(&session_ref, ConnectSessionState::Expired, None);
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Failed);
                 return;
             }
         };
+        let secret = submission.secret();
+        let valid = secret.expose_secret().starts_with("xapp-");
+        let result = if valid {
+            self.complete_connection(&session_ref, Secret::new(secret.expose_secret()))
+                .await
+        } else {
+            Err(SlackError::new("credential-shape"))
+        };
         let accepted = match result {
             Ok(connection_ref) => {
-                self.finish_session(
+                let _ = lock(&self.sessions).finish(
                     &session_ref,
-                    ConnectSessionState::Completed,
-                    Some(connection_ref),
+                    ConnectSessionTerminal::Completed { connection_ref },
                 );
                 true
             }
             Err(_) => {
-                self.finish_session(&session_ref, ConnectSessionState::Failed, None);
+                let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Failed);
                 false
             }
         };
-        if let Some(stream) = &mut stream {
-            let response = if accepted {
-                b"{\"accepted\":true}\n".as_slice()
-            } else {
-                b"{\"accepted\":false}\n".as_slice()
-            };
-            let _ = stream.write_all(response).await;
-            let _ = stream.shutdown().await;
-        }
-    }
-
-    fn finish_session(
-        &self,
-        session_ref: &str,
-        state: ConnectSessionState,
-        connection_ref: Option<String>,
-    ) {
-        if let Some(session) = lock(&self.sessions).get_mut(session_ref) {
-            session.state = state;
-            session.endpoint = None;
-            session.connection_ref = connection_ref;
-        }
+        let _ = submission.respond(accepted).await;
     }
 
     async fn complete_connection(
@@ -611,10 +611,8 @@ impl SlackInner {
         secret: Secret,
     ) -> Result<String, SlackError> {
         let label = lock(&self.sessions)
-            .get(session_ref)
-            .filter(|session| session.state == ConnectSessionState::Pending)
-            .map(|session| session.label.clone())
-            .ok_or_else(|| SlackError::new("connect-session"))?;
+            .pending_label(session_ref)
+            .map_err(|_| SlackError::new("connect-session"))?;
         let instance_id = random_uuid()?;
         let connection_ref = format!("connection:slack:{instance_id}");
         let connection = StoredConnection {
@@ -628,10 +626,10 @@ impl SlackInner {
         let credential_ref = self.credential_ref(&connection)?;
         let (transaction, generation) = self.reserve_transaction()?;
         let mut batch = SecretBatch::new(
-            CredentialScope::new(&self.owner.tenant_id, AUTHORITY)
+            CredentialScope::new(self.owner.tenant_id(), AUTHORITY)
                 .map_err(|_| SlackError::new("credential-address"))?,
         );
-        let digest = proposal_digest(&self.credential_store.address(&credential_ref), &secret);
+        let digest = proposal_digest(&TenantLayout.render(&credential_ref), &secret);
         batch
             .put(credential_ref, secret)
             .map_err(|_| SlackError::new("credential-batch"))?;
@@ -666,6 +664,7 @@ impl SlackInner {
             .map_err(|_| SlackError::new("credential-commit"))?;
         {
             let mut state = lock(&self.metadata);
+            let prior = state.clone();
             state
                 .pending
                 .retain(|pending| pending.transaction_id != transaction_hex);
@@ -673,7 +672,10 @@ impl SlackInner {
             state
                 .connections
                 .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
-            write_state(&self.state_root.join("connections.json"), &state)?;
+            if let Err(error) = write_state(&self.state_root.join("connections.json"), &state) {
+                *state = prior;
+                return Err(error);
+            }
         }
         let _ = self.credential_store.reclaim(generation).await;
         self.start_supervisor(connection);
@@ -744,7 +746,7 @@ impl SlackInner {
 
     fn credential_ref(&self, connection: &StoredConnection) -> Result<CredentialRef, SlackError> {
         CredentialRef::for_instance(
-            &self.owner.tenant_id,
+            self.owner.tenant_id(),
             AUTHORITY,
             &connection.instance_id,
             SERVICE,
@@ -819,6 +821,7 @@ impl SlackInner {
             .send()
             .await
             .map_err(|_| SlackError::new("socket-ticket-request"))?;
+        drop(token);
         if !response.status().is_success()
             || response
                 .content_length()
@@ -1033,55 +1036,6 @@ impl EventStore {
             .find(|stored| stored.event.event_ref == event_ref)
             .map(|stored| stored.event.clone())
     }
-}
-
-async fn accept_owner(listener: UnixListener) -> Result<UnixStream, SlackError> {
-    loop {
-        let (stream, _) = listener
-            .accept()
-            .await
-            .map_err(|_| SlackError::new("connect-session-accept"))?;
-        let credential = stream
-            .peer_cred()
-            .map_err(|_| SlackError::new("connect-session-peer"))?;
-        if credential.uid() == rustix::process::geteuid().as_raw() {
-            return Ok(stream);
-        }
-    }
-}
-
-async fn read_submitted_secret(mut stream: UnixStream) -> Result<(Secret, UnixStream), SlackError> {
-    let mut bytes = Zeroizing::new(Vec::with_capacity(256));
-    {
-        let reader = BufReader::new(&mut stream);
-        let mut bounded = reader.take((MAX_APP_TOKEN_BYTES + 3) as u64);
-        tokio::time::timeout(
-            Duration::from_secs(30),
-            bounded.read_until(b'\n', &mut bytes),
-        )
-        .await
-        .map_err(|_| SlackError::new("connect-session-timeout"))?
-        .map_err(|_| SlackError::new("connect-session-read"))?;
-    }
-    if bytes.last() != Some(&b'\n') || bytes.len() > MAX_APP_TOKEN_BYTES + 2 {
-        return Err(SlackError::new("credential-shape"));
-    }
-    bytes.pop();
-    if bytes.last() == Some(&b'\r') {
-        bytes.pop();
-    }
-    let value = std::str::from_utf8(&bytes).map_err(|_| SlackError::new("credential-shape"))?;
-    if !value.starts_with("xapp-")
-        || value.len() > MAX_APP_TOKEN_BYTES
-        || value
-            .bytes()
-            .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
-    {
-        return Err(SlackError::new("credential-shape"));
-    }
-    let bytes = std::mem::take(&mut *bytes);
-    let value = String::from_utf8(bytes).expect("credential bytes were validated as UTF-8");
-    Ok((Secret::new(value), stream))
 }
 
 fn project_data_event(
@@ -1341,13 +1295,6 @@ fn ensure_owner_directory(path: &Path) -> Result<(), SlackError> {
     Ok(())
 }
 
-fn refuse_existing_path(path: &Path) -> Result<(), SlackError> {
-    match fs::symlink_metadata(path) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        _ => Err(SlackError::new("connect-session-path")),
-    }
-}
-
 fn refuse_existing_non_owner_file(path: &Path) -> Result<(), SlackError> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -1364,26 +1311,23 @@ fn refuse_existing_non_owner_file(path: &Path) -> Result<(), SlackError> {
     fs::remove_file(path).map_err(|_| SlackError::new("owner-state"))
 }
 
-fn remove_owned_socket(path: &Path) -> Result<(), SlackError> {
-    let metadata = match fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(_) => return Err(SlackError::new("connect-session-path")),
-    };
-    if !std::os::unix::fs::FileTypeExt::is_socket(&metadata.file_type())
-        || metadata.uid() != rustix::process::geteuid().as_raw()
-    {
-        return Err(SlackError::new("connect-session-path"));
-    }
-    fs::remove_file(path).map_err(|_| SlackError::new("connect-session-path"))
-}
-
 fn connection_unavailable() -> ConnectionError {
     ConnectionError::new(
         ConnectionErrorCode::Unavailable,
         "connection management is temporarily unavailable",
         true,
     )
+}
+
+fn connect_session_error(error: ConnectSessionLifecycleError) -> ConnectionError {
+    match error {
+        ConnectSessionLifecycleError::Capacity => ConnectionError::new(
+            ConnectionErrorCode::Conflict,
+            "too many Connect Sessions are pending",
+            true,
+        ),
+        _ => connection_unavailable(),
+    }
 }
 
 fn connection_not_found() -> ConnectionError {
@@ -1417,199 +1361,4 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::RefusingBackend;
-
-    const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SECRET";
-
-    #[test]
-    fn only_the_inner_admitted_event_is_projected() {
-        let payload = serde_json::json!({
-            "token": SENTINEL,
-            "event_id": "Ev01",
-            "event": {
-                "type": "message",
-                "channel_type": "channel",
-                "channel": "C01",
-                "user": "U01",
-                "text": "hello",
-                "ts": "1.0"
-            }
-        });
-        let (_, kind, projected) =
-            project_data_event(Some(&payload), &["message.channels".to_owned()]).unwrap();
-        assert_eq!(kind, "message.channels");
-        let encoded = serde_json::to_string(&projected).unwrap();
-        assert!(!encoded.contains(SENTINEL));
-        assert!(projected.get("event").is_none());
-        assert_eq!(projected["text"], "hello");
-    }
-
-    #[test]
-    fn message_loop_guards_and_closed_event_grants_are_applied_before_storage() {
-        let bot = serde_json::json!({
-            "event_id": "Ev02",
-            "event": {"type": "message", "channel_type": "channel", "bot_id": "B01", "text": "own"}
-        });
-        assert!(project_data_event(Some(&bot), &["message.channels".to_owned()]).is_none());
-        let unknown = serde_json::json!({
-            "event_id": "Ev03",
-            "event": {"type": "reaction_added"}
-        });
-        assert!(project_data_event(Some(&unknown), &["message.channels".to_owned()]).is_none());
-    }
-
-    #[test]
-    fn socket_ticket_destination_is_closed_to_slack_tls_hosts() {
-        assert!(validate_socket_url("wss://wss-primary.slack.com/link/?ticket=sentinel").is_ok());
-        assert!(
-            validate_socket_url("wss://slack.com.example.invalid/link/?ticket=sentinel").is_err()
-        );
-        assert!(validate_socket_url("ws://wss-primary.slack.com/link/?ticket=sentinel").is_err());
-    }
-
-    fn owner() -> OwnerContext {
-        OwnerContext {
-            tenant_id: "tenant-local".to_owned(),
-            agent_id: "agent-dev".to_owned(),
-            agent_revision: 1,
-            authority_snapshot_id: "authority-1".to_owned(),
-            authority_snapshot_sha256: "a".repeat(64),
-        }
-    }
-
-    fn policy() -> SlackIntegrationConfig {
-        SlackIntegrationConfig {
-            grant_ref: "grant:slack-inbound".to_owned(),
-            initiation: InitiationConfig::Provider,
-            allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
-            connect_session_ttl_seconds: 30,
-        }
-    }
-
-    #[tokio::test]
-    async fn one_use_completion_publishes_only_value_free_connection_state() {
-        let root = tempfile::tempdir().unwrap();
-        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = SlackBackend::open_with_supervision(
-            owner(),
-            policy(),
-            root.path(),
-            Arc::new(RefusingBackend),
-            false,
-        )
-        .await
-        .unwrap();
-        let created = backend
-            .handle_connection(
-                &owner(),
-                ConnectionRequest::ConnectSessionCreate(
-                    protocol::connection::ConnectSessionCreateRequest {
-                        integration_ref: INTEGRATION_REF.to_owned(),
-                        label: "Development Slack".to_owned(),
-                    },
-                ),
-            )
-            .await
-            .unwrap();
-        let ConnectionResult::ConnectSessionCreate(created) = created else {
-            panic!("wrong result");
-        };
-        let endpoint = PathBuf::from(created.completion_endpoint.clone().unwrap());
-        let submitted = format!("xapp-{SENTINEL}");
-        let mut stream = UnixStream::connect(&endpoint).await.unwrap();
-        stream.write_all(submitted.as_bytes()).await.unwrap();
-        stream.write_all(b"\n").await.unwrap();
-        let mut response = String::new();
-        BufReader::new(&mut stream)
-            .read_line(&mut response)
-            .await
-            .unwrap();
-        assert_eq!(response, "{\"accepted\":true}\n");
-        assert!(!endpoint.exists());
-        assert!(UnixStream::connect(&endpoint).await.is_err());
-
-        let status = backend
-            .handle_connection(
-                &owner(),
-                ConnectionRequest::ConnectSessionStatus(
-                    protocol::connection::ConnectSessionStatusRequest {
-                        connect_session_ref: created.connect_session_ref,
-                    },
-                ),
-            )
-            .await
-            .unwrap();
-        let ConnectionResult::ConnectSessionStatus(status) = status else {
-            panic!("wrong result");
-        };
-        assert_eq!(status.state, ConnectSessionState::Completed);
-        assert!(status.completion_endpoint.is_none());
-        let connection_ref = status.connection_ref.unwrap();
-        let description = backend
-            .handle_connection(
-                &owner(),
-                ConnectionRequest::Describe(protocol::connection::DescribeRequest {
-                    connection_ref,
-                }),
-            )
-            .await
-            .unwrap();
-        let ConnectionResult::Describe(description) = description else {
-            panic!("wrong result");
-        };
-        assert_eq!(description.summary.state, ConnectionState::Authorized);
-        assert_eq!(description.channels[0].state, ChannelState::Starting);
-
-        let metadata = fs::read_to_string(root.path().join("connections.json")).unwrap();
-        assert!(!metadata.contains(SENTINEL));
-        assert!(!metadata.contains("completion_endpoint"));
-        let connection = lock(&backend.inner.metadata).connections[0].clone();
-        let credential = backend
-            .inner
-            .credential_store
-            .get(&backend.inner.credential_ref(&connection).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(credential.expose_secret(), submitted);
-        backend.shutdown().await;
-    }
-
-    #[tokio::test]
-    async fn event_is_durable_and_deduplicated_before_pull_and_replay() {
-        let root = tempfile::tempdir().unwrap();
-        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let store = EventStore::open(root.path().join("events.jsonl")).unwrap();
-        let connection = StoredConnection {
-            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
-            instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
-            label: "Development Slack".to_owned(),
-            grant_ref: "grant:slack-inbound".to_owned(),
-            initiation: InitiationConfig::Provider,
-            allowed_events: vec!["message.channels".to_owned()],
-        };
-        let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
-        store
-            .append(&connection, "Ev01", "message.channels", payload.clone())
-            .unwrap();
-        store
-            .append(&connection, "Ev01", "message.channels", payload)
-            .unwrap();
-        let (events, cursor) = store
-            .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)
-            .await;
-        assert_eq!(events.len(), 1);
-        assert_eq!(cursor, 1);
-        assert_eq!(events[0].provenance, EventProvenance::Native);
-        assert_eq!(store.replay(&events[0].event_ref), Some(events[0].clone()));
-
-        let reopened = EventStore::open(root.path().join("events.jsonl")).unwrap();
-        let (events, cursor) = reopened
-            .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)
-            .await;
-        assert_eq!(events.len(), 1);
-        assert_eq!(cursor, 1);
-    }
-}
+include!("backend_tests.rs");

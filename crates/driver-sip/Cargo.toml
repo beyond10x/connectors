@@ -17,7 +17,7 @@ members = ["."]
 async-trait = "0.1"
 bytes = "1"
 domain = { version = "0.1.0", path = "../domain" }
-server = { version = "0.1.0", path = "../server" }
+service = { version = "0.1.0", path = "../service" }
 sipx-call = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 sipx-media = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 sipx-sip = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
@@ -33,5 +33,4 @@ protocol = { version = "0.1.0", path = "../protocol" }
 rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
 rtvbp-voice-endpoint = { version = "0.1.0", path = "../rtvbp-voice-endpoint" }
 serde_json = "1"
-service = { version = "0.1.0", path = "../service" }
 tokio = { version = "1", default-features = false, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }

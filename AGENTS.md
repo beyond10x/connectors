@@ -168,23 +168,33 @@ cargo fetch --locked
 cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
 cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
+cargo fetch --manifest-path crates/connectors-runtime/Cargo.toml --locked
+cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
 cargo build --workspace --locked
 cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
 cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
+cargo build --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked
+cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
 cargo test --locked -p catalog-build --test main json_governance::
 cargo test --workspace --locked --no-fail-fast
 cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
 cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
 cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
+cargo test --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked --no-fail-fast
+cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo clippy --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all-targets --locked -- -D warnings
 cargo clippy --manifest-path crates/driver-sip/Cargo.toml --all-targets --locked -- -D warnings
 cargo clippy --manifest-path crates/voice-runtime/Cargo.toml --all-targets --locked -- -D warnings
+cargo clippy --manifest-path crates/connectors-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
+cargo clippy --manifest-path crates/connectors-cli/Cargo.toml --all-targets --locked -- -D warnings
 cargo fmt --all --check
 cargo fmt --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all --check
 cargo fmt --manifest-path crates/driver-sip/Cargo.toml --all --check
 cargo fmt --manifest-path crates/voice-runtime/Cargo.toml --all --check
+cargo fmt --manifest-path crates/connectors-runtime/Cargo.toml --all --check
+cargo fmt --manifest-path crates/connectors-cli/Cargo.toml --all --check
 cargo run --locked -p catalog-cli -- build
 cargo run --locked -p catalog-cli -- diff
 cargo run --locked -p catalog-cli -- check

@@ -1,6 +1,6 @@
 [package]
 name = "connectors-cli"
-description = "Personal-local Connectors daemon and isolated runtime composition leaf."
+description = "Thin command-line frontend for reusable Connector client and runtime libraries."
 edition = "2021"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
@@ -18,39 +18,12 @@ name = "connectors"
 path = "src/main.rs"
 
 [dependencies]
-async-trait = "0.1"
-axum = { version = "0.8", features = ["json", "tokio"] }
-catalog = { version = "0.1.0", path = "../catalog" }
 clap = { version = "4", features = ["derive"] }
-connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
-connector-secrets = { version = "0.1.0", path = "../connector-secrets", features = ["vault"] }
-domain = { version = "0.1.0", path = "../domain" }
-ed25519-dalek = "2"
-getrandom = "0.3"
-hex = "0.4"
-futures-util = "0.3"
-http = "1"
-k8s-openapi = { version = "0.28", features = ["v1_32"] }
-kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring"] }
+connectors-client = { version = "0.1.0", path = "../connectors-client" }
+connectors-runtime = { version = "0.1.0", path = "../connectors-runtime" }
 protocol = { version = "0.1.0", path = "../protocol" }
-rustls = "0.23"
-rustix = { version = "1.1.4", features = ["fs", "process"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 rpassword = "7"
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-server = { version = "0.1.0", path = "../server" }
-service = { version = "0.1.0", path = "../service" }
-sha2 = "0.10"
 thiserror = "2"
-tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
-tokio-rustls = "0.26"
-tokio-tungstenite = { version = "0.28", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
-toml = "0.8"
-url = "2"
-voice-runtime = { version = "0.1.0", path = "../voice-runtime" }
-webpki-roots = "1"
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "time"] }
 zeroize = "1"
-
-[dev-dependencies]
-tempfile = "3"

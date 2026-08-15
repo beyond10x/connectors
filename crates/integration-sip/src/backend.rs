@@ -16,18 +16,19 @@ use domain::{
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
-    OperationResult, OperationSummary, OwnerContext, RequestedSessionTermination, SessionRequest,
-    SessionState, SessionStatus, SessionTerminateRequest, SessionTermination,
+    OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest, SessionState,
+    SessionStatus, SessionTerminateRequest, SessionTermination,
 };
 use protocol::sip::{SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_TOOL_REF};
-use server::local::OperationBackend;
-use server::{admit_voice_dial, AdmittedVoicePlan};
-use service::{plan_operation, PlanningEnvironment};
+use service::{admit_voice_dial, AdmittedVoicePlan};
+use service::{
+    plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
+};
 use sha2::{Digest as _, Sha256};
 use tokio::sync::{watch, Semaphore};
 use voice_runtime::VoiceSessionControl;
 
-use crate::PersonalVoiceConfig;
+use connectors_config::PersonalVoiceConfig;
 
 const ASTERISK_DOCUMENT: &str = include_str!("../../../catalog/asterisk.catalog.json");
 const MAX_LIVE_SESSIONS: usize = 64;
@@ -64,12 +65,13 @@ pub trait SessionLauncher: Send + Sync + 'static {
 /// Configured implementation of the generic operation contract for exactly `sip.dial`.
 pub struct SipOperationBackend<L> {
     config: PersonalVoiceConfig,
+    principal: PrincipalContext,
     launcher: Arc<L>,
     document: Document,
     output_schema: serde_json::Value,
     catalog_sha256: String,
     deployment_sha256: String,
-    routes: server::SipDialRouteTable,
+    routes: service::SipDialRouteTable,
     sessions: Mutex<BTreeMap<String, SessionRecord>>,
     audit: Arc<AuditJournal>,
     live_capacity: Arc<Semaphore>,
@@ -165,6 +167,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         launcher: Arc<L>,
         state_root: &Path,
     ) -> Result<Self, OperationError> {
+        let principal = config.principal_context().map_err(|_| unavailable())?;
         let document = Document::parse(ASTERISK_DOCUMENT).map_err(|_| unavailable())?;
         let operation = document
             .operation(SIP_DIAL_OPERATION)
@@ -184,6 +187,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         let routes = config.sip_routes().map_err(|_| unavailable())?;
         Ok(Self {
             config,
+            principal,
             launcher,
             document,
             output_schema,
@@ -199,8 +203,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         })
     }
 
-    fn check_context(&self, actual: &OwnerContext) -> Result<(), OperationError> {
-        if actual == &self.config.owner_context() {
+    fn check_context(&self, actual: &PrincipalContext) -> Result<(), OperationError> {
+        if actual == &self.principal {
             Ok(())
         } else {
             Err(OperationError::new(
@@ -242,7 +246,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         }
     }
 
-    fn description_ref(&self, context: &OwnerContext) -> String {
+    fn description_ref(&self, context: &PrincipalContext) -> String {
         let mut digest = Sha256::new();
         digest.update(self.catalog_sha256.as_bytes());
         digest.update(b"\0");
@@ -260,7 +264,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
 
     fn describe(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: DescribeRequest,
     ) -> Result<OperationResult, OperationError> {
         require_operation(&request.operation_ref)?;
@@ -283,7 +287,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
 
     async fn invoke(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         require_operation(&request.operation_ref)?;
@@ -332,8 +336,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         let admission = AdmittedOperation::from_grant_decision(
             "asterisk",
             SIP_DIAL_OPERATION,
-            &context.tenant_id,
-            &context.agent_id,
+            context.tenant_id(),
+            context.actor_subject(),
             &self.config.connection.grant_ref,
             connection,
         );
@@ -379,8 +383,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                 execution_ref: &execution_ref,
                 operation_ref: SIP_DIAL_TOOL_REF,
                 connection_ref: &self.config.connection.connection_ref,
-                tenant_id: &context.tenant_id,
-                agent_id: &context.agent_id,
+                tenant_id: context.tenant_id(),
+                agent_id: context.actor_subject(),
                 action: "session_established",
                 termination: None,
             })
@@ -396,8 +400,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         let terminal_audit_ref = audit_ref.clone();
         let terminal_execution_ref = execution_ref.clone();
         let terminal_connection_ref = self.config.connection.connection_ref.clone();
-        let terminal_tenant_id = context.tenant_id.clone();
-        let terminal_agent_id = context.agent_id.clone();
+        let terminal_tenant_id = context.tenant_id().to_owned();
+        let terminal_agent_id = context.actor_subject().to_owned();
         tokio::spawn(async move {
             let _live_permit = live_permit;
             loop {
@@ -495,10 +499,32 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
 }
 
 #[async_trait]
-impl<L: SessionLauncher> OperationBackend for SipOperationBackend<L> {
+impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
+    fn capabilities(&self) -> BackendCapabilities {
+        BackendCapabilities::OPERATIONS
+    }
+
+    fn owns_operation(&self, request: &OperationRequest) -> bool {
+        match request {
+            OperationRequest::Describe(request) => request.operation_ref == SIP_DIAL_TOOL_REF,
+            OperationRequest::Invoke(request) => {
+                request.operation_ref == SIP_DIAL_TOOL_REF
+                    && request.connection_ref == self.config.connection.connection_ref
+            }
+            OperationRequest::SessionStatus(request)
+            | OperationRequest::SessionReconcile(request) => {
+                lock(&self.sessions).contains_key(&request.execution_ref)
+            }
+            OperationRequest::SessionTerminate(request) => {
+                lock(&self.sessions).contains_key(&request.execution_ref)
+            }
+            OperationRequest::Search(_) => false,
+        }
+    }
+
     async fn handle(
         &self,
-        context: &OwnerContext,
+        context: &PrincipalContext,
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         self.check_context(context)?;
@@ -583,31 +609,6 @@ impl<L: SessionLauncher> OperationBackend for SipOperationBackend<L> {
                     break;
                 }
             }
-        }
-    }
-}
-
-/// Safe backend used by zero-config personal mode before any Connection is configured.
-#[derive(Debug, Default)]
-pub struct RefusingBackend;
-
-#[async_trait]
-impl OperationBackend for RefusingBackend {
-    async fn handle(
-        &self,
-        _context: &OwnerContext,
-        request: OperationRequest,
-    ) -> Result<OperationResult, OperationError> {
-        match request {
-            OperationRequest::Search(_) => Ok(OperationResult::Search {
-                operations: Vec::new(),
-            }),
-            OperationRequest::SessionReconcile(_) => Err(OperationError::new(
-                OperationErrorCode::OutcomeUnknown,
-                "session outcome is unknown to this daemon generation",
-                false,
-            )),
-            _ => Err(not_found()),
         }
     }
 }
@@ -733,7 +734,7 @@ mod tests {
     use tokio::sync::watch;
 
     use super::*;
-    use crate::config::InitiationConfig;
+    use connectors_config::InitiationConfig;
 
     #[derive(Default)]
     struct FakeLauncher {
@@ -824,7 +825,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
 
     async fn description_ref(
         backend: &SipOperationBackend<FakeLauncher>,
-        context: &OwnerContext,
+        context: &PrincipalContext,
     ) -> String {
         match backend
             .handle(
@@ -863,7 +864,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         let launcher = Arc::new(FakeLauncher::default());
         let backend =
             SipOperationBackend::new(config(), Arc::clone(&launcher), root.path()).unwrap();
-        let context = backend.config.owner_context();
+        let context = backend.principal.clone();
 
         let search = backend
             .handle(
@@ -985,7 +986,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         configured.connection.initiation = InitiationConfig::Provider;
         let backend =
             SipOperationBackend::new(configured, Arc::clone(&launcher), root.path()).unwrap();
-        let context = backend.config.owner_context();
+        let context = backend.principal.clone();
         let lease = description_ref(&backend, &context).await;
         let refused = backend
             .handle(
@@ -1000,7 +1001,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         let alias_launcher = Arc::new(FakeLauncher::default());
         let alias_backend =
             SipOperationBackend::new(config(), Arc::clone(&alias_launcher), root.path()).unwrap();
-        let alias_context = alias_backend.config.owner_context();
+        let alias_context = alias_backend.principal.clone();
         let alias_lease = description_ref(&alias_backend, &alias_context).await;
         let mut changed_route = config();
         changed_route.application.resource = "different-voice-channel".to_owned();
@@ -1025,8 +1026,9 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         assert_eq!(unknown_alias.code, OperationErrorCode::NotGranted);
         assert!(lock(&alias_launcher.routes).is_empty());
 
-        let mut stale = context.clone();
-        stale.agent_revision += 1;
+        let mut stale_owner = backend.config.owner_context();
+        stale_owner.agent_revision += 1;
+        let stale = PrincipalContext::local(&stale_owner).unwrap();
         let stale = backend
             .handle(
                 &stale,
