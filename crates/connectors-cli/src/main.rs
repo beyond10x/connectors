@@ -242,6 +242,7 @@ enum MainError {
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     match Cli::parse().command {
         Command::Serve { config, state_root } => serve(config, state_root).await,
         Command::ServeHosted { config } => serve_hosted(&config).await,

@@ -23,6 +23,7 @@ connectors-client = { version = "0.1.0", path = "../connectors-client" }
 connectors-runtime = { version = "0.1.0", path = "../connectors-runtime" }
 protocol = { version = "0.1.0", path = "../protocol" }
 rpassword = "7"
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "time"] }
