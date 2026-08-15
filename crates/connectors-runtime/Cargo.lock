@@ -465,6 +465,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "zeroize",
 ]
 
 [[package]]
@@ -479,12 +480,14 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]
 name = "connectors-config"
 version = "0.1.0"
 dependencies = [
+ "connector-address",
  "domain",
  "protocol",
  "rustix",
@@ -506,6 +509,7 @@ dependencies = [
  "connectors-config",
  "futures-util",
  "hex",
+ "hosted-vault",
  "identity-http",
  "integration-kubernetes",
  "integration-monitoring",
@@ -1656,6 +1660,7 @@ dependencies = [
  "async-trait",
  "catalog",
  "connector-resolve",
+ "connector-secrets",
  "connectors-config",
  "domain",
  "ed25519-dalek",
@@ -3077,6 +3082,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+ "zeroize",
 ]
 
 [[package]]

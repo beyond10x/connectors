@@ -228,6 +228,12 @@ placements = ["personal"]
 connection_scopes = ["principal"]
 
 [[credential_sources]]
+id = "central-managed-vault"
+driver = "managed-store"
+placements = ["central"]
+connection_scopes = ["tenant"]
+
+[[credential_sources]]
 id = "organization-vault"
 driver = "secret-provider"
 provider_connection = "connection:organization-vault"
@@ -290,6 +296,13 @@ exist, but the current hosted Integrations do not consume a reusable provider cr
 composition now refuses a Vault-enabled configuration until such an Integration is selected and
 the store can be injected into that exact consumer. This keeps an available custody mechanism from
 becoming an inert wrapper or a misleading readiness claim.
+
+**2026-08-15 SIP consumer activation.** Hosted `sip.dial` is the first exact consumer. Its
+value-free deployment configuration names distinct username and password `CredentialRef` leaves;
+the runtime derives and pins the installation tenant, authenticates to Vault with the pod identity
+at startup, and resolves the pair only after voice-plan admission. Missing, unavailable, malformed,
+or cross-tenant material refuses the call. The Session Authority signing key remains deployment
+identity material and is deliberately not reclassified as a provider credential.
 
 1. Replace the development `FileStore` release path with an OS-keychain backend while preserving
    the existing prepared transaction and crash-recovery contract.

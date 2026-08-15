@@ -8,7 +8,8 @@ mod personal;
 
 pub use hosted::{
     HostedIdentityConfig, HostedKubernetesConfig, HostedListenerConfig, HostedServerConfig,
-    HostedServerConfigError, HostedSipConfig, HostedStorageConfig, HostedVaultConfig,
+    HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig, HostedStorageConfig,
+    HostedVaultConfig,
 };
 pub use personal::{
     AuthorityConfig, ConfigError, GrafanaIntegrationConfig, InitiationConfig,

@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use connector_address::credential::CredentialRef;
+
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
@@ -62,6 +64,18 @@ pub struct HostedSipConfig {
     pub listen: Option<SocketAddr>,
     #[serde(default)]
     pub deployment_config: Option<PathBuf>,
+    #[serde(default)]
+    pub credentials: Option<HostedSipCredentialConfig>,
+}
+
+/// Value-free Vault addresses for the optional SIP digest challenge response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedSipCredentialConfig {
+    pub authority: String,
+    pub service: String,
+    pub username_credential: String,
+    pub password_credential: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +138,24 @@ impl HostedServerConfig {
             && self.vault.role.is_none()
             && self.vault.token_file.is_none()
             && self.vault.ca_file.is_none();
+        let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
+        let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
+            CredentialRef::new(
+                &self.tenant_id,
+                &credentials.authority,
+                &credentials.service,
+                &credentials.username_credential,
+            )
+            .is_ok()
+                && CredentialRef::new(
+                    &self.tenant_id,
+                    &credentials.authority,
+                    &credentials.service,
+                    &credentials.password_credential,
+                )
+                .is_ok()
+                && credentials.username_credential != credentials.password_credential
+        });
         if !valid_ref(&self.tenant_id, 256)
             || self.identity.origin.len() > 2_048
             || !valid_base_path(&self.server.base_path)
@@ -134,10 +166,12 @@ impl HostedServerConfig {
                 .namespaces
                 .iter()
                 .any(|namespace| !valid_dns_label(namespace, 63))
-            || (self.sip.enabled
-                != (self.sip.listen.is_some() && self.sip.deployment_config.is_some()))
+            || (self.sip.enabled != sip_complete)
+            || !sip_credentials_valid
             || (self.vault.enabled && !vault_complete)
             || (!self.vault.enabled && !vault_empty)
+            || (self.vault.enabled != self.sip.credentials.is_some())
+            || (self.vault.enabled && !self.sip.enabled)
             || !valid_dns_label(&self.vault.mount, 63)
         {
             return Err(HostedServerConfigError::Invalid);
@@ -278,7 +312,14 @@ role = "b10x-connectors"
 token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 ca_file = "/etc/b10x-vault-ca/ca.crt"
 [sip]
-enabled = false
+enabled = true
+listen = "0.0.0.0:5060"
+deployment_config = "/etc/b10x-connectors-sip/deployment.toml"
+[sip.credentials]
+authority = "org.asterisk.ari"
+service = "default"
+username_credential = "sip_username"
+password_credential = "sip_password"
 "#,
         )
         .unwrap();
@@ -296,7 +337,51 @@ enabled = false
             "a disabled Vault cannot retain even one runtime identity field"
         );
         inconsistent.vault.token_file = None;
+        inconsistent.sip.credentials = None;
         inconsistent.validate().unwrap();
+    }
+
+    #[test]
+    fn hosted_vault_requires_a_valid_distinct_sip_digest_pair() {
+        let mut config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = true
+listen = "0.0.0.0:5060"
+deployment_config = "/etc/b10x-connectors-sip/deployment.toml"
+[sip.credentials]
+authority = "org.asterisk.ari"
+service = "default"
+username_credential = "sip_username"
+password_credential = "sip_password"
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        config.sip.credentials.as_mut().unwrap().password_credential = "sip_username".to_owned();
+        assert!(config.validate().is_err());
+        config.sip.credentials.as_mut().unwrap().password_credential = "sip.password".to_owned();
+        assert!(config.validate().is_err());
+        config.sip.credentials = None;
+        assert!(config.validate().is_err());
     }
 
     #[test]

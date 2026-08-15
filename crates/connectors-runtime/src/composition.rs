@@ -7,10 +7,13 @@ use std::sync::Arc;
 
 use connector_secrets::{FileStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connectors_config::{HostedServerConfig, PersonalConfig};
+use hosted_vault::HostedVaultStore;
 use identity_http::IdentityHttpVerifier;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
-use integration_sip::{load_authority_issuer, RuntimeLauncher, SipOperationBackend};
+use integration_sip::{
+    load_authority_issuer, RuntimeLauncher, SipOperationBackend, StoredSipCredentials,
+};
 use integration_slack::SlackBackend;
 use serde_json::{json, Value};
 use server::local::LocalOperationDaemon;
@@ -49,8 +52,8 @@ pub enum RuntimeError {
     Daemon(#[from] server::local::LocalDaemonError),
     #[error("the personal credential store could not be opened")]
     CredentialStore,
-    #[error("hosted Vault is configured but no hosted Integration consumes a credential store")]
-    UnconsumedCredentialStore,
+    #[error(transparent)]
+    HostedVault(#[from] hosted_vault::HostedVaultError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -232,10 +235,14 @@ impl HostedRuntime {
     /// Build the hosted backend registry and bind its TCP listener.
     pub async fn bind(config_path: &Path) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
-        if config.vault.enabled {
-            return Err(RuntimeError::UnconsumedCredentialStore);
-        }
         validate_state_root(&config.storage.state_root)?;
+        let credential_store: Option<Arc<dyn SecretStore>> = if config.vault.enabled {
+            let store = HostedVaultStore::new(&config.vault)?;
+            store.initialize().await?;
+            Some(Arc::new(store))
+        } else {
+            None
+        };
         let identity_origin = url::Url::parse(&config.identity.origin)
             .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
         let verifier = Arc::new(IdentityHttpVerifier::new(
@@ -257,7 +264,7 @@ impl HostedRuntime {
                 .deployment_config
                 .as_deref()
                 .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
-            let personal = PersonalConfig::read(deployment_config)?;
+            let personal = PersonalConfig::read_hosted(deployment_config)?;
             let voice = personal
                 .voice()?
                 .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
@@ -271,12 +278,31 @@ impl HostedRuntime {
                 return Err(connectors_config::HostedServerConfigError::Invalid.into());
             }
             let issuer = Arc::new(load_authority_issuer(&voice.authority)?);
-            let launcher = Arc::new(RuntimeLauncher::new(
-                issuer,
-                voice.application.endpoint.clone(),
-                voice.application.connect_address,
-                voice.application.tls_server_name.clone(),
-            ));
+            let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
+                let store = credential_store
+                    .as_ref()
+                    .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                    .clone();
+                let source = Arc::new(StoredSipCredentials::new(
+                    store,
+                    config.tenant_id.clone(),
+                    credentials,
+                )?);
+                Arc::new(RuntimeLauncher::with_credential_source(
+                    issuer,
+                    voice.application.endpoint.clone(),
+                    voice.application.connect_address,
+                    voice.application.tls_server_name.clone(),
+                    source,
+                ))
+            } else {
+                Arc::new(RuntimeLauncher::new(
+                    issuer,
+                    voice.application.endpoint.clone(),
+                    voice.application.connect_address,
+                    voice.application.tls_server_name.clone(),
+                ))
+            };
             backends.push(Arc::new(SipOperationBackend::new(
                 voice,
                 launcher,

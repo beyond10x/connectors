@@ -11,6 +11,7 @@ publish = false
 workspace = "../connectors-runtime"
 
 [dependencies]
+connector-address = { version = "0.1.0", path = "../connector-address" }
 domain = { version = "0.1.0", path = "../domain" }
 protocol = { version = "0.1.0", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
