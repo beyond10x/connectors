@@ -2,6 +2,26 @@
   "contract": "b10x.connector-connection.v0alpha1",
   "cases": [
     {
+      "name": "candidate-search-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-candidates-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"candidate_search","params":{"integration_ref":"kubernetes","query":"dev","limit":32}}
+      }
+    },
+    {
+      "name": "candidate-activate-cannot-select-credential-source",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha1",
+        "request_id": "request-candidate-activate-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"candidate_activate","params":{"candidate_ref":"candidate:kubernetes:1","label":"Development cluster","kubeconfig":"/tmp/config"}}
+      }
+    },
+    {
       "name": "connect-session-create-valid",
       "valid": true,
       "frame": {

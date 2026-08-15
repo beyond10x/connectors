@@ -30,6 +30,10 @@ pub struct RequestEnvelope {
     deny_unknown_fields
 )]
 pub enum ConnectionRequest {
+    /// Passively enumerate local, value-free Integration candidates before any provider contact.
+    CandidateSearch(CandidateSearchRequest),
+    /// Explicitly activate one opaque candidate and create its direct Connection.
+    CandidateActivate(CandidateActivateRequest),
     Search(SearchRequest),
     Describe(DescribeRequest),
     /// Read stored observations only. An active provider refresh remains an admitted operation.
@@ -38,6 +42,22 @@ pub enum ConnectionRequest {
     Materialize(MaterializeRequest),
     ConnectSessionCreate(ConnectSessionCreateRequest),
     ConnectSessionStatus(ConnectSessionStatusRequest),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CandidateSearchRequest {
+    pub integration_ref: String,
+    pub query: String,
+    pub limit: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CandidateActivateRequest {
+    /// Opaque candidate identity. Credential-source and provider routes remain Connector-owned.
+    pub candidate_ref: String,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -164,6 +184,26 @@ pub enum DiscoveryObservationState {
     Withdrawn,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionCandidateState {
+    Detected,
+    Activated,
+}
+
+/// Value-free projection of a potential direct Connection found in trusted local configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectionCandidateSummary {
+    pub candidate_ref: String,
+    pub integration_ref: String,
+    pub title: String,
+    pub state: ConnectionCandidateState,
+    pub evidence_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_ref: Option<String>,
+}
+
 /// Value-free projection of one already-reconciled discovery observation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -216,6 +256,10 @@ pub struct ConnectSessionStatus {
     deny_unknown_fields
 )]
 pub enum ConnectionResult {
+    CandidateSearch {
+        candidates: Vec<ConnectionCandidateSummary>,
+    },
+    CandidateActivate(ConnectionDescription),
     Search {
         connections: Vec<ConnectionSummary>,
     },
@@ -286,6 +330,23 @@ impl RequestEnvelope {
         }
         validate_context(&self.context)?;
         match &self.request {
+            ConnectionRequest::CandidateSearch(request) => {
+                require_ref(&request.integration_ref)?;
+                if request.query.len() > 512
+                    || request.limit == 0
+                    || request.limit > MAX_SEARCH_RESULTS
+                {
+                    return Err(invalid_input(
+                        "connection candidate search bounds are invalid",
+                    ));
+                }
+            }
+            ConnectionRequest::CandidateActivate(request) => {
+                require_ref(&request.candidate_ref)?;
+                if request.label.trim().is_empty() || request.label.len() > 256 {
+                    return Err(invalid_input("connection label is invalid"));
+                }
+            }
             ConnectionRequest::Search(request) => {
                 if request.query.len() > 512
                     || request.limit == 0
@@ -361,6 +422,37 @@ impl ResponseEnvelope {
 
 fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
     match result {
+        ConnectionResult::CandidateSearch { candidates } => {
+            if candidates.len() > usize::from(MAX_SEARCH_RESULTS) {
+                return Err(protocol_refusal());
+            }
+            for candidate in candidates {
+                if !valid_ref(&candidate.candidate_ref, 512)
+                    || !valid_ref(&candidate.integration_ref, 512)
+                    || candidate.title.trim().is_empty()
+                    || candidate.title.len() > 256
+                    || candidate.evidence_sha256.len() != 64
+                    || !candidate
+                        .evidence_sha256
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit())
+                    || candidate
+                        .connection_ref
+                        .as_deref()
+                        .is_some_and(|value| !valid_ref(value, 512))
+                {
+                    return Err(protocol_refusal());
+                }
+                match candidate.state {
+                    ConnectionCandidateState::Detected if candidate.connection_ref.is_none() => {}
+                    ConnectionCandidateState::Activated if candidate.connection_ref.is_some() => {}
+                    _ => return Err(protocol_refusal()),
+                }
+            }
+        }
+        ConnectionResult::CandidateActivate(description) => {
+            validate_description(description)?;
+        }
         ConnectionResult::Search { connections } => {
             if connections.len() > usize::from(MAX_SEARCH_RESULTS) {
                 return Err(protocol_refusal());
@@ -370,19 +462,7 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
             }
         }
         ConnectionResult::Describe(description) | ConnectionResult::Materialize(description) => {
-            validate_summary(&description.summary)?;
-            if description.channels.len() > 64 {
-                return Err(protocol_refusal());
-            }
-            for channel in &description.channels {
-                require_ref(&channel.channel_ref)?;
-                require_ref(&channel.binding_ref)?;
-                if channel.events.len() > 64
-                    || channel.events.iter().any(|event| !valid_ref(event, 512))
-                {
-                    return Err(protocol_refusal());
-                }
-            }
+            validate_description(description)?;
         }
         ConnectionResult::ObservationSearch { observations } => {
             if observations.len() > usize::from(MAX_SEARCH_RESULTS) {
@@ -419,6 +499,21 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
                         && session.connection_ref.is_none() => {}
                 _ => return Err(protocol_refusal()),
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_description(description: &ConnectionDescription) -> Result<(), ConnectionError> {
+    validate_summary(&description.summary)?;
+    if description.channels.len() > 64 {
+        return Err(protocol_refusal());
+    }
+    for channel in &description.channels {
+        require_ref(&channel.channel_ref)?;
+        require_ref(&channel.binding_ref)?;
+        if channel.events.len() > 64 || channel.events.iter().any(|event| !valid_ref(event, 512)) {
+            return Err(protocol_refusal());
         }
     }
     Ok(())
@@ -697,5 +792,53 @@ mod tests {
         )
         .validate()
         .unwrap();
+    }
+
+    #[test]
+    fn candidates_are_value_free_and_activation_selects_no_route() {
+        let search = RequestEnvelope {
+            protocol: CONTRACT.to_owned(),
+            request_id: "candidate-search-1".to_owned(),
+            context: context(),
+            request: ConnectionRequest::CandidateSearch(CandidateSearchRequest {
+                integration_ref: "kubernetes".to_owned(),
+                query: "dev".to_owned(),
+                limit: 32,
+            }),
+        };
+        search.validate().unwrap();
+        let response = ResponseEnvelope::success(
+            "candidate-search-1",
+            ConnectionResult::CandidateSearch {
+                candidates: vec![ConnectionCandidateSummary {
+                    candidate_ref: "candidate:kubernetes:opaque".to_owned(),
+                    integration_ref: "kubernetes".to_owned(),
+                    title: "development".to_owned(),
+                    state: ConnectionCandidateState::Detected,
+                    evidence_sha256: "a".repeat(64),
+                    connection_ref: None,
+                }],
+            },
+        );
+        response.validate().unwrap();
+        let encoded = serde_json::to_string(&response).unwrap();
+        assert!(!encoded.contains("kubeconfig"));
+        assert!(!encoded.contains("server_url"));
+        assert!(!encoded.contains("credential"));
+
+        let activation: Result<RequestEnvelope, _> = serde_json::from_value(serde_json::json!({
+            "protocol": CONTRACT,
+            "request_id": "candidate-activate-bad",
+            "context": context(),
+            "request": {
+                "method": "candidate_activate",
+                "params": {
+                    "candidate_ref": "candidate:kubernetes:opaque",
+                    "label": "development",
+                    "server_url": "https://cluster.example"
+                }
+            }
+        }));
+        assert!(activation.is_err());
     }
 }

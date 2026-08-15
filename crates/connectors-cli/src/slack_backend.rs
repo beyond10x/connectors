@@ -250,6 +250,16 @@ impl OperationBackend for SlackBackend {
     ) -> Result<ConnectionResult, ConnectionError> {
         self.inner.check_connection_context(context)?;
         match request {
+            ConnectionRequest::CandidateSearch(request) => {
+                self.operation
+                    .handle_connection(context, ConnectionRequest::CandidateSearch(request))
+                    .await
+            }
+            ConnectionRequest::CandidateActivate(request) => {
+                self.operation
+                    .handle_connection(context, ConnectionRequest::CandidateActivate(request))
+                    .await
+            }
             ConnectionRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
                 let stored = lock(&self.inner.metadata).connections.clone();

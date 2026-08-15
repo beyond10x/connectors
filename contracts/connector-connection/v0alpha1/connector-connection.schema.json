@@ -27,6 +27,8 @@
     },
     "request": {
       "oneOf": [
+        {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"candidate_search"},"params":{"type":"object","additionalProperties":false,"required":["integration_ref","query","limit"],"properties":{"integration_ref":{"$ref":"#/$defs/ref"},"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":64}}}}},
+        {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"candidate_activate"},"params":{"type":"object","additionalProperties":false,"required":["candidate_ref","label"],"properties":{"candidate_ref":{"$ref":"#/$defs/ref"},"label":{"type":"string","minLength":1,"maxLength":256}}}}},
         {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"search"},"params":{"type":"object","additionalProperties":false,"required":["query","limit"],"properties":{"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":64}}}}},
         {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"describe"},"params":{"type":"object","additionalProperties":false,"required":["connection_ref"],"properties":{"connection_ref":{"$ref":"#/$defs/ref"}}}}},
         {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"observation_search"},"params":{"type":"object","additionalProperties":false,"required":["source_connection_ref","query","limit"],"properties":{"source_connection_ref":{"$ref":"#/$defs/ref"},"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":64}}}}},
@@ -92,6 +94,17 @@
         "connection_ref":{"$ref":"#/$defs/ref"}
       }
     },
+    "connection_candidate": {
+      "type":"object","additionalProperties":false,
+      "required":["candidate_ref","integration_ref","title","state","evidence_sha256"],
+      "properties": {
+        "candidate_ref":{"$ref":"#/$defs/ref"},"integration_ref":{"$ref":"#/$defs/ref"},
+        "title":{"type":"string","minLength":1,"maxLength":256},
+        "state":{"enum":["detected","activated"]},
+        "evidence_sha256":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},
+        "connection_ref":{"$ref":"#/$defs/ref"}
+      }
+    },
     "discovery_observation": {
       "type":"object","additionalProperties":false,
       "required":["observation_ref","discovery_ref","source_connection_ref","observed_type","title","state","evidence_generation","evidence_sha256"],
@@ -108,6 +121,8 @@
     },
     "result": {
       "oneOf": [
+        {"type":"object","additionalProperties":false,"required":["result","value"],"properties":{"result":{"const":"candidate_search"},"value":{"type":"object","additionalProperties":false,"required":["candidates"],"properties":{"candidates":{"type":"array","maxItems":64,"items":{"$ref":"#/$defs/connection_candidate"}}}}}},
+        {"type":"object","additionalProperties":false,"required":["result","value"],"properties":{"result":{"const":"candidate_activate"},"value":{"$ref":"#/$defs/connection_description"}}},
         {"type":"object","additionalProperties":false,"required":["result","value"],"properties":{"result":{"const":"search"},"value":{"type":"object","additionalProperties":false,"required":["connections"],"properties":{"connections":{"type":"array","maxItems":64,"items":{"$ref":"#/$defs/connection_summary"}}}}}},
         {"type":"object","additionalProperties":false,"required":["result","value"],"properties":{"result":{"const":"describe"},"value":{"$ref":"#/$defs/connection_description"}}},
         {"type":"object","additionalProperties":false,"required":["result","value"],"properties":{"result":{"const":"observation_search"},"value":{"type":"object","additionalProperties":false,"required":["observations"],"properties":{"observations":{"type":"array","maxItems":64,"items":{"$ref":"#/$defs/discovery_observation"}}}}}},

@@ -29,6 +29,8 @@ ed25519-dalek = "2"
 getrandom = "0.3"
 hex = "0.4"
 futures-util = "0.3"
+k8s-openapi = { version = "0.28", features = ["v1_32"] }
+kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring"] }
 protocol = { version = "0.1.0", path = "../protocol" }
 rustls = "0.23"
 rustix = { version = "1.1.4", features = ["fs", "process"] }
