@@ -16,13 +16,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
-use catalog::Placement as CredentialPlacement;
-use connector_resolve::auth::Assembled;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use connector_resolve::document::{Document, ProtocolDriver};
 use connectors_config::B10xIntegrationConfig;
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
 use driver_audio::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use driver_cdp::LocalBrowserDriver;
+use ed25519_dalek::pkcs8::DecodePrivateKey as _;
+use ed25519_dalek::{Signer as _, SigningKey};
 use protocol::audio::{
     SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_SPEAK_TOOL_REF, SPEECH_STATUS_OPERATION,
     SPEECH_STATUS_TOOL_REF,
@@ -46,7 +47,7 @@ use protocol::operation::{
     ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use service::{
     admit_audio_plan, admit_browser_address, admit_browser_plan, admit_speech_speak,
@@ -60,15 +61,16 @@ mod work_events;
 
 use audit::{AuditEvent, AuditJournal};
 use policy::{
-    all_operation_rows, approval, check_approval, effect, operation_row, post_dispatch_error,
-    response_schema,
+    all_operation_rows, approval, check_approval, effect, module_operation, operation_row,
+    post_dispatch_error, response_schema,
 };
 use work_events::WorkEventStore;
 
 const PROVIDER: &str = "b10x";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
-const MAX_BEARER_BYTES: u64 = 512;
-const ONTOLOGY_BEARER_CREDENTIAL: &str = "b10x.internal.ontology_bearer";
+const MODULE_REQUEST_TYPE: &str = "b10x.module-request.v1+jws";
+const MODULE_AUTHORIZATION_SCHEME: &str = "DLModule ";
+const MODULE_REQUEST_TTL_SECONDS: u64 = 30;
 const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const HTTP_TOTAL_TIMEOUT: Duration = Duration::from_secs(30);
 const WORK_EVENT_CHANNEL: &str = "event-channel:b10x:work";
@@ -247,7 +249,7 @@ pub enum B10xIntegrationError {
 #[derive(Clone)]
 enum PrincipalAdmission {
     Exact(PrincipalContext),
-    Tenant(String),
+    Tenants(BTreeSet<String>),
 }
 
 /// One composed B10x Provider backend.
@@ -264,6 +266,133 @@ pub struct B10xBackend {
     browser: Option<Arc<Mutex<Option<LocalBrowserDriver>>>>,
     audit: AuditJournal,
     work_events: WorkEventStore,
+    module_signer: Option<ModuleSigner>,
+}
+
+struct ModuleSigner {
+    issuer: String,
+    kid: String,
+    key: SigningKey,
+}
+
+#[derive(Serialize)]
+struct ModuleProtectedHeader<'a> {
+    alg: &'static str,
+    kid: &'a str,
+    typ: &'static str,
+}
+
+#[derive(Serialize)]
+struct ModuleRequestClaims<'a> {
+    iss: &'a str,
+    aud: &'a str,
+    tenant_id: &'a str,
+    sub: &'a str,
+    act: &'a str,
+    operation: &'a str,
+    method: &'a str,
+    target: &'a str,
+    body_sha256: String,
+    idempotency_key_sha256: Option<String>,
+    authority_snapshot_id: &'a str,
+    authority_snapshot_sha256: &'a str,
+    grants: [&'a str; 1],
+    iat: u64,
+    nbf: u64,
+    exp: u64,
+    jti: String,
+}
+
+impl ModuleSigner {
+    fn load(
+        config: &B10xIntegrationConfig,
+    ) -> Result<Option<Self>, B10xIntegrationError> {
+        if config.work_origin.is_none() && config.ontology_origin.is_none() {
+            return Ok(None);
+        }
+        let encoded = read_owner_key(
+            config
+                .module_signing_key_file
+                .as_deref()
+                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+        )
+        .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+        let key = if encoded.starts_with("-----BEGIN PRIVATE KEY-----") {
+            SigningKey::from_pkcs8_pem(&encoded)
+                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?
+        } else {
+            let decoded = URL_SAFE_NO_PAD
+                .decode(encoded)
+                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+            let bytes: [u8; 32] = decoded
+                .try_into()
+                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+            SigningKey::from_bytes(&bytes)
+        };
+        Ok(Some(Self {
+            issuer: config
+                .module_signing_issuer
+                .clone()
+                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+            kid: config
+                .module_signing_key_id
+                .clone()
+                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+            key,
+        }))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn authorization(
+        &self,
+        context: &PrincipalContext,
+        audience: &str,
+        operation: &str,
+        method: &str,
+        target: &str,
+        body: &[u8],
+        idempotency_key: Option<&str>,
+    ) -> Result<String, OperationError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| unavailable())?
+            .as_secs();
+        let protected = ModuleProtectedHeader {
+            alg: "EdDSA",
+            kid: &self.kid,
+            typ: MODULE_REQUEST_TYPE,
+        };
+        let claims = ModuleRequestClaims {
+            iss: &self.issuer,
+            aud: audience,
+            tenant_id: context.tenant_id(),
+            sub: context.subject(),
+            act: context.actor_subject(),
+            operation,
+            method,
+            target,
+            body_sha256: format!("{:x}", Sha256::digest(body)),
+            idempotency_key_sha256: idempotency_key
+                .map(|value| format!("{:x}", Sha256::digest(value.as_bytes()))),
+            authority_snapshot_id: context.authority_snapshot_id(),
+            authority_snapshot_sha256: context.authority_snapshot_sha256(),
+            grants: [operation],
+            iat: now,
+            nbf: now,
+            exp: now.saturating_add(MODULE_REQUEST_TTL_SECONDS),
+            jti: opaque_ref("module-request")?,
+        };
+        let protected =
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&protected).map_err(|_| unavailable())?);
+        let claims =
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(|_| unavailable())?);
+        let signing_input = format!("{protected}.{claims}");
+        let signature = self.key.sign(signing_input.as_bytes());
+        Ok(format!(
+            "{MODULE_AUTHORIZATION_SCHEME}{signing_input}.{}",
+            URL_SAFE_NO_PAD.encode(signature.to_bytes())
+        ))
+    }
 }
 
 impl B10xBackend {
@@ -279,10 +408,17 @@ impl B10xBackend {
     /// Compose a hosted backend for Identity-verified principals in one tenant.
     pub fn hosted(
         config: B10xIntegrationConfig,
-        tenant_id: String,
+        tenant_ids: Vec<String>,
         state_root: &Path,
     ) -> Result<Self, B10xIntegrationError> {
-        Self::new(config, PrincipalAdmission::Tenant(tenant_id), state_root)
+        if tenant_ids.is_empty() {
+            return Err(B10xIntegrationError::InvalidConfiguration);
+        }
+        Self::new(
+            config,
+            PrincipalAdmission::Tenants(tenant_ids.into_iter().collect()),
+            state_root,
+        )
     }
 
     fn new(
@@ -290,6 +426,14 @@ impl B10xBackend {
         admission: PrincipalAdmission,
         state_root: &Path,
     ) -> Result<Self, B10xIntegrationError> {
+        let legacy_event_tenant = match &admission {
+            PrincipalAdmission::Exact(principal) => Some(principal.tenant_id().to_owned()),
+            PrincipalAdmission::Tenants(tenants) if tenants.len() == 1 => {
+                tenants.iter().next().cloned()
+            }
+            PrincipalAdmission::Tenants(_) => None,
+        };
+        let module_signer = ModuleSigner::load(&config)?;
         let document = Document::parse(DOCUMENT)
             .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
         let catalog: Value = serde_json::from_str(DOCUMENT)
@@ -305,6 +449,11 @@ impl B10xBackend {
                     .map_err(|_| B10xIntegrationError::InvalidConfiguration)?,
             )
         );
+        let work_events = WorkEventStore::open(
+            state_root.join("b10x-work-events.json"),
+            legacy_event_tenant.as_deref(),
+        )
+        .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
         Ok(Self {
             audio: config.audio_route().map(|_| Arc::new(Mutex::new(None))),
             browser: config.browser_route().map(|_| Arc::new(Mutex::new(None))),
@@ -317,8 +466,8 @@ impl B10xBackend {
             catalog_sha256: format!("{:x}", Sha256::digest(DOCUMENT.as_bytes())),
             deployment_sha256,
             audit: AuditJournal::new(state_root.join("b10x-operation-audit.jsonl")),
-            work_events: WorkEventStore::open(state_root.join("b10x-work-events.json"))
-                .map_err(|()| B10xIntegrationError::InvalidConfiguration)?,
+            work_events,
+            module_signer,
         })
     }
 
@@ -349,7 +498,7 @@ impl B10xBackend {
     fn context_admitted(&self, context: &PrincipalContext) -> bool {
         match &self.admission {
             PrincipalAdmission::Exact(expected) => expected == context,
-            PrincipalAdmission::Tenant(tenant) => tenant == context.tenant_id(),
+            PrincipalAdmission::Tenants(tenants) => tenants.contains(context.tenant_id()),
         }
     }
 
@@ -528,7 +677,10 @@ impl B10xBackend {
         let dispatched = match operation.protocol_driver() {
             ProtocolDriver::AudioV1 => self.invoke_audio(canonical, plan, request.input).await,
             ProtocolDriver::CdpV1 => self.invoke_browser(canonical, plan, request.input).await,
-            ProtocolDriver::HttpV1 => self.invoke_http(canonical, operation, request.input).await,
+            ProtocolDriver::HttpV1 => {
+                self.invoke_http(context, canonical, operation, request.input)
+                    .await
+            }
             ProtocolDriver::SipV1 => Err(unavailable()),
         };
         let dispatched = match dispatched {
@@ -776,13 +928,14 @@ impl B10xBackend {
 
     async fn invoke_http(
         &self,
+        context: &PrincipalContext,
         canonical: &str,
         operation: &connector_resolve::document::Operation,
         input: Value,
     ) -> Result<Value, OperationError> {
         tokio::time::timeout(
             self.http_total_timeout,
-            self.invoke_http_within_deadline(canonical, operation, input),
+            self.invoke_http_within_deadline(context, canonical, operation, input),
         )
         .await
         .map_err(|_| unavailable())?
@@ -790,28 +943,13 @@ impl B10xBackend {
 
     async fn invoke_http_within_deadline(
         &self,
+        context: &PrincipalContext,
         canonical: &str,
         operation: &connector_resolve::document::Operation,
         input: Value,
     ) -> Result<Value, OperationError> {
         let origin = self.origin(canonical).ok_or_else(unavailable)?;
-        let credentials = if is_ontology_operation(canonical) {
-            vec![Assembled::new(
-                ONTOLOGY_BEARER_CREDENTIAL,
-                read_bearer(
-                    self.config
-                        .ontology_bearer_file
-                        .as_deref()
-                        .ok_or_else(not_granted)?,
-                )?,
-                CredentialPlacement::Header {
-                    name: "Authorization",
-                    prefix: "Bearer ",
-                },
-            )]
-        } else {
-            Vec::new()
-        };
+        let credentials = Vec::new();
         let plan =
             connector_resolve::resolve(operation, &origin, &input, &BTreeMap::new(), &credentials)
                 .map_err(|_| invalid())?;
@@ -821,11 +959,45 @@ impl B10xBackend {
         same_origin(&origin, &target)
             .then_some(())
             .ok_or_else(not_granted)?;
-        let mut outbound = self.client.request(method, target);
+        let request_method = plan.request.method.clone();
+        let target_binding = match target.query() {
+            Some(query) => format!("{}?{query}", target.path()),
+            None => target.path().to_owned(),
+        };
+        let body = plan.request.body.unwrap_or_default();
+        let idempotency_key = plan
+            .request
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("idempotency-key"))
+            .map(|(_, value)| value.as_str());
+        let operation = module_operation(canonical).ok_or_else(not_granted)?;
+        let audience = if canonical.starts_with("work-") {
+            "urn:b10x:module:work"
+        } else {
+            "urn:b10x:module:ontology"
+        };
+        let authorization = self
+            .module_signer
+            .as_ref()
+            .ok_or_else(not_granted)?
+            .authorization(
+                context,
+                audience,
+                operation,
+                &request_method,
+                &target_binding,
+                body.as_bytes(),
+                idempotency_key,
+            )?;
+        let mut outbound = self
+            .client
+            .request(method, target)
+            .header(reqwest::header::AUTHORIZATION, authorization);
         for (name, value) in plan.request.headers {
             outbound = outbound.header(name, value);
         }
-        if let Some(body) = plan.request.body {
+        if !body.is_empty() {
             outbound = outbound.body(body);
         }
         let mut response = outbound.send().await.map_err(|_| unavailable())?;
@@ -870,20 +1042,39 @@ impl B10xBackend {
         }
     }
 
-    async fn refresh_work_events(&self) -> Result<(), EventError> {
+    async fn refresh_work_events(&self, context: &PrincipalContext) -> Result<(), EventError> {
         let origin = self.config.work_origin().ok_or_else(event_not_granted)?;
         let mut url = reqwest::Url::parse(&format!("{origin}/api/work/v2/events"))
             .map_err(|_| event_protocol())?;
         {
             let mut query = url.query_pairs_mut();
-            if let Some(cursor) = self.work_events.owner_cursor()? {
+            if let Some(cursor) = self.work_events.owner_cursor(context.tenant_id())? {
                 query.append_pair("cursor", &cursor);
             }
             query.append_pair("limit", "100");
         }
+        let target = match url.query() {
+            Some(query) => format!("{}?{query}", url.path()),
+            None => url.path().to_owned(),
+        };
+        let authorization = self
+            .module_signer
+            .as_ref()
+            .ok_or_else(event_not_granted)?
+            .authorization(
+                context,
+                "urn:b10x:module:work",
+                "module.events.read",
+                "GET",
+                &target,
+                &[],
+                None,
+            )
+            .map_err(|_| event_not_granted())?;
         let response = self
             .client
             .get(url)
+            .header(reqwest::header::AUTHORIZATION, authorization)
             .send()
             .await
             .map_err(|_| event_unavailable())?;
@@ -943,7 +1134,8 @@ impl B10xBackend {
                 },
             ));
         }
-        self.work_events.append(page.next_cursor, events)
+        self.work_events
+            .append(context.tenant_id(), page.next_cursor, events)
     }
 }
 
@@ -1120,10 +1312,12 @@ impl ConnectorBackend for B10xBackend {
                     .unwrap_or("0")
                     .parse::<u64>()
                     .map_err(|_| event_invalid())?;
-                self.refresh_work_events().await?;
-                let (events, next) = self
-                    .work_events
-                    .receive(after, usize::from(request.limit))?;
+                self.refresh_work_events(context).await?;
+                let (events, next) = self.work_events.receive(
+                    context.tenant_id(),
+                    after,
+                    usize::from(request.limit),
+                )?;
                 Ok(EventResult::Receive {
                     events,
                     next: next.to_string(),
@@ -1132,7 +1326,7 @@ impl ConnectorBackend for B10xBackend {
             EventRequest::Replay(request) => {
                 let event = self
                     .work_events
-                    .replay(&request.event_ref)?
+                    .replay(context.tenant_id(), &request.event_ref)?
                     .ok_or_else(event_not_found)?;
                 Ok(EventResult::Replay(event))
             }
@@ -1281,7 +1475,7 @@ fn valid_ontology_ref(value: &str) -> bool {
             .all(|character| !character.is_whitespace() && !character.is_control())
 }
 
-fn read_bearer(path: &Path) -> Result<String, OperationError> {
+fn read_owner_key(path: &Path) -> Result<String, OperationError> {
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
@@ -1291,18 +1485,21 @@ fn read_bearer(path: &Path) -> Result<String, OperationError> {
     if !metadata.is_file()
         || metadata.uid() != rustix::process::geteuid().as_raw()
         || metadata.permissions().mode() & 0o077 != 0
-        || metadata.len() > MAX_BEARER_BYTES
+        || metadata.len() > 4096
     {
         return Err(not_granted());
     }
     let mut value = String::new();
     (&mut file)
-        .take(MAX_BEARER_BYTES + 1)
+        .take(4097)
         .read_to_string(&mut value)
         .map_err(|_| not_granted())?;
     let value = value.trim_end_matches(['\r', '\n']);
-    if !(32..=MAX_BEARER_BYTES as usize).contains(&value.len())
-        || !value.bytes().all(|byte| byte.is_ascii_graphic())
+    if value.len() < 32
+        || value.len() > 4096
+        || value
+            .chars()
+            .any(|character| character.is_control() && !matches!(character, '\r' | '\n'))
     {
         return Err(not_granted());
     }
