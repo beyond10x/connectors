@@ -529,16 +529,18 @@ impl SlackInner {
         let endpoint =
             BoundCompletionEndpoint::bind(&directory, &id).map_err(|_| connection_unavailable())?;
         let endpoint_path = endpoint.path().to_path_buf();
+        let browser_completion_url = endpoint.browser_url();
         let expires_at_unix_ms = now_ms()
             .and_then(|now| {
                 now.checked_add(self.policy.connect_session_ttl_seconds.saturating_mul(1000))
             })
             .ok_or_else(connection_unavailable)?;
-        let status = match lock(&self.sessions).reserve(
+        let status = match lock(&self.sessions).reserve_with_browser(
             session_ref.clone(),
             label,
             expires_at_unix_ms,
             endpoint_path.display().to_string(),
+            Some(browser_completion_url),
         ) {
             Ok(status) => status,
             Err(error) => {

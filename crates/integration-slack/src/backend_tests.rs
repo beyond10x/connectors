@@ -155,6 +155,12 @@ mod tests {
         let ConnectionResult::ConnectSessionCreate(created) = created else {
             panic!("wrong result");
         };
+        assert!(
+            created
+                .browser_completion_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("http://127.0.0.1:"))
+        );
         let endpoint = PathBuf::from(created.completion_endpoint.clone().unwrap());
         let submitted = format!("xapp-{SENTINEL}");
         let mut stream = UnixStream::connect(&endpoint).await.unwrap();
@@ -185,6 +191,7 @@ mod tests {
         };
         assert_eq!(status.state, ConnectSessionState::Completed);
         assert!(status.completion_endpoint.is_none());
+        assert!(status.browser_completion_url.is_none());
         let connection_ref = status.connection_ref.unwrap();
         let description = backend
             .handle_connection(

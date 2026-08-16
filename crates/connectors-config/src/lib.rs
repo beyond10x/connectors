@@ -12,6 +12,8 @@ pub use hosted::{
     HostedVaultConfig,
 };
 pub use personal::{
-    AuthorityConfig, ConfigError, GrafanaIntegrationConfig, InitiationConfig,
-    KubernetesIntegrationConfig, PersonalConfig, PersonalVoiceConfig, SlackIntegrationConfig,
+    AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,
+    ConnectionConfig, B10xConnectionConfig, B10xIntegrationConfig,
+    GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, PersonalConfig,
+    PersonalVoiceConfig, SlackIntegrationConfig,
 };

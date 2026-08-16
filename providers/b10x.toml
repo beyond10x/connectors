@@ -23,6 +23,201 @@ description = "B10x-owned Connector capabilities implemented by closed built-in 
 [[services]]
 name = "default"
 tags = ["telephony"]
+# Published before named services existed; it keeps its elided address so the native driver members
+# above retain their identifiers while named siblings are added.
+legacy = true
+
+# B10x's own Ontology service. Unlike the native drivers above, its members are ordinary HTTP
+# operations declared from the service's own released contract, so a caller reaches knowledge under
+# the same Grant and audit as any other Connector member. The Connection resolves the deployment;
+# no origin crosses this boundary.
+[[services]]
+name = "knowledge"
+tags = ["knowledge-base"]
+description = "Bounded read access to the independent B10x Ontology: query, snapshot, explain"
+
+# Work owns generic coordination state. The deployment resolves the private Work origin; no HTTP
+# destination, performer identity, Agent core, or storage adapter is selectable by the caller.
+[[services]]
+name = "tasks"
+tags = ["project-management"]
+description = "Requests, tasks, optimistic status updates, and ordered Work events"
+
+[[spec]]
+service = "knowledge"
+path = "specs/b10x/ontology-v0alpha1.openapi.json"
+upstream_version = "ontology v0alpha1"
+fetched_at = "2026-08-16T00:00:00Z"
+sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
+
+[[patch.operations]]
+service = "knowledge"
+select = "queryClaims"
+rename = "knowledge-query"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+
+[[patch.operations]]
+service = "knowledge"
+select = "explainClaim"
+rename = "knowledge-explain"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+
+[[patch.operations]]
+service = "knowledge"
+select = "createContextSnapshot"
+rename = "knowledge-snapshot"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+
+[[spec]]
+service = "tasks"
+path = "specs/b10x/work-v0alpha1.openapi.json"
+upstream_version = "work v0alpha1"
+fetched_at = "2026-08-16T00:00:00Z"
+sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
+
+[[patch.operations]]
+service = "tasks"
+select = "createWorkRequest"
+rename = "work-request-create"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "getWorkRequest"
+rename = "work-request-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "listWorkRequests"
+rename = "work-request-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "createWorkTask"
+rename = "work-task-create"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "getWorkTask"
+rename = "work-task-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "listWorkTasks"
+rename = "work-task-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "updateWorkTaskStatus"
+rename = "work-task-status-update"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+service = "tasks"
+select = "listWorkEvents"
+rename = "work-event-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
 
 # This repository-authored member is defined by the accepted native-voice architecture and the
 # closed `sip_v1` implementation. A caller supplies only a deployment-owned destination alias. The

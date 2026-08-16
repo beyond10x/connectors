@@ -206,6 +206,25 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
             };
             serde_json::to_vec(&response).map_err(io::Error::other)?
         }
+        protocol::catalog::CONTRACT => {
+            let request: protocol::catalog::RequestEnvelope = match serde_json::from_slice(frame) {
+                Ok(request) => request,
+                Err(_) => return Ok(None),
+            };
+            if request.validate().is_err() || PrincipalContext::local(&request.context).is_err() {
+                return Ok(None);
+            }
+            let request_id = request.request_id;
+            let response = match crate::catalog_projection::handle(request.request) {
+                Ok(result) => protocol::catalog::ResponseEnvelope::success(&request_id, result),
+                Err(error) => protocol::catalog::ResponseEnvelope::failure(&request_id, error),
+            };
+            let response = match response.validate() {
+                Ok(()) => response,
+                Err(error) => protocol::catalog::ResponseEnvelope::failure(request_id, error),
+            };
+            serde_json::to_vec(&response).map_err(io::Error::other)?
+        }
         protocol::event::CONTRACT => {
             let request: protocol::event::RequestEnvelope = match serde_json::from_slice(frame) {
                 Ok(request) => request,

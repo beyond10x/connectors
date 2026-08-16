@@ -10,6 +10,7 @@ struct SessionRecord {
     state: ConnectSessionState,
     expires_at_unix_ms: u64,
     completion_endpoint: Option<String>,
+    browser_completion_url: Option<String>,
     connection_ref: Option<String>,
 }
 
@@ -69,12 +70,32 @@ impl ConnectSessionLifecycle {
         expires_at_unix_ms: u64,
         completion_endpoint: String,
     ) -> Result<ConnectSessionStatus, ConnectSessionLifecycleError> {
+        self.reserve_with_browser(
+            session_ref,
+            label,
+            expires_at_unix_ms,
+            completion_endpoint,
+            None,
+        )
+    }
+
+    pub fn reserve_with_browser(
+        &mut self,
+        session_ref: String,
+        label: String,
+        expires_at_unix_ms: u64,
+        completion_endpoint: String,
+        browser_completion_url: Option<String>,
+    ) -> Result<ConnectSessionStatus, ConnectSessionLifecycleError> {
         if !valid_ref(&session_ref)
             || label.trim().is_empty()
             || label.len() > 256
             || expires_at_unix_ms == 0
             || completion_endpoint.is_empty()
             || completion_endpoint.len() > 4_096
+            || browser_completion_url
+                .as_deref()
+                .is_some_and(|value| value.is_empty() || value.len() > 4_096)
         {
             return Err(ConnectSessionLifecycleError::Invalid);
         }
@@ -97,6 +118,7 @@ impl ConnectSessionLifecycle {
                 state: ConnectSessionState::Pending,
                 expires_at_unix_ms,
                 completion_endpoint: Some(completion_endpoint),
+                browser_completion_url,
                 connection_ref: None,
             },
         );
@@ -118,6 +140,7 @@ impl ConnectSessionLifecycle {
             state: session.state,
             expires_at_unix_ms: session.expires_at_unix_ms,
             completion_endpoint: session.completion_endpoint.clone(),
+            browser_completion_url: session.browser_completion_url.clone(),
             connection_ref: session.connection_ref.clone(),
         })
     }
@@ -157,6 +180,7 @@ impl ConnectSessionLifecycle {
         };
         session.state = state;
         session.completion_endpoint = None;
+        session.browser_completion_url = None;
         session.connection_ref = connection_ref;
         Ok(())
     }
@@ -169,6 +193,7 @@ impl ConnectSessionLifecycle {
                 if let Some(endpoint) = session.completion_endpoint.take() {
                     endpoints.push(endpoint);
                 }
+                session.browser_completion_url = None;
                 session.state = ConnectSessionState::Failed;
             }
         }

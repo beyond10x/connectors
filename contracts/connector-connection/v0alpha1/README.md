@@ -10,9 +10,11 @@ credential source, store, Vault address, mount, role, item, or fallback, and no 
 one. Credential read-back, export, value listing, and generic provider-secret retrieval are not
 methods in this protocol.
 
-`connect_session_create` returns a pending session with a short-lived `completion_endpoint`. That
-endpoint belongs to Connectors, accepts one credential-acquisition completion, and disappears. It
-is not the durable Connection and it is not the harness's reusable Endpoint. The creator polls
+`connect_session_create` returns a pending session with a short-lived `completion_endpoint` and may
+also return a loopback-only `browser_completion_url`. Both belong to Connectors, accept one
+credential-acquisition completion, and disappear. A credential entered in the setup page posts
+directly to the Connector process; Agent only sees the opaque one-use URL. Neither endpoint is the
+durable Connection or the harness's reusable Endpoint. The creator polls
 `connect_session_status`; only a completed terminal status names `connection_ref`, and it names
 nothing else from acquisition.
 

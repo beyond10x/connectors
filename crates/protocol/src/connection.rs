@@ -5,6 +5,7 @@
 #![allow(missing_docs)]
 
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::operation::OwnerContext;
 
@@ -12,6 +13,8 @@ pub const CONTRACT: &str = "b10x.connector-connection.v0alpha1";
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 pub const MAX_RESPONSE_BYTES: usize = 128 * 1024;
 pub const MAX_SEARCH_RESULTS: u16 = 64;
+
+const MAX_BROWSER_CAPABILITY_TOKEN_BYTES: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -234,8 +237,8 @@ pub enum ConnectSessionState {
 
 /// Value-free status for one single-purpose acquisition session.
 ///
-/// `completion_endpoint` is a short-lived Connector-owned endpoint, not an Agent Endpoint and not
-/// the durable Connection. It is present only while pending and accepts one completion attempt.
+/// Completion endpoints are short-lived Connector-owned endpoints, not Agent Endpoints and not
+/// the durable Connection. They are present only while pending and accept one completion attempt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectSessionStatus {
@@ -245,6 +248,9 @@ pub struct ConnectSessionStatus {
     pub expires_at_unix_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_endpoint: Option<String>,
+    /// Optional one-use browser setup page. Provider credentials post directly to Connectors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser_completion_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connection_ref: Option<String>,
 }
@@ -482,6 +488,10 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
                 .as_deref()
                 .is_some_and(|value| value.is_empty() || value.len() > 4096 || value.contains('\n'))
                 || session
+                    .browser_completion_url
+                    .as_deref()
+                    .is_some_and(|value| !valid_browser_completion_url(value))
+                || session
                     .connection_ref
                     .as_deref()
                     .is_some_and(|value| !valid_ref(value, 512))
@@ -494,9 +504,11 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
                         && session.connection_ref.is_none() => {}
                 ConnectSessionState::Completed
                     if session.completion_endpoint.is_none()
+                        && session.browser_completion_url.is_none()
                         && session.connection_ref.is_some() => {}
                 ConnectSessionState::Expired | ConnectSessionState::Failed
                     if session.completion_endpoint.is_none()
+                        && session.browser_completion_url.is_none()
                         && session.connection_ref.is_none() => {}
                 _ => return Err(protocol_refusal()),
             }
@@ -619,6 +631,52 @@ fn valid_ref(value: &str, max: usize) -> bool {
             .all(|byte| !byte.is_ascii_control() && byte != b' ')
 }
 
+fn valid_browser_completion_url(value: &str) -> bool {
+    if value.is_empty() || value.len() > 4096 || value.contains(['\r', '\n']) {
+        return false;
+    }
+    let Some(authority_and_path) = value.strip_prefix("http://") else {
+        return false;
+    };
+    let Some((authority, _)) = authority_and_path.split_once('/') else {
+        return false;
+    };
+    let Some(port_text) = authority.strip_prefix("127.0.0.1:") else {
+        return false;
+    };
+    if port_text.is_empty() || !port_text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    let Ok(port) = port_text.parse::<u16>() else {
+        return false;
+    };
+    if port == 0 {
+        return false;
+    }
+
+    let Ok(url) = Url::parse(value) else {
+        return false;
+    };
+    let Some(token) = url
+        .fragment()
+        .and_then(|fragment| fragment.strip_prefix("token="))
+    else {
+        return false;
+    };
+    url.scheme() == "http"
+        && url.host_str() == Some("127.0.0.1")
+        && url.port_or_known_default() == Some(port)
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.path() == "/"
+        && url.query().is_none()
+        && !token.is_empty()
+        && token.len() <= MAX_BROWSER_CAPABILITY_TOKEN_BYTES
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
 fn invalid_input(message: &'static str) -> ConnectionError {
     ConnectionError::new(ConnectionErrorCode::InvalidInput, message, false)
 }
@@ -653,6 +711,9 @@ mod tests {
             state: ConnectSessionState::Pending,
             expires_at_unix_ms: 1,
             completion_endpoint: Some("unix:/state/connect.sock".to_owned()),
+            browser_completion_url: Some(
+                "http://127.0.0.1:41000/#token=opaque-capability".to_owned(),
+            ),
             connection_ref: None,
         };
         ResponseEnvelope::success(
@@ -669,6 +730,33 @@ mod tests {
         )
         .validate()
         .is_err());
+    }
+
+    #[test]
+    fn browser_completion_url_is_an_exact_loopback_capability() {
+        assert!(valid_browser_completion_url(
+            "http://127.0.0.1:41000/#token=opaque-capability_1"
+        ));
+        for invalid in [
+            "https://127.0.0.1:41000/#token=opaque-capability",
+            "http://localhost:41000/#token=opaque-capability",
+            "http://127.0.0.1/#token=opaque-capability",
+            "http://127.0.0.1:0/#token=opaque-capability",
+            "http://127.0.0.1:80@evil.example/#token=opaque-capability",
+            "http://127.0.0.1:41000/complete#token=opaque-capability",
+            "http://127.0.0.1:41000/?next=evil#token=opaque-capability",
+            "http://127.0.0.1:41000/#token=",
+            "http://127.0.0.1:41000/#token=not+padded=",
+            "http://127.0.0.1:41000/#token=opaque&next=evil",
+            "http://127.0.0.1:41000/#other=opaque-capability",
+        ] {
+            assert!(!valid_browser_completion_url(invalid), "accepted {invalid}");
+        }
+        let oversized = format!(
+            "http://127.0.0.1:41000/#token={}",
+            "a".repeat(MAX_BROWSER_CAPABILITY_TOKEN_BYTES + 1)
+        );
+        assert!(!valid_browser_completion_url(&oversized));
     }
 
     #[test]

@@ -9,6 +9,9 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
+use protocol::catalog::{
+    RequestEnvelope as CatalogRequestEnvelope, ResponseEnvelope as CatalogResponseEnvelope,
+};
 use protocol::connection::{
     ConnectionError, ConnectionErrorCode, RequestEnvelope as ConnectionRequestEnvelope,
     ResponseEnvelope as ConnectionResponseEnvelope, MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES,
@@ -93,6 +96,10 @@ pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn ConnectorBac
         .route(
             "/connections",
             post(connection).layer(DefaultBodyLimit::max(CONNECTION_MAX_FRAME_BYTES)),
+        )
+        .route(
+            "/catalog",
+            post(catalog).layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
         )
         .with_state(HostedState { verifier, backend })
 }
@@ -182,6 +189,53 @@ async fn readiness(State(state): State<HostedState>) -> Response {
         Ok(()) => (StatusCode::OK, "ok\n").into_response(),
         Err(_) => (StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable\n").into_response(),
     }
+}
+
+async fn catalog(
+    State(state): State<HostedState>,
+    headers: HeaderMap,
+    Json(request): Json<CatalogRequestEnvelope>,
+) -> Response {
+    if let Err(error) = request.validate() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(CatalogResponseEnvelope::failure(&request.request_id, error)),
+        )
+            .into_response();
+    }
+    let Some(credential) = bearer(&headers) else {
+        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
+    };
+    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
+        Ok(principal) => principal,
+        Err(IdentityVerificationError::Refused) => {
+            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
+        }
+        Err(IdentityVerificationError::Unavailable) => {
+            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
+        }
+    };
+    if principal.tenant_id != request.context.tenant_id
+        || !principal.allows("connectors.catalog.read")
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(CatalogResponseEnvelope::failure(
+                &request.request_id,
+                protocol::catalog::CatalogError {
+                    code: "not_granted".to_owned(),
+                    message: "the verified authority does not admit catalog reads".to_owned(),
+                },
+            )),
+        )
+            .into_response();
+    }
+    let request_id = request.request_id;
+    let response = match crate::catalog_projection::handle(request.request) {
+        Ok(result) => CatalogResponseEnvelope::success(&request_id, result),
+        Err(error) => CatalogResponseEnvelope::failure(&request_id, error),
+    };
+    Json(response).into_response()
 }
 
 async fn operation(

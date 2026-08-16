@@ -1,8 +1,8 @@
 connectors-catalog-pack 1
-digest sha256 21d5c40bf22501a1f4676fead03505170fe6cee6e765c2162d388b9beecc0e4f
+digest sha256 7eac572016142658a53c3d74b6dee7ff7092937e8c243651cf25594901eb32ad
 schema 2
 providers 60
-operations 854
+operations 865
 p airtable 0 18802
 p alertmanager 18802 2442
 p algolia 21244 25132
@@ -17,52 +17,52 @@ p clickup 4815025 30043
 p cloudflare 4845068 24160
 p confluence 4869228 38172
 p contentful 4907400 22143
-p b10x 4929543 24547
-p datadog 4954090 12693
-p discord 4966783 35641
-p docusign 5002424 26634
-p dropbox 5029058 20909
-p figma 5049967 21851
-p fly 5071818 22584
-p freshdesk 5094402 58939
-p front 5153341 25653
-p github 5178994 293257
-p gitlab 5472251 65567
-p google 5537818 36884
-p grafana 5574702 17900
-p hubspot 5592602 20182
-p intercom 5612784 30424
-p jira 5643208 28079
-p klaviyo 5671287 38461
-p launchdarkly 5709748 25153
-p loki 5734901 5048
-p mailchimp 5739949 40733
-p microsoft_graph 5780682 1085776
-p miro 6866458 32555
-p newrelic 6899013 29377
-p notion 6928390 18656
-p okta 6947046 22114
-p openai 6969160 1682736
-p openrouter 8651896 12907
-p pagerduty 8664803 37513
-p postmark 8702316 20013
-p prometheus 8722329 4863
-p resend 8727192 18601
-p salesforce 8745793 19117
-p sendgrid 8764910 15721
-p sentry 8780631 27655
-p shopify 8808286 27359
-p slack 8835645 233794
-p statuspage 9069439 29615
-p stripe 9099054 70726
-p supabase 9169780 13423
-p trello 9183203 26218
-p twilio 9209421 71610
-p typeform 9281031 28953
-p vercel 9309984 17422
-p webflow 9327406 21919
-p zendesk 9349325 1146583
-p zoom 10495908 9393
+p b10x 4929543 89986
+p datadog 5019529 12693
+p discord 5032222 35641
+p docusign 5067863 26634
+p dropbox 5094497 20909
+p figma 5115406 21851
+p fly 5137257 22584
+p freshdesk 5159841 58939
+p front 5218780 25653
+p github 5244433 293257
+p gitlab 5537690 65567
+p google 5603257 36884
+p grafana 5640141 17900
+p hubspot 5658041 20182
+p intercom 5678223 30424
+p jira 5708647 28079
+p klaviyo 5736726 38461
+p launchdarkly 5775187 25153
+p loki 5800340 5048
+p mailchimp 5805388 40733
+p microsoft_graph 5846121 1085776
+p miro 6931897 32555
+p newrelic 6964452 29377
+p notion 6993829 18656
+p okta 7012485 22114
+p openai 7034599 1682736
+p openrouter 8717335 12907
+p pagerduty 8730242 37513
+p postmark 8767755 20013
+p prometheus 8787768 4863
+p resend 8792631 18601
+p salesforce 8811232 19117
+p sendgrid 8830349 15721
+p sentry 8846070 27655
+p shopify 8873725 27359
+p slack 8901084 233794
+p statuspage 9134878 29615
+p stripe 9164493 70726
+p supabase 9235219 13423
+p trello 9248642 26218
+p twilio 9274860 71610
+p typeform 9346470 28953
+p vercel 9375423 17422
+p webflow 9392845 21919
+p zendesk 9414764 1146583
+p zoom 10561347 9393
 o airtable-record-create airtable default 5038 4705
 o airtable-record-delete airtable default 14724 3734
 o airtable-record-get airtable default 709 4323
@@ -618,306 +618,317 @@ o contentful-entries-list contentful delivery 4914903 3605
 o contentful-entry-create contentful management 4921223 3916
 o contentful-entry-get contentful delivery 4912206 2691
 o contentful-entry-publish contentful management 4925145 3423
-o datadog-incident-get datadog default 4965028 1448
-o datadog-incident-list datadog default 4964006 1016
-o datadog-monitor-get datadog default 4960222 3778
-o datadog-monitor-list datadog default 4956469 3747
-o discord-channel-messages discord default 4987936 7169
-o discord-current-user discord default 4969145 3941
-o discord-guild-channels discord default 4982886 5044
-o discord-guild-get discord default 4976548 6332
-o discord-guild-list discord default 4973092 3450
-o discord-message-create discord default 4995111 7009
-o docusign-envelope-create-from-template docusign default 5019759 5619
-o docusign-envelope-get docusign default 5011971 3060
-o docusign-envelope-list docusign default 5007702 4263
-o docusign-envelope-recipients-get docusign default 5015037 4716
-o docusign-envelope-void docusign default 5025384 3339
-o docusign-verify docusign default 5004981 2715
-o dropbox-folder-create dropbox default 5043624 3041
-o dropbox-folder-list dropbox default 5033012 3329
-o dropbox-metadata-get dropbox default 5036347 4147
-o dropbox-search dropbox default 5040500 3118
-o dropbox-temporary-link-get dropbox default 5046671 3004
-o dropbox-user-me dropbox default 5030456 2550
-o figma-file-comments-list figma default 5067471 3989
-o figma-file-get figma default 5053300 4085
-o figma-file-nodes-get figma default 5057391 3603
-o figma-image-render-get figma default 5061000 3336
-o figma-project-files-list figma default 5064342 3123
-o figma-user-me figma default 5051263 2031
-o fly-machine-create fly machines 5081987 3091
-o fly-machine-delete fly machines 5091698 2332
-o fly-machine-events-list fly machines 5079231 2750
-o fly-machine-get fly machines 5076449 2776
-o fly-machine-restart fly machines 5089475 2217
-o fly-machine-start fly machines 5085084 2173
-o fly-machine-stop fly machines 5087263 2206
-o fly-machines-list fly machines 5074168 2275
-o fly-regions-list fly machines 5072507 1655
-o freshdesk-contact-create freshdesk default 5148459 4534
-o freshdesk-contact-get freshdesk default 5144406 4047
-o freshdesk-contact-list freshdesk default 5138372 6028
-o freshdesk-test freshdesk default 5095293 2337
-o freshdesk-ticket-create freshdesk default 5108774 12461
-o freshdesk-ticket-get freshdesk default 5103609 5159
-o freshdesk-ticket-list freshdesk default 5097636 5967
-o freshdesk-ticket-note-add freshdesk default 5132613 5753
-o freshdesk-ticket-update freshdesk default 5121241 11366
-o front-conversation-get front default 5161455 4065
-o front-conversation-list front default 5157060 4389
-o front-conversation-message-list front default 5165526 6112
-o front-conversation-reply front default 5171644 3848
-o front-conversation-tag-add front default 5175498 3216
-o front-verify front default 5154568 2486
-o github-commit-list github default 5384365 18372
-o github-issue-comment-add github default 5204908 4993
-o github-issue-create github default 5198404 6498
-o github-issue-get github default 5186993 5874
-o github-issue-list github default 5209907 94261
-o github-org-list github default 5416010 4192
-o github-org-repo-list github default 5420208 25105
-o github-pull-files-list github default 5304174 5426
-o github-pull-get github default 5192873 5525
-o github-repo-get github default 5182393 4594
-o github-user-get github default 5402743 13261
-o github-user-repo-list github default 5445319 26404
-o github-workflow-run-list github default 5309606 74753
-o gitlab-branch-list gitlab default 5531337 5868
-o gitlab-group-list gitlab default 5482728 6415
-o gitlab-issue-create gitlab default 5511005 6589
-o gitlab-issue-get gitlab default 5504919 6080
-o gitlab-issue-list gitlab default 5497297 7616
-o gitlab-merge-request-list gitlab default 5517600 7643
-o gitlab-pipeline-get gitlab default 5525249 6082
-o gitlab-project-list gitlab default 5489149 8142
-o gitlab-user-get gitlab default 5478709 4013
-o google-calendar-calendar-get google calendar 5564976 3684
-o google-calendar-event-get google calendar 5551533 6563
-o google-calendar-event-insert google calendar 5558102 6868
-o google-drive-file-get google drive 5568666 2298
-o google-drive-file-update google drive 5570970 2814
-o google-gmail-labels-list google gmail 5547464 4063
-o google-gmail-message-get google gmail 5538573 4995
-o google-gmail-message-send google gmail 5543574 3884
-o grafana-dashboard-get grafana default 5582001 3146
-o grafana-dashboards-list grafana default 5577505 4490
-o grafana-datasource-query grafana default 5587251 5033
-o grafana-datasources-list grafana default 5585153 2092
-o hubspot-company-get hubspot default 5605281 3550
-o hubspot-contact-create hubspot default 5597856 3927
-o hubspot-contact-get hubspot default 5593361 4489
-o hubspot-contact-update hubspot default 5601789 3486
-o hubspot-deal-get hubspot default 5608837 3622
-o intercom-contact-create intercom default 5620730 5231
-o intercom-contact-get intercom default 5614706 6018
-o intercom-contact-note-create intercom default 5638690 4274
-o intercom-conversation-get intercom default 5625967 6016
-o intercom-conversation-reply intercom default 5631989 6695
-o jira-issue-comment-add jira default 5658753 4337
-o jira-issue-comment-list jira default 5653878 4869
-o jira-issue-create jira default 5649242 4630
-o jira-issue-get jira default 5645346 3890
-o jira-issue-transition jira default 5667761 3122
-o jira-issue-transitions-list jira default 5663096 4659
-o klaviyo-account-list klaviyo default 5673213 4885
-o klaviyo-event-create klaviyo default 5702669 6792
-o klaviyo-list-list klaviyo default 5698757 3906
-o klaviyo-profile-create klaviyo default 5689827 8924
-o klaviyo-profile-get klaviyo default 5684507 5314
-o klaviyo-profile-list klaviyo default 5678104 6397
-o launchdarkly-environment-list launchdarkly default 5714993 4327
-o launchdarkly-flag-get launchdarkly default 5724755 4098
-o launchdarkly-flag-list launchdarkly default 5719326 5423
-o launchdarkly-flag-toggle launchdarkly default 5728859 5711
-o launchdarkly-project-list launchdarkly default 5711286 3701
-o loki-query-range loki default 5735722 3881
-o mailchimp-audience-get mailchimp default 5749252 3936
-o mailchimp-audience-list mailchimp default 5744532 4714
-o mailchimp-audience-member-get mailchimp default 5760206 6149
-o mailchimp-audience-member-list mailchimp default 5753194 7006
-o mailchimp-audience-member-upsert mailchimp default 5766361 8988
-o mailchimp-campaign-list mailchimp default 5775355 4969
-o mailchimp-ping mailchimp default 5742462 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 5808270 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 6697681 159938
-o microsoft_graph-calendar-event-create microsoft_graph calendar 5800993 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 5794447 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 6861360 4039
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 6857625 3729
-o microsoft_graph-files-item-get microsoft_graph files 5812028 5482
-o microsoft_graph-files-item-update microsoft_graph files 5817516 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 5791134 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 5782421 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 5822307 875368
-o microsoft_graph-mail-message-reply microsoft_graph mail 5788023 3105
-o miro-board-item-get miro default 6880695 7877
-o miro-board-item-list miro default 6870695 9994
-o miro-board-list miro default 6867838 2851
-o miro-sticky-note-create miro default 6888578 3738
-o miro-sticky-note-delete miro default 6896699 1954
-o miro-sticky-note-update miro default 6892322 4371
-o newrelic-alert-policy-list newrelic default 6910835 3047
-o newrelic-alert-violation-list newrelic default 6913888 4217
-o newrelic-application-get newrelic default 6906669 4160
-o newrelic-application-list newrelic default 6902002 4661
-o newrelic-deployment-create newrelic default 6921807 6216
-o newrelic-deployment-list newrelic default 6918111 3690
-o notion-database-query notion default 6935336 3464
-o notion-page-create notion default 6941997 4755
-o notion-page-get notion default 6931982 3348
-o notion-search notion default 6938806 3185
-o notion-user-me notion default 6929946 2030
-o okta-group-list okta default 6958055 3824
-o okta-user-deactivate okta default 6965715 3102
-o okta-user-get okta default 6954320 3729
-o okta-user-group-list okta default 6961885 3824
-o okta-user-list okta default 6949339 4975
-o openai-batch-list openai default 8638740 12904
-o openai-chat-completion openai default 6974108 5224
-o openai-embeddings-create openai default 6979338 4010
-o openai-file-list openai default 8633439 5295
-o openai-model-get openai default 6971998 2104
-o openai-models-list openai default 6969829 2163
-o openai-response-get openai default 6983354 1212702
-o openai-response-input-item-list openai default 8196062 437371
-o openrouter-chat-completion openrouter default 8656843 5888
-o openrouter-credits-get openrouter default 8662737 1808
-o openrouter-model-endpoints-list openrouter default 8654225 2612
-o openrouter-models-list openrouter default 8652582 1637
-o pagerduty-incident-acknowledge pagerduty default 8692192 5034
-o pagerduty-incident-get pagerduty default 8674918 5736
-o pagerduty-incident-list pagerduty default 8666369 8543
-o pagerduty-incident-resolve pagerduty default 8697232 4790
-o pagerduty-oncall-list pagerduty default 8687040 5146
-o pagerduty-service-list pagerduty default 8680660 6374
-o postmark-bounce-get postmark server 8718668 3209
-o postmark-bounce-list postmark server 8713781 4881
-o postmark-deliverystats-get postmark server 8711167 2608
-o postmark-email-send postmark server 8703821 7340
-o prometheus-query-range prometheus default 8723166 3681
-o resend-domain-get resend default 8740390 5175
-o resend-domain-list resend default 8737065 3319
-o resend-email-get resend default 8732250 4809
-o resend-email-send resend default 8728021 4223
-o salesforce-record-create salesforce default 8753957 3265
-o salesforce-record-get salesforce default 8750527 3424
-o salesforce-record-update salesforce default 8757228 2958
-o salesforce-sobject-describe salesforce default 8760192 4425
-o salesforce-whoami salesforce default 8747686 2835
-o sendgrid-email-validate sendgrid default 8776189 4143
-o sendgrid-suppression-bounce-list sendgrid default 8772772 3411
-o sendgrid-template-get sendgrid default 8770403 2363
-o sendgrid-template-list sendgrid default 8766246 4151
-o sentry-issue-event-latest sentry default 8801031 6935
-o sentry-issue-get sentry default 8781338 7008
-o sentry-issue-update sentry default 8788352 6365
-o sentry-project-get sentry default 8794723 6302
-o shopify-customer-get shopify default 8826663 5180
-o shopify-inventory-level-list shopify default 8831849 3461
-o shopify-order-get shopify default 8810152 6452
-o shopify-product-get shopify default 8816610 4772
-o shopify-product-update shopify default 8821388 5269
+o datadog-incident-get datadog default 5030467 1448
+o datadog-incident-list datadog default 5029445 1016
+o datadog-monitor-get datadog default 5025661 3778
+o datadog-monitor-list datadog default 5021908 3747
+o discord-channel-messages discord default 5053375 7169
+o discord-current-user discord default 5034584 3941
+o discord-guild-channels discord default 5048325 5044
+o discord-guild-get discord default 5041987 6332
+o discord-guild-list discord default 5038531 3450
+o discord-message-create discord default 5060550 7009
+o docusign-envelope-create-from-template docusign default 5085198 5619
+o docusign-envelope-get docusign default 5077410 3060
+o docusign-envelope-list docusign default 5073141 4263
+o docusign-envelope-recipients-get docusign default 5080476 4716
+o docusign-envelope-void docusign default 5090823 3339
+o docusign-verify docusign default 5070420 2715
+o dropbox-folder-create dropbox default 5109063 3041
+o dropbox-folder-list dropbox default 5098451 3329
+o dropbox-metadata-get dropbox default 5101786 4147
+o dropbox-search dropbox default 5105939 3118
+o dropbox-temporary-link-get dropbox default 5112110 3004
+o dropbox-user-me dropbox default 5095895 2550
+o figma-file-comments-list figma default 5132910 3989
+o figma-file-get figma default 5118739 4085
+o figma-file-nodes-get figma default 5122830 3603
+o figma-image-render-get figma default 5126439 3336
+o figma-project-files-list figma default 5129781 3123
+o figma-user-me figma default 5116702 2031
+o fly-machine-create fly machines 5147426 3091
+o fly-machine-delete fly machines 5157137 2332
+o fly-machine-events-list fly machines 5144670 2750
+o fly-machine-get fly machines 5141888 2776
+o fly-machine-restart fly machines 5154914 2217
+o fly-machine-start fly machines 5150523 2173
+o fly-machine-stop fly machines 5152702 2206
+o fly-machines-list fly machines 5139607 2275
+o fly-regions-list fly machines 5137946 1655
+o freshdesk-contact-create freshdesk default 5213898 4534
+o freshdesk-contact-get freshdesk default 5209845 4047
+o freshdesk-contact-list freshdesk default 5203811 6028
+o freshdesk-test freshdesk default 5160732 2337
+o freshdesk-ticket-create freshdesk default 5174213 12461
+o freshdesk-ticket-get freshdesk default 5169048 5159
+o freshdesk-ticket-list freshdesk default 5163075 5967
+o freshdesk-ticket-note-add freshdesk default 5198052 5753
+o freshdesk-ticket-update freshdesk default 5186680 11366
+o front-conversation-get front default 5226894 4065
+o front-conversation-list front default 5222499 4389
+o front-conversation-message-list front default 5230965 6112
+o front-conversation-reply front default 5237083 3848
+o front-conversation-tag-add front default 5240937 3216
+o front-verify front default 5220007 2486
+o github-commit-list github default 5449804 18372
+o github-issue-comment-add github default 5270347 4993
+o github-issue-create github default 5263843 6498
+o github-issue-get github default 5252432 5874
+o github-issue-list github default 5275346 94261
+o github-org-list github default 5481449 4192
+o github-org-repo-list github default 5485647 25105
+o github-pull-files-list github default 5369613 5426
+o github-pull-get github default 5258312 5525
+o github-repo-get github default 5247832 4594
+o github-user-get github default 5468182 13261
+o github-user-repo-list github default 5510758 26404
+o github-workflow-run-list github default 5375045 74753
+o gitlab-branch-list gitlab default 5596776 5868
+o gitlab-group-list gitlab default 5548167 6415
+o gitlab-issue-create gitlab default 5576444 6589
+o gitlab-issue-get gitlab default 5570358 6080
+o gitlab-issue-list gitlab default 5562736 7616
+o gitlab-merge-request-list gitlab default 5583039 7643
+o gitlab-pipeline-get gitlab default 5590688 6082
+o gitlab-project-list gitlab default 5554588 8142
+o gitlab-user-get gitlab default 5544148 4013
+o google-calendar-calendar-get google calendar 5630415 3684
+o google-calendar-event-get google calendar 5616972 6563
+o google-calendar-event-insert google calendar 5623541 6868
+o google-drive-file-get google drive 5634105 2298
+o google-drive-file-update google drive 5636409 2814
+o google-gmail-labels-list google gmail 5612903 4063
+o google-gmail-message-get google gmail 5604012 4995
+o google-gmail-message-send google gmail 5609013 3884
+o grafana-dashboard-get grafana default 5647440 3146
+o grafana-dashboards-list grafana default 5642944 4490
+o grafana-datasource-query grafana default 5652690 5033
+o grafana-datasources-list grafana default 5650592 2092
+o hubspot-company-get hubspot default 5670720 3550
+o hubspot-contact-create hubspot default 5663295 3927
+o hubspot-contact-get hubspot default 5658800 4489
+o hubspot-contact-update hubspot default 5667228 3486
+o hubspot-deal-get hubspot default 5674276 3622
+o intercom-contact-create intercom default 5686169 5231
+o intercom-contact-get intercom default 5680145 6018
+o intercom-contact-note-create intercom default 5704129 4274
+o intercom-conversation-get intercom default 5691406 6016
+o intercom-conversation-reply intercom default 5697428 6695
+o jira-issue-comment-add jira default 5724192 4337
+o jira-issue-comment-list jira default 5719317 4869
+o jira-issue-create jira default 5714681 4630
+o jira-issue-get jira default 5710785 3890
+o jira-issue-transition jira default 5733200 3122
+o jira-issue-transitions-list jira default 5728535 4659
+o klaviyo-account-list klaviyo default 5738652 4885
+o klaviyo-event-create klaviyo default 5768108 6792
+o klaviyo-list-list klaviyo default 5764196 3906
+o klaviyo-profile-create klaviyo default 5755266 8924
+o klaviyo-profile-get klaviyo default 5749946 5314
+o klaviyo-profile-list klaviyo default 5743543 6397
+o knowledge-explain b10x knowledge 4965349 2845
+o knowledge-query b10x knowledge 4953895 11448
+o knowledge-snapshot b10x knowledge 4968200 11760
+o launchdarkly-environment-list launchdarkly default 5780432 4327
+o launchdarkly-flag-get launchdarkly default 5790194 4098
+o launchdarkly-flag-list launchdarkly default 5784765 5423
+o launchdarkly-flag-toggle launchdarkly default 5794298 5711
+o launchdarkly-project-list launchdarkly default 5776725 3701
+o loki-query-range loki default 5801161 3881
+o mailchimp-audience-get mailchimp default 5814691 3936
+o mailchimp-audience-list mailchimp default 5809971 4714
+o mailchimp-audience-member-get mailchimp default 5825645 6149
+o mailchimp-audience-member-list mailchimp default 5818633 7006
+o mailchimp-audience-member-upsert mailchimp default 5831800 8988
+o mailchimp-campaign-list mailchimp default 5840794 4969
+o mailchimp-ping mailchimp default 5807901 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 5873709 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 6763120 159938
+o microsoft_graph-calendar-event-create microsoft_graph calendar 5866432 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 5859886 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 6926799 4039
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 6923064 3729
+o microsoft_graph-files-item-get microsoft_graph files 5877467 5482
+o microsoft_graph-files-item-update microsoft_graph files 5882955 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 5856573 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 5847860 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 5887746 875368
+o microsoft_graph-mail-message-reply microsoft_graph mail 5853462 3105
+o miro-board-item-get miro default 6946134 7877
+o miro-board-item-list miro default 6936134 9994
+o miro-board-list miro default 6933277 2851
+o miro-sticky-note-create miro default 6954017 3738
+o miro-sticky-note-delete miro default 6962138 1954
+o miro-sticky-note-update miro default 6957761 4371
+o newrelic-alert-policy-list newrelic default 6976274 3047
+o newrelic-alert-violation-list newrelic default 6979327 4217
+o newrelic-application-get newrelic default 6972108 4160
+o newrelic-application-list newrelic default 6967441 4661
+o newrelic-deployment-create newrelic default 6987246 6216
+o newrelic-deployment-list newrelic default 6983550 3690
+o notion-database-query notion default 7000775 3464
+o notion-page-create notion default 7007436 4755
+o notion-page-get notion default 6997421 3348
+o notion-search notion default 7004245 3185
+o notion-user-me notion default 6995385 2030
+o okta-group-list okta default 7023494 3824
+o okta-user-deactivate okta default 7031154 3102
+o okta-user-get okta default 7019759 3729
+o okta-user-group-list okta default 7027324 3824
+o okta-user-list okta default 7014778 4975
+o openai-batch-list openai default 8704179 12904
+o openai-chat-completion openai default 7039547 5224
+o openai-embeddings-create openai default 7044777 4010
+o openai-file-list openai default 8698878 5295
+o openai-model-get openai default 7037437 2104
+o openai-models-list openai default 7035268 2163
+o openai-response-get openai default 7048793 1212702
+o openai-response-input-item-list openai default 8261501 437371
+o openrouter-chat-completion openrouter default 8722282 5888
+o openrouter-credits-get openrouter default 8728176 1808
+o openrouter-model-endpoints-list openrouter default 8719664 2612
+o openrouter-models-list openrouter default 8718021 1637
+o pagerduty-incident-acknowledge pagerduty default 8757631 5034
+o pagerduty-incident-get pagerduty default 8740357 5736
+o pagerduty-incident-list pagerduty default 8731808 8543
+o pagerduty-incident-resolve pagerduty default 8762671 4790
+o pagerduty-oncall-list pagerduty default 8752479 5146
+o pagerduty-service-list pagerduty default 8746099 6374
+o postmark-bounce-get postmark server 8784107 3209
+o postmark-bounce-list postmark server 8779220 4881
+o postmark-deliverystats-get postmark server 8776606 2608
+o postmark-email-send postmark server 8769260 7340
+o prometheus-query-range prometheus default 8788605 3681
+o resend-domain-get resend default 8805829 5175
+o resend-domain-list resend default 8802504 3319
+o resend-email-get resend default 8797689 4809
+o resend-email-send resend default 8793460 4223
+o salesforce-record-create salesforce default 8819396 3265
+o salesforce-record-get salesforce default 8815966 3424
+o salesforce-record-update salesforce default 8822667 2958
+o salesforce-sobject-describe salesforce default 8825631 4425
+o salesforce-whoami salesforce default 8813125 2835
+o sendgrid-email-validate sendgrid default 8841628 4143
+o sendgrid-suppression-bounce-list sendgrid default 8838211 3411
+o sendgrid-template-get sendgrid default 8835842 2363
+o sendgrid-template-list sendgrid default 8831685 4151
+o sentry-issue-event-latest sentry default 8866470 6935
+o sentry-issue-get sentry default 8846777 7008
+o sentry-issue-update sentry default 8853791 6365
+o sentry-project-get sentry default 8860162 6302
+o shopify-customer-get shopify default 8892102 5180
+o shopify-inventory-level-list shopify default 8897288 3461
+o shopify-order-get shopify default 8875591 6452
+o shopify-product-get shopify default 8882049 4772
+o shopify-product-update shopify default 8886827 5269
 o sip-dial b10x default 4929877 2823
-o slack-admin-app-requests-list slack admin 8991290 4516
-o slack-admin-conversations-search slack admin 8995812 64081
-o slack-admin-teams-list slack admin 9059899 4007
-o slack-admin-users-list slack admin 9063912 4451
-o slack-chat-post-message slack default 8846929 45357
-o slack-conversations-history slack default 8892292 49463
-o slack-reactions-add slack default 8985355 5929
-o slack-users-info slack default 8941761 43588
+o slack-admin-app-requests-list slack admin 9056729 4516
+o slack-admin-conversations-search slack admin 9061251 64081
+o slack-admin-teams-list slack admin 9125338 4007
+o slack-admin-users-list slack admin 9129351 4451
+o slack-chat-post-message slack default 8912368 45357
+o slack-conversations-history slack default 8957731 49463
+o slack-reactions-add slack default 9050794 5929
+o slack-users-info slack default 9007200 43588
 o speech-speak b10x default 4932706 2907
 o speech-status b10x default 4935619 2246
-o statuspage-component-list statuspage default 9094334 4304
-o statuspage-incident-create statuspage default 9080980 6655
-o statuspage-incident-get statuspage default 9076685 4289
-o statuspage-incident-list statuspage default 9071521 5158
-o statuspage-incident-update statuspage default 9087641 6687
-o stripe-balance-get stripe default 9106369 2591
-o stripe-billing-meter-list stripe default 9160297 9122
-o stripe-charge-get stripe default 9112046 3784
-o stripe-charge-refund-create stripe default 9131212 4638
-o stripe-country-spec-list stripe default 9135856 9165
-o stripe-customer-get stripe default 9108966 3074
-o stripe-event-list stripe default 9145027 9473
-o stripe-exchange-rate-list stripe default 9154506 5785
-o stripe-payment-intent-cancel stripe default 9127262 3944
-o stripe-payment-intent-capture stripe default 9122671 4585
-o stripe-payment-intent-get stripe default 9115836 3802
-o stripe-refund-get stripe default 9119644 3021
-o supabase-auth-settings supabase default 9179835 2955
-o supabase-rows-list supabase default 9176450 3379
-o supabase-schema-describe supabase default 9172510 3934
-o trello-board-get trello default 9189570 3619
-o trello-board-list trello default 9185742 3822
-o trello-board-lists trello default 9193195 1604
-o trello-card-archive trello default 9204673 4364
-o trello-card-create trello default 9199494 5173
-o trello-list-cards trello default 9194805 4683
-o twilio-account-get twilio default 9217828 2969
-o twilio-call-get twilio default 9240955 4476
-o twilio-call-list twilio default 9233035 7914
-o twilio-conference-list twilio default 9272953 7737
-o twilio-message-get twilio default 9228199 4830
-o twilio-message-list twilio default 9220803 7390
-o twilio-recording-get twilio default 9256206 8396
-o twilio-recording-list twilio default 9245437 10763
-o twilio-usage-record-list twilio default 9264608 8339
-o typeform-form-get typeform default 9290369 5108
-o typeform-form-list typeform default 9284664 5699
-o typeform-response-delete typeform default 9306704 3050
-o typeform-response-list typeform default 9295483 11215
-o typeform-user-me typeform default 9282385 2273
-o vercel-deployment-cancel vercel default 9324477 2663
-o vercel-deployment-get vercel default 9321516 2955
-o vercel-deployments-list vercel default 9316216 5294
-o vercel-project-get vercel default 9313247 2963
-o vercel-projects-list vercel default 9311769 1472
-o webflow-collection-get webflow default 9334774 4235
-o webflow-collection-item-get webflow default 9343100 3491
-o webflow-collection-item-list webflow default 9339015 4079
-o webflow-collection-list webflow default 9331693 3075
-o webflow-site-list webflow default 9328950 2737
-o webflow-site-publish webflow default 9346597 2360
-o zendesk-custom-object-list zendesk default 9476061 5894
-o zendesk-custom-status-list zendesk default 9681146 5413
-o zendesk-group-list zendesk default 9652985 3756
-o zendesk-help-center-article-create zendesk help-center 9982965 9386
-o zendesk-help-center-article-get zendesk help-center 9961558 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 9974414 8545
-o zendesk-help-center-article-list zendesk help-center 9953031 8521
-o zendesk-help-center-category-list zendesk help-center 9944290 4211
-o zendesk-help-center-section-list zendesk help-center 9948507 4518
-o zendesk-help-center-translation-list zendesk help-center 9969406 5002
-o zendesk-incremental-organization-list zendesk default 9461839 8641
-o zendesk-incremental-ticket-event-list zendesk default 9470486 5569
-o zendesk-incremental-ticket-list zendesk default 9361134 74662
-o zendesk-incremental-user-list zendesk default 9435802 26031
-o zendesk-messaging-conversation-create zendesk messaging 9992357 10167
-o zendesk-messaging-conversation-get zendesk messaging 10002530 10469
-o zendesk-messaging-conversation-update zendesk messaging 10013005 11165
-o zendesk-messaging-message-create zendesk messaging 10031230 276191
-o zendesk-messaging-message-list zendesk messaging 10307427 158036
-o zendesk-messaging-participant-list zendesk messaging 10024176 7048
-o zendesk-messaging-user-create zendesk messaging 10465469 10089
-o zendesk-messaging-user-get zendesk messaging 10475564 9350
-o zendesk-messaging-user-update zendesk messaging 10484920 9961
-o zendesk-organization-show zendesk default 9646980 5999
-o zendesk-test zendesk default 9686565 23020
-o zendesk-ticket-audit-list zendesk default 9355318 5810
-o zendesk-ticket-comment-list zendesk default 9783329 19828
-o zendesk-ticket-field-list zendesk default 9656747 15042
-o zendesk-ticket-form-list zendesk default 9671795 9345
-o zendesk-ticket-recent-list zendesk default 9481961 71467
-o zendesk-ticket-search zendesk default 9709591 5013
-o zendesk-ticket-show zendesk default 9714610 68713
-o zendesk-ticket-update zendesk default 9803163 141121
-o zendesk-user-show zendesk default 9625478 21496
-o zendesk-view-ticket-list zendesk default 9553434 72038
-o zoom-meeting-delete zoom default 10496774 2358
-o zoom-user-get zoom default 10499138 5881
-payload 10505301
+o statuspage-component-list statuspage default 9159773 4304
+o statuspage-incident-create statuspage default 9146419 6655
+o statuspage-incident-get statuspage default 9142124 4289
+o statuspage-incident-list statuspage default 9136960 5158
+o statuspage-incident-update statuspage default 9153080 6687
+o stripe-balance-get stripe default 9171808 2591
+o stripe-billing-meter-list stripe default 9225736 9122
+o stripe-charge-get stripe default 9177485 3784
+o stripe-charge-refund-create stripe default 9196651 4638
+o stripe-country-spec-list stripe default 9201295 9165
+o stripe-customer-get stripe default 9174405 3074
+o stripe-event-list stripe default 9210466 9473
+o stripe-exchange-rate-list stripe default 9219945 5785
+o stripe-payment-intent-cancel stripe default 9192701 3944
+o stripe-payment-intent-capture stripe default 9188110 4585
+o stripe-payment-intent-get stripe default 9181275 3802
+o stripe-refund-get stripe default 9185083 3021
+o supabase-auth-settings supabase default 9245274 2955
+o supabase-rows-list supabase default 9241889 3379
+o supabase-schema-describe supabase default 9237949 3934
+o trello-board-get trello default 9255009 3619
+o trello-board-list trello default 9251181 3822
+o trello-board-lists trello default 9258634 1604
+o trello-card-archive trello default 9270112 4364
+o trello-card-create trello default 9264933 5173
+o trello-list-cards trello default 9260244 4683
+o twilio-account-get twilio default 9283267 2969
+o twilio-call-get twilio default 9306394 4476
+o twilio-call-list twilio default 9298474 7914
+o twilio-conference-list twilio default 9338392 7737
+o twilio-message-get twilio default 9293638 4830
+o twilio-message-list twilio default 9286242 7390
+o twilio-recording-get twilio default 9321645 8396
+o twilio-recording-list twilio default 9310876 10763
+o twilio-usage-record-list twilio default 9330047 8339
+o typeform-form-get typeform default 9355808 5108
+o typeform-form-list typeform default 9350103 5699
+o typeform-response-delete typeform default 9372143 3050
+o typeform-response-list typeform default 9360922 11215
+o typeform-user-me typeform default 9347824 2273
+o vercel-deployment-cancel vercel default 9389916 2663
+o vercel-deployment-get vercel default 9386955 2955
+o vercel-deployments-list vercel default 9381655 5294
+o vercel-project-get vercel default 9378686 2963
+o vercel-projects-list vercel default 9377208 1472
+o webflow-collection-get webflow default 9400213 4235
+o webflow-collection-item-get webflow default 9408539 3491
+o webflow-collection-item-list webflow default 9404454 4079
+o webflow-collection-list webflow default 9397132 3075
+o webflow-site-list webflow default 9394389 2737
+o webflow-site-publish webflow default 9412036 2360
+o work-event-list b10x tasks 5014987 3854
+o work-request-create b10x tasks 4979966 5562
+o work-request-get b10x tasks 4985534 3277
+o work-request-list b10x tasks 4988817 4708
+o work-task-create b10x tasks 4993531 7209
+o work-task-get b10x tasks 5000746 3780
+o work-task-list b10x tasks 5004532 5325
+o work-task-status-update b10x tasks 5009863 5118
+o zendesk-custom-object-list zendesk default 9541500 5894
+o zendesk-custom-status-list zendesk default 9746585 5413
+o zendesk-group-list zendesk default 9718424 3756
+o zendesk-help-center-article-create zendesk help-center 10048404 9386
+o zendesk-help-center-article-get zendesk help-center 10026997 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 10039853 8545
+o zendesk-help-center-article-list zendesk help-center 10018470 8521
+o zendesk-help-center-category-list zendesk help-center 10009729 4211
+o zendesk-help-center-section-list zendesk help-center 10013946 4518
+o zendesk-help-center-translation-list zendesk help-center 10034845 5002
+o zendesk-incremental-organization-list zendesk default 9527278 8641
+o zendesk-incremental-ticket-event-list zendesk default 9535925 5569
+o zendesk-incremental-ticket-list zendesk default 9426573 74662
+o zendesk-incremental-user-list zendesk default 9501241 26031
+o zendesk-messaging-conversation-create zendesk messaging 10057796 10167
+o zendesk-messaging-conversation-get zendesk messaging 10067969 10469
+o zendesk-messaging-conversation-update zendesk messaging 10078444 11165
+o zendesk-messaging-message-create zendesk messaging 10096669 276191
+o zendesk-messaging-message-list zendesk messaging 10372866 158036
+o zendesk-messaging-participant-list zendesk messaging 10089615 7048
+o zendesk-messaging-user-create zendesk messaging 10530908 10089
+o zendesk-messaging-user-get zendesk messaging 10541003 9350
+o zendesk-messaging-user-update zendesk messaging 10550359 9961
+o zendesk-organization-show zendesk default 9712419 5999
+o zendesk-test zendesk default 9752004 23020
+o zendesk-ticket-audit-list zendesk default 9420757 5810
+o zendesk-ticket-comment-list zendesk default 9848768 19828
+o zendesk-ticket-field-list zendesk default 9722186 15042
+o zendesk-ticket-form-list zendesk default 9737234 9345
+o zendesk-ticket-recent-list zendesk default 9547400 71467
+o zendesk-ticket-search zendesk default 9775030 5013
+o zendesk-ticket-show zendesk default 9780049 68713
+o zendesk-ticket-update zendesk default 9868602 141121
+o zendesk-user-show zendesk default 9690917 21496
+o zendesk-view-ticket-list zendesk default 9618873 72038
+o zoom-meeting-delete zoom default 10562213 2358
+o zoom-user-get zoom default 10564577 5881
+payload 10570740
 {
   "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
@@ -150071,15 +150082,2476 @@ payload 10505301
         "human_visible"
       ],
       "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "",
+        "input_schema": {
+          "properties": {
+            "branches": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "predicate": {},
+            "subject": {}
+          },
+          "required": [
+            "branches",
+            "limit",
+            "predicate",
+            "subject"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "knowledge-query",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "branches",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "symbol": "branches"
+        },
+        {
+          "name": "limit",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "predicate",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": "predicate"
+        },
+        {
+          "name": "subject",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": "subject"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "branches": {
+              "$param": "branches"
+            },
+            "limit": {
+              "$param": "limit"
+            },
+            "predicate": {
+              "$param": "predicate"
+            },
+            "subject": {
+              "$param": "subject"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/v1/query"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "author": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "branch": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "confidence_millionths": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "evidence": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "observed_at": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "record": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                        "type": "string"
+                      },
+                      "source": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "record",
+                      "observed_at"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                },
+                "id": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "object": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "reference"
+                        },
+                        "value": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "string"
+                        },
+                        "value": {
+                          "maxLength": 16384,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "integer"
+                        },
+                        "value": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "boolean"
+                        },
+                        "value": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "decimal"
+                        },
+                        "value": {
+                          "maxLength": 16384,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "observed_at": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "predicate": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "schema_revision": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "sensitivity": {
+                  "enum": [
+                    "public",
+                    "internal",
+                    "confidential",
+                    "restricted"
+                  ],
+                  "type": "string"
+                },
+                "state": {
+                  "enum": [
+                    "observed",
+                    "inferred",
+                    "confirmed",
+                    "rejected",
+                    "revoked",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                "subject": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "valid_from": {
+                  "maxLength": 128,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_until": {
+                  "maxLength": 128,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "visibility": {
+                  "enum": [
+                    "private",
+                    "department",
+                    "tenant"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "subject",
+                "predicate",
+                "object",
+                "schema_revision",
+                "branch",
+                "author",
+                "visibility",
+                "sensitivity",
+                "state",
+                "confidence_millionths",
+                "observed_at",
+                "valid_from",
+                "valid_until",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "claims",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "knowledge"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "",
+        "input_schema": {
+          "properties": {
+            "branch": {
+              "type": "string"
+            },
+            "claim": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "branch",
+            "claim"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "knowledge-explain",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "branch",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "symbol": "branch"
+        },
+        {
+          "name": "claim",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "symbol": "claim"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/v1/branches/{branch}/claims/{claim}/explain"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "response_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "occurred_at": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "parent": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            },
+            "sequence": {
+              "format": "uint64",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "subject": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "revision",
+            "parent",
+            "sequence",
+            "kind",
+            "subject",
+            "actor",
+            "occurred_at"
+          ],
+          "type": "object"
+        },
+        "maxItems": 100,
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "knowledge"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "",
+        "input_schema": {
+          "properties": {
+            "branches": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "predicate": {},
+            "subject": {}
+          },
+          "required": [
+            "branches",
+            "limit",
+            "predicate",
+            "subject"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "knowledge-snapshot",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "branches",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "symbol": "branches"
+        },
+        {
+          "name": "limit",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "predicate",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": "predicate"
+        },
+        {
+          "name": "subject",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": "subject"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "branches": {
+              "$param": "branches"
+            },
+            "limit": {
+              "$param": "limit"
+            },
+            "predicate": {
+              "$param": "predicate"
+            },
+            "subject": {
+              "$param": "subject"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/v1/snapshots"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_heads": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "claims": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "author": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "branch": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "confidence_millionths": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "evidence": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "observed_at": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "record": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                        "type": "string"
+                      },
+                      "source": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "record",
+                      "observed_at"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                },
+                "id": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "object": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "reference"
+                        },
+                        "value": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "string"
+                        },
+                        "value": {
+                          "maxLength": 16384,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "integer"
+                        },
+                        "value": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "boolean"
+                        },
+                        "value": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "decimal"
+                        },
+                        "value": {
+                          "maxLength": 16384,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "observed_at": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "predicate": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "schema_revision": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "sensitivity": {
+                  "enum": [
+                    "public",
+                    "internal",
+                    "confidential",
+                    "restricted"
+                  ],
+                  "type": "string"
+                },
+                "state": {
+                  "enum": [
+                    "observed",
+                    "inferred",
+                    "confirmed",
+                    "rejected",
+                    "revoked",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                "subject": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                "valid_from": {
+                  "maxLength": 128,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_until": {
+                  "maxLength": 128,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "visibility": {
+                  "enum": [
+                    "private",
+                    "department",
+                    "tenant"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "subject",
+                "predicate",
+                "object",
+                "schema_revision",
+                "branch",
+                "author",
+                "visibility",
+                "sensitivity",
+                "state",
+                "confidence_millionths",
+                "observed_at",
+                "valid_from",
+                "valid_until",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "digest",
+          "branch_heads",
+          "claims",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "knowledge"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Create or replay one work request",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "references": {
+              "items": {},
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Idempotency_Key",
+            "description",
+            "references",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Create or replay one work request",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-request-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "description",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": "",
+            "maxLength": 65536,
+            "type": "string"
+          },
+          "symbol": "description"
+        },
+        {
+          "name": "references",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "maxItems": 128,
+            "type": "array"
+          },
+          "symbol": "references"
+        },
+        {
+          "name": "title",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "title"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "description": {
+              "$param": "description"
+            },
+            "references": {
+              "$param": "references"
+            },
+            "title": {
+              "$param": "title"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/work/v1/requests"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "planned",
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Get one work request",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Get one work request",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-request-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "symbol": "id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/work/v1/requests/{id}"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "planned",
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List work requests",
+        "input_schema": {
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List work requests",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-request-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/api/work/v1/requests"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at_ms": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "references": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9_.:-]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "revision": {
+                  "format": "uint64",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "open",
+                    "planned",
+                    "active",
+                    "completed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updated_at_ms": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "title",
+                "description",
+                "status",
+                "references",
+                "created_at_ms",
+                "updated_at_ms"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Create or replay one task under a request",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "depends_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "references": {
+              "items": {},
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "Idempotency_Key",
+            "depends_on",
+            "description",
+            "references",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Create or replay one task under a request",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-task-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "symbol": "id"
+        },
+        {
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "depends_on",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "maxItems": 128,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "symbol": "depends_on"
+        },
+        {
+          "name": "description",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": "",
+            "maxLength": 65536,
+            "type": "string"
+          },
+          "symbol": "description"
+        },
+        {
+          "name": "references",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "maxItems": 128,
+            "type": "array"
+          },
+          "symbol": "references"
+        },
+        {
+          "name": "title",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "title"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "depends_on": {
+              "$param": "depends_on"
+            },
+            "description": {
+              "$param": "description"
+            },
+            "references": {
+              "$param": "references"
+            },
+            "title": {
+              "$param": "title"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/work/v1/requests/{id}/tasks"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Get one work task",
+        "input_schema": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Get one work task",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-task-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "symbol": "id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/work/v1/tasks/{id}"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List work tasks",
+        "input_schema": {
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List work tasks",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-task-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/api/work/v1/tasks"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at_ms": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "depends_on": {
+                  "items": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.:-]+$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "references": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9_.:-]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "request_id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "revision": {
+                  "format": "uint64",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "pending",
+                    "ready",
+                    "running",
+                    "blocked",
+                    "completed",
+                    "failed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updated_at_ms": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "request_id",
+                "revision",
+                "title",
+                "description",
+                "status",
+                "depends_on",
+                "references",
+                "created_at_ms",
+                "updated_at_ms"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Update task status with optimistic revision checking",
+        "input_schema": {
+          "properties": {
+            "expected_revision": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "expected_revision",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Update task status with optimistic revision checking",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-task-status-update",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "symbol": "id"
+        },
+        {
+          "name": "expected_revision",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "expected_revision"
+        },
+        {
+          "name": "status",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "symbol": "status"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "expected_revision": {
+              "$param": "expected_revision"
+            },
+            "status": {
+              "$param": "status"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PATCH",
+        "url": "{base}/api/work/v1/tasks/{id}/status"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "value": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "tasks"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List ordered work events after a sequence",
+        "input_schema": {
+          "properties": {
+            "after_sequence": {
+              "type": "number"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "after_sequence",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List ordered work events after a sequence",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "work-event-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "after_sequence",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "after_sequence"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "after_sequence",
+            "value": {
+              "$param": "after_sequence"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/api/work/v1/events"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "aggregate_id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "aggregate_kind": {
+                  "enum": [
+                    "request",
+                    "task"
+                  ],
+                  "type": "string"
+                },
+                "aggregate_revision": {
+                  "format": "uint64",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "at_ms": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "kind": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sequence": {
+                  "format": "uint64",
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "sequence",
+                "aggregate_kind",
+                "aggregate_id",
+                "aggregate_revision",
+                "kind",
+                "at_ms"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "tasks"
     }
   ],
   "schema_version": 2,
   "services": [
     {
       "base_url": "https://b10x.io",
+      "legacy": true,
       "name": "default",
       "tags": [
         "telephony"
+      ]
+    },
+    {
+      "base_url": "https://b10x.io",
+      "description": "Bounded read access to the independent B10x Ontology: query, snapshot, explain",
+      "name": "knowledge",
+      "tags": [
+        "knowledge-base"
+      ]
+    },
+    {
+      "base_url": "https://b10x.io",
+      "description": "Requests, tasks, optimistic status updates, and ordered Work events",
+      "name": "tasks",
+      "tags": [
+        "project-management"
       ]
     }
   ],

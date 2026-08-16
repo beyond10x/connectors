@@ -54,6 +54,12 @@ path = "contracts/connector-event/v0alpha1/connector-event.schema.json"
 path = "contracts/connector-event/v0alpha1/vectors.schema.json"
 
 [[schema]]
+path = "contracts/connector-catalog/v0alpha1/connector-catalog.schema.json"
+
+[[schema]]
+path = "contracts/connector-catalog/v0alpha1/vectors.schema.json"
+
+[[schema]]
 path = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
 
 [[schema]]
@@ -105,6 +111,14 @@ schema = "contracts/connector-event/v0alpha1/vectors.schema.json"
 
 [[document]]
 path = "contracts/connector-event/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-catalog/v0alpha1/vectors.json"
+schema = "contracts/connector-catalog/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-catalog/v0alpha1/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"
 
 [[document]]
@@ -175,6 +189,14 @@ origin = "vendored-source"
 
 [[syntax]]
 path = "specs/asterisk/resources.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/ontology-v0alpha1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/work-v0alpha1.openapi.json"
 origin = "vendored-source"
 
 [[syntax]]

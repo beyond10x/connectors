@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "5a30e26d0f69b3f245443516f1f126c3dcec9583667af84de006842fbfab83f8"
+sha256 = "20122272f326351887e32545c0602bf3da9f8dc046f14780cdadc9e86c6dd2ea"
 
 [[provider]]
 id = "airtable"
@@ -191,11 +191,23 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 [[provider]]
 id = "b10x"
 generator = "connectors 0.1.0"
-toml_sha256 = "4bbdc2ea60602b6b353dcb1a40c4c249cac050e280406514ef0ca83b047bd270"
-ir_sha256 = "0f7c2e5be8844e976f18d38374b085f33fc55228f2e4320cc108f7732e75fe71"
+toml_sha256 = "4befa22091f40e9d74042ecba7d1ef6a1550ef20c1a6e60c052899d5356feaf7"
+ir_sha256 = "4e31f8488b95c7c46b00b6ee06417f5440faa336ac0ed72630682a4d358574a0"
+
+[[provider.specs]]
+path = "specs/b10x/ontology-v0alpha1.openapi.json"
+service = "knowledge"
+upstream_version = "ontology v0alpha1"
+sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
+
+[[provider.specs]]
+path = "specs/b10x/work-v0alpha1.openapi.json"
+service = "tasks"
+upstream_version = "work v0alpha1"
+sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "370835c591aad21f9bdd080b8c7ae65603919c00c0bdeb17fc5241532c410176"
+"catalog/b10x.catalog.json" = "2d4a52aa59a5529a821a742a2b4d3ae1afa9c68a7bb7e4b41c8b7a9a0f97dc62"
 
 [[provider]]
 id = "datadog"
