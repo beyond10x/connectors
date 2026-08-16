@@ -79,6 +79,44 @@ impl HostedAdmissionPolicy {
     fn admits_operator(&self, principal: &HostedPrincipal) -> bool {
         !self.operator_groups.is_empty() && !self.operator_groups.is_disjoint(&principal.groups)
     }
+
+    fn admits_operation(
+        &self,
+        principal: &HostedPrincipal,
+        request: &protocol::operation::OperationRequest,
+    ) -> bool {
+        self.admits_operator(principal) || tenant_member_module_read(request)
+    }
+}
+
+fn tenant_member_module_read(request: &protocol::operation::OperationRequest) -> bool {
+    let protocol::operation::OperationRequest::Invoke(invoke) = request else {
+        return false;
+    };
+    matches!(
+        invoke.operation_ref.as_str(),
+        "work/request.get"
+            | "work/request.list"
+            | "work/task.get"
+            | "work/task.list"
+            | "work.requests.get"
+            | "work.requests.list"
+            | "work.tasks.get"
+            | "work.tasks.list"
+            | "work-request-get"
+            | "work-request-list"
+            | "work-task-get"
+            | "work-task-list"
+            | "ontology/branch.list"
+            | "ontology/claim.explain"
+            | "ontology/claim.query"
+            | "ontology.branches.list"
+            | "ontology.claims.explain"
+            | "ontology.claims.query"
+            | "ontology-branch-list"
+            | "knowledge-explain"
+            | "knowledge-query"
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -427,7 +465,7 @@ async fn operation(
             | protocol::operation::OperationRequest::SessionStatus(_)
             | protocol::operation::OperationRequest::SessionTerminate(_)
             | protocol::operation::OperationRequest::SessionReconcile(_)
-    ) && !state.policy.admits_operator(&principal)
+    ) && !state.policy.admits_operation(&principal, &request.request)
     {
         return operation_failure(
             &request.request_id,
@@ -534,7 +572,9 @@ mod tests {
     use axum::body::Body;
     use axum::http::Request;
     use protocol::connection::{ConnectionRequest, ConnectionResult};
-    use protocol::operation::{OperationRequest, OperationResult, OwnerContext, SearchRequest};
+    use protocol::operation::{
+        InvokeRequest, OperationRequest, OperationResult, OwnerContext, SearchRequest,
+    };
     use tower::ServiceExt as _;
 
     struct Verifier;
@@ -633,6 +673,34 @@ mod tests {
                 limit: 10,
             }),
         }
+    }
+
+    #[test]
+    fn tenant_members_receive_only_read_only_module_invocation() {
+        let read = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: "work/task.list".to_owned(),
+            connection_ref: "connection:b10x".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: None,
+        });
+        let write = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: "work/task.create".to_owned(),
+            connection_ref: "connection:b10x".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: None,
+        });
+        let external = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: "slack.chat.post-message".to_owned(),
+            connection_ref: "connection:slack".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: None,
+        });
+        assert!(tenant_member_module_read(&read));
+        assert!(!tenant_member_module_read(&write));
+        assert!(!tenant_member_module_read(&external));
     }
 
     #[tokio::test]
