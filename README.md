@@ -89,9 +89,10 @@ enabled = false
 listen = "0.0.0.0:5060"
 
 [b10x]
-tenant_member_modules = ["ontology", "work"]
+tenant_member_modules = ["ontology", "planner", "work"]
 work_origin = "http://b10x-work:8080"
 ontology_origin = "http://b10x-ontology:8080"
+planner_origin = "http://b10x-planner:8080"
 module_signing_key_file = "/var/run/b10x-module-auth/private.pem"
 module_signing_key_id = "developer-1"
 module_signing_issuer = "b10x-connectors"

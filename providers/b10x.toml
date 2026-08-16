@@ -43,10 +43,17 @@ name = "tasks"
 tags = ["project-management"]
 description = "Requests, tasks, optimistic status updates, and ordered Work events"
 
+# Planner owns durable product and engineering plans. Repository Markdown is a projection of this
+# database-backed owner, and callers never select a database, filesystem path, or private origin.
+[[services]]
+name = "planning"
+tags = ["project-management"]
+description = "Projects, typed planning entities, searchable boards, lifecycle gates, repository synchronization, and ordered planning events"
+
 [[spec]]
 service = "knowledge"
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
-upstream_version = "ontology module v0alpha2 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+upstream_version = "ontology module v0alpha2 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
 fetched_at = "2026-08-16T00:00:00Z"
 sha256 = "38183cbfa4df9b2a87d0a083d3fd0737875ca2f4fc1746f3e56888d3e7145f78"
 
@@ -59,7 +66,6 @@ direction = "read"
 risk = "low"
 idempotency = "idempotent"
 effects = ["read", "network"]
-semantic_effects = ["read"]
 interaction_shape = "unary"
 protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
@@ -195,7 +201,6 @@ direction = "write"
 risk = "high"
 idempotency = "non_idempotent"
 effects = ["write", "network"]
-semantic_effects = ["write_db", "human_visible"]
 interaction_shape = "unary"
 protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
@@ -308,17 +313,17 @@ expose = true
 [[spec]]
 service = "tasks"
 path = "specs/b10x/work-v1.openapi.json"
-upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+upstream_version = "work module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "011bb2d109a5d0bd0d5f1d5094a9e253fa6596212f42fe6a279cccb4b45c18f8"
+sha256 = "b16026bf25d4f0ff80da89cd9d9ca5b81c1a8479e1d7ef591fa9d2896b953471"
 
 [[spec]]
 kind = "asyncapi"
 service = "tasks"
 path = "specs/b10x/work-v1.asyncapi.yaml"
-upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+upstream_version = "work module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
+sha256 = "350cf11b9bb3131d2435c25e218abf3c23bc991908040e800824e94fdebde7a7"
 
 [[patch.operations]]
 service = "tasks"
@@ -459,6 +464,248 @@ select = "work_task_status_changed"
 rename = "task.status-changed"
 description = "A Work task status transition was committed"
 group = "Work"
+
+[[spec]]
+service = "planning"
+path = "specs/b10x/planner-v1.openapi.json"
+upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+fetched_at = "2026-08-17T00:00:00Z"
+sha256 = "e642ccb86a6be6cb7501ebee6ed5a1094eb86d54959b207579ae1346ed5a7e85"
+
+[[spec]]
+kind = "asyncapi"
+service = "planning"
+path = "specs/b10x/planner-v1.asyncapi.yaml"
+upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+fetched_at = "2026-08-17T00:00:00Z"
+sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
+
+# Planner's generated API uses one uniform contract: GET is read-only and every POST mutates the
+# database under owner-level idempotency. PUT is currently only the idempotent sync-session chunk
+# upload and is overridden below. Selection remains separate from exposure.
+[patch.naming]
+rule = "kebab"
+prefix = "planner"
+
+[patch.naming.pin]
+planner_project_register = "planner-project-register"
+planner_project_list = "planner-project-list"
+planner_board_get = "planner-board-get"
+planner_search = "planner-search"
+planner_entity_create = "planner-entity-create"
+planner_entity_get = "planner-entity-get"
+planner_entity_list = "planner-entity-list"
+planner_entity_update = "planner-entity-update"
+planner_entity_delete = "planner-entity-delete"
+planner_entity_restore = "planner-entity-restore"
+planner_story_transition_explain = "planner-story-transition-explain"
+planner_story_gate_record = "planner-story-gate-record"
+planner_story_transition = "planner-story-transition"
+planner_decision_transition = "planner-decision-transition"
+planner_sync_preview = "planner-sync-preview"
+planner_sync_apply = "planner-sync-apply"
+planner_sync_confirm = "planner-sync-confirm"
+planner_sync_conflict_list = "planner-sync-conflict-list"
+planner_sync_conflict_resolve = "planner-sync-conflict-resolve"
+planner_search_all = "planner-search-all"
+planner_sync_session_begin = "planner-sync-session-begin"
+planner_sync_session_upload = "planner-sync-session-upload"
+planner_sync_session_preview = "planner-sync-session-preview"
+planner_sync_session_apply = "planner-sync-session-apply"
+planner_sync_session_confirm = "planner-sync-session-confirm"
+
+[patch.directions.planning]
+planner_project_register = "write"
+planner_project_list = "read"
+planner_board_get = "read"
+planner_search = "read"
+planner_entity_create = "write"
+planner_entity_get = "read"
+planner_entity_list = "read"
+planner_entity_update = "write"
+planner_entity_delete = "write"
+planner_entity_restore = "write"
+planner_story_transition_explain = "read"
+planner_story_gate_record = "write"
+planner_story_transition = "write"
+planner_decision_transition = "write"
+planner_sync_preview = "read"
+planner_sync_apply = "write"
+planner_sync_confirm = "write"
+planner_sync_conflict_list = "read"
+planner_sync_conflict_resolve = "write"
+planner_search_all = "read"
+planner_sync_session_begin = "write"
+planner_sync_session_upload = "write"
+planner_sync_session_preview = "read"
+planner_sync_session_apply = "write"
+planner_sync_session_confirm = "write"
+
+[[patch.select]]
+service = "planning"
+path_prefix = "/api/planner/v1"
+methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[[patch.select]]
+service = "planning"
+path_prefix = "/api/planner/v1"
+methods = ["POST", "PUT"]
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[[patch.select]]
+service = "planning"
+path_prefix = "/api/planner/v1"
+methods = ["DELETE"]
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+# The bounded board/search/navigation surface is useful to a model. Mutation and repository-sync
+# operations remain callable only by exact reference and do not consume the model tool surface.
+[[patch.operations]]
+service = "planning"
+select = "planner_project_list"
+description = "List registered Planner projects through the bounded cursor contract"
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_board_get"
+description = "Read one validated project board containing typed planning entities and relations"
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_search"
+description = "Search typed planning entities inside one registered project"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_get"
+description = "Read one typed planning entity by project, kind, and identifier"
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_list"
+description = "List typed planning entities inside one registered project"
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_story_transition_explain"
+description = "Explain whether a story may enter a requested workflow state and which gates block it"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_conflict_list"
+description = "List unresolved repository and database synchronization conflicts for one project"
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_search_all"
+description = "Search typed planning entities across every registered project"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_preview"
+description = "Preview a three-way repository and database synchronization without changing either side"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_session_upload"
+description = "Upload one bounded idempotent chunk of parsed repository documents to a sync session"
+idempotency = "idempotent"
+
+[[patch.events]]
+service = "planning"
+select = "planner_project_registered"
+rename = "project.registered"
+description = "A Planner project was registered"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_entity_created"
+rename = "entity.created"
+description = "A typed planning entity was created"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_entity_updated"
+rename = "entity.updated"
+description = "A typed planning entity was updated"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_entity_deleted"
+rename = "entity.deleted"
+description = "A typed planning entity tombstone was committed"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_entity_restored"
+rename = "entity.restored"
+description = "A typed planning entity was restored"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_sync_conflict_recorded"
+rename = "sync-conflict.recorded"
+description = "A repository and database synchronization conflict was recorded"
+group = "Planner"
+
+[[patch.events]]
+service = "planning"
+select = "planner_sync_conflict_resolved"
+rename = "sync-conflict.resolved"
+description = "A repository and database synchronization conflict was resolved"
+group = "Planner"
 
 # This repository-authored member is defined by the accepted native-voice architecture and the
 # closed `sip_v1` implementation. A caller supplies only a deployment-owned destination alias. The

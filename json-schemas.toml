@@ -208,6 +208,14 @@ path = "specs/b10x/work-v1.openapi.json"
 origin = "vendored-source"
 
 [[syntax]]
+path = "specs/b10x/planner-v1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/planner-v1.module.json"
+origin = "vendored-source"
+
+[[syntax]]
 path = "specs/github/api.github.com.2022-11-28-2026-08-02.openapi.json"
 origin = "vendored-source"
 

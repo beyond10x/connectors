@@ -1,0 +1,555 @@
+{
+  "cli": {
+    "binary": "b10x-planner",
+    "remote_transport": "connectors",
+    "structured_output": "json"
+  },
+  "contracts": {
+    "asyncapi": {
+      "media_type": "application/yaml",
+      "path": "asyncapi.yaml",
+      "sha256": "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
+    },
+    "openapi": {
+      "media_type": "application/json",
+      "path": "openapi.json",
+      "sha256": "e642ccb86a6be6cb7501ebee6ed5a1094eb86d54959b207579ae1346ed5a7e85"
+    }
+  },
+  "events": [
+    {
+      "asyncapi_message_id": "planner_project_registered",
+      "global_id": "planner/project.registered",
+      "key": "project.registered",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_entity_created",
+      "global_id": "planner/entity.created",
+      "key": "entity.created",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_entity_updated",
+      "global_id": "planner/entity.updated",
+      "key": "entity.updated",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_entity_deleted",
+      "global_id": "planner/entity.deleted",
+      "key": "entity.deleted",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_entity_restored",
+      "global_id": "planner/entity.restored",
+      "key": "entity.restored",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_sync_conflict_recorded",
+      "global_id": "planner/sync.conflict-recorded",
+      "key": "sync.conflict-recorded",
+      "schema_version": 1
+    },
+    {
+      "asyncapi_message_id": "planner_sync_conflict_resolved",
+      "global_id": "planner/sync.conflict-resolved",
+      "key": "sync.conflict-resolved",
+      "schema_version": 1
+    }
+  ],
+  "module": {
+    "domain_owner": "b10x/planner",
+    "id": "planner",
+    "source_path": "modules/planner",
+    "source_repository": "https://github.com/b10x/modules"
+  },
+  "operations": [
+    {
+      "cli_path": [
+        "project",
+        "register"
+      ],
+      "connector_member": "project-register",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/project.register",
+      "idempotency": "keyed",
+      "key": "project.register",
+      "method": "POST",
+      "openapi_operation_id": "planner_project_register",
+      "path": "/projects",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "project",
+        "list"
+      ],
+      "connector_member": "project-list",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/project.list",
+      "idempotency": "idempotent",
+      "key": "project.list",
+      "method": "GET",
+      "openapi_operation_id": "planner_project_list",
+      "path": "/projects",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "board",
+        "get"
+      ],
+      "connector_member": "board-get",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/board.get",
+      "idempotency": "idempotent",
+      "key": "board.get",
+      "method": "GET",
+      "openapi_operation_id": "planner_board_get",
+      "path": "/projects/{project}/board",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "search"
+      ],
+      "connector_member": "search",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/search",
+      "idempotency": "idempotent",
+      "key": "search",
+      "method": "POST",
+      "openapi_operation_id": "planner_search",
+      "path": "/projects/{project}/search",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "create"
+      ],
+      "connector_member": "entity-create",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/entity.create",
+      "idempotency": "keyed",
+      "key": "entity.create",
+      "method": "POST",
+      "openapi_operation_id": "planner_entity_create",
+      "path": "/projects/{project}/entities",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "get"
+      ],
+      "connector_member": "entity-get",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/entity.get",
+      "idempotency": "idempotent",
+      "key": "entity.get",
+      "method": "GET",
+      "openapi_operation_id": "planner_entity_get",
+      "path": "/projects/{project}/entities/{kind}/{id}",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "list"
+      ],
+      "connector_member": "entity-list",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/entity.list",
+      "idempotency": "idempotent",
+      "key": "entity.list",
+      "method": "GET",
+      "openapi_operation_id": "planner_entity_list",
+      "path": "/projects/{project}/entities",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "update"
+      ],
+      "connector_member": "entity-update",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/entity.update",
+      "idempotency": "keyed",
+      "key": "entity.update",
+      "method": "PUT",
+      "openapi_operation_id": "planner_entity_update",
+      "path": "/projects/{project}/entities/{kind}/{id}",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "delete"
+      ],
+      "connector_member": "entity-delete",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/entity.delete",
+      "idempotency": "keyed",
+      "key": "entity.delete",
+      "method": "DELETE",
+      "openapi_operation_id": "planner_entity_delete",
+      "path": "/projects/{project}/entities/{kind}/{id}",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "entity",
+        "restore"
+      ],
+      "connector_member": "entity-restore",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/entity.restore",
+      "idempotency": "keyed",
+      "key": "entity.restore",
+      "method": "POST",
+      "openapi_operation_id": "planner_entity_restore",
+      "path": "/projects/{project}/entities/{kind}/{id}/restore",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "story",
+        "transition",
+        "explain"
+      ],
+      "connector_member": "story-transition-explain",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/story.transition.explain",
+      "idempotency": "idempotent",
+      "key": "story.transition.explain",
+      "method": "POST",
+      "openapi_operation_id": "planner_story_transition_explain",
+      "path": "/projects/{project}/stories/{id}/transitions/explain",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "story",
+        "gate",
+        "record"
+      ],
+      "connector_member": "story-gate-record",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/story.gate.record",
+      "idempotency": "keyed",
+      "key": "story.gate.record",
+      "method": "POST",
+      "openapi_operation_id": "planner_story_gate_record",
+      "path": "/projects/{project}/stories/{id}/gates",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "story",
+        "transition"
+      ],
+      "connector_member": "story-transition",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/story.transition",
+      "idempotency": "keyed",
+      "key": "story.transition",
+      "method": "POST",
+      "openapi_operation_id": "planner_story_transition",
+      "path": "/projects/{project}/stories/{id}/transitions",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "decision",
+        "transition"
+      ],
+      "connector_member": "decision-transition",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/decision.transition",
+      "idempotency": "keyed",
+      "key": "decision.transition",
+      "method": "POST",
+      "openapi_operation_id": "planner_decision_transition",
+      "path": "/projects/{project}/decisions/{id}/transitions",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "preview"
+      ],
+      "connector_member": "sync-preview",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/sync.preview",
+      "idempotency": "idempotent",
+      "key": "sync.preview",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_preview",
+      "path": "/sync/preview",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "apply"
+      ],
+      "connector_member": "sync-apply",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.apply",
+      "idempotency": "keyed",
+      "key": "sync.apply",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_apply",
+      "path": "/sync/apply",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "confirm"
+      ],
+      "connector_member": "sync-confirm",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.confirm",
+      "idempotency": "keyed",
+      "key": "sync.confirm",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_confirm",
+      "path": "/sync/confirm",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "conflict",
+        "list"
+      ],
+      "connector_member": "sync-conflict-list",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/sync.conflict.list",
+      "idempotency": "idempotent",
+      "key": "sync.conflict.list",
+      "method": "GET",
+      "openapi_operation_id": "planner_sync_conflict_list",
+      "path": "/projects/{project}/sync/conflicts",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "conflict",
+        "resolve"
+      ],
+      "connector_member": "sync-conflict-resolve",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.conflict.resolve",
+      "idempotency": "keyed",
+      "key": "sync.conflict.resolve",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_conflict_resolve",
+      "path": "/sync/conflicts/{id}/resolve",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "search",
+        "all"
+      ],
+      "connector_member": "search-all",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/search.all",
+      "idempotency": "idempotent",
+      "key": "search.all",
+      "method": "POST",
+      "openapi_operation_id": "planner_search_all",
+      "path": "/search",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "session",
+        "begin"
+      ],
+      "connector_member": "sync-session-begin",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.session.begin",
+      "idempotency": "keyed",
+      "key": "sync.session.begin",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_session_begin",
+      "path": "/sync/sessions",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "session",
+        "upload"
+      ],
+      "connector_member": "sync-session-upload",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.session.upload",
+      "idempotency": "idempotent",
+      "key": "sync.session.upload",
+      "method": "PUT",
+      "openapi_operation_id": "planner_sync_session_upload",
+      "path": "/sync/sessions/{session}/documents",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "session",
+        "preview"
+      ],
+      "connector_member": "sync-session-preview",
+      "direction": "read",
+      "effects": [
+        "read"
+      ],
+      "global_id": "planner/sync.session.preview",
+      "idempotency": "idempotent",
+      "key": "sync.session.preview",
+      "method": "GET",
+      "openapi_operation_id": "planner_sync_session_preview",
+      "path": "/sync/sessions/{session}/preview",
+      "risk_floor": "low"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "session",
+        "apply"
+      ],
+      "connector_member": "sync-session-apply",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.session.apply",
+      "idempotency": "keyed",
+      "key": "sync.session.apply",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_session_apply",
+      "path": "/sync/sessions/{session}/apply",
+      "risk_floor": "medium"
+    },
+    {
+      "cli_path": [
+        "sync",
+        "session",
+        "confirm"
+      ],
+      "connector_member": "sync-session-confirm",
+      "direction": "write",
+      "effects": [
+        "write"
+      ],
+      "global_id": "planner/sync.session.confirm",
+      "idempotency": "keyed",
+      "key": "sync.session.confirm",
+      "method": "POST",
+      "openapi_operation_id": "planner_sync_session_confirm",
+      "path": "/sync/sessions/{session}/confirm",
+      "risk_floor": "medium"
+    }
+  ],
+  "protocol": "b10x.module-manifest.v1",
+  "release": {
+    "bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "stability": "development",
+    "version": "0.1.0-dev.1"
+  },
+  "runtime": {
+    "api_base_path": "/api/planner/v1",
+    "cross_domain_owner_process_required": true,
+    "placements": [
+      "library",
+      "service",
+      "cli"
+    ]
+  },
+  "ui": [
+    {
+      "id": "planner.board",
+      "manifest": {
+        "media_type": "application/json",
+        "path": "ui/planner-board.json",
+        "sha256": "4eff813f69a0899e0bac105b02c31d33004c6fdd5b2fdb69bdd7588440af90f7"
+      },
+      "version": 1
+    }
+  ]
+}

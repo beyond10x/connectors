@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "9cf9b34a88510ec18a4025a71e1a9aac89d91dd697b86a4e05c163473298a4b2"
+sha256 = "a9f1aaaaee35a8fe05ffb43646d62f8283d8b5920407d0e472f6f19543d00377"
 
 [[provider]]
 id = "airtable"
@@ -191,29 +191,41 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 [[provider]]
 id = "b10x"
 generator = "connectors 0.1.0"
-toml_sha256 = "5125920678c5ee566072db13a620d3942a7ae4bba0480f2fc4e01324f530bbcf"
-ir_sha256 = "906fdad2e8ceb92bf5a5f08ac0e57374f762e783401e8bc8c15ddfecda074a73"
+toml_sha256 = "6e7ab6a94794c6e5426052c42381bff27c7e680953d427ed46ff6895616e3575"
+ir_sha256 = "aeab296dc85c1075f1d12eb3746b4992979b6338f9f17b898382fd32b9d3ff1d"
 
 [[provider.specs]]
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
 service = "knowledge"
-upstream_version = "ontology module v0alpha2 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+upstream_version = "ontology module v0alpha2 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
 sha256 = "38183cbfa4df9b2a87d0a083d3fd0737875ca2f4fc1746f3e56888d3e7145f78"
 
 [[provider.specs]]
 path = "specs/b10x/work-v1.openapi.json"
 service = "tasks"
-upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
-sha256 = "011bb2d109a5d0bd0d5f1d5094a9e253fa6596212f42fe6a279cccb4b45c18f8"
+upstream_version = "work module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+sha256 = "b16026bf25d4f0ff80da89cd9d9ca5b81c1a8479e1d7ef591fa9d2896b953471"
 
 [[provider.specs]]
 path = "specs/b10x/work-v1.asyncapi.yaml"
 service = "tasks"
-upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
-sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
+upstream_version = "work module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+sha256 = "350cf11b9bb3131d2435c25e218abf3c23bc991908040e800824e94fdebde7a7"
+
+[[provider.specs]]
+path = "specs/b10x/planner-v1.openapi.json"
+service = "planning"
+upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+sha256 = "e642ccb86a6be6cb7501ebee6ed5a1094eb86d54959b207579ae1346ed5a7e85"
+
+[[provider.specs]]
+path = "specs/b10x/planner-v1.asyncapi.yaml"
+service = "planning"
+upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "76487bd2b80c1b92bdb9a5d220598c6ac37571b4ca284161d6a8368222a4e8c5"
+"catalog/b10x.catalog.json" = "6616dcc0ec510671d9663ebe130cc50d175dc614487cbee060ea7c77b06bc254"
 
 [[provider]]
 id = "datadog"

@@ -46,13 +46,18 @@ struct StoredEvent {
     event: DataEvent,
 }
 
-pub(super) struct WorkEventStore {
+pub(super) struct ModuleEventStore {
+    module: &'static str,
     path: PathBuf,
     state: Mutex<State>,
 }
 
-impl WorkEventStore {
-    pub(super) fn open(path: PathBuf, legacy_tenant: Option<&str>) -> Result<Self, ()> {
+impl ModuleEventStore {
+    pub(super) fn open(
+        module: &'static str,
+        path: PathBuf,
+        legacy_tenant: Option<&str>,
+    ) -> Result<Self, ()> {
         let state = if path.exists() {
             let bytes = fs::read(&path).map_err(|_| ())?;
             match serde_json::from_slice::<PersistedState>(&bytes).map_err(|_| ())? {
@@ -74,6 +79,7 @@ impl WorkEventStore {
             State::default()
         };
         Ok(Self {
+            module,
             path,
             state: Mutex::new(state),
         })
@@ -107,7 +113,7 @@ impl WorkEventStore {
                 .events
                 .last()
                 .map_or(1, |stored| stored.sequence.saturating_add(1));
-            event.event_ref = format!("event:b10x:work:{sequence}");
+            event.event_ref = format!("event:b10x:{}:{sequence}", self.module);
             tenant_state.events.push(StoredEvent {
                 sequence,
                 owner_id,
@@ -219,7 +225,7 @@ mod tests {
     fn cursors_events_and_replay_are_partitioned_by_tenant() {
         let temporary = tempfile::tempdir().expect("temporary directory");
         let path = temporary.path().join("work-events.json");
-        let store = WorkEventStore::open(path.clone(), None).expect("open store");
+        let store = ModuleEventStore::open("work", path.clone(), None).expect("open store");
 
         store
             .append(
@@ -258,7 +264,8 @@ mod tests {
             .is_some());
 
         drop(store);
-        let reopened = WorkEventStore::open(path, None).expect("reopen partitioned store");
+        let reopened =
+            ModuleEventStore::open("work", path, None).expect("reopen partitioned store");
         assert_eq!(reopened.receive("tenant-a", 0, 10).unwrap().0.len(), 1);
         assert_eq!(reopened.receive("tenant-b", 0, 10).unwrap().0.len(), 1);
     }

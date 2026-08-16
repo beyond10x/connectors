@@ -27,6 +27,7 @@ fn config(root: &Path) -> B10xIntegrationConfig {
         tenant_member_modules: None,
         work_origin: Some("http://127.0.0.1:4180".to_owned()),
         ontology_origin: None,
+        planner_origin: None,
         ontology_bearer_file: None,
         module_signing_key_file: Some(signing_key),
         module_signing_key_id: Some("test-1".to_owned()),
@@ -287,6 +288,44 @@ async fn work_owner_events_are_checkpointed_into_connector_sequence_space() {
         .exists());
 }
 
+#[tokio::test]
+async fn planner_owner_events_are_checkpointed_into_connector_sequence_space() {
+    let (origin, server) = fake_http(
+        r#"{"events":[{"protocol":"b10x.module-event.v1","id":"planner-event-1","module":"planner","key":"entity.created","schema_version":1,"occurred_at":"2026-08-17T12:00:00Z","cursor":"planner:deployment:1","data":{"project":"demo","kind":"story","id":"S-001"}}],"next_cursor":"planner:deployment:1","has_more":false}"#,
+    );
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.work_origin = None;
+    configured.planner_origin = Some(origin);
+    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let result = backend
+        .handle_event(
+            &principal(),
+            EventRequest::Receive(protocol::event::ReceiveRequest {
+                channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
+                after: None,
+                limit: 10,
+                wait_ms: 0,
+            }),
+        )
+        .await
+        .unwrap();
+    let EventResult::Receive { events, next } = result else {
+        panic!("receive result expected")
+    };
+    assert_eq!(next, "1");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, "entity.created");
+    assert_eq!(events[0].event_ref, "event:b10x:planner:1");
+    let request = server.join().unwrap();
+    assert!(request.starts_with("GET /api/planner/v1/events?"));
+    assert!(temporary
+        .path()
+        .join("b10x-planner-events.json")
+        .exists());
+}
+
 #[test]
 fn browser_catalog_symbol_is_translated_into_the_closed_driver_input() {
     let document = Document::parse(DOCUMENT).unwrap();
@@ -332,6 +371,28 @@ async fn work_invocation_crosses_the_private_http_boundary_with_signed_authority
     assert_eq!(output, serde_json::json!({"items":[], "next_cursor":null}));
     let request = server.join().unwrap();
     assert!(request.starts_with("GET /api/work/v2/requests?"));
+    assert!(request.contains("authorization: DLModule "));
+    assert_eq!(audit_outcomes(temporary.path()), ["attempted", "completed"]);
+}
+
+#[tokio::test]
+async fn planner_invocation_crosses_the_private_http_boundary_with_signed_authority() {
+    let (origin, server) = fake_http(r#"{"items":[],"next_cursor":null}"#);
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.work_origin = None;
+    configured.planner_origin = Some(origin);
+    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let output = invoke_read(
+        &backend,
+        "planner/project.list",
+        serde_json::json!({"cursor":"", "limit":"1"}),
+    )
+    .await;
+    assert_eq!(output, serde_json::json!({"items":[], "next_cursor":null}));
+    let request = server.join().unwrap();
+    assert!(request.starts_with("GET /api/planner/v1/projects?"));
     assert!(request.contains("authorization: DLModule "));
     assert_eq!(audit_outcomes(temporary.path()), ["attempted", "completed"]);
 }
