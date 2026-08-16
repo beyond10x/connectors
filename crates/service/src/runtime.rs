@@ -147,6 +147,11 @@ pub struct BackendCapabilities {
     pub events: bool,
 }
 
+/// Value-free readiness failure for one configured Integration dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("a configured Connector backend dependency is unavailable")]
+pub struct BackendReadinessError;
+
 /// Secret-bearing, bounded completion payload. Diagnostics never reveal its contents and its
 /// allocation is cleared on drop.
 pub struct HostedCompletionSubmission(Zeroizing<Vec<u8>>);
@@ -155,6 +160,35 @@ impl HostedCompletionSubmission {
     #[must_use]
     pub fn new(value: Vec<u8>) -> Self {
         Self(Zeroizing::new(value))
+    }
+
+    /// Allocate the secret-owned receive buffer before transport bytes arrive. Callers which
+    /// enforce an upper bound should reserve that complete bound so extending the buffer cannot
+    /// reallocate previously received secret material into ordinary freed heap storage.
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Zeroizing::new(Vec::with_capacity(capacity)))
+    }
+
+    /// Append one transport chunk without ever reallocating the zeroizing-owned receive buffer.
+    /// Returns `false` when the reserved capacity cannot admit the complete chunk.
+    #[must_use]
+    pub fn extend_from_slice(&mut self, value: &[u8]) -> bool {
+        if value.len() > self.0.capacity().saturating_sub(self.0.len()) {
+            return false;
+        }
+        self.0.extend_from_slice(value);
+        true
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     #[must_use]
@@ -206,6 +240,10 @@ impl BackendCapabilities {
 /// [`BackendCapabilities`].
 #[async_trait]
 pub trait ConnectorBackend: Send + Sync + 'static {
+    /// Check mandatory backend dependencies without reading a credential or widening authority.
+    /// Every backend must state its posture explicitly; there is no fail-open default.
+    async fn ready(&self) -> Result<(), BackendReadinessError>;
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities::OPERATIONS
     }
@@ -312,5 +350,15 @@ mod tests {
         assert_eq!(admitted.subject(), "person:owner");
         assert_eq!(admitted.actor_subject(), "service:caller");
         assert_eq!(admitted.agent_revision(), None);
+    }
+
+    #[test]
+    fn hosted_completion_submission_never_reallocates_received_secret_material() {
+        let mut submission = HostedCompletionSubmission::with_capacity(8);
+        assert!(submission.extend_from_slice(b"secret"));
+        let allocation = submission.expose_secret().as_ptr();
+        assert!(!submission.extend_from_slice(b"overflow"));
+        assert_eq!(submission.expose_secret(), b"secret");
+        assert_eq!(submission.expose_secret().as_ptr(), allocation);
     }
 }

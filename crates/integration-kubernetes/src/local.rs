@@ -611,6 +611,12 @@ impl KubernetesLocalBackend {
 
 #[async_trait]
 impl ConnectorBackend for KubernetesLocalBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        // Construction validates kubeconfig and local state. Cluster reachability is provider
+        // health and remains an operation-level degradation.
+        Ok(())
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,

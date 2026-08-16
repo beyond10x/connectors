@@ -231,6 +231,14 @@ a generic secret-reading operation. The first hosted Kubernetes Integration itse
 use workload identity and therefore does not manufacture a reusable credential merely because a
 store is present.
 
+Hosted liveness remains process-local. Hosted readiness additionally requires the Identity
+verifier and every configured backend's mandatory dependencies. A credential-backed Integration
+therefore checks its `SecretStore` through a value-free readiness port; Vault proves service health
+and a usable workload-authenticated session without reading a credential address or value. An
+upstream provider outage degrades that Integration and is not, by itself, global process
+readiness. Both `ConnectorBackend` and `SecretStore` require every implementation to state its
+readiness posture explicitly; neither port supplies a fail-open success default.
+
 **2026-08-15 hosted-consumer correction.** The Vault capability and its deployment configuration
 are implemented, but the current hosted adapter set contains no provider-credential consumer:
 Kubernetes status uses workload identity and SIP resolves operation-scoped deployment material.

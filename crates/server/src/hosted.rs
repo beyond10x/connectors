@@ -4,12 +4,13 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use axum::body::Bytes;
+use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
+use futures_util::StreamExt as _;
 use protocol::catalog::{
     RequestEnvelope as CatalogRequestEnvelope, ResponseEnvelope as CatalogResponseEnvelope,
 };
@@ -213,7 +214,7 @@ async fn complete_session(
     State(state): State<HostedState>,
     AxumPath(session_ref): AxumPath<String>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Response {
     let capability = headers
         .get("x-connect-session")
@@ -230,19 +231,27 @@ async fn complete_session(
         .and_then(|value| value.to_str().ok())
         != Some("application/octet-stream")
         || capability.is_none()
-        || body.is_empty()
     {
         return secure_completion_response(error(
             StatusCode::BAD_REQUEST,
             "connect-session-invalid",
         ));
     }
+    let submission = match read_completion_submission(body).await {
+        Ok(submission) if !submission.is_empty() => submission,
+        Ok(_) | Err(()) => {
+            return secure_completion_response(error(
+                StatusCode::BAD_REQUEST,
+                "connect-session-invalid",
+            ));
+        }
+    };
     let result = state
         .backend
         .complete_hosted_session(
             &session_ref,
             capability.expect("checked capability"),
-            HostedCompletionSubmission::new(body.to_vec()),
+            submission,
         )
         .await;
     let response = match result {
@@ -259,6 +268,24 @@ async fn complete_session(
         ),
     };
     secure_completion_response(response)
+}
+
+async fn read_completion_submission(body: Body) -> Result<HostedCompletionSubmission, ()> {
+    // Reserving the full admitted bound prevents Vec growth from leaving an earlier copy of
+    // credential bytes in freed heap storage. HTTP frame buffers remain transport-owned and are
+    // copied exactly once, directly into the zeroizing-owned allocation.
+    let mut submission = HostedCompletionSubmission::with_capacity(MAX_COMPLETION_BYTES);
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| ())?;
+        if submission.len().saturating_add(chunk.len()) > MAX_COMPLETION_BYTES {
+            return Err(());
+        }
+        if !submission.extend_from_slice(&chunk) {
+            return Err(());
+        }
+    }
+    Ok(submission)
 }
 
 fn secure_completion_response(mut response: Response) -> Response {
@@ -367,9 +394,12 @@ async fn liveness() -> &'static str {
 }
 
 async fn readiness(State(state): State<HostedState>) -> Response {
-    match state.verifier.ready().await {
+    if state.verifier.ready().await.is_err() {
+        return (StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable\n").into_response();
+    }
+    match state.backend.ready().await {
         Ok(()) => (StatusCode::OK, "ok\n").into_response(),
-        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable\n").into_response(),
+        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, "backend-unavailable\n").into_response(),
     }
 }
 
@@ -568,8 +598,10 @@ fn event_failure(request_id: &str, failure: EventError, status: StatusCode) -> R
 
 #[cfg(test)]
 mod tests {
+    use std::convert::Infallible;
+
     use super::*;
-    use axum::body::Body;
+    use axum::body::{Body, Bytes};
     use axum::http::Request;
     use protocol::connection::{ConnectionRequest, ConnectionResult};
     use protocol::operation::{
@@ -616,6 +648,11 @@ mod tests {
 
     #[async_trait]
     impl ConnectorBackend for Backend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            // This transport test backend has no configured dependency.
+            Ok(())
+        }
+
         async fn handle(
             &self,
             context: &PrincipalContext,
@@ -636,6 +673,23 @@ mod tests {
             Ok(ConnectionResult::Search {
                 connections: Vec::new(),
             })
+        }
+    }
+
+    struct UnavailableBackend;
+
+    #[async_trait]
+    impl ConnectorBackend for UnavailableBackend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            Err(service::BackendReadinessError)
+        }
+
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            _request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            unreachable!("readiness never dispatches an operation")
         }
     }
 
@@ -673,6 +727,31 @@ mod tests {
                 limit: 10,
             }),
         }
+    }
+
+    #[tokio::test]
+    async fn hosted_completion_streams_fragments_into_a_redacted_bounded_submission() {
+        const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SECRET";
+        let chunks = [
+            Ok::<_, Infallible>(Bytes::from_static(b"xapp-")),
+            Ok(Bytes::from_static(SENTINEL.as_bytes())),
+            Ok(Bytes::from_static(b"\nxoxb-value\nxoxp-value")),
+        ];
+        let submission =
+            read_completion_submission(Body::from_stream(futures_util::stream::iter(chunks)))
+                .await
+                .unwrap();
+        assert_eq!(
+            submission.expose_secret(),
+            format!("xapp-{SENTINEL}\nxoxb-value\nxoxp-value").as_bytes()
+        );
+        assert!(!format!("{submission:?}").contains(SENTINEL));
+
+        let oversized = Body::from_stream(futures_util::stream::iter([
+            Ok::<_, Infallible>(Bytes::from(vec![b'x'; MAX_COMPLETION_BYTES])),
+            Ok(Bytes::from_static(b"x")),
+        ]));
+        assert!(read_completion_submission(oversized).await.is_err());
     }
 
     #[test]
@@ -779,6 +858,30 @@ mod tests {
                 .unwrap()
                 .status(),
             StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn hosted_liveness_stays_local_when_a_backend_dependency_is_unready() {
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(UnavailableBackend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
+        assert_eq!(
+            app.clone()
+                .oneshot(Request::get("/livez").body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+        assert_eq!(
+            app.oneshot(Request::get("/readyz").body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
         );
     }
 

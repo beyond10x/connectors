@@ -378,6 +378,11 @@ mod tests {
 
     #[async_trait]
     impl ConnectorBackend for SyntheticBackend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            // This process-local transport test backend has no configured dependency.
+            Ok(())
+        }
+
         async fn handle(
             &self,
             _context: &PrincipalContext,

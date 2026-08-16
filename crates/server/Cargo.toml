@@ -15,6 +15,7 @@ axum.workspace = true
 catalog.workspace = true
 protocol.workspace = true
 fs2.workspace = true
+futures-util = "0.3"
 rustix.workspace = true
 serde.workspace = true
 serde_json.workspace = true

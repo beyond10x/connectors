@@ -275,6 +275,12 @@ impl KubernetesStatusBackend {
 
 #[async_trait]
 impl ConnectorBackend for KubernetesStatusBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        // Construction validates in-cluster trust and client configuration. Kubernetes API
+        // availability is provider health and remains an operation-level degradation.
+        Ok(())
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,

@@ -4,6 +4,7 @@ use std::fs::OpenOptions;
 use std::io::Read as _;
 use std::os::unix::fs::OpenOptionsExt as _;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -28,6 +29,8 @@ pub struct HostedVaultStore {
     client: reqwest::Client,
     transport: HttpTransport,
     address: String,
+    health: Arc<dyn VaultHealthProbe>,
+    session_probe: Arc<dyn VaultSessionProbe>,
     login_endpoint: Url,
     mount: String,
     role: String,
@@ -38,6 +41,50 @@ pub struct HostedVaultStore {
 struct VaultSession {
     token: Secret,
     refresh_at: Instant,
+}
+
+#[async_trait]
+trait VaultHealthProbe: Send + Sync {
+    async fn ready(&self) -> Result<(), HostedVaultError>;
+}
+
+#[async_trait]
+trait VaultSessionProbe: Send + Sync {
+    async fn ready(&self, token: &Secret) -> Result<(), StoreError>;
+}
+
+struct HttpVaultHealthProbe {
+    client: reqwest::Client,
+    endpoint: Url,
+}
+
+#[async_trait]
+impl VaultHealthProbe for HttpVaultHealthProbe {
+    async fn ready(&self) -> Result<(), HostedVaultError> {
+        let response = self
+            .client
+            .get(self.endpoint.clone())
+            .send()
+            .await
+            .map_err(|_| HostedVaultError::AuthenticationUnavailable)?;
+        health_status(response.status())
+    }
+}
+
+struct StoredVaultSessionProbe {
+    transport: HttpTransport,
+    address: String,
+    mount: String,
+}
+
+#[async_trait]
+impl VaultSessionProbe for StoredVaultSessionProbe {
+    async fn ready(&self, token: &Secret) -> Result<(), StoreError> {
+        VaultStore::new(self.transport.clone(), &self.address, token.clone())
+            .with_mount(&self.mount)
+            .ready()
+            .await
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -124,13 +171,28 @@ impl HostedVaultStore {
             .add_root_certificate(certificate)
             .build()
             .map_err(|_| HostedVaultError::HttpClient)?;
+        let mut health_endpoint = origin.clone();
+        health_endpoint.set_path("/v1/sys/health");
+        health_endpoint.set_query(Some("standbyok=true&perfstandbyok=true"));
         origin.set_path("/v1/auth/kubernetes/login");
+        let transport = HttpTransport::with_client(client.clone());
+        let address = address.trim_end_matches('/').to_owned();
+        let mount = config.mount.clone();
         Ok(Self {
-            transport: HttpTransport::with_client(client.clone()),
+            transport: transport.clone(),
+            health: Arc::new(HttpVaultHealthProbe {
+                client: client.clone(),
+                endpoint: health_endpoint,
+            }),
+            session_probe: Arc::new(StoredVaultSessionProbe {
+                transport,
+                address: address.clone(),
+                mount: mount.clone(),
+            }),
             client,
-            address: address.trim_end_matches('/').to_owned(),
+            address,
             login_endpoint: origin,
-            mount: config.mount.clone(),
+            mount,
             role,
             token_file,
             session: Mutex::new(None),
@@ -141,6 +203,16 @@ impl HostedVaultStore {
     pub async fn initialize(&self) -> Result<(), HostedVaultError> {
         let _ = self.current_token().await?;
         Ok(())
+    }
+
+    /// Prove Vault reachability and retain a usable workload-authenticated session without naming
+    /// or reading any credential address or value. The bounded, zeroizing token-self response is
+    /// neither decoded nor exposed.
+    pub async fn ready(&self) -> Result<(), HostedVaultError> {
+        self.health.ready().await?;
+        self.authenticated_ready()
+            .await
+            .map_err(hosted_readiness_error)
     }
 
     async fn current_token(&self) -> Result<Secret, HostedVaultError> {
@@ -158,6 +230,17 @@ impl HostedVaultStore {
 
     async fn invalidate(&self) {
         *self.session.lock().await = None;
+    }
+
+    async fn authenticated_ready(&self) -> Result<(), StoreError> {
+        let token = self.current_token().await.map_err(auth_store_error)?;
+        let result = self.session_probe.ready(&token).await;
+        if !matches!(result, Err(StoreError::Denied { .. })) {
+            return result;
+        }
+        self.invalidate().await;
+        let token = self.current_token().await.map_err(auth_store_error)?;
+        self.session_probe.ready(&token).await
     }
 
     async fn login(&self) -> Result<VaultSession, HostedVaultError> {
@@ -223,6 +306,12 @@ impl HostedVaultStore {
 
 #[async_trait]
 impl SecretStore for HostedVaultStore {
+    async fn ready(&self) -> Result<(), StoreError> {
+        HostedVaultStore::ready(self)
+            .await
+            .map_err(auth_store_error)
+    }
+
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
         let result = self.store().await?.get(reference).await;
         if !matches!(result, Err(StoreError::Denied { .. })) {
@@ -261,6 +350,26 @@ fn auth_store_error(error: HostedVaultError) -> StoreError {
             path: "vault:kubernetes-login".to_owned(),
             reason: "a usable Vault session could not be obtained".to_owned(),
         },
+    }
+}
+
+fn hosted_readiness_error(error: StoreError) -> HostedVaultError {
+    match error {
+        StoreError::Denied { .. } => HostedVaultError::AuthenticationRefused,
+        StoreError::NotFound { .. }
+        | StoreError::Unreachable { .. }
+        | StoreError::Backend { .. }
+        | StoreError::Layout { .. }
+        | StoreError::Conflict { .. }
+        | StoreError::Unsupported { .. } => HostedVaultError::AuthenticationUnavailable,
+    }
+}
+
+fn health_status(status: StatusCode) -> Result<(), HostedVaultError> {
+    if status.is_success() {
+        Ok(())
+    } else {
+        Err(HostedVaultError::AuthenticationUnavailable)
     }
 }
 
@@ -306,7 +415,74 @@ fn valid_token(value: &str, maximum: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
+
+    struct FixedHealth(bool);
+
+    #[async_trait]
+    impl VaultHealthProbe for FixedHealth {
+        async fn ready(&self) -> Result<(), HostedVaultError> {
+            if self.0 {
+                Ok(())
+            } else {
+                Err(HostedVaultError::AuthenticationUnavailable)
+            }
+        }
+    }
+
+    struct FixedSessionProbe {
+        ready: bool,
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl VaultSessionProbe for FixedSessionProbe {
+        async fn ready(&self, _token: &Secret) -> Result<(), StoreError> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            if self.ready {
+                Ok(())
+            } else {
+                Err(StoreError::Denied {
+                    path: "vault:auth/token/lookup-self".to_owned(),
+                    reason: "SENTINEL-NOT-A-REAL-SECRET".to_owned(),
+                })
+            }
+        }
+    }
+
+    fn store_with_readiness(
+        health_ready: bool,
+        session_ready: bool,
+    ) -> (HostedVaultStore, Arc<AtomicUsize>) {
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .no_proxy()
+            .build()
+            .unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let store = HostedVaultStore {
+            transport: HttpTransport::with_client(client.clone()),
+            client,
+            address: "https://vault.example.test:8200".to_owned(),
+            health: Arc::new(FixedHealth(health_ready)),
+            session_probe: Arc::new(FixedSessionProbe {
+                ready: session_ready,
+                calls: Arc::clone(&calls),
+            }),
+            login_endpoint: Url::parse("https://vault.example.test:8200/v1/auth/kubernetes/login")
+                .unwrap(),
+            mount: "b10x-connectors".to_owned(),
+            role: "b10x-connectors".to_owned(),
+            token_file: PathBuf::from("/unread/test-token"),
+            session: Mutex::new(Some(VaultSession {
+                token: Secret::new("SENTINEL-NOT-A-REAL-SECRET"),
+                refresh_at: Instant::now() + Duration::from_secs(300),
+            })),
+        };
+        (store, calls)
+    }
 
     #[test]
     fn vault_origin_and_role_are_closed() {
@@ -326,6 +502,36 @@ mod tests {
         assert!(matches!(
             HostedVaultStore::new(&config),
             Err(HostedVaultError::InvalidConfig)
+        ));
+    }
+
+    #[tokio::test]
+    async fn readiness_requires_health_and_an_accepted_session_without_reading_a_credential() {
+        let (ready, ready_calls) = store_with_readiness(true, true);
+        ready.ready().await.unwrap();
+        assert_eq!(ready_calls.load(Ordering::Acquire), 1);
+
+        let (unhealthy, unhealthy_calls) = store_with_readiness(false, true);
+        assert!(matches!(
+            unhealthy.ready().await,
+            Err(HostedVaultError::AuthenticationUnavailable)
+        ));
+        assert_eq!(unhealthy_calls.load(Ordering::Acquire), 0);
+
+        let (revoked, revoked_calls) = store_with_readiness(true, false);
+        let error = revoked.ready().await.unwrap_err();
+        assert!(matches!(error, HostedVaultError::AuthenticationUnavailable));
+        assert!(!error.to_string().contains("SENTINEL"));
+        assert_eq!(revoked_calls.load(Ordering::Acquire), 1);
+        assert!(revoked.session.lock().await.is_none());
+    }
+
+    #[test]
+    fn only_healthy_vault_status_is_ready() {
+        health_status(StatusCode::OK).unwrap();
+        assert!(matches!(
+            health_status(StatusCode::SERVICE_UNAVAILABLE),
+            Err(HostedVaultError::AuthenticationUnavailable)
         ));
     }
 }

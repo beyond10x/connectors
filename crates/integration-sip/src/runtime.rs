@@ -74,6 +74,13 @@ impl RuntimeLauncher {
 
 #[async_trait]
 impl SessionLauncher for RuntimeLauncher {
+    async fn ready(&self) -> Result<(), LaunchError> {
+        self.credentials
+            .ready()
+            .await
+            .map_err(|_| LaunchError::new("credential_source_unavailable"))
+    }
+
     async fn launch(&self, admitted: AdmittedVoicePlan) -> Result<LaunchedSession, LaunchError> {
         let control = VoiceSessionControl::new();
         let task_control = control.clone();
@@ -189,6 +196,10 @@ impl StoredSipCredentials {
 
 #[async_trait]
 impl CredentialSource for StoredSipCredentials {
+    async fn ready(&self) -> Result<(), DependencyError> {
+        self.store.ready().await.map_err(credential_store_error)
+    }
+
     async fn resolve(
         &self,
         admitted: &AdmittedVoicePlan,
@@ -214,6 +225,10 @@ struct EmptyCredentials;
 
 #[async_trait]
 impl CredentialSource for EmptyCredentials {
+    async fn ready(&self) -> Result<(), DependencyError> {
+        Ok(())
+    }
+
     async fn resolve(
         &self,
         _admitted: &AdmittedVoicePlan,
@@ -350,10 +365,48 @@ fn termination(
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::{symlink, PermissionsExt as _};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use connector_secrets::{MemoryStore, Secret};
 
     use super::*;
+
+    struct UnreadyStore {
+        reads: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SecretStore for UnreadyStore {
+        async fn ready(&self) -> Result<(), StoreError> {
+            Err(StoreError::Unreachable {
+                path: "vault".to_owned(),
+                reason: "test health refusal".to_owned(),
+            })
+        }
+
+        async fn get(
+            &self,
+            _reference: &CredentialRef,
+        ) -> Result<connector_secrets::Secret, StoreError> {
+            self.reads.fetch_add(1, Ordering::AcqRel);
+            Err(StoreError::Unreachable {
+                path: "credential".to_owned(),
+                reason: "test read refusal".to_owned(),
+            })
+        }
+
+        async fn put(
+            &self,
+            _reference: &CredentialRef,
+            _secret: &connector_secrets::Secret,
+        ) -> Result<(), StoreError> {
+            unreachable!("readiness never stores a credential")
+        }
+
+        async fn delete(&self, _reference: &CredentialRef) -> Result<(), StoreError> {
+            unreachable!("readiness never deletes a credential")
+        }
+    }
 
     fn config(path: &Path) -> AuthorityConfig {
         AuthorityConfig {
@@ -465,5 +518,26 @@ mod tests {
                 .code(),
             "sip_credentials_not_configured"
         );
+    }
+
+    #[tokio::test]
+    async fn stored_credential_readiness_is_value_free_and_reports_store_unavailability() {
+        let store = Arc::new(UnreadyStore {
+            reads: AtomicUsize::new(0),
+        });
+        let source = Arc::new(
+            StoredSipCredentials::new(
+                store.clone() as Arc<dyn SecretStore>,
+                "tenant-1",
+                &credential_config(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            source.ready().await.unwrap_err().code(),
+            "sip_credentials_unavailable"
+        );
+        assert_eq!(store.reads.load(Ordering::Acquire), 0);
     }
 }

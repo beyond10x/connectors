@@ -159,6 +159,10 @@ impl PreparedVaultStore {
 
 #[async_trait]
 impl SecretStore for PreparedVaultStore {
+    async fn ready(&self) -> Result<(), StoreError> {
+        self.inner.ready().await
+    }
+
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
         self.inner.get(reference).await
     }

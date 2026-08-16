@@ -3431,6 +3431,7 @@ dependencies = [
  "axum",
  "catalog",
  "fs2",
+ "futures-util",
  "protocol",
  "rustix",
  "serde",
