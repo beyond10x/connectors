@@ -1,0 +1,304 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "B10x Ontology development API",
+    "version": "v0alpha1",
+    "description": "Bounded development contract shared by local Unix and private TCP adapters. Transport admission and caller authority are derived outside request bodies."
+  },
+  "servers": [
+    {
+      "url": "http+unix://ontology.local",
+      "description": "Owner-only local Unix socket"
+    },
+    {
+      "url": "http://ontology.local:8080",
+      "description": "Private development TCP adapter; bearer required except for health"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": { "description": "Development service is available" }
+        }
+      }
+    },
+    "/v1/schemas": {
+      "post": {
+        "operationId": "registerSchema",
+        "responses": {
+          "201": { "description": "Immutable schema revision registered" },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/branches": {
+      "get": {
+        "operationId": "listBranches",
+        "responses": { "200": { "description": "Caller-visible branches" } }
+      },
+      "post": {
+        "operationId": "createBranch",
+        "responses": {
+          "201": { "description": "Branch created" },
+          "403": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/branches/{branch}/claims": {
+      "post": {
+        "operationId": "assertPrivateClaim",
+        "parameters": [ { "$ref": "#/components/parameters/Branch" } ],
+        "responses": {
+          "201": { "description": "Private claim revision committed" },
+          "409": { "$ref": "#/components/responses/Refusal" },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/branches/{branch}/schema": {
+      "post": {
+        "operationId": "extendPrivateSchema",
+        "parameters": [ { "$ref": "#/components/parameters/Branch" } ],
+        "responses": {
+          "201": { "description": "Compatible private schema revision committed" },
+          "409": { "$ref": "#/components/responses/Refusal" },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/branches/{branch}/claims/{claim}/retract": {
+      "post": {
+        "operationId": "retractPrivateClaim",
+        "parameters": [
+          { "$ref": "#/components/parameters/Branch" },
+          { "$ref": "#/components/parameters/Claim" }
+        ],
+        "responses": {
+          "200": { "description": "Retraction or supersession revision committed" },
+          "409": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/branches/{branch}/claims/{claim}/explain": {
+      "get": {
+        "operationId": "explainClaim",
+        "parameters": [
+          { "$ref": "#/components/parameters/Branch" },
+          { "$ref": "#/components/parameters/Claim" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Value-free revision/provenance explanation",
+            "content": { "application/json": { "schema": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/RevisionEvent" } } } }
+          },
+          "404": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "operationId": "queryClaims",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Query" } } }
+        },
+        "responses": {
+          "200": { "description": "Bounded caller-visible claim result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QueryResult" } } } },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/snapshots": {
+      "post": {
+        "operationId": "createContextSnapshot",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Query" } } }
+        },
+        "responses": {
+          "200": { "description": "Immutable task-scoped context projection", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ContextSnapshot" } } } },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/packs/install": {
+      "post": {
+        "operationId": "installPack",
+        "responses": {
+          "201": { "description": "Digest-pinned pack installed" },
+          "403": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/proposals": {
+      "post": {
+        "operationId": "createPromotionProposal",
+        "responses": {
+          "201": { "description": "Revision-bound draft created" },
+          "409": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/proposals/{proposal}": {
+      "get": {
+        "operationId": "getPromotionProposal",
+        "parameters": [ { "$ref": "#/components/parameters/Proposal" } ],
+        "responses": {
+          "200": { "description": "Current proposal state" },
+          "404": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/proposals/{proposal}/evaluate": {
+      "post": {
+        "operationId": "evaluatePromotionProposal",
+        "parameters": [ { "$ref": "#/components/parameters/Proposal" } ],
+        "responses": {
+          "200": { "description": "Evaluation appended" },
+          "403": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/proposals/{proposal}/approve": {
+      "post": {
+        "operationId": "recordHumanApproval",
+        "parameters": [ { "$ref": "#/components/parameters/Proposal" } ],
+        "responses": {
+          "204": { "description": "External approval reference recorded" },
+          "403": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    },
+    "/v1/proposals/{proposal}/promote": {
+      "post": {
+        "operationId": "promoteProposal",
+        "parameters": [ { "$ref": "#/components/parameters/Proposal" } ],
+        "responses": {
+          "200": { "description": "Claims atomically promoted" },
+          "409": { "$ref": "#/components/responses/Refusal" },
+          "422": { "$ref": "#/components/responses/Refusal" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Branch": {
+        "name": "branch",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 256 }
+      },
+      "Claim": {
+        "name": "claim",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 256 }
+      },
+      "Proposal": {
+        "name": "proposal",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "responses": {
+      "Refusal": {
+        "description": "Fail-closed refusal with no echoed claim content",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Identifier": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$" },
+      "Sensitivity": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] },
+      "Visibility": { "type": "string", "enum": ["private", "department", "tenant"] },
+      "EpistemicState": { "type": "string", "enum": ["observed", "inferred", "confirmed", "rejected", "revoked", "superseded"] },
+      "ClaimValue": {
+        "oneOf": [
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"], "properties": { "kind": { "const": "reference" }, "value": { "$ref": "#/components/schemas/Identifier" } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"], "properties": { "kind": { "const": "string" }, "value": { "type": "string", "maxLength": 16384 } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"], "properties": { "kind": { "const": "integer" }, "value": { "type": "integer", "format": "int64" } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"], "properties": { "kind": { "const": "boolean" }, "value": { "type": "boolean" } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"], "properties": { "kind": { "const": "decimal" }, "value": { "type": "string", "maxLength": 16384 } } }
+        ]
+      },
+      "EvidenceRef": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source", "record", "observed_at"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Identifier" },
+          "record": { "$ref": "#/components/schemas/Identifier" },
+          "observed_at": { "type": "string", "minLength": 1, "maxLength": 128 }
+        }
+      },
+      "Claim": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "subject", "predicate", "object", "schema_revision", "branch", "author", "visibility", "sensitivity", "state", "confidence_millionths", "observed_at", "valid_from", "valid_until", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Identifier" },
+          "subject": { "$ref": "#/components/schemas/Identifier" },
+          "predicate": { "$ref": "#/components/schemas/Identifier" },
+          "object": { "$ref": "#/components/schemas/ClaimValue" },
+          "schema_revision": { "$ref": "#/components/schemas/Identifier" },
+          "branch": { "$ref": "#/components/schemas/Identifier" },
+          "author": { "$ref": "#/components/schemas/Identifier" },
+          "visibility": { "$ref": "#/components/schemas/Visibility" },
+          "sensitivity": { "$ref": "#/components/schemas/Sensitivity" },
+          "state": { "$ref": "#/components/schemas/EpistemicState" },
+          "confidence_millionths": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000000 },
+          "observed_at": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "valid_from": { "type": ["string", "null"], "maxLength": 128 },
+          "valid_until": { "type": ["string", "null"], "maxLength": 128 },
+          "evidence": { "type": "array", "maxItems": 32, "items": { "$ref": "#/components/schemas/EvidenceRef" } }
+        }
+      },
+      "Query": {
+        "type": "object", "additionalProperties": false,
+        "required": ["branches", "subject", "predicate", "limit"],
+        "properties": {
+          "branches": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/components/schemas/Identifier" } },
+          "subject": { "oneOf": [{ "$ref": "#/components/schemas/Identifier" }, { "type": "null" }] },
+          "predicate": { "oneOf": [{ "$ref": "#/components/schemas/Identifier" }, { "type": "null" }] },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        }
+      },
+      "QueryResult": {
+        "type": "object", "additionalProperties": false, "required": ["claims", "truncated"],
+        "properties": { "claims": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Claim" } }, "truncated": { "type": "boolean" } }
+      },
+      "ContextSnapshot": {
+        "type": "object", "additionalProperties": false, "required": ["digest", "branch_heads", "claims", "truncated"],
+        "properties": {
+          "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "branch_heads": { "type": "object", "additionalProperties": { "type": "string" } },
+          "claims": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Claim" } },
+          "truncated": { "type": "boolean" }
+        }
+      },
+      "RevisionEvent": {
+        "type": "object", "additionalProperties": false, "required": ["revision", "parent", "sequence", "kind", "subject", "actor", "occurred_at"],
+        "properties": {
+          "revision": { "type": "string" }, "parent": { "type": "string" },
+          "sequence": { "type": "integer", "format": "uint64", "minimum": 1 }, "kind": { "type": "string" },
+          "subject": { "$ref": "#/components/schemas/Identifier" }, "actor": { "$ref": "#/components/schemas/Identifier" },
+          "occurred_at": { "type": "string", "minLength": 1, "maxLength": 128 }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

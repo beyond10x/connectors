@@ -5,6 +5,7 @@
 
 pub mod audio;
 pub mod browser;
+pub mod catalog;
 pub mod connection;
 pub mod event;
 pub mod operation;

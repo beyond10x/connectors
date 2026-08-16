@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use connector_address::credential::CredentialRef;
 
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
+use crate::personal::B10xIntegrationConfig;
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
@@ -24,6 +25,8 @@ pub struct HostedServerConfig {
     #[serde(default)]
     pub vault: HostedVaultConfig,
     pub sip: HostedSipConfig,
+    #[serde(default)]
+    pub b10x: Option<B10xIntegrationConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,6 +180,10 @@ impl HostedServerConfig {
             || (self.vault.enabled != self.sip.credentials.is_some())
             || (self.vault.enabled && !self.sip.enabled)
             || !valid_dns_label(&self.vault.mount, 63)
+            || self
+                .b10x
+                .as_ref()
+                .is_some_and(|b10x| b10x.validate().is_err())
         {
             return Err(HostedServerConfigError::Invalid);
         }

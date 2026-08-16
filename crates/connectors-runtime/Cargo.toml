@@ -18,6 +18,7 @@ members = [
     "../hosted-vault",
     "../identity-http",
     "../integration-kubernetes",
+    "../integration-b10x",
     "../integration-monitoring",
     "../integration-sip",
     "../integration-slack",
@@ -33,6 +34,7 @@ futures-util = "0.3"
 hosted-vault = { version = "0.1.0", path = "../hosted-vault" }
 identity-http = { version = "0.1.0", path = "../identity-http" }
 integration-kubernetes = { version = "0.1.0", path = "../integration-kubernetes" }
+integration-b10x = { version = "0.1.0", path = "../integration-b10x" }
 integration-monitoring = { version = "0.1.0", path = "../integration-monitoring" }
 integration-sip = { version = "0.1.0", path = "../integration-sip" }
 integration-slack = { version = "0.1.0", path = "../integration-slack" }

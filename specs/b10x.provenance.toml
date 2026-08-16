@@ -3,9 +3,9 @@ origin = "repository-authored"
 authored_at = "2026-08-16"
 reviewed_at = "2026-08-16"
 provider_path = "providers/b10x.toml"
-provider_sha256 = "4bbdc2ea60602b6b353dcb1a40c4c249cac050e280406514ef0ca83b047bd270"
-coverage = "exact-shipped-native-capability-surface"
-purpose = "Authoritative repository-owned source for the B10x-owned native Connector members: sip.dial, implemented by the closed sip_v1 driver; speech.speak/speech.status, implemented by the closed audio_v1 driver; and browser.open/goto/snapshot/screenshot/close, implemented by the closed cdp_v1 driver. Browser interaction (clicking, typing, submitting) is deliberately outside this coverage: it is a mutation and waits on the approval round-trip."
+provider_sha256 = "4befa22091f40e9d74042ecba7d1ef6a1550ef20c1a6e60c052899d5356feaf7"
+coverage = "exact-shipped-native-and-b10x-service-capability-surface"
+purpose = "Authoritative repository-owned source for B10x native Connector members and the selected Work and Ontology service operations. Native speech and browser operations remain behind their closed drivers. Work and Ontology wire contracts are vendored byte-for-byte from their owner repositories and reached only through deployment-owned private origins."
 references = [
   "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -13,4 +13,21 @@ references = [
   "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
   "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
 ]
+
+[[spec]]
+service = "knowledge"
+owner_repository = "https://github.com/b10x/ontology"
+owner_path = "contracts/ontology/v0alpha1/openapi.json"
+vendored_path = "specs/b10x/ontology-v0alpha1.openapi.json"
+sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "tasks"
+owner_repository = "https://github.com/b10x/work"
+owner_path = "contracts/work/v0alpha1/openapi.json"
+vendored_path = "specs/b10x/work-v0alpha1.openapi.json"
+sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
+vendoring = "exact-bytes"

@@ -78,6 +78,11 @@ fn connector_event_bundle_is_immutable() {
 }
 
 #[test]
+fn connector_catalog_bundle_is_immutable() {
+    check("contracts/connector-catalog/v0alpha1/bundle.json");
+}
+
+#[test]
 fn connector_operation_vectors_match_the_strict_reader() {
     let path = root().join("contracts/connector-operation/v0alpha1/vectors.json");
     let vectors: OperationVectors =
@@ -112,6 +117,26 @@ fn connector_connection_vectors_match_the_strict_reader() {
             result.is_ok(),
             vector.valid,
             "connection vector `{}` disagrees with the reader: {result:?}",
+            vector.name
+        );
+    }
+}
+
+#[test]
+fn connector_catalog_vectors_match_the_strict_reader() {
+    let path = root().join("contracts/connector-catalog/v0alpha1/vectors.json");
+    let vectors: OperationVectors =
+        serde_json::from_slice(&fs::read(path).expect("vectors are readable"))
+            .expect("vectors parse");
+    assert_eq!(vectors.contract, protocol::catalog::CONTRACT);
+    for vector in vectors.cases {
+        let result = serde_json::from_value::<protocol::catalog::RequestEnvelope>(vector.frame)
+            .map_err(|error| error.to_string())
+            .and_then(|request| request.validate().map_err(|error| format!("{error:?}")));
+        assert_eq!(
+            result.is_ok(),
+            vector.valid,
+            "catalog vector `{}` disagrees with the reader: {result:?}",
             vector.name
         );
     }

@@ -1298,6 +1298,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "url",
 ]
 
 [[package]]
@@ -1720,6 +1721,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "catalog",
  "fs2",
  "protocol",
  "rustix",

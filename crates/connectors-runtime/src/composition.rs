@@ -9,6 +9,7 @@ use connector_secrets::{FileStore, MemoryStore, PreparedSecretStore, SecretStore
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_vault::HostedVaultStore;
 use identity_http::IdentityHttpVerifier;
+use integration_b10x::{B10xBackend, B10xIntegrationError};
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
 use integration_sip::{
@@ -46,6 +47,8 @@ pub enum RuntimeError {
     Kubernetes(#[from] integration_kubernetes::KubernetesBackendError),
     #[error(transparent)]
     KubernetesLocal(#[from] integration_kubernetes::KubernetesLocalError),
+    #[error(transparent)]
+    B10x(#[from] B10xIntegrationError),
     #[error(transparent)]
     Identity(#[from] identity_http::IdentityVerifierConfigError),
     #[error(transparent)]
@@ -111,6 +114,7 @@ impl PersonalRuntime {
         let mut monitoring_connections = None;
         let mut kubernetes_candidates = None;
         let mut kubernetes_connections = None;
+        let mut b10x_configured = false;
 
         if let Some(config_path) = config_path {
             let config = PersonalConfig::read(config_path)?;
@@ -163,6 +167,14 @@ impl PersonalRuntime {
                 kubernetes_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
+            if let Some(b10x) = config.b10x {
+                backends.push(Arc::new(B10xBackend::personal(
+                    b10x,
+                    owner.clone(),
+                    &state_root,
+                )?));
+                b10x_configured = true;
+            }
             // Slack starts background supervision, so construct it only after every adapter whose
             // constructor can still fail. This keeps failed composition from leaking live tasks.
             if let Some(slack) = config.slack {
@@ -206,6 +218,7 @@ impl PersonalRuntime {
             "kubernetes_configured": kubernetes_candidates.is_some(),
             "kubernetes_candidates": kubernetes_candidates,
             "kubernetes_connections": kubernetes_connections,
+            "b10x_configured": b10x_configured,
         });
         Ok(Self { daemon, readiness })
     }
@@ -309,6 +322,14 @@ impl HostedRuntime {
                 &config.storage.state_root,
             )?));
         }
+        let b10x_enabled = config.b10x.is_some();
+        if let Some(b10x) = config.b10x {
+            backends.push(Arc::new(B10xBackend::hosted(
+                b10x,
+                config.tenant_id.clone(),
+                &config.storage.state_root,
+            )?));
+        }
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let connector_router = server::hosted::router(verifier, backend.clone());
@@ -327,6 +348,7 @@ impl HostedRuntime {
             "vault_enabled": config.vault.enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
+            "b10x_enabled": b10x_enabled,
         });
         Ok(Self {
             listener,

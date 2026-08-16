@@ -123,8 +123,8 @@ consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json", "crates
 note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sample configurations. The samples are interoperability evidence for an optional configured Asterisk peer; Asterisk owns no native sip.dial capability."
 
 [[source]]
-id = "b10x-native-sip"
-kind = "provider-contract"
+id = "b10x-owned-contracts"
+kind = "provider-and-openapi-contracts"
 origin = "repository-authored"
 references = [
   "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
@@ -133,11 +133,12 @@ references = [
   "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
   "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
 ]
 refresh = "authored-review"
 pins = "specs/b10x.provenance.toml"
-consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "crates/integration-sip/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
-note = "The reviewed B10x Provider contract owns sip.dial and its closed sip_v1 implementation. Asterisk, a carrier, an SBC, or another PBX may be selected only as a Connection-owned SIP peer. The same pinned file also carries the two device and browser capability families accepted by architecture ADR 0035: speech.speak/speech.status behind the closed audio_v1 driver, and browser.open/goto/snapshot/screenshot/close behind the closed cdp_v1 driver. Browser interaction is deliberately absent from that surface."
+consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
+note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus selected operations from the exact Work and Ontology owner contracts. Deployment Connections resolve all peers and private HTTP origins; callers never select them. Browser interaction remains outside this surface."
 
 [[source]]
 id = "babelforce-openapi"

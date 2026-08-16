@@ -6,13 +6,14 @@ use std::ops::RangeInclusive;
 use std::path::Path;
 use std::time::Duration;
 
+use domain::audio::AudioSink;
 use domain::InitiationPolicy;
 use protocol::operation::OwnerContext;
 use serde::{Deserialize, Serialize};
 use service::PrincipalContext;
 use service::{
-    SipDeploymentRoute, SipDialRouteTable, SipNetworkMode, SipSignalingTransport, SocketAperture,
-    VoiceApplicationRoute,
+    AudioDeploymentRoute, BrowserDeploymentRoute, SipDeploymentRoute, SipDialRouteTable,
+    SipNetworkMode, SipSignalingTransport, SocketAperture, VoiceApplicationRoute,
 };
 
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
@@ -40,6 +41,8 @@ pub struct PersonalConfig {
     pub grafana: Option<GrafanaIntegrationConfig>,
     #[serde(default)]
     pub kubernetes: Option<KubernetesIntegrationConfig>,
+    #[serde(default)]
+    pub b10x: Option<B10xIntegrationConfig>,
 }
 
 /// Complete deployment selection needed to make the development `sip.dial` member callable.
@@ -78,6 +81,20 @@ pub struct ConnectionConfig {
     pub grant_ref: String,
     pub initiation: InitiationConfig,
     pub approval_evidence_ref: String,
+}
+
+/// Deployment-owned Connection for B10x service and device capabilities.
+///
+/// This shape deliberately has no approval reference. A static configured string is not
+/// receiver-verifiable evidence for one invocation, so the B10x Integration refuses its
+/// approval-required operations until an approval verifier is composed at the Connector boundary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct B10xConnectionConfig {
+    pub connection_ref: String,
+    pub label: String,
+    pub grant_ref: String,
+    pub initiation: InitiationConfig,
 }
 
 /// Closed Connection initiation policy.
@@ -161,6 +178,52 @@ pub struct KubernetesIntegrationConfig {
     pub allow_exec_auth: bool,
     #[serde(default = "default_kubernetes_resource_limit")]
     pub resource_limit: u16,
+}
+
+/// Deployment-owned routes for B10x's native drivers and private services.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct B10xIntegrationConfig {
+    pub connection: B10xConnectionConfig,
+    #[serde(default)]
+    pub work_origin: Option<String>,
+    #[serde(default)]
+    pub ontology_origin: Option<String>,
+    #[serde(default)]
+    pub ontology_bearer_file: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub audio: Option<AudioIntegrationConfig>,
+    #[serde(default)]
+    pub browser: Option<BrowserIntegrationConfig>,
+}
+
+/// Exact local Piper/audio route. No field is caller-visible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioIntegrationConfig {
+    #[serde(default)]
+    pub synthesizer: Option<std::path::PathBuf>,
+    pub voice: std::path::PathBuf,
+    #[serde(default)]
+    pub voice_config: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub voice_sha256: Option<String>,
+    #[serde(default)]
+    pub sink: Option<AudioSink>,
+    pub maximum_characters: u32,
+    pub maximum_utterance_seconds: u64,
+}
+
+/// Exact dedicated Chromium-family browser route. No field is caller-visible.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrowserIntegrationConfig {
+    #[serde(default)]
+    pub executable: Option<std::path::PathBuf>,
+    pub user_data_dir: std::path::PathBuf,
+    pub artifacts_dir: std::path::PathBuf,
+    pub maximum_nodes: u32,
+    pub maximum_navigation_seconds: u64,
 }
 
 /// One opaque alias mapped to an exact driver route.
@@ -292,15 +355,127 @@ impl PersonalConfig {
         if let Some(kubernetes) = &self.kubernetes {
             kubernetes.validate()?;
         }
+        if let Some(b10x) = &self.b10x {
+            b10x.validate()?;
+        }
         if voice.is_none()
             && self.slack.is_none()
             && self.grafana.is_none()
             && self.kubernetes.is_none()
+            && self.b10x.is_none()
         {
             return Err(ConfigError::Invalid);
         }
         Ok(())
     }
+}
+
+impl B10xIntegrationConfig {
+    pub(crate) fn validate(&self) -> Result<(), ConfigError> {
+        if !valid_connection(&self.connection)
+            || matches!(self.connection.initiation, InitiationConfig::Provider)
+            || (self.ontology_origin.is_some() != self.ontology_bearer_file.is_some())
+            || self
+                .ontology_bearer_file
+                .as_deref()
+                .is_some_and(|path| !path.is_absolute())
+            || self
+                .work_origin
+                .as_deref()
+                .is_some_and(|origin| !private_origin(origin))
+            || self
+                .ontology_origin
+                .as_deref()
+                .is_some_and(|origin| !private_origin(origin))
+            || (self.work_origin.is_none()
+                && self.ontology_origin.is_none()
+                && self.audio.is_none()
+                && self.browser.is_none())
+        {
+            return Err(ConfigError::Invalid);
+        }
+        if let Some(route) = self.audio_route() {
+            service::validate_audio_deployment_route(&route).map_err(|_| ConfigError::Invalid)?;
+        }
+        if let Some(route) = self.browser_route() {
+            service::validate_browser_deployment_route(&route).map_err(|_| ConfigError::Invalid)?;
+        }
+        Ok(())
+    }
+
+    /// Build the non-wire initiation policy.
+    #[must_use]
+    pub fn initiation_policy(&self) -> InitiationPolicy {
+        match self.connection.initiation {
+            InitiationConfig::B10x => InitiationPolicy::b10x_only(),
+            InitiationConfig::Provider => InitiationPolicy::provider_only(),
+            InitiationConfig::Both => InitiationPolicy::bidirectional(),
+        }
+    }
+
+    /// Build the deployment-only audio route when configured.
+    #[must_use]
+    pub fn audio_route(&self) -> Option<AudioDeploymentRoute> {
+        self.audio.as_ref().map(|audio| AudioDeploymentRoute {
+            connection: self.connection.connection_ref.clone(),
+            synthesizer: audio.synthesizer.clone(),
+            voice: audio.voice.clone(),
+            voice_config: audio.voice_config.clone(),
+            voice_sha256: audio.voice_sha256.clone(),
+            sink: audio.sink,
+            maximum_characters: audio.maximum_characters,
+            maximum_utterance: Duration::from_secs(audio.maximum_utterance_seconds),
+        })
+    }
+
+    /// Build the deployment-only browser route when configured.
+    #[must_use]
+    pub fn browser_route(&self) -> Option<BrowserDeploymentRoute> {
+        self.browser.as_ref().map(|browser| BrowserDeploymentRoute {
+            connection: self.connection.connection_ref.clone(),
+            executable: browser.executable.clone(),
+            user_data_dir: browser.user_data_dir.clone(),
+            artifacts_dir: browser.artifacts_dir.clone(),
+            maximum_nodes: browser.maximum_nodes,
+            maximum_navigation: Duration::from_secs(browser.maximum_navigation_seconds),
+        })
+    }
+
+    /// Canonical Work origin without a trailing slash.
+    #[must_use]
+    pub fn work_origin(&self) -> Option<String> {
+        self.work_origin
+            .as_deref()
+            .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+
+    /// Canonical Ontology origin without a trailing slash.
+    #[must_use]
+    pub fn ontology_origin(&self) -> Option<String> {
+        self.ontology_origin
+            .as_deref()
+            .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+}
+
+fn valid_connection(connection: &B10xConnectionConfig) -> bool {
+    config_ref(&connection.connection_ref, 512)
+        && !connection.label.is_empty()
+        && connection.label.len() <= 1024
+        && config_ref(&connection.grant_ref, 512)
+}
+
+fn private_origin(value: &str) -> bool {
+    let Ok(origin) = url::Url::parse(value) else {
+        return false;
+    };
+    matches!(origin.scheme(), "http" | "https")
+        && origin.host_str().is_some()
+        && origin.username().is_empty()
+        && origin.password().is_none()
+        && (origin.path().is_empty() || origin.path() == "/")
+        && origin.query().is_none()
+        && origin.fragment().is_none()
 }
 
 impl SlackIntegrationConfig {
