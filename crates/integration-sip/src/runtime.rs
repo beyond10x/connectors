@@ -126,6 +126,11 @@ impl StoredSipCredentials {
         config: &HostedSipCredentialConfig,
     ) -> Result<Self, LaunchError> {
         let tenant = tenant.into();
+        if config.authority != protocol::sip::SIP_DIAL_PROVIDER_AUTHORITY
+            || config.service != "default"
+        {
+            return Err(LaunchError::new("sip_credential_provider_mismatch"));
+        }
         let username = CredentialRef::new(
             &tenant,
             &config.authority,
@@ -380,7 +385,7 @@ mod tests {
 
     fn credential_config() -> HostedSipCredentialConfig {
         HostedSipCredentialConfig {
-            authority: "org.asterisk.ari".to_owned(),
+            authority: protocol::sip::SIP_DIAL_PROVIDER_AUTHORITY.to_owned(),
             service: "default".to_owned(),
             username_credential: "sip_username".to_owned(),
             password_credential: "sip_password".to_owned(),
@@ -390,10 +395,20 @@ mod tests {
     #[tokio::test]
     async fn stored_credentials_are_tenant_scoped_ordered_and_redacted() {
         let store = Arc::new(MemoryStore::new());
-        let username =
-            CredentialRef::new("tenant-1", "org.asterisk.ari", "default", "sip_username").unwrap();
-        let password =
-            CredentialRef::new("tenant-1", "org.asterisk.ari", "default", "sip_password").unwrap();
+        let username = CredentialRef::new(
+            "tenant-1",
+            protocol::sip::SIP_DIAL_PROVIDER_AUTHORITY,
+            "default",
+            "sip_username",
+        )
+        .unwrap();
+        let password = CredentialRef::new(
+            "tenant-1",
+            protocol::sip::SIP_DIAL_PROVIDER_AUTHORITY,
+            "default",
+            "sip_password",
+        )
+        .unwrap();
         store
             .put(&username, &Secret::new("caller-1"))
             .await
@@ -427,6 +442,15 @@ mod tests {
 
     #[tokio::test]
     async fn missing_sip_credentials_fail_closed() {
+        let mut wrong_provider = credential_config();
+        wrong_provider.authority = "org.asterisk.ari".to_owned();
+        assert!(StoredSipCredentials::new(
+            Arc::new(MemoryStore::new()),
+            "tenant-1",
+            &wrong_provider,
+        )
+        .is_err());
+
         let source = StoredSipCredentials::new(
             Arc::new(MemoryStore::new()),
             "tenant-1",

@@ -12,7 +12,7 @@
   "target": {
     "repository": "b10x/connectors",
     "schema_version": 2,
-    "schema_sha256": "c2784bef08fb9316f6617671cbc3f814d02e47c26ae9dd25ca99410459e2b925"
+    "schema_sha256": "a3cfabfc9c86a22ba46b80f8f36b43e39bb96c224d883fb312e1158d646a7f16"
   },
   "closed_mappings": {
     "risk": {

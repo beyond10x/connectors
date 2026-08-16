@@ -122,8 +122,9 @@ pub struct ProviderEntry {
     base_url: String,
     /// The vendor's API version, as the default for this provider's services. `null` when unstated.
     api_version: Option<String>,
-    /// Every host this connector reaches, as its base URLs spell them: the union of its services'
-    /// (C-49), in declaration order and deduplicated.
+    /// Every fixed host this connector's HTTP operations reach, as their service base URLs spell
+    /// them: the union of its services' (C-49), in declaration order and deduplicated. Native
+    /// operations contribute no host because their admitted Connection resolves the peer.
     ///
     /// The union rather than `base_url`'s own host, because a multi-service provider reaches a host
     /// per service — Google's Gmail is on `gmail.googleapis.com` while its Calendar and Drive are on
@@ -131,7 +132,7 @@ pub struct ProviderEntry {
     /// reader this provider never calls a host it calls on three of its eight operations. Widening
     /// happens the other way and is what must not: a *service's* [`ServiceEntry::hosts`] stays its own
     /// and is never the union, because that one is an egress claim rather than a description.
-    /// Identical to the old value for a single-surface provider, whose union is its one host.
+    /// Identical to the old value for a single-surface HTTP provider, whose union is its one host.
     hosts: Vec<String>,
     /// Discovery-only union of the provider services' audiences.
     audiences: Vec<Audience>,
@@ -641,6 +642,8 @@ enum OperationProtocolEntry {
         path: String,
     },
     SipV1,
+    AudioV1,
+    CdpV1,
 }
 
 /// The public subset of one patch-selected operation's derived provenance.
@@ -704,20 +707,32 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
             OperationRequest::HttpV1 { .. } => {
                 vec![surface::host_of(connector.base_url_of(&operation.service))?.to_string()]
             }
-            OperationRequest::SipV1 => Vec::new(),
+            OperationRequest::SipV1 | OperationRequest::AudioV1 | OperationRequest::CdpV1 => {
+                Vec::new()
+            }
         };
         operations.push(operation_entry(connector, operation, hosts));
     }
 
     let mut services = Vec::new();
-    // The provider's own host list is assembled here rather than from `connector.base_url`, so that it
-    // is the union of what its services reach — see [`ProviderEntry::hosts`].
+    // The provider's own host list is assembled here rather than from `connector.base_url`, so that
+    // it is the union of what its HTTP operations actually reach — see [`ProviderEntry::hosts`]. A
+    // native-only service retains the IR's required base-URL identity field but publishes no fixed
+    // egress host; its Connection resolves the admitted peer instead.
     let mut hosts: Vec<String> = Vec::new();
     for name in connector.service_names() {
         let base_url = connector.base_url_of(name);
-        let host = surface::host_of(base_url)?.to_string();
-        if !hosts.contains(&host) {
-            hosts.push(host);
+        let mut service_hosts = Vec::new();
+        for operation in connector.operations_of(name) {
+            if matches!(operation.request, OperationRequest::HttpV1 { .. }) {
+                let host = surface::host_of(base_url)?.to_string();
+                if !service_hosts.contains(&host) {
+                    service_hosts.push(host.clone());
+                }
+                if !hosts.contains(&host) {
+                    hosts.push(host);
+                }
+            }
         }
         services.push(ServiceEntry {
             name: name.to_owned(),
@@ -726,9 +741,9 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
                 .map(|service| service.description.clone())
                 .unwrap_or_default(),
             base_url: base_url.to_owned(),
-            // This one is the service's own and is deliberately *not* the union above: it is an
-            // egress claim about one installable unit.
-            hosts: vec![surface::host_of(base_url)?.to_string()],
+            // This one is the service's own and is deliberately *not* the union above: it is the
+            // exact fixed egress surface of its HTTP members. Native members contribute none.
+            hosts: service_hosts,
             api_version: connector.api_version_of(name).map(str::to_owned),
             gid: connector.gid_of(name).map(|gid| gid.to_string()),
             operation_count: connector.operations_of(name).count(),
@@ -996,6 +1011,8 @@ fn operation_entry(
                 path: path.clone(),
             },
             OperationRequest::SipV1 => OperationProtocolEntry::SipV1,
+            OperationRequest::AudioV1 => OperationProtocolEntry::AudioV1,
+            OperationRequest::CdpV1 => OperationProtocolEntry::CdpV1,
         },
         placement_requirement: operation.placement_requirement,
         implementation_form: operation.implementation_form,
@@ -1671,6 +1688,10 @@ mod tests {
             },
         ];
         connector.operations[0].service = "mail".to_string();
+        let mut calendar_operation = connector.operations[0].clone();
+        calendar_operation.id = "calendar-list".to_string();
+        calendar_operation.service = "calendar".to_string();
+        connector.operations.push(calendar_operation);
 
         let entry = provider_entry(&connector).expect("the connector describes");
         let document = serde_json::to_value(&entry).expect("the entry serializes");
@@ -1701,6 +1722,18 @@ mod tests {
         let entry = provider_entry(&connector()).expect("the connector describes");
         let document = serde_json::to_value(&entry).expect("the entry serializes");
         assert_eq!(document["hosts"], json!(["{tenant}.acme.example"]));
+    }
+
+    #[test]
+    fn a_native_service_publishes_no_fixed_egress_host() {
+        let mut connector = connector();
+        connector.operations[0].request = OperationRequest::SipV1;
+        let entry = provider_entry(&connector).expect("the native connector describes");
+        let document = serde_json::to_value(&entry).expect("the entry serializes");
+
+        assert_eq!(document["hosts"], json!([]));
+        assert_eq!(document["services"][0]["hosts"], json!([]));
+        assert_eq!(document["operations"][0]["hosts"], json!([]));
     }
 
     #[test]

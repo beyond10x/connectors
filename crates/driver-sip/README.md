@@ -13,7 +13,7 @@ those peers before exposing the session, but the operator must have pre-admitted
 learned address and bounded port range.
 
 `examples/sip_dial_characterize.rs` is the operator-only proof tool. It resolves the generated
-`sip-dial` catalog member, applies Connection initiation plus Grant evidence, selects only the fixed
+B10x `sip-dial` catalog member, applies Connection initiation plus Grant evidence, selects only the fixed
 `asterisk-dev` alias, establishes the call, verifies the neutral 8 kHz/20 ms RTP echo, emits opaque
 references, and terminates the dialog. Environment fields configure the reviewed route; none is
 caller/model input and the example is not a general dial proxy.

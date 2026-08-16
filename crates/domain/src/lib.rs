@@ -2,6 +2,7 @@
 
 //! Protocol-neutral Connectors domain types. Planning is data and performs no I/O.
 
+pub mod audio;
 mod connection;
 mod discovery;
 mod plan;
@@ -15,6 +16,6 @@ pub use discovery::{
     ConnectionCandidate, ConnectionCandidateSource, DiscoveryError, DiscoveryObservation,
 };
 pub use plan::{
-    AdmittedOperation, Capability, DriverId, HttpPlan, Implementation, Interaction,
-    MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
+    AdmittedOperation, AudioPlan, BrowserPlan, Capability, DriverId, HttpPlan, Implementation,
+    Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
 };

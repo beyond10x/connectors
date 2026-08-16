@@ -23,8 +23,8 @@ SIP call without importing RTVBP or requiring a live carrier.
       `TelephonySession` port and only `server` selects it after admission.
 - [x] The closed catalog vocabulary represents `sip_v1` without accepting arbitrary driver names;
       canonical-document and consumer round-trip tests preserve it exactly.
-- [x] At least one authoritative or repository-authored carrier/PBX source with registered
-      provenance produces a reviewed provider declaration and generated canonical catalog member
+- [x] The repository-authored B10x native-capability source with registered provenance
+      produces a reviewed provider declaration and generated canonical catalog member
       whose interaction shape is `session_establishment`, driver is `sip_v1`, implementation is
       `built_in`, and capability/risk/idempotency facts are exact. The first exposure is deliberately
       limited to the alias-only `sip.dial` member after the driver and development route proof.
@@ -65,16 +65,16 @@ SIP call without importing RTVBP or requiring a live carrier.
   supervisor. Media/signal EOF is no longer reclassified as remote hangup; a sipx timeout remains
   `transport_lost` through the neutral port. Session teardown joins the sipx owner task through
   endpoint shutdown, while dropping an abandoned session aborts that owner.
-- Asterisk's pinned first-party SIP and RTP samples, provenance, provider declaration, canonical
-  document, lock row, pack, and web projection now land together. One catalog invariant permits
-  exactly that reviewed `sip-dial` member, requires its non-HTTP facts, and refuses an inherited
-  HTTP endpoint/host.
+- The B10x source pin, provider declaration, canonical document, lock row, pack, and web
+  projection now land together. One catalog invariant permits exactly that reviewed `sip-dial`
+  member under `b10x` / `io.b10x`, requires its non-HTTP facts, and proves Asterisk's
+  ARI Provider contains no native SIP member or inherited HTTP endpoint/host.
 - `sip.dial` takes only a Connection-owned symbolic alias. Planning independently requires
   B10x initiation authority and a Grant; server admission resolves the alias to an exact
   deployment route and refuses caller-supplied URIs, hosts, ports, placement, credentials, or
   aperture widening before the driver.
 - The operator-authorized development mode completed a real TCP SIP call and RTP echo against the
-  dev-cluster Asterisk. The proof is intentionally weaker than stable support: the learned peer is
+  configured dev-cluster Asterisk peer. The proof is intentionally weaker than stable support: the learned peer is
   validated before the session is returned, but the selected sipx media runtime may already have
   transmitted symmetric RTP internally. The complete lifecycle matrix and enforceable pre-send
   learned-peer gate remain open.

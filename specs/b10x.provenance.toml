@@ -1,0 +1,16 @@
+version = 1
+origin = "repository-authored"
+authored_at = "2026-08-16"
+reviewed_at = "2026-08-16"
+provider_path = "providers/b10x.toml"
+provider_sha256 = "4bbdc2ea60602b6b353dcb1a40c4c249cac050e280406514ef0ca83b047bd270"
+coverage = "exact-shipped-native-capability-surface"
+purpose = "Authoritative repository-owned source for the B10x-owned native Connector members: sip.dial, implemented by the closed sip_v1 driver; speech.speak/speech.status, implemented by the closed audio_v1 driver; and browser.open/goto/snapshot/screenshot/close, implemented by the closed cdp_v1 driver. Browser interaction (clicking, typing, submitting) is deliberately outside this coverage: it is a mutation and waits on the approval round-trip."
+references = [
+  "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
+  "https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+]

@@ -10,6 +10,8 @@ use connector_address::credential::CredentialRef;
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
+const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
+const NATIVE_SIP_SERVICE: &str = "default";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -140,13 +142,15 @@ impl HostedServerConfig {
             && self.vault.ca_file.is_none();
         let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
         let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
-            CredentialRef::new(
-                &self.tenant_id,
-                &credentials.authority,
-                &credentials.service,
-                &credentials.username_credential,
-            )
-            .is_ok()
+            credentials.authority == NATIVE_SIP_AUTHORITY
+                && credentials.service == NATIVE_SIP_SERVICE
+                && CredentialRef::new(
+                    &self.tenant_id,
+                    &credentials.authority,
+                    &credentials.service,
+                    &credentials.username_credential,
+                )
+                .is_ok()
                 && CredentialRef::new(
                     &self.tenant_id,
                     &credentials.authority,
@@ -316,7 +320,7 @@ enabled = true
 listen = "0.0.0.0:5060"
 deployment_config = "/etc/b10x-connectors-sip/deployment.toml"
 [sip.credentials]
-authority = "org.asterisk.ari"
+authority = "io.b10x"
 service = "default"
 username_credential = "sip_username"
 password_credential = "sip_password"
@@ -367,7 +371,7 @@ enabled = true
 listen = "0.0.0.0:5060"
 deployment_config = "/etc/b10x-connectors-sip/deployment.toml"
 [sip.credentials]
-authority = "org.asterisk.ari"
+authority = "io.b10x"
 service = "default"
 username_credential = "sip_username"
 password_credential = "sip_password"
@@ -379,6 +383,9 @@ password_credential = "sip_password"
         config.sip.credentials.as_mut().unwrap().password_credential = "sip_username".to_owned();
         assert!(config.validate().is_err());
         config.sip.credentials.as_mut().unwrap().password_credential = "sip.password".to_owned();
+        assert!(config.validate().is_err());
+        config.sip.credentials.as_mut().unwrap().password_credential = "sip_password".to_owned();
+        config.sip.credentials.as_mut().unwrap().authority = "org.asterisk.ari".to_owned();
         assert!(config.validate().is_err());
         config.sip.credentials = None;
         assert!(config.validate().is_err());

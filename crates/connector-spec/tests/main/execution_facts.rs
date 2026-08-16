@@ -131,8 +131,113 @@ fn sip_v1_is_a_closed_session_establishment_driver() {
 
     let schema = include_str!("../../schema/provider-toml.schema.json");
     assert!(
-        schema.contains(r#""enum": ["http_v1", "sip_v1"]"#),
+        schema.contains(r#""enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1"]"#),
         "the authored-provider schema must admit the same closed driver vocabulary"
+    );
+}
+
+#[test]
+fn audio_v1_is_a_closed_unary_device_driver() {
+    let axes = AXES.replace(
+        "protocol_driver = \"http_v1\"",
+        "protocol_driver = \"audio_v1\"",
+    );
+    let source = operation(&format!("effects = [\"read\", \"local_system\"]\n{axes}"))
+        .replace("id = \"acme-read\"", "id = \"acme-speech-status\"")
+        .replace("method = \"GET\"\n", "")
+        .replace("path = \"/v1/items\"\n", "")
+        .replace(
+            "required_capabilities = [\"public_network\"]",
+            "required_capabilities = [\"device\"]",
+        );
+    let loaded = provider::load("providers/acme.toml", &source).expect("audio operation loads");
+    let operation = &loaded.connector.operations[0];
+    assert_eq!(operation.interaction_shape, InteractionShape::Unary);
+    assert_eq!(operation.request.driver(), ProtocolDriver::AudioV1);
+    assert!(operation.request.http_method().is_none());
+    assert!(operation.request.http_path().is_none());
+
+    // A device answers one bounded request and returns; no other lifecycle is admitted, and the
+    // HTTP-only request fields remain structurally impossible.
+    let session = source.replace(
+        "interaction_shape = \"unary\"",
+        "interaction_shape = \"session_establishment\"",
+    );
+    let error = provider::load("providers/acme.toml", &session)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("audio v1 is admitted only as `unary`"),
+        "{error}"
+    );
+
+    let with_method = source.replace(
+        "direction = \"read\"",
+        "method = \"GET\"\ndirection = \"read\"",
+    );
+    let error = provider::load("providers/acme.toml", &with_method)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("audio_v1 operation refuses HTTP-only `method` and `path`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn cdp_v1_is_a_closed_leased_session_browser_driver() {
+    let axes = AXES
+        .replace(
+            "interaction_shape = \"unary\"",
+            "interaction_shape = \"leased_session\"",
+        )
+        .replace(
+            "protocol_driver = \"http_v1\"",
+            "protocol_driver = \"cdp_v1\"",
+        )
+        .replace(
+            "required_capabilities = [\"public_network\"]",
+            "required_capabilities = [\"public_network\", \"process\"]",
+        );
+    let source = operation(&format!("effects = [\"read\", \"browser\"]\n{axes}"))
+        .replace("id = \"acme-read\"", "id = \"acme-browser-snapshot\"")
+        .replace("method = \"GET\"\n", "")
+        .replace("path = \"/v1/items\"\n", "");
+    let loaded = provider::load("providers/acme.toml", &source).expect("browser operation loads");
+    let operation = &loaded.connector.operations[0];
+    assert_eq!(operation.interaction_shape, InteractionShape::LeasedSession);
+    assert_eq!(operation.request.driver(), ProtocolDriver::CdpV1);
+    assert!(operation.request.http_method().is_none());
+    assert!(operation.request.http_path().is_none());
+
+    // A browser is held across calls. `unary` would deny that the process, profile and page
+    // survive between operations; `session_establishment` would promise a direct-byte plane that
+    // does not exist. Neither is admitted, and the HTTP-only request fields stay structurally
+    // impossible.
+    for denied in ["unary", "session_establishment", "stream", "subscription"] {
+        let wrong = source.replace(
+            "interaction_shape = \"leased_session\"",
+            &format!("interaction_shape = {denied:?}"),
+        );
+        let error = provider::load("providers/acme.toml", &wrong)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("CDP v1 is admitted only as `leased_session`"),
+            "{denied} was admitted: {error}"
+        );
+    }
+
+    let with_path = source.replace(
+        "direction = \"read\"",
+        "path = \"/v1/items\"\ndirection = \"read\"",
+    );
+    let error = provider::load("providers/acme.toml", &with_path)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("cdp_v1 operation refuses HTTP-only `method` and `path`"),
+        "{error}"
     );
 }
 

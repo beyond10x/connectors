@@ -3,6 +3,8 @@
 
 //! Strict versioned Connectors wire contracts.
 
+pub mod audio;
+pub mod browser;
 pub mod connection;
 pub mod event;
 pub mod operation;

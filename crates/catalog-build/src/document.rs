@@ -333,12 +333,26 @@ struct DocOperation<'a> {
 enum DocProtocolOperation<'a> {
     HttpV1 { request: DocHttpRequest<'a> },
     SipV1 { request: DocSipRequest },
+    AudioV1 { request: DocAudioRequest },
+    CdpV1 { request: DocCdpRequest },
 }
 
 /// The admitted SIP request carries no HTTP-shaped data. Call arguments remain in the operation's
 /// declared parameter contract and become a bounded driver plan only after grant admission.
 #[derive(Serialize)]
 struct DocSipRequest {}
+
+/// The admitted local-audio request carries no HTTP-shaped data either. The bounded utterance
+/// remains an ordinary declared parameter; the synthesizer, voice and sink are deployment-owned and
+/// resolved only after grant admission.
+#[derive(Serialize)]
+struct DocAudioRequest {}
+
+/// The admitted browser request carries no HTTP-shaped data either. The browser's own HTTP traffic
+/// is the driver's, and the executable, dedicated profile directory and artifact directory are
+/// deployment-owned facts resolved only after grant admission.
+#[derive(Serialize)]
+struct DocCdpRequest {}
 
 /// **The HTTP request template** — the data equivalent of the emitted Flux body.
 #[derive(Serialize)]
@@ -1088,10 +1102,23 @@ fn request_template<'a>(
     operation: &'a Operation,
     pins: &[DocPin<'a>],
 ) -> Result<DocProtocolOperation<'a>> {
-    let OperationRequest::HttpV1 { method, path } = &operation.request else {
-        return Ok(DocProtocolOperation::SipV1 {
-            request: DocSipRequest {},
-        });
+    let (method, path) = match &operation.request {
+        OperationRequest::HttpV1 { method, path } => (method, path),
+        OperationRequest::SipV1 => {
+            return Ok(DocProtocolOperation::SipV1 {
+                request: DocSipRequest {},
+            });
+        }
+        OperationRequest::AudioV1 => {
+            return Ok(DocProtocolOperation::AudioV1 {
+                request: DocAudioRequest {},
+            });
+        }
+        OperationRequest::CdpV1 => {
+            return Ok(DocProtocolOperation::CdpV1 {
+                request: DocCdpRequest {},
+            });
+        }
     };
     let set = &operation.params;
     let url = format!("{{base}}{}", path_template(operation, path, pins)?);
@@ -1615,7 +1642,10 @@ fn endpoint_slots(
 ) -> Result<BTreeMap<String, BTreeSet<&'static str>>> {
     let mut slots: BTreeMap<String, BTreeSet<&'static str>> = BTreeMap::new();
 
-    if matches!(operation.request, OperationRequest::SipV1) {
+    if matches!(
+        operation.request,
+        OperationRequest::SipV1 | OperationRequest::AudioV1 | OperationRequest::CdpV1
+    ) {
         return Ok(slots);
     }
 
@@ -1876,7 +1906,7 @@ pub fn schema() -> &'static Value {
                         "repeatability_condition": { "type": "string" },
                         "semantic_effects": { "type": "array", "items": { "type": "string" } },
                         "interaction_shape": { "enum": ["unary", "stream", "subscription", "leased_session", "session_establishment"] },
-                        "protocol_driver": { "enum": ["http_v1", "sip_v1"] },
+                        "protocol_driver": { "enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1"] },
                         "placement_requirement": { "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"] },
                         "implementation_form": { "enum": ["built_in"] },
                         "required_capabilities": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"] } },
@@ -1913,6 +1943,14 @@ pub fn schema() -> &'static Value {
                         {
                             "if": { "properties": { "protocol_driver": { "const": "sip_v1" } } },
                             "then": { "properties": { "request": { "$ref": "#/$defs/sip_request" } } }
+                        },
+                        {
+                            "if": { "properties": { "protocol_driver": { "const": "audio_v1" } } },
+                            "then": { "properties": { "request": { "$ref": "#/$defs/audio_request" } } }
+                        },
+                        {
+                            "if": { "properties": { "protocol_driver": { "const": "cdp_v1" } } },
+                            "then": { "properties": { "request": { "$ref": "#/$defs/cdp_request" } } }
                         }
                     ],
                     "additionalProperties": false
@@ -1962,6 +2000,16 @@ pub fn schema() -> &'static Value {
                 },
                 "sip_request": {
                     "description": "SIP driver request marker. HTTP-shaped request facts are structurally impossible.",
+                    "type": "object",
+                    "maxProperties": 0
+                },
+                "audio_request": {
+                    "description": "Local-audio driver request marker. HTTP-shaped request facts are structurally impossible, and no device, synthesizer, voice or sink is nameable here.",
+                    "type": "object",
+                    "maxProperties": 0
+                },
+                "cdp_request": {
+                    "description": "Browser driver request marker. HTTP-shaped request facts are structurally impossible: the browser's own traffic belongs to the driver, and no executable, profile directory or artifact directory is nameable here.",
                     "type": "object",
                     "maxProperties": 0
                 },

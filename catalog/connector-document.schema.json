@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "audio_request": {
+      "description": "Local-audio driver request marker. HTTP-shaped request facts are structurally impossible, and no device, synthesizer, voice or sink is nameable here.",
+      "maxProperties": 0,
+      "type": "object"
+    },
     "auth": {
       "additionalProperties": false,
       "properties": {
@@ -188,6 +193,11 @@
           ]
         }
       ]
+    },
+    "cdp_request": {
+      "description": "Browser driver request marker. HTTP-shaped request facts are structurally impossible: the browser's own traffic belongs to the driver, and no executable, profile directory or artifact directory is nameable here.",
+      "maxProperties": 0,
+      "type": "object"
     },
     "channel": {
       "additionalProperties": false,
@@ -741,6 +751,38 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": {
+                "const": "audio_v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "request": {
+                "$ref": "#/$defs/audio_request"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": {
+                "const": "cdp_v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "request": {
+                "$ref": "#/$defs/cdp_request"
+              }
+            }
+          }
         }
       ],
       "properties": {
@@ -855,7 +897,9 @@
         "protocol_driver": {
           "enum": [
             "http_v1",
-            "sip_v1"
+            "sip_v1",
+            "audio_v1",
+            "cdp_v1"
           ]
         },
         "rate_limit": {

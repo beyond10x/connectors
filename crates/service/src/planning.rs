@@ -5,9 +5,9 @@ use connector_resolve::document::{
     RequiredCapability,
 };
 use domain::{
-    AdmittedOperation, Capability, ConnectionInitiator, ConnectionRoute, DriverId, HttpPlan,
-    Implementation, Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan,
-    RouteAdapter, SipPlan, ZeroIoPlan,
+    AdmittedOperation, AudioPlan, BrowserPlan, Capability, ConnectionInitiator, ConnectionRoute,
+    DriverId, HttpPlan, Implementation, Interaction, MediatedHttpPlan, OperationFacts, Placement,
+    ProtocolPlan, RouteAdapter, SipPlan, ZeroIoPlan,
 };
 
 /// Deployment facts consulted during pure planning.
@@ -102,6 +102,16 @@ pub fn plan_operation(
         (ConnectionRoute::Direct, ProtocolRequestTemplate::SipV1) => ProtocolPlan::SipV1(SipPlan {
             connection: admission.connection().to_owned(),
         }),
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::AudioV1) => {
+            ProtocolPlan::AudioV1(AudioPlan {
+                connection: admission.connection().to_owned(),
+            })
+        }
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::CdpV1) => {
+            ProtocolPlan::CdpV1(BrowserPlan {
+                connection: admission.connection().to_owned(),
+            })
+        }
         (
             ConnectionRoute::ViaConnection {
                 parent_connection,
@@ -126,7 +136,12 @@ pub fn plan_operation(
                 adapter: *adapter,
             })
         }
-        (ConnectionRoute::ViaConnection { .. }, ProtocolRequestTemplate::SipV1) => {
+        (
+            ConnectionRoute::ViaConnection { .. },
+            ProtocolRequestTemplate::SipV1
+            | ProtocolRequestTemplate::AudioV1
+            | ProtocolRequestTemplate::CdpV1,
+        ) => {
             return Err(PlanError::MediatedRouteDriverMismatch);
         }
     };
@@ -147,6 +162,8 @@ fn driver_of(operation: &Operation) -> DriverId {
     match operation.request {
         ProtocolRequestTemplate::HttpV1(_) => DriverId::HttpV1,
         ProtocolRequestTemplate::SipV1 => DriverId::SipV1,
+        ProtocolRequestTemplate::AudioV1 => DriverId::AudioV1,
+        ProtocolRequestTemplate::CdpV1 => DriverId::CdpV1,
     }
 }
 

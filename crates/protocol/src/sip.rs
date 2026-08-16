@@ -8,6 +8,12 @@ pub const SIP_DIAL_OPERATION: &str = "sip-dial";
 /// Model/harness-facing operation reference derived from [`SIP_DIAL_OPERATION`].
 pub const SIP_DIAL_TOOL_REF: &str = "sip.dial";
 
+/// Stable Provider id for the B10x-owned native SIP capability.
+pub const SIP_DIAL_PROVIDER: &str = "b10x";
+
+/// Permanent Provider authority for B10x-owned Connector capabilities.
+pub const SIP_DIAL_PROVIDER_AUTHORITY: &str = "io.b10x";
+
 /// Caller input for one SIP dial request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

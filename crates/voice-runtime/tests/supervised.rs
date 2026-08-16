@@ -9,7 +9,7 @@ use domain::{
     AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ZeroIoPlan,
 };
 use futures_util::{SinkExt as _, StreamExt as _};
-use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION};
+use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER};
 use protocol::voice::{Acknowledged, Close, Ready, Terminated};
 use rtvbp::{ControlFrame, Envelope as _, FrameKind};
 use rtvbp_voice_endpoint::{CLOSE_METHOD, INITIALIZE_METHOD, PROFILE, TERMINATED_EVENT};
@@ -85,16 +85,16 @@ fn loopback() -> IpAddr {
 }
 
 fn plan() -> ZeroIoPlan {
-    let document = Document::parse(include_str!("../../../catalog/asterisk.catalog.json"))
-        .expect("canonical Asterisk catalog parses");
+    let document = Document::parse(include_str!("../../../catalog/b10x.catalog.json"))
+        .expect("canonical B10x catalog parses");
     let operation = document
         .operation(SIP_DIAL_OPERATION)
         .expect("sip.dial is published");
     plan_operation(
-        "asterisk",
+        SIP_DIAL_PROVIDER,
         operation,
         AdmittedOperation::from_grant_decision(
-            "asterisk",
+            SIP_DIAL_PROVIDER,
             SIP_DIAL_OPERATION,
             "org-1",
             "principal-1",

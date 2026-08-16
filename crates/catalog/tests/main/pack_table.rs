@@ -71,11 +71,10 @@ fn the_derived_operation_facts_agree_with_the_documents() {
         for operation in provider.operations {
             assert_eq!(operation.provider, provider.id);
 
-            // HTTP reaches its own service host. SIP destinations come from admitted Connection
-            // aliases and must not inherit the provider's unrelated HTTP base URL.
-            if operation.protocol_driver == catalog::ProtocolDriver::SipV1 {
-                assert!(operation.hosts.is_empty());
-            } else {
+            // HTTP reaches its own service host. A native driver's destination comes from the
+            // admitted Connection and the deployment — a SIP alias, a local sound device — and must
+            // not inherit the provider's unrelated HTTP base URL.
+            if operation.protocol_driver == catalog::ProtocolDriver::HttpV1 {
                 assert_eq!(
                     operation.hosts.len(),
                     1,
@@ -84,6 +83,12 @@ fn the_derived_operation_facts_agree_with_the_documents() {
                 );
                 let host = operation.hosts[0];
                 assert!(!host.is_empty() && !host.contains("://") && !host.contains('/'));
+            } else {
+                assert!(
+                    operation.hosts.is_empty(),
+                    "`{}` publishes an HTTP host for a native driver",
+                    operation.id
+                );
             }
 
             // `credential_requirement` is the derivation `table.rs` documents: declared exactly

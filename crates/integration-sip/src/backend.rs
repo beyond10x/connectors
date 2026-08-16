@@ -19,7 +19,9 @@ use protocol::operation::{
     OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest, SessionState,
     SessionStatus, SessionTerminateRequest, SessionTermination,
 };
-use protocol::sip::{SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_TOOL_REF};
+use protocol::sip::{
+    SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF,
+};
 use service::{admit_voice_dial, AdmittedVoicePlan};
 use service::{
     plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
@@ -30,7 +32,7 @@ use voice_runtime::VoiceSessionControl;
 
 use connectors_config::PersonalVoiceConfig;
 
-const ASTERISK_DOCUMENT: &str = include_str!("../../../catalog/asterisk.catalog.json");
+const B10X_DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 const MAX_LIVE_SESSIONS: usize = 64;
 const MAX_SESSION_RECORDS: usize = 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
@@ -168,18 +170,18 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         state_root: &Path,
     ) -> Result<Self, OperationError> {
         let principal = config.principal_context().map_err(|_| unavailable())?;
-        let document = Document::parse(ASTERISK_DOCUMENT).map_err(|_| unavailable())?;
+        let document = Document::parse(B10X_DOCUMENT).map_err(|_| unavailable())?;
         let operation = document
             .operation(SIP_DIAL_OPERATION)
             .ok_or_else(unavailable)?;
-        if document.connector != "asterisk"
+        if document.connector != SIP_DIAL_PROVIDER
             || !operation.expose
             || operation.protocol_driver() != ProtocolDriver::SipV1
         {
             return Err(unavailable());
         }
-        let output_schema = response_schema(ASTERISK_DOCUMENT)?;
-        let catalog_sha256 = format!("{:x}", Sha256::digest(ASTERISK_DOCUMENT.as_bytes()));
+        let output_schema = response_schema(B10X_DOCUMENT)?;
+        let catalog_sha256 = format!("{:x}", Sha256::digest(B10X_DOCUMENT.as_bytes()));
         let deployment_sha256 = format!(
             "{:x}",
             Sha256::digest(serde_json::to_vec(&config).map_err(|_| unavailable())?)
@@ -222,7 +224,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             .expect("validated canonical operation");
         OperationSummary {
             operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
-            title: "Dial an Asterisk SIP voice session".to_owned(),
+            title: "Dial a SIP voice session".to_owned(),
             effect: effect(operation.effects()),
             approval: ApprovalPosture::Required,
             connections: vec![self.connection()],
@@ -233,8 +235,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         ConnectionSummary {
             connection_ref: self.config.connection.connection_ref.clone(),
             label: self.config.connection.label.clone(),
-            provider: "asterisk".to_owned(),
-            audiences: catalog::provider(catalog::ProviderKey::id("asterisk"))
+            provider: SIP_DIAL_PROVIDER.to_owned(),
+            audiences: catalog::provider(catalog::ProviderKey::id(SIP_DIAL_PROVIDER))
                 .map(|provider| {
                     provider
                         .audiences
@@ -274,7 +276,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             .expect("validated canonical operation");
         Ok(OperationResult::Describe(OperationDescription {
             operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
-            title: "Dial an Asterisk SIP voice session".to_owned(),
+            title: "Dial a SIP voice session".to_owned(),
             description: operation.contract_description().to_owned(),
             input_schema: operation.input_schema().clone(),
             output_schema: self.output_schema.clone(),
@@ -334,7 +336,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         )
         .map_err(|_| not_granted())?;
         let admission = AdmittedOperation::from_grant_decision(
-            "asterisk",
+            SIP_DIAL_PROVIDER,
             SIP_DIAL_OPERATION,
             context.tenant_id(),
             context.actor_subject(),
@@ -342,7 +344,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             connection,
         );
         let plan = plan_operation(
-            "asterisk",
+            SIP_DIAL_PROVIDER,
             operation,
             admission,
             &PlanningEnvironment {
@@ -533,7 +535,7 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
                 let needle = request.query.to_ascii_lowercase();
                 let summary = self.summary();
                 let haystack = format!(
-                    "{} {} sip voice asterisk dial call",
+                    "{} {} sip voice dial call peer pbx",
                     summary.operation_ref, summary.title
                 )
                 .to_ascii_lowercase();

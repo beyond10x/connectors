@@ -2,7 +2,9 @@
 
 //! Pure Connectors use cases.
 
+mod audio;
 pub mod authority;
+mod browser;
 mod connect_session;
 mod dispatch;
 mod planning;
@@ -10,6 +12,15 @@ mod runtime;
 mod sip;
 mod voice;
 
+pub use audio::{
+    admit_audio_plan, admit_speech_speak, validate_audio_deployment_route, AdmittedAudioPlan,
+    AudioAdmissionError, AudioDeploymentRoute, MAX_UTTERANCE, MAX_UTTERANCES_PER_CONNECTION,
+};
+pub use browser::{
+    admit_browser_address, admit_browser_plan, validate_browser_deployment_route,
+    AdmittedBrowserPlan, BrowserAdmissionError, BrowserDeploymentRoute, MAX_NAVIGATION,
+    MAX_NAVIGATIONS_PER_CONNECTION, MAX_SCREENSHOTS_PER_CONNECTION,
+};
 pub use connect_session::{
     ConnectSessionLifecycle, ConnectSessionLifecycleError, ConnectSessionTerminal,
 };

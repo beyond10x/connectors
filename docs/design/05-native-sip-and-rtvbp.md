@@ -12,11 +12,17 @@ This document turns the accepted cross-repository boundary into a Connectors imp
 The platform-family plan/dispatch seam, alpha `VoiceSession` owner bundle, one-shot authority, and
 memory RTVBP endpoint now exist. The exact `sipx` driver, proof-bearing admission, locally
 bounded WebSocket endpoints, application adapter, and a supervised runtime leaf now also exist.
-That leaf resolves the generated Asterisk `sip-dial` member, proves authenticated model-free duplex
+That leaf resolves the generated B10x `sip-dial` member, proves authenticated model-free duplex
 composition and one terminal result over real loopback SIP/RTP plus RTVBP WebSocket, and returns an
 operation receipt at establishment. A separate operator-authorized characterization has established
-TCP SIP and an RTP echo against the dev-cluster Asterisk. Stable serving, the remaining lifecycle
+TCP SIP and an RTP echo against a configured dev-cluster Asterisk peer. Stable serving, the remaining lifecycle
 and placement matrix, and a signed release remain gated work.
+
+**2026-08-16 Provider-ownership correction.** Native `sip.dial` is a B10x capability under
+the permanent Provider identity `b10x` / `io.b10x`. Asterisk never owned this member:
+its `asterisk` / `org.asterisk.ari` Provider remains the vendor ARI surface, while Asterisk is one
+possible Connection-owned SIP peer alongside carriers, SBCs, and other PBXs. This correction
+supersedes the earlier Asterisk-provider wording without changing the stable `sip.dial` tool ref.
 
 The released-alpha `ConnectorOperation` bundle and owner-only local daemon now project this member
 as generic `search`/`describe`/`invoke` plus session status/termination/reconciliation. The product
@@ -87,14 +93,17 @@ connectors/
 │       ├── examples/asterisk-dev.example.toml
 │       └── Cargo.lock                    # complete product dependency closure
 ├── specs/
+│   ├── b10x.provenance.toml         # repository-owned native capability source pin
 │   └── asterisk/
 │       ├── samples/pjsip.conf.sample     # pinned first-party SIP configuration source
 │       ├── samples/rtp.conf.sample       # pinned first-party RTP configuration source
-│       └── provenance.toml               # source identity, scope and byte pins
+│       └── provenance.toml               # optional Asterisk peer interoperability evidence
 ├── providers/
-│   └── asterisk.toml                     # ARI plus exposed native sip-dial member
+│   ├── b10x.toml                    # exposed native sip-dial member
+│   └── asterisk.toml                     # vendor-owned ARI surface only
 ├── catalog/
-│   └── asterisk.catalog.json             # generated canonical provider document
+│   ├── b10x.catalog.json            # generated native capability document
+│   └── asterisk.catalog.json             # generated ARI provider document
 ├── contracts/
 │   ├── connector-operation/v0alpha1/     # generic clean-room operation/session contract
 │   └── voice-session/v0alpha1/           # protocol-neutral semantics and conformance vectors
@@ -106,9 +115,10 @@ connectors/
     └── S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md
 ```
 
-The first concrete provider is Asterisk. Its permanent provider authority remains
-`org.asterisk.ari`; the native member is additionally grounded in Asterisk's pinned first-party SIP
-and RTP configuration sources. No `vendor/sipx`,
+The native capability Provider is B10x, with permanent authority `io.b10x`. Asterisk's
+separate `org.asterisk.ari` authority remains attached only to its ARI surface. Its pinned
+first-party SIP and RTP samples provide interoperability evidence for the configured development
+peer, not ownership or provenance for `sip.dial`. No `vendor/sipx`,
 `vendor/rtvbp`, Git submodule, `voice` repository, substrate protocol module, dynamic plugin, or
 out-of-process gateway artifact is added by this plan.
 
@@ -170,7 +180,7 @@ keepalive pumps, lease expiry, first-wins termination, teardown, and payload-fre
 owns no SIP, RTVBP, or product semantics.
 
 `connectors-cli` is a fourth nested workspace and the product composition leaf. It reads the
-canonical Asterisk member, verifies the exact personal owner snapshot, Connection initiation,
+canonical B10x member, verifies the exact personal owner snapshot, Connection initiation,
 Grant reference, description lease, external approval reference and configured alias before
 constructing an admitted voice plan. It depends on `voice-runtime`, not directly on either adapter.
 The owner-only Unix socket is in `server`; the binary owns deployment config, authority signing-key
@@ -218,12 +228,13 @@ interval elapsed.
 
 ## 4. Catalog and admission
 
-`sip_v1` is a closed catalog `protocol_driver` value. It is not itself a provider: every supported
-carrier or PBX appears as a source-grounded provider member whose generated canonical document
-declares that driver. RTVBP and `VoiceSession` are not separate providers or callable operations;
-they are the post-admission binding and semantic contract behind the SIP member.
+`sip_v1` is a closed catalog `protocol_driver` value. It is not itself a provider. The
+repository-owned B10x Provider declares the capability; a carrier, Asterisk, SBC, or other
+PBX is a Connection-owned peer and does not become the operation's Provider merely because it
+speaks SIP. RTVBP and `VoiceSession` are not separate providers or callable operations; they are
+the post-admission binding and semantic contract behind the SIP member.
 
-The source-grounded Asterisk declaration uses:
+The repository-authored B10x declaration uses:
 
 - interaction shape `session_establishment`;
 - protocol driver `sip_v1`;
@@ -344,8 +355,9 @@ replacement or a reviewed maintained fork and a repinned owner bundle.
 3. Complete S-033's cross-repository lifecycle vectors, including lease, revocation, generation
    drain, and an outward satellite/unserved fixture. The local WebSocket now proves immediate
    causal overload and bounded joined teardown even when writes never progress.
-4. Asterisk is selected and source-grounded; its provider declaration, generated `sip-dial` member,
-   lock row, pack, and web projection land atomically with the runtime proof.
+4. The repository-authored B10x Provider declaration, generated `sip-dial` member, source
+   pin, lock row, pack, and web projection land atomically with the runtime proof. Asterisk's
+   separate source remains interoperability evidence for one configured peer.
 5. The operator-authorized non-loopback mode has completed one exact dev-cluster TCP SIP and RTP
    echo characterization. It is intentionally not a stable-network claim: the route remains
    deployment-owned, exact-aperture, and explicitly marked development.

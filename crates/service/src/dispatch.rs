@@ -95,6 +95,8 @@ pub enum DispatchError {
 pub struct Dispatcher<'a> {
     pub http_v1: Option<&'a dyn BuiltInDriver>,
     pub sip_v1: Option<&'a dyn BuiltInDriver>,
+    pub audio_v1: Option<&'a dyn BuiltInDriver>,
+    pub cdp_v1: Option<&'a dyn BuiltInDriver>,
     pub policy: &'a dyn DispatchPolicy,
     pub audit: &'a dyn AuditSink,
 }
@@ -109,6 +111,8 @@ impl Dispatcher<'_> {
         let driver = match selected {
             DriverId::HttpV1 => self.http_v1,
             DriverId::SipV1 => self.sip_v1,
+            DriverId::AudioV1 => self.audio_v1,
+            DriverId::CdpV1 => self.cdp_v1,
         }
         .ok_or(DispatchError::DriverUnavailable(selected.as_str()))?;
         if driver.driver() != selected {
@@ -223,6 +227,8 @@ mod tests {
         let dispatcher = Dispatcher {
             http_v1: None,
             sip_v1: Some(&driver),
+            audio_v1: None,
+            cdp_v1: None,
             policy: &policy,
             audit: &policy,
         };
