@@ -16,7 +16,10 @@ The list is an authorization ceiling. An omitted list preserves existing persona
 an explicit empty list exposes no Work or Ontology operations to hosted tenant members. Entries
 must be sorted, unique, supported, and backed by a configured private origin.
 
-Module global operation IDs such as `work/request.list` and `ontology/claim.query` are accepted by
+Identity-verified tenant members may invoke the fixed read-only Work/Ontology subset without the
+deployment operator group. The hosted receiver checks this exact subset before dispatch; writes,
+other B10x operations, and external-provider invocations remain operator-only. Module global
+operation IDs such as `work/request.list` and `ontology/claim.query` are accepted by
 Describe/Invoke in addition to established Connector compatibility names. This lets Agent resolve
 a declarative UI contribution's `required_operations` without guessing provider names. It remains
 the controller's responsibility to reacquire a fresh description lease and check grants/approval
