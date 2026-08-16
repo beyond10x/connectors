@@ -441,6 +441,96 @@
         "title": "Problem",
         "type": "object"
       },
+      "work_task_create_body": {
+        "$defs": {
+          "CreateTask": {
+            "additionalProperties": false,
+            "properties": {
+              "depends_on": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "default": "",
+                "type": "string"
+              },
+              "references": {
+                "default": [],
+                "items": {
+                  "$ref": "#/components/schemas/work_task_create_body/$defs/TypedRef"
+                },
+                "type": "array"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          },
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "depends_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "type": "string"
+          },
+          "references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/work_task_create_body/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
       "work_task_create_input": {
         "$defs": {
           "CreateTask": {
@@ -609,6 +699,78 @@
           "updated_at_ms"
         ],
         "title": "WorkTask",
+        "type": "object"
+      },
+      "work_task_create_path": {
+        "$defs": {
+          "CreateTask": {
+            "additionalProperties": false,
+            "properties": {
+              "depends_on": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "default": "",
+                "type": "string"
+              },
+              "references": {
+                "default": [],
+                "items": {
+                  "$ref": "#/components/schemas/work_task_create_path/$defs/TypedRef"
+                },
+                "type": "array"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          },
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
         "type": "object"
       },
       "work_task_create_problem": {
@@ -955,6 +1117,68 @@
         "title": "Problem",
         "type": "object"
       },
+      "work_task_status_update_body": {
+        "$defs": {
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "UpdateTaskStatus": {
+            "additionalProperties": false,
+            "properties": {
+              "expected_revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/work_task_status_update_body/$defs/TaskStatus"
+              }
+            },
+            "required": [
+              "expected_revision",
+              "status"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_task_status_update_body/$defs/TaskStatus"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "status"
+        ],
+        "type": "object"
+      },
       "work_task_status_update_input": {
         "$defs": {
           "IdPath": {
@@ -1109,6 +1333,62 @@
         "title": "WorkTask",
         "type": "object"
       },
+      "work_task_status_update_path": {
+        "$defs": {
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "UpdateTaskStatus": {
+            "additionalProperties": false,
+            "properties": {
+              "expected_revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/work_task_status_update_path/$defs/TaskStatus"
+              }
+            },
+            "required": [
+              "expected_revision",
+              "status"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
       "work_task_status_update_problem": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1155,6 +1435,24 @@
     "/api/work/v2/requests": {
       "get": {
         "operationId": "work_request_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/work_request_list_input/properties/cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/work_request_list_input/properties/limit"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1190,6 +1488,20 @@
       },
       "post": {
         "operationId": "work_request_create",
+        "parameters": [
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1243,7 +1555,7 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/work_request_get_input/properties/id"
             }
           }
         ],
@@ -1290,6 +1602,18 @@
             "name": "id",
             "required": true,
             "schema": {
+              "$ref": "#/components/schemas/work_task_create_path/properties/id"
+            }
+          },
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
               "type": "string"
             }
           }
@@ -1298,7 +1622,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/work_task_create_input"
+                "$ref": "#/components/schemas/work_task_create_body"
               }
             }
           },
@@ -1341,6 +1665,24 @@
     "/api/work/v2/tasks": {
       "get": {
         "operationId": "work_task_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/work_task_list_input/properties/cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/work_task_list_input/properties/limit"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1384,7 +1726,7 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/work_task_get_input/properties/id"
             }
           }
         ],
@@ -1431,6 +1773,18 @@
             "name": "id",
             "required": true,
             "schema": {
+              "$ref": "#/components/schemas/work_task_status_update_path/properties/id"
+            }
+          },
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
               "type": "string"
             }
           }
@@ -1439,7 +1793,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/work_task_status_update_input"
+                "$ref": "#/components/schemas/work_task_status_update_body"
               }
             }
           },

@@ -126,7 +126,7 @@ note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sampl
 id = "b10x-owned-contracts"
 kind = "provider-openapi-and-asyncapi-contracts"
 origin = "repository-authored"
-upstream = "https://github.com/b10x/modules (commit 46a0281988266c5101bafb15f226d039f8b0e338)"
+upstream = "https://github.com/b10x/modules (commit 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5)"
 references = [
   "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -135,7 +135,7 @@ references = [
   "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
   "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
-  "https://github.com/b10x/modules/tree/46a0281988266c5101bafb15f226d039f8b0e338",
+  "https://github.com/b10x/modules/tree/55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5",
 ]
 refresh = "authored-review"
 pins = "specs/b10x.provenance.toml"

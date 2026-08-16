@@ -185,6 +185,10 @@ pub struct KubernetesIntegrationConfig {
 #[serde(deny_unknown_fields)]
 pub struct B10xIntegrationConfig {
     pub connection: B10xConnectionConfig,
+    /// Modules granted by default to every Identity-verified member of the hosted tenant.
+    /// `None` preserves the pre-policy behavior for personal and existing hosted configurations.
+    #[serde(default)]
+    pub tenant_member_modules: Option<Vec<String>>,
     #[serde(default)]
     pub work_origin: Option<String>,
     #[serde(default)]
@@ -387,6 +391,17 @@ impl B10xIntegrationConfig {
                 .ontology_origin
                 .as_deref()
                 .is_some_and(|origin| !private_origin(origin))
+            || self.tenant_member_modules.as_ref().is_some_and(|modules| {
+                let mut canonical = modules.clone();
+                canonical.sort();
+                canonical.dedup();
+                canonical != *modules
+                    || modules.iter().any(|module| {
+                        !matches!(module.as_str(), "ontology" | "work")
+                            || module == "work" && self.work_origin.is_none()
+                            || module == "ontology" && self.ontology_origin.is_none()
+                    })
+            })
             || (self.work_origin.is_none()
                 && self.ontology_origin.is_none()
                 && self.audio.is_none()
@@ -455,6 +470,16 @@ impl B10xIntegrationConfig {
         self.ontology_origin
             .as_deref()
             .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+
+    /// Whether a hosted tenant member receives one configured module by deployment policy.
+    #[must_use]
+    pub fn tenant_member_module_enabled(&self, module: &str) -> bool {
+        self.tenant_member_modules.as_ref().is_none_or(|modules| {
+            modules
+                .binary_search_by(|configured| configured.as_str().cmp(module))
+                .is_ok()
+        })
     }
 }
 

@@ -46,9 +46,9 @@ description = "Requests, tasks, optimistic status updates, and ordered Work even
 [[spec]]
 service = "knowledge"
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
-upstream_version = "ontology module v0alpha2 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
+upstream_version = "ontology module v0alpha2 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "f3af3649173addfb8a49ab04b3dc9d9fb6eb745632316e1a8ab12cd7f62ac14c"
+sha256 = "38183cbfa4df9b2a87d0a083d3fd0737875ca2f4fc1746f3e56888d3e7145f78"
 
 [[patch.operations]]
 service = "knowledge"
@@ -308,15 +308,15 @@ expose = true
 [[spec]]
 service = "tasks"
 path = "specs/b10x/work-v1.openapi.json"
-upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
+upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "6feffb689878a8e664c6a9ab1d4c25c536193ed8baebcfb392860d7b00ec0630"
+sha256 = "011bb2d109a5d0bd0d5f1d5094a9e253fa6596212f42fe6a279cccb4b45c18f8"
 
 [[spec]]
 kind = "asyncapi"
 service = "tasks"
 path = "specs/b10x/work-v1.asyncapi.yaml"
-upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
+upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
 fetched_at = "2026-08-16T00:00:00Z"
 sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
 

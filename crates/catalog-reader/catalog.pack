@@ -1,5 +1,5 @@
 connectors-catalog-pack 1
-digest sha256 9c0220b01d508417c78c6f45f450b0bf05f3f1aa162936ee58327cfa83123a97
+digest sha256 d36e2072eab20f8ffc61f46ce81b53b0b48e2fdb1f8ab1b4d4a10420599eac12
 schema 2
 providers 60
 operations 876
@@ -17,52 +17,52 @@ p clickup 4815025 30043
 p cloudflare 4845068 24160
 p confluence 4869228 38172
 p contentful 4907400 22143
-p b10x 4929543 231041
-p datadog 5160584 12693
-p discord 5173277 35641
-p docusign 5208918 26634
-p dropbox 5235552 20909
-p figma 5256461 21851
-p fly 5278312 22584
-p freshdesk 5300896 58939
-p front 5359835 25653
-p github 5385488 293257
-p gitlab 5678745 65567
-p google 5744312 36884
-p grafana 5781196 17900
-p hubspot 5799096 20182
-p intercom 5819278 30424
-p jira 5849702 28079
-p klaviyo 5877781 38461
-p launchdarkly 5916242 25153
-p loki 5941395 5048
-p mailchimp 5946443 40733
-p microsoft_graph 5987176 1085776
-p miro 7072952 32555
-p newrelic 7105507 29377
-p notion 7134884 18656
-p okta 7153540 22114
-p openai 7175654 1682736
-p openrouter 8858390 12907
-p pagerduty 8871297 37513
-p postmark 8908810 20013
-p prometheus 8928823 4863
-p resend 8933686 18601
-p salesforce 8952287 19117
-p sendgrid 8971404 15721
-p sentry 8987125 27655
-p shopify 9014780 27359
-p slack 9042139 233794
-p statuspage 9275933 29615
-p stripe 9305548 70726
-p supabase 9376274 13423
-p trello 9389697 26218
-p twilio 9415915 71610
-p typeform 9487525 28953
-p vercel 9516478 17422
-p webflow 9533900 21919
-p zendesk 9555819 1146583
-p zoom 10702402 9393
+p b10x 4929543 219654
+p datadog 5149197 12693
+p discord 5161890 35641
+p docusign 5197531 26634
+p dropbox 5224165 20909
+p figma 5245074 21851
+p fly 5266925 22584
+p freshdesk 5289509 58939
+p front 5348448 25653
+p github 5374101 293257
+p gitlab 5667358 65567
+p google 5732925 36884
+p grafana 5769809 17900
+p hubspot 5787709 20182
+p intercom 5807891 30424
+p jira 5838315 28079
+p klaviyo 5866394 38461
+p launchdarkly 5904855 25153
+p loki 5930008 5048
+p mailchimp 5935056 40733
+p microsoft_graph 5975789 1085776
+p miro 7061565 32555
+p newrelic 7094120 29377
+p notion 7123497 18656
+p okta 7142153 22114
+p openai 7164267 1682736
+p openrouter 8847003 12907
+p pagerduty 8859910 37513
+p postmark 8897423 20013
+p prometheus 8917436 4863
+p resend 8922299 18601
+p salesforce 8940900 19117
+p sendgrid 8960017 15721
+p sentry 8975738 27655
+p shopify 9003393 27359
+p slack 9030752 233794
+p statuspage 9264546 29615
+p stripe 9294161 70726
+p supabase 9364887 13423
+p trello 9378310 26218
+p twilio 9404528 71610
+p typeform 9476138 28953
+p vercel 9505091 17422
+p webflow 9522513 21919
+p zendesk 9544432 1146583
+p zoom 10691015 9393
 o airtable-record-create airtable default 5038 4705
 o airtable-record-delete airtable default 14724 3734
 o airtable-record-get airtable default 709 4323
@@ -618,328 +618,328 @@ o contentful-entries-list contentful delivery 4914903 3605
 o contentful-entry-create contentful management 4921223 3916
 o contentful-entry-get contentful delivery 4912206 2691
 o contentful-entry-publish contentful management 4925145 3423
-o datadog-incident-get datadog default 5171522 1448
-o datadog-incident-list datadog default 5170500 1016
-o datadog-monitor-get datadog default 5166716 3778
-o datadog-monitor-list datadog default 5162963 3747
-o discord-channel-messages discord default 5194430 7169
-o discord-current-user discord default 5175639 3941
-o discord-guild-channels discord default 5189380 5044
-o discord-guild-get discord default 5183042 6332
-o discord-guild-list discord default 5179586 3450
-o discord-message-create discord default 5201605 7009
-o docusign-envelope-create-from-template docusign default 5226253 5619
-o docusign-envelope-get docusign default 5218465 3060
-o docusign-envelope-list docusign default 5214196 4263
-o docusign-envelope-recipients-get docusign default 5221531 4716
-o docusign-envelope-void docusign default 5231878 3339
-o docusign-verify docusign default 5211475 2715
-o dropbox-folder-create dropbox default 5250118 3041
-o dropbox-folder-list dropbox default 5239506 3329
-o dropbox-metadata-get dropbox default 5242841 4147
-o dropbox-search dropbox default 5246994 3118
-o dropbox-temporary-link-get dropbox default 5253165 3004
-o dropbox-user-me dropbox default 5236950 2550
-o figma-file-comments-list figma default 5273965 3989
-o figma-file-get figma default 5259794 4085
-o figma-file-nodes-get figma default 5263885 3603
-o figma-image-render-get figma default 5267494 3336
-o figma-project-files-list figma default 5270836 3123
-o figma-user-me figma default 5257757 2031
-o fly-machine-create fly machines 5288481 3091
-o fly-machine-delete fly machines 5298192 2332
-o fly-machine-events-list fly machines 5285725 2750
-o fly-machine-get fly machines 5282943 2776
-o fly-machine-restart fly machines 5295969 2217
-o fly-machine-start fly machines 5291578 2173
-o fly-machine-stop fly machines 5293757 2206
-o fly-machines-list fly machines 5280662 2275
-o fly-regions-list fly machines 5279001 1655
-o freshdesk-contact-create freshdesk default 5354953 4534
-o freshdesk-contact-get freshdesk default 5350900 4047
-o freshdesk-contact-list freshdesk default 5344866 6028
-o freshdesk-test freshdesk default 5301787 2337
-o freshdesk-ticket-create freshdesk default 5315268 12461
-o freshdesk-ticket-get freshdesk default 5310103 5159
-o freshdesk-ticket-list freshdesk default 5304130 5967
-o freshdesk-ticket-note-add freshdesk default 5339107 5753
-o freshdesk-ticket-update freshdesk default 5327735 11366
-o front-conversation-get front default 5367949 4065
-o front-conversation-list front default 5363554 4389
-o front-conversation-message-list front default 5372020 6112
-o front-conversation-reply front default 5378138 3848
-o front-conversation-tag-add front default 5381992 3216
-o front-verify front default 5361062 2486
-o github-commit-list github default 5590859 18372
-o github-issue-comment-add github default 5411402 4993
-o github-issue-create github default 5404898 6498
-o github-issue-get github default 5393487 5874
-o github-issue-list github default 5416401 94261
-o github-org-list github default 5622504 4192
-o github-org-repo-list github default 5626702 25105
-o github-pull-files-list github default 5510668 5426
-o github-pull-get github default 5399367 5525
-o github-repo-get github default 5388887 4594
-o github-user-get github default 5609237 13261
-o github-user-repo-list github default 5651813 26404
-o github-workflow-run-list github default 5516100 74753
-o gitlab-branch-list gitlab default 5737831 5868
-o gitlab-group-list gitlab default 5689222 6415
-o gitlab-issue-create gitlab default 5717499 6589
-o gitlab-issue-get gitlab default 5711413 6080
-o gitlab-issue-list gitlab default 5703791 7616
-o gitlab-merge-request-list gitlab default 5724094 7643
-o gitlab-pipeline-get gitlab default 5731743 6082
-o gitlab-project-list gitlab default 5695643 8142
-o gitlab-user-get gitlab default 5685203 4013
-o google-calendar-calendar-get google calendar 5771470 3684
-o google-calendar-event-get google calendar 5758027 6563
-o google-calendar-event-insert google calendar 5764596 6868
-o google-drive-file-get google drive 5775160 2298
-o google-drive-file-update google drive 5777464 2814
-o google-gmail-labels-list google gmail 5753958 4063
-o google-gmail-message-get google gmail 5745067 4995
-o google-gmail-message-send google gmail 5750068 3884
-o grafana-dashboard-get grafana default 5788495 3146
-o grafana-dashboards-list grafana default 5783999 4490
-o grafana-datasource-query grafana default 5793745 5033
-o grafana-datasources-list grafana default 5791647 2092
-o hubspot-company-get hubspot default 5811775 3550
-o hubspot-contact-create hubspot default 5804350 3927
-o hubspot-contact-get hubspot default 5799855 4489
-o hubspot-contact-update hubspot default 5808283 3486
-o hubspot-deal-get hubspot default 5815331 3622
-o intercom-contact-create intercom default 5827224 5231
-o intercom-contact-get intercom default 5821200 6018
-o intercom-contact-note-create intercom default 5845184 4274
-o intercom-conversation-get intercom default 5832461 6016
-o intercom-conversation-reply intercom default 5838483 6695
-o jira-issue-comment-add jira default 5865247 4337
-o jira-issue-comment-list jira default 5860372 4869
-o jira-issue-create jira default 5855736 4630
-o jira-issue-get jira default 5851840 3890
-o jira-issue-transition jira default 5874255 3122
-o jira-issue-transitions-list jira default 5869590 4659
-o klaviyo-account-list klaviyo default 5879707 4885
-o klaviyo-event-create klaviyo default 5909163 6792
-o klaviyo-list-list klaviyo default 5905251 3906
-o klaviyo-profile-create klaviyo default 5896321 8924
-o klaviyo-profile-get klaviyo default 5891001 5314
-o klaviyo-profile-list klaviyo default 5884598 6397
+o datadog-incident-get datadog default 5160135 1448
+o datadog-incident-list datadog default 5159113 1016
+o datadog-monitor-get datadog default 5155329 3778
+o datadog-monitor-list datadog default 5151576 3747
+o discord-channel-messages discord default 5183043 7169
+o discord-current-user discord default 5164252 3941
+o discord-guild-channels discord default 5177993 5044
+o discord-guild-get discord default 5171655 6332
+o discord-guild-list discord default 5168199 3450
+o discord-message-create discord default 5190218 7009
+o docusign-envelope-create-from-template docusign default 5214866 5619
+o docusign-envelope-get docusign default 5207078 3060
+o docusign-envelope-list docusign default 5202809 4263
+o docusign-envelope-recipients-get docusign default 5210144 4716
+o docusign-envelope-void docusign default 5220491 3339
+o docusign-verify docusign default 5200088 2715
+o dropbox-folder-create dropbox default 5238731 3041
+o dropbox-folder-list dropbox default 5228119 3329
+o dropbox-metadata-get dropbox default 5231454 4147
+o dropbox-search dropbox default 5235607 3118
+o dropbox-temporary-link-get dropbox default 5241778 3004
+o dropbox-user-me dropbox default 5225563 2550
+o figma-file-comments-list figma default 5262578 3989
+o figma-file-get figma default 5248407 4085
+o figma-file-nodes-get figma default 5252498 3603
+o figma-image-render-get figma default 5256107 3336
+o figma-project-files-list figma default 5259449 3123
+o figma-user-me figma default 5246370 2031
+o fly-machine-create fly machines 5277094 3091
+o fly-machine-delete fly machines 5286805 2332
+o fly-machine-events-list fly machines 5274338 2750
+o fly-machine-get fly machines 5271556 2776
+o fly-machine-restart fly machines 5284582 2217
+o fly-machine-start fly machines 5280191 2173
+o fly-machine-stop fly machines 5282370 2206
+o fly-machines-list fly machines 5269275 2275
+o fly-regions-list fly machines 5267614 1655
+o freshdesk-contact-create freshdesk default 5343566 4534
+o freshdesk-contact-get freshdesk default 5339513 4047
+o freshdesk-contact-list freshdesk default 5333479 6028
+o freshdesk-test freshdesk default 5290400 2337
+o freshdesk-ticket-create freshdesk default 5303881 12461
+o freshdesk-ticket-get freshdesk default 5298716 5159
+o freshdesk-ticket-list freshdesk default 5292743 5967
+o freshdesk-ticket-note-add freshdesk default 5327720 5753
+o freshdesk-ticket-update freshdesk default 5316348 11366
+o front-conversation-get front default 5356562 4065
+o front-conversation-list front default 5352167 4389
+o front-conversation-message-list front default 5360633 6112
+o front-conversation-reply front default 5366751 3848
+o front-conversation-tag-add front default 5370605 3216
+o front-verify front default 5349675 2486
+o github-commit-list github default 5579472 18372
+o github-issue-comment-add github default 5400015 4993
+o github-issue-create github default 5393511 6498
+o github-issue-get github default 5382100 5874
+o github-issue-list github default 5405014 94261
+o github-org-list github default 5611117 4192
+o github-org-repo-list github default 5615315 25105
+o github-pull-files-list github default 5499281 5426
+o github-pull-get github default 5387980 5525
+o github-repo-get github default 5377500 4594
+o github-user-get github default 5597850 13261
+o github-user-repo-list github default 5640426 26404
+o github-workflow-run-list github default 5504713 74753
+o gitlab-branch-list gitlab default 5726444 5868
+o gitlab-group-list gitlab default 5677835 6415
+o gitlab-issue-create gitlab default 5706112 6589
+o gitlab-issue-get gitlab default 5700026 6080
+o gitlab-issue-list gitlab default 5692404 7616
+o gitlab-merge-request-list gitlab default 5712707 7643
+o gitlab-pipeline-get gitlab default 5720356 6082
+o gitlab-project-list gitlab default 5684256 8142
+o gitlab-user-get gitlab default 5673816 4013
+o google-calendar-calendar-get google calendar 5760083 3684
+o google-calendar-event-get google calendar 5746640 6563
+o google-calendar-event-insert google calendar 5753209 6868
+o google-drive-file-get google drive 5763773 2298
+o google-drive-file-update google drive 5766077 2814
+o google-gmail-labels-list google gmail 5742571 4063
+o google-gmail-message-get google gmail 5733680 4995
+o google-gmail-message-send google gmail 5738681 3884
+o grafana-dashboard-get grafana default 5777108 3146
+o grafana-dashboards-list grafana default 5772612 4490
+o grafana-datasource-query grafana default 5782358 5033
+o grafana-datasources-list grafana default 5780260 2092
+o hubspot-company-get hubspot default 5800388 3550
+o hubspot-contact-create hubspot default 5792963 3927
+o hubspot-contact-get hubspot default 5788468 4489
+o hubspot-contact-update hubspot default 5796896 3486
+o hubspot-deal-get hubspot default 5803944 3622
+o intercom-contact-create intercom default 5815837 5231
+o intercom-contact-get intercom default 5809813 6018
+o intercom-contact-note-create intercom default 5833797 4274
+o intercom-conversation-get intercom default 5821074 6016
+o intercom-conversation-reply intercom default 5827096 6695
+o jira-issue-comment-add jira default 5853860 4337
+o jira-issue-comment-list jira default 5848985 4869
+o jira-issue-create jira default 5844349 4630
+o jira-issue-get jira default 5840453 3890
+o jira-issue-transition jira default 5862868 3122
+o jira-issue-transitions-list jira default 5858203 4659
+o klaviyo-account-list klaviyo default 5868320 4885
+o klaviyo-event-create klaviyo default 5897776 6792
+o klaviyo-list-list klaviyo default 5893864 3906
+o klaviyo-profile-create klaviyo default 5884934 8924
+o klaviyo-profile-get klaviyo default 5879614 5314
+o klaviyo-profile-list klaviyo default 5873211 6397
 o knowledge-explain b10x knowledge 4988762 3681
 o knowledge-query b10x knowledge 4970513 18243
 o knowledge-snapshot b10x knowledge 4992449 18480
-o launchdarkly-environment-list launchdarkly default 5921487 4327
-o launchdarkly-flag-get launchdarkly default 5931249 4098
-o launchdarkly-flag-list launchdarkly default 5925820 5423
-o launchdarkly-flag-toggle launchdarkly default 5935353 5711
-o launchdarkly-project-list launchdarkly default 5917780 3701
-o loki-query-range loki default 5942216 3881
-o mailchimp-audience-get mailchimp default 5955746 3936
-o mailchimp-audience-list mailchimp default 5951026 4714
-o mailchimp-audience-member-get mailchimp default 5966700 6149
-o mailchimp-audience-member-list mailchimp default 5959688 7006
-o mailchimp-audience-member-upsert mailchimp default 5972855 8988
-o mailchimp-campaign-list mailchimp default 5981849 4969
-o mailchimp-ping mailchimp default 5948956 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 6014764 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 6904175 159938
-o microsoft_graph-calendar-event-create microsoft_graph calendar 6007487 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 6000941 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 7067854 4039
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 7064119 3729
-o microsoft_graph-files-item-get microsoft_graph files 6018522 5482
-o microsoft_graph-files-item-update microsoft_graph files 6024010 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 5997628 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 5988915 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 6028801 875368
-o microsoft_graph-mail-message-reply microsoft_graph mail 5994517 3105
-o miro-board-item-get miro default 7087189 7877
-o miro-board-item-list miro default 7077189 9994
-o miro-board-list miro default 7074332 2851
-o miro-sticky-note-create miro default 7095072 3738
-o miro-sticky-note-delete miro default 7103193 1954
-o miro-sticky-note-update miro default 7098816 4371
-o newrelic-alert-policy-list newrelic default 7117329 3047
-o newrelic-alert-violation-list newrelic default 7120382 4217
-o newrelic-application-get newrelic default 7113163 4160
-o newrelic-application-list newrelic default 7108496 4661
-o newrelic-deployment-create newrelic default 7128301 6216
-o newrelic-deployment-list newrelic default 7124605 3690
-o notion-database-query notion default 7141830 3464
-o notion-page-create notion default 7148491 4755
-o notion-page-get notion default 7138476 3348
-o notion-search notion default 7145300 3185
-o notion-user-me notion default 7136440 2030
-o okta-group-list okta default 7164549 3824
-o okta-user-deactivate okta default 7172209 3102
-o okta-user-get okta default 7160814 3729
-o okta-user-group-list okta default 7168379 3824
-o okta-user-list okta default 7155833 4975
+o launchdarkly-environment-list launchdarkly default 5910100 4327
+o launchdarkly-flag-get launchdarkly default 5919862 4098
+o launchdarkly-flag-list launchdarkly default 5914433 5423
+o launchdarkly-flag-toggle launchdarkly default 5923966 5711
+o launchdarkly-project-list launchdarkly default 5906393 3701
+o loki-query-range loki default 5930829 3881
+o mailchimp-audience-get mailchimp default 5944359 3936
+o mailchimp-audience-list mailchimp default 5939639 4714
+o mailchimp-audience-member-get mailchimp default 5955313 6149
+o mailchimp-audience-member-list mailchimp default 5948301 7006
+o mailchimp-audience-member-upsert mailchimp default 5961468 8988
+o mailchimp-campaign-list mailchimp default 5970462 4969
+o mailchimp-ping mailchimp default 5937569 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 6003377 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 6892788 159938
+o microsoft_graph-calendar-event-create microsoft_graph calendar 5996100 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 5989554 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 7056467 4039
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 7052732 3729
+o microsoft_graph-files-item-get microsoft_graph files 6007135 5482
+o microsoft_graph-files-item-update microsoft_graph files 6012623 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 5986241 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 5977528 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 6017414 875368
+o microsoft_graph-mail-message-reply microsoft_graph mail 5983130 3105
+o miro-board-item-get miro default 7075802 7877
+o miro-board-item-list miro default 7065802 9994
+o miro-board-list miro default 7062945 2851
+o miro-sticky-note-create miro default 7083685 3738
+o miro-sticky-note-delete miro default 7091806 1954
+o miro-sticky-note-update miro default 7087429 4371
+o newrelic-alert-policy-list newrelic default 7105942 3047
+o newrelic-alert-violation-list newrelic default 7108995 4217
+o newrelic-application-get newrelic default 7101776 4160
+o newrelic-application-list newrelic default 7097109 4661
+o newrelic-deployment-create newrelic default 7116914 6216
+o newrelic-deployment-list newrelic default 7113218 3690
+o notion-database-query notion default 7130443 3464
+o notion-page-create notion default 7137104 4755
+o notion-page-get notion default 7127089 3348
+o notion-search notion default 7133913 3185
+o notion-user-me notion default 7125053 2030
+o okta-group-list okta default 7153162 3824
+o okta-user-deactivate okta default 7160822 3102
+o okta-user-get okta default 7149427 3729
+o okta-user-group-list okta default 7156992 3824
+o okta-user-list okta default 7144446 4975
 o ontology-branch-create b10x knowledge 5014826 21208
 o ontology-branch-list b10x knowledge 5010935 3885
-o ontology-branch-schema-extend b10x knowledge 5036040 6833
-o ontology-claim-assert b10x knowledge 5042879 9044
-o ontology-claim-retract b10x knowledge 5051929 4169
-o ontology-pack-install b10x knowledge 5056104 33224
-o ontology-proposal-approval-record b10x knowledge 5111971 1990
-o ontology-proposal-create b10x knowledge 5089334 7295
-o ontology-proposal-evaluate b10x knowledge 5103134 8831
-o ontology-proposal-get b10x knowledge 5096635 6493
-o ontology-proposal-promote b10x knowledge 5113967 2660
-o ontology-schema-register b10x knowledge 5116633 5453
-o openai-batch-list openai default 8845234 12904
-o openai-chat-completion openai default 7180602 5224
-o openai-embeddings-create openai default 7185832 4010
-o openai-file-list openai default 8839933 5295
-o openai-model-get openai default 7178492 2104
-o openai-models-list openai default 7176323 2163
-o openai-response-get openai default 7189848 1212702
-o openai-response-input-item-list openai default 8402556 437371
-o openrouter-chat-completion openrouter default 8863337 5888
-o openrouter-credits-get openrouter default 8869231 1808
-o openrouter-model-endpoints-list openrouter default 8860719 2612
-o openrouter-models-list openrouter default 8859076 1637
-o pagerduty-incident-acknowledge pagerduty default 8898686 5034
-o pagerduty-incident-get pagerduty default 8881412 5736
-o pagerduty-incident-list pagerduty default 8872863 8543
-o pagerduty-incident-resolve pagerduty default 8903726 4790
-o pagerduty-oncall-list pagerduty default 8893534 5146
-o pagerduty-service-list pagerduty default 8887154 6374
-o postmark-bounce-get postmark server 8925162 3209
-o postmark-bounce-list postmark server 8920275 4881
-o postmark-deliverystats-get postmark server 8917661 2608
-o postmark-email-send postmark server 8910315 7340
-o prometheus-query-range prometheus default 8929660 3681
-o resend-domain-get resend default 8946884 5175
-o resend-domain-list resend default 8943559 3319
-o resend-email-get resend default 8938744 4809
-o resend-email-send resend default 8934515 4223
-o salesforce-record-create salesforce default 8960451 3265
-o salesforce-record-get salesforce default 8957021 3424
-o salesforce-record-update salesforce default 8963722 2958
-o salesforce-sobject-describe salesforce default 8966686 4425
-o salesforce-whoami salesforce default 8954180 2835
-o sendgrid-email-validate sendgrid default 8982683 4143
-o sendgrid-suppression-bounce-list sendgrid default 8979266 3411
-o sendgrid-template-get sendgrid default 8976897 2363
-o sendgrid-template-list sendgrid default 8972740 4151
-o sentry-issue-event-latest sentry default 9007525 6935
-o sentry-issue-get sentry default 8987832 7008
-o sentry-issue-update sentry default 8994846 6365
-o sentry-project-get sentry default 9001217 6302
-o shopify-customer-get shopify default 9033157 5180
-o shopify-inventory-level-list shopify default 9038343 3461
-o shopify-order-get shopify default 9016646 6452
-o shopify-product-get shopify default 9023104 4772
-o shopify-product-update shopify default 9027882 5269
+o ontology-branch-schema-extend b10x knowledge 5036040 2727
+o ontology-claim-assert b10x knowledge 5038773 2709
+o ontology-claim-retract b10x knowledge 5041488 3008
+o ontology-pack-install b10x knowledge 5044502 33224
+o ontology-proposal-approval-record b10x knowledge 5098162 1443
+o ontology-proposal-create b10x knowledge 5077732 7295
+o ontology-proposal-evaluate b10x knowledge 5091532 6624
+o ontology-proposal-get b10x knowledge 5085033 6493
+o ontology-proposal-promote b10x knowledge 5099611 2095
+o ontology-schema-register b10x knowledge 5101712 5453
+o openai-batch-list openai default 8833847 12904
+o openai-chat-completion openai default 7169215 5224
+o openai-embeddings-create openai default 7174445 4010
+o openai-file-list openai default 8828546 5295
+o openai-model-get openai default 7167105 2104
+o openai-models-list openai default 7164936 2163
+o openai-response-get openai default 7178461 1212702
+o openai-response-input-item-list openai default 8391169 437371
+o openrouter-chat-completion openrouter default 8851950 5888
+o openrouter-credits-get openrouter default 8857844 1808
+o openrouter-model-endpoints-list openrouter default 8849332 2612
+o openrouter-models-list openrouter default 8847689 1637
+o pagerduty-incident-acknowledge pagerduty default 8887299 5034
+o pagerduty-incident-get pagerduty default 8870025 5736
+o pagerduty-incident-list pagerduty default 8861476 8543
+o pagerduty-incident-resolve pagerduty default 8892339 4790
+o pagerduty-oncall-list pagerduty default 8882147 5146
+o pagerduty-service-list pagerduty default 8875767 6374
+o postmark-bounce-get postmark server 8913775 3209
+o postmark-bounce-list postmark server 8908888 4881
+o postmark-deliverystats-get postmark server 8906274 2608
+o postmark-email-send postmark server 8898928 7340
+o prometheus-query-range prometheus default 8918273 3681
+o resend-domain-get resend default 8935497 5175
+o resend-domain-list resend default 8932172 3319
+o resend-email-get resend default 8927357 4809
+o resend-email-send resend default 8923128 4223
+o salesforce-record-create salesforce default 8949064 3265
+o salesforce-record-get salesforce default 8945634 3424
+o salesforce-record-update salesforce default 8952335 2958
+o salesforce-sobject-describe salesforce default 8955299 4425
+o salesforce-whoami salesforce default 8942793 2835
+o sendgrid-email-validate sendgrid default 8971296 4143
+o sendgrid-suppression-bounce-list sendgrid default 8967879 3411
+o sendgrid-template-get sendgrid default 8965510 2363
+o sendgrid-template-list sendgrid default 8961353 4151
+o sentry-issue-event-latest sentry default 8996138 6935
+o sentry-issue-get sentry default 8976445 7008
+o sentry-issue-update sentry default 8983459 6365
+o sentry-project-get sentry default 8989830 6302
+o shopify-customer-get shopify default 9021770 5180
+o shopify-inventory-level-list shopify default 9026956 3461
+o shopify-order-get shopify default 9005259 6452
+o shopify-product-get shopify default 9011717 4772
+o shopify-product-update shopify default 9016495 5269
 o sip-dial b10x default 4946495 2823
-o slack-admin-app-requests-list slack admin 9197784 4516
-o slack-admin-conversations-search slack admin 9202306 64081
-o slack-admin-teams-list slack admin 9266393 4007
-o slack-admin-users-list slack admin 9270406 4451
-o slack-chat-post-message slack default 9053423 45357
-o slack-conversations-history slack default 9098786 49463
-o slack-reactions-add slack default 9191849 5929
-o slack-users-info slack default 9148255 43588
+o slack-admin-app-requests-list slack admin 9186397 4516
+o slack-admin-conversations-search slack admin 9190919 64081
+o slack-admin-teams-list slack admin 9255006 4007
+o slack-admin-users-list slack admin 9259019 4451
+o slack-chat-post-message slack default 9042036 45357
+o slack-conversations-history slack default 9087399 49463
+o slack-reactions-add slack default 9180462 5929
+o slack-users-info slack default 9136868 43588
 o speech-speak b10x default 4949324 2907
 o speech-status b10x default 4952237 2246
-o statuspage-component-list statuspage default 9300828 4304
-o statuspage-incident-create statuspage default 9287474 6655
-o statuspage-incident-get statuspage default 9283179 4289
-o statuspage-incident-list statuspage default 9278015 5158
-o statuspage-incident-update statuspage default 9294135 6687
-o stripe-balance-get stripe default 9312863 2591
-o stripe-billing-meter-list stripe default 9366791 9122
-o stripe-charge-get stripe default 9318540 3784
-o stripe-charge-refund-create stripe default 9337706 4638
-o stripe-country-spec-list stripe default 9342350 9165
-o stripe-customer-get stripe default 9315460 3074
-o stripe-event-list stripe default 9351521 9473
-o stripe-exchange-rate-list stripe default 9361000 5785
-o stripe-payment-intent-cancel stripe default 9333756 3944
-o stripe-payment-intent-capture stripe default 9329165 4585
-o stripe-payment-intent-get stripe default 9322330 3802
-o stripe-refund-get stripe default 9326138 3021
-o supabase-auth-settings supabase default 9386329 2955
-o supabase-rows-list supabase default 9382944 3379
-o supabase-schema-describe supabase default 9379004 3934
-o trello-board-get trello default 9396064 3619
-o trello-board-list trello default 9392236 3822
-o trello-board-lists trello default 9399689 1604
-o trello-card-archive trello default 9411167 4364
-o trello-card-create trello default 9405988 5173
-o trello-list-cards trello default 9401299 4683
-o twilio-account-get twilio default 9424322 2969
-o twilio-call-get twilio default 9447449 4476
-o twilio-call-list twilio default 9439529 7914
-o twilio-conference-list twilio default 9479447 7737
-o twilio-message-get twilio default 9434693 4830
-o twilio-message-list twilio default 9427297 7390
-o twilio-recording-get twilio default 9462700 8396
-o twilio-recording-list twilio default 9451931 10763
-o twilio-usage-record-list twilio default 9471102 8339
-o typeform-form-get typeform default 9496863 5108
-o typeform-form-list typeform default 9491158 5699
-o typeform-response-delete typeform default 9513198 3050
-o typeform-response-list typeform default 9501977 11215
-o typeform-user-me typeform default 9488879 2273
-o vercel-deployment-cancel vercel default 9530971 2663
-o vercel-deployment-get vercel default 9528010 2955
-o vercel-deployments-list vercel default 9522710 5294
-o vercel-project-get vercel default 9519741 2963
-o vercel-projects-list vercel default 9518263 1472
-o webflow-collection-get webflow default 9541268 4235
-o webflow-collection-item-get webflow default 9549594 3491
-o webflow-collection-item-list webflow default 9545509 4079
-o webflow-collection-list webflow default 9538187 3075
-o webflow-site-list webflow default 9535444 2737
-o webflow-site-publish webflow default 9553091 2360
-o work-request-create b10x tasks 5122092 5232
-o work-request-get b10x tasks 5127330 3674
-o work-request-list b10x tasks 5131010 6050
-o work-task-create b10x tasks 5137066 6202
-o work-task-get b10x tasks 5143274 4010
-o work-task-list b10x tasks 5147290 6819
-o work-task-status-update b10x tasks 5154115 5784
-o zendesk-custom-object-list zendesk default 9682555 5894
-o zendesk-custom-status-list zendesk default 9887640 5413
-o zendesk-group-list zendesk default 9859479 3756
-o zendesk-help-center-article-create zendesk help-center 10189459 9386
-o zendesk-help-center-article-get zendesk help-center 10168052 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 10180908 8545
-o zendesk-help-center-article-list zendesk help-center 10159525 8521
-o zendesk-help-center-category-list zendesk help-center 10150784 4211
-o zendesk-help-center-section-list zendesk help-center 10155001 4518
-o zendesk-help-center-translation-list zendesk help-center 10175900 5002
-o zendesk-incremental-organization-list zendesk default 9668333 8641
-o zendesk-incremental-ticket-event-list zendesk default 9676980 5569
-o zendesk-incremental-ticket-list zendesk default 9567628 74662
-o zendesk-incremental-user-list zendesk default 9642296 26031
-o zendesk-messaging-conversation-create zendesk messaging 10198851 10167
-o zendesk-messaging-conversation-get zendesk messaging 10209024 10469
-o zendesk-messaging-conversation-update zendesk messaging 10219499 11165
-o zendesk-messaging-message-create zendesk messaging 10237724 276191
-o zendesk-messaging-message-list zendesk messaging 10513921 158036
-o zendesk-messaging-participant-list zendesk messaging 10230670 7048
-o zendesk-messaging-user-create zendesk messaging 10671963 10089
-o zendesk-messaging-user-get zendesk messaging 10682058 9350
-o zendesk-messaging-user-update zendesk messaging 10691414 9961
-o zendesk-organization-show zendesk default 9853474 5999
-o zendesk-test zendesk default 9893059 23020
-o zendesk-ticket-audit-list zendesk default 9561812 5810
-o zendesk-ticket-comment-list zendesk default 9989823 19828
-o zendesk-ticket-field-list zendesk default 9863241 15042
-o zendesk-ticket-form-list zendesk default 9878289 9345
-o zendesk-ticket-recent-list zendesk default 9688455 71467
-o zendesk-ticket-search zendesk default 9916085 5013
-o zendesk-ticket-show zendesk default 9921104 68713
-o zendesk-ticket-update zendesk default 10009657 141121
-o zendesk-user-show zendesk default 9831972 21496
-o zendesk-view-ticket-list zendesk default 9759928 72038
-o zoom-meeting-delete zoom default 10703268 2358
-o zoom-user-get zoom default 10705632 5881
-payload 10711795
+o statuspage-component-list statuspage default 9289441 4304
+o statuspage-incident-create statuspage default 9276087 6655
+o statuspage-incident-get statuspage default 9271792 4289
+o statuspage-incident-list statuspage default 9266628 5158
+o statuspage-incident-update statuspage default 9282748 6687
+o stripe-balance-get stripe default 9301476 2591
+o stripe-billing-meter-list stripe default 9355404 9122
+o stripe-charge-get stripe default 9307153 3784
+o stripe-charge-refund-create stripe default 9326319 4638
+o stripe-country-spec-list stripe default 9330963 9165
+o stripe-customer-get stripe default 9304073 3074
+o stripe-event-list stripe default 9340134 9473
+o stripe-exchange-rate-list stripe default 9349613 5785
+o stripe-payment-intent-cancel stripe default 9322369 3944
+o stripe-payment-intent-capture stripe default 9317778 4585
+o stripe-payment-intent-get stripe default 9310943 3802
+o stripe-refund-get stripe default 9314751 3021
+o supabase-auth-settings supabase default 9374942 2955
+o supabase-rows-list supabase default 9371557 3379
+o supabase-schema-describe supabase default 9367617 3934
+o trello-board-get trello default 9384677 3619
+o trello-board-list trello default 9380849 3822
+o trello-board-lists trello default 9388302 1604
+o trello-card-archive trello default 9399780 4364
+o trello-card-create trello default 9394601 5173
+o trello-list-cards trello default 9389912 4683
+o twilio-account-get twilio default 9412935 2969
+o twilio-call-get twilio default 9436062 4476
+o twilio-call-list twilio default 9428142 7914
+o twilio-conference-list twilio default 9468060 7737
+o twilio-message-get twilio default 9423306 4830
+o twilio-message-list twilio default 9415910 7390
+o twilio-recording-get twilio default 9451313 8396
+o twilio-recording-list twilio default 9440544 10763
+o twilio-usage-record-list twilio default 9459715 8339
+o typeform-form-get typeform default 9485476 5108
+o typeform-form-list typeform default 9479771 5699
+o typeform-response-delete typeform default 9501811 3050
+o typeform-response-list typeform default 9490590 11215
+o typeform-user-me typeform default 9477492 2273
+o vercel-deployment-cancel vercel default 9519584 2663
+o vercel-deployment-get vercel default 9516623 2955
+o vercel-deployments-list vercel default 9511323 5294
+o vercel-project-get vercel default 9508354 2963
+o vercel-projects-list vercel default 9506876 1472
+o webflow-collection-get webflow default 9529881 4235
+o webflow-collection-item-get webflow default 9538207 3491
+o webflow-collection-item-list webflow default 9534122 4079
+o webflow-collection-list webflow default 9526800 3075
+o webflow-site-list webflow default 9524057 2737
+o webflow-site-publish webflow default 9541704 2360
+o work-request-create b10x tasks 5107171 5856
+o work-request-get b10x tasks 5113033 3674
+o work-request-list b10x tasks 5116713 6973
+o work-task-create b10x tasks 5123692 7072
+o work-task-get b10x tasks 5130770 4010
+o work-task-list b10x tasks 5134786 7742
+o work-task-status-update b10x tasks 5142534 5978
+o zendesk-custom-object-list zendesk default 9671168 5894
+o zendesk-custom-status-list zendesk default 9876253 5413
+o zendesk-group-list zendesk default 9848092 3756
+o zendesk-help-center-article-create zendesk help-center 10178072 9386
+o zendesk-help-center-article-get zendesk help-center 10156665 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 10169521 8545
+o zendesk-help-center-article-list zendesk help-center 10148138 8521
+o zendesk-help-center-category-list zendesk help-center 10139397 4211
+o zendesk-help-center-section-list zendesk help-center 10143614 4518
+o zendesk-help-center-translation-list zendesk help-center 10164513 5002
+o zendesk-incremental-organization-list zendesk default 9656946 8641
+o zendesk-incremental-ticket-event-list zendesk default 9665593 5569
+o zendesk-incremental-ticket-list zendesk default 9556241 74662
+o zendesk-incremental-user-list zendesk default 9630909 26031
+o zendesk-messaging-conversation-create zendesk messaging 10187464 10167
+o zendesk-messaging-conversation-get zendesk messaging 10197637 10469
+o zendesk-messaging-conversation-update zendesk messaging 10208112 11165
+o zendesk-messaging-message-create zendesk messaging 10226337 276191
+o zendesk-messaging-message-list zendesk messaging 10502534 158036
+o zendesk-messaging-participant-list zendesk messaging 10219283 7048
+o zendesk-messaging-user-create zendesk messaging 10660576 10089
+o zendesk-messaging-user-get zendesk messaging 10670671 9350
+o zendesk-messaging-user-update zendesk messaging 10680027 9961
+o zendesk-organization-show zendesk default 9842087 5999
+o zendesk-test zendesk default 9881672 23020
+o zendesk-ticket-audit-list zendesk default 9550425 5810
+o zendesk-ticket-comment-list zendesk default 9978436 19828
+o zendesk-ticket-field-list zendesk default 9851854 15042
+o zendesk-ticket-form-list zendesk default 9866902 9345
+o zendesk-ticket-recent-list zendesk default 9677068 71467
+o zendesk-ticket-search zendesk default 9904698 5013
+o zendesk-ticket-show zendesk default 9909717 68713
+o zendesk-ticket-update zendesk default 9998270 141121
+o zendesk-user-show zendesk default 9820585 21496
+o zendesk-view-ticket-list zendesk default 9748541 72038
+o zoom-meeting-delete zoom default 10691881 2358
+o zoom-user-get zoom default 10694245 5881
+payload 10700408
 {
   "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
   "auth": [
@@ -153112,26 +153112,16 @@ payload 10711795
         "description": "Extend the schema admitted by one ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
               "type": "string"
-            },
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
-              "type": "string"
-            },
-            "schema": {}
+            }
           },
           "required": [
             "branch",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at",
-            "schema"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -153159,165 +153149,26 @@ payload 10711795
           "symbol": "branch"
         },
         {
-          "name": "expected_revision",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
-        },
-        {
-          "name": "schema",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "properties": {
-              "compatibility": {
-                "enum": [
-                  "initial",
-                  "compatible",
-                  "breaking"
-                ],
-                "type": "string"
-              },
-              "digest": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "predicates": {
-                "additionalProperties": {
-                  "properties": {
-                    "default_sensitivity": {
-                      "enum": [
-                        "public",
-                        "internal",
-                        "confidential",
-                        "restricted"
-                      ],
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "id": {
-                      "type": "string"
-                    },
-                    "value_kind": {
-                      "enum": [
-                        "reference",
-                        "string",
-                        "integer",
-                        "boolean",
-                        "decimal"
-                      ],
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "value_kind",
-                    "description",
-                    "default_sensitivity"
-                  ],
-                  "type": "object"
-                },
-                "type": "object"
-              },
-              "previous": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "shapes": {
-                "additionalProperties": {
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "properties": {
-                      "items": {
-                        "properties": {
-                          "predicate": {
-                            "type": "string"
-                          },
-                          "required": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "predicate",
-                          "required"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "properties"
-                  ],
-                  "type": "object"
-                },
-                "type": "object"
-              }
-            },
-            "required": [
-              "id",
-              "compatibility",
-              "predicates",
-              "shapes",
-              "digest"
-            ],
-            "type": "object"
-          },
-          "symbol": "schema"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            },
-            "schema": {
-              "$param": "schema"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/schema"
@@ -153365,26 +153216,16 @@ payload 10711795
         "description": "Assert one typed claim in an ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
-              "type": "string"
-            },
-            "claim": {},
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
               "type": "string"
             }
           },
           "required": [
             "branch",
-            "claim",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -153412,248 +153253,26 @@ payload 10711795
           "symbol": "branch"
         },
         {
-          "name": "claim",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "properties": {
-              "confidence_millionths": {
-                "format": "uint32",
-                "minimum": 0,
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "evidence": {
-                "items": {
-                  "properties": {
-                    "observed_at": {
-                      "type": "string"
-                    },
-                    "record": {
-                      "type": "string"
-                    },
-                    "source": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "source",
-                    "record",
-                    "observed_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "id": {
-                "type": "string"
-              },
-              "object": {
-                "oneOf": [
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "reference",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "string",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "integer",
-                        "type": "string"
-                      },
-                      "value": {
-                        "format": "int64",
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "boolean",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "decimal",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  }
-                ]
-              },
-              "observed_at": {
-                "type": "string"
-              },
-              "predicate": {
-                "type": "string"
-              },
-              "schema_revision": {
-                "type": "string"
-              },
-              "sensitivity": {
-                "enum": [
-                  "public",
-                  "internal",
-                  "confidential",
-                  "restricted"
-                ],
-                "type": "string"
-              },
-              "state": {
-                "enum": [
-                  "observed",
-                  "inferred",
-                  "confirmed",
-                  "rejected",
-                  "revoked",
-                  "superseded"
-                ],
-                "type": "string"
-              },
-              "subject": {
-                "type": "string"
-              },
-              "valid_from": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "valid_until": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "visibility": {
-                "enum": [
-                  "private",
-                  "department",
-                  "tenant"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "subject",
-              "predicate",
-              "object",
-              "schema_revision",
-              "visibility",
-              "sensitivity",
-              "state",
-              "observed_at",
-              "evidence"
-            ],
-            "type": "object"
-          },
-          "symbol": "claim"
-        },
-        {
-          "name": "expected_revision",
-          "position": "body",
-          "required": true,
-          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "claim": {
-              "$param": "claim"
-            },
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims"
@@ -153701,30 +153320,20 @@ payload 10711795
         "description": "Retract one claim from an ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
               "type": "string"
             },
             "claim": {
               "type": "string"
-            },
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
-              "type": "string"
-            },
-            "replacement": {}
+            }
           },
           "required": [
             "branch",
             "claim",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at",
-            "replacement"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -153761,67 +153370,26 @@ payload 10711795
           "symbol": "claim"
         },
         {
-          "name": "expected_revision",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
-        },
-        {
-          "name": "replacement",
-          "position": "body",
-          "required": false,
-          "schema": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "symbol": "replacement"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            },
-            "replacement": {
-              "$param": "replacement"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims/{claim}/retract"
@@ -155570,29 +155138,12 @@ payload 10711795
         "description": "Evaluate a governed ontology proposal and publish its human-visible decision state",
         "input_schema": {
           "properties": {
-            "evaluator": {
-              "type": "string"
-            },
-            "evidence": {
-              "items": {},
-              "type": "array"
-            },
-            "passed": {
-              "type": "boolean"
-            },
             "proposal": {
-              "type": "string"
-            },
-            "recorded_at": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "evaluator",
-            "evidence",
-            "passed",
-            "recorded_at"
+            "proposal"
           ],
           "type": "object"
         }
@@ -155618,86 +155169,11 @@ payload 10711795
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "evaluator",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "evaluator"
-        },
-        {
-          "name": "evidence",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "items": {
-              "properties": {
-                "observed_at": {
-                  "type": "string"
-                },
-                "record": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source",
-                "record",
-                "observed_at"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "symbol": "evidence"
-        },
-        {
-          "name": "passed",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "boolean"
-          },
-          "symbol": "passed"
-        },
-        {
-          "name": "recorded_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "recorded_at"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "evaluator": {
-              "$param": "evaluator"
-            },
-            "evidence": {
-              "$param": "evidence"
-            },
-            "passed": {
-              "$param": "passed"
-            },
-            "recorded_at": {
-              "$param": "recorded_at"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/evaluate"
       },
@@ -155916,16 +155392,12 @@ payload 10711795
         "description": "Record an approval decision on one governed ontology proposal",
         "input_schema": {
           "properties": {
-            "approval": {
-              "type": "string"
-            },
             "proposal": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "approval"
+            "proposal"
           ],
           "type": "object"
         }
@@ -155951,31 +155423,11 @@ payload 10711795
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "approval",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "approval"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "approval": {
-              "$param": "approval"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/approve"
       },
@@ -155996,16 +155448,12 @@ payload 10711795
         "description": "Promote an approved ontology proposal into the human-visible governed state",
         "input_schema": {
           "properties": {
-            "occurred_at": {
-              "type": "string"
-            },
             "proposal": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "occurred_at"
+            "proposal"
           ],
           "type": "object"
         }
@@ -156031,31 +155479,11 @@ payload 10711795
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "occurred_at": {
-              "$param": "occurred_at"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/promote"
       },
@@ -156318,6 +155746,9 @@ payload 10711795
         "description": "Create one Work request under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "description": {
               "type": "string"
             },
@@ -156330,6 +155761,7 @@ payload 10711795
             }
           },
           "required": [
+            "Idempotency_Key",
             "description",
             "references",
             "title"
@@ -156350,6 +155782,19 @@ payload 10711795
       "implementation_form": "built_in",
       "interaction_shape": "unary",
       "params": [
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
         {
           "name": "description",
           "position": "body",
@@ -156414,6 +155859,9 @@ payload 10711795
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "POST",
@@ -156685,8 +156133,14 @@ payload 10711795
       "contract": {
         "description": "List Work requests through the module's bounded cursor contract",
         "input_schema": {
-          "properties": {},
-          "required": [],
+          "properties": {
+            "cursor": {},
+            "limit": {}
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
           "type": "object"
         }
       },
@@ -156702,10 +156156,50 @@ payload 10711795
       "idempotency": "idempotent",
       "implementation_form": "built_in",
       "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "limit"
+        }
+      ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
         "url": "{base}/api/work/v2/requests"
       },
       "required_capabilities": [
@@ -156909,16 +156403,36 @@ payload 10711795
         "description": "Create one task under a Work request using an idempotency identity",
         "input_schema": {
           "properties": {
-            "body": {},
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "depends_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "type": "string"
+            },
             "id": {
               "type": "string"
             },
-            "path": {}
+            "references": {
+              "items": {},
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
           },
           "required": [
             "id",
-            "body",
-            "path"
+            "Idempotency_Key",
+            "depends_on",
+            "description",
+            "references",
+            "title"
           ],
           "type": "object"
         }
@@ -156946,71 +156460,75 @@ payload 10711795
           "symbol": "id"
         },
         {
-          "name": "body",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "depends_on": {
-                "default": [],
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "description": {
-                "default": "",
-                "type": "string"
-              },
-              "references": {
-                "default": [],
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "value"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "title": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "title"
-            ],
-            "type": "object"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
           },
-          "symbol": "body"
+          "symbol": "Idempotency_Key"
         },
         {
-          "name": "path",
+          "name": "depends_on",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "symbol": "depends_on"
+        },
+        {
+          "name": "description",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": "",
+            "type": "string"
+          },
+          "symbol": "description"
+        },
+        {
+          "name": "references",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "symbol": "references"
+        },
+        {
+          "name": "title",
           "position": "body",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "type": "object"
+            "type": "string"
           },
-          "symbol": "path"
+          "symbol": "title"
         }
       ],
       "placement_requirement": "connectors_deployment",
@@ -157019,15 +156537,24 @@ payload 10711795
         "body": {
           "encoding": "json",
           "template": {
-            "body": {
-              "$param": "body"
+            "depends_on": {
+              "$param": "depends_on"
             },
-            "path": {
-              "$param": "path"
+            "description": {
+              "$param": "description"
+            },
+            "references": {
+              "$param": "references"
+            },
+            "title": {
+              "$param": "title"
             }
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "POST",
@@ -157329,8 +156856,14 @@ payload 10711795
       "contract": {
         "description": "List Work tasks through the module's bounded cursor contract",
         "input_schema": {
-          "properties": {},
-          "required": [],
+          "properties": {
+            "cursor": {},
+            "limit": {}
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
           "type": "object"
         }
       },
@@ -157346,10 +156879,50 @@ payload 10711795
       "idempotency": "idempotent",
       "implementation_form": "built_in",
       "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "limit"
+        }
+      ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
         "url": "{base}/api/work/v2/tasks"
       },
       "required_capabilities": [
@@ -157581,16 +157154,24 @@ payload 10711795
         "description": "Update one Work task status using optimistic revision and idempotency identities",
         "input_schema": {
           "properties": {
-            "body": {},
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "expected_revision": {
+              "type": "number"
+            },
             "id": {
               "type": "string"
             },
-            "path": {}
+            "status": {
+              "type": "string"
+            }
           },
           "required": [
             "id",
-            "body",
-            "path"
+            "Idempotency_Key",
+            "expected_revision",
+            "status"
           ],
           "type": "object"
         }
@@ -157618,55 +157199,46 @@ payload 10711795
           "symbol": "id"
         },
         {
-          "name": "body",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "expected_revision": {
-                "format": "uint64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "status": {
-                "enum": [
-                  "pending",
-                  "ready",
-                  "running",
-                  "blocked",
-                  "completed",
-                  "failed",
-                  "cancelled"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "expected_revision",
-              "status"
-            ],
-            "type": "object"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
           },
-          "symbol": "body"
+          "symbol": "Idempotency_Key"
         },
         {
-          "name": "path",
+          "name": "expected_revision",
           "position": "body",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "type": "object"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
-          "symbol": "path"
+          "symbol": "expected_revision"
+        },
+        {
+          "name": "status",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "symbol": "status"
         }
       ],
       "placement_requirement": "connectors_deployment",
@@ -157675,15 +157247,18 @@ payload 10711795
         "body": {
           "encoding": "json",
           "template": {
-            "body": {
-              "$param": "body"
+            "expected_revision": {
+              "$param": "expected_revision"
             },
-            "path": {
-              "$param": "path"
+            "status": {
+              "$param": "status"
             }
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "PATCH",
