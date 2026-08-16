@@ -81,6 +81,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "created_by_actor": {
+            "type": "string"
+          },
+          "created_by_subject": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -101,6 +107,9 @@
           "status": {
             "$ref": "#/components/schemas/work_request_create_output/$defs/RequestStatus"
           },
+          "tenant_id": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -108,9 +117,16 @@
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
+          },
+          "updated_by_actor": {
+            "type": "string"
+          },
+          "updated_by_subject": {
+            "type": "string"
           }
         },
         "required": [
+          "tenant_id",
           "id",
           "revision",
           "title",
@@ -118,7 +134,11 @@
           "status",
           "references",
           "created_at_ms",
-          "updated_at_ms"
+          "updated_at_ms",
+          "created_by_subject",
+          "updated_by_subject",
+          "created_by_actor",
+          "updated_by_actor"
         ],
         "title": "WorkRequest",
         "type": "object"
@@ -209,6 +229,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "created_by_actor": {
+            "type": "string"
+          },
+          "created_by_subject": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -229,6 +255,9 @@
           "status": {
             "$ref": "#/components/schemas/work_request_get_output/$defs/RequestStatus"
           },
+          "tenant_id": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -236,9 +265,16 @@
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
+          },
+          "updated_by_actor": {
+            "type": "string"
+          },
+          "updated_by_subject": {
+            "type": "string"
           }
         },
         "required": [
+          "tenant_id",
           "id",
           "revision",
           "title",
@@ -246,7 +282,11 @@
           "status",
           "references",
           "created_at_ms",
-          "updated_at_ms"
+          "updated_at_ms",
+          "created_by_subject",
+          "updated_by_subject",
+          "created_by_actor",
+          "updated_by_actor"
         ],
         "title": "WorkRequest",
         "type": "object"
@@ -342,6 +382,12 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "created_by_actor": {
+                "type": "string"
+              },
+              "created_by_subject": {
+                "type": "string"
+              },
               "description": {
                 "type": "string"
               },
@@ -362,6 +408,9 @@
               "status": {
                 "$ref": "#/components/schemas/work_request_list_output/$defs/RequestStatus"
               },
+              "tenant_id": {
+                "type": "string"
+              },
               "title": {
                 "type": "string"
               },
@@ -369,9 +418,16 @@
                 "format": "uint64",
                 "minimum": 0,
                 "type": "integer"
+              },
+              "updated_by_actor": {
+                "type": "string"
+              },
+              "updated_by_subject": {
+                "type": "string"
               }
             },
             "required": [
+              "tenant_id",
               "id",
               "revision",
               "title",
@@ -379,7 +435,11 @@
               "status",
               "references",
               "created_at_ms",
-              "updated_at_ms"
+              "updated_at_ms",
+              "created_by_subject",
+              "updated_by_subject",
+              "created_by_actor",
+              "updated_by_actor"
             ],
             "type": "object"
           }
@@ -648,6 +708,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "created_by_actor": {
+            "type": "string"
+          },
+          "created_by_subject": {
+            "type": "string"
+          },
           "depends_on": {
             "items": {
               "type": "string"
@@ -677,6 +743,9 @@
           "status": {
             "$ref": "#/components/schemas/work_task_create_output/$defs/TaskStatus"
           },
+          "tenant_id": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -684,9 +753,16 @@
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
+          },
+          "updated_by_actor": {
+            "type": "string"
+          },
+          "updated_by_subject": {
+            "type": "string"
           }
         },
         "required": [
+          "tenant_id",
           "id",
           "request_id",
           "revision",
@@ -696,7 +772,11 @@
           "depends_on",
           "references",
           "created_at_ms",
-          "updated_at_ms"
+          "updated_at_ms",
+          "created_by_subject",
+          "updated_by_subject",
+          "created_by_actor",
+          "updated_by_actor"
         ],
         "title": "WorkTask",
         "type": "object"
@@ -861,6 +941,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "created_by_actor": {
+            "type": "string"
+          },
+          "created_by_subject": {
+            "type": "string"
+          },
           "depends_on": {
             "items": {
               "type": "string"
@@ -890,6 +976,9 @@
           "status": {
             "$ref": "#/components/schemas/work_task_get_output/$defs/TaskStatus"
           },
+          "tenant_id": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -897,9 +986,16 @@
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
+          },
+          "updated_by_actor": {
+            "type": "string"
+          },
+          "updated_by_subject": {
+            "type": "string"
           }
         },
         "required": [
+          "tenant_id",
           "id",
           "request_id",
           "revision",
@@ -909,7 +1005,11 @@
           "depends_on",
           "references",
           "created_at_ms",
-          "updated_at_ms"
+          "updated_at_ms",
+          "created_by_subject",
+          "updated_by_subject",
+          "created_by_actor",
+          "updated_by_actor"
         ],
         "title": "WorkTask",
         "type": "object"
@@ -1007,6 +1107,12 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "created_by_actor": {
+                "type": "string"
+              },
+              "created_by_subject": {
+                "type": "string"
+              },
               "depends_on": {
                 "items": {
                   "type": "string"
@@ -1036,6 +1142,9 @@
               "status": {
                 "$ref": "#/components/schemas/work_task_list_output/$defs/TaskStatus"
               },
+              "tenant_id": {
+                "type": "string"
+              },
               "title": {
                 "type": "string"
               },
@@ -1043,9 +1152,16 @@
                 "format": "uint64",
                 "minimum": 0,
                 "type": "integer"
+              },
+              "updated_by_actor": {
+                "type": "string"
+              },
+              "updated_by_subject": {
+                "type": "string"
               }
             },
             "required": [
+              "tenant_id",
               "id",
               "request_id",
               "revision",
@@ -1055,7 +1171,11 @@
               "depends_on",
               "references",
               "created_at_ms",
-              "updated_at_ms"
+              "updated_at_ms",
+              "created_by_subject",
+              "updated_by_subject",
+              "created_by_actor",
+              "updated_by_actor"
             ],
             "type": "object"
           }
@@ -1280,6 +1400,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "created_by_actor": {
+            "type": "string"
+          },
+          "created_by_subject": {
+            "type": "string"
+          },
           "depends_on": {
             "items": {
               "type": "string"
@@ -1309,6 +1435,9 @@
           "status": {
             "$ref": "#/components/schemas/work_task_status_update_output/$defs/TaskStatus"
           },
+          "tenant_id": {
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -1316,9 +1445,16 @@
             "format": "uint64",
             "minimum": 0,
             "type": "integer"
+          },
+          "updated_by_actor": {
+            "type": "string"
+          },
+          "updated_by_subject": {
+            "type": "string"
           }
         },
         "required": [
+          "tenant_id",
           "id",
           "request_id",
           "revision",
@@ -1328,7 +1464,11 @@
           "depends_on",
           "references",
           "created_at_ms",
-          "updated_at_ms"
+          "updated_at_ms",
+          "created_by_subject",
+          "updated_by_subject",
+          "created_by_actor",
+          "updated_by_actor"
         ],
         "title": "WorkTask",
         "type": "object"

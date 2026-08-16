@@ -1,0 +1,274 @@
+asyncapi: 3.0.0
+channels:
+  moduleEvents:
+    address: /api/planner/v1/events
+    messages:
+      planner_entity_created:
+        $ref: '#/components/messages/planner_entity_created'
+      planner_entity_deleted:
+        $ref: '#/components/messages/planner_entity_deleted'
+      planner_entity_restored:
+        $ref: '#/components/messages/planner_entity_restored'
+      planner_entity_updated:
+        $ref: '#/components/messages/planner_entity_updated'
+      planner_project_registered:
+        $ref: '#/components/messages/planner_project_registered'
+      planner_sync_conflict_recorded:
+        $ref: '#/components/messages/planner_sync_conflict_recorded'
+      planner_sync_conflict_resolved:
+        $ref: '#/components/messages/planner_sync_conflict_resolved'
+components:
+  messages:
+    planner_entity_created:
+      name: planner_entity_created
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: entity.created
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/entity.created
+    planner_entity_deleted:
+      name: planner_entity_deleted
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: entity.deleted
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/entity.deleted
+    planner_entity_restored:
+      name: planner_entity_restored
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: entity.restored
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/entity.restored
+    planner_entity_updated:
+      name: planner_entity_updated
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: entity.updated
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/entity.updated
+    planner_project_registered:
+      name: planner_project_registered
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: project.registered
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/project.registered
+    planner_sync_conflict_recorded:
+      name: planner_sync_conflict_recorded
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: sync.conflict-recorded
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/sync.conflict-recorded
+    planner_sync_conflict_resolved:
+      name: planner_sync_conflict_resolved
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $schema: https://json-schema.org/draft/2020-12/schema
+            title: AnyValue
+          id:
+            type: string
+          key:
+            const: sync.conflict-resolved
+          module:
+            const: planner
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: planner/sync.conflict-resolved
+info:
+  title: planner module events
+  version: 0.1.0-dev.1
+operations:
+  receiveModuleEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/moduleEvents'

@@ -3,7 +3,7 @@
 //! Runtime composition for B10x-owned Connector capabilities.
 //!
 //! This Integration is the only runtime adapter that joins the reviewed B10x catalog to the
-//! closed local audio/CDP drivers and to deployment-owned private Work/Ontology origins. Agent sees
+//! closed local audio/CDP drivers and to deployment-owned private Work/Ontology/Planner origins. Agent sees
 //! only the credential-free operation protocol. It cannot select a driver, executable, profile,
 //! voice, filesystem path, HTTP origin, bearer, or placement.
 
@@ -25,14 +25,11 @@ use driver_cdp::LocalBrowserDriver;
 use ed25519_dalek::pkcs8::DecodePrivateKey as _;
 use ed25519_dalek::{Signer as _, SigningKey};
 use protocol::audio::{
-    SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_SPEAK_TOOL_REF, SPEECH_STATUS_OPERATION,
-    SPEECH_STATUS_TOOL_REF,
+    SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION,
 };
 use protocol::browser::{
-    BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_CLOSE_TOOL_REF,
-    BROWSER_GOTO_OPERATION, BROWSER_GOTO_TOOL_REF, BROWSER_OPEN_OPERATION, BROWSER_OPEN_TOOL_REF,
-    BROWSER_SCREENSHOT_OPERATION, BROWSER_SCREENSHOT_TOOL_REF, BROWSER_SNAPSHOT_OPERATION,
-    BROWSER_SNAPSHOT_TOOL_REF,
+    BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_GOTO_OPERATION,
+    BROWSER_OPEN_OPERATION, BROWSER_SCREENSHOT_OPERATION, BROWSER_SNAPSHOT_OPERATION,
 };
 use protocol::connection::{
     ChannelState, ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
@@ -47,7 +44,7 @@ use protocol::operation::{
     ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use service::{
     admit_audio_plan, admit_browser_address, admit_browser_plan, admit_speech_speak,
@@ -57,6 +54,7 @@ use sha2::{Digest as _, Sha256};
 
 mod audit;
 mod policy;
+mod surface;
 mod work_events;
 
 use audit::{AuditEvent, AuditJournal};
@@ -64,178 +62,15 @@ use policy::{
     all_operation_rows, approval, check_approval, effect, module_operation, operation_row,
     post_dispatch_error, response_schema,
 };
-use work_events::WorkEventStore;
+use work_events::ModuleEventStore;
 
 const PROVIDER: &str = "b10x";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
-const MODULE_REQUEST_TYPE: &str = "b10x.module-request.v1+jws";
-const MODULE_AUTHORIZATION_SCHEME: &str = "DLModule ";
-const MODULE_REQUEST_TTL_SECONDS: u64 = 30;
-const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-const HTTP_TOTAL_TIMEOUT: Duration = Duration::from_secs(30);
-const WORK_EVENT_CHANNEL: &str = "event-channel:b10x:work";
-const WORK_EVENT_BINDING: &str = "work.module-events.v1";
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct WorkOwnerEventPage {
-    events: Vec<WorkOwnerEvent>,
-    next_cursor: Option<String>,
-    has_more: bool,
-}
-
-#[derive(Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
-struct WorkOwnerEvent {
-    protocol: String,
-    id: String,
-    module: String,
-    key: String,
-    schema_version: u16,
-    occurred_at: String,
-    cursor: String,
-    data: Value,
-}
-
-const OPERATIONS: [(&str, &str, &str); 29] = [
-    (
-        SPEECH_SPEAK_OPERATION,
-        SPEECH_SPEAK_TOOL_REF,
-        "Speak on local audio",
-    ),
-    (
-        SPEECH_STATUS_OPERATION,
-        SPEECH_STATUS_TOOL_REF,
-        "Inspect local speech readiness",
-    ),
-    (
-        BROWSER_OPEN_OPERATION,
-        BROWSER_OPEN_TOOL_REF,
-        "Open a dedicated browser",
-    ),
-    (
-        BROWSER_GOTO_OPERATION,
-        BROWSER_GOTO_TOOL_REF,
-        "Navigate the dedicated browser",
-    ),
-    (
-        BROWSER_SNAPSHOT_OPERATION,
-        BROWSER_SNAPSHOT_TOOL_REF,
-        "Read the browser page structure",
-    ),
-    (
-        BROWSER_SCREENSHOT_OPERATION,
-        BROWSER_SCREENSHOT_TOOL_REF,
-        "Capture a browser screenshot",
-    ),
-    (
-        BROWSER_CLOSE_OPERATION,
-        BROWSER_CLOSE_TOOL_REF,
-        "Close the dedicated browser",
-    ),
-    (
-        "knowledge-query",
-        "knowledge.query",
-        "Query visible Ontology claims",
-    ),
-    (
-        "knowledge-explain",
-        "knowledge.explain",
-        "Explain one Ontology claim",
-    ),
-    (
-        "knowledge-snapshot",
-        "knowledge.snapshot",
-        "Create an Ontology context snapshot",
-    ),
-    (
-        "ontology-branch-list",
-        "ontology.branches.list",
-        "List Ontology branches",
-    ),
-    (
-        "ontology-branch-create",
-        "ontology.branches.create",
-        "Create an Ontology branch",
-    ),
-    (
-        "ontology-branch-schema-extend",
-        "ontology.branches.schema.extend",
-        "Extend an Ontology branch schema",
-    ),
-    (
-        "ontology-claim-assert",
-        "ontology.claims.assert",
-        "Assert an Ontology claim",
-    ),
-    (
-        "ontology-claim-retract",
-        "ontology.claims.retract",
-        "Retract an Ontology claim",
-    ),
-    (
-        "ontology-pack-install",
-        "ontology.packs.install",
-        "Install an Ontology pack",
-    ),
-    (
-        "ontology-proposal-create",
-        "ontology.proposals.create",
-        "Create an Ontology proposal",
-    ),
-    (
-        "ontology-proposal-get",
-        "ontology.proposals.get",
-        "Get an Ontology proposal",
-    ),
-    (
-        "ontology-proposal-evaluate",
-        "ontology.proposals.evaluate",
-        "Evaluate an Ontology proposal",
-    ),
-    (
-        "ontology-proposal-approval-record",
-        "ontology.proposals.approval.record",
-        "Record an Ontology proposal approval",
-    ),
-    (
-        "ontology-proposal-promote",
-        "ontology.proposals.promote",
-        "Promote an Ontology proposal",
-    ),
-    (
-        "ontology-schema-register",
-        "ontology.schemas.register",
-        "Register an Ontology schema",
-    ),
-    (
-        "work-request-create",
-        "work.requests.create",
-        "Create a Work request",
-    ),
-    (
-        "work-request-get",
-        "work.requests.get",
-        "Get a Work request",
-    ),
-    (
-        "work-request-list",
-        "work.requests.list",
-        "List Work requests",
-    ),
-    (
-        "work-task-create",
-        "work.tasks.create",
-        "Create a Work task",
-    ),
-    ("work-task-get", "work.tasks.get", "Get a Work task"),
-    ("work-task-list", "work.tasks.list", "List Work tasks"),
-    (
-        "work-task-status-update",
-        "work.tasks.status.update",
-        "Update Work task status",
-    ),
-];
+use surface::{
+    HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, MODULE_AUTHORIZATION_SCHEME,
+    MODULE_REQUEST_TTL_SECONDS, MODULE_REQUEST_TYPE, OPERATIONS, PLANNER_EVENT_BINDING,
+    PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL, WorkOwnerEventPage,
+};
 
 /// Runtime construction failure. Messages deliberately carry no bearer or remote response body.
 #[derive(Debug, thiserror::Error)]
@@ -265,7 +100,8 @@ pub struct B10xBackend {
     audio: Option<Arc<Mutex<Option<LocalSpeechDriver>>>>,
     browser: Option<Arc<Mutex<Option<LocalBrowserDriver>>>>,
     audit: AuditJournal,
-    work_events: WorkEventStore,
+    work_events: ModuleEventStore,
+    planner_events: ModuleEventStore,
     module_signer: Option<ModuleSigner>,
 }
 
@@ -307,7 +143,10 @@ impl ModuleSigner {
     fn load(
         config: &B10xIntegrationConfig,
     ) -> Result<Option<Self>, B10xIntegrationError> {
-        if config.work_origin.is_none() && config.ontology_origin.is_none() {
+        if config.work_origin.is_none()
+            && config.ontology_origin.is_none()
+            && config.planner_origin.is_none()
+        {
             return Ok(None);
         }
         let encoded = read_owner_key(
@@ -449,9 +288,16 @@ impl B10xBackend {
                     .map_err(|_| B10xIntegrationError::InvalidConfiguration)?,
             )
         );
-        let work_events = WorkEventStore::open(
+        let work_events = ModuleEventStore::open(
+            "work",
             state_root.join("b10x-work-events.json"),
             legacy_event_tenant.as_deref(),
+        )
+        .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
+        let planner_events = ModuleEventStore::open(
+            "planner",
+            state_root.join("b10x-planner-events.json"),
+            None,
         )
         .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
         Ok(Self {
@@ -467,6 +313,7 @@ impl B10xBackend {
             deployment_sha256,
             audit: AuditJournal::new(state_root.join("b10x-operation-audit.jsonl")),
             work_events,
+            planner_events,
             module_signer,
         })
     }
@@ -518,6 +365,9 @@ impl B10xBackend {
             }
             value if value.starts_with("work-") => {
                 self.module_admitted("work") && self.config.work_origin.is_some()
+            }
+            value if value.starts_with("planner-") => {
+                self.module_admitted("planner") && self.config.planner_origin.is_some()
             }
             _ => false,
         }
@@ -974,6 +824,8 @@ impl B10xBackend {
         let operation = module_operation(canonical).ok_or_else(not_granted)?;
         let audience = if canonical.starts_with("work-") {
             "urn:b10x:module:work"
+        } else if canonical.starts_with("planner-") {
+            "urn:b10x:module:planner"
         } else {
             "urn:b10x:module:ontology"
         };
@@ -1037,6 +889,8 @@ impl B10xBackend {
             self.config.ontology_origin()
         } else if canonical.starts_with("work-") {
             self.config.work_origin()
+        } else if canonical.starts_with("planner-") {
+            self.config.planner_origin()
         } else {
             None
         }
@@ -1137,6 +991,108 @@ impl B10xBackend {
         self.work_events
             .append(context.tenant_id(), page.next_cursor, events)
     }
+
+    async fn refresh_planner_events(&self, context: &PrincipalContext) -> Result<(), EventError> {
+        let origin = self.config.planner_origin().ok_or_else(event_not_granted)?;
+        let mut url = reqwest::Url::parse(&format!("{origin}/api/planner/v1/events"))
+            .map_err(|_| event_protocol())?;
+        {
+            let mut query = url.query_pairs_mut();
+            if let Some(cursor) = self.planner_events.owner_cursor(context.tenant_id())? {
+                query.append_pair("cursor", &cursor);
+            }
+            query.append_pair("limit", "100");
+        }
+        let target = match url.query() {
+            Some(query) => format!("{}?{query}", url.path()),
+            None => url.path().to_owned(),
+        };
+        let authorization = self
+            .module_signer
+            .as_ref()
+            .ok_or_else(event_not_granted)?
+            .authorization(
+                context,
+                "urn:b10x:module:planner",
+                "module.events.read",
+                "GET",
+                &target,
+                &[],
+                None,
+            )
+            .map_err(|_| event_not_granted())?;
+        let response = self
+            .client
+            .get(url)
+            .header(reqwest::header::AUTHORIZATION, authorization)
+            .send()
+            .await
+            .map_err(|_| event_unavailable())?;
+        if response.status() == reqwest::StatusCode::CONFLICT {
+            return Err(EventError::new(
+                EventErrorCode::Protocol,
+                "Planner owner cursor requires a full resynchronization",
+                false,
+            ));
+        }
+        if !response.status().is_success() {
+            return Err(event_unavailable());
+        }
+        let bytes = response.bytes().await.map_err(|_| event_unavailable())?;
+        if bytes.len() > protocol::event::MAX_RESPONSE_BYTES {
+            return Err(event_protocol());
+        }
+        let page: WorkOwnerEventPage =
+            serde_json::from_slice(&bytes).map_err(|_| event_protocol())?;
+        if page.has_more && page.next_cursor.is_none() {
+            return Err(event_protocol());
+        }
+        let received_at_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        let mut events = Vec::with_capacity(page.events.len());
+        for owner in page.events {
+            if owner.protocol != "b10x.module-event.v1"
+                || owner.module != "planner"
+                || owner.schema_version != 1
+                || owner.id.is_empty()
+                || owner.cursor.is_empty()
+                || !matches!(
+                    owner.key.as_str(),
+                    "project.registered"
+                        | "entity.created"
+                        | "entity.updated"
+                        | "entity.deleted"
+                        | "entity.restored"
+                        | "sync-conflict.recorded"
+                        | "sync-conflict.resolved"
+                )
+            {
+                return Err(event_protocol());
+            }
+            let owner_id = owner.id.clone();
+            let event_type = owner.key.clone();
+            let payload = serde_json::to_value(owner).map_err(|_| event_protocol())?;
+            events.push((
+                owner_id,
+                DataEvent {
+                    event_ref: "pending:b10x:planner".to_owned(),
+                    channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
+                    connection_ref: self.config.connection.connection_ref.clone(),
+                    integration_ref: PROVIDER.to_owned(),
+                    event_type,
+                    provenance: EventProvenance::Polled,
+                    received_at_unix_ms,
+                    payload,
+                },
+            ));
+        }
+        self.planner_events
+            .append(context.tenant_id(), page.next_cursor, events)
+    }
 }
 
 fn is_ontology_operation(canonical: &str) -> bool {
@@ -1182,7 +1138,7 @@ impl ConnectorBackend for B10xBackend {
         BackendCapabilities {
             operations: true,
             connections: true,
-            events: self.config.work_origin.is_some(),
+            events: self.config.work_origin.is_some() || self.config.planner_origin.is_some(),
         }
     }
 
@@ -1207,9 +1163,15 @@ impl ConnectorBackend for B10xBackend {
 
     fn owns_event(&self, request: &EventRequest) -> bool {
         match request {
-            EventRequest::Receive(request) => request.channel_ref == WORK_EVENT_CHANNEL,
+            EventRequest::Receive(request) => {
+                matches!(
+                    request.channel_ref.as_str(),
+                    WORK_EVENT_CHANNEL | PLANNER_EVENT_CHANNEL
+                )
+            }
             EventRequest::Replay(request) => {
                 request.event_ref.starts_with("event:b10x:work:")
+                    || request.event_ref.starts_with("event:b10x:planner:")
             }
             EventRequest::Search(_) => false,
         }
@@ -1255,22 +1217,38 @@ impl ConnectorBackend for B10xBackend {
             ConnectionRequest::Describe(request)
                 if request.connection_ref == self.config.connection.connection_ref =>
             {
+                let mut channels = Vec::new();
+                if self.configured("work-request-list") {
+                    channels.push(protocol::connection::ChannelSummary {
+                        channel_ref: WORK_EVENT_CHANNEL.to_owned(),
+                        binding_ref: WORK_EVENT_BINDING.to_owned(),
+                        state: ChannelState::Connected,
+                        events: vec![
+                            "work/request.created".to_owned(),
+                            "work/task.created".to_owned(),
+                            "work/task.status-changed".to_owned(),
+                        ],
+                    });
+                }
+                if self.configured("planner-project-list") {
+                    channels.push(protocol::connection::ChannelSummary {
+                        channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
+                        binding_ref: PLANNER_EVENT_BINDING.to_owned(),
+                        state: ChannelState::Connected,
+                        events: vec![
+                            "planner/project.registered".to_owned(),
+                            "planner/entity.created".to_owned(),
+                            "planner/entity.updated".to_owned(),
+                            "planner/entity.deleted".to_owned(),
+                            "planner/entity.restored".to_owned(),
+                            "planner/sync-conflict.recorded".to_owned(),
+                            "planner/sync-conflict.resolved".to_owned(),
+                        ],
+                    });
+                }
                 Ok(ConnectionResult::Describe(ConnectionDescription {
                     summary: self.lifecycle_connection(),
-                    channels: self
-                        .configured("work-request-list")
-                        .then(|| protocol::connection::ChannelSummary {
-                            channel_ref: WORK_EVENT_CHANNEL.to_owned(),
-                            binding_ref: WORK_EVENT_BINDING.to_owned(),
-                            state: ChannelState::Connected,
-                            events: vec![
-                                "work/request.created".to_owned(),
-                                "work/task.created".to_owned(),
-                                "work/task.status-changed".to_owned(),
-                            ],
-                        })
-                        .into_iter()
-                        .collect(),
+                    channels,
                 }))
             }
             _ => Err(ConnectionError::new(
@@ -1293,47 +1271,78 @@ impl ConnectorBackend for B10xBackend {
                 false,
             ));
         }
-        if !self.configured("work-request-list") {
-            return Err(event_not_granted());
-        }
         match request {
             EventRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
-                let channels = (query.is_empty()
-                    || "work".contains(&query)
-                    || WORK_EVENT_BINDING.contains(&query))
-                .then(|| work_event_channel(&self.config))
-                .into_iter()
-                .take(usize::from(request.limit))
-                .collect();
+                let mut channels = Vec::new();
+                if self.configured("work-request-list")
+                    && (query.is_empty()
+                        || "work".contains(&query)
+                        || WORK_EVENT_BINDING.contains(&query))
+                {
+                    channels.push(work_event_channel(&self.config));
+                }
+                if self.configured("planner-project-list")
+                    && (query.is_empty()
+                        || "planner".contains(&query)
+                        || PLANNER_EVENT_BINDING.contains(&query))
+                {
+                    channels.push(planner_event_channel(&self.config));
+                }
+                channels.truncate(usize::from(request.limit));
                 Ok(EventResult::Search { channels })
             }
             EventRequest::Receive(request) => {
-                if request.channel_ref != WORK_EVENT_CHANNEL {
-                    return Err(event_not_found());
-                }
                 let after = request
                     .after
                     .as_deref()
                     .unwrap_or("0")
                     .parse::<u64>()
                     .map_err(|_| event_invalid())?;
-                self.refresh_work_events(context).await?;
-                let (events, next) = self.work_events.receive(
-                    context.tenant_id(),
-                    after,
-                    usize::from(request.limit),
-                )?;
+                let (events, next) = match request.channel_ref.as_str() {
+                    WORK_EVENT_CHANNEL if self.configured("work-request-list") => {
+                        self.refresh_work_events(context).await?;
+                        self.work_events.receive(
+                            context.tenant_id(),
+                            after,
+                            usize::from(request.limit),
+                        )?
+                    }
+                    PLANNER_EVENT_CHANNEL if self.configured("planner-project-list") => {
+                        self.refresh_planner_events(context).await?;
+                        self.planner_events.receive(
+                            context.tenant_id(),
+                            after,
+                            usize::from(request.limit),
+                        )?
+                    }
+                    WORK_EVENT_CHANNEL | PLANNER_EVENT_CHANNEL => {
+                        return Err(event_not_granted());
+                    }
+                    _ => return Err(event_not_found()),
+                };
                 Ok(EventResult::Receive {
                     events,
                     next: next.to_string(),
                 })
             }
             EventRequest::Replay(request) => {
-                let event = self
-                    .work_events
-                    .replay(context.tenant_id(), &request.event_ref)?
-                    .ok_or_else(event_not_found)?;
+                let event = if request.event_ref.starts_with("event:b10x:work:")
+                    && self.configured("work-request-list")
+                {
+                    self.work_events
+                        .replay(context.tenant_id(), &request.event_ref)?
+                } else if request
+                    .event_ref
+                    .starts_with("event:b10x:planner:")
+                    && self.configured("planner-project-list")
+                {
+                    self.planner_events
+                        .replay(context.tenant_id(), &request.event_ref)?
+                } else {
+                    return Err(event_not_found());
+                }
+                .ok_or_else(event_not_found)?;
                 Ok(EventResult::Replay(event))
             }
         }
@@ -1378,10 +1387,28 @@ fn work_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
     }
 }
 
+fn planner_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
+    ChannelSummary {
+        channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
+        connection_ref: config.connection.connection_ref.clone(),
+        integration_ref: PROVIDER.to_owned(),
+        binding_ref: PLANNER_EVENT_BINDING.to_owned(),
+        events: vec![
+            "planner/project.registered".to_owned(),
+            "planner/entity.created".to_owned(),
+            "planner/entity.updated".to_owned(),
+            "planner/entity.deleted".to_owned(),
+            "planner/entity.restored".to_owned(),
+            "planner/sync-conflict.recorded".to_owned(),
+            "planner/sync-conflict.resolved".to_owned(),
+        ],
+    }
+}
+
 fn event_unavailable() -> EventError {
     EventError::new(
         EventErrorCode::Unavailable,
-        "Work event owner is unavailable",
+        "Module event owner is unavailable",
         true,
     )
 }
@@ -1389,7 +1416,7 @@ fn event_unavailable() -> EventError {
 fn event_not_found() -> EventError {
     EventError::new(
         EventErrorCode::NotFound,
-        "Work event or channel was not found",
+        "Module event or channel was not found",
         false,
     )
 }
@@ -1397,7 +1424,7 @@ fn event_not_found() -> EventError {
 fn event_not_granted() -> EventError {
     EventError::new(
         EventErrorCode::NotGranted,
-        "Work events are not granted to this tenant member",
+        "Module events are not granted to this tenant member",
         false,
     )
 }
