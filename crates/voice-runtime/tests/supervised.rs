@@ -42,6 +42,10 @@ struct EmptyCredentials;
 
 #[async_trait]
 impl CredentialSource for EmptyCredentials {
+    async fn ready(&self) -> Result<(), DependencyError> {
+        Ok(())
+    }
+
     async fn resolve(
         &self,
         _admitted: &AdmittedVoicePlan,

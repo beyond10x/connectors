@@ -1172,6 +1172,12 @@ fn browser_url_symbol(input: Value) -> Result<String, OperationError> {
 
 #[async_trait]
 impl ConnectorBackend for B10xBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        // Construction validates local drivers and configured origins. Remote Work/Ontology
+        // availability is operation-scoped and must not become global process readiness.
+        Ok(())
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,

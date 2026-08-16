@@ -539,6 +539,11 @@ pub(crate) fn validate_transactional_bounds(
 
 #[async_trait]
 impl<L: Layout + Send + Sync> SecretStore for FileStore<L> {
+    async fn ready(&self) -> Result<(), StoreError> {
+        // Opening validated the owner-only file and acquired its process-lifetime lease.
+        Ok(())
+    }
+
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
         let path = self.layout.render(reference);
         self.locked()

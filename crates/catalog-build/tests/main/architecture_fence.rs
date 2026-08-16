@@ -29,8 +29,9 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/connector-secrets/src/file.rs",
-        2_620,
-        "cross-platform owner-bound store pending format and platform split",
+        2_625,
+        "cross-platform owner-bound store now states its required local readiness contract; no \
+         further growth is admitted before the pending format and platform split",
     ),
     (
         "crates/integration-slack/src/backend.rs",
@@ -39,6 +40,13 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
          event persistence, and outcome-aware audit together while their shared transaction \
          invariants settle; the final growth closes hosted-session expiry, and no further growth \
          is admitted before those arms split",
+    ),
+    (
+        "crates/integration-b10x/src/lib.rs",
+        1_600,
+        "hosted signed-module request verification and the Work event bridge remain in the \
+         integration root until their shared actor-policy construction is extracted; no further \
+         growth is admitted before that split",
     ),
     (
         "crates/catalog-build/src/document.rs",

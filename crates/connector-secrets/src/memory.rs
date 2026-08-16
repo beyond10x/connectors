@@ -117,6 +117,11 @@ impl<L> fmt::Debug for MemoryStore<L> {
 
 #[async_trait]
 impl<L: Layout + Send + Sync> SecretStore for MemoryStore<L> {
+    async fn ready(&self) -> Result<(), StoreError> {
+        // The store has no dependency outside this process after construction.
+        Ok(())
+    }
+
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
         let path = self.layout.render(reference);
         self.locked()

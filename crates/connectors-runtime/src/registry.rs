@@ -13,8 +13,8 @@ use protocol::operation::{
     OperationSummary,
 };
 use service::{
-    BackendCapabilities, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
-    HostedCompletionSubmission, PrincipalContext,
+    BackendCapabilities, BackendReadinessError, ConnectorBackend, HostedCompletionError,
+    HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -86,6 +86,13 @@ impl BackendRegistry {
 
 #[async_trait]
 impl ConnectorBackend for BackendRegistry {
+    async fn ready(&self) -> Result<(), BackendReadinessError> {
+        for backend in &self.backends {
+            backend.ready().await?;
+        }
+        Ok(())
+    }
+
     async fn handle(
         &self,
         context: &PrincipalContext,
@@ -519,6 +526,23 @@ mod tests {
         invocation_leases: Mutex<Vec<String>>,
     }
 
+    struct UnavailableBackend;
+
+    #[async_trait]
+    impl ConnectorBackend for UnavailableBackend {
+        async fn ready(&self) -> Result<(), BackendReadinessError> {
+            Err(BackendReadinessError)
+        }
+
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            _request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            unreachable!("readiness never dispatches an operation")
+        }
+    }
+
     impl SyntheticBackend {
         fn empty(capabilities: BackendCapabilities) -> Arc<Self> {
             Arc::new(Self {
@@ -635,6 +659,11 @@ mod tests {
 
     #[async_trait]
     impl ConnectorBackend for SyntheticBackend {
+        async fn ready(&self) -> Result<(), BackendReadinessError> {
+            // Registry routing fixtures carry no configured runtime dependency.
+            Ok(())
+        }
+
         fn capabilities(&self) -> BackendCapabilities {
             self.capabilities
         }
@@ -830,6 +859,15 @@ mod tests {
                 .map(|backend| backend as Arc<dyn ConnectorBackend>)
                 .collect(),
         )
+    }
+
+    #[tokio::test]
+    async fn readiness_requires_every_configured_backend() {
+        let ready: Arc<dyn ConnectorBackend> =
+            SyntheticBackend::empty(BackendCapabilities::OPERATIONS);
+        let unavailable: Arc<dyn ConnectorBackend> = Arc::new(UnavailableBackend);
+        let registry = BackendRegistry::new(vec![ready, unavailable]);
+        assert_eq!(registry.ready().await, Err(BackendReadinessError));
     }
 
     #[tokio::test]

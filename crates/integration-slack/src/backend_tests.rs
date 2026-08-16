@@ -9,6 +9,42 @@ mod tests {
 
     const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SECRET";
 
+    struct UnavailableStore;
+
+    #[async_trait]
+    impl connector_secrets::SecretStore for UnavailableStore {
+        async fn ready(&self) -> Result<(), connector_secrets::StoreError> {
+            Err(connector_secrets::StoreError::Unreachable {
+                path: "test:secret-store".to_owned(),
+                reason: SENTINEL.to_owned(),
+            })
+        }
+
+        async fn get(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+        ) -> Result<connector_secrets::Secret, connector_secrets::StoreError> {
+            unreachable!("readiness must not retrieve a credential")
+        }
+
+        async fn put(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+            _secret: &connector_secrets::Secret,
+        ) -> Result<(), connector_secrets::StoreError> {
+            unreachable!("readiness must not write a credential")
+        }
+
+        async fn delete(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+        ) -> Result<(), connector_secrets::StoreError> {
+            unreachable!("readiness must not delete a credential")
+        }
+    }
+
+    impl connector_secrets::PreparedSecretStore for UnavailableStore {}
+
     #[test]
     fn only_the_inner_admitted_event_is_projected() {
         let payload = serde_json::json!({
@@ -73,6 +109,120 @@ mod tests {
             format!("xapp-{SENTINEL}\nxoxp-{SENTINEL}\nxoxb-{SENTINEL}").as_bytes()
         )
         .is_err());
+        let trimmed = parse_hosted_submission(
+            format!("  xapp-{SENTINEL} \r\n xoxb-{SENTINEL}\t\n xoxp-{SENTINEL}  ").as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(
+            trimmed.app_token.expose_secret(),
+            format!("xapp-{SENTINEL}")
+        );
+        assert!(parse_hosted_submission(b"xapp-\nxoxb-value\nxoxp-value").is_err());
+    }
+
+    #[test]
+    fn hosted_setup_page_requires_capability_and_distinguishes_safe_failures() {
+        let page = hosted_setup::HOSTED_SETUP_PAGE;
+        assert!(page.contains("validCapability"));
+        assert!(page.contains("field.value.trim()"));
+        assert!(page.contains("validToken(values[0],'xapp-')"));
+        assert!(page.contains("validToken(values[1],'xoxb-')"));
+        assert!(page.contains("validToken(values[2],'xoxp-')"));
+        assert!(page.contains("response.status===400"));
+        assert!(page.contains("response.status===403"));
+        assert!(page.contains("response.status===503"));
+        assert!(page.contains("Slack or the Secret Store is unavailable"));
+        assert!(!page.contains(SENTINEL));
+    }
+
+    #[test]
+    fn hosted_completion_errors_separate_conflicts_from_store_outages() {
+        for code in [
+            "credential-shape",
+            "credential-verify-refused",
+            "credential-workspace",
+            "connection-conflict",
+            "app-token-conflict",
+        ] {
+            assert_eq!(
+                hosted_completion_error(SlackError::new(code)),
+                HostedCompletionError::Refused
+            );
+        }
+        for code in [
+            "credential-resolve",
+            "credential-verify-unavailable",
+            "credential-prepare",
+            "credential-commit",
+        ] {
+            assert_eq!(
+                hosted_completion_error(SlackError::new(code)),
+                HostedCompletionError::Unavailable
+            );
+        }
+    }
+
+    #[test]
+    fn slack_auth_test_refuses_only_explicit_invalid_credentials() {
+        let explicit = br#"{"ok":false,"error":"invalid_auth"}"#;
+        let error = classify_auth_test_response(reqwest::StatusCode::OK, None, explicit)
+            .unwrap_err();
+        assert_eq!(error.code, "credential-verify-refused");
+        assert_eq!(
+            hosted_completion_error(error),
+            HostedCompletionError::Refused
+        );
+
+        let valid = classify_auth_test_response(
+            reqwest::StatusCode::OK,
+            None,
+            br#"{"ok":true,"team_id":"T012345"}"#,
+        )
+        .unwrap();
+        assert_eq!(valid, "T012345");
+    }
+
+    #[test]
+    fn slack_auth_test_provider_and_transport_failures_are_unavailable() {
+        for (status, body) in [
+            (reqwest::StatusCode::TOO_MANY_REQUESTS, b"rate limited".as_slice()),
+            (reqwest::StatusCode::INTERNAL_SERVER_ERROR, b"failure".as_slice()),
+            (reqwest::StatusCode::OK, b"not-json".as_slice()),
+            (
+                reqwest::StatusCode::OK,
+                br#"{"ok":false,"error":"provider_changed"}"#.as_slice(),
+            ),
+            (reqwest::StatusCode::OK, br#"{"ok":true}"#.as_slice()),
+        ] {
+            let error = classify_auth_test_response(status, None, body).unwrap_err();
+            assert_eq!(error.code, "credential-verify-unavailable");
+            assert_eq!(
+                hosted_completion_error(error),
+                HostedCompletionError::Unavailable
+            );
+        }
+
+        let oversized = vec![b'x'; MAX_AUTH_TEST_RESPONSE_BYTES + 1];
+        assert_eq!(
+            classify_auth_test_response(reqwest::StatusCode::OK, None, &oversized)
+                .unwrap_err()
+                .code,
+            "credential-verify-unavailable"
+        );
+        assert_eq!(
+            classify_auth_test_response(
+                reqwest::StatusCode::OK,
+                Some(MAX_AUTH_TEST_RESPONSE_BYTES as u64 + 1),
+                br#"{"ok":true,"team_id":"T012345"}"#,
+            )
+            .unwrap_err()
+            .code,
+            "credential-verify-unavailable"
+        );
+        assert_eq!(
+            hosted_completion_error(SlackError::new("credential-verify-unavailable")),
+            HostedCompletionError::Unavailable
+        );
     }
 
     #[test]
@@ -304,6 +454,71 @@ mod tests {
             backend.hosted_completion_page(&created.connect_session_ref),
             Err(HostedCompletionError::NotFound)
         ));
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn invalid_hosted_capability_cannot_consume_a_connect_session() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let created = backend
+            .inner
+            .create_session(&owner(), "Development Slack".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(
+            backend
+                .complete_hosted_session(
+                    &created.connect_session_ref,
+                    &"0".repeat(64),
+                    HostedCompletionSubmission::new(
+                        format!("xapp-{SENTINEL}\nxoxb-{SENTINEL}\nxoxp-{SENTINEL}").into_bytes(),
+                    ),
+                )
+                .await,
+            Err(HostedCompletionError::Refused)
+        );
+        assert!(backend.owns_hosted_completion(&created.connect_session_ref));
+        assert!(matches!(
+            backend.hosted_completion_page(&created.connect_session_ref),
+            Ok(HostedCompletionPage {
+                title: "Connect Slack",
+                ..
+            })
+        ));
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn slack_readiness_is_value_free_and_tracks_the_secret_store() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(UnavailableStore),
+            false,
+        )
+        .await
+        .unwrap();
+        let error = backend.ready().await.unwrap_err();
+        assert!(!error.to_string().contains(SENTINEL));
         backend.shutdown().await;
     }
 

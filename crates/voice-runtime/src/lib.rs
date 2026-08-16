@@ -50,6 +50,9 @@ impl DependencyError {
 /// Resolve operation-scoped SIP credentials after admission; values remain inside the runtime.
 #[async_trait]
 pub trait CredentialSource: Send + Sync {
+    /// Check the configured credential dependency without resolving an operation-scoped value.
+    async fn ready(&self) -> Result<(), DependencyError>;
+
     async fn resolve(&self, admitted: &AdmittedVoicePlan)
         -> Result<CredentialSet, DependencyError>;
 }

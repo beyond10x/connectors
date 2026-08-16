@@ -6,6 +6,10 @@ telephony port, issues an ephemeral proof-bound authority, connects outward to t
 application endpoint, starts the `b10x.voice.v1` RTVBP binding, and supervises control,
 signals, duplex media, keepalive, lease, and termination as one task.
 
+Every `CredentialSource` must also implement a value-free readiness check. A stored SIP source uses
+that check to prove only its injected Secret Store dependency; it never resolves a credential or
+probes the SIP provider before an admitted operation.
+
 `dial_establishment_channel()` is the operation-serving seam. Its observer emits exactly one
 serializable `SipDialEstablished` receipt after both SIP and the authenticated application binding
 are ready, while `run_outbound` continues supervising the live session. A terminal result that wins

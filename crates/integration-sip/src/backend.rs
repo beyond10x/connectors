@@ -24,7 +24,8 @@ use protocol::sip::{
 };
 use service::{admit_voice_dial, AdmittedVoicePlan};
 use service::{
-    plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
+    plan_operation, BackendCapabilities, BackendReadinessError, ConnectorBackend,
+    PlanningEnvironment, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 use tokio::sync::{watch, Semaphore};
@@ -61,6 +62,10 @@ pub struct LaunchedSession {
 /// Socket-owning runtime seam. Tests can prove operation semantics without opening SIP/RTVBP.
 #[async_trait]
 pub trait SessionLauncher: Send + Sync + 'static {
+    /// Check mandatory launch dependencies without opening a provider connection or reading a
+    /// credential value.
+    async fn ready(&self) -> Result<(), LaunchError>;
+
     async fn launch(&self, admitted: AdmittedVoicePlan) -> Result<LaunchedSession, LaunchError>;
 }
 
@@ -502,6 +507,13 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
 
 #[async_trait]
 impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
+    async fn ready(&self) -> Result<(), BackendReadinessError> {
+        self.launcher
+            .ready()
+            .await
+            .map_err(|_| BackendReadinessError)
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities::OPERATIONS
     }
@@ -727,6 +739,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     use protocol::operation::{
         DescribeRequest, InvokeRequest, OperationRequest, OperationResult, SearchRequest,
@@ -740,12 +753,21 @@ mod tests {
 
     #[derive(Default)]
     struct FakeLauncher {
+        unavailable: AtomicBool,
         routes: Mutex<Vec<String>>,
         completion: Mutex<Option<watch::Sender<Option<SessionTermination>>>>,
     }
 
     #[async_trait]
     impl SessionLauncher for FakeLauncher {
+        async fn ready(&self) -> Result<(), LaunchError> {
+            if self.unavailable.load(Ordering::Acquire) {
+                Err(LaunchError::new("test_dependency_unavailable"))
+            } else {
+                Ok(())
+            }
+        }
+
         async fn launch(
             &self,
             admitted: AdmittedVoicePlan,
@@ -823,6 +845,19 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         let root = tempfile::tempdir().unwrap();
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         root
+    }
+
+    #[tokio::test]
+    async fn readiness_delegates_to_the_mandatory_launcher_probe_without_launching() {
+        let root = state_root();
+        let launcher = Arc::new(FakeLauncher::default());
+        let backend =
+            SipOperationBackend::new(config(), Arc::clone(&launcher), root.path()).unwrap();
+
+        backend.ready().await.unwrap();
+        launcher.unavailable.store(true, Ordering::Release);
+        assert_eq!(backend.ready().await, Err(BackendReadinessError));
+        assert!(lock(&launcher.routes).is_empty());
     }
 
     async fn description_ref(

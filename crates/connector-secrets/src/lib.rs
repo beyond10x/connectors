@@ -149,6 +149,12 @@ use async_trait::async_trait;
 /// construction*, not a global lookup.
 #[async_trait]
 pub trait SecretStore: Send + Sync {
+    /// Check whether this already-configured store can currently serve requests without reading a
+    /// credential value. Every implementation must state its readiness posture explicitly;
+    /// in-process stores may return success after construction, while remote stores perform a
+    /// value-free transport/authentication probe.
+    async fn ready(&self) -> Result<(), StoreError>;
+
     /// Read the value at `reference`.
     ///
     /// # Errors

@@ -1,5 +1,7 @@
 //! Slack Socket Mode Integration, Connection custody, and durable event delivery.
 
+mod hosted_setup;
+
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read as _, Write as _};
@@ -43,9 +45,14 @@ use zeroize::Zeroizing;
 
 use connectors_config::{InitiationConfig, SlackIntegrationConfig};
 use service::{
-    BackendCapabilities, ConnectSessionLifecycle, ConnectSessionLifecycleError,
-    ConnectSessionTerminal, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
-    HostedCompletionSubmission, PrincipalContext,
+    BackendCapabilities, BackendReadinessError, ConnectSessionLifecycle,
+    ConnectSessionLifecycleError, ConnectSessionTerminal, ConnectorBackend, HostedCompletionError,
+    HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
+};
+
+use hosted_setup::{
+    classify_auth_test_response, hosted_completion_error, parse_hosted_submission,
+    random_capability, valid_hosted_capability, MAX_AUTH_TEST_RESPONSE_BYTES,
 };
 
 const INTEGRATION_REF: &str = "slack";
@@ -58,7 +65,6 @@ const SOCKET_BINDING_REF: &str = "com.slack.api:v1#socket";
 const STATE_VERSION: u8 = 2;
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_APP_TOKEN_BYTES: usize = 1024;
-const MAX_HOSTED_SUBMISSION_BYTES: usize = 8 * 1024;
 const MAX_STATE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_EVENT_STORE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
@@ -222,13 +228,6 @@ struct SocketTicket {
     url: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct AuthTestResponse {
-    ok: bool,
-    #[serde(default)]
-    team_id: Option<String>,
-}
-
 /// Slack's transport envelope. Only the inner `payload.event` is projected to a Connector event.
 #[derive(Deserialize)]
 struct SocketEnvelope {
@@ -364,6 +363,14 @@ impl SlackBackend {
 
 #[async_trait]
 impl ConnectorBackend for SlackBackend {
+    async fn ready(&self) -> Result<(), BackendReadinessError> {
+        self.inner
+            .credential_store
+            .ready()
+            .await
+            .map_err(|_| BackendReadinessError)
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
@@ -440,10 +447,7 @@ impl ConnectorBackend for SlackBackend {
         if !self.owns_hosted_completion(session_ref) {
             return Err(HostedCompletionError::NotFound);
         }
-        Ok(HostedCompletionPage {
-            title: "Connect Slack",
-            html: HOSTED_SETUP_PAGE,
-        })
+        Ok(hosted_setup::completion_page())
     }
 
     async fn complete_hosted_session(
@@ -452,14 +456,22 @@ impl ConnectorBackend for SlackBackend {
         capability: &str,
         submission: HostedCompletionSubmission,
     ) -> Result<(), HostedCompletionError> {
-        let expected = lock(&self.inner.hosted_sessions)
-            .remove(session_ref)
-            .ok_or(HostedCompletionError::NotFound)?;
-        let actual: [u8; 32] = Sha256::digest(capability.as_bytes()).into();
-        if !constant_time_equal(&expected.capability_sha256, &actual) {
-            let _ = lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
-            lock(&self.inner.session_owners).remove(session_ref);
+        self.inner.expire_hosted_sessions();
+        if !valid_hosted_capability(capability) {
             return Err(HostedCompletionError::Refused);
+        }
+        let actual: [u8; 32] = Sha256::digest(capability.as_bytes()).into();
+        {
+            let mut sessions = lock(&self.inner.hosted_sessions);
+            let expected = sessions
+                .get(session_ref)
+                .ok_or(HostedCompletionError::NotFound)?;
+            if !constant_time_equal(&expected.capability_sha256, &actual) {
+                return Err(HostedCompletionError::Refused);
+            }
+            sessions
+                .remove(session_ref)
+                .expect("the checked hosted session remains present");
         }
         let status = lock(&self.inner.sessions)
             .status(session_ref)
@@ -481,11 +493,11 @@ impl ConnectorBackend for SlackBackend {
         };
         let team_id = match self.inner.verify_workspace_credentials(&credentials).await {
             Ok(team_id) => team_id,
-            Err(_) => {
+            Err(error) => {
                 let _ =
                     lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
                 lock(&self.inner.session_owners).remove(session_ref);
-                return Err(HostedCompletionError::Refused);
+                return Err(hosted_completion_error(error));
             }
         };
         let owner_subject = lock(&self.inner.session_owners)
@@ -505,10 +517,10 @@ impl ConnectorBackend for SlackBackend {
                     .map_err(|_| HostedCompletionError::Unavailable)?;
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let _ =
                     lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
-                Err(HostedCompletionError::Unavailable)
+                Err(hosted_completion_error(error))
             }
         }
     }
@@ -1448,37 +1460,28 @@ impl SlackInner {
             .bearer_auth(token.expose_secret())
             .send()
             .await
-            .map_err(|_| SlackError::new("credential-verify"))?;
+            .map_err(|_| SlackError::new("credential-verify-unavailable"))?;
         if !response.status().is_success()
             || response
                 .content_length()
-                .is_some_and(|length| length > 64 * 1024)
+                .is_some_and(|length| length > MAX_AUTH_TEST_RESPONSE_BYTES as u64)
         {
-            return Err(SlackError::new("credential-verify"));
+            return Err(SlackError::new("credential-verify-unavailable"));
         }
-        let mut bytes = Zeroizing::new(Vec::new());
+        let status = response.status();
+        let content_length = response.content_length();
+        let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_AUTH_TEST_RESPONSE_BYTES));
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|_| SlackError::new("credential-verify"))?
+            .map_err(|_| SlackError::new("credential-verify-unavailable"))?
         {
-            if bytes.len().saturating_add(chunk.len()) > 64 * 1024 {
-                return Err(SlackError::new("credential-verify"));
+            if bytes.len().saturating_add(chunk.len()) > MAX_AUTH_TEST_RESPONSE_BYTES {
+                return Err(SlackError::new("credential-verify-unavailable"));
             }
             bytes.extend_from_slice(&chunk);
         }
-        let verified: AuthTestResponse =
-            serde_json::from_slice(&bytes).map_err(|_| SlackError::new("credential-verify"))?;
-        let team_id = verified
-            .ok
-            .then_some(verified.team_id)
-            .flatten()
-            .filter(|team| {
-                (2..=64).contains(&team.len())
-                    && team.bytes().all(|byte| byte.is_ascii_alphanumeric())
-            })
-            .ok_or_else(|| SlackError::new("credential-verify"))?;
-        Ok(team_id)
+        classify_auth_test_response(status, content_length, &bytes)
     }
 
     fn app_credential_ref(&self) -> Result<CredentialRef, SlackError> {
@@ -2050,43 +2053,6 @@ fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {
     SecretProposalDigest::from_protocol_bytes(digest.finalize().into())
 }
 
-fn parse_hosted_submission(bytes: &[u8]) -> Result<SlackCredentials, HostedCompletionError> {
-    if bytes.is_empty() || bytes.len() > MAX_HOSTED_SUBMISSION_BYTES {
-        return Err(HostedCompletionError::Invalid);
-    }
-    let value = std::str::from_utf8(bytes).map_err(|_| HostedCompletionError::Invalid)?;
-    let mut values = value.split('\n');
-    let app = values.next().ok_or(HostedCompletionError::Invalid)?;
-    let bot = values.next().ok_or(HostedCompletionError::Invalid)?;
-    let user = values.next().ok_or(HostedCompletionError::Invalid)?;
-    if values.next().is_some()
-        || !valid_slack_token(app, "xapp-")
-        || !valid_slack_token(bot, "xoxb-")
-        || !valid_slack_token(user, "xoxp-")
-    {
-        return Err(HostedCompletionError::Invalid);
-    }
-    Ok(SlackCredentials {
-        app_token: Secret::new(app),
-        bot_token: Some(Secret::new(bot)),
-        user_token: Some(Secret::new(user)),
-    })
-}
-
-fn valid_slack_token(value: &str, prefix: &str) -> bool {
-    value.starts_with(prefix)
-        && value.len() <= 2048
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'"' | b'\\'))
-}
-
-fn random_capability() -> Result<String, SlackError> {
-    let mut bytes = [0_u8; 32];
-    getrandom::fill(&mut bytes).map_err(|_| SlackError::new("randomness"))?;
-    Ok(hex::encode(bytes))
-}
-
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     let mut difference = left.len() ^ right.len();
     for index in 0..left.len().max(right.len()) {
@@ -2097,8 +2063,6 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     }
     difference == 0
 }
-
-const HOSTED_SETUP_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect Slack</title><style>body{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}input,button{box-sizing:border-box;width:100%;padding:.8rem;margin:.5rem 0}button{cursor:pointer}.hint{color:#aaa}</style><h1>Connect Slack</h1><p>These credentials go directly to hosted Connectors and are committed to its SecretStore. Zwirn never receives them.</p><form><label>Socket Mode app token<input name="app" type="password" autocomplete="off" placeholder="xapp-…" required></label><label>Companion bot token<input name="bot" type="password" autocomplete="off" placeholder="xoxb-…" required></label><label>Your user token<input name="user" type="password" autocomplete="off" placeholder="xoxp-…" required></label><button>Connect</button></form><p class="hint">The bot token handles mentions and replies. The user token performs reads as you.</p><p id="status"></p><script>const capability=new URLSearchParams(location.hash.slice(1)).get('token');history.replaceState(null,'',location.pathname+'#ready');document.querySelector('form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;const status=document.querySelector('#status');const fields=[form.elements.app,form.elements.bot,form.elements.user];try{const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Connect-Session':capability},body:fields.map(field=>field.value).join('\n')});fields.forEach(field=>field.value='');status.textContent=response.ok?'Slack connected. You may close this tab.':'Slack connection was refused.'}catch{fields.forEach(field=>field.value='');status.textContent='Connectors is unavailable.'}});</script>"#;
 
 fn decode_transaction(encoded: &str) -> Result<SecretTransactionId, SlackError> {
     let bytes = hex::decode(encoded).map_err(|_| SlackError::new("transaction-state"))?;

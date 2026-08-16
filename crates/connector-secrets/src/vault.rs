@@ -288,6 +288,12 @@ impl<T: VaultTransport, L: Layout> VaultStore<T, L> {
         format!("{}/v1/{}/metadata/{path}", self.base_url, self.mount)
     }
 
+    /// A value-free endpoint which proves both Vault reachability and acceptance of this store's
+    /// already-configured token without naming a credential address.
+    fn readiness_url(&self) -> String {
+        format!("{}/v1/auth/token/lookup-self", self.base_url)
+    }
+
     /// Send, and turn "no answer" into [`StoreError::Unreachable`].
     async fn send(
         &self,
@@ -360,6 +366,17 @@ fn status_error(status: u16, path: &str) -> StoreError {
 
 #[async_trait]
 impl<T: VaultTransport, L: Layout + Send + Sync> SecretStore for VaultStore<T, L> {
+    async fn ready(&self) -> Result<(), StoreError> {
+        const READINESS_PATH: &str = "vault:auth/token/lookup-self";
+        let response = self
+            .send(Method::Get, self.readiness_url(), READINESS_PATH, None)
+            .await?;
+        match response.status() {
+            200 => Ok(()),
+            status => Err(status_error(status, READINESS_PATH)),
+        }
+    }
+
     async fn get(&self, reference: &CredentialRef) -> Result<Secret, StoreError> {
         let path = self.layout.render(reference);
         let url = self.data_url(&path);
@@ -595,6 +612,7 @@ mod tests {
         "https://vault.invalid:8200/v1/secret/data/tenants/9f3a4b2c/com.zendesk.api/support/api_token";
     const METADATA_URL: &str =
         "https://vault.invalid:8200/v1/secret/metadata/tenants/9f3a4b2c/com.zendesk.api/support/api_token";
+    const READINESS_URL: &str = "https://vault.invalid:8200/v1/auth/token/lookup-self";
 
     /// A [`VaultTransport`] that answers from a script and records what it was asked.
     ///
@@ -708,6 +726,20 @@ mod tests {
 
     fn store<T: VaultTransport>(transport: T) -> VaultStore<T> {
         VaultStore::new(transport, BASE, Secret::new(SENTINEL_TOKEN))
+    }
+
+    #[tokio::test]
+    async fn readiness_uses_token_self_lookup_without_a_credential_address() {
+        let store = store(Recorded::new().reply(Method::Get, READINESS_URL, 200, "{}"));
+
+        store.ready().await.expect("ready");
+
+        let requests = store.transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, Method::Get);
+        assert_eq!(requests[0].url, READINESS_URL);
+        assert!(requests[0].body.is_none());
+        assert!(!requests[0].url.contains("tenants/"));
     }
 
     async fn http_transport_answer(

@@ -25,6 +25,13 @@ mod tests {
 
     #[async_trait]
     impl SecretStore for FailingStore {
+        async fn ready(&self) -> Result<(), StoreError> {
+            Err(StoreError::Unreachable {
+                path: "test".to_owned(),
+                reason: "injected failure".to_owned(),
+            })
+        }
+
         async fn get(&self, _reference: &CredentialRef) -> Result<Secret, StoreError> {
             Err(StoreError::NotFound {
                 path: "test".to_owned(),
@@ -104,6 +111,26 @@ alertmanager = "grant:alertmanager"
 "#,
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn readiness_checks_only_the_mandatory_credential_store() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let executor = Arc::new(FakeExecutor::default());
+        let backend = MonitoringBackend::with_executor(
+            owner,
+            policy(),
+            root.path(),
+            Arc::new(FailingStore),
+            credential_ref,
+            Arc::clone(&executor),
+        );
+
+        assert_eq!(backend.ready().await, Err(BackendReadinessError));
+        assert!(lock(&executor.requests).is_empty());
     }
 
     #[tokio::test]

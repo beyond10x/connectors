@@ -34,8 +34,8 @@ use protocol::operation::{
 use reqwest::redirect::Policy;
 use serde_json::Value;
 use service::{
-    plan_operation, BackendCapabilities, ConnectSessionLifecycle, ConnectSessionTerminal,
-    ConnectorBackend, PlanningEnvironment, PrincipalContext,
+    plan_operation, BackendCapabilities, BackendReadinessError, ConnectSessionLifecycle,
+    ConnectSessionTerminal, ConnectorBackend, PlanningEnvironment, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 use tokio::task::JoinHandle;
@@ -278,6 +278,14 @@ impl MonitoringBackend {
 
 #[async_trait]
 impl ConnectorBackend for MonitoringBackend {
+    async fn ready(&self) -> Result<(), BackendReadinessError> {
+        self.inner
+            .credential_store
+            .ready()
+            .await
+            .map_err(|_| BackendReadinessError)
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
