@@ -1,11 +1,11 @@
-version = 1
+version = 2
 origin = "repository-authored"
 authored_at = "2026-08-16"
 reviewed_at = "2026-08-16"
 provider_path = "providers/b10x.toml"
-provider_sha256 = "4befa22091f40e9d74042ecba7d1ef6a1550ef20c1a6e60c052899d5356feaf7"
-coverage = "exact-shipped-native-and-b10x-service-capability-surface"
-purpose = "Authoritative repository-owned source for B10x native Connector members and the selected Work and Ontology service operations. Native speech and browser operations remain behind their closed drivers. Work and Ontology wire contracts are vendored byte-for-byte from their owner repositories and reached only through deployment-owned private origins."
+provider_sha256 = "bb4d8f0aaaeef583641d62dd1a0809ab513ad2b67dab64b2e371c4cfdd9b7cce"
+coverage = "exact-shipped-native-and-module-operation-event-capability-surface"
+purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work and Ontology module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte from one immutable b10x/modules revision and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
 references = [
   "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -14,7 +14,18 @@ references = [
   "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
   "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/modules/tree/46a0281988266c5101bafb15f226d039f8b0e338",
 ]
+
+# The source revision is exact, but these manifests deliberately still identify development
+# bundles with the all-zero release digest. Catalog admission therefore proves contract bytes, not
+# release-signature parity; legacy repositories remain unarchived until real signed bundle digests
+# and consumer overlap satisfy the module retirement gate.
+module_repository = "https://github.com/b10x/modules"
+module_revision = "46a0281988266c5101bafb15f226d039f8b0e338"
+module_release_version = "0.2.0-dev.1"
+module_release_stability = "development"
+module_release_bundle_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 
 [[spec]]
 service = "knowledge"
@@ -30,4 +41,40 @@ owner_repository = "https://github.com/b10x/work"
 owner_path = "contracts/work/v0alpha1/openapi.json"
 vendored_path = "specs/b10x/work-v0alpha1.openapi.json"
 sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "knowledge"
+kind = "openapi"
+owner_repository = "https://github.com/b10x/modules"
+owner_revision = "46a0281988266c5101bafb15f226d039f8b0e338"
+owner_path = "modules/ontology/contracts/ontology/v0alpha2/openapi.json"
+owner_manifest_path = "modules/ontology/contracts/ontology/v0alpha2/manifest.json"
+owner_manifest_sha256 = "0ddb01b0b7509513c5e61e0fba1f1d3d80027a543ca01c5a2ba2c886c24caab7"
+vendored_path = "specs/b10x/ontology-v0alpha2.openapi.json"
+sha256 = "f3af3649173addfb8a49ab04b3dc9d9fb6eb745632316e1a8ab12cd7f62ac14c"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "tasks"
+kind = "openapi"
+owner_repository = "https://github.com/b10x/modules"
+owner_revision = "46a0281988266c5101bafb15f226d039f8b0e338"
+owner_path = "modules/work/contracts/work/v1/openapi.json"
+owner_manifest_path = "modules/work/contracts/work/v1/module.json"
+owner_manifest_sha256 = "5b77dd4e510fdf812d4a6bac4045bb29a22feda3db095de2a86237372b35d934"
+vendored_path = "specs/b10x/work-v1.openapi.json"
+sha256 = "6feffb689878a8e664c6a9ab1d4c25c536193ed8baebcfb392860d7b00ec0630"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "tasks"
+kind = "asyncapi"
+owner_repository = "https://github.com/b10x/modules"
+owner_revision = "46a0281988266c5101bafb15f226d039f8b0e338"
+owner_path = "modules/work/contracts/work/v1/asyncapi.yaml"
+owner_manifest_path = "modules/work/contracts/work/v1/module.json"
+owner_manifest_sha256 = "5b77dd4e510fdf812d4a6bac4045bb29a22feda3db095de2a86237372b35d934"
+vendored_path = "specs/b10x/work-v1.asyncapi.yaml"
+sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
 vendoring = "exact-bytes"
