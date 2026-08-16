@@ -124,8 +124,9 @@ note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sampl
 
 [[source]]
 id = "b10x-owned-contracts"
-kind = "provider-and-openapi-contracts"
+kind = "provider-openapi-and-asyncapi-contracts"
 origin = "repository-authored"
+upstream = "https://github.com/b10x/modules (commit 46a0281988266c5101bafb15f226d039f8b0e338)"
 references = [
   "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -134,11 +135,12 @@ references = [
   "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
   "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/modules/tree/46a0281988266c5101bafb15f226d039f8b0e338",
 ]
 refresh = "authored-review"
 pins = "specs/b10x.provenance.toml"
-consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
-note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus selected operations from the exact Work and Ontology owner contracts. Deployment Connections resolve all peers and private HTTP origins; callers never select them. Browser interaction remains outside this surface."
+consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/ontology-v0alpha2.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "specs/b10x/work-v1.openapi.json", "specs/b10x/work-v1.asyncapi.yaml", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
+note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus explicitly selected operations and events from exact Work and Ontology module contracts. `b10x/work` and `b10x/ontology` remain durable domain-owner identities; implementation source now lives in b10x/modules. Deployment Connections resolve all peers and private HTTP origins, while persistence remains behind each module runtime. The v0alpha1 bytes remain temporarily as migration evidence and are not active Provider inputs. Browser interaction remains outside this surface."
 
 [[source]]
 id = "babelforce-openapi"

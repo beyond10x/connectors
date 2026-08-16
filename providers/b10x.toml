@@ -27,16 +27,16 @@ tags = ["telephony"]
 # above retain their identifiers while named siblings are added.
 legacy = true
 
-# B10x's own Ontology service. Unlike the native drivers above, its members are ordinary HTTP
-# operations declared from the service's own released contract, so a caller reaches knowledge under
-# the same Grant and audit as any other Connector member. The Connection resolves the deployment;
-# no origin crosses this boundary.
+# B10x's Ontology module. Its durable owner identity remains `b10x/ontology` while the
+# source now lives in the `b10x/modules` collection. The Connection resolves the deployment;
+# no origin or persistence adapter crosses this boundary.
 [[services]]
 name = "knowledge"
 tags = ["knowledge-base"]
-description = "Bounded read access to the independent B10x Ontology: query, snapshot, explain"
+description = "Ontology branches, claims, schemas, proposals, packs, snapshots, and explanations"
 
-# Work owns generic coordination state. The deployment resolves the private Work origin; no HTTP
+# Work's durable owner identity remains `b10x/work` while its implementation lives beside
+# Ontology in `b10x/modules`. The deployment resolves the private module origin; no HTTP
 # destination, performer identity, Agent core, or storage adapter is selectable by the caller.
 [[services]]
 name = "tasks"
@@ -45,64 +45,286 @@ description = "Requests, tasks, optimistic status updates, and ordered Work even
 
 [[spec]]
 service = "knowledge"
-path = "specs/b10x/ontology-v0alpha1.openapi.json"
-upstream_version = "ontology v0alpha1"
+path = "specs/b10x/ontology-v0alpha2.openapi.json"
+upstream_version = "ontology module v0alpha2 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
+sha256 = "f3af3649173addfb8a49ab04b3dc9d9fb6eb745632316e1a8ab12cd7f62ac14c"
 
 [[patch.operations]]
 service = "knowledge"
-select = "queryClaims"
+select = "ontology_claim_query"
 rename = "knowledge-query"
+description = "Query claims in one ontology branch using the module's bounded typed query contract"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
 effects = ["read", "network"]
+semantic_effects = ["read"]
 interaction_shape = "unary"
 protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network", "file_secret"]
+expose = true
 
 [[patch.operations]]
 service = "knowledge"
-select = "explainClaim"
+select = "ontology_claim_explain"
 rename = "knowledge-explain"
+description = "Explain one ontology claim and its supporting provenance in a branch"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
 effects = ["read", "network"]
+semantic_effects = ["read"]
 interaction_shape = "unary"
 protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network", "file_secret"]
+expose = true
 
 [[patch.operations]]
 service = "knowledge"
-select = "createContextSnapshot"
+select = "ontology_snapshot_create"
 rename = "knowledge-snapshot"
+description = "Create a deterministic read-only snapshot of one ontology branch"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
 effects = ["read", "network"]
+semantic_effects = ["read"]
 interaction_shape = "unary"
 protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_branch_list"
+rename = "ontology-branch-list"
+description = "List ontology branches visible to the admitted caller"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_branch_create"
+rename = "ontology-branch-create"
+description = "Create one ontology branch"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_branch_schema_extend"
+rename = "ontology-branch-schema-extend"
+description = "Extend the schema admitted by one ontology branch under an idempotency identity"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_claim_assert"
+rename = "ontology-claim-assert"
+description = "Assert one typed claim in an ontology branch under an idempotency identity"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_claim_retract"
+rename = "ontology-claim-retract"
+description = "Retract one claim from an ontology branch under an idempotency identity"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_pack_install"
+rename = "ontology-pack-install"
+description = "Install an ontology pack, changing the human-visible governed knowledge surface"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "human_visible"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_proposal_create"
+rename = "ontology-proposal-create"
+description = "Create one governed ontology change proposal"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_proposal_get"
+rename = "ontology-proposal-get"
+description = "Read one governed ontology change proposal"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_proposal_evaluate"
+rename = "ontology-proposal-evaluate"
+description = "Evaluate a governed ontology proposal and publish its human-visible decision state"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "human_visible"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_proposal_approval_record"
+rename = "ontology-proposal-approval-record"
+description = "Record an approval decision on one governed ontology proposal"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "human_visible"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_proposal_promote"
+rename = "ontology-proposal-promote"
+description = "Promote an approved ontology proposal into the human-visible governed state"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "human_visible"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "knowledge"
+select = "ontology_schema_register"
+rename = "ontology-schema-register"
+description = "Register a governed ontology schema visible to module consumers"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "human_visible"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
 
 [[spec]]
 service = "tasks"
-path = "specs/b10x/work-v0alpha1.openapi.json"
-upstream_version = "work v0alpha1"
+path = "specs/b10x/work-v1.openapi.json"
+upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
+sha256 = "6feffb689878a8e664c6a9ab1d4c25c536193ed8baebcfb392860d7b00ec0630"
+
+[[spec]]
+kind = "asyncapi"
+service = "tasks"
+path = "specs/b10x/work-v1.asyncapi.yaml"
+upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
+fetched_at = "2026-08-16T00:00:00Z"
+sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
 
 [[patch.operations]]
 service = "tasks"
-select = "createWorkRequest"
+select = "work_request_create"
 rename = "work-request-create"
+description = "Create one Work request under an idempotency identity"
 direction = "write"
 risk = "medium"
 idempotency = "non_idempotent"
@@ -113,11 +335,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "getWorkRequest"
+select = "work_request_get"
 rename = "work-request-get"
+description = "Get one Work request by its opaque identifier"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
@@ -128,11 +352,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "listWorkRequests"
+select = "work_request_list"
 rename = "work-request-list"
+description = "List Work requests through the module's bounded cursor contract"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
@@ -143,11 +369,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "createWorkTask"
+select = "work_task_create"
 rename = "work-task-create"
+description = "Create one task under a Work request using an idempotency identity"
 direction = "write"
 risk = "medium"
 idempotency = "non_idempotent"
@@ -158,11 +386,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "getWorkTask"
+select = "work_task_get"
 rename = "work-task-get"
+description = "Get one Work task by its opaque identifier"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
@@ -173,11 +403,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "listWorkTasks"
+select = "work_task_list"
 rename = "work-task-list"
+description = "List Work tasks through the module's bounded cursor contract"
 direction = "read"
 risk = "low"
 idempotency = "idempotent"
@@ -188,11 +420,13 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
 [[patch.operations]]
 service = "tasks"
-select = "updateWorkTaskStatus"
+select = "work_task_status_update"
 rename = "work-task-status-update"
+description = "Update one Work task status using optimistic revision and idempotency identities"
 direction = "write"
 risk = "medium"
 idempotency = "non_idempotent"
@@ -203,21 +437,28 @@ protocol_driver = "http_v1"
 placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network"]
+expose = true
 
-[[patch.operations]]
+[[patch.events]]
 service = "tasks"
-select = "listWorkEvents"
-rename = "work-event-list"
-direction = "read"
-risk = "low"
-idempotency = "idempotent"
-effects = ["read", "network"]
-semantic_effects = ["read"]
-interaction_shape = "unary"
-protocol_driver = "http_v1"
-placement_requirement = "connectors_deployment"
-implementation_form = "built_in"
-required_capabilities = ["private_network"]
+select = "work_request_created"
+rename = "request.created"
+description = "A Work request was committed"
+group = "Work"
+
+[[patch.events]]
+service = "tasks"
+select = "work_task_created"
+rename = "task.created"
+description = "A Work task was committed"
+group = "Work"
+
+[[patch.events]]
+service = "tasks"
+select = "work_task_status_changed"
+rename = "task.status-changed"
+description = "A Work task status transition was committed"
+group = "Work"
 
 # This repository-authored member is defined by the accepted native-voice architecture and the
 # closed `sip_v1` implementation. A caller supplies only a deployment-owned destination alias. The

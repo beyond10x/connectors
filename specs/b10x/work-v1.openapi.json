@@ -1,0 +1,1483 @@
+{
+  "components": {
+    "schemas": {
+      "work_request_create_input": {
+        "$defs": {
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "type": "string"
+          },
+          "references": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/work_request_create_input/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CreateRequest",
+        "type": "object"
+      },
+      "work_request_create_output": {
+        "$defs": {
+          "RequestStatus": {
+            "enum": [
+              "open",
+              "planned",
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/work_request_create_output/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_request_create_output/$defs/RequestStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "title": "WorkRequest",
+        "type": "object"
+      },
+      "work_request_create_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_request_get_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "IdPath",
+        "type": "object"
+      },
+      "work_request_get_output": {
+        "$defs": {
+          "RequestStatus": {
+            "enum": [
+              "open",
+              "planned",
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/work_request_get_output/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_request_get_output/$defs/RequestStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "title": "WorkRequest",
+        "type": "object"
+      },
+      "work_request_get_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_request_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "ListInput",
+        "type": "object"
+      },
+      "work_request_list_output": {
+        "$defs": {
+          "RequestStatus": {
+            "enum": [
+              "open",
+              "planned",
+              "active",
+              "completed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          },
+          "WorkRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "references": {
+                "items": {
+                  "$ref": "#/components/schemas/work_request_list_output/$defs/TypedRef"
+                },
+                "type": "array"
+              },
+              "revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/work_request_list_output/$defs/RequestStatus"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "revision",
+              "title",
+              "description",
+              "status",
+              "references",
+              "created_at_ms",
+              "updated_at_ms"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/work_request_list_output/$defs/WorkRequest"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page",
+        "type": "object"
+      },
+      "work_request_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_task_create_input": {
+        "$defs": {
+          "CreateTask": {
+            "additionalProperties": false,
+            "properties": {
+              "depends_on": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "default": "",
+                "type": "string"
+              },
+              "references": {
+                "default": [],
+                "items": {
+                  "$ref": "#/components/schemas/work_task_create_input/$defs/TypedRef"
+                },
+                "type": "array"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          },
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/work_task_create_input/$defs/CreateTask"
+          },
+          "path": {
+            "$ref": "#/components/schemas/work_task_create_input/$defs/IdPath"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "title": "PathBody",
+        "type": "object"
+      },
+      "work_task_create_output": {
+        "$defs": {
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/work_task_create_output/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_task_create_output/$defs/TaskStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "title": "WorkTask",
+        "type": "object"
+      },
+      "work_task_create_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_task_get_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "IdPath",
+        "type": "object"
+      },
+      "work_task_get_output": {
+        "$defs": {
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/work_task_get_output/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_task_get_output/$defs/TaskStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "title": "WorkTask",
+        "type": "object"
+      },
+      "work_task_get_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_task_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "ListInput",
+        "type": "object"
+      },
+      "work_task_list_output": {
+        "$defs": {
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          },
+          "WorkTask": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "depends_on": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "references": {
+                "items": {
+                  "$ref": "#/components/schemas/work_task_list_output/$defs/TypedRef"
+                },
+                "type": "array"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/work_task_list_output/$defs/TaskStatus"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "request_id",
+              "revision",
+              "title",
+              "description",
+              "status",
+              "depends_on",
+              "references",
+              "created_at_ms",
+              "updated_at_ms"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/work_task_list_output/$defs/WorkTask"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page",
+        "type": "object"
+      },
+      "work_task_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "work_task_status_update_input": {
+        "$defs": {
+          "IdPath": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "UpdateTaskStatus": {
+            "additionalProperties": false,
+            "properties": {
+              "expected_revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/work_task_status_update_input/$defs/TaskStatus"
+              }
+            },
+            "required": [
+              "expected_revision",
+              "status"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/work_task_status_update_input/$defs/UpdateTaskStatus"
+          },
+          "path": {
+            "$ref": "#/components/schemas/work_task_status_update_input/$defs/IdPath"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "title": "PathBody",
+        "type": "object"
+      },
+      "work_task_status_update_output": {
+        "$defs": {
+          "TaskStatus": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "TypedRef": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "created_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/work_task_status_update_output/$defs/TypedRef"
+            },
+            "type": "array"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/work_task_status_update_output/$defs/TaskStatus"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "revision",
+          "title",
+          "description",
+          "status",
+          "depends_on",
+          "references",
+          "created_at_ms",
+          "updated_at_ms"
+        ],
+        "title": "WorkTask",
+        "type": "object"
+      },
+      "work_task_status_update_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": true,
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ],
+        "title": "Problem",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "work module API",
+    "version": "0.2.0-dev.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/work/v2/requests": {
+      "get": {
+        "operationId": "work_request_list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_list_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_list_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-global-id": "work/request.list",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_request_list_input"
+        },
+        "x-b10x-risk-floor": "low"
+      },
+      "post": {
+        "operationId": "work_request_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/work_request_create_input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_create_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_create_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-global-id": "work/request.create",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_request_create_input"
+        },
+        "x-b10x-risk-floor": "medium"
+      }
+    },
+    "/api/work/v2/requests/{id}": {
+      "get": {
+        "operationId": "work_request_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_get_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_request_get_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-global-id": "work/request.get",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_request_get_input"
+        },
+        "x-b10x-risk-floor": "low"
+      }
+    },
+    "/api/work/v2/requests/{id}/tasks": {
+      "post": {
+        "operationId": "work_task_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/work_task_create_input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_create_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_create_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-global-id": "work/task.create",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_task_create_input"
+        },
+        "x-b10x-risk-floor": "medium"
+      }
+    },
+    "/api/work/v2/tasks": {
+      "get": {
+        "operationId": "work_task_list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_list_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_list_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-global-id": "work/task.list",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_task_list_input"
+        },
+        "x-b10x-risk-floor": "low"
+      }
+    },
+    "/api/work/v2/tasks/{id}": {
+      "get": {
+        "operationId": "work_task_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_get_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_get_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-global-id": "work/task.get",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_task_get_input"
+        },
+        "x-b10x-risk-floor": "low"
+      }
+    },
+    "/api/work/v2/tasks/{id}/status": {
+      "patch": {
+        "operationId": "work_task_status_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/work_task_status_update_input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_status_update_output"
+                }
+              }
+            },
+            "description": "Successful owner response"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/work_task_status_update_problem"
+                }
+              }
+            },
+            "description": "Typed module problem"
+          }
+        },
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-global-id": "work/task.status.update",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/work_task_status_update_input"
+        },
+        "x-b10x-risk-floor": "medium"
+      }
+    }
+  }
+}
