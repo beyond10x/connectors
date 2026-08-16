@@ -1,7 +1,7 @@
 # Connect Slack
 
-> Personal-local alpha. The final product presents this flow in **Settings → Connections**; the CLI
-> is the current first-party surface for the same operation.
+> Personal-local CLI and hosted Zwirn setup are available. Both are Connector-owned Connect
+> Sessions; neither sends provider credentials through Agent or a model.
 
 Ask whoever manages your Slack app to enable Socket Mode and subscribe it to the message events you
 want. Socket Mode needs an app-level `xapp` token with `connections:write`; receiving the selected
@@ -11,7 +11,7 @@ directly; credentials should not be sent to another person, agent, or harness. S
 [Socket Mode setup guide](https://docs.slack.dev/apis/events-api/using-socket-mode/) for the app-side
 steps.
 
-Then add Slack:
+For personal-local, add Slack with:
 
 ```sh
 connectors connect slack
@@ -42,11 +42,20 @@ is callable. The product discards the short-lived acquisition details and shows 
 Connection. Neither an agent nor its harness receives the credential or the one-use completion
 endpoint.
 
-For this personal-local alpha, the person configuring the deployment also owns the Slack app and
-the command currently collects only the app-level Socket Mode token. The catalog now declares the
-ordinary bot installation and the separate delegated-user OAuth flow exactly, including their
-scope-gated operations, but the general OAuth/scope-aware Connection runtime is M3 work and is not
-claimed by the current CLI.
+For personal-local, the command currently collects only the app-level Socket Mode token. Hosted
+Zwirn instead starts an HTTPS Connect Session and opens the exact same-origin setup page. That page
+accepts the Integration's app-level Socket Mode token plus one workspace's bot and delegated-user
+tokens and submits all three directly to hosted Connectors. The Connector validates that the bot
+and user belong to the same Slack workspace, prepares all credential changes in Vault, commits the
+transaction, and only then publishes a value-free workspace Connection. Zwirn learns only the
+terminal Connection reference.
+
+In the hosted companion flow, one Integration supervisor owns the Socket Mode WebSocket and routes
+events by Slack workspace to the correct Connection. It stays connected while Zwirn is offline.
+The bot credential receives mentions and performs `chat.postMessage`/reaction writes; the delegated
+user credential performs conversations-history and user-info reads. Mutating operations require
+normal correlated human approval. Zwirn pulls only normalized admitted events with a short-lived
+`connectors.events.read` token; it never receives the Socket Mode ticket or any Slack token.
 
 The finished product asks only for credentials required by the chosen features:
 

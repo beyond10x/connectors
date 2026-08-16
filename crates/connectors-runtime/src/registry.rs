@@ -12,7 +12,10 @@ use protocol::operation::{
     OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
     OperationSummary,
 };
-use service::{BackendCapabilities, ConnectorBackend, PrincipalContext};
+use service::{
+    BackendCapabilities, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
+    HostedCompletionSubmission, PrincipalContext,
+};
 use sha2::{Digest as _, Sha256};
 
 /// Closed, deterministic registry of configured Integration backends.
@@ -45,6 +48,13 @@ impl BackendRegistry {
         self.backends
             .iter()
             .filter(|backend| backend.owns_event(request))
+            .collect()
+    }
+
+    fn completion_claims(&self, session_ref: &str) -> Vec<&Arc<dyn ConnectorBackend>> {
+        self.backends
+            .iter()
+            .filter(|backend| backend.owns_hosted_completion(session_ref))
             .collect()
     }
 
@@ -291,9 +301,42 @@ impl ConnectorBackend for BackendRegistry {
         matches!(request, EventRequest::Search(_)) || !self.event_claims(request).is_empty()
     }
 
+    fn owns_hosted_completion(&self, session_ref: &str) -> bool {
+        !self.completion_claims(session_ref).is_empty()
+    }
+
+    fn hosted_completion_page(
+        &self,
+        session_ref: &str,
+    ) -> Result<HostedCompletionPage, HostedCompletionError> {
+        unique_completion_claim(self.completion_claims(session_ref))?
+            .hosted_completion_page(session_ref)
+    }
+
+    async fn complete_hosted_session(
+        &self,
+        session_ref: &str,
+        capability: &str,
+        submission: HostedCompletionSubmission,
+    ) -> Result<(), HostedCompletionError> {
+        unique_completion_claim(self.completion_claims(session_ref))?
+            .complete_hosted_session(session_ref, capability, submission)
+            .await
+    }
+
     async fn shutdown(&self) {
         futures_util::future::join_all(self.backends.iter().map(|backend| backend.shutdown()))
             .await;
+    }
+}
+
+fn unique_completion_claim(
+    claims: Vec<&Arc<dyn ConnectorBackend>>,
+) -> Result<&Arc<dyn ConnectorBackend>, HostedCompletionError> {
+    match claims.as_slice() {
+        [backend] => Ok(backend),
+        [] => Err(HostedCompletionError::NotFound),
+        _ => Err(HostedCompletionError::Unavailable),
     }
 }
 

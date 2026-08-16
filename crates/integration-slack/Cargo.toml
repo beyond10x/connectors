@@ -12,12 +12,15 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
+catalog = { version = "0.1.0", path = "../catalog" }
 connect-session-transport = { version = "0.1.0", path = "../connect-session-transport" }
 connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
+connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
 futures-util = "0.3"
 getrandom = "0.3"
 hex = "0.4"
+jsonschema = { version = "0.33", default-features = false }
 protocol = { version = "0.1.0", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 rustix = { version = "1.1.4", features = ["fs", "process"] }

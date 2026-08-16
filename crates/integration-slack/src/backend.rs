@@ -1,6 +1,6 @@
 //! Slack Socket Mode Integration, Connection custody, and durable event delivery.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
@@ -27,7 +27,11 @@ use protocol::event::{
     ChannelSummary as EventChannelSummary, DataEvent, EventError, EventErrorCode, EventProvenance,
     EventRequest, EventResult,
 };
-use protocol::operation::{OperationError, OperationErrorCode, OperationRequest, OperationResult};
+use protocol::operation::{
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
+    InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
+    OperationRequest, OperationResult, OperationSummary,
+};
 use reqwest::redirect::Policy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -40,22 +44,35 @@ use zeroize::Zeroizing;
 use connectors_config::{InitiationConfig, SlackIntegrationConfig};
 use service::{
     BackendCapabilities, ConnectSessionLifecycle, ConnectSessionLifecycleError,
-    ConnectSessionTerminal, ConnectorBackend, PrincipalContext,
+    ConnectSessionTerminal, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
+    HostedCompletionSubmission, PrincipalContext,
 };
 
 const INTEGRATION_REF: &str = "slack";
 const AUTHORITY: &str = "com.slack.api";
 const SERVICE: &str = "default";
 const APP_TOKEN_CREDENTIAL: &str = "app_token";
+const BOT_TOKEN_CREDENTIAL: &str = "bot_token";
+const USER_TOKEN_CREDENTIAL: &str = "user_token";
 const SOCKET_BINDING_REF: &str = "com.slack.api:v1#socket";
-const STATE_VERSION: u8 = 1;
+const STATE_VERSION: u8 = 2;
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_APP_TOKEN_BYTES: usize = 1024;
+const MAX_HOSTED_SUBMISSION_BYTES: usize = 8 * 1024;
 const MAX_STATE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_EVENT_STORE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_STORED_EVENTS: usize = 10_000;
 const MAX_SOCKET_MESSAGE_BYTES: usize = 1024 * 1024;
 const APPS_CONNECTIONS_OPEN: &str = "https://slack.com/api/apps.connections.open";
+const AUTH_TEST: &str = "https://slack.com/api/auth.test";
+const SLACK_ORIGIN: &str = "https://slack.com";
+const SLACK_OPERATIONS: [&str; 4] = [
+    "slack-chat-post-message",
+    "slack-conversations-history",
+    "slack-users-info",
+    "slack-reactions-add",
+];
 
 /// Redaction-safe Slack runtime failure.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -76,19 +93,42 @@ pub struct SlackBackend {
 }
 
 struct SlackInner {
-    owner: PrincipalContext,
+    admission: PrincipalAdmission,
+    completion_mode: CompletionMode,
     policy: SlackIntegrationConfig,
     state_root: PathBuf,
     credential_store: Arc<dyn PreparedSecretStore>,
     metadata: Mutex<StateFile>,
     sessions: Mutex<ConnectSessionLifecycle>,
+    session_owners: Mutex<BTreeMap<String, String>>,
+    hosted_sessions: Mutex<BTreeMap<String, HostedSession>>,
+    hosted_completion_lock: tokio::sync::Mutex<()>,
     event_store: Arc<EventStore>,
+    audit: AuditJournal,
     channel_states: Mutex<BTreeMap<String, ChannelState>>,
-    started_supervisors: Mutex<BTreeSet<String>>,
+    integration_channel_state: Mutex<ChannelState>,
+    supervisor_started: Mutex<bool>,
     shutdown: watch::Sender<bool>,
     tasks: Mutex<Vec<JoinHandle<()>>>,
     http: reqwest::Client,
     supervision_enabled: bool,
+}
+
+#[derive(Clone)]
+enum PrincipalAdmission {
+    Exact(PrincipalContext),
+    Tenant(String),
+}
+
+#[derive(Clone)]
+enum CompletionMode {
+    Local,
+    Hosted { public_origin: url::Url },
+}
+
+struct HostedSession {
+    capability_sha256: [u8; 32],
+    expires_at_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +160,16 @@ struct StoredConnection {
     grant_ref: String,
     initiation: InitiationConfig,
     allowed_events: Vec<String>,
+    #[serde(default)]
+    owner_subject: String,
+    #[serde(default)]
+    team_id: String,
+}
+
+struct SlackCredentials {
+    app_token: Secret,
+    bot_token: Option<Secret>,
+    user_token: Option<Secret>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +183,26 @@ struct EventStore {
     path: PathBuf,
     events: Mutex<Vec<StoredEvent>>,
     notify: Notify,
+}
+
+struct AuditJournal {
+    path: PathBuf,
+    state: Mutex<AuditJournalState>,
+}
+
+#[derive(Default)]
+struct AuditJournalState {
+    terminal_reservations: BTreeMap<String, u64>,
+}
+
+#[derive(Clone, Copy, Serialize)]
+struct AuditEvent<'a> {
+    audit_ref: &'a str,
+    operation_ref: &'a str,
+    connection_ref: &'a str,
+    tenant_id: &'a str,
+    actor_subject: &'a str,
+    outcome: &'a str,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +220,13 @@ struct SocketTicket {
     ok: bool,
     #[serde(default)]
     url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AuthTestResponse {
+    ok: bool,
+    #[serde(default)]
+    team_id: Option<String>,
 }
 
 /// Slack's transport envelope. Only the inner `payload.event` is projected to a Connector event.
@@ -173,11 +250,59 @@ impl SlackBackend {
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
     ) -> Result<Self, SlackError> {
-        Self::open_with_supervision(owner, policy, state_root, credential_store, true).await
+        Self::open_inner(
+            PrincipalAdmission::Exact(owner),
+            CompletionMode::Local,
+            policy,
+            state_root,
+            credential_store,
+            true,
+        )
+        .await
     }
 
+    /// Open the hosted Slack Integration for one Identity tenant. Connect Sessions complete over
+    /// the exact public Connector origin and every credential is committed through `credential_store`.
+    pub async fn open_hosted(
+        tenant_id: String,
+        public_origin: url::Url,
+        policy: SlackIntegrationConfig,
+        state_root: &Path,
+        credential_store: Arc<dyn PreparedSecretStore>,
+    ) -> Result<Self, SlackError> {
+        Self::open_inner(
+            PrincipalAdmission::Tenant(tenant_id),
+            CompletionMode::Hosted { public_origin },
+            policy,
+            state_root,
+            credential_store,
+            true,
+        )
+        .await
+    }
+
+    #[cfg(test)]
     async fn open_with_supervision(
         owner: PrincipalContext,
+        policy: SlackIntegrationConfig,
+        state_root: &Path,
+        credential_store: Arc<dyn PreparedSecretStore>,
+        supervision_enabled: bool,
+    ) -> Result<Self, SlackError> {
+        Self::open_inner(
+            PrincipalAdmission::Exact(owner),
+            CompletionMode::Local,
+            policy,
+            state_root,
+            credential_store,
+            supervision_enabled,
+        )
+        .await
+    }
+
+    async fn open_inner(
+        admission: PrincipalAdmission,
+        completion_mode: CompletionMode,
         policy: SlackIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
@@ -195,7 +320,8 @@ impl SlackBackend {
             .map_err(|_| SlackError::new("http-client"))?;
         let (shutdown, _) = watch::channel(false);
         let inner = Arc::new(SlackInner {
-            owner,
+            admission,
+            completion_mode,
             policy,
             state_root: state_root.to_path_buf(),
             credential_store,
@@ -204,9 +330,14 @@ impl SlackBackend {
                 ConnectSessionLifecycle::new(INTEGRATION_REF, MAX_CONNECT_SESSIONS)
                     .map_err(|_| SlackError::new("connect-session-lifecycle"))?,
             ),
+            session_owners: Mutex::new(BTreeMap::new()),
+            hosted_sessions: Mutex::new(BTreeMap::new()),
+            hosted_completion_lock: tokio::sync::Mutex::new(()),
             event_store,
+            audit: AuditJournal::new(state_root.join("slack-operation-audit.jsonl")),
             channel_states: Mutex::new(BTreeMap::new()),
-            started_supervisors: Mutex::new(BTreeSet::new()),
+            integration_channel_state: Mutex::new(ChannelState::Starting),
+            supervisor_started: Mutex::new(false),
             shutdown,
             tasks: Mutex::new(Vec::new()),
             http,
@@ -235,9 +366,29 @@ impl SlackBackend {
 impl ConnectorBackend for SlackBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
-            operations: false,
+            operations: true,
             connections: true,
             events: true,
+        }
+    }
+
+    fn owns_operation(&self, request: &OperationRequest) -> bool {
+        match request {
+            OperationRequest::Describe(request) => is_slack_operation(&request.operation_ref),
+            OperationRequest::Invoke(request) => {
+                is_slack_operation(&request.operation_ref)
+                    && lock(&self.inner.metadata)
+                        .connections
+                        .iter()
+                        .any(|connection| {
+                            connection.connection_ref == request.connection_ref
+                                && self.inner.connection_is_admitted(connection)
+                        })
+            }
+            OperationRequest::Search(_)
+            | OperationRequest::SessionStatus(_)
+            | OperationRequest::SessionTerminate(_)
+            | OperationRequest::SessionReconcile(_) => false,
         }
     }
 
@@ -276,16 +427,110 @@ impl ConnectorBackend for SlackBackend {
         }
     }
 
+    fn owns_hosted_completion(&self, session_ref: &str) -> bool {
+        matches!(self.inner.completion_mode, CompletionMode::Hosted { .. })
+            && lock(&self.inner.hosted_sessions).contains_key(session_ref)
+    }
+
+    fn hosted_completion_page(
+        &self,
+        session_ref: &str,
+    ) -> Result<HostedCompletionPage, HostedCompletionError> {
+        self.inner.expire_hosted_sessions();
+        if !self.owns_hosted_completion(session_ref) {
+            return Err(HostedCompletionError::NotFound);
+        }
+        Ok(HostedCompletionPage {
+            title: "Connect Slack",
+            html: HOSTED_SETUP_PAGE,
+        })
+    }
+
+    async fn complete_hosted_session(
+        &self,
+        session_ref: &str,
+        capability: &str,
+        submission: HostedCompletionSubmission,
+    ) -> Result<(), HostedCompletionError> {
+        let expected = lock(&self.inner.hosted_sessions)
+            .remove(session_ref)
+            .ok_or(HostedCompletionError::NotFound)?;
+        let actual: [u8; 32] = Sha256::digest(capability.as_bytes()).into();
+        if !constant_time_equal(&expected.capability_sha256, &actual) {
+            let _ = lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
+            lock(&self.inner.session_owners).remove(session_ref);
+            return Err(HostedCompletionError::Refused);
+        }
+        let status = lock(&self.inner.sessions)
+            .status(session_ref)
+            .ok_or(HostedCompletionError::NotFound)?;
+        if now_ms().is_none_or(|now| now >= status.expires_at_unix_ms) {
+            let _ = lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Expired);
+            lock(&self.inner.session_owners).remove(session_ref);
+            return Err(HostedCompletionError::Refused);
+        }
+        let _completion = self.inner.hosted_completion_lock.lock().await;
+        let credentials = match parse_hosted_submission(submission.expose_secret()) {
+            Ok(credentials) => credentials,
+            Err(error) => {
+                let _ =
+                    lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
+                lock(&self.inner.session_owners).remove(session_ref);
+                return Err(error);
+            }
+        };
+        let team_id = match self.inner.verify_workspace_credentials(&credentials).await {
+            Ok(team_id) => team_id,
+            Err(_) => {
+                let _ =
+                    lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
+                lock(&self.inner.session_owners).remove(session_ref);
+                return Err(HostedCompletionError::Refused);
+            }
+        };
+        let owner_subject = lock(&self.inner.session_owners)
+            .remove(session_ref)
+            .ok_or(HostedCompletionError::NotFound)?;
+        match self
+            .inner
+            .complete_connection(session_ref, owner_subject, team_id, credentials)
+            .await
+        {
+            Ok(connection_ref) => {
+                lock(&self.inner.sessions)
+                    .finish(
+                        session_ref,
+                        ConnectSessionTerminal::Completed { connection_ref },
+                    )
+                    .map_err(|_| HostedCompletionError::Unavailable)?;
+                Ok(())
+            }
+            Err(_) => {
+                let _ =
+                    lock(&self.inner.sessions).finish(session_ref, ConnectSessionTerminal::Failed);
+                Err(HostedCompletionError::Unavailable)
+            }
+        }
+    }
+
     async fn handle(
         &self,
-        _context: &PrincipalContext,
-        _request: OperationRequest,
+        context: &PrincipalContext,
+        request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
-        Err(OperationError::new(
-            OperationErrorCode::NotFound,
-            "Slack Integration does not provide operations",
-            false,
-        ))
+        self.inner.check_operation_context(context)?;
+        match request {
+            OperationRequest::Search(request) => Ok(OperationResult::Search {
+                operations: self.inner.search_operations(context, &request.query),
+            }),
+            OperationRequest::Describe(request) => self
+                .inner
+                .describe_operation(context, &request.operation_ref),
+            OperationRequest::Invoke(request) => self.inner.invoke(context, request).await,
+            OperationRequest::SessionStatus(_)
+            | OperationRequest::SessionTerminate(_)
+            | OperationRequest::SessionReconcile(_) => Err(operation_not_found()),
+        }
     }
 
     async fn handle_connection(
@@ -308,6 +553,7 @@ impl ConnectorBackend for SlackBackend {
                 let mut connections = stored
                     .into_iter()
                     .filter(|connection| self.inner.connection_is_admitted(connection))
+                    .filter(|connection| self.inner.connection_owned_by(connection, context))
                     .filter(|connection| {
                         query.is_empty()
                             || connection.label.to_ascii_lowercase().contains(&query)
@@ -325,6 +571,7 @@ impl ConnectorBackend for SlackBackend {
                     .find(|connection| {
                         connection.connection_ref == request.connection_ref
                             && self.inner.connection_is_admitted(connection)
+                            && self.inner.connection_owned_by(connection, context)
                     })
                     .cloned()
                     .ok_or_else(connection_not_found)?;
@@ -341,10 +588,16 @@ impl ConnectorBackend for SlackBackend {
                         false,
                     ));
                 }
-                let session = self.inner.create_session(request.label).await?;
+                let session = self.inner.create_session(context, request.label).await?;
                 Ok(ConnectionResult::ConnectSessionCreate(session))
             }
             ConnectionRequest::ConnectSessionStatus(request) => {
+                if lock(&self.inner.session_owners)
+                    .get(&request.connect_session_ref)
+                    .is_none_or(|owner| owner != context.subject())
+                {
+                    return Err(connection_not_found());
+                }
                 let session = self
                     .inner
                     .session_status(&request.connect_session_ref)
@@ -367,6 +620,7 @@ impl ConnectorBackend for SlackBackend {
                     .connections
                     .iter()
                     .filter(|connection| self.inner.connection_is_admitted(connection))
+                    .filter(|connection| self.inner.connection_owned_by(connection, context))
                     .filter(|connection| {
                         query.is_empty()
                             || connection.label.to_ascii_lowercase().contains(&query)
@@ -382,7 +636,7 @@ impl ConnectorBackend for SlackBackend {
                 Ok(EventResult::Search { channels })
             }
             EventRequest::Receive(request) => {
-                self.inner.require_channel(&request.channel_ref)?;
+                self.inner.require_channel(&request.channel_ref, context)?;
                 let after = request
                     .after
                     .as_deref()
@@ -410,7 +664,7 @@ impl ConnectorBackend for SlackBackend {
                     .event_store
                     .replay(&request.event_ref)
                     .ok_or_else(event_not_found)?;
-                self.inner.require_channel(&event.channel_ref)?;
+                self.inner.require_channel(&event.channel_ref, context)?;
                 Ok(EventResult::Replay(event))
             }
         }
@@ -428,10 +682,19 @@ impl ConnectorBackend for SlackBackend {
         for endpoint in lock(&self.inner.sessions).fail_pending() {
             let _ = remove_endpoint(Path::new(&endpoint));
         }
+        lock(&self.inner.hosted_sessions).clear();
+        lock(&self.inner.session_owners).clear();
     }
 }
 
 impl SlackInner {
+    fn tenant_id(&self) -> &str {
+        match &self.admission {
+            PrincipalAdmission::Exact(owner) => owner.tenant_id(),
+            PrincipalAdmission::Tenant(tenant) => tenant,
+        }
+    }
+
     fn connection_is_admitted(&self, connection: &StoredConnection) -> bool {
         connection.grant_ref == self.policy.grant_ref
             && connection.initiation == self.policy.initiation
@@ -440,10 +703,38 @@ impl SlackInner {
                 .allowed_events
                 .iter()
                 .all(|event| self.policy.allowed_events.contains(event))
+            && match self.admission {
+                PrincipalAdmission::Exact(_) => true,
+                PrincipalAdmission::Tenant(_) => {
+                    !connection.owner_subject.is_empty() && !connection.team_id.is_empty()
+                }
+            }
+    }
+
+    fn connection_owned_by(
+        &self,
+        connection: &StoredConnection,
+        context: &PrincipalContext,
+    ) -> bool {
+        self.context_admitted(context)
+            && match &self.admission {
+                PrincipalAdmission::Exact(owner) => {
+                    connection.owner_subject.is_empty()
+                        || connection.owner_subject == owner.subject()
+                }
+                PrincipalAdmission::Tenant(_) => connection.owner_subject == context.subject(),
+            }
+    }
+
+    fn context_admitted(&self, actual: &PrincipalContext) -> bool {
+        match &self.admission {
+            PrincipalAdmission::Exact(owner) => owner == actual,
+            PrincipalAdmission::Tenant(tenant) => tenant == actual.tenant_id(),
+        }
     }
 
     fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
-        if actual == &self.owner {
+        if self.context_admitted(actual) {
             Ok(())
         } else {
             Err(ConnectionError::new(
@@ -455,7 +746,7 @@ impl SlackInner {
     }
 
     fn check_event_context(&self, actual: &PrincipalContext) -> Result<(), EventError> {
-        if actual == &self.owner {
+        if self.context_admitted(actual) {
             Ok(())
         } else {
             Err(EventError::new(
@@ -464,6 +755,275 @@ impl SlackInner {
                 false,
             ))
         }
+    }
+
+    fn check_operation_context(&self, actual: &PrincipalContext) -> Result<(), OperationError> {
+        if self.context_admitted(actual) {
+            Ok(())
+        } else {
+            Err(OperationError::new(
+                OperationErrorCode::StaleAuthority,
+                "owner authority snapshot is not current",
+                false,
+            ))
+        }
+    }
+
+    fn operation_connections(&self, context: &PrincipalContext) -> Vec<OperationConnectionSummary> {
+        lock(&self.metadata)
+            .connections
+            .iter()
+            .filter(|connection| self.connection_is_admitted(connection))
+            .filter(|connection| self.connection_owned_by(connection, context))
+            .map(|connection| OperationConnectionSummary {
+                connection_ref: connection.connection_ref.clone(),
+                label: connection.label.clone(),
+                provider: INTEGRATION_REF.to_owned(),
+                audiences: vec!["workspace".to_owned()],
+            })
+            .collect()
+    }
+
+    fn search_operations(&self, context: &PrincipalContext, query: &str) -> Vec<OperationSummary> {
+        let connections = self.operation_connections(context);
+        if connections.is_empty() {
+            return Vec::new();
+        }
+        let query = query.to_ascii_lowercase();
+        SLACK_OPERATIONS
+            .iter()
+            .filter_map(|operation_ref| {
+                let operation = connector_resolve::document::operation(operation_ref)?;
+                let title = operation_title(operation_ref);
+                (query.is_empty()
+                    || operation_ref.contains(&query)
+                    || title.to_ascii_lowercase().contains(&query)
+                    || operation
+                        .contract_description()
+                        .to_ascii_lowercase()
+                        .contains(&query))
+                .then(|| OperationSummary {
+                    operation_ref: (*operation_ref).to_owned(),
+                    title: title.to_owned(),
+                    effect: operation_effect(operation_ref),
+                    approval: operation_approval(operation_ref),
+                    connections: connections.clone(),
+                })
+            })
+            .collect()
+    }
+
+    fn description_ref(&self, context: &PrincipalContext, operation_ref: &str) -> String {
+        let mut digest = Sha256::new();
+        digest.update(b"b10x/slack-description/v1\0");
+        digest.update(serde_json::to_vec(context).expect("principal context serializes"));
+        digest.update(b"\0");
+        digest.update(operation_ref.as_bytes());
+        digest.update(b"\0");
+        digest.update(self.policy.grant_ref.as_bytes());
+        for connection in self.operation_connections(context) {
+            digest.update(b"\0");
+            digest.update(connection.connection_ref.as_bytes());
+        }
+        format!("description-sha256-{:x}", digest.finalize())
+    }
+
+    fn describe_operation(
+        &self,
+        context: &PrincipalContext,
+        operation_ref: &str,
+    ) -> Result<OperationResult, OperationError> {
+        if !is_slack_operation(operation_ref) {
+            return Err(operation_not_found());
+        }
+        let operation = connector_resolve::document::operation(operation_ref)
+            .ok_or_else(operation_not_found)?;
+        let connections = self.operation_connections(context);
+        if connections.is_empty() {
+            return Err(operation_not_found());
+        }
+        Ok(OperationResult::Describe(OperationDescription {
+            operation_ref: operation_ref.to_owned(),
+            title: operation_title(operation_ref).to_owned(),
+            description: operation.contract_description().to_owned(),
+            input_schema: operation.input_schema().clone(),
+            output_schema: serde_json::json!({"type":"object"}),
+            effect: operation_effect(operation_ref),
+            approval: operation_approval(operation_ref),
+            connections,
+            description_ref: self.description_ref(context, operation_ref),
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        context: &PrincipalContext,
+        request: InvokeRequest,
+    ) -> Result<OperationResult, OperationError> {
+        if !is_slack_operation(&request.operation_ref) {
+            return Err(operation_not_found());
+        }
+        let connection = lock(&self.metadata)
+            .connections
+            .iter()
+            .find(|connection| {
+                connection.connection_ref == request.connection_ref
+                    && self.connection_is_admitted(connection)
+                    && self.connection_owned_by(connection, context)
+            })
+            .cloned()
+            .ok_or_else(operation_not_granted)?;
+        if request.description_ref != self.description_ref(context, &request.operation_ref) {
+            return Err(OperationError::new(
+                OperationErrorCode::StaleAuthority,
+                "operation description lease is stale",
+                false,
+            ));
+        }
+        if operation_approval(&request.operation_ref) == ApprovalPosture::Required
+            && request.approval_evidence_ref.is_none()
+        {
+            return Err(OperationError::new(
+                OperationErrorCode::ApprovalRequired,
+                "this Slack write requires correlated approval evidence",
+                false,
+            ));
+        }
+        let operation = connector_resolve::document::operation(&request.operation_ref)
+            .ok_or_else(operation_not_found)?;
+        let validator = jsonschema::validator_for(operation.input_schema())
+            .map_err(|_| operation_unavailable())?;
+        if !validator.is_valid(&request.input) {
+            return Err(operation_invalid());
+        }
+        let credential_name = if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
+            USER_TOKEN_CREDENTIAL
+        } else {
+            BOT_TOKEN_CREDENTIAL
+        };
+        let credential_ref = self
+            .connection_credential_ref(&connection, credential_name)
+            .map_err(|_| operation_not_granted())?;
+        let credential = self
+            .credential_store
+            .get(&credential_ref)
+            .await
+            .map_err(|_| operation_not_granted())?;
+        let declared_name = if credential_name == USER_TOKEN_CREDENTIAL {
+            "slack.user_token"
+        } else {
+            "slack.bot_token"
+        };
+        let assembled = connector_resolve::auth::Assembled::new(
+            declared_name,
+            credential.expose_secret().to_owned(),
+            catalog::Placement::Header {
+                name: "Authorization",
+                prefix: "Bearer ",
+            },
+        );
+        drop(credential);
+        let plan = connector_resolve::resolve(
+            operation,
+            SLACK_ORIGIN,
+            &request.input,
+            &BTreeMap::new(),
+            &[assembled],
+        )
+        .map_err(|_| operation_invalid())?;
+        let target = url::Url::parse(&plan.request.url).map_err(|_| operation_unavailable())?;
+        if target.scheme() != "https"
+            || target.host_str() != Some("slack.com")
+            || target.port_or_known_default() != Some(443)
+            || !target.username().is_empty()
+            || target.password().is_some()
+            || target.fragment().is_some()
+        {
+            return Err(operation_not_granted());
+        }
+        let method = reqwest::Method::from_bytes(plan.request.method.as_bytes())
+            .map_err(|_| operation_unavailable())?;
+        let mut outbound = self.http.request(method, target);
+        for (name, value) in plan.request.headers {
+            outbound = outbound.header(name, value);
+        }
+        if let Some(body) = plan.request.body {
+            outbound = outbound.body(body);
+        }
+        let audit_ref = format!(
+            "audit:slack:{}",
+            random_uuid().map_err(|_| operation_unavailable())?
+        );
+        let audit = AuditEvent {
+            audit_ref: &audit_ref,
+            operation_ref: &request.operation_ref,
+            connection_ref: &request.connection_ref,
+            tenant_id: context.tenant_id(),
+            actor_subject: context.actor_subject(),
+            outcome: "attempted",
+        };
+        // No request reaches Slack unless the attempted record and capacity for its terminal
+        // outcome are durable first.
+        self.audit
+            .begin(audit)
+            .map_err(|_| operation_unavailable())?;
+        let dispatched = async {
+            let mut response = outbound.send().await.map_err(|_| operation_unavailable())?;
+            if !response.status().is_success()
+                || response
+                    .content_length()
+                    .is_some_and(|length| length > protocol::operation::MAX_RESULT_BYTES as u64)
+            {
+                return Err(operation_unavailable());
+            }
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response
+                .chunk()
+                .await
+                .map_err(|_| operation_unavailable())?
+            {
+                if bytes.len().saturating_add(chunk.len()) > protocol::operation::MAX_RESULT_BYTES {
+                    return Err(OperationError::new(
+                        OperationErrorCode::ResultTooLarge,
+                        "Slack operation result exceeds the admitted bound",
+                        false,
+                    ));
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            serde_json::from_slice(&bytes).map_err(|_| operation_unavailable())
+        }
+        .await;
+        let output = match dispatched {
+            Ok(output) => output,
+            Err(error) => {
+                self.audit
+                    .finish(AuditEvent {
+                        outcome: "indeterminate",
+                        ..audit
+                    })
+                    .map_err(|_| post_dispatch_error(&request.operation_ref))?;
+                return Err(
+                    if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
+                        error
+                    } else {
+                        post_dispatch_error(&request.operation_ref)
+                    },
+                );
+            }
+        };
+        self.audit
+            .finish(AuditEvent {
+                outcome: "completed",
+                ..audit
+            })
+            .map_err(|_| post_dispatch_error(&request.operation_ref))?;
+        Ok(OperationResult::Invoke(InvocationResult {
+            operation_ref: request.operation_ref,
+            output,
+            connector_audit_ref: audit_ref,
+            execution_ref: None,
+        }))
     }
 
     fn describe(&self, connection: &StoredConnection) -> ConnectionDescription {
@@ -502,12 +1062,18 @@ impl SlackInner {
         }
     }
 
-    fn require_channel(&self, requested: &str) -> Result<StoredConnection, EventError> {
+    fn require_channel(
+        &self,
+        requested: &str,
+        context: &PrincipalContext,
+    ) -> Result<StoredConnection, EventError> {
         lock(&self.metadata)
             .connections
             .iter()
             .find(|connection| {
-                channel_ref(connection) == requested && self.connection_is_admitted(connection)
+                channel_ref(connection) == requested
+                    && self.connection_is_admitted(connection)
+                    && self.connection_owned_by(connection, context)
             })
             .cloned()
             .ok_or_else(event_not_found)
@@ -521,43 +1087,96 @@ impl SlackInner {
 
     async fn create_session(
         self: &Arc<Self>,
+        owner: &PrincipalContext,
         label: String,
     ) -> Result<ConnectSessionStatus, ConnectionError> {
+        self.expire_hosted_sessions();
         let id = random_uuid().map_err(|_| connection_unavailable())?;
         let session_ref = format!("connect-session:{id}");
-        let directory = self.state_root.join("connect-sessions");
-        let endpoint =
-            BoundCompletionEndpoint::bind(&directory, &id).map_err(|_| connection_unavailable())?;
-        let endpoint_path = endpoint.path().to_path_buf();
-        let browser_completion_url = endpoint.browser_url();
         let expires_at_unix_ms = now_ms()
             .and_then(|now| {
                 now.checked_add(self.policy.connect_session_ttl_seconds.saturating_mul(1000))
             })
             .ok_or_else(connection_unavailable)?;
-        let status = match lock(&self.sessions).reserve_with_browser(
-            session_ref.clone(),
-            label,
-            expires_at_unix_ms,
-            endpoint_path.display().to_string(),
-            Some(browser_completion_url),
-        ) {
-            Ok(status) => status,
-            Err(error) => {
-                drop(endpoint);
-                return Err(connect_session_error(error));
+        let status = match &self.completion_mode {
+            CompletionMode::Local => {
+                let directory = self.state_root.join("connect-sessions");
+                let endpoint = BoundCompletionEndpoint::bind(&directory, &id)
+                    .map_err(|_| connection_unavailable())?;
+                let endpoint_path = endpoint.path().to_path_buf();
+                let browser_completion_url = endpoint.browser_url();
+                let status = match lock(&self.sessions).reserve_with_browser(
+                    session_ref.clone(),
+                    label,
+                    expires_at_unix_ms,
+                    endpoint_path.display().to_string(),
+                    Some(browser_completion_url),
+                ) {
+                    Ok(status) => status,
+                    Err(error) => {
+                        drop(endpoint);
+                        return Err(connect_session_error(error));
+                    }
+                };
+                let inner = Arc::clone(self);
+                let task_session_ref = session_ref.clone();
+                lock(&self.tasks).push(tokio::spawn(async move {
+                    inner.serve_completion(endpoint, task_session_ref).await;
+                }));
+                status
+            }
+            CompletionMode::Hosted { public_origin } => {
+                let capability = random_capability().map_err(|_| connection_unavailable())?;
+                let mut url = public_origin.clone();
+                url.path_segments_mut()
+                    .map_err(|_| connection_unavailable())?
+                    .push("connect-sessions")
+                    .push(&session_ref);
+                url.set_fragment(Some(&format!("token={capability}")));
+                let status = lock(&self.sessions)
+                    .reserve_browser(session_ref.clone(), label, expires_at_unix_ms, url.into())
+                    .map_err(connect_session_error)?;
+                lock(&self.hosted_sessions).insert(
+                    session_ref.clone(),
+                    HostedSession {
+                        capability_sha256: Sha256::digest(capability.as_bytes()).into(),
+                        expires_at_unix_ms,
+                    },
+                );
+                status
             }
         };
-        let inner = Arc::clone(self);
-        let task_session_ref = session_ref;
-        lock(&self.tasks).push(tokio::spawn(async move {
-            inner.serve_completion(endpoint, task_session_ref).await;
-        }));
+        lock(&self.session_owners).insert(session_ref, owner.subject().to_owned());
         Ok(status)
     }
 
     fn session_status(&self, session_ref: &str) -> Option<ConnectSessionStatus> {
+        self.expire_hosted_sessions();
         lock(&self.sessions).status(session_ref)
+    }
+
+    fn expire_hosted_sessions(&self) {
+        let Some(now) = now_ms() else {
+            return;
+        };
+        let expired = {
+            let mut hosted_sessions = lock(&self.hosted_sessions);
+            let expired = hosted_sessions
+                .iter()
+                .filter(|(_, session)| now >= session.expires_at_unix_ms)
+                .map(|(session_ref, _)| session_ref.clone())
+                .collect::<Vec<_>>();
+            for session_ref in &expired {
+                hosted_sessions.remove(session_ref);
+            }
+            expired
+        };
+        let mut sessions = lock(&self.sessions);
+        let mut session_owners = lock(&self.session_owners);
+        for session_ref in expired {
+            let _ = sessions.finish(&session_ref, ConnectSessionTerminal::Expired);
+            session_owners.remove(&session_ref);
+        }
     }
 
     async fn serve_completion(
@@ -586,8 +1205,26 @@ impl SlackInner {
         let secret = submission.secret();
         let valid = secret.expose_secret().starts_with("xapp-");
         let result = if valid {
-            self.complete_connection(&session_ref, Secret::new(secret.expose_secret()))
-                .await
+            let owner = lock(&self.session_owners)
+                .get(&session_ref)
+                .cloned()
+                .ok_or_else(|| SlackError::new("connect-session"));
+            match owner {
+                Ok(owner_subject) => {
+                    self.complete_connection(
+                        &session_ref,
+                        owner_subject,
+                        String::new(),
+                        SlackCredentials {
+                            app_token: Secret::new(secret.expose_secret()),
+                            bot_token: None,
+                            user_token: None,
+                        },
+                    )
+                    .await
+                }
+                Err(error) => Err(error),
+            }
         } else {
             Err(SlackError::new("credential-shape"))
         };
@@ -610,7 +1247,9 @@ impl SlackInner {
     async fn complete_connection(
         self: &Arc<Self>,
         session_ref: &str,
-        secret: Secret,
+        owner_subject: String,
+        team_id: String,
+        credentials: SlackCredentials,
     ) -> Result<String, SlackError> {
         let label = lock(&self.sessions)
             .pending_label(session_ref)
@@ -624,17 +1263,46 @@ impl SlackInner {
             grant_ref: self.policy.grant_ref.clone(),
             initiation: self.policy.initiation,
             allowed_events: self.policy.allowed_events.clone(),
+            owner_subject,
+            team_id,
         };
-        let credential_ref = self.credential_ref(&connection)?;
+        let app_credential_ref = self.app_credential_ref()?;
+        if !lock(&self.metadata).connections.is_empty() {
+            let current = self
+                .credential_store
+                .get(&app_credential_ref)
+                .await
+                .map_err(|_| SlackError::new("credential-resolve"))?;
+            if !constant_time_equal(
+                current.expose_secret().as_bytes(),
+                credentials.app_token.expose_secret().as_bytes(),
+            ) {
+                return Err(SlackError::new("app-token-conflict"));
+            }
+        }
+        let bot_credential_ref =
+            self.connection_credential_ref(&connection, BOT_TOKEN_CREDENTIAL)?;
+        let user_credential_ref =
+            self.connection_credential_ref(&connection, USER_TOKEN_CREDENTIAL)?;
         let (transaction, generation) = self.reserve_transaction()?;
         let mut batch = SecretBatch::new(
-            CredentialScope::new(self.owner.tenant_id(), AUTHORITY)
+            CredentialScope::new(self.tenant_id(), AUTHORITY)
                 .map_err(|_| SlackError::new("credential-address"))?,
         );
-        let digest = proposal_digest(&TenantLayout.render(&credential_ref), &secret);
         batch
-            .put(credential_ref, secret)
+            .put(app_credential_ref, credentials.app_token)
             .map_err(|_| SlackError::new("credential-batch"))?;
+        if let Some(bot_token) = credentials.bot_token {
+            batch
+                .put(bot_credential_ref, bot_token)
+                .map_err(|_| SlackError::new("credential-batch"))?;
+        }
+        if let Some(user_token) = credentials.user_token {
+            batch
+                .put(user_credential_ref, user_token)
+                .map_err(|_| SlackError::new("credential-batch"))?;
+        }
+        let digest = proposal_digest(&batch);
         self.credential_store
             .prepare(transaction, digest, &batch)
             .await
@@ -746,48 +1414,120 @@ impl SlackInner {
         Ok(())
     }
 
-    fn credential_ref(&self, connection: &StoredConnection) -> Result<CredentialRef, SlackError> {
+    async fn verify_workspace_credentials(
+        &self,
+        credentials: &SlackCredentials,
+    ) -> Result<String, SlackError> {
+        let bot = credentials
+            .bot_token
+            .as_ref()
+            .ok_or_else(|| SlackError::new("credential-shape"))?;
+        let user = credentials
+            .user_token
+            .as_ref()
+            .ok_or_else(|| SlackError::new("credential-shape"))?;
+        let bot_team = self.auth_test(bot).await?;
+        let user_team = self.auth_test(user).await?;
+        if bot_team != user_team {
+            return Err(SlackError::new("credential-workspace"));
+        }
+        if lock(&self.metadata)
+            .connections
+            .iter()
+            .any(|connection| connection.team_id == bot_team)
+        {
+            return Err(SlackError::new("connection-conflict"));
+        }
+        Ok(bot_team)
+    }
+
+    async fn auth_test(&self, token: &Secret) -> Result<String, SlackError> {
+        let mut response = self
+            .http
+            .post(AUTH_TEST)
+            .bearer_auth(token.expose_secret())
+            .send()
+            .await
+            .map_err(|_| SlackError::new("credential-verify"))?;
+        if !response.status().is_success()
+            || response
+                .content_length()
+                .is_some_and(|length| length > 64 * 1024)
+        {
+            return Err(SlackError::new("credential-verify"));
+        }
+        let mut bytes = Zeroizing::new(Vec::new());
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| SlackError::new("credential-verify"))?
+        {
+            if bytes.len().saturating_add(chunk.len()) > 64 * 1024 {
+                return Err(SlackError::new("credential-verify"));
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let verified: AuthTestResponse =
+            serde_json::from_slice(&bytes).map_err(|_| SlackError::new("credential-verify"))?;
+        let team_id = verified
+            .ok
+            .then_some(verified.team_id)
+            .flatten()
+            .filter(|team| {
+                (2..=64).contains(&team.len())
+                    && team.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            })
+            .ok_or_else(|| SlackError::new("credential-verify"))?;
+        Ok(team_id)
+    }
+
+    fn app_credential_ref(&self) -> Result<CredentialRef, SlackError> {
+        CredentialRef::new(self.tenant_id(), AUTHORITY, SERVICE, APP_TOKEN_CREDENTIAL)
+            .map_err(|_| SlackError::new("credential-address"))
+    }
+
+    fn connection_credential_ref(
+        &self,
+        connection: &StoredConnection,
+        credential: &str,
+    ) -> Result<CredentialRef, SlackError> {
         CredentialRef::for_instance(
-            self.owner.tenant_id(),
+            self.tenant_id(),
             AUTHORITY,
             &connection.instance_id,
             SERVICE,
-            APP_TOKEN_CREDENTIAL,
+            credential,
         )
         .map_err(|_| SlackError::new("credential-address"))
     }
 
     fn start_supervisor(self: &Arc<Self>, connection: StoredConnection) {
-        if !lock(&self.started_supervisors).insert(connection.connection_ref.clone()) {
-            return;
-        }
-        lock(&self.channel_states)
-            .insert(connection.connection_ref.clone(), ChannelState::Starting);
+        let state = *lock(&self.integration_channel_state);
+        lock(&self.channel_states).insert(connection.connection_ref, state);
         if !self.supervision_enabled {
             return;
         }
+        let mut started = lock(&self.supervisor_started);
+        if *started {
+            return;
+        }
+        *started = true;
+        drop(started);
         let inner = Arc::clone(self);
         let shutdown = self.shutdown.subscribe();
         lock(&self.tasks).push(tokio::spawn(async move {
-            inner.supervise(connection, shutdown).await;
+            inner.supervise(shutdown).await;
         }));
     }
 
-    async fn supervise(
-        self: Arc<Self>,
-        connection: StoredConnection,
-        mut shutdown: watch::Receiver<bool>,
-    ) {
+    async fn supervise(self: Arc<Self>, mut shutdown: watch::Receiver<bool>) {
         let mut backoff = Duration::from_secs(1);
         loop {
             if *shutdown.borrow() {
                 break;
             }
-            lock(&self.channel_states).insert(
-                connection.connection_ref.clone(),
-                ChannelState::Reconnecting,
-            );
-            let outcome = self.run_socket(&connection, &mut shutdown).await;
+            self.set_channel_state(ChannelState::Reconnecting);
+            let outcome = self.run_socket(&mut shutdown).await;
             if *shutdown.borrow() {
                 break;
             }
@@ -802,15 +1542,22 @@ impl SlackInner {
             }
             backoff = (backoff * 2).min(Duration::from_secs(30));
         }
-        lock(&self.channel_states).insert(connection.connection_ref.clone(), ChannelState::Stopped);
+        self.set_channel_state(ChannelState::Stopped);
     }
 
-    async fn run_socket(
-        &self,
-        connection: &StoredConnection,
-        shutdown: &mut watch::Receiver<bool>,
-    ) -> Result<(), SlackError> {
-        let credential_ref = self.credential_ref(connection)?;
+    fn set_channel_state(&self, state: ChannelState) {
+        *lock(&self.integration_channel_state) = state;
+        let connections = lock(&self.metadata).connections.clone();
+        let mut states = lock(&self.channel_states);
+        for connection in connections {
+            if self.connection_is_admitted(&connection) {
+                states.insert(connection.connection_ref, state);
+            }
+        }
+    }
+
+    async fn run_socket(&self, shutdown: &mut watch::Receiver<bool>) -> Result<(), SlackError> {
+        let credential_ref = self.app_credential_ref()?;
         let token = self
             .credential_store
             .get(&credential_ref)
@@ -866,8 +1613,7 @@ impl SlackInner {
             tokio_tungstenite::connect_async_with_config(&*url, Some(websocket), false)
                 .await
                 .map_err(|_| SlackError::new("socket-connect"))?;
-        lock(&self.channel_states)
-            .insert(connection.connection_ref.clone(), ChannelState::Connected);
+        self.set_channel_state(ChannelState::Connected);
         loop {
             tokio::select! {
                 changed = shutdown.changed() => {
@@ -879,7 +1625,7 @@ impl SlackInner {
                 message = socket.next() => {
                     match message {
                         Some(Ok(Message::Text(text))) => {
-                            self.handle_socket_text(connection, text.as_ref(), &mut socket).await?;
+                            self.handle_socket_text(text.as_ref(), &mut socket).await?;
                         }
                         Some(Ok(Message::Ping(payload))) => {
                             socket.send(Message::Pong(payload)).await.map_err(|_| SlackError::new("socket-write"))?;
@@ -893,12 +1639,7 @@ impl SlackInner {
         }
     }
 
-    async fn handle_socket_text<S>(
-        &self,
-        connection: &StoredConnection,
-        text: &str,
-        socket: &mut S,
-    ) -> Result<(), SlackError>
+    async fn handle_socket_text<S>(&self, text: &str, socket: &mut S) -> Result<(), SlackError>
     where
         S: futures_util::Sink<Message> + Unpin,
     {
@@ -917,11 +1658,27 @@ impl SlackInner {
             return Err(SlackError::new("socket-envelope"));
         }
         if envelope.kind == "events_api" {
-            if let Some((delivery_id, event_type, payload)) =
-                project_data_event(envelope.payload.as_ref(), &connection.allowed_events)
-            {
-                self.event_store
-                    .append(connection, &delivery_id, &event_type, payload)?;
+            let connection = envelope
+                .payload
+                .as_ref()
+                .and_then(|payload| payload.get("team_id"))
+                .and_then(Value::as_str)
+                .and_then(|team_id| {
+                    lock(&self.metadata)
+                        .connections
+                        .iter()
+                        .find(|connection| {
+                            connection.team_id == team_id && self.connection_is_admitted(connection)
+                        })
+                        .cloned()
+                });
+            if let Some(connection) = connection {
+                if let Some((delivery_id, event_type, payload)) =
+                    project_data_event(envelope.payload.as_ref(), &connection.allowed_events)
+                {
+                    self.event_store
+                        .append(&connection, &delivery_id, &event_type, payload)?;
+                }
             }
         }
         let acknowledgement = serde_json::to_string(&serde_json::json!({
@@ -933,6 +1690,114 @@ impl SlackInner {
             .await
             .map_err(|_| SlackError::new("socket-ack"))
     }
+}
+
+impl AuditJournal {
+    fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            state: Mutex::new(AuditJournalState::default()),
+        }
+    }
+
+    fn begin(&self, event: AuditEvent<'_>) -> Result<(), SlackError> {
+        if event.outcome != "attempted" {
+            return Err(SlackError::new("audit-outcome"));
+        }
+        let mut state = lock(&self.state);
+        if state.terminal_reservations.contains_key(event.audit_ref) {
+            return Err(SlackError::new("audit-duplicate"));
+        }
+        let attempted = audit_line(event, now_ms().ok_or_else(|| SlackError::new("clock"))?)?;
+        let terminal_reservation = u64::try_from(
+            audit_line(
+                AuditEvent {
+                    outcome: "indeterminate",
+                    ..event
+                },
+                u64::MAX,
+            )?
+            .len(),
+        )
+        .map_err(|_| SlackError::new("audit-bound"))?;
+        let outstanding = state
+            .terminal_reservations
+            .values()
+            .try_fold(0_u64, |sum, value| sum.checked_add(*value))
+            .ok_or_else(|| SlackError::new("audit-bound"))?;
+        let mut file = open_owner_append(&self.path)?;
+        let current = file
+            .metadata()
+            .map_err(|_| SlackError::new("audit-store"))?
+            .len();
+        let attempted_bytes =
+            u64::try_from(attempted.len()).map_err(|_| SlackError::new("audit-bound"))?;
+        if current
+            .checked_add(outstanding)
+            .and_then(|length| length.checked_add(attempted_bytes))
+            .and_then(|length| length.checked_add(terminal_reservation))
+            .is_none_or(|length| length > MAX_AUDIT_BYTES)
+        {
+            return Err(SlackError::new("audit-bound"));
+        }
+        file.write_all(&attempted)
+            .and_then(|()| file.sync_data())
+            .map_err(|_| SlackError::new("audit-store"))?;
+        state
+            .terminal_reservations
+            .insert(event.audit_ref.to_owned(), terminal_reservation);
+        Ok(())
+    }
+
+    fn finish(&self, event: AuditEvent<'_>) -> Result<(), SlackError> {
+        if !matches!(event.outcome, "completed" | "indeterminate") {
+            return Err(SlackError::new("audit-outcome"));
+        }
+        let mut state = lock(&self.state);
+        let reservation = state
+            .terminal_reservations
+            .get(event.audit_ref)
+            .copied()
+            .ok_or_else(|| SlackError::new("audit-missing"))?;
+        let terminal = audit_line(event, now_ms().ok_or_else(|| SlackError::new("clock"))?)?;
+        let terminal_bytes =
+            u64::try_from(terminal.len()).map_err(|_| SlackError::new("audit-bound"))?;
+        if terminal_bytes > reservation {
+            return Err(SlackError::new("audit-bound"));
+        }
+        let outstanding_other = state
+            .terminal_reservations
+            .values()
+            .try_fold(0_u64, |sum, value| sum.checked_add(*value))
+            .and_then(|sum| sum.checked_sub(reservation))
+            .ok_or_else(|| SlackError::new("audit-bound"))?;
+        let mut file = open_owner_append(&self.path)?;
+        if file
+            .metadata()
+            .map_err(|_| SlackError::new("audit-store"))?
+            .len()
+            .checked_add(outstanding_other)
+            .and_then(|length| length.checked_add(terminal_bytes))
+            .is_none_or(|length| length > MAX_AUDIT_BYTES)
+        {
+            return Err(SlackError::new("audit-bound"));
+        }
+        file.write_all(&terminal)
+            .and_then(|()| file.sync_data())
+            .map_err(|_| SlackError::new("audit-store"))?;
+        state.terminal_reservations.remove(event.audit_ref);
+        Ok(())
+    }
+}
+
+fn audit_line(event: AuditEvent<'_>, at_unix_ms: u64) -> Result<Vec<u8>, SlackError> {
+    let mut line = serde_json::to_vec(&serde_json::json!({
+        "at_unix_ms": at_unix_ms,
+        "event": event,
+    }))
+    .map_err(|_| SlackError::new("audit-store"))?;
+    line.push(b'\n');
+    Ok(line)
 }
 
 impl EventStore {
@@ -1083,6 +1948,78 @@ fn event_channel_summary(connection: &StoredConnection) -> EventChannelSummary {
     }
 }
 
+fn is_slack_operation(operation_ref: &str) -> bool {
+    SLACK_OPERATIONS.contains(&operation_ref)
+}
+
+fn operation_title(operation_ref: &str) -> &'static str {
+    match operation_ref {
+        "slack-chat-post-message" => "Post Slack message",
+        "slack-conversations-history" => "Read Slack conversation history",
+        "slack-users-info" => "Look up Slack user",
+        "slack-reactions-add" => "Add Slack reaction",
+        _ => "Slack operation",
+    }
+}
+
+fn operation_effect(operation_ref: &str) -> EffectClass {
+    match operation_ref {
+        "slack-conversations-history" | "slack-users-info" => EffectClass::ReadOnly,
+        "slack-chat-post-message" | "slack-reactions-add" => EffectClass::Mutating,
+        _ => EffectClass::Destructive,
+    }
+}
+
+fn operation_approval(operation_ref: &str) -> ApprovalPosture {
+    if operation_effect(operation_ref) == EffectClass::ReadOnly {
+        ApprovalPosture::NotRequired
+    } else {
+        ApprovalPosture::Required
+    }
+}
+
+fn operation_not_found() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::NotFound,
+        "Slack operation was not found",
+        false,
+    )
+}
+
+fn operation_not_granted() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::NotGranted,
+        "Slack operation is not granted for this Connection",
+        false,
+    )
+}
+
+fn operation_invalid() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::InvalidInput,
+        "Slack operation input is invalid",
+        false,
+    )
+}
+
+fn operation_unavailable() -> OperationError {
+    OperationError::new(
+        OperationErrorCode::Unavailable,
+        "Slack operation is unavailable",
+        true,
+    )
+}
+
+fn post_dispatch_error(operation_ref: &str) -> OperationError {
+    OperationError::new(
+        OperationErrorCode::OutcomeUnknown,
+        format!(
+            "Slack operation {operation_ref} may have reached Slack; do not retry automatically"
+        ),
+        false,
+    )
+}
+
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
         InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
@@ -1098,14 +2035,70 @@ fn channel_ref(connection: &StoredConnection) -> String {
     format!("channel:slack:{}:socket", connection.instance_id)
 }
 
-fn proposal_digest(address: &str, secret: &Secret) -> SecretProposalDigest {
+fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {
     let mut digest = Sha256::new();
-    digest.update(b"b10x/slack-connect/v1\0");
-    digest.update(address.as_bytes());
-    digest.update(b"\0");
-    digest.update(secret.expose_secret().as_bytes());
+    digest.update(b"b10x/slack-connect/v2\0");
+    for (reference, secret) in batch
+        .put_entries()
+        .expect("Slack connect batches contain puts only")
+    {
+        digest.update(TenantLayout.render(reference).as_bytes());
+        digest.update(b"\0");
+        digest.update(secret.expose_secret().as_bytes());
+        digest.update(b"\0");
+    }
     SecretProposalDigest::from_protocol_bytes(digest.finalize().into())
 }
+
+fn parse_hosted_submission(bytes: &[u8]) -> Result<SlackCredentials, HostedCompletionError> {
+    if bytes.is_empty() || bytes.len() > MAX_HOSTED_SUBMISSION_BYTES {
+        return Err(HostedCompletionError::Invalid);
+    }
+    let value = std::str::from_utf8(bytes).map_err(|_| HostedCompletionError::Invalid)?;
+    let mut values = value.split('\n');
+    let app = values.next().ok_or(HostedCompletionError::Invalid)?;
+    let bot = values.next().ok_or(HostedCompletionError::Invalid)?;
+    let user = values.next().ok_or(HostedCompletionError::Invalid)?;
+    if values.next().is_some()
+        || !valid_slack_token(app, "xapp-")
+        || !valid_slack_token(bot, "xoxb-")
+        || !valid_slack_token(user, "xoxp-")
+    {
+        return Err(HostedCompletionError::Invalid);
+    }
+    Ok(SlackCredentials {
+        app_token: Secret::new(app),
+        bot_token: Some(Secret::new(bot)),
+        user_token: Some(Secret::new(user)),
+    })
+}
+
+fn valid_slack_token(value: &str, prefix: &str) -> bool {
+    value.starts_with(prefix)
+        && value.len() <= 2048
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'"' | b'\\'))
+}
+
+fn random_capability() -> Result<String, SlackError> {
+    let mut bytes = [0_u8; 32];
+    getrandom::fill(&mut bytes).map_err(|_| SlackError::new("randomness"))?;
+    Ok(hex::encode(bytes))
+}
+
+fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
+    let mut difference = left.len() ^ right.len();
+    for index in 0..left.len().max(right.len()) {
+        difference |= usize::from(
+            left.get(index).copied().unwrap_or_default()
+                ^ right.get(index).copied().unwrap_or_default(),
+        );
+    }
+    difference == 0
+}
+
+const HOSTED_SETUP_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect Slack</title><style>body{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}input,button{box-sizing:border-box;width:100%;padding:.8rem;margin:.5rem 0}button{cursor:pointer}.hint{color:#aaa}</style><h1>Connect Slack</h1><p>These credentials go directly to hosted Connectors and are committed to its SecretStore. Zwirn never receives them.</p><form><label>Socket Mode app token<input name="app" type="password" autocomplete="off" placeholder="xapp-…" required></label><label>Companion bot token<input name="bot" type="password" autocomplete="off" placeholder="xoxb-…" required></label><label>Your user token<input name="user" type="password" autocomplete="off" placeholder="xoxp-…" required></label><button>Connect</button></form><p class="hint">The bot token handles mentions and replies. The user token performs reads as you.</p><p id="status"></p><script>const capability=new URLSearchParams(location.hash.slice(1)).get('token');history.replaceState(null,'',location.pathname+'#ready');document.querySelector('form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;const status=document.querySelector('#status');const fields=[form.elements.app,form.elements.bot,form.elements.user];try{const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Connect-Session':capability},body:fields.map(field=>field.value).join('\n')});fields.forEach(field=>field.value='');status.textContent=response.ok?'Slack connected. You may close this tab.':'Slack connection was refused.'}catch{fields.forEach(field=>field.value='');status.textContent='Connectors is unavailable.'}});</script>"#;
 
 fn decode_transaction(encoded: &str) -> Result<SecretTransactionId, SlackError> {
     let bytes = hex::decode(encoded).map_err(|_| SlackError::new("transaction-state"))?;
@@ -1166,11 +2159,12 @@ fn read_state(path: &Path) -> Result<StateFile, SlackError> {
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
         .map_err(|_| SlackError::new("connection-state"))?;
-    let state: StateFile =
+    let mut state: StateFile =
         serde_json::from_slice(&bytes).map_err(|_| SlackError::new("connection-state"))?;
-    if state.version != STATE_VERSION || state.next_transaction_generation == 0 {
+    if !matches!(state.version, 1 | STATE_VERSION) || state.next_transaction_generation == 0 {
         return Err(SlackError::new("connection-state-version"));
     }
+    state.version = STATE_VERSION;
     Ok(state)
 }
 

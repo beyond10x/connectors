@@ -54,6 +54,11 @@ first-class client API rather than a support ticket.
   event-store and pull halves, not M4 completion: generic subscriptions, signed push delivery,
   retries, retention, operational events, audit, hosted authority, and the same-event push+pull exit
   remain open.
+- 2026-08-16 — hosted Slack now supervises one Integration-level Socket Mode transport independent
+  of local Zwirn, attributes admitted workspace events to value-free Connections, persists them,
+  and exposes bounded exact-scope pull with cursors. This closes the companion's offline-to-online
+  mention path but not M4's generic signed push, multiplexed subscription, retention, or
+  same-event push+pull exit.
 
 ## Notes
 

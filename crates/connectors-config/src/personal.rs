@@ -479,7 +479,7 @@ fn private_origin(value: &str) -> bool {
 }
 
 impl SlackIntegrationConfig {
-    fn validate(&self) -> Result<(), ConfigError> {
+    pub(crate) fn validate(&self) -> Result<(), ConfigError> {
         let mut events = self.allowed_events.clone();
         events.sort();
         events.dedup();

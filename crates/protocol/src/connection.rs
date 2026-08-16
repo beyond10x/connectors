@@ -500,7 +500,8 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
             }
             match session.state {
                 ConnectSessionState::Pending
-                    if session.completion_endpoint.is_some()
+                    if (session.completion_endpoint.is_some()
+                        || session.browser_completion_url.is_some())
                         && session.connection_ref.is_none() => {}
                 ConnectSessionState::Completed
                     if session.completion_endpoint.is_none()
@@ -635,25 +636,6 @@ fn valid_browser_completion_url(value: &str) -> bool {
     if value.is_empty() || value.len() > 4096 || value.contains(['\r', '\n']) {
         return false;
     }
-    let Some(authority_and_path) = value.strip_prefix("http://") else {
-        return false;
-    };
-    let Some((authority, _)) = authority_and_path.split_once('/') else {
-        return false;
-    };
-    let Some(port_text) = authority.strip_prefix("127.0.0.1:") else {
-        return false;
-    };
-    if port_text.is_empty() || !port_text.bytes().all(|byte| byte.is_ascii_digit()) {
-        return false;
-    }
-    let Ok(port) = port_text.parse::<u16>() else {
-        return false;
-    };
-    if port == 0 {
-        return false;
-    }
-
     let Ok(url) = Url::parse(value) else {
         return false;
     };
@@ -663,12 +645,17 @@ fn valid_browser_completion_url(value: &str) -> bool {
     else {
         return false;
     };
-    url.scheme() == "http"
+    let local = url.scheme() == "http"
         && url.host_str() == Some("127.0.0.1")
-        && url.port_or_known_default() == Some(port)
+        && url.port().is_some_and(|port| port != 0)
+        && url.path() == "/";
+    let hosted = url.scheme() == "https"
+        && url.host_str().is_some()
+        && url.path().contains("/connect-sessions/")
+        && !url.path().ends_with('/');
+    (local || hosted)
         && url.username().is_empty()
         && url.password().is_none()
-        && url.path() == "/"
         && url.query().is_none()
         && !token.is_empty()
         && token.len() <= MAX_BROWSER_CAPABILITY_TOKEN_BYTES

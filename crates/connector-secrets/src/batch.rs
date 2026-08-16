@@ -51,6 +51,21 @@ impl SecretBatch {
         &self.scope
     }
 
+    /// Borrow every put in a put-only batch.
+    ///
+    /// Prepared remote stores use this to stage complete credential generations without exposing
+    /// mutation internals or decomposing moves and deletes into unsafe point operations. A batch
+    /// containing any other mutation returns `None` and must be refused by that store.
+    pub fn put_entries(&self) -> Option<Vec<(&CredentialRef, &Secret)>> {
+        self.operations
+            .iter()
+            .map(|operation| match operation {
+                Mutation::Put { at, secret } => Some((at, secret)),
+                Mutation::Move { .. } | Mutation::Delete { .. } => None,
+            })
+            .collect()
+    }
+
     /// Add a checked move. Applying it refuses a missing source or occupied destination.
     pub fn move_secret(
         &mut self,

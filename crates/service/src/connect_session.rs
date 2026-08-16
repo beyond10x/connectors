@@ -87,15 +87,51 @@ impl ConnectSessionLifecycle {
         completion_endpoint: String,
         browser_completion_url: Option<String>,
     ) -> Result<ConnectSessionStatus, ConnectSessionLifecycleError> {
+        self.reserve_endpoints(
+            session_ref,
+            label,
+            expires_at_unix_ms,
+            Some(completion_endpoint),
+            browser_completion_url,
+        )
+    }
+
+    /// Reserve a hosted session whose one-use completion endpoint is exposed only as HTTPS.
+    pub fn reserve_browser(
+        &mut self,
+        session_ref: String,
+        label: String,
+        expires_at_unix_ms: u64,
+        browser_completion_url: String,
+    ) -> Result<ConnectSessionStatus, ConnectSessionLifecycleError> {
+        self.reserve_endpoints(
+            session_ref,
+            label,
+            expires_at_unix_ms,
+            None,
+            Some(browser_completion_url),
+        )
+    }
+
+    fn reserve_endpoints(
+        &mut self,
+        session_ref: String,
+        label: String,
+        expires_at_unix_ms: u64,
+        completion_endpoint: Option<String>,
+        browser_completion_url: Option<String>,
+    ) -> Result<ConnectSessionStatus, ConnectSessionLifecycleError> {
         if !valid_ref(&session_ref)
             || label.trim().is_empty()
             || label.len() > 256
             || expires_at_unix_ms == 0
-            || completion_endpoint.is_empty()
-            || completion_endpoint.len() > 4_096
+            || completion_endpoint
+                .as_deref()
+                .is_some_and(|value| value.is_empty() || value.len() > 4_096)
             || browser_completion_url
                 .as_deref()
                 .is_some_and(|value| value.is_empty() || value.len() > 4_096)
+            || completion_endpoint.is_none() && browser_completion_url.is_none()
         {
             return Err(ConnectSessionLifecycleError::Invalid);
         }
@@ -117,7 +153,7 @@ impl ConnectSessionLifecycle {
                 label,
                 state: ConnectSessionState::Pending,
                 expires_at_unix_ms,
-                completion_endpoint: Some(completion_endpoint),
+                completion_endpoint,
                 browser_completion_url,
                 connection_ref: None,
             },

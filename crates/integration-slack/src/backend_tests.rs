@@ -55,6 +55,53 @@ mod tests {
         assert!(validate_socket_url("ws://wss-primary.slack.com/link/?ticket=sentinel").is_err());
     }
 
+    #[test]
+    fn hosted_completion_requires_the_three_distinct_slack_credentials() {
+        let submission = format!("xapp-{SENTINEL}\nxoxb-{SENTINEL}\nxoxp-{SENTINEL}");
+        let parsed = parse_hosted_submission(submission.as_bytes()).unwrap();
+        assert_eq!(parsed.app_token.expose_secret(), format!("xapp-{SENTINEL}"));
+        assert_eq!(
+            parsed.bot_token.unwrap().expose_secret(),
+            format!("xoxb-{SENTINEL}")
+        );
+        assert_eq!(
+            parsed.user_token.unwrap().expose_secret(),
+            format!("xoxp-{SENTINEL}")
+        );
+        assert!(parse_hosted_submission(format!("xapp-{SENTINEL}").as_bytes()).is_err());
+        assert!(parse_hosted_submission(
+            format!("xapp-{SENTINEL}\nxoxp-{SENTINEL}\nxoxb-{SENTINEL}").as_bytes()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn operation_audit_is_durable_bounded_and_value_free() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let journal = AuditJournal::new(root.path().join("slack-operation-audit.jsonl"));
+        let event = AuditEvent {
+            audit_ref: "audit:slack:test",
+            operation_ref: "slack-chat-post-message",
+            connection_ref: "connection:slack:test",
+            tenant_id: "tenant-test",
+            actor_subject: "subject-test",
+            outcome: "attempted",
+        };
+        journal.begin(event).unwrap();
+        journal
+            .finish(AuditEvent {
+                outcome: "completed",
+                ..event
+            })
+            .unwrap();
+        let stored = fs::read_to_string(root.path().join("slack-operation-audit.jsonl")).unwrap();
+        assert_eq!(stored.lines().count(), 2);
+        assert!(stored.contains("attempted"));
+        assert!(stored.contains("completed"));
+        assert!(!stored.contains(SENTINEL));
+    }
+
     fn owner() -> PrincipalContext {
         PrincipalContext::local(&protocol::operation::OwnerContext {
             tenant_id: "tenant-local".to_owned(),
@@ -92,7 +139,7 @@ mod tests {
         assert_eq!(
             backend.capabilities(),
             BackendCapabilities {
-                operations: false,
+                operations: true,
                 connections: true,
                 events: true,
             }
@@ -102,10 +149,10 @@ mod tests {
             limit: 10,
         });
         assert!(!backend.owns_operation(&operation));
-        assert_eq!(
-            backend.handle(&owner(), operation).await.unwrap_err().code,
-            OperationErrorCode::NotFound
-        );
+        assert!(matches!(
+            backend.handle(&owner(), operation).await.unwrap(),
+            OperationResult::Search { operations } if operations.is_empty()
+        ));
 
         let candidate_search = ConnectionRequest::CandidateSearch(
             protocol::connection::CandidateSearchRequest {
@@ -211,12 +258,52 @@ mod tests {
         let metadata = fs::read_to_string(root.path().join("connections.json")).unwrap();
         assert!(!metadata.contains(SENTINEL));
         assert!(!metadata.contains("completion_endpoint"));
-        let connection = lock(&backend.inner.metadata).connections[0].clone();
         let credential = credential_store
-            .get(&backend.inner.credential_ref(&connection).unwrap())
+            .get(&backend.inner.app_credential_ref().unwrap())
             .await
             .unwrap();
         assert_eq!(credential.expose_secret(), submitted);
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn hosted_sessions_expire_and_release_pending_capacity_without_submission() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let created = backend
+            .inner
+            .create_session(&owner(), "Development Slack".to_owned())
+            .await
+            .unwrap();
+        lock(&backend.inner.hosted_sessions)
+            .get_mut(&created.connect_session_ref)
+            .unwrap()
+            .expires_at_unix_ms = 1;
+
+        let status = backend
+            .inner
+            .session_status(&created.connect_session_ref)
+            .unwrap();
+        assert_eq!(status.state, ConnectSessionState::Expired);
+        assert!(status.browser_completion_url.is_none());
+        assert!(!lock(&backend.inner.hosted_sessions).contains_key(&created.connect_session_ref));
+        assert!(!lock(&backend.inner.session_owners).contains_key(&created.connect_session_ref));
+        assert!(matches!(
+            backend.hosted_completion_page(&created.connect_session_ref),
+            Err(HostedCompletionError::NotFound)
+        ));
         backend.shutdown().await;
     }
 
@@ -232,6 +319,8 @@ mod tests {
             grant_ref: "grant:slack-inbound".to_owned(),
             initiation: InitiationConfig::Provider,
             allowed_events: vec!["message.channels".to_owned()],
+            owner_subject: owner().subject().to_owned(),
+            team_id: String::new(),
         };
         let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
         store
@@ -276,6 +365,8 @@ mod tests {
             grant_ref: "grant:replaced".to_owned(),
             initiation: InitiationConfig::Provider,
             allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
+            owner_subject: owner().subject().to_owned(),
+            team_id: String::new(),
         };
         lock(&backend.inner.metadata)
             .connections
