@@ -9,6 +9,7 @@ use protocol::connection::{
 use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
 use protocol::operation::{OperationError, OperationRequest, OperationResult, OwnerContext};
 use serde::Serialize;
+use zeroize::Zeroizing;
 
 /// The identity which actually reached the Connector application boundary.
 ///
@@ -146,6 +147,48 @@ pub struct BackendCapabilities {
     pub events: bool,
 }
 
+/// Secret-bearing, bounded completion payload. Diagnostics never reveal its contents and its
+/// allocation is cleared on drop.
+pub struct HostedCompletionSubmission(Zeroizing<Vec<u8>>);
+
+impl HostedCompletionSubmission {
+    #[must_use]
+    pub fn new(value: Vec<u8>) -> Self {
+        Self(Zeroizing::new(value))
+    }
+
+    #[must_use]
+    pub fn expose_secret(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl std::fmt::Debug for HostedCompletionSubmission {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("HostedCompletionSubmission(<redacted>)")
+    }
+}
+
+/// Value-free hosted Connect Session page supplied by the owning Integration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostedCompletionPage {
+    pub title: &'static str,
+    pub html: &'static str,
+}
+
+/// Closed refusal vocabulary for capability-authenticated hosted credential completion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum HostedCompletionError {
+    #[error("hosted Connect Session was not found")]
+    NotFound,
+    #[error("hosted Connect Session capability was refused")]
+    Refused,
+    #[error("hosted Connect Session submission was invalid")]
+    Invalid,
+    #[error("hosted Connect Session completion is unavailable")]
+    Unavailable,
+}
+
 impl BackendCapabilities {
     pub const OPERATIONS: Self = Self {
         operations: true,
@@ -177,6 +220,26 @@ pub trait ConnectorBackend: Send + Sync + 'static {
 
     fn owns_event(&self, _request: &EventRequest) -> bool {
         false
+    }
+
+    fn owns_hosted_completion(&self, _connect_session_ref: &str) -> bool {
+        false
+    }
+
+    fn hosted_completion_page(
+        &self,
+        _connect_session_ref: &str,
+    ) -> Result<HostedCompletionPage, HostedCompletionError> {
+        Err(HostedCompletionError::NotFound)
+    }
+
+    async fn complete_hosted_session(
+        &self,
+        _connect_session_ref: &str,
+        _capability: &str,
+        _submission: HostedCompletionSubmission,
+    ) -> Result<(), HostedCompletionError> {
+        Err(HostedCompletionError::NotFound)
     }
 
     async fn handle(

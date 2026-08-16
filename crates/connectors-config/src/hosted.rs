@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use connector_address::credential::CredentialRef;
 
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
-use crate::personal::B10xIntegrationConfig;
+use crate::personal::{B10xIntegrationConfig, InitiationConfig, SlackIntegrationConfig};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
@@ -20,13 +20,51 @@ pub struct HostedServerConfig {
     pub tenant_id: String,
     pub server: HostedListenerConfig,
     pub identity: HostedIdentityConfig,
+    #[serde(default)]
+    pub authority: HostedAuthorityConfig,
     pub storage: HostedStorageConfig,
     pub kubernetes: HostedKubernetesConfig,
     #[serde(default)]
     pub vault: HostedVaultConfig,
     pub sip: HostedSipConfig,
     #[serde(default)]
+    pub slack: Option<HostedSlackConfig>,
+    #[serde(default)]
     pub b10x: Option<B10xIntegrationConfig>,
+}
+
+/// Value-free hosted Slack policy. Every credential still arrives through a Connect Session and
+/// is committed only by the configured SecretStore.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedSlackConfig {
+    pub public_origin: String,
+    pub grant_ref: String,
+    pub initiation: InitiationConfig,
+    pub allowed_events: Vec<String>,
+    #[serde(default = "default_connect_session_ttl_seconds")]
+    pub connect_session_ttl_seconds: u64,
+}
+
+impl HostedSlackConfig {
+    #[must_use]
+    pub fn policy(&self) -> SlackIntegrationConfig {
+        SlackIntegrationConfig {
+            grant_ref: self.grant_ref.clone(),
+            initiation: self.initiation,
+            allowed_events: self.allowed_events.clone(),
+            connect_session_ttl_seconds: self.connect_session_ttl_seconds,
+        }
+    }
+}
+
+/// Receiver-owned mapping from Identity-verified group facts to hosted Connector operators.
+/// An empty mapping admits no effect-bearing hosted request.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedAuthorityConfig {
+    #[serde(default)]
+    pub operator_groups: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,6 +181,19 @@ impl HostedServerConfig {
             && self.vault.role.is_none()
             && self.vault.token_file.is_none()
             && self.vault.ca_file.is_none();
+        let slack_valid = self.slack.as_ref().is_none_or(|slack| {
+            let origin = url::Url::parse(&slack.public_origin);
+            origin.is_ok_and(|origin| {
+                origin.scheme() == "https"
+                    && origin.host_str().is_some()
+                    && origin.username().is_empty()
+                    && origin.password().is_none()
+                    && origin.query().is_none()
+                    && origin.fragment().is_none()
+                    && origin.path() == self.server.base_path
+            }) && slack.policy().validate().is_ok()
+        });
+        let vault_required = self.sip.credentials.is_some() || self.slack.is_some();
         let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
         let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
             credentials.authority == NATIVE_SIP_AUTHORITY
@@ -177,13 +228,14 @@ impl HostedServerConfig {
             || !sip_credentials_valid
             || (self.vault.enabled && !vault_complete)
             || (!self.vault.enabled && !vault_empty)
-            || (self.vault.enabled != self.sip.credentials.is_some())
-            || (self.vault.enabled && !self.sip.enabled)
+            || (self.vault.enabled != vault_required)
             || !valid_dns_label(&self.vault.mount, 63)
             || self
                 .b10x
                 .as_ref()
                 .is_some_and(|b10x| b10x.validate().is_err())
+            || !valid_groups(&self.authority.operator_groups)
+            || !slack_valid
         {
             return Err(HostedServerConfigError::Invalid);
         }
@@ -197,8 +249,27 @@ impl HostedServerConfig {
     }
 }
 
+fn valid_groups(groups: &[String]) -> bool {
+    let mut canonical = groups.to_vec();
+    canonical.sort();
+    canonical.dedup();
+    canonical == groups
+        && groups.iter().all(|group| {
+            (1..=64).contains(&group.len())
+                && group.bytes().enumerate().all(|(index, byte)| {
+                    byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit() && index > 0
+                        || matches!(byte, b'-' | b'_') && index > 0
+                })
+        })
+}
+
 fn default_vault_mount() -> String {
     "secret".to_owned()
+}
+
+fn default_connect_session_ttl_seconds() -> u64 {
+    300
 }
 
 fn default_kubernetes_token_file() -> PathBuf {

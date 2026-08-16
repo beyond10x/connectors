@@ -7,9 +7,9 @@ mod hosted;
 mod personal;
 
 pub use hosted::{
-    HostedIdentityConfig, HostedKubernetesConfig, HostedListenerConfig, HostedServerConfig,
-    HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig, HostedStorageConfig,
-    HostedVaultConfig,
+    HostedAuthorityConfig, HostedIdentityConfig, HostedKubernetesConfig, HostedListenerConfig,
+    HostedServerConfig, HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig,
+    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig,
 };
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,

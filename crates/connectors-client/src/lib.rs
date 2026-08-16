@@ -459,6 +459,7 @@ pub struct HostedClient {
     http: reqwest::Client,
     operations: Url,
     connections: Url,
+    events: Url,
 }
 
 impl HostedClient {
@@ -537,10 +538,41 @@ impl HostedClient {
         validate_connection_response(response, &request_id)
     }
 
+    /// Sends one hosted Event request with an ephemeral Identity bearer.
+    pub async fn event(
+        &self,
+        bearer: &str,
+        context: &operation::OwnerContext,
+        request: event::EventRequest,
+    ) -> Result<event::ResponseEnvelope, ClientError> {
+        require_bearer(bearer)?;
+        let request_id = request_id();
+        let envelope = event::RequestEnvelope {
+            protocol: event::CONTRACT.to_owned(),
+            request_id: request_id.clone(),
+            context: context.clone(),
+            request,
+        };
+        envelope
+            .validate()
+            .map_err(|error| ClientError::InvalidRequest(error.to_string()))?;
+        let response = self
+            .exchange(
+                &self.events,
+                bearer,
+                &envelope,
+                event::MAX_FRAME_BYTES,
+                event::MAX_RESPONSE_BYTES,
+            )
+            .await?;
+        validate_event_response(response, &request_id)
+    }
+
     fn from_parts(base: Url, http: reqwest::Client) -> Self {
         Self {
             operations: endpoint(&base, "operations"),
             connections: endpoint(&base, "connections"),
+            events: endpoint(&base, "events"),
             http,
         }
     }

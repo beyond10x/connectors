@@ -33,6 +33,14 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
         "cross-platform owner-bound store pending format and platform split",
     ),
     (
+        "crates/integration-slack/src/backend.rs",
+        2_360,
+        "the first hosted companion slice keeps acquisition recovery, Socket Mode supervision, \
+         event persistence, and outcome-aware audit together while their shared transaction \
+         invariants settle; the final growth closes hosted-session expiry, and no further growth \
+         is admitted before those arms split",
+    ),
+    (
         "crates/catalog-build/src/document.rs",
         2_568,
         "canonical lowering pending section-oriented extraction; +27 for the closed `audio_v1` \

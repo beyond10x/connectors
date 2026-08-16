@@ -79,6 +79,11 @@ changes owners. This is the milestone at which the client contract is real.
   **Add Slack** equivalent. Slack's app-level token is app-wide, so moving its custody to Integration
   and acquiring workspace Connections through OAuth remains required before a multi-workspace
   product claim.
+- 2026-08-16 — the hosted companion slice adds exact-scope Identity/operator admission, a
+  same-origin browser Connect Session, Vault-prepared Integration app-token plus workspace
+  bot/user-token custody, value-free Connection publication, and audited Slack user reads and
+  approval-required bot writes. It proves the selected hosted path, not general OAuth,
+  reauthorization, arbitrary Grant administration, or the full M3 exit.
 
 ## Notes
 

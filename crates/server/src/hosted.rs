@@ -4,9 +4,10 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use axum::extract::{DefaultBodyLimit, State};
+use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
 use axum::http::{header, HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Json, Response};
+use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use protocol::catalog::{
@@ -16,14 +17,21 @@ use protocol::connection::{
     ConnectionError, ConnectionErrorCode, RequestEnvelope as ConnectionRequestEnvelope,
     ResponseEnvelope as ConnectionResponseEnvelope, MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES,
 };
+use protocol::event::{
+    EventError, EventErrorCode, RequestEnvelope as EventRequestEnvelope,
+    ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
+};
 use protocol::operation::{
     OperationError, OperationErrorCode, RequestEnvelope, ResponseEnvelope,
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::Serialize;
-use service::{ConnectorBackend, PrincipalContext};
+use service::{
+    ConnectorBackend, HostedCompletionError, HostedCompletionSubmission, PrincipalContext,
+};
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
+const MAX_COMPLETION_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostedPrincipal {
@@ -33,6 +41,7 @@ pub struct HostedPrincipal {
     pub actor_subject: String,
     pub token_id: String,
     pub scopes: BTreeSet<String>,
+    pub groups: BTreeSet<String>,
     pub authority_snapshot_sha256: String,
     pub deployment_id: Option<String>,
 }
@@ -50,6 +59,25 @@ impl HostedPrincipal {
             self.token_id.clone(),
             self.authority_snapshot_sha256.clone(),
         )
+    }
+}
+
+/// Receiver-owned admission policy for effect-bearing hosted Connector request families.
+#[derive(Debug, Clone, Default)]
+pub struct HostedAdmissionPolicy {
+    operator_groups: BTreeSet<String>,
+}
+
+impl HostedAdmissionPolicy {
+    #[must_use]
+    pub fn new(operator_groups: impl IntoIterator<Item = String>) -> Self {
+        Self {
+            operator_groups: operator_groups.into_iter().collect(),
+        }
+    }
+
+    fn admits_operator(&self, principal: &HostedPrincipal) -> bool {
+        !self.operator_groups.is_empty() && !self.operator_groups.is_disjoint(&principal.groups)
     }
 }
 
@@ -76,6 +104,7 @@ pub trait IdentityVerifier: Send + Sync + 'static {
 struct HostedState {
     verifier: Arc<dyn IdentityVerifier>,
     backend: Arc<dyn ConnectorBackend>,
+    policy: HostedAdmissionPolicy,
 }
 
 #[derive(Debug, Serialize)]
@@ -84,7 +113,11 @@ struct ErrorBody {
     error: &'static str,
 }
 
-pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn ConnectorBackend>) -> Router {
+pub fn router(
+    verifier: Arc<dyn IdentityVerifier>,
+    backend: Arc<dyn ConnectorBackend>,
+    policy: HostedAdmissionPolicy,
+) -> Router {
     Router::new()
         .route("/livez", get(liveness))
         .route("/readyz", get(readiness))
@@ -101,7 +134,117 @@ pub fn router(verifier: Arc<dyn IdentityVerifier>, backend: Arc<dyn ConnectorBac
             "/catalog",
             post(catalog).layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
         )
-        .with_state(HostedState { verifier, backend })
+        .route(
+            "/events",
+            post(event).layer(DefaultBodyLimit::max(EVENT_MAX_FRAME_BYTES)),
+        )
+        .route(
+            "/connect-sessions/{session_ref}",
+            get(completion_page)
+                .post(complete_session)
+                .layer(DefaultBodyLimit::max(MAX_COMPLETION_BYTES)),
+        )
+        .with_state(HostedState {
+            verifier,
+            backend,
+            policy,
+        })
+}
+
+async fn completion_page(
+    State(state): State<HostedState>,
+    AxumPath(session_ref): AxumPath<String>,
+) -> Response {
+    let response = match state.backend.hosted_completion_page(&session_ref) {
+        Ok(page) => Html(page.html).into_response(),
+        Err(HostedCompletionError::NotFound | HostedCompletionError::Refused) => {
+            error(StatusCode::NOT_FOUND, "connect-session-not-found")
+        }
+        Err(HostedCompletionError::Invalid) => {
+            error(StatusCode::BAD_REQUEST, "connect-session-invalid")
+        }
+        Err(HostedCompletionError::Unavailable) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "connect-session-unavailable",
+        ),
+    };
+    secure_completion_response(response)
+}
+
+async fn complete_session(
+    State(state): State<HostedState>,
+    AxumPath(session_ref): AxumPath<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let capability = headers
+        .get("x-connect-session")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| {
+            !value.is_empty()
+                && value.len() <= 256
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        });
+    if headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        != Some("application/octet-stream")
+        || capability.is_none()
+        || body.is_empty()
+    {
+        return secure_completion_response(error(
+            StatusCode::BAD_REQUEST,
+            "connect-session-invalid",
+        ));
+    }
+    let result = state
+        .backend
+        .complete_hosted_session(
+            &session_ref,
+            capability.expect("checked capability"),
+            HostedCompletionSubmission::new(body.to_vec()),
+        )
+        .await;
+    let response = match result {
+        Ok(()) => Json(serde_json::json!({"accepted": true})).into_response(),
+        Err(HostedCompletionError::NotFound | HostedCompletionError::Refused) => {
+            error(StatusCode::FORBIDDEN, "connect-session-refused")
+        }
+        Err(HostedCompletionError::Invalid) => {
+            error(StatusCode::BAD_REQUEST, "connect-session-invalid")
+        }
+        Err(HostedCompletionError::Unavailable) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "connect-session-unavailable",
+        ),
+    };
+    secure_completion_response(response)
+}
+
+fn secure_completion_response(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CACHE_CONTROL,
+        "no-store".parse().expect("static header"),
+    );
+    headers.insert("pragma", "no-cache".parse().expect("static header"));
+    headers.insert(
+        "referrer-policy",
+        "no-referrer".parse().expect("static header"),
+    );
+    headers.insert(
+        "x-content-type-options",
+        "nosniff".parse().expect("static header"),
+    );
+    headers.insert(
+        "content-security-policy",
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"
+            .parse()
+            .expect("static header"),
+    );
+    response
 }
 
 async fn connection(
@@ -154,12 +297,13 @@ async fn connection(
         protocol::connection::ConnectionRequest::CandidateActivate(_)
             | protocol::connection::ConnectionRequest::Materialize(_)
             | protocol::connection::ConnectionRequest::ConnectSessionCreate(_)
-    ) {
+    ) && !state.policy.admits_operator(&principal)
+    {
         return connection_failure(
             &request.request_id,
             ConnectionError::new(
                 ConnectionErrorCode::NotGranted,
-                "hosted connection mutation is disabled until Connector-owned management policy is configured",
+                "the Connector-owned management policy does not admit this principal",
                 false,
             ),
             StatusCode::FORBIDDEN,
@@ -283,12 +427,13 @@ async fn operation(
             | protocol::operation::OperationRequest::SessionStatus(_)
             | protocol::operation::OperationRequest::SessionTerminate(_)
             | protocol::operation::OperationRequest::SessionReconcile(_)
-    ) {
+    ) && !state.policy.admits_operator(&principal)
+    {
         return operation_failure(
             &request.request_id,
             OperationError::new(
                 OperationErrorCode::NotGranted,
-                "hosted invocation is disabled until Connector-owned Grant admission is configured",
+                "the Connector-owned management policy does not admit this principal",
                 false,
             ),
             StatusCode::FORBIDDEN,
@@ -301,6 +446,51 @@ async fn operation(
     let response = match state.backend.handle(&owner, request.request).await {
         Ok(result) => ResponseEnvelope::success(&request.request_id, result),
         Err(error) => ResponseEnvelope::failure(&request.request_id, error),
+    };
+    Json(response).into_response()
+}
+
+async fn event(
+    State(state): State<HostedState>,
+    headers: HeaderMap,
+    Json(request): Json<EventRequestEnvelope>,
+) -> Response {
+    if let Err(error) = request.validate() {
+        return event_failure(&request.request_id, error, StatusCode::BAD_REQUEST);
+    }
+    let Some(credential) = bearer(&headers) else {
+        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
+    };
+    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
+        Ok(principal) => principal,
+        Err(IdentityVerificationError::Refused) => {
+            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
+        }
+        Err(IdentityVerificationError::Unavailable) => {
+            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
+        }
+    };
+    if principal.tenant_id != request.context.tenant_id
+        || !principal.allows("connectors.events.read")
+        || !state.policy.admits_operator(&principal)
+    {
+        return event_failure(
+            &request.request_id,
+            EventError::new(
+                EventErrorCode::NotGranted,
+                "the verified authority does not admit Connector event reads",
+                false,
+            ),
+            StatusCode::FORBIDDEN,
+        );
+    }
+    let owner = match principal.principal_context() {
+        Ok(owner) => owner,
+        Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
+    };
+    let response = match state.backend.handle_event(&owner, request.request).await {
+        Ok(result) => EventResponseEnvelope::success(&request.request_id, result),
+        Err(error) => EventResponseEnvelope::failure(&request.request_id, error),
     };
     Json(response).into_response()
 }
@@ -326,6 +516,14 @@ fn connection_failure(request_id: &str, failure: ConnectionError, status: Status
     (
         status,
         Json(ConnectionResponseEnvelope::failure(request_id, failure)),
+    )
+        .into_response()
+}
+
+fn event_failure(request_id: &str, failure: EventError, status: StatusCode) -> Response {
+    (
+        status,
+        Json(EventResponseEnvelope::failure(request_id, failure)),
     )
         .into_response()
 }
@@ -365,7 +563,9 @@ mod tests {
                     "connectors.catalog.read".to_owned(),
                     "connectors.connections.manage".to_owned(),
                     "connectors.invoke".to_owned(),
+                    "connectors.events.read".to_owned(),
                 ]),
+                groups: BTreeSet::from(["operator".to_owned()]),
                 authority_snapshot_sha256: "b".repeat(64),
                 deployment_id: None,
             })
@@ -437,7 +637,11 @@ mod tests {
 
     #[tokio::test]
     async fn hosted_route_requires_identity_and_exact_tenant_binding() {
-        let app = router(Arc::new(Verifier), Arc::new(Backend));
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
         let request = Request::post("/operations")
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(
@@ -471,7 +675,11 @@ mod tests {
 
     #[tokio::test]
     async fn hosted_connection_route_uses_the_same_identity_boundary() {
-        let app = router(Arc::new(Verifier), Arc::new(Backend));
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
         let request = Request::post("/connections")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::AUTHORIZATION, "Bearer access")
@@ -484,7 +692,11 @@ mod tests {
 
     #[tokio::test]
     async fn hosted_liveness_and_identity_backed_readiness_are_distinct() {
-        let app = router(Arc::new(Verifier), Arc::new(Backend));
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
         assert_eq!(
             app.clone()
                 .oneshot(Request::get("/livez").body(Body::empty()).unwrap())
@@ -500,5 +712,34 @@ mod tests {
                 .status(),
             StatusCode::OK
         );
+    }
+
+    #[tokio::test]
+    async fn hosted_completion_failures_are_non_cacheable_and_browser_hardened() {
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
+        for request in [
+            Request::get("/connect-sessions/connect-session:unknown")
+                .body(Body::empty())
+                .unwrap(),
+            Request::post("/connect-sessions/connect-session:unknown")
+                .header(header::CONTENT_TYPE, "text/plain")
+                .body(Body::from("refused"))
+                .unwrap(),
+        ] {
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL).unwrap(),
+                "no-store"
+            );
+            assert_eq!(
+                response.headers().get("referrer-policy").unwrap(),
+                "no-referrer"
+            );
+            assert!(response.headers().contains_key("content-security-policy"));
+        }
     }
 }

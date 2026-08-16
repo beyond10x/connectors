@@ -30,8 +30,8 @@ pub use dispatch::{
 };
 pub use planning::{plan_operation, PlanError, PlanningEnvironment};
 pub use runtime::{
-    BackendCapabilities, ConnectorBackend, PrincipalContext, PrincipalContextError,
-    PrincipalIdentity,
+    BackendCapabilities, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
+    HostedCompletionSubmission, PrincipalContext, PrincipalContextError, PrincipalIdentity,
 };
 pub use sip::{
     admit_sip_dial, admit_sip_plan, validate_sip_deployment_route, AdmittedSipPlan,

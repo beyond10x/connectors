@@ -50,6 +50,7 @@ struct VerificationResponse {
     scope: String,
     dl_principal_kind: String,
     dl_tenant: String,
+    groups: Vec<String>,
     #[serde(default)]
     dl_deployment: Option<String>,
 }
@@ -158,6 +159,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
             serde_json::from_slice(&bytes).map_err(|_| IdentityVerificationError::Unavailable)?;
         let now = unix_time().ok_or(IdentityVerificationError::Unavailable)?;
         let scopes = validate_scopes(&admitted.scope).ok_or(IdentityVerificationError::Refused)?;
+        let groups = validate_groups(&admitted.groups).ok_or(IdentityVerificationError::Refused)?;
         if admitted.iss != self.expected_issuer
             || admitted.aud != CONNECTORS_AUDIENCE
             || admitted.dl_tenant != self.expected_tenant
@@ -189,10 +191,28 @@ impl IdentityVerifier for IdentityHttpVerifier {
             actor_subject: admitted.act.sub,
             token_id: admitted.jti,
             scopes,
+            groups,
             authority_snapshot_sha256,
             deployment_id: admitted.dl_deployment,
         })
     }
+}
+
+fn validate_groups(value: &[String]) -> Option<BTreeSet<String>> {
+    let groups = value.iter().cloned().collect::<BTreeSet<_>>();
+    if groups.len() != value.len()
+        || groups.iter().any(|group| {
+            !(1..=64).contains(&group.len())
+                || !group.bytes().enumerate().all(|(index, byte)| {
+                    byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit() && index > 0
+                        || matches!(byte, b'-' | b'_') && index > 0
+                })
+        })
+    {
+        return None;
+    }
+    Some(groups)
 }
 
 fn valid_access_token(value: &str) -> bool {

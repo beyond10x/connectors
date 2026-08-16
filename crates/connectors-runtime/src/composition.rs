@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use connector_secrets::{FileStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connectors_config::{HostedServerConfig, PersonalConfig};
-use hosted_vault::HostedVaultStore;
+use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_b10x::{B10xBackend, B10xIntegrationError};
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
@@ -244,17 +244,43 @@ pub struct HostedRuntime {
     backend: Arc<BackendRegistry>,
     readiness: Value,
 }
+
+struct HostedCredentialStores {
+    values: Option<Arc<dyn SecretStore>>,
+    prepared: Option<Arc<dyn PreparedSecretStore>>,
+}
+
 impl HostedRuntime {
     /// Build the hosted backend registry and bind its TCP listener.
     pub async fn bind(config_path: &Path) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
         validate_state_root(&config.storage.state_root)?;
-        let credential_store: Option<Arc<dyn SecretStore>> = if config.vault.enabled {
+        let credential_stores = if config.vault.enabled {
             let store = HostedVaultStore::new(&config.vault)?;
             store.initialize().await?;
-            Some(Arc::new(store))
+            let store = Arc::new(store);
+            let secret_store: Arc<dyn SecretStore> = store;
+            let prepared = PreparedVaultStore::open(
+                secret_store.clone(),
+                config
+                    .storage
+                    .state_root
+                    .join("vault-prepared-transactions.json"),
+            )
+            .map_err(|_| RuntimeError::CredentialStore)?;
+            prepared
+                .initialize()
+                .await
+                .map_err(|_| RuntimeError::CredentialStore)?;
+            HostedCredentialStores {
+                values: Some(secret_store),
+                prepared: Some(Arc::new(prepared)),
+            }
         } else {
-            None
+            HostedCredentialStores {
+                values: None,
+                prepared: None,
+            }
         };
         let identity_origin = url::Url::parse(&config.identity.origin)
             .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
@@ -292,7 +318,8 @@ impl HostedRuntime {
             }
             let issuer = Arc::new(load_authority_issuer(&voice.authority)?);
             let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
-                let store = credential_store
+                let store = credential_stores
+                    .values
                     .as_ref()
                     .ok_or(connectors_config::HostedServerConfigError::Invalid)?
                     .clone();
@@ -330,9 +357,31 @@ impl HostedRuntime {
                 &config.storage.state_root,
             )?));
         }
+        let slack_enabled = config.slack.is_some();
+        if let Some(slack) = config.slack {
+            let public_origin = url::Url::parse(&slack.public_origin)
+                .map_err(|_| connectors_config::HostedServerConfigError::Invalid)?;
+            let store = credential_stores
+                .prepared
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            backends.push(Arc::new(
+                SlackBackend::open_hosted(
+                    config.tenant_id.clone(),
+                    public_origin,
+                    slack.policy(),
+                    &config.storage.state_root,
+                    store,
+                )
+                .await?,
+            ));
+        }
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
-        let connector_router = server::hosted::router(verifier, backend.clone());
+        let admission =
+            server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone());
+        let connector_router = server::hosted::router(verifier, backend.clone(), admission);
         let application = if config.server.base_path == "/" {
             connector_router
         } else {
@@ -349,6 +398,7 @@ impl HostedRuntime {
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
             "b10x_enabled": b10x_enabled,
+            "slack_enabled": slack_enabled,
         });
         Ok(Self {
             listener,

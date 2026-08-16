@@ -1,6 +1,6 @@
 # Design 06: personal Slack Socket Mode through Connection custody
 
-**Status:** personal-local alpha implemented; general M3/M4 stores and Agent adapter remain open · **Date:** 2026-08-14
+**Status:** personal-local alpha plus hosted companion slice implemented; full M3/M4 remain open · **Date:** 2026-08-16
 
 This document fixes the boundary for receiving Slack messages without letting Agent, a harness, a
 model, configuration, or ambient process state read the Slack app token. It specializes the generic
@@ -91,6 +91,15 @@ that Integration, Slack OAuth creates stable workspace Connections with their in
 credentials, and inbound `team_id`/`enterprise_id` attribution routes each event to the right
 Connection and Grant. The generic Connection and Event contracts do not change for that move.
 
+**2026-08-16 hosted companion amendment.** The first hosted slice now applies that ownership split
+with operator-entered credentials: one Vault-held Integration `xapp` token drives one supervised
+Socket Mode connection, while every workspace Connection binds a bot `xoxb` token and a delegated
+user `xoxp` token validated against the same `team_id`. Bot writes and delegated-user reads are
+separate admitted operations. A short-lived same-origin HTTPS Connect Session submits all three
+values directly to Connectors, prepares them in Vault as one transaction, and publishes no
+Connection metadata until commit. Only capability-fragment digests and terminal value-free state
+exist outside SecretStore custody.
+
 The personal-local daemon creates one Unix socket below `<state>/connect-sessions/`, mode `0600`
 inside an owner-only directory. It accepts one same-UID peer, removes the socket before processing,
 bounds and validates one newline-terminated app-level token, and returns only
@@ -164,7 +173,9 @@ The alpha `b10x.connector-event.v0alpha1` contract exposes bounded `search`, `re
 polled provenance, receipt time, and the schema-bound normalized payload. It cannot carry a
 credential address, completion endpoint, WebSocket URL, or Slack transport envelope.
 
-Personal local uses long-poll receive over the owner-authenticated Unix socket. That proves durable
+Personal local uses long-poll receive over the owner-authenticated Unix socket. Hosted uses the
+same normalized durable event model behind an exact-scope Identity-authenticated HTTPS pull; the
+Socket Mode supervisor remains hosted and does not depend on a connected Agent. That proves durable
 pull and replay for one provider; it does not claim M4 completion. M4 still requires general
 Connection/Grant/subscription persistence, authenticated multiplexed WebSocket subscriptions,
 durable signed push deliveries and retry queues, operational-event separation, retention, audit,
