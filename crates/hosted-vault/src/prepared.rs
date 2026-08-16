@@ -98,16 +98,19 @@ impl PreparedVaultStore {
     /// Resolve incomplete commits and remove incomplete staging before the store is exposed.
     pub async fn initialize(&self) -> Result<(), StoreError> {
         let mut journal = self.journal.lock().await;
+        let mut journal_changed = false;
         for index in 0..journal.transactions.len() {
             match journal.transactions[index].phase {
                 Phase::Staging => {
                     self.remove_staged(&journal.transactions[index]).await?;
                     journal.transactions[index].phase = Phase::Aborted;
+                    journal_changed = true;
                 }
                 Phase::Committing => {
                     self.publish(&journal.transactions[index]).await?;
                     journal.transactions[index].phase = Phase::Committed;
                     write_journal(&self.journal_path, &journal)?;
+                    journal_changed = false;
                     self.remove_staged(&journal.transactions[index]).await?;
                 }
                 Phase::Committed => {
@@ -116,7 +119,10 @@ impl PreparedVaultStore {
                 Phase::Prepared | Phase::Aborted => {}
             }
         }
-        write_journal(&self.journal_path, &journal)
+        if journal_changed {
+            write_journal(&self.journal_path, &journal)?;
+        }
+        Ok(())
     }
 
     async fn publish(&self, transaction: &Transaction) -> Result<(), StoreError> {
@@ -611,6 +617,19 @@ mod tests {
         );
         batch.put(reference, Secret::new(value)).expect("valid put");
         batch
+    }
+
+    #[tokio::test]
+    async fn clean_initialize_does_not_create_an_empty_journal() {
+        let root = tempfile::tempdir().expect("temporary root");
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).expect("owner mode");
+        let journal = root.path().join("vault-prepared-transactions.json");
+        let store =
+            PreparedVaultStore::open(Arc::new(MemoryStore::new()), journal.clone()).expect("open");
+
+        store.initialize().await.expect("initialize");
+
+        assert!(!journal.exists());
     }
 
     #[tokio::test]
