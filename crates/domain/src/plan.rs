@@ -7,6 +7,8 @@ use crate::{ConnectionAuthority, RouteAdapter};
 pub enum DriverId {
     HttpV1,
     SipV1,
+    AudioV1,
+    CdpV1,
 }
 
 impl DriverId {
@@ -15,6 +17,8 @@ impl DriverId {
         match self {
             Self::HttpV1 => "http_v1",
             Self::SipV1 => "sip_v1",
+            Self::AudioV1 => "audio_v1",
+            Self::CdpV1 => "cdp_v1",
         }
     }
 }
@@ -159,12 +163,29 @@ pub struct SipPlan {
     pub connection: String,
 }
 
-/// Exactly one closed driver plan. HTTP and SIP fields cannot coexist.
+/// An inert local-audio plan. The synthesizer, voice model and audio sink are deployment-selected
+/// facts resolved after admission; no caller-provided path, device or executable appears here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AudioPlan {
+    pub connection: String,
+}
+
+/// An inert browser plan. The executable, the dedicated profile directory and the artifact
+/// directory are deployment-selected facts resolved after admission; no caller-provided path,
+/// executable or address appears here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrowserPlan {
+    pub connection: String,
+}
+
+/// Exactly one closed driver plan. HTTP, SIP, audio and browser fields cannot coexist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolPlan {
     HttpV1(HttpPlan),
     MediatedHttpV1(MediatedHttpPlan),
     SipV1(SipPlan),
+    AudioV1(AudioPlan),
+    CdpV1(BrowserPlan),
 }
 
 impl ProtocolPlan {
@@ -173,6 +194,8 @@ impl ProtocolPlan {
             Self::HttpV1(_) => DriverId::HttpV1,
             Self::MediatedHttpV1(_) => DriverId::HttpV1,
             Self::SipV1(_) => DriverId::SipV1,
+            Self::AudioV1(_) => DriverId::AudioV1,
+            Self::CdpV1(_) => DriverId::CdpV1,
         }
     }
 }

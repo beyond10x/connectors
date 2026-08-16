@@ -44,16 +44,19 @@
 //! 12. [`the_credential_requirement_agrees_with_the_auth_list`] — the stored token (S-001) is
 //!     `declared` exactly when the effective `auth` list is non-empty; the empty side carries one
 //!     of the two distinction tokens the old derivation could not tell apart.
-//! 13. [`no_sip_provider_is_advertised_before_its_atomic_catalog_change`] — the closed runtime
-//!     vocabulary can land first, but no effective connector member claims it before source,
-//!     dispatch, and generated artifacts arrive together.
+//! 13. [`sip_catalog_surface_is_the_bounded_b10x_dial_member`] — the closed runtime
+//!     vocabulary can land first, but only the repository-owned B10x Provider may publish
+//!     the bounded native SIP member; a configured PBX remains a peer rather than its owner.
+//! 14. [`the_browser_surface_is_read_only_and_carries_no_interaction_member`] — every `cdp_v1`
+//!     member is a B10x-owned read on a lease, and no interaction member exists anywhere in
+//!     the catalogue: clicking and typing are mutations and wait on the approval round-trip.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use catalog_build::pipeline::{self, Plan};
 use catalog_build::workspace::Workspace;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 // ---------------------------------------------------------------------------------------------
 // The subject
@@ -117,7 +120,7 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
 /// must make the same source/runtime case explicitly instead of inheriting permission from the
 /// existence of the driver vocabulary.
 #[test]
-fn sip_catalog_surface_is_the_bounded_dial_member() {
+fn sip_catalog_surface_is_the_bounded_b10x_dial_member() {
     let (workspace, plan) = full_plan();
     let sip = documents(&workspace, &plan)
         .into_iter()
@@ -137,7 +140,21 @@ fn sip_catalog_surface_is_the_bounded_dial_member() {
         "every SIP member needs an atomic source/runtime review"
     );
     let (provider, operation) = &sip[0];
-    assert_eq!(provider, "asterisk");
+    assert_eq!(provider, "b10x");
+    assert_eq!(
+        documents(&workspace, &plan)["asterisk"]["operations"]
+            .as_array()
+            .expect("Asterisk operations")
+            .iter()
+            .filter(|operation| operation["protocol_driver"] == "sip_v1")
+            .count(),
+        0,
+        "Asterisk is only a configurable SIP peer, never the native capability owner"
+    );
+    assert_eq!(
+        documents(&workspace, &plan)["b10x"]["authority"],
+        "io.b10x"
+    );
     assert_eq!(operation["id"], "sip-dial");
     assert_eq!(operation["interaction_shape"], "session_establishment");
     assert_eq!(operation["risk"], "high");
@@ -146,6 +163,104 @@ fn sip_catalog_surface_is_the_bounded_dial_member() {
     assert!(operation.get("endpoint").is_none());
     assert!(operation["request"].get("method").is_none());
     assert!(operation["request"].get("path").is_none());
+
+    let provenance: toml::Value = toml::from_str(
+        &std::fs::read_to_string(repo_root().join("specs/b10x.provenance.toml"))
+            .expect("read B10x source provenance"),
+    )
+    .expect("B10x source provenance is TOML");
+    assert_eq!(provenance["origin"].as_str(), Some("repository-authored"));
+    let provider_bytes = std::fs::read(repo_root().join("providers/b10x.toml"))
+        .expect("read B10x Provider source");
+    let measured_provider_sha256 = connector_spec::sha256_hex(&provider_bytes);
+    assert_eq!(
+        provenance["provider_sha256"].as_str(),
+        Some(measured_provider_sha256.as_str()),
+        "the authored B10x Provider moved without its provenance pin"
+    );
+}
+
+/// **The browser surface is five read-only observations, and interaction is not one of them.**
+///
+/// Clicking, typing and submitting act on someone else's system on the operator's behalf, so they
+/// are mutations and wait on the approval round-trip being built separately. A `cdp_v1` operation
+/// declaring `direction = "write"` — or an interaction id appearing at all — would put an unapproved
+/// write on a surface whose whole claim is that it only reads, so it fails here rather than in
+/// review.
+#[test]
+fn the_browser_surface_is_read_only_and_carries_no_interaction_member() {
+    let (workspace, plan) = full_plan();
+    let documents = documents(&workspace, &plan);
+    let browser: Vec<(String, Value)> = documents
+        .iter()
+        .flat_map(|(provider, document)| {
+            document["operations"]
+                .as_array()
+                .expect("operations")
+                .iter()
+                .filter(|operation| operation["protocol_driver"] == "cdp_v1")
+                .map(|operation| (provider.clone(), operation.clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let ids: Vec<&str> = browser
+        .iter()
+        .map(|(_, operation)| operation["id"].as_str().expect("id"))
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "browser-open",
+            "browser-goto",
+            "browser-snapshot",
+            "browser-screenshot",
+            "browser-close"
+        ],
+        "the browser surface changed shape; every member needs an atomic source/runtime review"
+    );
+
+    for (provider, operation) in &browser {
+        let id = operation["id"].as_str().expect("id");
+        assert_eq!(provider, "b10x", "{id} is not B10x-owned");
+        assert_eq!(
+            operation["direction"], "read",
+            "{id} is not read-only, so it needs the approval round-trip first"
+        );
+        assert_eq!(
+            operation["interaction_shape"], "leased_session",
+            "{id} does not hold a lease, but a browser spans calls"
+        );
+        assert_eq!(operation["placement_requirement"], "connectors_deployment");
+        assert_eq!(operation["implementation_form"], "built_in");
+        assert_eq!(
+            operation["required_capabilities"],
+            json!(["public_network", "process"]),
+            "{id} must declare the process and network authority the whole lease needs"
+        );
+        assert_eq!(operation["auth"], json!([]), "{id} holds no credential");
+        assert!(operation.get("endpoint").is_none());
+        assert!(operation["request"].get("method").is_none());
+        assert!(operation["request"].get("path").is_none());
+    }
+
+    // Whole-catalogue, not just this provider: an interaction member arriving anywhere behind this
+    // driver is the failure this test exists for.
+    for document in documents.values() {
+        for operation in document["operations"].as_array().expect("operations") {
+            let id = operation["id"].as_str().expect("id");
+            assert!(
+                ![
+                    "browser-act",
+                    "browser-click",
+                    "browser-type",
+                    "browser-submit"
+                ]
+                .contains(&id),
+                "{id} is interaction and must not join a read-only surface"
+            );
+        }
+    }
 }
 
 /// Slack is the first provider whose bearer credentials have materially different capability

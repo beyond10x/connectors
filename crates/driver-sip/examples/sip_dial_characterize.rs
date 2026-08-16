@@ -8,7 +8,7 @@ use std::time::Duration;
 use connector_resolve::document::Document;
 use domain::voice::{AudioFrame, TerminationReason};
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy};
-use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_TOOL_REF};
+use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF};
 use service::{
     admit_sip_dial, CredentialSet, SipDeploymentRoute, SipDialRouteTable, SipNetworkMode,
     SipSignalingTransport, SocketAperture,
@@ -42,16 +42,16 @@ fn port(name: &str) -> u16 {
 async fn main() {
     let connection = "asterisk-dev-characterization";
     let alias = "asterisk-dev";
-    let document = Document::parse(include_str!("../../../catalog/asterisk.catalog.json"))
-        .expect("canonical Asterisk catalog parses");
+    let document = Document::parse(include_str!("../../../catalog/b10x.catalog.json"))
+        .expect("canonical B10x catalog parses");
     let operation = document
         .operation(SIP_DIAL_OPERATION)
         .expect("sip.dial is published");
     let plan = plan_operation(
-        "asterisk",
+        SIP_DIAL_PROVIDER,
         operation,
         AdmittedOperation::from_grant_decision(
-            "asterisk",
+            SIP_DIAL_PROVIDER,
             SIP_DIAL_OPERATION,
             "development",
             "operator",

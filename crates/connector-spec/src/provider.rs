@@ -2334,6 +2334,8 @@ fn compose(
             path: spec.path.clone(),
         },
         ProtocolDriver::SipV1 => OperationRequest::SipV1,
+        ProtocolDriver::AudioV1 => OperationRequest::AudioV1,
+        ProtocolDriver::CdpV1 => OperationRequest::CdpV1,
     };
 
     let operation = Operation {
@@ -6336,6 +6338,54 @@ fn validate_operations(connector: &Connector, problems: &mut Vec<String>) {
                     problems.push(format!(
                         "operation {id:?} selects `sip_v1` but declares HTTP path, query, or header \
                          parameters; SIP call inputs must use the driver payload"
+                    ));
+                }
+            }
+            OperationRequest::AudioV1 => {
+                // A local device answers one bounded request and returns; it establishes no
+                // direct-byte session and leases nothing. Admitting `audio_v1` under any other
+                // shape would promise a lifecycle the driver does not implement.
+                if operation.interaction_shape != InteractionShape::Unary {
+                    problems.push(format!(
+                        "operation {id:?} selects `audio_v1` with interaction shape {:?}; audio v1 \
+                         is admitted only as `unary`",
+                        operation.interaction_shape
+                    ));
+                }
+                if !operation.params.path.is_empty()
+                    || !operation.params.query.is_empty()
+                    || !operation.params.header.is_empty()
+                    || !operation.params.const_headers.is_empty()
+                {
+                    problems.push(format!(
+                        "operation {id:?} selects `audio_v1` but declares HTTP path, query, or \
+                         header parameters; local-device inputs must use the driver payload"
+                    ));
+                }
+            }
+            OperationRequest::CdpV1 => {
+                // A browser is a resource held across calls: one operation opens the session,
+                // several observe or navigate inside it, one releases it. That is `leased_session`
+                // and nothing else. `unary` would deny that the profile, process and page survive
+                // between calls; `session_establishment` would promise a direct-byte plane and a
+                // short-lived endpoint authority, and there is none — every browser result returns
+                // through the ordinary bounded operation path.
+                if operation.interaction_shape != InteractionShape::LeasedSession {
+                    problems.push(format!(
+                        "operation {id:?} selects `cdp_v1` with interaction shape {:?}; CDP v1 is \
+                         admitted only as `leased_session`",
+                        operation.interaction_shape
+                    ));
+                }
+                if !operation.params.path.is_empty()
+                    || !operation.params.query.is_empty()
+                    || !operation.params.header.is_empty()
+                    || !operation.params.const_headers.is_empty()
+                {
+                    problems.push(format!(
+                        "operation {id:?} selects `cdp_v1` but declares HTTP path, query, or \
+                         header parameters; the browser's own HTTP traffic belongs to the driver, \
+                         not to this operation's request template"
                     ));
                 }
             }

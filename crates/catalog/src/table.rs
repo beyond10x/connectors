@@ -626,12 +626,13 @@ fn build_operation(
         ),
         credentials: leak_requirements(raw.auth.clone()),
         credential_requirement: credential_requirement(raw),
-        // HTTP reaches the operation's service host. SIP has no HTTP destination: its exact
-        // signaling/media apertures are selected from the Connection only after admission.
-        hosts: if raw.protocol_driver == "sip_v1" {
-            &[]
-        } else {
+        // HTTP reaches the operation's service host. A native driver has no HTTP destination: SIP's
+        // exact signaling/media apertures and audio's exact device are selected from the Connection
+        // and the deployment only after admission, so neither publishes a fixed egress host.
+        hosts: if raw.protocol_driver == "http_v1" {
             leak_slice(vec![leak_str(host_of(&raw.id, base_url))])
+        } else {
+            &[]
         },
         contract_description: leak_str(
             raw.contract
@@ -1058,6 +1059,8 @@ fn protocol_driver(operation: &str, word: &str) -> ProtocolDriver {
     match word {
         "http_v1" => ProtocolDriver::HttpV1,
         "sip_v1" => ProtocolDriver::SipV1,
+        "audio_v1" => ProtocolDriver::AudioV1,
+        "cdp_v1" => ProtocolDriver::CdpV1,
         other => panic!("operation `{operation}` declares unknown protocol driver `{other}`"),
     }
 }
@@ -1198,6 +1201,31 @@ mod tests {
         assert_eq!(
             provider.operations[0].protocol_driver,
             ProtocolDriver::SipV1
+        );
+    }
+
+    #[test]
+    fn cdp_v1_survives_the_generated_table() {
+        let document = document(
+            r#", "credential_requirement": "no-credential-required""#,
+            "[]",
+        )
+        .replace(
+            "\"interaction_shape\": \"unary\"",
+            "\"interaction_shape\": \"leased_session\"",
+        )
+        .replace(
+            "\"protocol_driver\": \"http_v1\"",
+            "\"protocol_driver\": \"cdp_v1\"",
+        );
+        let provider = build("t", &document);
+        assert_eq!(
+            provider.operations[0].interaction_shape,
+            InteractionShape::LeasedSession
+        );
+        assert_eq!(
+            provider.operations[0].protocol_driver,
+            ProtocolDriver::CdpV1
         );
     }
 

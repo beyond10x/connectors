@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "baaca7ff4ab8469abe02dff19e975ee3d2b16a3ca476debf55d0d410f65e12e1"
+sha256 = "5a30e26d0f69b3f245443516f1f126c3dcec9583667af84de006842fbfab83f8"
 
 [[provider]]
 id = "airtable"
@@ -80,8 +80,8 @@ generator = "connectors 0.1.0"
 source_url = "https://github.com/asterisk/asterisk/tree/f0e408a7b0d829c85bf15fa4b487870a50cb3000/rest-api"
 upstream_version = "22.10.1"
 spec_sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
-toml_sha256 = "ae61f7451ec11c68c98109a9fdda745a44e5dc5f3503fbb0a7410663c8a17dc3"
-ir_sha256 = "c0f4ea2d25e7d71d3fe486245b8ec3c2add647e62574674f38e79f974afb8128"
+toml_sha256 = "9de8bdb845c0f0d4e95990f2303695ab3d3bd160cf74538b9a5c9e606039f7fa"
+ir_sha256 = "7b8ba237ea721dee6938e73fe121614ade51e9052bc8b70f49c1437a69450b9b"
 
 [[provider.specs]]
 path = "specs/asterisk/ari-22.10.1.openapi.json"
@@ -90,7 +90,7 @@ upstream_version = "22.10.1"
 sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
 
 [provider.artifacts]
-"catalog/asterisk.catalog.json" = "f5c48f0765c95c7f02692bf5ae6a84b381e77431cbee16a369178668a5a5650c"
+"catalog/asterisk.catalog.json" = "623ffc7f98f4052249aa7ffe0d41508596292a3de93d207a07f728b489e4f91b"
 
 [[provider]]
 id = "babelforce"
@@ -187,6 +187,15 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 
 [provider.artifacts]
 "catalog/contentful.catalog.json" = "4778e1ff063f8f6dd6d3a2bdf2168f35b77772d826538c81a2bb1dc9ee5de00d"
+
+[[provider]]
+id = "b10x"
+generator = "connectors 0.1.0"
+toml_sha256 = "4bbdc2ea60602b6b353dcb1a40c4c249cac050e280406514ef0ca83b047bd270"
+ir_sha256 = "0f7c2e5be8844e976f18d38374b085f33fc55228f2e4320cc108f7732e75fe71"
+
+[provider.artifacts]
+"catalog/b10x.catalog.json" = "370835c591aad21f9bdd080b8c7ae65603919c00c0bdeb17fc5241532c410176"
 
 [[provider]]
 id = "datadog"

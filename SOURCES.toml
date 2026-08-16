@@ -113,13 +113,31 @@ consumers = ["providers/slack.toml", "catalog/slack.catalog.json", "crates/integ
 note = "Pins Slack's exact live Swagger 2 bytes and deterministic curated OpenAPI 3 projections for four workspace and four read-only Admin operations. Slack publishes no maintained Events AsyncAPI document, so the exact two-event AsyncAPI source is repository-authored from current official references and is explicitly marked as such."
 
 [[source]]
-id = "asterisk-ari-sip"
+id = "asterisk-ari"
 kind = "vendor-protocol-source"
+origin = "vendor"
 upstream = "https://github.com/asterisk/asterisk (tag 22.10.1)"
 refresh = "scripts/vendor-asterisk-ari.py"
 pins = "specs/asterisk/provenance.toml"
-consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json", "crates/driver-sip/"]
-note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sample configurations. The authored sip.dial member uses the samples only as first-party protocol/deployment evidence; its wire implementation is the independently pinned sipx driver."
+consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json", "crates/driver-sip/examples/sip_dial_characterize.rs"]
+note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sample configurations. The samples are interoperability evidence for an optional configured Asterisk peer; Asterisk owns no native sip.dial capability."
+
+[[source]]
+id = "b10x-native-sip"
+kind = "provider-contract"
+origin = "repository-authored"
+references = [
+  "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
+  "https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+]
+refresh = "authored-review"
+pins = "specs/b10x.provenance.toml"
+consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "crates/integration-sip/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
+note = "The reviewed B10x Provider contract owns sip.dial and its closed sip_v1 implementation. Asterisk, a carrier, an SBC, or another PBX may be selected only as a Connection-owned SIP peer. The same pinned file also carries the two device and browser capability families accepted by architecture ADR 0035: speech.speak/speech.status behind the closed audio_v1 driver, and browser.open/goto/snapshot/screenshot/close behind the closed cdp_v1 driver. Browser interaction is deliberately absent from that surface."
 
 [[source]]
 id = "babelforce-openapi"

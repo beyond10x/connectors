@@ -153,6 +153,8 @@ pub enum InteractionShape {
 pub enum ProtocolDriver {
     HttpV1,
     SipV1,
+    AudioV1,
+    CdpV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -224,11 +226,21 @@ struct RawOperation {
 enum RawProtocolOperation {
     HttpV1 { request: RequestTemplate },
     SipV1 { request: EmptySipRequest },
+    AudioV1 { request: EmptyAudioRequest },
+    CdpV1 { request: EmptyCdpRequest },
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EmptySipRequest {}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptyAudioRequest {}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptyCdpRequest {}
 
 /// The stored model-facing contract projection: the ToolSpec's description and input schema, as the
 /// build computed them from the emitted declaration's own lowering.
@@ -423,6 +435,10 @@ pub enum ProtocolRequestTemplate {
     HttpV1(RequestTemplate),
     /// One admitted SIP session-establishment operation.
     SipV1,
+    /// One admitted local-audio unary operation.
+    AudioV1,
+    /// One admitted browser operation on a leased `DevTools` session.
+    CdpV1,
 }
 
 impl ProtocolRequestTemplate {
@@ -431,6 +447,8 @@ impl ProtocolRequestTemplate {
         match self {
             Self::HttpV1(_) => ProtocolDriver::HttpV1,
             Self::SipV1 => ProtocolDriver::SipV1,
+            Self::AudioV1 => ProtocolDriver::AudioV1,
+            Self::CdpV1 => ProtocolDriver::CdpV1,
         }
     }
 
@@ -438,7 +456,7 @@ impl ProtocolRequestTemplate {
     pub const fn http(&self) -> Option<&RequestTemplate> {
         match self {
             Self::HttpV1(request) => Some(request),
-            Self::SipV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
         }
     }
 }
@@ -493,6 +511,14 @@ impl Operation {
             RawProtocolOperation::SipV1 { request } => {
                 let EmptySipRequest {} = request;
                 ProtocolRequestTemplate::SipV1
+            }
+            RawProtocolOperation::AudioV1 { request } => {
+                let EmptyAudioRequest {} = request;
+                ProtocolRequestTemplate::AudioV1
+            }
+            RawProtocolOperation::CdpV1 { request } => {
+                let EmptyCdpRequest {} = request;
+                ProtocolRequestTemplate::CdpV1
             }
         };
 

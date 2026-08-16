@@ -27,6 +27,8 @@ jobs:
           cargo fetch --locked
           cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo fetch --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo fetch --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo fetch --manifest-path crates/connectors-runtime/Cargo.toml --locked
           cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
@@ -35,6 +37,8 @@ jobs:
           cargo build --workspace --locked
           cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo build --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo build --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo build --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked
           cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
@@ -46,6 +50,8 @@ jobs:
           cargo test --workspace --locked --no-fail-fast
           cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo test --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo test --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo test --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked --no-fail-fast
           cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked
@@ -54,6 +60,8 @@ jobs:
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/driver-sip/Cargo.toml --all-targets --locked -- -D warnings
+          cargo clippy --manifest-path crates/driver-audio/Cargo.toml --all-targets --locked -- -D warnings
+          cargo clippy --manifest-path crates/driver-cdp/Cargo.toml --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/voice-runtime/Cargo.toml --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/connectors-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
           cargo clippy --manifest-path crates/connectors-cli/Cargo.toml --all-targets --locked -- -D warnings
@@ -62,6 +70,8 @@ jobs:
           cargo fmt --all --check
           cargo fmt --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all --check
           cargo fmt --manifest-path crates/driver-sip/Cargo.toml --all --check
+          cargo fmt --manifest-path crates/driver-audio/Cargo.toml --all --check
+          cargo fmt --manifest-path crates/driver-cdp/Cargo.toml --all --check
           cargo fmt --manifest-path crates/voice-runtime/Cargo.toml --all --check
           cargo fmt --manifest-path crates/connectors-runtime/Cargo.toml --all --check
           cargo fmt --manifest-path crates/connectors-cli/Cargo.toml --all --check
@@ -88,6 +98,8 @@ jobs:
           cargo fetch --locked
           cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo fetch --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo fetch --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo fetch --manifest-path crates/connectors-runtime/Cargo.toml --locked
           cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
@@ -96,6 +108,8 @@ jobs:
           cargo build --workspace --locked
           cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo build --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo build --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo build --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked
           cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
@@ -104,6 +118,8 @@ jobs:
           cargo test --workspace --locked --no-fail-fast
           cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
           cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
+          cargo test --manifest-path crates/driver-audio/Cargo.toml --locked
+          cargo test --manifest-path crates/driver-cdp/Cargo.toml --locked
           cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
           cargo test --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked --no-fail-fast
           cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked

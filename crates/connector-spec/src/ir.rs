@@ -311,6 +311,13 @@ pub enum InteractionShape {
 pub enum ProtocolDriver {
     HttpV1,
     SipV1,
+    /// Local audio devices. Closed, built into connectors, and reachable only where a person is —
+    /// a speaker exists at a satellite placement, never in a hosted deployment.
+    AudioV1,
+    /// A browser, spoken to over the Chrome `DevTools` Protocol. Closed and built into connectors.
+    /// The external system is the browser process the driver launched on its own dedicated
+    /// profile; page, element and navigation meaning stay here rather than moving to Substrate.
+    CdpV1,
 }
 
 /// Driver-specific request facts for one operation.
@@ -332,6 +339,15 @@ pub enum OperationRequest {
     },
     /// One admitted SIP call-establishment request.
     SipV1,
+    /// One admitted local-audio request. Like SIP it carries no HTTP-shaped fields: the bounded
+    /// utterance is an ordinary declared parameter, and every device fact — synthesizer, voice,
+    /// sink — is deployment-owned and resolved only after admission.
+    AudioV1,
+    /// One admitted browser request on a leased session. It carries no HTTP-shaped fields either:
+    /// the browser's own HTTP traffic is the driver's, never this operation's request template, and
+    /// the executable, dedicated profile directory and artifact directory are deployment-owned
+    /// facts resolved only after admission.
+    CdpV1,
 }
 
 impl OperationRequest {
@@ -340,6 +356,8 @@ impl OperationRequest {
         match self {
             Self::HttpV1 { .. } => ProtocolDriver::HttpV1,
             Self::SipV1 => ProtocolDriver::SipV1,
+            Self::AudioV1 => ProtocolDriver::AudioV1,
+            Self::CdpV1 => ProtocolDriver::CdpV1,
         }
     }
 
@@ -347,7 +365,7 @@ impl OperationRequest {
     pub const fn http_method(&self) -> Option<HttpMethod> {
         match self {
             Self::HttpV1 { method, .. } => Some(*method),
-            Self::SipV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
         }
     }
 
@@ -355,7 +373,7 @@ impl OperationRequest {
     pub fn http_path(&self) -> Option<&str> {
         match self {
             Self::HttpV1 { path, .. } => Some(path),
-            Self::SipV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
         }
     }
 }
@@ -1676,6 +1694,18 @@ impl<'de> Deserialize<'de> for Operation {
             (ProtocolDriver::SipV1, _, _) => {
                 return Err(serde::de::Error::custom(
                     "sip_v1 operation refuses HTTP-only `method` and `path`",
+                ));
+            }
+            (ProtocolDriver::AudioV1, None, None) => OperationRequest::AudioV1,
+            (ProtocolDriver::AudioV1, _, _) => {
+                return Err(serde::de::Error::custom(
+                    "audio_v1 operation refuses HTTP-only `method` and `path`",
+                ));
+            }
+            (ProtocolDriver::CdpV1, None, None) => OperationRequest::CdpV1,
+            (ProtocolDriver::CdpV1, _, _) => {
+                return Err(serde::de::Error::custom(
+                    "cdp_v1 operation refuses HTTP-only `method` and `path`",
                 ));
             }
         };

@@ -204,6 +204,8 @@ pub enum InteractionShape {
 pub enum ProtocolDriver {
     HttpV1,
     SipV1,
+    AudioV1,
+    CdpV1,
 }
 
 /// Placement requirement before deployment selection.

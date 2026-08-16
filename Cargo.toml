@@ -39,6 +39,8 @@ members = [
 # OpenAPI and JSON object ordering and therefore canonical artifacts. CI builds every nested
 # workspace directly.
 exclude = [
+    "crates/driver-audio",
+    "crates/driver-cdp",
     "crates/driver-sip",
     "crates/rtvbp-voice-endpoint",
     "crates/voice-runtime",

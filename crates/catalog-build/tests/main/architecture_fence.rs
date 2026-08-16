@@ -16,13 +16,16 @@ const CLI_TOTAL_LINE_LIMIT: usize = 800;
 const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     (
         "crates/connector-spec/src/provider.rs",
-        7_241,
-        "legacy provider compiler pending grammar-focused extraction",
+        7_291,
+        "legacy provider compiler pending grammar-focused extraction; +23 for the closed `audio_v1` \
+         driver's lowering and its unary-only coherence rule, +27 for the closed `cdp_v1` driver's \
+         lowering and its leased-session-only coherence rule",
     ),
     (
         "crates/connector-spec/src/ir.rs",
-        2_687,
-        "legacy compiler IR pending declaration-family extraction",
+        2_717,
+        "legacy compiler IR pending declaration-family extraction; +14 for the closed `audio_v1` \
+         driver and its request variant, +16 for the closed `cdp_v1` driver and its request variant",
     ),
     (
         "crates/connector-secrets/src/file.rs",
@@ -31,8 +34,9 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/document.rs",
-        2_520,
-        "canonical lowering pending section-oriented extraction",
+        2_568,
+        "canonical lowering pending section-oriented extraction; +27 for the closed `audio_v1` \
+         driver's request marker and schema branch, +21 for the closed `cdp_v1` driver's",
     ),
     (
         "crates/catalog-build/src/scaffold.rs",
@@ -41,8 +45,10 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/site.rs",
-        1_718,
-        "site projection pending model and renderer split",
+        1_751,
+        "site projection pending model and renderer split; the growth past 1,718 is in-flight site \
+         work, plus 2 lines for the closed `audio_v1` protocol entry and 4 for the closed `cdp_v1` \
+         one",
     ),
 ];
 
@@ -263,6 +269,11 @@ fn product_cli_is_a_thin_frontend() {
         "connectors-runtime",
         "protocol",
         "rpassword",
+        // A process must install exactly one rustls crypto provider before any TLS is attempted,
+        // and only the binary can do that. `0c47258 runtime: select the AWS-LC crypto provider`
+        // made that choice in the CLI and did not record it here; this line records the decision
+        // already taken, and does not widen the frontend beyond process-level startup.
+        "rustls",
         "serde",
         "serde_json",
         "thiserror",

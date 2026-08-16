@@ -61,12 +61,13 @@ changes owners. This is the milestone at which the client contract is real.
 
 ## Progress
 
-- 2026-08-14 — a development-only vertical slice now projects the source-grounded Asterisk
+- 2026-08-14 — a development-only vertical slice now projects the source-grounded B10x
   `sip.dial` member through generic search/describe/invoke, exact personal owner snapshot,
   Connection initiation, configured Grant/approval references, alias-only routing, live session
   custody and payload-free local audit. It is evidence for the eventual one-path invoke design, not
   M3 completion: general Integration/Connection/Grant persistence, credential acquisition, hosted
-  authority, lifecycle and a stable real-provider exit remain open.
+  authority, lifecycle and a stable real-provider exit remain open. The characterized Asterisk
+  system is only the Connection-owned SIP peer.
 - 2026-08-14 — the personal-local Slack slice adds a value-free Integration policy, one-use
   operator-entry Connect Session, prepared owner-only credential custody, crash-recovered durable
   Connection metadata, and stable post-creation ids. It deliberately does not claim M3: general
