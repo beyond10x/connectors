@@ -22,6 +22,8 @@ the full SaaS or satellite surface.
   drivers, placement, and the direct byte-plane split.
 - [docs/design/04-the-callers-contract.md](docs/design/04-the-callers-contract.md) — measured proof
   of the catalog document as the caller contract.
+- [docs/design/11-hosted-module-request-authority.md](docs/design/11-hosted-module-request-authority.md)
+  — Connector-only, request-bound Work/Ontology authority and tenant/user attribution.
 - [docs/guides/connect-slack.md](docs/guides/connect-slack.md) — the public-facing personal-local
   Slack connection flow.
 - [docs/guides/connect-gitlab.md](docs/guides/connect-gitlab.md) — connect GitLab as yourself or as
@@ -56,6 +58,7 @@ Hosted configuration is strict TOML and rejects unknown fields or inconsistent e
 
 ```toml
 tenant_id = "tenant-dev"
+module_tenant_ids = ["tenant-dev"]
 
 [server]
 listen = "0.0.0.0:8080"
@@ -85,6 +88,14 @@ ca_file = "/etc/b10x-vault-ca/ca.crt"
 enabled = false
 listen = "0.0.0.0:5060"
 
+[b10x]
+tenant_member_modules = ["ontology", "work"]
+work_origin = "http://b10x-work:8080"
+ontology_origin = "http://b10x-ontology:8080"
+module_signing_key_file = "/var/run/b10x-module-auth/private.pem"
+module_signing_key_id = "developer-1"
+module_signing_issuer = "b10x-connectors"
+
 [slack]
 public_origin = "https://code.example.test/api/connectors/v1"
 grant_ref = "grant:slack:workspace-companion"
@@ -97,6 +108,13 @@ Kubernetes is enabled if and only if its namespace set is non-empty. SIP is enab
 both `listen` and `deployment_config` are present; that deployment config uses the existing strict
 personal voice schema, and every SIP target must bind the configured listen address. See
 [`crates/connectors-config/examples/hosted-dev.example.toml`](crates/connectors-config/examples/hosted-dev.example.toml).
+
+`module_tenant_ids` is the exact sorted set this Connector deployment may project to hosted module
+origins; an empty value retains the single `tenant_id` compatibility posture. Every Work and
+Ontology request is signed only after the request's verified tenant is in that set and its exact
+operation is admitted. The Babelforce developer config deliberately contains one tenant, while the
+request signer and tenant-partitioned event store are exercised with multiple tenants. Static
+Ontology bearer configuration is rejected, and signing failure never falls back to direct HTTP.
 
 Hosted Slack requires the Vault SecretStore. Its prepared transaction stages all three submitted
 credentials in Vault, durably commits them, and only then publishes value-free Connection metadata.

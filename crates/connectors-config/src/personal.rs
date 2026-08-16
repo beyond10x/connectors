@@ -195,6 +195,13 @@ pub struct B10xIntegrationConfig {
     pub ontology_origin: Option<String>,
     #[serde(default)]
     pub ontology_bearer_file: Option<std::path::PathBuf>,
+    /// Owner-only file containing the base64url-encoded 32-byte Ed25519 module-signing seed.
+    #[serde(default)]
+    pub module_signing_key_file: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub module_signing_key_id: Option<String>,
+    #[serde(default)]
+    pub module_signing_issuer: Option<String>,
     #[serde(default)]
     pub audio: Option<AudioIntegrationConfig>,
     #[serde(default)]
@@ -378,9 +385,9 @@ impl B10xIntegrationConfig {
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
         if !valid_connection(&self.connection)
             || matches!(self.connection.initiation, InitiationConfig::Provider)
-            || (self.ontology_origin.is_some() != self.ontology_bearer_file.is_some())
+            || self.ontology_bearer_file.is_some()
             || self
-                .ontology_bearer_file
+                .module_signing_key_file
                 .as_deref()
                 .is_some_and(|path| !path.is_absolute())
             || self
@@ -402,6 +409,16 @@ impl B10xIntegrationConfig {
                             || module == "ontology" && self.ontology_origin.is_none()
                     })
             })
+            || ((self.work_origin.is_some() || self.ontology_origin.is_some())
+                && (self.module_signing_key_file.is_none()
+                    || self
+                        .module_signing_key_id
+                        .as_deref()
+                        .is_none_or(|value| !config_ref(value, 128))
+                    || self
+                        .module_signing_issuer
+                        .as_deref()
+                        .is_none_or(|value| !config_ref(value, 256))))
             || (self.work_origin.is_none()
                 && self.ontology_origin.is_none()
                 && self.audio.is_none()

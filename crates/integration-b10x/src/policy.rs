@@ -45,13 +45,41 @@ fn module_global_alias(value: &str) -> Option<&'static str> {
     })
 }
 
+pub(super) fn module_operation(canonical: &str) -> Option<&'static str> {
+    Some(match canonical {
+        "work-request-create" => "work/request.create",
+        "work-request-get" => "work/request.get",
+        "work-request-list" => "work/request.list",
+        "work-task-create" => "work/task.create",
+        "work-task-get" => "work/task.get",
+        "work-task-list" => "work/task.list",
+        "work-task-status-update" => "work/task.status.update",
+        "ontology-schema-register" => "ontology/schema.register",
+        "ontology-branch-list" => "ontology/branch.list",
+        "ontology-branch-create" => "ontology/branch.create",
+        "ontology-branch-schema-extend" => "ontology/branch.schema.extend",
+        "ontology-claim-assert" => "ontology/claim.assert",
+        "ontology-claim-retract" => "ontology/claim.retract",
+        "knowledge-explain" => "ontology/claim.explain",
+        "knowledge-query" => "ontology/claim.query",
+        "knowledge-snapshot" => "ontology/snapshot.create",
+        "ontology-pack-install" => "ontology/pack.install",
+        "ontology-proposal-create" => "ontology/proposal.create",
+        "ontology-proposal-get" => "ontology/proposal.get",
+        "ontology-proposal-evaluate" => "ontology/proposal.evaluate",
+        "ontology-proposal-approval-record" => "ontology/proposal.approval.record",
+        "ontology-proposal-promote" => "ontology/proposal.promote",
+        _ => return None,
+    })
+}
+
 pub(super) fn response_schema(catalog: &Value, canonical: &str) -> Result<Value, OperationError> {
     let operation = catalog["operations"]
         .as_array()
         .and_then(|operations| {
-            operations.iter().find(|operation| {
-                operation.get("id").and_then(Value::as_str) == Some(canonical)
-            })
+            operations
+                .iter()
+                .find(|operation| operation.get("id").and_then(Value::as_str) == Some(canonical))
         })
         .ok_or_else(unavailable)?;
     let schema = operation

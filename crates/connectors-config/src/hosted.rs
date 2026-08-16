@@ -18,6 +18,9 @@ const NATIVE_SIP_SERVICE: &str = "default";
 #[serde(deny_unknown_fields)]
 pub struct HostedServerConfig {
     pub tenant_id: String,
+    /// Tenants admitted to the partitioned module backend. Empty means only `tenant_id`.
+    #[serde(default)]
+    pub module_tenant_ids: Vec<String>,
     pub server: HostedListenerConfig,
     pub identity: HostedIdentityConfig,
     #[serde(default)]
@@ -173,6 +176,9 @@ impl HostedServerConfig {
     }
 
     fn validate(&self) -> Result<(), HostedServerConfigError> {
+        let mut module_tenants = self.module_tenant_ids.clone();
+        module_tenants.sort();
+        module_tenants.dedup();
         let vault_complete = self.vault.address.is_some()
             && self.vault.role.is_some()
             && self.vault.token_file.is_some()
@@ -215,6 +221,11 @@ impl HostedServerConfig {
                 && credentials.username_credential != credentials.password_credential
         });
         if !valid_ref(&self.tenant_id, 256)
+            || module_tenants != self.module_tenant_ids
+            || self
+                .module_tenant_ids
+                .iter()
+                .any(|tenant| !valid_ref(tenant, 256))
             || self.identity.origin.len() > 2_048
             || !valid_base_path(&self.server.base_path)
             || !self.storage.state_root.is_absolute()
@@ -246,6 +257,15 @@ impl HostedServerConfig {
             return Err(HostedServerConfigError::Invalid);
         }
         Ok(())
+    }
+
+    #[must_use]
+    pub fn admitted_module_tenants(&self) -> Vec<String> {
+        if self.module_tenant_ids.is_empty() {
+            vec![self.tenant_id.clone()]
+        } else {
+            self.module_tenant_ids.clone()
+        }
     }
 }
 

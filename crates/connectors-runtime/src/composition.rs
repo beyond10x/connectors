@@ -350,10 +350,11 @@ impl HostedRuntime {
             )?));
         }
         let b10x_enabled = config.b10x.is_some();
+        let admitted_module_tenants = config.admitted_module_tenants();
         if let Some(b10x) = config.b10x {
             backends.push(Arc::new(B10xBackend::hosted(
                 b10x,
-                config.tenant_id.clone(),
+                admitted_module_tenants,
                 &config.storage.state_root,
             )?));
         }
