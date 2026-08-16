@@ -3742,26 +3742,16 @@
         "description": "Extend the schema admitted by one ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
               "type": "string"
-            },
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
-              "type": "string"
-            },
-            "schema": {}
+            }
           },
           "required": [
             "branch",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at",
-            "schema"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -3789,165 +3779,26 @@
           "symbol": "branch"
         },
         {
-          "name": "expected_revision",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
-        },
-        {
-          "name": "schema",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "properties": {
-              "compatibility": {
-                "enum": [
-                  "initial",
-                  "compatible",
-                  "breaking"
-                ],
-                "type": "string"
-              },
-              "digest": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "predicates": {
-                "additionalProperties": {
-                  "properties": {
-                    "default_sensitivity": {
-                      "enum": [
-                        "public",
-                        "internal",
-                        "confidential",
-                        "restricted"
-                      ],
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "id": {
-                      "type": "string"
-                    },
-                    "value_kind": {
-                      "enum": [
-                        "reference",
-                        "string",
-                        "integer",
-                        "boolean",
-                        "decimal"
-                      ],
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "value_kind",
-                    "description",
-                    "default_sensitivity"
-                  ],
-                  "type": "object"
-                },
-                "type": "object"
-              },
-              "previous": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "shapes": {
-                "additionalProperties": {
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "properties": {
-                      "items": {
-                        "properties": {
-                          "predicate": {
-                            "type": "string"
-                          },
-                          "required": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "predicate",
-                          "required"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "properties"
-                  ],
-                  "type": "object"
-                },
-                "type": "object"
-              }
-            },
-            "required": [
-              "id",
-              "compatibility",
-              "predicates",
-              "shapes",
-              "digest"
-            ],
-            "type": "object"
-          },
-          "symbol": "schema"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            },
-            "schema": {
-              "$param": "schema"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/schema"
@@ -3995,26 +3846,16 @@
         "description": "Assert one typed claim in an ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
-              "type": "string"
-            },
-            "claim": {},
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
               "type": "string"
             }
           },
           "required": [
             "branch",
-            "claim",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -4042,248 +3883,26 @@
           "symbol": "branch"
         },
         {
-          "name": "claim",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "properties": {
-              "confidence_millionths": {
-                "format": "uint32",
-                "minimum": 0,
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "evidence": {
-                "items": {
-                  "properties": {
-                    "observed_at": {
-                      "type": "string"
-                    },
-                    "record": {
-                      "type": "string"
-                    },
-                    "source": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "source",
-                    "record",
-                    "observed_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "id": {
-                "type": "string"
-              },
-              "object": {
-                "oneOf": [
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "reference",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "string",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "integer",
-                        "type": "string"
-                      },
-                      "value": {
-                        "format": "int64",
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "boolean",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "decimal",
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "value"
-                    ],
-                    "type": "object"
-                  }
-                ]
-              },
-              "observed_at": {
-                "type": "string"
-              },
-              "predicate": {
-                "type": "string"
-              },
-              "schema_revision": {
-                "type": "string"
-              },
-              "sensitivity": {
-                "enum": [
-                  "public",
-                  "internal",
-                  "confidential",
-                  "restricted"
-                ],
-                "type": "string"
-              },
-              "state": {
-                "enum": [
-                  "observed",
-                  "inferred",
-                  "confirmed",
-                  "rejected",
-                  "revoked",
-                  "superseded"
-                ],
-                "type": "string"
-              },
-              "subject": {
-                "type": "string"
-              },
-              "valid_from": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "valid_until": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "visibility": {
-                "enum": [
-                  "private",
-                  "department",
-                  "tenant"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "subject",
-              "predicate",
-              "object",
-              "schema_revision",
-              "visibility",
-              "sensitivity",
-              "state",
-              "observed_at",
-              "evidence"
-            ],
-            "type": "object"
-          },
-          "symbol": "claim"
-        },
-        {
-          "name": "expected_revision",
-          "position": "body",
-          "required": true,
-          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "claim": {
-              "$param": "claim"
-            },
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims"
@@ -4331,30 +3950,20 @@
         "description": "Retract one claim from an ontology branch under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "branch": {
               "type": "string"
             },
             "claim": {
               "type": "string"
-            },
-            "expected_revision": {
-              "type": "string"
-            },
-            "idempotency_key": {
-              "type": "string"
-            },
-            "occurred_at": {
-              "type": "string"
-            },
-            "replacement": {}
+            }
           },
           "required": [
             "branch",
             "claim",
-            "expected_revision",
-            "idempotency_key",
-            "occurred_at",
-            "replacement"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -4391,67 +4000,26 @@
           "symbol": "claim"
         },
         {
-          "name": "expected_revision",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
             "type": "string"
           },
-          "symbol": "expected_revision"
-        },
-        {
-          "name": "idempotency_key",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "idempotency_key"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
-        },
-        {
-          "name": "replacement",
-          "position": "body",
-          "required": false,
-          "schema": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "symbol": "replacement"
+          "symbol": "Idempotency_Key"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "expected_revision": {
-              "$param": "expected_revision"
-            },
-            "idempotency_key": {
-              "$param": "idempotency_key"
-            },
-            "occurred_at": {
-              "$param": "occurred_at"
-            },
-            "replacement": {
-              "$param": "replacement"
-            }
-          }
-        },
         "headers": {
-          "content-type": "application/json"
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
         },
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims/{claim}/retract"
@@ -6200,29 +5768,12 @@
         "description": "Evaluate a governed ontology proposal and publish its human-visible decision state",
         "input_schema": {
           "properties": {
-            "evaluator": {
-              "type": "string"
-            },
-            "evidence": {
-              "items": {},
-              "type": "array"
-            },
-            "passed": {
-              "type": "boolean"
-            },
             "proposal": {
-              "type": "string"
-            },
-            "recorded_at": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "evaluator",
-            "evidence",
-            "passed",
-            "recorded_at"
+            "proposal"
           ],
           "type": "object"
         }
@@ -6248,86 +5799,11 @@
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "evaluator",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "evaluator"
-        },
-        {
-          "name": "evidence",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "items": {
-              "properties": {
-                "observed_at": {
-                  "type": "string"
-                },
-                "record": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source",
-                "record",
-                "observed_at"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "symbol": "evidence"
-        },
-        {
-          "name": "passed",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "boolean"
-          },
-          "symbol": "passed"
-        },
-        {
-          "name": "recorded_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "recorded_at"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "evaluator": {
-              "$param": "evaluator"
-            },
-            "evidence": {
-              "$param": "evidence"
-            },
-            "passed": {
-              "$param": "passed"
-            },
-            "recorded_at": {
-              "$param": "recorded_at"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/evaluate"
       },
@@ -6546,16 +6022,12 @@
         "description": "Record an approval decision on one governed ontology proposal",
         "input_schema": {
           "properties": {
-            "approval": {
-              "type": "string"
-            },
             "proposal": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "approval"
+            "proposal"
           ],
           "type": "object"
         }
@@ -6581,31 +6053,11 @@
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "approval",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "approval"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "approval": {
-              "$param": "approval"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/approve"
       },
@@ -6626,16 +6078,12 @@
         "description": "Promote an approved ontology proposal into the human-visible governed state",
         "input_schema": {
           "properties": {
-            "occurred_at": {
-              "type": "string"
-            },
             "proposal": {
               "type": "string"
             }
           },
           "required": [
-            "proposal",
-            "occurred_at"
+            "proposal"
           ],
           "type": "object"
         }
@@ -6661,31 +6109,11 @@
             "type": "string"
           },
           "symbol": "proposal"
-        },
-        {
-          "name": "occurred_at",
-          "position": "body",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "symbol": "occurred_at"
         }
       ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
-        "body": {
-          "encoding": "json",
-          "template": {
-            "occurred_at": {
-              "$param": "occurred_at"
-            }
-          }
-        },
-        "headers": {
-          "content-type": "application/json"
-        },
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/promote"
       },
@@ -6948,6 +6376,9 @@
         "description": "Create one Work request under an idempotency identity",
         "input_schema": {
           "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
             "description": {
               "type": "string"
             },
@@ -6960,6 +6391,7 @@
             }
           },
           "required": [
+            "Idempotency_Key",
             "description",
             "references",
             "title"
@@ -6980,6 +6412,19 @@
       "implementation_form": "built_in",
       "interaction_shape": "unary",
       "params": [
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
         {
           "name": "description",
           "position": "body",
@@ -7044,6 +6489,9 @@
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "POST",
@@ -7315,8 +6763,14 @@
       "contract": {
         "description": "List Work requests through the module's bounded cursor contract",
         "input_schema": {
-          "properties": {},
-          "required": [],
+          "properties": {
+            "cursor": {},
+            "limit": {}
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
           "type": "object"
         }
       },
@@ -7332,10 +6786,50 @@
       "idempotency": "idempotent",
       "implementation_form": "built_in",
       "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "limit"
+        }
+      ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
         "url": "{base}/api/work/v2/requests"
       },
       "required_capabilities": [
@@ -7539,16 +7033,36 @@
         "description": "Create one task under a Work request using an idempotency identity",
         "input_schema": {
           "properties": {
-            "body": {},
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "depends_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "type": "string"
+            },
             "id": {
               "type": "string"
             },
-            "path": {}
+            "references": {
+              "items": {},
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
           },
           "required": [
             "id",
-            "body",
-            "path"
+            "Idempotency_Key",
+            "depends_on",
+            "description",
+            "references",
+            "title"
           ],
           "type": "object"
         }
@@ -7576,71 +7090,75 @@
           "symbol": "id"
         },
         {
-          "name": "body",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "depends_on": {
-                "default": [],
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "description": {
-                "default": "",
-                "type": "string"
-              },
-              "references": {
-                "default": [],
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "value"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "title": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "title"
-            ],
-            "type": "object"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
           },
-          "symbol": "body"
+          "symbol": "Idempotency_Key"
         },
         {
-          "name": "path",
+          "name": "depends_on",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "symbol": "depends_on"
+        },
+        {
+          "name": "description",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": "",
+            "type": "string"
+          },
+          "symbol": "description"
+        },
+        {
+          "name": "references",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "default": [],
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "symbol": "references"
+        },
+        {
+          "name": "title",
           "position": "body",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "type": "object"
+            "type": "string"
           },
-          "symbol": "path"
+          "symbol": "title"
         }
       ],
       "placement_requirement": "connectors_deployment",
@@ -7649,15 +7167,24 @@
         "body": {
           "encoding": "json",
           "template": {
-            "body": {
-              "$param": "body"
+            "depends_on": {
+              "$param": "depends_on"
             },
-            "path": {
-              "$param": "path"
+            "description": {
+              "$param": "description"
+            },
+            "references": {
+              "$param": "references"
+            },
+            "title": {
+              "$param": "title"
             }
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "POST",
@@ -7959,8 +7486,14 @@
       "contract": {
         "description": "List Work tasks through the module's bounded cursor contract",
         "input_schema": {
-          "properties": {},
-          "required": [],
+          "properties": {
+            "cursor": {},
+            "limit": {}
+          },
+          "required": [
+            "cursor",
+            "limit"
+          ],
           "type": "object"
         }
       },
@@ -7976,10 +7509,50 @@
       "idempotency": "idempotent",
       "implementation_form": "built_in",
       "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "limit"
+        }
+      ],
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
+        "query": [
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
         "url": "{base}/api/work/v2/tasks"
       },
       "required_capabilities": [
@@ -8211,16 +7784,24 @@
         "description": "Update one Work task status using optimistic revision and idempotency identities",
         "input_schema": {
           "properties": {
-            "body": {},
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "expected_revision": {
+              "type": "number"
+            },
             "id": {
               "type": "string"
             },
-            "path": {}
+            "status": {
+              "type": "string"
+            }
           },
           "required": [
             "id",
-            "body",
-            "path"
+            "Idempotency_Key",
+            "expected_revision",
+            "status"
           ],
           "type": "object"
         }
@@ -8248,55 +7829,46 @@
           "symbol": "id"
         },
         {
-          "name": "body",
-          "position": "body",
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "expected_revision": {
-                "format": "uint64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "status": {
-                "enum": [
-                  "pending",
-                  "ready",
-                  "running",
-                  "blocked",
-                  "completed",
-                  "failed",
-                  "cancelled"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "expected_revision",
-              "status"
-            ],
-            "type": "object"
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
           },
-          "symbol": "body"
+          "symbol": "Idempotency_Key"
         },
         {
-          "name": "path",
+          "name": "expected_revision",
           "position": "body",
           "required": true,
           "schema": {
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "type": "object"
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
           },
-          "symbol": "path"
+          "symbol": "expected_revision"
+        },
+        {
+          "name": "status",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "pending",
+              "ready",
+              "running",
+              "blocked",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "symbol": "status"
         }
       ],
       "placement_requirement": "connectors_deployment",
@@ -8305,15 +7877,18 @@
         "body": {
           "encoding": "json",
           "template": {
-            "body": {
-              "$param": "body"
+            "expected_revision": {
+              "$param": "expected_revision"
             },
-            "path": {
-              "$param": "path"
+            "status": {
+              "$param": "status"
             }
           }
         },
         "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
           "content-type": "application/json"
         },
         "method": "PATCH",

@@ -13,7 +13,7 @@ use std::io::Read as _;
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use catalog::Placement as CredentialPlacement;
@@ -34,14 +34,19 @@ use protocol::browser::{
     BROWSER_SNAPSHOT_TOOL_REF,
 };
 use protocol::connection::{
-    ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
+    ChannelState, ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
     ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
     ConnectionSummary as LifecycleConnectionSummary,
+};
+use protocol::event::{
+    ChannelSummary, DataEvent, EventError, EventErrorCode, EventProvenance, EventRequest,
+    EventResult,
 };
 use protocol::operation::{
     ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
+use serde::Deserialize;
 use serde_json::Value;
 use service::{
     admit_audio_plan, admit_browser_address, admit_browser_plan, admit_speech_speak,
@@ -51,12 +56,14 @@ use sha2::{Digest as _, Sha256};
 
 mod audit;
 mod policy;
+mod work_events;
 
 use audit::{AuditEvent, AuditJournal};
 use policy::{
     all_operation_rows, approval, check_approval, effect, operation_row, post_dispatch_error,
     response_schema,
 };
+use work_events::WorkEventStore;
 
 const PROVIDER: &str = "b10x";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
@@ -64,8 +71,31 @@ const MAX_BEARER_BYTES: u64 = 512;
 const ONTOLOGY_BEARER_CREDENTIAL: &str = "b10x.internal.ontology_bearer";
 const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const HTTP_TOTAL_TIMEOUT: Duration = Duration::from_secs(30);
+const WORK_EVENT_CHANNEL: &str = "event-channel:b10x:work";
+const WORK_EVENT_BINDING: &str = "work.module-events.v1";
 
-const OPERATIONS: [(&str, &str, &str); 15] = [
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkOwnerEventPage {
+    events: Vec<WorkOwnerEvent>,
+    next_cursor: Option<String>,
+    has_more: bool,
+}
+
+#[derive(Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct WorkOwnerEvent {
+    protocol: String,
+    id: String,
+    module: String,
+    key: String,
+    schema_version: u16,
+    occurred_at: String,
+    cursor: String,
+    data: Value,
+}
+
+const OPERATIONS: [(&str, &str, &str); 29] = [
     (
         SPEECH_SPEAK_OPERATION,
         SPEECH_SPEAK_TOOL_REF,
@@ -117,6 +147,66 @@ const OPERATIONS: [(&str, &str, &str); 15] = [
         "Create an Ontology context snapshot",
     ),
     (
+        "ontology-branch-list",
+        "ontology.branches.list",
+        "List Ontology branches",
+    ),
+    (
+        "ontology-branch-create",
+        "ontology.branches.create",
+        "Create an Ontology branch",
+    ),
+    (
+        "ontology-branch-schema-extend",
+        "ontology.branches.schema.extend",
+        "Extend an Ontology branch schema",
+    ),
+    (
+        "ontology-claim-assert",
+        "ontology.claims.assert",
+        "Assert an Ontology claim",
+    ),
+    (
+        "ontology-claim-retract",
+        "ontology.claims.retract",
+        "Retract an Ontology claim",
+    ),
+    (
+        "ontology-pack-install",
+        "ontology.packs.install",
+        "Install an Ontology pack",
+    ),
+    (
+        "ontology-proposal-create",
+        "ontology.proposals.create",
+        "Create an Ontology proposal",
+    ),
+    (
+        "ontology-proposal-get",
+        "ontology.proposals.get",
+        "Get an Ontology proposal",
+    ),
+    (
+        "ontology-proposal-evaluate",
+        "ontology.proposals.evaluate",
+        "Evaluate an Ontology proposal",
+    ),
+    (
+        "ontology-proposal-approval-record",
+        "ontology.proposals.approval.record",
+        "Record an Ontology proposal approval",
+    ),
+    (
+        "ontology-proposal-promote",
+        "ontology.proposals.promote",
+        "Promote an Ontology proposal",
+    ),
+    (
+        "ontology-schema-register",
+        "ontology.schemas.register",
+        "Register an Ontology schema",
+    ),
+    (
         "work-request-create",
         "work.requests.create",
         "Create a Work request",
@@ -137,16 +227,12 @@ const OPERATIONS: [(&str, &str, &str); 15] = [
         "Create a Work task",
     ),
     ("work-task-get", "work.tasks.get", "Get a Work task"),
-];
-
-const REMAINING_WORK_OPERATIONS: [(&str, &str, &str); 3] = [
     ("work-task-list", "work.tasks.list", "List Work tasks"),
     (
         "work-task-status-update",
         "work.tasks.status.update",
         "Update Work task status",
     ),
-    ("work-event-list", "work.events.list", "List Work events"),
 ];
 
 /// Runtime construction failure. Messages deliberately carry no bearer or remote response body.
@@ -177,6 +263,7 @@ pub struct B10xBackend {
     audio: Option<Arc<Mutex<Option<LocalSpeechDriver>>>>,
     browser: Option<Arc<Mutex<Option<LocalBrowserDriver>>>>,
     audit: AuditJournal,
+    work_events: WorkEventStore,
 }
 
 impl B10xBackend {
@@ -230,6 +317,8 @@ impl B10xBackend {
             catalog_sha256: format!("{:x}", Sha256::digest(DOCUMENT.as_bytes())),
             deployment_sha256,
             audit: AuditJournal::new(state_root.join("b10x-operation-audit.jsonl")),
+            work_events: WorkEventStore::open(state_root.join("b10x-work-events.json"))
+                .map_err(|()| B10xIntegrationError::InvalidConfiguration)?,
         })
     }
 
@@ -273,11 +362,21 @@ impl B10xBackend {
             | BROWSER_SCREENSHOT_OPERATION
             | BROWSER_CLOSE_OPERATION => self.browser.is_some(),
             "knowledge-query" | "knowledge-explain" | "knowledge-snapshot" => {
-                self.config.ontology_origin.is_some()
+                self.module_admitted("ontology") && self.config.ontology_origin.is_some()
             }
-            value if value.starts_with("work-") => self.config.work_origin.is_some(),
+            value if value.starts_with("ontology-") => {
+                self.module_admitted("ontology") && self.config.ontology_origin.is_some()
+            }
+            value if value.starts_with("work-") => {
+                self.module_admitted("work") && self.config.work_origin.is_some()
+            }
             _ => false,
         }
+    }
+
+    fn module_admitted(&self, module: &str) -> bool {
+        matches!(&self.admission, PrincipalAdmission::Exact(_))
+            || self.config.tenant_member_module_enabled(module)
     }
 
     fn operation(
@@ -519,7 +618,7 @@ impl B10xBackend {
             ProtocolDriver::HttpV1 => {
                 let origin = self.origin(canonical).ok_or_else(unavailable)?;
                 let mut capabilities = BTreeSet::from([Capability::PrivateNetwork]);
-                if canonical.starts_with("knowledge-") {
+                if is_ontology_operation(canonical) {
                     capabilities.insert(Capability::FileSecret);
                 }
                 (
@@ -696,7 +795,7 @@ impl B10xBackend {
         input: Value,
     ) -> Result<Value, OperationError> {
         let origin = self.origin(canonical).ok_or_else(unavailable)?;
-        let credentials = if canonical.starts_with("knowledge-") {
+        let credentials = if is_ontology_operation(canonical) {
             vec![Assembled::new(
                 ONTOLOGY_BEARER_CREDENTIAL,
                 read_bearer(
@@ -762,7 +861,7 @@ impl B10xBackend {
     }
 
     fn origin(&self, canonical: &str) -> Option<String> {
-        if canonical.starts_with("knowledge-") {
+        if is_ontology_operation(canonical) {
             self.config.ontology_origin()
         } else if canonical.starts_with("work-") {
             self.config.work_origin()
@@ -770,6 +869,86 @@ impl B10xBackend {
             None
         }
     }
+
+    async fn refresh_work_events(&self) -> Result<(), EventError> {
+        let origin = self.config.work_origin().ok_or_else(event_not_granted)?;
+        let mut url = reqwest::Url::parse(&format!("{origin}/api/work/v2/events"))
+            .map_err(|_| event_protocol())?;
+        {
+            let mut query = url.query_pairs_mut();
+            if let Some(cursor) = self.work_events.owner_cursor()? {
+                query.append_pair("cursor", &cursor);
+            }
+            query.append_pair("limit", "100");
+        }
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|_| event_unavailable())?;
+        if response.status() == reqwest::StatusCode::CONFLICT {
+            return Err(EventError::new(
+                EventErrorCode::Protocol,
+                "Work owner cursor requires a full resynchronization",
+                false,
+            ));
+        }
+        if !response.status().is_success() {
+            return Err(event_unavailable());
+        }
+        let bytes = response.bytes().await.map_err(|_| event_unavailable())?;
+        if bytes.len() > protocol::event::MAX_RESPONSE_BYTES {
+            return Err(event_protocol());
+        }
+        let page: WorkOwnerEventPage =
+            serde_json::from_slice(&bytes).map_err(|_| event_protocol())?;
+        if page.has_more && page.next_cursor.is_none() {
+            return Err(event_protocol());
+        }
+        let received_at_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        let mut events = Vec::with_capacity(page.events.len());
+        for owner in page.events {
+            if owner.protocol != "b10x.module-event.v1"
+                || owner.module != "work"
+                || owner.schema_version != 1
+                || owner.id.is_empty()
+                || owner.cursor.is_empty()
+                || !matches!(
+                    owner.key.as_str(),
+                    "request.created" | "task.created" | "task.status-changed"
+                )
+            {
+                return Err(event_protocol());
+            }
+            let owner_id = owner.id.clone();
+            let event_type = owner.key.clone();
+            let payload = serde_json::to_value(owner).map_err(|_| event_protocol())?;
+            events.push((
+                owner_id,
+                DataEvent {
+                    event_ref: "pending:b10x:work".to_owned(),
+                    channel_ref: WORK_EVENT_CHANNEL.to_owned(),
+                    connection_ref: self.config.connection.connection_ref.clone(),
+                    integration_ref: PROVIDER.to_owned(),
+                    event_type,
+                    provenance: EventProvenance::Polled,
+                    received_at_unix_ms,
+                    payload,
+                },
+            ));
+        }
+        self.work_events.append(page.next_cursor, events)
+    }
+}
+
+fn is_ontology_operation(canonical: &str) -> bool {
+    canonical.starts_with("knowledge-") || canonical.starts_with("ontology-")
 }
 
 // `url` is reserved by the generic request assembler, so the frozen catalog contract publishes
@@ -805,7 +984,7 @@ impl ConnectorBackend for B10xBackend {
         BackendCapabilities {
             operations: true,
             connections: true,
-            events: false,
+            events: self.config.work_origin.is_some(),
         }
     }
 
@@ -826,6 +1005,16 @@ impl ConnectorBackend for B10xBackend {
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
         matches!(request, ConnectionRequest::Describe(request)
             if request.connection_ref == self.config.connection.connection_ref)
+    }
+
+    fn owns_event(&self, request: &EventRequest) -> bool {
+        match request {
+            EventRequest::Receive(request) => request.channel_ref == WORK_EVENT_CHANNEL,
+            EventRequest::Replay(request) => {
+                request.event_ref.starts_with("event:b10x:work:")
+            }
+            EventRequest::Search(_) => false,
+        }
     }
 
     async fn handle(
@@ -870,7 +1059,20 @@ impl ConnectorBackend for B10xBackend {
             {
                 Ok(ConnectionResult::Describe(ConnectionDescription {
                     summary: self.lifecycle_connection(),
-                    channels: Vec::new(),
+                    channels: self
+                        .configured("work-request-list")
+                        .then(|| protocol::connection::ChannelSummary {
+                            channel_ref: WORK_EVENT_CHANNEL.to_owned(),
+                            binding_ref: WORK_EVENT_BINDING.to_owned(),
+                            state: ChannelState::Connected,
+                            events: vec![
+                                "work/request.created".to_owned(),
+                                "work/task.created".to_owned(),
+                                "work/task.status-changed".to_owned(),
+                            ],
+                        })
+                        .into_iter()
+                        .collect(),
                 }))
             }
             _ => Err(ConnectionError::new(
@@ -878,6 +1080,62 @@ impl ConnectorBackend for B10xBackend {
                 "B10x Integration Connection was not found",
                 false,
             )),
+        }
+    }
+
+    async fn handle_event(
+        &self,
+        context: &PrincipalContext,
+        request: EventRequest,
+    ) -> Result<EventResult, EventError> {
+        if !self.context_admitted(context) {
+            return Err(EventError::new(
+                EventErrorCode::StaleAuthority,
+                "owner authority snapshot is not current",
+                false,
+            ));
+        }
+        if !self.configured("work-request-list") {
+            return Err(event_not_granted());
+        }
+        match request {
+            EventRequest::Search(request) => {
+                let query = request.query.to_ascii_lowercase();
+                let channels = (query.is_empty()
+                    || "work".contains(&query)
+                    || WORK_EVENT_BINDING.contains(&query))
+                .then(|| work_event_channel(&self.config))
+                .into_iter()
+                .take(usize::from(request.limit))
+                .collect();
+                Ok(EventResult::Search { channels })
+            }
+            EventRequest::Receive(request) => {
+                if request.channel_ref != WORK_EVENT_CHANNEL {
+                    return Err(event_not_found());
+                }
+                let after = request
+                    .after
+                    .as_deref()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .map_err(|_| event_invalid())?;
+                self.refresh_work_events().await?;
+                let (events, next) = self
+                    .work_events
+                    .receive(after, usize::from(request.limit))?;
+                Ok(EventResult::Receive {
+                    events,
+                    next: next.to_string(),
+                })
+            }
+            EventRequest::Replay(request) => {
+                let event = self
+                    .work_events
+                    .replay(&request.event_ref)?
+                    .ok_or_else(event_not_found)?;
+                Ok(EventResult::Replay(event))
+            }
         }
     }
 
@@ -904,6 +1162,60 @@ fn http_client(
         .timeout(total_timeout)
         .build()
         .map_err(|_| B10xIntegrationError::HttpClient)
+}
+
+fn work_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
+    ChannelSummary {
+        channel_ref: WORK_EVENT_CHANNEL.to_owned(),
+        connection_ref: config.connection.connection_ref.clone(),
+        integration_ref: PROVIDER.to_owned(),
+        binding_ref: WORK_EVENT_BINDING.to_owned(),
+        events: vec![
+            "work/request.created".to_owned(),
+            "work/task.created".to_owned(),
+            "work/task.status-changed".to_owned(),
+        ],
+    }
+}
+
+fn event_unavailable() -> EventError {
+    EventError::new(
+        EventErrorCode::Unavailable,
+        "Work event owner is unavailable",
+        true,
+    )
+}
+
+fn event_not_found() -> EventError {
+    EventError::new(
+        EventErrorCode::NotFound,
+        "Work event or channel was not found",
+        false,
+    )
+}
+
+fn event_not_granted() -> EventError {
+    EventError::new(
+        EventErrorCode::NotGranted,
+        "Work events are not granted to this tenant member",
+        false,
+    )
+}
+
+fn event_invalid() -> EventError {
+    EventError::new(
+        EventErrorCode::InvalidInput,
+        "Work event request is invalid",
+        false,
+    )
+}
+
+fn event_protocol() -> EventError {
+    EventError::new(
+        EventErrorCode::Protocol,
+        "Work owner event response was refused",
+        false,
+    )
 }
 
 fn validate_json(schema: &Value, value: &Value) -> Result<(), ()> {
@@ -1054,411 +1366,4 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use connectors_config::{B10xConnectionConfig, InitiationConfig};
-    use protocol::operation::{DescribeRequest, InvokeRequest, OwnerContext, SearchRequest};
-    use std::fs;
-    use std::io::Write as _;
-    use std::net::TcpListener;
-    use std::thread;
-    use std::time::{Duration, Instant};
-
-    fn config() -> B10xIntegrationConfig {
-        B10xIntegrationConfig {
-            connection: B10xConnectionConfig {
-                connection_ref: "connection-b10x".to_owned(),
-                label: "B10x local".to_owned(),
-                grant_ref: "grant-b10x".to_owned(),
-                initiation: InitiationConfig::B10x,
-            },
-            work_origin: Some("http://127.0.0.1:4180".to_owned()),
-            ontology_origin: None,
-            ontology_bearer_file: None,
-            audio: None,
-            browser: None,
-        }
-    }
-
-    fn principal() -> PrincipalContext {
-        PrincipalContext::local(&OwnerContext {
-            tenant_id: "tenant-test".to_owned(),
-            agent_id: "agent-test".to_owned(),
-            agent_revision: 1,
-            authority_snapshot_id: "snapshot-test".to_owned(),
-            authority_snapshot_sha256: "a".repeat(64),
-        })
-        .unwrap()
-    }
-
-    fn fake_http(response_body: &'static str) -> (String, thread::JoinHandle<String>) {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let origin = format!("http://{}", listener.local_addr().unwrap());
-        let task = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .unwrap();
-            let mut request = Vec::new();
-            let expected = loop {
-                let mut buffer = [0_u8; 2048];
-                let read = stream.read(&mut buffer).unwrap();
-                assert_ne!(read, 0, "HTTP request ended before its declared body");
-                request.extend_from_slice(&buffer[..read]);
-                assert!(request.len() <= 64 * 1024);
-                let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n")
-                else {
-                    continue;
-                };
-                let headers = std::str::from_utf8(&request[..header_end]).unwrap();
-                let content_length = headers
-                    .lines()
-                    .find_map(|line| {
-                        let (name, value) = line.split_once(':')?;
-                        name.eq_ignore_ascii_case("content-length")
-                            .then(|| value.trim().parse::<usize>().unwrap())
-                    })
-                    .unwrap_or(0);
-                break header_end + 4 + content_length;
-            };
-            while request.len() < expected {
-                let mut buffer = [0_u8; 2048];
-                let read = stream.read(&mut buffer).unwrap();
-                assert_ne!(read, 0, "HTTP request ended before its declared body");
-                request.extend_from_slice(&buffer[..read]);
-            }
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
-                response_body.len()
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-            String::from_utf8(request).unwrap()
-        });
-        (origin, task)
-    }
-
-    fn stalling_http(delay: Duration) -> (String, thread::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let origin = format!("http://{}", listener.local_addr().unwrap());
-        let task = thread::spawn(move || {
-            let (_stream, _) = listener.accept().unwrap();
-            thread::sleep(delay);
-        });
-        (origin, task)
-    }
-
-    async fn invoke_operation(
-        backend: &B10xBackend,
-        operation_ref: &str,
-        input: Value,
-        approval_evidence_ref: Option<&str>,
-    ) -> Result<OperationResult, OperationError> {
-        let OperationResult::Describe(description) = backend
-            .handle(
-                &principal(),
-                OperationRequest::Describe(DescribeRequest {
-                    operation_ref: operation_ref.to_owned(),
-                }),
-            )
-            .await
-            .unwrap()
-        else {
-            panic!("description expected")
-        };
-        backend
-            .handle(
-                &principal(),
-                OperationRequest::Invoke(InvokeRequest {
-                    operation_ref: operation_ref.to_owned(),
-                    connection_ref: "connection-b10x".to_owned(),
-                    description_ref: description.description_ref,
-                    input,
-                    approval_evidence_ref: approval_evidence_ref.map(ToOwned::to_owned),
-                }),
-            )
-            .await
-    }
-
-    async fn invoke_read(backend: &B10xBackend, operation_ref: &str, input: Value) -> Value {
-        let OperationResult::Invoke(result) = invoke_operation(backend, operation_ref, input, None)
-            .await
-            .unwrap()
-        else {
-            panic!("invocation expected")
-        };
-        result.output
-    }
-
-    fn audit_outcomes(root: &Path) -> Vec<String> {
-        fs::read_to_string(root.join("b10x-operation-audit.jsonl"))
-            .unwrap()
-            .lines()
-            .map(|line| {
-                serde_json::from_str::<Value>(line).unwrap()["event"]["outcome"]
-                    .as_str()
-                    .unwrap()
-                    .to_owned()
-            })
-            .collect()
-    }
-
-    #[tokio::test]
-    async fn search_projects_only_configured_capabilities() {
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = B10xBackend::personal(config(), principal(), temporary.path()).unwrap();
-        let OperationResult::Search { operations } = backend
-            .handle(
-                &principal(),
-                OperationRequest::Search(SearchRequest {
-                    query: String::new(),
-                    limit: 25,
-                }),
-            )
-            .await
-            .unwrap()
-        else {
-            panic!("search result expected")
-        };
-        assert_eq!(operations.len(), 8);
-        assert!(operations
-            .iter()
-            .all(|operation| operation.operation_ref.starts_with("work.")));
-        assert!(operations
-            .iter()
-            .all(|operation| operation.connections.len() == 1));
-
-        let ConnectionResult::Search { connections } = backend
-            .handle_connection(
-                &principal(),
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
-                    query: "b10x".to_owned(),
-                    limit: 64,
-                }),
-            )
-            .await
-            .unwrap()
-        else {
-            panic!("Connection search result expected")
-        };
-        assert_eq!(connections.len(), 1);
-        assert_eq!(connections[0].integration_ref, PROVIDER);
-        assert_eq!(connections[0].state, ConnectionState::Callable);
-        assert_eq!(connections[0].route, ConnectionRoute::Direct);
-    }
-
-    #[test]
-    fn browser_catalog_symbol_is_translated_into_the_closed_driver_input() {
-        let document = Document::parse(DOCUMENT).unwrap();
-        let operation = document.operation(BROWSER_OPEN_OPERATION).unwrap();
-        assert_eq!(
-            operation.input_schema()["required"],
-            serde_json::json!(["url_2"])
-        );
-        assert_eq!(
-            browser_open_input(serde_json::json!({"url_2":"https://example.com"}))
-                .unwrap()
-                .url
-                .as_deref(),
-            Some("https://example.com")
-        );
-        assert!(browser_open_input(serde_json::json!({"url":"https://example.com"})).is_err());
-        assert!(browser_goto_input(serde_json::json!({"url_2":7})).is_err());
-    }
-
-    #[test]
-    fn a_mutating_post_dispatch_failure_is_not_declared_retriable() {
-        let document = Document::parse(DOCUMENT).unwrap();
-        let operation = document.operation("work-request-create").unwrap();
-        let error = post_dispatch_error(operation, unavailable());
-        assert_eq!(error.code, OperationErrorCode::OutcomeUnknown);
-        assert!(!error.retriable);
-    }
-
-    #[tokio::test]
-    async fn work_invocation_crosses_the_private_http_boundary_without_a_credential() {
-        let (origin, server) = fake_http(r#"{"items":[],"next_cursor":null}"#);
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let mut configured = config();
-        configured.work_origin = Some(origin);
-        let backend =
-            B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
-        let output = invoke_read(
-            &backend,
-            "work.requests.list",
-            serde_json::json!({"cursor":"", "limit":1}),
-        )
-        .await;
-        assert_eq!(output, serde_json::json!({"items":[], "next_cursor":null}));
-        let request = server.join().unwrap();
-        assert!(request.starts_with("GET /api/work/v1/requests?"));
-        assert!(!request.to_ascii_lowercase().contains("authorization:"));
-        assert_eq!(audit_outcomes(temporary.path()), ["attempted", "completed"]);
-    }
-
-    #[tokio::test]
-    async fn copied_static_approval_text_cannot_authorize_an_effect() {
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = B10xBackend::personal(config(), principal(), temporary.path()).unwrap();
-
-        let missing = invoke_operation(
-            &backend,
-            "work.requests.create",
-            serde_json::json!({}),
-            None,
-        )
-        .await
-        .unwrap_err();
-        assert_eq!(missing.code, OperationErrorCode::ApprovalRequired);
-
-        let copied = invoke_operation(
-            &backend,
-            "work.requests.create",
-            serde_json::json!({}),
-            Some("approval-policy:deployment:copied-from-config"),
-        )
-        .await
-        .unwrap_err();
-        assert_eq!(copied.code, OperationErrorCode::ApprovalDenied);
-        assert!(!temporary
-            .path()
-            .join("b10x-operation-audit.jsonl")
-            .exists());
-    }
-
-    #[tokio::test]
-    async fn invalid_post_dispatch_output_is_audited_as_indeterminate() {
-        let (origin, server) = fake_http(r#"{}"#);
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let mut configured = config();
-        configured.work_origin = Some(origin);
-        let backend =
-            B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
-
-        let error = invoke_operation(
-            &backend,
-            "work.requests.list",
-            serde_json::json!({"cursor":"", "limit":1}),
-            None,
-        )
-        .await
-        .unwrap_err();
-        assert_eq!(error.code, OperationErrorCode::Unavailable);
-        server.join().unwrap();
-        assert_eq!(
-            audit_outcomes(temporary.path()),
-            ["attempted", "indeterminate"]
-        );
-    }
-
-    #[tokio::test]
-    async fn total_http_deadline_bounds_a_stalled_private_service() {
-        let (origin, server) = stalling_http(Duration::from_millis(250));
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let mut configured = config();
-        configured.work_origin = Some(origin);
-        let mut backend =
-            B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
-        backend.client = http_client(Duration::from_millis(25), Duration::from_millis(50)).unwrap();
-        backend.http_total_timeout = Duration::from_millis(50);
-
-        let operation = backend.document.operation("work-request-list").unwrap();
-        let started = Instant::now();
-        let error = backend
-            .invoke_http(
-                "work-request-list",
-                operation,
-                serde_json::json!({"cursor":"", "limit":1}),
-            )
-            .await
-            .unwrap_err();
-        assert_eq!(error.code, OperationErrorCode::Unavailable);
-        let elapsed = started.elapsed();
-        assert!(elapsed < Duration::from_millis(200), "elapsed {elapsed:?}");
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn ontology_invocation_reads_the_owner_only_bearer_at_call_time() {
-        let (origin, server) = fake_http(r#"{"claims":[],"truncated":false}"#);
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let bearer = temporary.path().join("ontology.bearer");
-        let mut bearer_file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .mode(0o600)
-            .open(&bearer)
-            .unwrap();
-        bearer_file
-            .write_all(b"SENTINEL-NOT-A-REAL-ONTOLOGY-BEARER\n")
-            .unwrap();
-        drop(bearer_file);
-        let mut configured = config();
-        configured.work_origin = None;
-        configured.ontology_origin = Some(origin);
-        configured.ontology_bearer_file = Some(bearer);
-        let backend =
-            B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
-        let output = invoke_read(
-            &backend,
-            "knowledge.query",
-            serde_json::json!({
-                "branches": ["main"],
-                "limit": 10,
-                "predicate": null,
-                "subject": null
-            }),
-        )
-        .await;
-        assert_eq!(output, serde_json::json!({"claims":[], "truncated":false}));
-        let request = server.join().unwrap();
-        assert!(request.starts_with("POST /v1/query HTTP/1.1\r\n"));
-        assert!(request.contains("SENTINEL-NOT-A-REAL-ONTOLOGY-BEARER"));
-        let audit =
-            fs::read_to_string(temporary.path().join("b10x-operation-audit.jsonl")).unwrap();
-        assert!(!audit.contains("SENTINEL-NOT-A-REAL-ONTOLOGY-BEARER"));
-    }
-
-    #[test]
-    fn every_projected_operation_has_a_response_schema() {
-        let catalog: Value = serde_json::from_str(DOCUMENT).unwrap();
-        for (canonical, _, _) in all_operation_rows() {
-            assert!(response_schema(&catalog, canonical).is_ok(), "{canonical}");
-        }
-    }
-
-    #[test]
-    fn ontology_nullable_fields_are_still_strict_after_catalog_lowering() {
-        assert!(validate_semantic_input(
-            "knowledge-query",
-            &serde_json::json!({
-                "branches": ["main"],
-                "limit": 10,
-                "predicate": null,
-                "subject": "entity:one"
-            }),
-        )
-        .is_ok());
-        for invalid in [
-            serde_json::json!({
-                "branches": ["main"], "limit": 10, "predicate": {}, "subject": null
-            }),
-            serde_json::json!({
-                "branches": ["main", "main"], "limit": 10, "predicate": null, "subject": null
-            }),
-            serde_json::json!({
-                "branches": [], "limit": 1.5, "predicate": null, "subject": null
-            }),
-            serde_json::json!({
-                "branches": [], "limit": 10, "predicate": null, "subject": null, "origin": "caller-selected"
-            }),
-        ] {
-            assert!(validate_semantic_input("knowledge-query", &invalid).is_err());
-        }
-    }
-}
+mod tests;

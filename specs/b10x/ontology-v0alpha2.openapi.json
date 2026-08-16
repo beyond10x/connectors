@@ -3544,18 +3544,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_claim_assert_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "201": {
             "content": {
@@ -3599,7 +3601,7 @@
             "name": "branch",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/ontology_claim_explain_input/properties/branch"
             }
           },
           {
@@ -3607,7 +3609,7 @@
             "name": "claim",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/ontology_claim_explain_input/properties/claim"
             }
           }
         ],
@@ -3664,18 +3666,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_claim_retract_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {
@@ -3721,18 +3725,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_branch_schema_extend_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "201": {
             "content": {
@@ -3871,7 +3877,7 @@
             "name": "proposal",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/ontology_proposal_get_input/properties/proposal"
             }
           }
         ],
@@ -3922,16 +3928,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_proposal_approval_record_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "204": {
             "content": {
@@ -3980,16 +3976,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_proposal_evaluate_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {
@@ -4038,16 +4024,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ontology_proposal_promote_input"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {

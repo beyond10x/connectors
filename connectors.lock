@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "e91939311441143bf8af1d58b33274cc0c8e304528d6502ad279247b6a5530a3"
+sha256 = "9cf9b34a88510ec18a4025a71e1a9aac89d91dd697b86a4e05c163473298a4b2"
 
 [[provider]]
 id = "airtable"
@@ -191,29 +191,29 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 [[provider]]
 id = "b10x"
 generator = "connectors 0.1.0"
-toml_sha256 = "bb4d8f0aaaeef583641d62dd1a0809ab513ad2b67dab64b2e371c4cfdd9b7cce"
-ir_sha256 = "8b761dcc94457f7500e8ed17db4547b2e75c72485c7f183d7ce7a0b2f93e5bd4"
+toml_sha256 = "5125920678c5ee566072db13a620d3942a7ae4bba0480f2fc4e01324f530bbcf"
+ir_sha256 = "906fdad2e8ceb92bf5a5f08ac0e57374f762e783401e8bc8c15ddfecda074a73"
 
 [[provider.specs]]
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
 service = "knowledge"
-upstream_version = "ontology module v0alpha2 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
-sha256 = "f3af3649173addfb8a49ab04b3dc9d9fb6eb745632316e1a8ab12cd7f62ac14c"
+upstream_version = "ontology module v0alpha2 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+sha256 = "38183cbfa4df9b2a87d0a083d3fd0737875ca2f4fc1746f3e56888d3e7145f78"
 
 [[provider.specs]]
 path = "specs/b10x/work-v1.openapi.json"
 service = "tasks"
-upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
-sha256 = "6feffb689878a8e664c6a9ab1d4c25c536193ed8baebcfb392860d7b00ec0630"
+upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
+sha256 = "011bb2d109a5d0bd0d5f1d5094a9e253fa6596212f42fe6a279cccb4b45c18f8"
 
 [[provider.specs]]
 path = "specs/b10x/work-v1.asyncapi.yaml"
 service = "tasks"
-upstream_version = "work module v1 at b10x/modules 46a0281988266c5101bafb15f226d039f8b0e338"
+upstream_version = "work module v1 at b10x/modules 55ddecae141ec3c8a3df3cb8bd4184421c1b2dd5"
 sha256 = "072ce02d3f8a9638a81637cbb1551994e802b78a46aef08221af8dd4a24763ed"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "d11d93b95d4e3d9e7c14aacbc72ea71863b0910bd415e79946043c4f2e208d97"
+"catalog/b10x.catalog.json" = "76487bd2b80c1b92bdb9a5d220598c6ac37571b4ca284161d6a8368222a4e8c5"
 
 [[provider]]
 id = "datadog"
