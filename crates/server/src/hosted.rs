@@ -240,7 +240,7 @@ fn secure_completion_response(mut response: Response) -> Response {
     );
     headers.insert(
         "content-security-policy",
-        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"
             .parse()
             .expect("static header"),
     );
@@ -739,7 +739,13 @@ mod tests {
                 response.headers().get("referrer-policy").unwrap(),
                 "no-referrer"
             );
-            assert!(response.headers().contains_key("content-security-policy"));
+            assert_eq!(
+                response
+                    .headers()
+                    .get("content-security-policy")
+                    .unwrap(),
+                "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"
+            );
         }
     }
 }

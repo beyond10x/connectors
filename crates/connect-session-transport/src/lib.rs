@@ -351,7 +351,7 @@ async fn write_http(
     body: &[u8],
 ) -> Result<(), CompletionTransportError> {
     let headers = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\r\n",
         body.len()
     );
     stream
@@ -528,6 +528,7 @@ mod tests {
             page.read_to_string(&mut page_response).await.unwrap();
             assert!(page_response.starts_with("HTTP/1.1 200 OK\r\n"));
             assert!(page_response.contains("Connect provider"));
+            assert!(page_response.contains("connect-src 'self'"));
 
             let secret = b"xapp-SENTINEL-NOT-A-REAL-SECRET";
             let mut submit = TcpStream::connect(&authority).await.unwrap();
