@@ -32,7 +32,8 @@ use protocol::operation::{
 };
 use serde::{Deserialize, Serialize};
 use service::{
-    ConnectorBackend, HostedCompletionError, HostedCompletionSubmission, PrincipalContext,
+    ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
+    PrincipalContext,
 };
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
@@ -288,7 +289,7 @@ pub fn router(
                 .post(complete_session)
                 .layer(DefaultBodyLimit::max(MAX_COMPLETION_BYTES)),
         )
-        .route("/oauth/slack/callback", get(slack_oauth_callback))
+        .route("/oauth/{integration_ref}/callback", get(oauth_callback))
         .with_state(HostedState {
             verifier,
             backend,
@@ -298,7 +299,7 @@ pub fn router(
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SlackOAuthCallbackQuery {
+struct OAuthCallbackQuery {
     state: String,
     #[serde(default)]
     code: Option<String>,
@@ -306,9 +307,10 @@ struct SlackOAuthCallbackQuery {
     error: Option<String>,
 }
 
-async fn slack_oauth_callback(
+async fn oauth_callback(
     State(state): State<HostedState>,
-    Query(query): Query<SlackOAuthCallbackQuery>,
+    AxumPath(integration_ref): AxumPath<String>,
+    Query(query): Query<OAuthCallbackQuery>,
 ) -> Response {
     let valid = |value: &str, maximum: usize| {
         !value.is_empty()
@@ -324,37 +326,42 @@ async fn slack_oauth_callback(
             .as_deref()
             .is_some_and(|error| !valid(error, 128))
         || query.code.is_some() == query.error.is_some()
-        || !state.backend.owns_hosted_oauth_state(&query.state)
+        || !valid(&integration_ref, 64)
+        || !state
+            .backend
+            .owns_hosted_oauth_state(&integration_ref, &query.state)
     {
         return secure_completion_response(error(
             StatusCode::BAD_REQUEST,
-            "slack-oauth-callback-invalid",
+            "oauth-callback-invalid",
         ));
     }
     let result = state
         .backend
-        .complete_hosted_oauth(&query.state, query.code.as_deref(), query.error.as_deref())
+        .complete_hosted_oauth(
+            &integration_ref,
+            &query.state,
+            query.code.as_deref(),
+            query.error.as_deref(),
+        )
         .await;
     let (status, message) = match result {
-        Ok(()) => (
-            StatusCode::OK,
-            "Slack account connected. You may close this tab.",
-        ),
+        Ok(()) => (StatusCode::OK, "Account connected. You may close this tab."),
         Err(HostedCompletionError::Refused | HostedCompletionError::Invalid) => (
             StatusCode::FORBIDDEN,
-            "Slack authorization was refused. Close this tab and start Connect again.",
+            "Authorization was refused. Close this tab and start Connect again.",
         ),
         Err(HostedCompletionError::NotFound) => (
             StatusCode::NOT_FOUND,
-            "This Slack authorization is unknown or expired.",
+            "This authorization is unknown or expired.",
         ),
         Err(HostedCompletionError::Unavailable) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            "Slack authorization is temporarily unavailable. Start Connect again later.",
+            "Authorization is temporarily unavailable. Start Connect again later.",
         ),
     };
     secure_completion_response((status, Html(format!(
-        "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect Slack</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}</style><h1>Connect Slack</h1><p>{message}</p>"
+        "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect account</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}</style><h1>Connect account</h1><p>{message}</p>"
     )))
         .into_response())
 }
@@ -501,6 +508,11 @@ async fn connection(
             return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
         }
     };
+    let self_service = matches!(
+        &request.request,
+        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
+            if state.backend.connect_session_access(request) == ConnectSessionAccess::SelfService
+    );
     let required_scope = match &request.request {
         protocol::connection::ConnectionRequest::CandidateSearch(_)
         | protocol::connection::ConnectionRequest::Search(_)
@@ -509,11 +521,7 @@ async fn connection(
         | protocol::connection::ConnectionRequest::ConnectSessionStatus(_) => {
             "connectors.catalog.read"
         }
-        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
-            if request.auth_profile.as_deref().is_some_and(|profile| {
-                matches!(profile, "slack.org_user" | "slack.companion_bot")
-            }) =>
-        {
+        protocol::connection::ConnectionRequest::ConnectSessionCreate(_) if self_service => {
             "connectors.connections.self"
         }
         protocol::connection::ConnectionRequest::CandidateActivate(_)
@@ -533,13 +541,6 @@ async fn connection(
             StatusCode::FORBIDDEN,
         );
     }
-    let self_service = matches!(
-        &request.request,
-        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
-            if request.auth_profile.as_deref().is_some_and(|profile| {
-                matches!(profile, "slack.org_user" | "slack.companion_bot")
-            })
-    );
     if matches!(
         &request.request,
         protocol::connection::ConnectionRequest::CandidateActivate(_)

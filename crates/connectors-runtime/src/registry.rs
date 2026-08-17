@@ -16,8 +16,8 @@ use protocol::operation::{
     OperationSummary,
 };
 use service::{
-    BackendCapabilities, BackendReadinessError, ConnectorBackend, HostedCompletionError,
-    HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
+    BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectorBackend,
+    HostedCompletionError, HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -65,6 +65,13 @@ impl BackendRegistry {
         self.backends
             .iter()
             .filter(|backend| backend.owns_hosted_completion(session_ref))
+            .collect()
+    }
+
+    fn oauth_claims(&self, integration_ref: &str, state: &str) -> Vec<&Arc<dyn ConnectorBackend>> {
+        self.backends
+            .iter()
+            .filter(|backend| backend.owns_hosted_oauth_state(integration_ref, state))
             .collect()
     }
 
@@ -374,6 +381,17 @@ impl ConnectorBackend for BackendRegistry {
             || !self.connection_claims(request).is_empty()
     }
 
+    fn connect_session_access(
+        &self,
+        request: &protocol::connection::ConnectSessionCreateRequest,
+    ) -> ConnectSessionAccess {
+        let wrapped = ConnectionRequest::ConnectSessionCreate(request.clone());
+        match unique_connection_claim(self.connection_claims(&wrapped)) {
+            Ok(backend) => backend.connect_session_access(request),
+            Err(_) => ConnectSessionAccess::Operator,
+        }
+    }
+
     fn owns_event(&self, request: &EventRequest) -> bool {
         matches!(request, EventRequest::Search(_)) || !self.event_claims(request).is_empty()
     }
@@ -403,6 +421,22 @@ impl ConnectorBackend for BackendRegistry {
     ) -> Result<(), HostedCompletionError> {
         unique_completion_claim(self.completion_claims(session_ref))?
             .complete_hosted_session(session_ref, capability, submission)
+            .await
+    }
+
+    fn owns_hosted_oauth_state(&self, integration_ref: &str, state: &str) -> bool {
+        !self.oauth_claims(integration_ref, state).is_empty()
+    }
+
+    async fn complete_hosted_oauth(
+        &self,
+        integration_ref: &str,
+        state: &str,
+        code: Option<&str>,
+        error: Option<&str>,
+    ) -> Result<(), HostedCompletionError> {
+        unique_completion_claim(self.oauth_claims(integration_ref, state))?
+            .complete_hosted_oauth(integration_ref, state, code, error)
             .await
     }
 

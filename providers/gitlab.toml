@@ -231,6 +231,70 @@ type = "object"
 required = ["id", "username", "state", "bot"]
 properties = { id = { type = "integer", description = "The user's global id" }, username = { type = "string" }, name = { type = "string" }, state = { type = "string", description = "`active`, `blocked`, or one of GitLab's other account states" }, bot = { type = "boolean", description = "Whether GitLab classifies the effective actor as a bot. A protected Connect Session uses this to refuse a human token selected as automation, or a bot token selected as a person" }, web_url = { type = "string", format = "uri" }, avatar_url = { type = "string", format = "uri" } }
 
+# Datasource backing reads. These stay out of the model operation surface; the hosted Integration
+# invokes them only through the bounded, allowlisted datasource projection.
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-user-list"
+method = "GET"
+direction = "read"
+path = "/users"
+description = "List GitLab users visible to the delegated user; reserved as a bounded datasource backing read"
+risk = "low"
+idempotency = "idempotent"
+expose = false
+
+[[operations.params.query]]
+name = "page"
+description = "1-based page number"
+required = false
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.query]]
+name = "per_page"
+description = "Results per page, at most 100"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[operations.response_schema]
+type = "array"
+items = { type = "object", required = ["id", "username", "state"], properties = { id = { type = "integer" }, username = { type = "string" }, name = { type = "string" }, state = { type = "string" }, bot = { type = "boolean" }, web_url = { type = "string", format = "uri" }, avatar_url = { type = "string", format = "uri" } } }
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-user-get-by-id"
+method = "GET"
+direction = "read"
+path = "/users/{user_id}"
+description = "Get one GitLab user by numeric id; reserved as a bounded datasource backing read"
+risk = "low"
+idempotency = "idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "user_id"
+description = "The user's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "username", "state"]
+properties = { id = { type = "integer" }, username = { type = "string" }, name = { type = "string" }, state = { type = "string" }, bot = { type = "boolean" }, web_url = { type = "string", format = "uri" }, avatar_url = { type = "string", format = "uri" } }
+
 # ---------------------------------------------------------------------------------------------
 # DISCOVERY — the two reads that answer "what can this token reach?" (C-527)
 #
@@ -292,6 +356,34 @@ schema = { type = "integer", minimum = 1, maximum = 100 }
 type = "array"
 items = { type = "object", required = ["id", "name", "path", "full_path"], properties = { id = { type = "integer", description = "The group's numeric id — what a project query's `id` refers to" }, name = { type = "string" }, path = { type = "string" }, full_path = { type = "string", description = "The namespaced path, `group/subgroup`" }, description = { type = "string" }, visibility = { type = "string", description = "`private`, `internal` or `public`" }, web_url = { type = "string", format = "uri" } } }
 
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-group-get"
+method = "GET"
+direction = "read"
+path = "/groups/{group_id}"
+description = "Get one reachable group by numeric id; reserved as a bounded datasource backing read"
+risk = "low"
+idempotency = "idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "group_id"
+description = "The group's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "name", "path", "full_path"]
+properties = { id = { type = "integer" }, name = { type = "string" }, path = { type = "string" }, full_path = { type = "string" }, description = { type = "string" }, visibility = { type = "string" }, web_url = { type = "string", format = "uri" } }
+
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
@@ -349,6 +441,34 @@ schema = { type = "integer", minimum = 1, maximum = 100 }
 [operations.response_schema]
 type = "array"
 items = { type = "object", required = ["id", "name", "path_with_namespace"], properties = { id = { type = "integer", description = "The project's numeric id — this is the `project_id` every other operation in this connector takes" }, name = { type = "string" }, path = { type = "string" }, path_with_namespace = { type = "string", description = "The namespaced path, `group/subgroup/project`. Human-facing only: it cannot be passed as `project_id`" }, description = { type = "string" }, default_branch = { type = "string" }, visibility = { type = "string", description = "`private`, `internal` or `public`" }, web_url = { type = "string", format = "uri" }, http_url_to_repo = { type = "string", format = "uri", description = "The HTTPS clone URL. Cloning is not a connector operation — this is the address a git client is given" }, last_activity_at = { type = "string", format = "date-time" } } }
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-project-get"
+method = "GET"
+direction = "read"
+path = "/projects/{project_id}"
+description = "Get one reachable project by numeric id; reserved as a bounded datasource backing read"
+risk = "low"
+idempotency = "idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "name", "path_with_namespace"]
+properties = { id = { type = "integer" }, name = { type = "string" }, path = { type = "string" }, path_with_namespace = { type = "string" }, description = { type = "string" }, default_branch = { type = "string" }, visibility = { type = "string" }, web_url = { type = "string", format = "uri" }, last_activity_at = { type = "string", format = "date-time" } }
 
 # ---------------------------------------------------------------------------------------------
 
@@ -538,6 +658,40 @@ schema = { type = "integer", minimum = 1, maximum = 100 }
 type = "array"
 description = "The matching merge requests"
 items = { type = "object", required = ["id", "iid", "project_id", "title", "state"], properties = { id = { type = "integer", description = "The merge request's global id" }, iid = { type = "integer", description = "The project-scoped number shown in GitLab's UI and URL" }, project_id = { type = "integer" }, title = { type = "string" }, description = { type = "string", description = "Markdown body, or null" }, state = { type = "string", enum = ["opened", "closed", "locked", "merged"] }, draft = { type = "boolean", description = "Whether it is marked as a draft; GitLab refuses to merge a draft until it is marked ready" }, source_branch = { type = "string" }, target_branch = { type = "string" }, sha = { type = "string", description = "The commit SHA currently at the tip of the source branch" }, author = { type = "object", description = "`{id, username, name}`" }, web_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, merged_at = { type = "string", format = "date-time", description = "Null unless merged" }, closed_at = { type = "string", format = "date-time", description = "Null unless closed without merging" } } }
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-merge-request-get"
+method = "GET"
+direction = "read"
+path = "/projects/{project_id}/merge_requests/{merge_request_iid}"
+description = "Get one project merge request by IID; reserved as a bounded datasource backing read"
+risk = "low"
+idempotency = "idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.path]]
+name = "merge_request_iid"
+description = "The project-scoped merge request number"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "iid", "project_id", "title", "state"]
+properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, title = { type = "string" }, description = { type = "string" }, state = { type = "string" }, draft = { type = "boolean" }, source_branch = { type = "string" }, target_branch = { type = "string" }, sha = { type = "string" }, author = { type = "object" }, web_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, merged_at = { type = "string", format = "date-time" }, closed_at = { type = "string", format = "date-time" } }
 
 # ---------------------------------------------------------------------------------------------
 

@@ -55,7 +55,7 @@ use zeroize::Zeroizing;
 
 use connectors_config::{InitiationConfig, SlackIntegrationConfig};
 use service::{
-    BackendCapabilities, BackendReadinessError, ConnectSessionLifecycle,
+    BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectSessionLifecycle,
     ConnectSessionLifecycleError, ConnectSessionTerminal, ConnectorBackend, HostedCompletionError,
     HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
 };
@@ -611,6 +611,22 @@ impl ConnectorBackend for SlackBackend {
         }
     }
 
+    fn connect_session_access(
+        &self,
+        request: &protocol::connection::ConnectSessionCreateRequest,
+    ) -> ConnectSessionAccess {
+        if request.integration_ref == INTEGRATION_REF
+            && request
+                .auth_profile
+                .as_deref()
+                .is_some_and(|profile| matches!(profile, PROFILE_ORG_USER | PROFILE_COMPANION_BOT))
+        {
+            ConnectSessionAccess::SelfService
+        } else {
+            ConnectSessionAccess::Operator
+        }
+    }
+
     fn owns_event(&self, request: &EventRequest) -> bool {
         match request {
             EventRequest::Receive(request) => self.inner.has_channel(&request.channel_ref),
@@ -745,16 +761,20 @@ impl ConnectorBackend for SlackBackend {
         }
     }
 
-    fn owns_hosted_oauth_state(&self, state: &str) -> bool {
-        lock(&self.inner.oauth_states).contains_key(state)
+    fn owns_hosted_oauth_state(&self, integration_ref: &str, state: &str) -> bool {
+        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_key(state)
     }
 
     async fn complete_hosted_oauth(
         &self,
+        integration_ref: &str,
         state: &str,
         code: Option<&str>,
         error: Option<&str>,
     ) -> Result<(), HostedCompletionError> {
+        if integration_ref != INTEGRATION_REF {
+            return Err(HostedCompletionError::NotFound);
+        }
         self.inner
             .complete_user_oauth(state, code, error)
             .await
