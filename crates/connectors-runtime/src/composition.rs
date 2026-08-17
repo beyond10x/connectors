@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use connector_secrets::{FileStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connectors_config::{HostedServerConfig, PersonalConfig};
+use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_b10x::{B10xBackend, B10xIntegrationError};
@@ -55,6 +56,10 @@ pub enum RuntimeError {
     Daemon(#[from] server::local::LocalDaemonError),
     #[error("the personal credential store could not be opened")]
     CredentialStore,
+    #[error("CONNECTORS_DATABASE_URL is required for hosted Connector state")]
+    MissingHostedDatabase,
+    #[error(transparent)]
+    HostedState(#[from] hosted_state::StateError),
     #[error(transparent)]
     HostedVault(#[from] hosted_vault::HostedVaultError),
     #[error(transparent)]
@@ -255,17 +260,18 @@ impl HostedRuntime {
     pub async fn bind(config_path: &Path) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
         validate_state_root(&config.storage.state_root)?;
+        let database_url =
+            env::var("CONNECTORS_DATABASE_URL").map_err(|_| RuntimeError::MissingHostedDatabase)?;
+        let hosted_state = PostgresState::connect(&database_url)?;
         let credential_stores = if config.vault.enabled {
             let store = HostedVaultStore::new(&config.vault)?;
             store.initialize().await?;
             let store = Arc::new(store);
             let secret_store: Arc<dyn SecretStore> = store;
-            let prepared = PreparedVaultStore::open(
+            let prepared = PreparedVaultStore::open_postgres(
                 secret_store.clone(),
-                config
-                    .storage
-                    .state_root
-                    .join("vault-prepared-transactions.json"),
+                hosted_state.clone(),
+                "vault.prepared-transactions",
             )
             .map_err(|_| RuntimeError::CredentialStore)?;
             prepared
@@ -343,19 +349,21 @@ impl HostedRuntime {
                     voice.application.tls_server_name.clone(),
                 ))
             };
-            backends.push(Arc::new(SipOperationBackend::new(
+            backends.push(Arc::new(SipOperationBackend::new_postgres(
                 voice,
                 launcher,
                 &config.storage.state_root,
+                hosted_state.clone(),
             )?));
         }
         let b10x_enabled = config.b10x.is_some();
         let admitted_module_tenants = config.admitted_module_tenants();
         if let Some(b10x) = config.b10x {
-            backends.push(Arc::new(B10xBackend::hosted(
+            backends.push(Arc::new(B10xBackend::hosted_postgres(
                 b10x,
                 admitted_module_tenants,
                 &config.storage.state_root,
+                hosted_state.clone(),
             )?));
         }
         let slack_enabled = config.slack.is_some();
@@ -374,6 +382,7 @@ impl HostedRuntime {
                     slack.policy(),
                     &config.storage.state_root,
                     store,
+                    hosted_state.clone(),
                 )
                 .await?,
             ));

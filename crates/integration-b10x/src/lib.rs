@@ -24,9 +24,8 @@ use driver_audio::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use driver_cdp::LocalBrowserDriver;
 use ed25519_dalek::pkcs8::DecodePrivateKey as _;
 use ed25519_dalek::{Signer as _, SigningKey};
-use protocol::audio::{
-    SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION,
-};
+use hosted_state::PostgresState;
+use protocol::audio::{SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION};
 use protocol::browser::{
     BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_GOTO_OPERATION,
     BROWSER_OPEN_OPERATION, BROWSER_SCREENSHOT_OPERATION, BROWSER_SNAPSHOT_OPERATION,
@@ -67,9 +66,9 @@ use work_events::ModuleEventStore;
 const PROVIDER: &str = "b10x";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 use surface::{
-    HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, MODULE_AUTHORIZATION_SCHEME,
+    WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, MODULE_AUTHORIZATION_SCHEME,
     MODULE_REQUEST_TTL_SECONDS, MODULE_REQUEST_TYPE, OPERATIONS, PLANNER_EVENT_BINDING,
-    PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL, WorkOwnerEventPage,
+    PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL,
 };
 
 /// Runtime construction failure. Messages deliberately carry no bearer or remote response body.
@@ -241,7 +240,12 @@ impl B10xBackend {
         principal: PrincipalContext,
         state_root: &Path,
     ) -> Result<Self, B10xIntegrationError> {
-        Self::new(config, PrincipalAdmission::Exact(principal), state_root)
+        Self::new(
+            config,
+            PrincipalAdmission::Exact(principal),
+            state_root,
+            None,
+        )
     }
 
     /// Compose a hosted backend for Identity-verified principals in one tenant.
@@ -250,6 +254,25 @@ impl B10xBackend {
         tenant_ids: Vec<String>,
         state_root: &Path,
     ) -> Result<Self, B10xIntegrationError> {
+        Self::hosted_inner(config, tenant_ids, state_root, None)
+    }
+
+    /// Compose hosted B10x state against the service-owned PostgreSQL database.
+    pub fn hosted_postgres(
+        config: B10xIntegrationConfig,
+        tenant_ids: Vec<String>,
+        state_root: &Path,
+        hosted_state: PostgresState,
+    ) -> Result<Self, B10xIntegrationError> {
+        Self::hosted_inner(config, tenant_ids, state_root, Some(hosted_state))
+    }
+
+    fn hosted_inner(
+        config: B10xIntegrationConfig,
+        tenant_ids: Vec<String>,
+        state_root: &Path,
+        hosted_state: Option<PostgresState>,
+    ) -> Result<Self, B10xIntegrationError> {
         if tenant_ids.is_empty() {
             return Err(B10xIntegrationError::InvalidConfiguration);
         }
@@ -257,6 +280,7 @@ impl B10xBackend {
             config,
             PrincipalAdmission::Tenants(tenant_ids.into_iter().collect()),
             state_root,
+            hosted_state,
         )
     }
 
@@ -264,6 +288,7 @@ impl B10xBackend {
         config: B10xIntegrationConfig,
         admission: PrincipalAdmission,
         state_root: &Path,
+        hosted_state: Option<PostgresState>,
     ) -> Result<Self, B10xIntegrationError> {
         let legacy_event_tenant = match &admission {
             PrincipalAdmission::Exact(principal) => Some(principal.tenant_id().to_owned()),
@@ -292,12 +317,16 @@ impl B10xBackend {
             "work",
             state_root.join("b10x-work-events.json"),
             legacy_event_tenant.as_deref(),
+            hosted_state.clone(),
+            "b10x.work-events",
         )
         .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
         let planner_events = ModuleEventStore::open(
             "planner",
             state_root.join("b10x-planner-events.json"),
             None,
+            hosted_state.clone(),
+            "b10x.planner-events",
         )
         .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
         Ok(Self {
@@ -311,7 +340,10 @@ impl B10xBackend {
             http_total_timeout: HTTP_TOTAL_TIMEOUT,
             catalog_sha256: format!("{:x}", Sha256::digest(DOCUMENT.as_bytes())),
             deployment_sha256,
-            audit: AuditJournal::new(state_root.join("b10x-operation-audit.jsonl")),
+            audit: AuditJournal::new(
+                state_root.join("b10x-operation-audit.jsonl"),
+                hosted_state,
+            ),
             work_events,
             planner_events,
             module_signer,
@@ -1332,9 +1364,7 @@ impl ConnectorBackend for B10xBackend {
                 {
                     self.work_events
                         .replay(context.tenant_id(), &request.event_ref)?
-                } else if request
-                    .event_ref
-                    .starts_with("event:b10x:planner:")
+                } else if request.event_ref.starts_with("event:b10x:planner:")
                     && self.configured("planner-project-list")
                 {
                     self.planner_events

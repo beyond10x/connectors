@@ -20,6 +20,7 @@ connectors-config = { version = "0.1.0", path = "../connectors-config" }
 futures-util = "0.3"
 getrandom = "0.3"
 hex = "0.4"
+hosted-state = { version = "0.1.0", path = "../hosted-state" }
 jsonschema = { version = "0.33", default-features = false }
 protocol = { version = "0.1.0", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }

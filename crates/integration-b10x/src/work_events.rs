@@ -5,8 +5,11 @@ use std::os::unix::fs::OpenOptionsExt as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use hosted_state::PostgresState;
 use protocol::event::{DataEvent, EventError, EventErrorCode};
 use serde::{Deserialize, Serialize};
+
+const MAX_EVENT_STATE_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +52,8 @@ struct StoredEvent {
 pub(super) struct ModuleEventStore {
     module: &'static str,
     path: PathBuf,
+    hosted_state: Option<PostgresState>,
+    hosted_key: &'static str,
     state: Mutex<State>,
 }
 
@@ -57,9 +62,19 @@ impl ModuleEventStore {
         module: &'static str,
         path: PathBuf,
         legacy_tenant: Option<&str>,
+        hosted_state: Option<PostgresState>,
+        hosted_key: &'static str,
     ) -> Result<Self, ()> {
-        let state = if path.exists() {
-            let bytes = fs::read(&path).map_err(|_| ())?;
+        let bytes = if let Some(hosted_state) = &hosted_state {
+            hosted_state
+                .read(hosted_key, MAX_EVENT_STATE_BYTES)
+                .map_err(|_| ())?
+        } else if path.exists() {
+            Some(fs::read(&path).map_err(|_| ())?)
+        } else {
+            None
+        };
+        let state = if let Some(bytes) = bytes {
             match serde_json::from_slice::<PersistedState>(&bytes).map_err(|_| ())? {
                 PersistedState::Partitioned(state) => state,
                 PersistedState::Legacy(legacy) => {
@@ -81,6 +96,8 @@ impl ModuleEventStore {
         Ok(Self {
             module,
             path,
+            hosted_state,
+            hosted_key,
             state: Mutex::new(state),
         })
     }
@@ -123,7 +140,7 @@ impl ModuleEventStore {
         if owner_cursor.is_some() {
             tenant_state.owner_cursor = owner_cursor;
         }
-        persist(&self.path, &guard)
+        self.persist(&guard)
     }
 
     pub(super) fn receive(
@@ -168,10 +185,22 @@ impl ModuleEventStore {
     fn state(&self) -> Result<MutexGuard<'_, State>, EventError> {
         self.state.lock().map_err(|_| unavailable())
     }
+
+    fn persist(&self, state: &State) -> Result<(), EventError> {
+        let bytes = serde_json::to_vec(state).map_err(|_| protocol())?;
+        if bytes.len() > MAX_EVENT_STATE_BYTES {
+            return Err(protocol());
+        }
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .replace(self.hosted_key, &bytes, MAX_EVENT_STATE_BYTES)
+                .map_err(|_| unavailable());
+        }
+        persist_file(&self.path, &bytes)
+    }
 }
 
-fn persist(path: &Path, state: &State) -> Result<(), EventError> {
-    let bytes = serde_json::to_vec(state).map_err(|_| protocol())?;
+fn persist_file(path: &Path, bytes: &[u8]) -> Result<(), EventError> {
     let temporary = path.with_extension("json.next");
     let mut file = OpenOptions::new()
         .create(true)
@@ -180,7 +209,7 @@ fn persist(path: &Path, state: &State) -> Result<(), EventError> {
         .mode(0o600)
         .open(&temporary)
         .map_err(|_| unavailable())?;
-    file.write_all(&bytes).map_err(|_| unavailable())?;
+    file.write_all(bytes).map_err(|_| unavailable())?;
     file.sync_all().map_err(|_| unavailable())?;
     fs::rename(temporary, path).map_err(|_| unavailable())
 }
@@ -225,7 +254,8 @@ mod tests {
     fn cursors_events_and_replay_are_partitioned_by_tenant() {
         let temporary = tempfile::tempdir().expect("temporary directory");
         let path = temporary.path().join("work-events.json");
-        let store = ModuleEventStore::open("work", path.clone(), None).expect("open store");
+        let store = ModuleEventStore::open("work", path.clone(), None, None, "work.events")
+            .expect("open store");
 
         store
             .append(
@@ -264,8 +294,8 @@ mod tests {
             .is_some());
 
         drop(store);
-        let reopened =
-            ModuleEventStore::open("work", path, None).expect("reopen partitioned store");
+        let reopened = ModuleEventStore::open("work", path, None, None, "work.events")
+            .expect("reopen partitioned store");
         assert_eq!(reopened.receive("tenant-a", 0, 10).unwrap().0.len(), 1);
         assert_eq!(reopened.receive("tenant-b", 0, 10).unwrap().0.len(), 1);
     }

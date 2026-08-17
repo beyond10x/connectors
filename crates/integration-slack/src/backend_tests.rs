@@ -229,7 +229,7 @@ mod tests {
     fn operation_audit_is_durable_bounded_and_value_free() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let journal = AuditJournal::new(root.path().join("slack-operation-audit.jsonl"));
+        let journal = AuditJournal::new(root.path().join("slack-operation-audit.jsonl"), None);
         let event = AuditEvent {
             audit_ref: "audit:slack:test",
             operation_ref: "slack-chat-post-message",
@@ -428,6 +428,7 @@ mod tests {
             policy(),
             root.path(),
             Arc::new(MemoryStore::new()),
+            None,
             false,
         )
         .await
@@ -469,6 +470,7 @@ mod tests {
             policy(),
             root.path(),
             Arc::new(MemoryStore::new()),
+            None,
             false,
         )
         .await
@@ -513,6 +515,7 @@ mod tests {
             policy(),
             root.path(),
             Arc::new(UnavailableStore),
+            None,
             false,
         )
         .await
@@ -526,7 +529,7 @@ mod tests {
     async fn event_is_durable_and_deduplicated_before_pull_and_replay() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let store = EventStore::open(root.path().join("events.jsonl")).unwrap();
+        let store = EventStore::open(root.path().join("events.jsonl"), None).unwrap();
         let connection = StoredConnection {
             connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
             instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
@@ -552,7 +555,7 @@ mod tests {
         assert_eq!(events[0].provenance, EventProvenance::Native);
         assert_eq!(store.replay(&events[0].event_ref), Some(events[0].clone()));
 
-        let reopened = EventStore::open(root.path().join("events.jsonl")).unwrap();
+        let reopened = EventStore::open(root.path().join("events.jsonl"), None).unwrap();
         let (events, cursor) = reopened
             .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)
             .await;

@@ -1,0 +1,15 @@
+[package]
+name = "hosted-state"
+description = "Bounded PostgreSQL state cells for hosted Connector runtimes."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/b10x"
+homepage = "https://github.com/b10x/b10x"
+rust-version = "1.88"
+publish = false
+workspace = "../connectors-runtime"
+
+[dependencies]
+postgres = "0.19"
+thiserror = "2"
