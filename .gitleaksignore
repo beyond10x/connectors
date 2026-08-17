@@ -69,3 +69,7 @@ c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:new-relic-user-api-id:3
 c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:sentry-access-token:462
 c78434fe6a310e3d3759e24e1715280bc49a2d37:crates/connector-spec/tests/main/verification_conformance.rs:generic-api-key:711
 93672c5e9d73ac4834fe38b03dec721ae9104b60:crates/protocol/src/connection.rs:generic-api-key:738
+ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:bitbucket-client-secret:135
+ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:discord-api-token:246
+ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:new-relic-user-api-id:464
+ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:sentry-access-token:579
