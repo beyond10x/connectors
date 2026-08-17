@@ -34,6 +34,13 @@ use protocol::connection::{
     ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
     ConnectionSummary as LifecycleConnectionSummary,
 };
+use protocol::datasource::{
+    AccessMode, BindingSearchRequest, Completeness, DatasourceBinding, DatasourceDescription,
+    DatasourceError, DatasourceErrorCode, DatasourcePage, DatasourceProvenance, DatasourceRead,
+    DatasourceRecord, DatasourceRequest, DatasourceResult, DatasourceSummary,
+    DescribeRequest as DatasourceDescribeRequest, ReadRequest, ReadVerb, RecordView,
+    SearchRequest as DatasourceSearchRequest,
+};
 use protocol::event::{
     ChannelSummary, DataEvent, EventError, EventErrorCode, EventProvenance, EventRequest,
     EventResult,
@@ -52,6 +59,7 @@ use sha2::{Digest as _, Sha256};
 
 mod audit;
 mod composition;
+mod datasource;
 mod policy;
 mod surface;
 mod work_events;
@@ -64,6 +72,7 @@ use policy::{
 use work_events::ModuleEventStore;
 
 const PROVIDER: &str = "b10x";
+const WORKSPACES_DATASOURCE: &str = "b10x.workspaces";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 use surface::{
     WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, MODULE_AUTHORIZATION_SCHEME,
@@ -145,6 +154,8 @@ impl ModuleSigner {
         if config.work_origin.is_none()
             && config.ontology_origin.is_none()
             && config.planner_origin.is_none()
+            && config.workspaces_origin.is_none()
+            && config.colab_origin.is_none()
         {
             return Ok(None);
         }
@@ -284,6 +295,12 @@ impl B10xBackend {
             }
             value if value.starts_with("planner-") => {
                 self.module_admitted("planner") && self.config.planner_origin.is_some()
+            }
+            value if value.starts_with("workspaces-") || value.starts_with("workspace-") => {
+                self.module_admitted("workspaces") && self.config.workspaces_origin.is_some()
+            }
+            value if value.starts_with("colab-") => {
+                self.module_admitted("colab") && self.config.colab_origin.is_some()
             }
             _ => false,
         }
@@ -539,7 +556,10 @@ impl B10xBackend {
             ProtocolDriver::HttpV1 => {
                 let origin = self.origin(canonical).ok_or_else(unavailable)?;
                 let mut capabilities = BTreeSet::from([Capability::PrivateNetwork]);
-                if is_ontology_operation(canonical) {
+                // Every private module request is signed with the deployment-owned key loaded
+                // from its projected file. The plan must account for that file-secret authority,
+                // not just Ontology's separate bearer-file case.
+                if module_operation(canonical).is_some() {
                     capabilities.insert(Capability::FileSecret);
                 }
                 (
@@ -741,13 +761,18 @@ impl B10xBackend {
             .find(|(name, _)| name.eq_ignore_ascii_case("idempotency-key"))
             .map(|(_, value)| value.as_str());
         let operation = module_operation(canonical).ok_or_else(not_granted)?;
-        let audience = if canonical.starts_with("work-") {
-            "urn:b10x:module:work"
-        } else if canonical.starts_with("planner-") {
-            "urn:b10x:module:planner"
-        } else {
-            "urn:b10x:module:ontology"
-        };
+        let audience =
+            if canonical.starts_with("workspaces-") || canonical.starts_with("workspace-") {
+                "urn:b10x:module:workspaces"
+            } else if canonical.starts_with("colab-") {
+                "urn:b10x:module:colab"
+            } else if canonical.starts_with("work-") {
+                "urn:b10x:module:work"
+            } else if canonical.starts_with("planner-") {
+                "urn:b10x:module:planner"
+            } else {
+                "urn:b10x:module:ontology"
+            };
         let authorization = self
             .module_signer
             .as_ref()
@@ -810,6 +835,10 @@ impl B10xBackend {
             self.config.work_origin()
         } else if canonical.starts_with("planner-") {
             self.config.planner_origin()
+        } else if canonical.starts_with("workspaces-") || canonical.starts_with("workspace-") {
+            self.config.workspaces_origin()
+        } else if canonical.starts_with("colab-") {
+            self.config.colab_origin()
         } else {
             None
         }
@@ -1058,7 +1087,7 @@ impl ConnectorBackend for B10xBackend {
             operations: true,
             connections: true,
             events: self.config.work_origin.is_some() || self.config.planner_origin.is_some(),
-            datasources: false,
+            datasources: self.workspace_datasource_admitted(),
         }
     }
 
@@ -1094,6 +1123,15 @@ impl ConnectorBackend for B10xBackend {
                     || request.event_ref.starts_with("event:b10x:planner:")
             }
             EventRequest::Search(_) => false,
+        }
+    }
+
+    fn owns_datasource(&self, request: &DatasourceRequest) -> bool {
+        match request {
+            DatasourceRequest::Describe(request) => request.datasource_ref == WORKSPACES_DATASOURCE,
+            DatasourceRequest::Bindings(request) => request.datasource_ref == WORKSPACES_DATASOURCE,
+            DatasourceRequest::Read(request) => request.datasource_ref == WORKSPACES_DATASOURCE,
+            DatasourceRequest::Search(_) => false,
         }
     }
 
@@ -1177,6 +1215,14 @@ impl ConnectorBackend for B10xBackend {
                 false,
             )),
         }
+    }
+
+    async fn handle_datasource(
+        &self,
+        context: &PrincipalContext,
+        request: DatasourceRequest,
+    ) -> Result<DatasourceResult, DatasourceError> {
+        self.handle_workspace_datasource(context, request).await
     }
 
     async fn handle_event(

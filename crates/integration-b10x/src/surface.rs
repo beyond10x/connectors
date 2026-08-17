@@ -43,7 +43,7 @@ pub(super) struct WorkOwnerEvent {
 }
 
 #[rustfmt::skip]
-pub(super) const OPERATIONS: [(&str, &str, &str); 54] = [
+pub(super) const OPERATIONS: [(&str, &str, &str); 72] = [
     (SPEECH_SPEAK_OPERATION, SPEECH_SPEAK_TOOL_REF, "Speak on local audio"),
     (SPEECH_STATUS_OPERATION, SPEECH_STATUS_TOOL_REF, "Inspect local speech readiness"),
     (BROWSER_OPEN_OPERATION, BROWSER_OPEN_TOOL_REF, "Open a dedicated browser"),
@@ -98,4 +98,22 @@ pub(super) const OPERATIONS: [(&str, &str, &str); 54] = [
     ("planner-sync-session-preview", "planner.sync.sessions.preview", "Preview a repository sync session"),
     ("planner-sync-session-apply", "planner.sync.sessions.apply", "Apply a repository sync session"),
     ("planner-sync-session-confirm", "planner.sync.sessions.confirm", "Confirm a repository sync session"),
+    ("workspaces-list", "workspaces.list", "List visible logical workspaces"),
+    ("workspaces-create", "workspaces.create", "Create a logical workspace"),
+    ("workspaces-get", "workspaces.get", "Get a logical workspace"),
+    ("workspaces-delete", "workspaces.delete", "Destroy a logical workspace"),
+    ("workspaces-checkouts-list", "workspaces.checkouts.list", "List workspace checkouts"),
+    ("workspaces-checkouts-create", "workspaces.checkouts.create", "Create a physical checkout"),
+    ("workspaces-checkouts-delete", "workspaces.checkouts.delete", "Destroy a physical checkout"),
+    ("workspace-file-read", "workspace.files.read", "Read a digest-bound checkout file"),
+    ("workspace-tree-list", "workspace.files.list", "List a bounded checkout tree"),
+    ("workspace-file-replace", "workspace.files.replace", "Compare-and-set replace a checkout file"),
+    ("workspace-file-edit", "workspace.files.edit", "Compare-and-set edit checkout text"),
+    ("workspace-file-patch", "workspace.files.patch", "Compare-and-set patch checkout lines"),
+    ("workspace-exec-start", "workspace.exec.start", "Run a bounded command in a checkout"),
+    ("colab-room-create", "colab.rooms.create", "Create a conversation room"),
+    ("colab-workspace-list", "colab.workspaces.list", "List conversation workspace attachments"),
+    ("colab-workspace-attach", "colab.workspaces.attach", "Attach a checkout to a conversation"),
+    ("colab-workspace-current-set", "colab.workspaces.current.set", "Select the current conversation checkout"),
+    ("colab-workspace-detach", "colab.workspaces.detach", "Detach a checkout from a conversation"),
 ];

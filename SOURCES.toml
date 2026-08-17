@@ -126,7 +126,7 @@ note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sampl
 id = "b10x-owned-contracts"
 kind = "provider-openapi-and-asyncapi-contracts"
 origin = "repository-authored"
-upstream = "https://github.com/b10x/modules at commit 719a8a321ee9828332b002f4b7b722ffcff59d52"
+upstream = "https://github.com/b10x/b10x plus retained b10x/modules release pins"
 references = [
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -135,13 +135,16 @@ references = [
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0042-logical-workspaces-are-a-product-neutral-control-plane.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0043-workspaces-is-an-independently-released-domain-module.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0044-zwirn-is-a-product-and-colab-is-a-domain-module.md",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52/modules/planner/contracts/planner/v1",
 ]
 refresh = "authored-review"
 pins = "specs/b10x.provenance.toml"
-consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/ontology-v0alpha2.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "specs/b10x/work-v1.openapi.json", "specs/b10x/work-v1.asyncapi.yaml", "specs/b10x/planner-v1.openapi.json", "specs/b10x/planner-v1.asyncapi.yaml", "specs/b10x/planner-v1.module.json", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
-note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus explicitly selected operations and events from exact Work, Ontology, and Planner module contracts. The modules retain durable domain-owner identities while implementation source lives in b10x/modules. Deployment Connections resolve all peers and private HTTP origins, while persistence remains behind each module runtime. The v0alpha1 bytes remain temporarily as migration evidence and are not active Provider inputs. Browser interaction remains outside this surface."
+consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/ontology-v0alpha2.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "specs/b10x/work-v1.openapi.json", "specs/b10x/work-v1.asyncapi.yaml", "specs/b10x/planner-v1.openapi.json", "specs/b10x/planner-v1.asyncapi.yaml", "specs/b10x/planner-v1.module.json", "specs/b10x/workspaces-v2.openapi.json", "specs/b10x/colab-v1.openapi.json", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
+note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus explicitly selected operations and events from exact Work, Ontology, Planner, Workspaces, and Colab module contracts. The modules retain durable domain-owner identities while implementation source lives in the B10x monorepo or an explicitly retained release pin. Deployment Connections resolve all peers and private HTTP origins, while persistence remains behind each module runtime. The v0alpha1 bytes remain temporarily as migration evidence and are not active Provider inputs. Browser interaction remains outside this surface."
 
 [[source]]
 id = "babelforce-openapi"

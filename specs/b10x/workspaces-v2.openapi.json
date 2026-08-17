@@ -1,0 +1,3760 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "workspaces module API",
+    "version": "0.1.0-dev.1"
+  },
+  "paths": {
+    "/api/workspaces/v2/workspaces": {
+      "get": {
+        "operationId": "workspaces_list",
+        "x-b10x-global-id": "workspaces/workspace.list",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_list_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_list_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_list_problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "workspaces_create",
+        "x-b10x-global-id": "workspaces/workspace.create",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_create_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_create_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_create_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspaces_create_input"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}": {
+      "get": {
+        "operationId": "workspaces_get",
+        "x-b10x-global-id": "workspaces/workspace.get",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_get_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_get_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_get_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_get_input/properties/workspace"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "workspaces_delete",
+        "x-b10x-global-id": "workspaces/workspace.delete",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "high",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_delete_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_delete_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_delete_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_delete_input/properties/workspace"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts": {
+      "get": {
+        "operationId": "workspaces_checkouts_list",
+        "x-b10x-global-id": "workspaces/checkout.list",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_checkouts_list_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_list_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_list_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_checkouts_list_input/properties/workspace"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "workspaces_checkouts_create",
+        "x-b10x-global-id": "workspaces/checkout.create",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_checkouts_create_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_create_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_create_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_checkouts_create_path/properties/workspace"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspaces_checkouts_create_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}": {
+      "delete": {
+        "operationId": "workspaces_checkouts_delete",
+        "x-b10x-global-id": "workspaces/checkout.delete",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "high",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspaces_checkouts_delete_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_delete_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspaces_checkouts_delete_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_checkouts_delete_input/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspaces_checkouts_delete_input/properties/checkout"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/execs": {
+      "post": {
+        "operationId": "workspace_exec_start",
+        "x-b10x-global-id": "workspaces/exec.start",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_exec_start_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_exec_start_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_exec_start_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_exec_start_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_exec_start_path/properties/checkout"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspace_exec_start_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-edits": {
+      "post": {
+        "operationId": "workspace_file_edit",
+        "x-b10x-global-id": "workspaces/file.edit",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_file_edit_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_edit_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_edit_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_edit_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_edit_path/properties/checkout"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_edit_query/properties/path"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspace_file_edit_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-patches": {
+      "post": {
+        "operationId": "workspace_file_patch",
+        "x-b10x-global-id": "workspaces/file.patch",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_file_patch_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_patch_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_patch_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_patch_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_patch_path/properties/checkout"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_patch_query/properties/path"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspace_file_patch_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/files": {
+      "get": {
+        "operationId": "workspace_file_read",
+        "x-b10x-global-id": "workspaces/file.read",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_file_read_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_read_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_read_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_read_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_read_path/properties/checkout"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_read_query/properties/path"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_read_query/properties/offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_read_query/properties/limit"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "workspace_file_replace",
+        "x-b10x-global-id": "workspaces/file.replace",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_file_replace_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_replace_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_file_replace_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_replace_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_replace_path/properties/checkout"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_file_replace_query/properties/path"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/workspace_file_replace_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/tree": {
+      "get": {
+        "operationId": "workspace_tree_list",
+        "x-b10x-global-id": "workspaces/file.list",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/workspace_tree_list_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_tree_list_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/workspace_tree_list_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_tree_list_path/properties/workspace"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_tree_list_path/properties/checkout"
+            }
+          },
+          {
+            "name": "limit_items",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_tree_list_query/properties/limit_items"
+            }
+          },
+          {
+            "name": "include_hidden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_tree_list_query/properties/include_hidden"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "workspace_exec_start_body": {
+        "type": "object",
+        "properties": {
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeout_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "output_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "processes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0
+          },
+          "memory_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "cpu_millis": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "argv"
+        ],
+        "$defs": {
+          "CheckoutContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "StartExecContractBody": {
+            "type": "object",
+            "properties": {
+              "argv": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timeout_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "output_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "processes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "memory_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "cpu_millis": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "argv"
+            ]
+          }
+        }
+      },
+      "workspace_exec_start_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_exec_start_input/$defs/CheckoutContractPath"
+          },
+          "body": {
+            "$ref": "#/components/schemas/workspace_exec_start_input/$defs/StartExecContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "body"
+        ],
+        "$defs": {
+          "CheckoutContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "StartExecContractBody": {
+            "type": "object",
+            "properties": {
+              "argv": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timeout_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "output_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "processes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "memory_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "cpu_millis": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "argv"
+            ]
+          }
+        }
+      },
+      "workspace_exec_start_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_exec_start_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "CheckoutContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "StartExecContractBody": {
+            "type": "object",
+            "properties": {
+              "argv": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timeout_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "output_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "processes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "memory_bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "cpu_millis": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "argv"
+            ]
+          }
+        }
+      },
+      "workspace_exec_start_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_file_edit_body": {
+        "type": "object",
+        "properties": {
+          "expected_sha256": {
+            "type": "string"
+          },
+          "old_text": {
+            "type": "string"
+          },
+          "new_text": {
+            "type": "string"
+          },
+          "match_policy": {
+            "$ref": "#/components/schemas/workspace_file_edit_body/$defs/TextMatchPolicyContract"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_sha256",
+          "old_text",
+          "new_text",
+          "match_policy"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "EditFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "old_text": {
+                "type": "string"
+              },
+              "new_text": {
+                "type": "string"
+              },
+              "match_policy": {
+                "$ref": "#/components/schemas/workspace_file_edit_body/$defs/TextMatchPolicyContract"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "old_text",
+              "new_text",
+              "match_policy"
+            ]
+          },
+          "TextMatchPolicyContract": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "flux_compatible"
+            ]
+          }
+        }
+      },
+      "workspace_file_edit_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathQueryBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_file_edit_input/$defs/FileContractPath"
+          },
+          "query": {
+            "$ref": "#/components/schemas/workspace_file_edit_input/$defs/FileMutationContractQuery"
+          },
+          "body": {
+            "$ref": "#/components/schemas/workspace_file_edit_input/$defs/EditFileContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "query",
+          "body"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "EditFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "old_text": {
+                "type": "string"
+              },
+              "new_text": {
+                "type": "string"
+              },
+              "match_policy": {
+                "$ref": "#/components/schemas/workspace_file_edit_input/$defs/TextMatchPolicyContract"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "old_text",
+              "new_text",
+              "match_policy"
+            ]
+          },
+          "TextMatchPolicyContract": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "flux_compatible"
+            ]
+          }
+        }
+      },
+      "workspace_file_edit_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_file_edit_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "EditFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "old_text": {
+                "type": "string"
+              },
+              "new_text": {
+                "type": "string"
+              },
+              "match_policy": {
+                "$ref": "#/components/schemas/workspace_file_edit_path/$defs/TextMatchPolicyContract"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "old_text",
+              "new_text",
+              "match_policy"
+            ]
+          },
+          "TextMatchPolicyContract": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "flux_compatible"
+            ]
+          }
+        }
+      },
+      "workspace_file_edit_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_file_edit_query": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "EditFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "old_text": {
+                "type": "string"
+              },
+              "new_text": {
+                "type": "string"
+              },
+              "match_policy": {
+                "$ref": "#/components/schemas/workspace_file_edit_query/$defs/TextMatchPolicyContract"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "old_text",
+              "new_text",
+              "match_policy"
+            ]
+          },
+          "TextMatchPolicyContract": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "flux_compatible"
+            ]
+          }
+        }
+      },
+      "workspace_file_patch_body": {
+        "type": "object",
+        "properties": {
+          "expected_sha256": {
+            "type": "string"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/workspace_file_patch_body/$defs/LinePatchContractEdit"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "expected_sha256",
+          "edits"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "PatchFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/workspace_file_patch_body/$defs/LinePatchContractEdit"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "edits"
+            ]
+          },
+          "LinePatchContractEdit": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_before"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_after"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "replace_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "delete_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_patch_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathQueryBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_file_patch_input/$defs/FileContractPath"
+          },
+          "query": {
+            "$ref": "#/components/schemas/workspace_file_patch_input/$defs/FileMutationContractQuery"
+          },
+          "body": {
+            "$ref": "#/components/schemas/workspace_file_patch_input/$defs/PatchFileContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "query",
+          "body"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "PatchFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/workspace_file_patch_input/$defs/LinePatchContractEdit"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "edits"
+            ]
+          },
+          "LinePatchContractEdit": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_before"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_after"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "replace_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "delete_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_patch_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_file_patch_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "PatchFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/workspace_file_patch_path/$defs/LinePatchContractEdit"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "edits"
+            ]
+          },
+          "LinePatchContractEdit": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_before"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_after"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "replace_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "delete_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_patch_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_file_patch_query": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "PatchFileContractBody": {
+            "type": "object",
+            "properties": {
+              "expected_sha256": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/workspace_file_patch_query/$defs/LinePatchContractEdit"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "expected_sha256",
+              "edits"
+            ]
+          },
+          "LinePatchContractEdit": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_before"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "insert_after"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "replace_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "end_line": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "delete_range"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "start_line",
+                  "end_line"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_read_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathQuery",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_file_read_input/$defs/FileContractPath"
+          },
+          "query": {
+            "$ref": "#/components/schemas/workspace_file_read_input/$defs/ReadContractQuery"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "query"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "ReadContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "offset": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          }
+        }
+      },
+      "workspace_file_read_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_file_read_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "ReadContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "offset": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          }
+        }
+      },
+      "workspace_file_read_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_file_read_query": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "ReadContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "offset": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              },
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          }
+        }
+      },
+      "workspace_file_replace_body": {
+        "type": "object",
+        "properties": {
+          "content_base64": {
+            "type": "string"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/workspace_file_replace_body/$defs/ExpectedFileStateContract"
+          },
+          "create_parents": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content_base64",
+          "expected"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "ReplaceFileContractBody": {
+            "type": "object",
+            "properties": {
+              "content_base64": {
+                "type": "string"
+              },
+              "expected": {
+                "$ref": "#/components/schemas/workspace_file_replace_body/$defs/ExpectedFileStateContract"
+              },
+              "create_parents": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content_base64",
+              "expected"
+            ]
+          },
+          "ExpectedFileStateContract": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "const": "absent"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "sha256"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "sha256"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_replace_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathQueryBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_file_replace_input/$defs/FileContractPath"
+          },
+          "query": {
+            "$ref": "#/components/schemas/workspace_file_replace_input/$defs/FileMutationContractQuery"
+          },
+          "body": {
+            "$ref": "#/components/schemas/workspace_file_replace_input/$defs/ReplaceFileContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "query",
+          "body"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "ReplaceFileContractBody": {
+            "type": "object",
+            "properties": {
+              "content_base64": {
+                "type": "string"
+              },
+              "expected": {
+                "$ref": "#/components/schemas/workspace_file_replace_input/$defs/ExpectedFileStateContract"
+              },
+              "create_parents": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content_base64",
+              "expected"
+            ]
+          },
+          "ExpectedFileStateContract": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "const": "absent"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "sha256"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "sha256"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_replace_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_file_replace_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "ReplaceFileContractBody": {
+            "type": "object",
+            "properties": {
+              "content_base64": {
+                "type": "string"
+              },
+              "expected": {
+                "$ref": "#/components/schemas/workspace_file_replace_path/$defs/ExpectedFileStateContract"
+              },
+              "create_parents": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content_base64",
+              "expected"
+            ]
+          },
+          "ExpectedFileStateContract": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "const": "absent"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "sha256"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "sha256"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_file_replace_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_file_replace_query": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "FileMutationContractQuery": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path"
+            ]
+          },
+          "ReplaceFileContractBody": {
+            "type": "object",
+            "properties": {
+              "content_base64": {
+                "type": "string"
+              },
+              "expected": {
+                "$ref": "#/components/schemas/workspace_file_replace_query/$defs/ExpectedFileStateContract"
+              },
+              "create_parents": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content_base64",
+              "expected"
+            ]
+          },
+          "ExpectedFileStateContract": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "const": "absent"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "sha256"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "sha256"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "workspace_tree_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathQuery",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspace_tree_list_input/$defs/FileContractPath"
+          },
+          "query": {
+            "$ref": "#/components/schemas/workspace_tree_list_input/$defs/TreeContractQuery"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "query"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "TreeContractQuery": {
+            "type": "object",
+            "properties": {
+              "limit_items": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "include_hidden": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspace_tree_list_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspace_tree_list_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "TreeContractQuery": {
+            "type": "object",
+            "properties": {
+              "limit_items": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "include_hidden": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspace_tree_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspace_tree_list_query": {
+        "type": "object",
+        "properties": {
+          "limit_items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0
+          },
+          "include_hidden": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "$defs": {
+          "FileContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              },
+              "checkout": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "TreeContractQuery": {
+            "type": "object",
+            "properties": {
+              "limit_items": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0
+              },
+              "include_hidden": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspaces_checkouts_create_body": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_ticket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "$defs": {
+          "WorkspaceContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace"
+            ]
+          },
+          "CreateCheckoutContractBody": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_ticket": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspaces_checkouts_create_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/workspaces_checkouts_create_input/$defs/WorkspaceContractPath"
+          },
+          "body": {
+            "$ref": "#/components/schemas/workspaces_checkouts_create_input/$defs/CreateCheckoutContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "body"
+        ],
+        "$defs": {
+          "WorkspaceContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace"
+            ]
+          },
+          "CreateCheckoutContractBody": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_ticket": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspaces_checkouts_create_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_checkouts_create_path": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace"
+        ],
+        "$defs": {
+          "WorkspaceContractPath": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace"
+            ]
+          },
+          "CreateCheckoutContractBody": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_ticket": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "workspaces_checkouts_create_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_checkouts_delete_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "CheckoutContractPath",
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ]
+      },
+      "workspaces_checkouts_delete_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_checkouts_delete_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_checkouts_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "WorkspaceContractPath",
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace"
+        ]
+      },
+      "workspaces_checkouts_list_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_checkouts_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_create_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "CreateWorkspaceContractBody",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "retention": {
+            "$ref": "#/components/schemas/workspaces_create_input/$defs/RetentionContract"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/workspaces_create_input/$defs/SourceBindingContract"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expires_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "retention"
+        ],
+        "$defs": {
+          "RetentionContract": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "ephemeral"
+            ]
+          },
+          "SourceBindingContract": {
+            "type": "object",
+            "properties": {
+              "forge": {
+                "$ref": "#/components/schemas/workspaces_create_input/$defs/ForgeContract"
+              },
+              "canonical_url": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "connection": {
+                "type": "string"
+              },
+              "default_branch": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "forge",
+              "canonical_url",
+              "repository",
+              "connection",
+              "default_branch"
+            ]
+          },
+          "ForgeContract": {
+            "type": "string",
+            "enum": [
+              "git-hub",
+              "git-lab"
+            ]
+          }
+        }
+      },
+      "workspaces_create_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_create_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_delete_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "WorkspaceContractPath",
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace"
+        ]
+      },
+      "workspaces_delete_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_delete_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_get_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "WorkspaceContractPath",
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace"
+        ]
+      },
+      "workspaces_get_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_get_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "workspaces_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_list_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "workspaces_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      }
+    }
+  }
+}

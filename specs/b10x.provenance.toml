@@ -3,9 +3,9 @@ origin = "repository-authored"
 authored_at = "2026-08-16"
 reviewed_at = "2026-08-16"
 provider_path = "providers/b10x.toml"
-provider_sha256 = "6e7ab6a94794c6e5426052c42381bff27c7e680953d427ed46ff6895616e3575"
+provider_sha256 = "cb7cfcabc0586d5cc8d70e4cdbe90c4fe835ac4c029867126efab15e759af881"
 coverage = "exact-shipped-native-and-module-operation-event-capability-surface"
-purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work, Ontology, and Planner module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte from immutable b10x/modules revisions and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
+purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work, Ontology, Planner, Workspaces, and Colab module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
 references = [
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md",
@@ -14,6 +14,9 @@ references = [
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0018-connectors-satellite-federation.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
   "https://github.com/b10x/b10x/blob/main/architecture/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0042-logical-workspaces-are-a-product-neutral-control-plane.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0043-workspaces-is-an-independently-released-domain-module.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0044-zwirn-is-a-product-and-colab-is-a-domain-module.md",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52/modules/planner/contracts/planner/v1",
 ]
@@ -112,4 +115,26 @@ owner_revision = "719a8a321ee9828332b002f4b7b722ffcff59d52"
 owner_path = "modules/planner/contracts/planner/v1/module.json"
 vendored_path = "specs/b10x/planner-v1.module.json"
 sha256 = "fad1824cdbcbda18cbd28c1bb856baf4f51cabac2a1f79b5b3ceb3f2a91f1a0a"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "workspaces"
+kind = "openapi"
+owner_repository = "https://github.com/b10x/b10x"
+owner_path = "model/modules/modules/workspaces/contracts/workspaces/v2/openapi.json"
+owner_manifest_path = "model/modules/modules/workspaces/contracts/workspaces/v2/module.json"
+owner_manifest_sha256 = "362abc0ced24816728f5e0380c34be1ff68697af7fa803b3e41a07d5c433c768"
+vendored_path = "specs/b10x/workspaces-v2.openapi.json"
+sha256 = "3f5735472a616c1cbb0470a0473d350de6d081288cf65e4a614d2939a13f1291"
+vendoring = "exact-bytes"
+
+[[spec]]
+service = "collaboration"
+kind = "openapi"
+owner_repository = "https://github.com/b10x/b10x"
+owner_path = "model/modules/modules/colab/contracts/colab/v1/openapi.json"
+owner_manifest_path = "model/modules/modules/colab/contracts/colab/v1/module.json"
+owner_manifest_sha256 = "9398434ee535a9c56791e721ba1744c2dbc46b67406c9d8e3b88cffb63703a70"
+vendored_path = "specs/b10x/colab-v1.openapi.json"
+sha256 = "ffbf0660d3ff02c98f925db390814bb192dd4ac1a1d8f9db215b7aa5e713235f"
 vendoring = "exact-bytes"

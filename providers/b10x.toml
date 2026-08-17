@@ -50,6 +50,30 @@ name = "planning"
 tags = ["project-management"]
 description = "Projects, typed planning entities, searchable boards, lifecycle gates, repository synchronization, and ordered planning events"
 
+[[services]]
+name = "workspaces"
+tags = ["developer-tools"]
+description = "Logical workspaces, Substrate-backed checkouts, digest-bound files, and bounded execution"
+
+[[services]]
+name = "collaboration"
+tags = ["messaging"]
+description = "Product-neutral conversation rooms and their current workspace attachments"
+
+[[spec]]
+service = "workspaces"
+path = "specs/b10x/workspaces-v2.openapi.json"
+upstream_version = "workspaces v2 development manifest 362abc0ced24816728f5e0380c34be1ff68697af7fa803b3e41a07d5c433c768"
+fetched_at = "2026-08-17T00:00:00Z"
+sha256 = "3f5735472a616c1cbb0470a0473d350de6d081288cf65e4a614d2939a13f1291"
+
+[[spec]]
+service = "collaboration"
+path = "specs/b10x/colab-v1.openapi.json"
+upstream_version = "colab v1 development manifest 9398434ee535a9c56791e721ba1744c2dbc46b67406c9d8e3b88cffb63703a70"
+fetched_at = "2026-08-17T00:00:00Z"
+sha256 = "ffbf0660d3ff02c98f925db390814bb192dd4ac1a1d8f9db215b7aa5e713235f"
+
 [[spec]]
 service = "knowledge"
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
@@ -972,3 +996,311 @@ expose = true
 type = "object"
 required = ["open", "profile_retained"]
 properties = { open = { type = "boolean", description = "Always false; the lease is released" }, profile_retained = { type = "boolean", description = "Always true; the dedicated profile directory survives so a later session keeps its logins" } }
+
+# Hosted module operations are selected explicitly from generated owner OpenAPI. Connectors owns
+# admission, exact request signing, and audit; neither Agent nor Zwirn receives a private origin.
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_list"
+rename = "workspaces-list"
+description = "List logical workspaces visible to the admitted principal"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_create"
+rename = "workspaces-create"
+description = "Create one logical workspace under an idempotency identity"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_get"
+rename = "workspaces-get"
+description = "Read one visible logical workspace"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_delete"
+rename = "workspaces-delete"
+description = "Destroy one logical workspace after all physical checkouts are absent"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_checkouts_list"
+rename = "workspaces-checkouts-list"
+description = "List physical checkout records for one visible workspace"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_checkouts_create"
+rename = "workspaces-checkouts-create"
+description = "Provision one Substrate-backed physical checkout"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspaces_checkouts_delete"
+rename = "workspaces-checkouts-delete"
+description = "Destroy one physical checkout and its confined files"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db", "write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_file_read"
+rename = "workspace-file-read"
+description = "Read one bounded checkout file slice with its complete-content digest"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_tree_list"
+rename = "workspace-tree-list"
+description = "List one bounded descriptor-confined checkout tree without following symlinks"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_file_replace"
+rename = "workspace-file-replace"
+description = "Replace a checkout file only when its expected absent or digest state still holds"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_file_edit"
+rename = "workspace-file-edit"
+description = "Apply a digest-bound unique text replacement and return a bounded diff"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_file_patch"
+rename = "workspace-file-patch"
+description = "Apply digest-bound original-line edits and return a bounded diff"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "workspaces"
+select = "workspace_exec_start"
+rename = "workspace-exec-start"
+description = "Run one argv-only bounded no-network command in the current checkout"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_file"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "collaboration"
+select = "colab_room_create"
+rename = "colab-room-create"
+description = "Create one product-neutral conversation room"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "collaboration"
+select = "colab_workspace_list"
+rename = "colab-workspace-list"
+description = "List workspace checkout references attached to one conversation"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "collaboration"
+select = "colab_workspace_attach"
+rename = "colab-workspace-attach"
+description = "Attach one Workspaces-owned checkout reference to a conversation"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "collaboration"
+select = "colab_workspace_current_set"
+rename = "colab-workspace-current-set"
+description = "Select one already-attached checkout as the conversation current checkout"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
+
+[[patch.operations]]
+service = "collaboration"
+select = "colab_workspace_detach"
+rename = "colab-workspace-detach"
+description = "Detach one Workspaces-owned checkout reference from a conversation"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+semantic_effects = ["write_db"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network", "file_secret"]
+expose = true
