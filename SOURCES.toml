@@ -58,6 +58,23 @@ consumers = ["providers/grafana.toml", "catalog/grafana.catalog.json"]
 note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Grafana 12+ dashboard and bounded data-source query surface. Each endpoint cites Grafana's official reference; instance-local Swagger remains the authority for deployment-specific additions."
 
 [[source]]
+id = "jira-authored-runtime-writes"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put",
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-id-put",
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-links/#api-rest-api-2-issuelink-post",
+  "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+  "https://support.atlassian.com/user-management/docs/create-oauth-2-0-credential-for-service-accounts/",
+  "https://support.atlassian.com/user-management/docs/manage-api-tokens-for-service-accounts/",
+]
+refresh = "authored-review"
+pins = "specs/jira.provenance.toml"
+consumers = ["providers/jira.toml", "catalog/jira.catalog.json", "crates/integration-jira/"]
+note = "One repository-authored OpenAPI 3.1 document records the exact three Jira v2 mutations added to the legacy inline catalog and hosted adapter. Flexible Atlassian request objects are intentionally narrowed to summary, comment body, or link type plus two issue keys. Official Atlassian guides additionally anchor delegated 3LO and the two supported service-account credential modes."
+
+[[source]]
 id = "prometheus-authored-openapi"
 kind = "openapi-spec"
 origin = "repository-authored"

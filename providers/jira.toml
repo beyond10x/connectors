@@ -1,16 +1,18 @@
-# Jira Cloud platform REST API — hand-authored, no vendor spec.
+# Jira Cloud platform REST API — hand-authored catalog with reviewed source evidence.
 #
 # Atlassian publishes an OpenAPI description of the Jira Cloud platform REST API
 # (`developer.atlassian.com/cloud/jira/platform/swagger-v3.v3.json`). It is not pointed at here for
 # the same reason zendesk's and github's are not: ingest (C-4) and the overlay (C-6) do not exist
 # yet, and the document describes several hundred operations — pointing at it without a selection
 # mechanism would be pointing at several hundred LLM tools. When C-14's fetch and C-4's ingest land,
-# this file becomes a `[spec]` pointer plus a `[[patch.operations]]` selection, and **the six
-# operations below are the selection to reproduce**: `getIssue`, `createIssue`, `getComments`,
-# `addComment`, `getTransitions`, `doTransition`.
+# this file can become a `[spec]` pointer plus a `[[patch.operations]]` selection. The original six
+# operations remain a stable legacy catalog surface. The three added mutations are also recorded in
+# `specs/jira/runtime-writes-2026-08-17.openapi.yaml`, a repository-authored exact-surface OpenAPI
+# document whose operation references point at Atlassian's current official v2 pages.
 #
-# Until then drift is undetectable by machine, exactly as for zendesk, freshdesk and github
-# (`docs/designs/provider-operation-inventory.md` §6.7).
+# The catalog compiler still consumes this detailed inline declaration. The authored source and its
+# byte pin make review drift visible without pretending that the several-hundred-operation vendor
+# document has already been selected safely by the compiler.
 #
 # ---------------------------------------------------------------------------------------------
 # WHY THIS FILE ADDRESSES `/rest/api/2/` AND NOT `/rest/api/3/`.
@@ -122,18 +124,17 @@
 #   description, so a model is not misled; it is the opposite of zendesk's `public = false`, where
 #   the plugin's default was the private one. An internal-note capability needs C-56.
 #
-# **Issue update (`PUT /rest/api/2/issue/{issueIdOrKey}`) is excluded** for a different reason: every
-# field it edits is optional by nature — an update names the one or two fields it changes — so under
-# C-56 it would either send explicit nulls over the fields the caller left alone (which on Jira
-# *clears* a field rather than being ignored: a data-loss write) or be reduced to an operation that
-# demands every field on every call. Neither is shippable. Workflow state is still reachable through
-# the two transition operations below, which is what an agent actually needs.
+# **Raw issue update remains excluded.** A dedicated `jira-issue-edit` operation sends exactly one
+# required `fields.summary` leaf. Callers cannot submit Jira's free-form `fields` or `update` maps,
+# and omitted fields therefore never travel as explicit nulls that could clear data.
 #
 # ---------------------------------------------------------------------------------------------
-# STILL CANNOT MAKE A LIVE CALL, for the same reason as every shipped connector: flux's
+# THE LEGACY FLUX CATALOG PATH STILL CANNOT MAKE A LIVE CALL, for the same reason as every shipped
+# connector: flux's
 # `http.request` takes `{"$secret": …}` as a whole-value replacement, so it cannot assemble a Basic
 # `Authorization` header from an email and a token (`docs/designs/auth-seam.md`). This connector is
-# the catalogue's proof, not a working client.
+# the catalogue's proof, not a working client. Hosted execution is a separate Integration adapter
+# that resolves bearer credentials and enforces Connection/Grant/approval policy at runtime.
 # ---------------------------------------------------------------------------------------------
 
 id = "jira"
@@ -186,11 +187,16 @@ api_version = "2"
 # tenant configuration, and `{site}` is the template a binding will resolve.
 base_url = "https://{site}.atlassian.net"
 
-description = "Jira Cloud issue tracking: read and create issues, comment on them, and drive workflow transitions"
+description = "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions"
 
 # Every operation authenticates the same way, so the requirement is declared once here rather than
-# repeated on all six.
-default_auth = [{ credentials = ["jira.api_token"] }]
+# repeated on the read surface; every write narrows to the delegated-user profile explicitly.
+default_auth = [
+  { credentials = ["jira.api_token"] },
+  { credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["read:jira-work"]] } },
+  { credentials = ["jira.service_oauth"], scopes = { "jira.service_oauth" = [["read:jira-work"]] } },
+  { credentials = ["jira.service_api_token"], scopes = { "jira.service_api_token" = [["read:jira-work"]] } },
+]
 
 # ---------------------------------------------------------------------------------------------
 # Credentials
@@ -215,8 +221,41 @@ user_env = ["JIRA_USER"]
 # half is the bare email address, and inventing a suffix here would corrupt every request.
 description = "Atlassian API token; the user half is the account email that minted it"
 
+[[auth]]
+name = "jira.user_oauth"
+scheme = "bearer"
+subject = "user"
+description = "Atlassian OAuth 2.0 access token granted by a signed-in user and bounded by that user's Jira permissions"
+
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/authorize"
+token_path = "/oauth/token"
+scopes = ["offline_access", "read:jira-work", "read:me", "write:jira-work"]
+grants = ["authorization_code", "refresh_token"]
+
+[[auth]]
+name = "jira.service_oauth"
+scheme = "bearer"
+subject = "app"
+description = "Atlassian service-account OAuth 2.0 access token for the tenant-shared read-only issue projection"
+
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/authorize"
+token_path = "/oauth/token"
+scopes = ["read:jira-work"]
+grants = ["client_credentials"]
+
+[[auth]]
+name = "jira.service_api_token"
+scheme = "bearer"
+subject = "app"
+env = ["JIRA_SERVICE_API_TOKEN"]
+description = "Scoped Atlassian service-account API token for the tenant-shared read-only issue projection"
+
 # ---------------------------------------------------------------------------------------------
-# Operations — 6, all on the v2 issue resource tree
+# Operations — 9, all on the v2 issue resource tree
 #
 # Curated to what an agent working an issue tracker actually does at runtime: read an issue, file
 # one, read the discussion, join it, and move the issue through its workflow. Everything
@@ -240,8 +279,14 @@ description = "Atlassian API token; the user half is the account email that mint
 # discovery metadata only, which keeps `default` implicit and this file emitting the same
 # `jira.flux` it emitted before.
 name = "default"
+legacy = true
 tags = ["issue-tracking", "project-management"]
 audiences = ["developer", "product-manager", "project-manager"]
+
+[[services]]
+name = "login"
+description = "Atlassian OAuth 2.0 authorization and token service; its credential responses are never Connector operations"
+base_url = "https://auth.atlassian.com"
 
 [[operations]]
 effects = ["read", "network"]
@@ -251,19 +296,20 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-get"
+service = "default"
 method = "GET"
 direction = "read"
 path = "/rest/api/2/issue/{issueIdOrKey}"
-description = "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content"
+description = "Read one Jira issue by key (`PROJ-123`) — summary, description, status, assignee, reporter and every other configured field. Hosted project admission requires a key rather than a numeric id. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this legacy catalog operation cannot encode. Text fields are wiki markup, not rich content"
 risk = "low"
 idempotency = "idempotent"
 
 [[operations.params.path]]
 name = "issue_key"
 wire = "issueIdOrKey"
-description = "The issue key, e.g. `PROJ-123`, or its numeric id"
+description = "The issue key, e.g. `PROJ-123`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # ---------------------------------------------------------------------------------------------
 # RESPONSE SHAPES (C-126) — read from `developer.atlassian.com/cloud/jira/platform/swagger.v3.json`,
@@ -282,7 +328,7 @@ schema = { type = "string", minLength = 1 }
 # authoritative, would be undocumented, and would be wrong on the first site whose administrator
 # renamed or removed one. That distinction is the whole reason C-126 refuses a guessed schema.
 #
-# Nothing in these six schemas is `required` in the vendor's spec and nearly everything is
+# Nothing in the original response schemas is `required` in the vendor's spec and nearly everything is
 # `readOnly`, so `required` below is used only where the reference's own example shows the member on
 # every response.
 # ---------------------------------------------------------------------------------------------
@@ -305,6 +351,8 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-create"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
 method = "POST"
 direction = "write"
 path = "/rest/api/2/issue"
@@ -325,14 +373,14 @@ name = "project_key"
 wire = "fields.project.key"
 description = "Key of the project to file the issue in, e.g. `PROJ`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}$", minLength = 1, maxLength = 32 }
 
 [[operations.params.body]]
 name = "summary"
 wire = "fields.summary"
 description = "One-line issue summary; this is the issue's title"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", minLength = 1, maxLength = 255 }
 
 # By name rather than by id: an id is per-site and opaque, and a model has no way to discover one
 # without the admin endpoints this connector excludes. The trade-off is that a name must match one
@@ -342,7 +390,7 @@ name = "issue_type"
 wire = "fields.issuetype.name"
 description = "Name of the issue type as the project defines it, e.g. `Task`, `Bug` or `Story`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", minLength = 1, maxLength = 128 }
 
 # `CreatedIssue`, `201 Created`. **The created issue is not returned** — only its identity. A flow that
 # needs the issue's fields has to follow up with `jira-issue-get`, which is the opposite of what
@@ -369,6 +417,7 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-comment-list"
+service = "default"
 method = "GET"
 direction = "read"
 path = "/rest/api/2/issue/{issueIdOrKey}/comment"
@@ -379,9 +428,9 @@ idempotency = "idempotent"
 [[operations.params.path]]
 name = "issue_key"
 wire = "issueIdOrKey"
-description = "The issue key, e.g. `PROJ-123`, or its numeric id"
+description = "The issue key, e.g. `PROJ-123`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # `PageOfComments` — exactly four members, and the page metadata is the point. This operation cannot
 # send `startAt` or `maxResults` (C-30), so `total` versus `maxResults` is the **only** way a caller
@@ -402,6 +451,8 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-comment-add"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
 method = "POST"
 direction = "write"
 path = "/rest/api/2/issue/{issueIdOrKey}/comment"
@@ -415,9 +466,9 @@ idempotency = "non_idempotent"
 [[operations.params.path]]
 name = "issue_key"
 wire = "issueIdOrKey"
-description = "The issue key, e.g. `PROJ-123`, or its numeric id"
+description = "The issue key, e.g. `PROJ-123`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # **A plain string at the body root, and this is the whole ADF decision in one field.** On v2 the
 # vendor documents `{"body": "<text>"}`; on v3 the same field is an ADF document, which no `wire`
@@ -427,7 +478,7 @@ schema = { type = "string", minLength = 1 }
 name = "body"
 description = "The comment text, in Jira wiki markup. Must not be blank"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", minLength = 1, maxLength = 32768 }
 
 # `201 Created`, and the body is a **bare `Comment`** — not the page envelope the list returns, and
 # not the issue. A consumer that reused the list's shape and read `comments[0]` would find nothing.
@@ -450,6 +501,7 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-transitions-list"
+service = "default"
 method = "GET"
 direction = "read"
 path = "/rest/api/2/issue/{issueIdOrKey}/transitions"
@@ -460,9 +512,9 @@ idempotency = "idempotent"
 [[operations.params.path]]
 name = "issue_key"
 wire = "issueIdOrKey"
-description = "The issue key, e.g. `PROJ-123`, or its numeric id"
+description = "The issue key, e.g. `PROJ-123`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # `Transitions`: the array, under `transitions`. This is the response a flow *has* to destructure —
 # it exists solely to produce the `transition_id` the next operation sends — so it is the one place in
@@ -489,6 +541,8 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]
 id = "jira-issue-transition"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
 method = "POST"
 direction = "write"
 path = "/rest/api/2/issue/{issueIdOrKey}/transitions"
@@ -505,9 +559,9 @@ idempotency = "non_idempotent"
 [[operations.params.path]]
 name = "issue_key"
 wire = "issueIdOrKey"
-description = "The issue key, e.g. `PROJ-123`, or its numeric id"
+description = "The issue key, e.g. `PROJ-123`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # `{"transition": {"id": "31"}}` — nested, so the path is declared with `wire` (C-29). A string
 # rather than an integer because that is how Jira publishes and accepts transition ids.
@@ -516,7 +570,7 @@ name = "transition_id"
 wire = "transition.id"
 description = "Id of the transition to perform, as returned by `jira-issue-transitions-list`, e.g. `31`"
 required = true
-schema = { type = "string", minLength = 1 }
+schema = { type = "string", pattern = "^[0-9]+$", minLength = 1, maxLength = 32 }
 
 # NO `response_schema`, DELIBERATELY (C-126). Jira answers this one `204 No Content`: the spec's
 # response entry is an empty schema with no example, and there is no body at all.
@@ -525,9 +579,124 @@ schema = { type = "string", minLength = 1 }
 # each satisfy a coverage count while telling a consumer nothing, and both would additionally be
 # *false* here — they describe an empty JSON object, and what arrives is no document. The honest record
 # is the one on the `description` above ("Answers `204` with an empty body on success"), which reaches
-# the tool contract a model reads, plus this note for whoever wonders why the coverage table shows
-# 5 of 6 for jira. Confirming the transition took means reading the issue back with
+# the tool contract a model reads, plus this note for whoever wonders why the response coverage is
+# intentionally incomplete. Confirming the transition took means reading the issue back with
 # `jira-issue-get`.
+
+# The three operations below extend the original six from Atlassian's current Jira Cloud REST API
+# v2 reference. They deliberately keep the same wiki-text surface and omit raw `fields`, `update`,
+# comment visibility, deletion, attachments, and automatic transition selection.
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "jira-issue-edit"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
+method = "PUT"
+direction = "write"
+path = "/rest/api/2/issue/{issueIdOrKey}"
+description = "Replace an issue's summary through Jira's documented edit endpoint. This curated operation cannot submit Jira's raw fields/update maps or clear unrelated fields"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "issue_key"
+wire = "issueIdOrKey"
+description = "The issue key, e.g. `PROJ-123`"
+required = true
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
+
+[[operations.params.body]]
+name = "summary"
+wire = "fields.summary"
+description = "Replacement one-line issue summary"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 255 }
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "jira-issue-comment-edit"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
+method = "PUT"
+direction = "write"
+path = "/rest/api/2/issue/{issueIdOrKey}/comment/{id}"
+description = "Replace one Jira comment body. The text is Jira wiki markup; visibility cannot be changed and delete is not exposed"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "issue_key"
+wire = "issueIdOrKey"
+description = "The issue key, e.g. `PROJ-123`"
+required = true
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
+
+[[operations.params.path]]
+name = "comment_id"
+wire = "id"
+description = "The numeric Jira comment id, represented as a string"
+required = true
+schema = { type = "string", pattern = "^[0-9]+$", minLength = 1, maxLength = 32 }
+
+[[operations.params.body]]
+name = "body"
+description = "Replacement comment text in Jira wiki markup"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 32768 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "body"]
+properties = { id = { type = "string" }, body = { type = "string" }, created = { type = "string" }, updated = { type = "string" } }
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "jira-issue-link-add"
+service = "default"
+auth = [{ credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["write:jira-work"]] } }]
+method = "POST"
+direction = "write"
+path = "/rest/api/2/issueLink"
+description = "Create one named Jira issue link between two admitted project issues. It cannot add a comment, delete a link, or submit raw link data"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.body]]
+name = "link_type"
+wire = "type.name"
+description = "Exact Jira issue-link type name, e.g. `Blocks`"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 128 }
+
+[[operations.params.body]]
+name = "inward_issue_key"
+wire = "inwardIssue.key"
+description = "Issue key on the inward side of the link"
+required = true
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
+
+[[operations.params.body]]
+name = "outward_issue_key"
+wire = "outwardIssue.key"
+description = "Issue key on the outward side of the link"
+required = true
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength = 3, maxLength = 64 }
 
 # ---------------------------------------------------------------------------------------------
 # Configuration
@@ -535,6 +704,7 @@ schema = { type = "string", minLength = 1 }
 
 [[config]]
 name = "site"
+service = "default"
 label = "Atlassian site name"
 help = "The part of your Jira URL before `.atlassian.net` — if you sign in at `acme.atlassian.net`, this is `acme`"
 example = "acme"
@@ -544,6 +714,7 @@ binds = "endpoint.site"
 
 [[config]]
 name = "email"
+service = "default"
 label = "Atlassian account email"
 help = "The email of the account that minted the API token. It travels as the username half of the request"
 example = "you@acme.com"
@@ -554,6 +725,7 @@ binds = "username.jira.api_token"
 
 [[config]]
 name = "api_token"
+service = "default"
 label = "API token"
 help = "Create one at id.atlassian.com under Security → API tokens. Atlassian shows it once"
 format = "token"

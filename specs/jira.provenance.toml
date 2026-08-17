@@ -1,0 +1,19 @@
+version = 1
+
+# Atlassian publishes a very large generated platform document. This smaller repository-authored
+# contract records only the three newly admitted operations and deliberately closes their flexible
+# request bodies to the fields B10x accepts. Each operation carries its official v2 page.
+
+[[spec]]
+path = "specs/jira/runtime-writes-2026-08-17.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-17"
+reviewed_at = "2026-08-17"
+sha256 = "b6a2e148e7aacfd741c5a96bbf9dc595670a7f1ef3e44bf352a90b772a00da20"
+coverage = "exact-added-runtime-write-surface"
+purpose = "Source evidence for summary-only issue edit, wiki-text comment edit, and named issue-link creation. The document excludes arbitrary fields/update maps, visibility, comments on links, delete, and attachments."
+references = [
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put",
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-id-put",
+  "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-links/#api-rest-api-2-issuelink-post",
+]

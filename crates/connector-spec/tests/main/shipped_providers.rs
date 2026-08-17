@@ -160,12 +160,11 @@ fn operation_selection_stays_curated() {
         // deal get. The cut is the query-encoding gap again — HubSpot's search endpoints and every
         // `properties=` projection are excluded. See `providers/hubspot.toml`.
         ("hubspot", 5),
-        // C-70 curates 6 of the Jira Cloud platform API's several hundred, all on the v2 issue
-        // resource tree. Two cuts shaped it: JQL search is excluded pending C-30 — a `jql` value is
-        // the most injectable query string in this fleet — and issue update is excluded pending
-        // C-56, because an update whose untouched fields travel as explicit nulls *clears* them on
-        // Jira. See the header comment in `providers/jira.toml`.
-        ("jira", 6),
+        // Jira curates 9 of the Jira Cloud platform API's several hundred, all on the v2 issue
+        // resource tree. JQL remains outside this legacy catalog path pending encoded queries; the
+        // one issue edit is a closed summary-only body so callers cannot submit free-form fields or
+        // clear omitted data. See the header comment in `providers/jira.toml`.
+        ("jira", 9),
         // C-73 curates 5: contact get and create, conversation get and reply, contact note. The cut
         // is the same query-encoding gap — every listing endpoint pages with an opaque
         // `starting_after` cursor — plus C-56, which is why every declared body field is required.
@@ -206,6 +205,45 @@ fn operation_selection_stays_curated() {
             loaded.connector.operations.len()
         );
     }
+}
+
+#[test]
+fn jira_added_writes_have_exact_authored_source_evidence() {
+    let specs = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("specs");
+    let relative = "jira/runtime-writes-2026-08-17.openapi.yaml";
+    let bytes = std::fs::read(specs.join(relative)).expect("read Jira authored source");
+    let provenance = std::fs::read_to_string(specs.join("jira.provenance.toml"))
+        .expect("read Jira provenance")
+        .parse::<toml::Table>()
+        .expect("Jira provenance is TOML");
+    let source = provenance["spec"]
+        .as_array()
+        .and_then(|entries| entries.first())
+        .and_then(toml::Value::as_table)
+        .expect("Jira provenance declares one source");
+    assert_eq!(
+        source["path"].as_str(),
+        Some("specs/jira/runtime-writes-2026-08-17.openapi.yaml")
+    );
+    assert_eq!(source["origin"].as_str(), Some("repository-authored"));
+    assert_eq!(
+        source["sha256"].as_str(),
+        Some(connector_spec::sha256_hex(&bytes).as_str()),
+        "the authored Jira source moved without its provenance pin"
+    );
+
+    let document = String::from_utf8(bytes).expect("Jira authored source is UTF-8");
+    let ingested = connector_spec::openapi::ingest(&document).expect("Jira source ingests");
+    assert_eq!(
+        ingested.operation_ids(),
+        [
+            "jira_issue_edit_summary",
+            "jira_issue_comment_edit",
+            "jira_issue_link_add",
+        ]
+    );
 }
 
 /// Every operation id has to be spellable as a Flux declaration name. flux-lang admits ASCII

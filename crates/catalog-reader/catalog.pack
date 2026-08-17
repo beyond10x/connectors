@@ -1,8 +1,8 @@
 connectors-catalog-pack 1
-digest sha256 2eeab355d08b12daf3e98af4f19b6a3716bf3ae9e37c313e6adadcea8aeadc5b
+digest sha256 be032a4f0e6dd22cea8d903fc2d4b9d9481cf920f8d34440fdcba271b231ec1a
 schema 2
 providers 60
-operations 924
+operations 927
 p airtable 0 18824
 p alertmanager 18824 2464
 p algolia 21288 25154
@@ -32,37 +32,37 @@ p google 10830649 36906
 p grafana 10867555 17922
 p hubspot 10885477 20204
 p intercom 10905681 30446
-p jira 10936127 28101
-p klaviyo 10964228 38483
-p launchdarkly 11002711 25175
-p loki 11027886 5070
-p mailchimp 11032956 40755
-p microsoft_graph 11073711 1085798
-p miro 12159509 32577
-p newrelic 12192086 29399
-p notion 12221485 18678
-p okta 12240163 22136
-p openai 12262299 1682758
-p openrouter 13945057 12929
-p pagerduty 13957986 37535
-p postmark 13995521 20035
-p prometheus 14015556 4885
-p resend 14020441 18623
-p salesforce 14039064 19139
-p sendgrid 14058203 15743
-p sentry 14073946 27677
-p shopify 14101623 27381
-p slack 14129004 234033
-p statuspage 14363037 29637
-p stripe 14392674 70748
-p supabase 14463422 13445
-p trello 14476867 26240
-p twilio 14503107 71632
-p typeform 14574739 28975
-p vercel 14603714 17444
-p webflow 14621158 21941
-p zendesk 14643099 1146605
-p zoom 15789704 9415
+p jira 10936127 45494
+p klaviyo 10981621 38483
+p launchdarkly 11020104 25175
+p loki 11045279 5070
+p mailchimp 11050349 40755
+p microsoft_graph 11091104 1085798
+p miro 12176902 32577
+p newrelic 12209479 29399
+p notion 12238878 18678
+p okta 12257556 22136
+p openai 12279692 1682758
+p openrouter 13962450 12929
+p pagerduty 13975379 37535
+p postmark 14012914 20035
+p prometheus 14032949 4885
+p resend 14037834 18623
+p salesforce 14056457 19139
+p sendgrid 14075596 15743
+p sentry 14091339 27677
+p shopify 14119016 27381
+p slack 14146397 234033
+p statuspage 14380430 29637
+p stripe 14410067 70748
+p supabase 14480815 13445
+p trello 14494260 26240
+p twilio 14520500 71632
+p typeform 14592132 28975
+p vercel 14621107 17444
+p webflow 14638551 21941
+p zendesk 14660492 1146605
+p zoom 15807097 9415
 o airtable-record-create airtable default 5060 4705
 o airtable-record-delete airtable default 14746 3734
 o airtable-record-get airtable default 731 4323
@@ -724,68 +724,71 @@ o intercom-contact-get intercom default 10907625 6018
 o intercom-contact-note-create intercom default 10931609 4274
 o intercom-conversation-get intercom default 10918886 6016
 o intercom-conversation-reply intercom default 10924908 6695
-o jira-issue-comment-add jira default 10951694 4337
-o jira-issue-comment-list jira default 10946819 4869
-o jira-issue-create jira default 10942183 4630
-o jira-issue-get jira default 10938287 3890
-o jira-issue-transition jira default 10960702 3122
-o jira-issue-transitions-list jira default 10956037 4659
-o klaviyo-account-list klaviyo default 10966176 4885
-o klaviyo-event-create klaviyo default 10995632 6792
-o klaviyo-list-list klaviyo default 10991720 3906
-o klaviyo-profile-create klaviyo default 10982790 8924
-o klaviyo-profile-get klaviyo default 10977470 5314
-o klaviyo-profile-list klaviyo default 10971067 6397
+o jira-issue-comment-add jira default 10956641 4711
+o jira-issue-comment-edit jira default 10973536 3664
+o jira-issue-comment-list jira default 10950686 5949
+o jira-issue-create jira default 10945636 5044
+o jira-issue-edit jira default 10970637 2893
+o jira-issue-get jira default 10940526 5104
+o jira-issue-link-add jira default 10977206 3704
+o jira-issue-transition jira default 10967103 3528
+o jira-issue-transitions-list jira default 10961358 5739
+o klaviyo-account-list klaviyo default 10983569 4885
+o klaviyo-event-create klaviyo default 11013025 6792
+o klaviyo-list-list klaviyo default 11009113 3906
+o klaviyo-profile-create klaviyo default 11000183 8924
+o klaviyo-profile-get klaviyo default 10994863 5314
+o klaviyo-profile-list klaviyo default 10988460 6397
 o knowledge-explain b10x knowledge 5000176 3681
 o knowledge-query b10x knowledge 4981949 18221
 o knowledge-snapshot b10x knowledge 5003863 18480
-o launchdarkly-environment-list launchdarkly default 11007978 4327
-o launchdarkly-flag-get launchdarkly default 11017740 4098
-o launchdarkly-flag-list launchdarkly default 11012311 5423
-o launchdarkly-flag-toggle launchdarkly default 11021844 5711
-o launchdarkly-project-list launchdarkly default 11004271 3701
-o loki-query-range loki default 11028729 3881
-o mailchimp-audience-get mailchimp default 11042281 3936
-o mailchimp-audience-list mailchimp default 11037561 4714
-o mailchimp-audience-member-get mailchimp default 11053235 6149
-o mailchimp-audience-member-list mailchimp default 11046223 7006
-o mailchimp-audience-member-upsert mailchimp default 11059390 8988
-o mailchimp-campaign-list mailchimp default 11068384 4969
-o mailchimp-ping mailchimp default 11035491 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11101321 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 11990732 159938
-o microsoft_graph-calendar-event-create microsoft_graph calendar 11094044 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 11087498 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 12154411 4039
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12150676 3729
-o microsoft_graph-files-item-get microsoft_graph files 11105079 5482
-o microsoft_graph-files-item-update microsoft_graph files 11110567 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 11084185 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 11075472 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 11115358 875368
-o microsoft_graph-mail-message-reply microsoft_graph mail 11081074 3105
-o miro-board-item-get miro default 12173768 7877
-o miro-board-item-list miro default 12163768 9994
-o miro-board-list miro default 12160911 2851
-o miro-sticky-note-create miro default 12181651 3738
-o miro-sticky-note-delete miro default 12189772 1954
-o miro-sticky-note-update miro default 12185395 4371
-o newrelic-alert-policy-list newrelic default 12203930 3047
-o newrelic-alert-violation-list newrelic default 12206983 4217
-o newrelic-application-get newrelic default 12199764 4160
-o newrelic-application-list newrelic default 12195097 4661
-o newrelic-deployment-create newrelic default 12214902 6216
-o newrelic-deployment-list newrelic default 12211206 3690
-o notion-database-query notion default 12228453 3464
-o notion-page-create notion default 12235114 4755
-o notion-page-get notion default 12225099 3348
-o notion-search notion default 12231923 3185
-o notion-user-me notion default 12223063 2030
-o okta-group-list okta default 12251194 3824
-o okta-user-deactivate okta default 12258854 3102
-o okta-user-get okta default 12247459 3729
-o okta-user-group-list okta default 12255024 3824
-o okta-user-list okta default 12242478 4975
+o launchdarkly-environment-list launchdarkly default 11025371 4327
+o launchdarkly-flag-get launchdarkly default 11035133 4098
+o launchdarkly-flag-list launchdarkly default 11029704 5423
+o launchdarkly-flag-toggle launchdarkly default 11039237 5711
+o launchdarkly-project-list launchdarkly default 11021664 3701
+o loki-query-range loki default 11046122 3881
+o mailchimp-audience-get mailchimp default 11059674 3936
+o mailchimp-audience-list mailchimp default 11054954 4714
+o mailchimp-audience-member-get mailchimp default 11070628 6149
+o mailchimp-audience-member-list mailchimp default 11063616 7006
+o mailchimp-audience-member-upsert mailchimp default 11076783 8988
+o mailchimp-campaign-list mailchimp default 11085777 4969
+o mailchimp-ping mailchimp default 11052884 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11118714 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 12008125 159938
+o microsoft_graph-calendar-event-create microsoft_graph calendar 11111437 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 11104891 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 12171804 4039
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12168069 3729
+o microsoft_graph-files-item-get microsoft_graph files 11122472 5482
+o microsoft_graph-files-item-update microsoft_graph files 11127960 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 11101578 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 11092865 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 11132751 875368
+o microsoft_graph-mail-message-reply microsoft_graph mail 11098467 3105
+o miro-board-item-get miro default 12191161 7877
+o miro-board-item-list miro default 12181161 9994
+o miro-board-list miro default 12178304 2851
+o miro-sticky-note-create miro default 12199044 3738
+o miro-sticky-note-delete miro default 12207165 1954
+o miro-sticky-note-update miro default 12202788 4371
+o newrelic-alert-policy-list newrelic default 12221323 3047
+o newrelic-alert-violation-list newrelic default 12224376 4217
+o newrelic-application-get newrelic default 12217157 4160
+o newrelic-application-list newrelic default 12212490 4661
+o newrelic-deployment-create newrelic default 12232295 6216
+o newrelic-deployment-list newrelic default 12228599 3690
+o notion-database-query notion default 12245846 3464
+o notion-page-create notion default 12252507 4755
+o notion-page-get notion default 12242492 3348
+o notion-search notion default 12249316 3185
+o notion-user-me notion default 12240456 2030
+o okta-group-list okta default 12268587 3824
+o okta-user-deactivate okta default 12276247 3102
+o okta-user-get okta default 12264852 3729
+o okta-user-group-list okta default 12272417 3824
+o okta-user-list okta default 12259871 4975
 o ontology-branch-create b10x knowledge 5026240 21208
 o ontology-branch-list b10x knowledge 5022349 3885
 o ontology-branch-schema-extend b10x knowledge 5047454 2727
@@ -798,24 +801,24 @@ o ontology-proposal-evaluate b10x knowledge 5102895 6624
 o ontology-proposal-get b10x knowledge 5096396 6493
 o ontology-proposal-promote b10x knowledge 5110974 2095
 o ontology-schema-register b10x knowledge 5113075 5453
-o openai-batch-list openai default 13931901 12904
-o openai-chat-completion openai default 12267269 5224
-o openai-embeddings-create openai default 12272499 4010
-o openai-file-list openai default 13926600 5295
-o openai-model-get openai default 12265159 2104
-o openai-models-list openai default 12262990 2163
-o openai-response-get openai default 12276515 1212702
-o openai-response-input-item-list openai default 13489223 437371
-o openrouter-chat-completion openrouter default 13950026 5888
-o openrouter-credits-get openrouter default 13955920 1808
-o openrouter-model-endpoints-list openrouter default 13947408 2612
-o openrouter-models-list openrouter default 13945765 1637
-o pagerduty-incident-acknowledge pagerduty default 13985397 5034
-o pagerduty-incident-get pagerduty default 13968123 5736
-o pagerduty-incident-list pagerduty default 13959574 8543
-o pagerduty-incident-resolve pagerduty default 13990437 4790
-o pagerduty-oncall-list pagerduty default 13980245 5146
-o pagerduty-service-list pagerduty default 13973865 6374
+o openai-batch-list openai default 13949294 12904
+o openai-chat-completion openai default 12284662 5224
+o openai-embeddings-create openai default 12289892 4010
+o openai-file-list openai default 13943993 5295
+o openai-model-get openai default 12282552 2104
+o openai-models-list openai default 12280383 2163
+o openai-response-get openai default 12293908 1212702
+o openai-response-input-item-list openai default 13506616 437371
+o openrouter-chat-completion openrouter default 13967419 5888
+o openrouter-credits-get openrouter default 13973313 1808
+o openrouter-model-endpoints-list openrouter default 13964801 2612
+o openrouter-models-list openrouter default 13963158 1637
+o pagerduty-incident-acknowledge pagerduty default 14002790 5034
+o pagerduty-incident-get pagerduty default 13985516 5736
+o pagerduty-incident-list pagerduty default 13976967 8543
+o pagerduty-incident-resolve pagerduty default 14007830 4790
+o pagerduty-oncall-list pagerduty default 13997638 5146
+o pagerduty-service-list pagerduty default 13991258 6374
 o planner-board-get b10x planning 5169866 199621
 o planner-decision-transition b10x planning 7223633 143410
 o planner-entity-create b10x planning 7367049 182491
@@ -841,95 +844,95 @@ o planner-sync-session-begin b10x planning 9388413 4723
 o planner-sync-session-confirm b10x planning 9805312 2461
 o planner-sync-session-preview b10x planning 9807779 415003
 o planner-sync-session-upload b10x planning 7108918 52735
-o postmark-bounce-get postmark server 14011895 3209
-o postmark-bounce-list postmark server 14007008 4881
-o postmark-deliverystats-get postmark server 14004394 2608
-o postmark-email-send postmark server 13997048 7340
-o prometheus-query-range prometheus default 14016415 3681
-o resend-domain-get resend default 14033661 5175
-o resend-domain-list resend default 14030336 3319
-o resend-email-get resend default 14025521 4809
-o resend-email-send resend default 14021292 4223
-o salesforce-record-create salesforce default 14047250 3265
-o salesforce-record-get salesforce default 14043820 3424
-o salesforce-record-update salesforce default 14050521 2958
-o salesforce-sobject-describe salesforce default 14053485 4425
-o salesforce-whoami salesforce default 14040979 2835
-o sendgrid-email-validate sendgrid default 14069504 4143
-o sendgrid-suppression-bounce-list sendgrid default 14066087 3411
-o sendgrid-template-get sendgrid default 14063718 2363
-o sendgrid-template-list sendgrid default 14059561 4151
-o sentry-issue-event-latest sentry default 14094368 6935
-o sentry-issue-get sentry default 14074675 7008
-o sentry-issue-update sentry default 14081689 6365
-o sentry-project-get sentry default 14088060 6302
-o shopify-customer-get shopify default 14120022 5180
-o shopify-inventory-level-list shopify default 14125208 3461
-o shopify-order-get shopify default 14103511 6452
-o shopify-product-get shopify default 14109969 4772
-o shopify-product-update shopify default 14114747 5269
+o postmark-bounce-get postmark server 14029288 3209
+o postmark-bounce-list postmark server 14024401 4881
+o postmark-deliverystats-get postmark server 14021787 2608
+o postmark-email-send postmark server 14014441 7340
+o prometheus-query-range prometheus default 14033808 3681
+o resend-domain-get resend default 14051054 5175
+o resend-domain-list resend default 14047729 3319
+o resend-email-get resend default 14042914 4809
+o resend-email-send resend default 14038685 4223
+o salesforce-record-create salesforce default 14064643 3265
+o salesforce-record-get salesforce default 14061213 3424
+o salesforce-record-update salesforce default 14067914 2958
+o salesforce-sobject-describe salesforce default 14070878 4425
+o salesforce-whoami salesforce default 14058372 2835
+o sendgrid-email-validate sendgrid default 14086897 4143
+o sendgrid-suppression-bounce-list sendgrid default 14083480 3411
+o sendgrid-template-get sendgrid default 14081111 2363
+o sendgrid-template-list sendgrid default 14076954 4151
+o sentry-issue-event-latest sentry default 14111761 6935
+o sentry-issue-get sentry default 14092068 7008
+o sentry-issue-update sentry default 14099082 6365
+o sentry-project-get sentry default 14105453 6302
+o shopify-customer-get shopify default 14137415 5180
+o shopify-inventory-level-list shopify default 14142601 3461
+o shopify-order-get shopify default 14120904 6452
+o shopify-product-get shopify default 14127362 4772
+o shopify-product-update shopify default 14132140 5269
 o sip-dial b10x default 4957931 2823
-o slack-admin-app-requests-list slack admin 14284888 4516
-o slack-admin-conversations-search slack admin 14289410 64081
-o slack-admin-teams-list slack admin 14353497 4007
-o slack-admin-users-list slack admin 14357510 4451
-o slack-chat-post-message slack default 14140527 45357
-o slack-conversations-history slack default 14185890 49463
-o slack-reactions-add slack default 14278953 5929
-o slack-users-info slack default 14235359 43588
+o slack-admin-app-requests-list slack admin 14302281 4516
+o slack-admin-conversations-search slack admin 14306803 64081
+o slack-admin-teams-list slack admin 14370890 4007
+o slack-admin-users-list slack admin 14374903 4451
+o slack-chat-post-message slack default 14157920 45357
+o slack-conversations-history slack default 14203283 49463
+o slack-reactions-add slack default 14296346 5929
+o slack-users-info slack default 14252752 43588
 o speech-speak b10x default 4960760 2907
 o speech-status b10x default 4963673 2246
-o statuspage-component-list statuspage default 14387954 4304
-o statuspage-incident-create statuspage default 14374600 6655
-o statuspage-incident-get statuspage default 14370305 4289
-o statuspage-incident-list statuspage default 14365141 5158
-o statuspage-incident-update statuspage default 14381261 6687
-o stripe-balance-get stripe default 14400011 2591
-o stripe-billing-meter-list stripe default 14453939 9122
-o stripe-charge-get stripe default 14405688 3784
-o stripe-charge-refund-create stripe default 14424854 4638
-o stripe-country-spec-list stripe default 14429498 9165
-o stripe-customer-get stripe default 14402608 3074
-o stripe-event-list stripe default 14438669 9473
-o stripe-exchange-rate-list stripe default 14448148 5785
-o stripe-payment-intent-cancel stripe default 14420904 3944
-o stripe-payment-intent-capture stripe default 14416313 4585
-o stripe-payment-intent-get stripe default 14409478 3802
-o stripe-refund-get stripe default 14413286 3021
-o supabase-auth-settings supabase default 14473499 2955
-o supabase-rows-list supabase default 14470114 3379
-o supabase-schema-describe supabase default 14466174 3934
-o trello-board-get trello default 14483256 3619
-o trello-board-list trello default 14479428 3822
-o trello-board-lists trello default 14486881 1604
-o trello-card-archive trello default 14498359 4364
-o trello-card-create trello default 14493180 5173
-o trello-list-cards trello default 14488491 4683
-o twilio-account-get twilio default 14511536 2969
-o twilio-call-get twilio default 14534663 4476
-o twilio-call-list twilio default 14526743 7914
-o twilio-conference-list twilio default 14566661 7737
-o twilio-message-get twilio default 14521907 4830
-o twilio-message-list twilio default 14514511 7390
-o twilio-recording-get twilio default 14549914 8396
-o twilio-recording-list twilio default 14539145 10763
-o twilio-usage-record-list twilio default 14558316 8339
-o typeform-form-get typeform default 14584099 5108
-o typeform-form-list typeform default 14578394 5699
-o typeform-response-delete typeform default 14600434 3050
-o typeform-response-list typeform default 14589213 11215
-o typeform-user-me typeform default 14576115 2273
-o vercel-deployment-cancel vercel default 14618229 2663
-o vercel-deployment-get vercel default 14615268 2955
-o vercel-deployments-list vercel default 14609968 5294
-o vercel-project-get vercel default 14606999 2963
-o vercel-projects-list vercel default 14605521 1472
-o webflow-collection-get webflow default 14628548 4235
-o webflow-collection-item-get webflow default 14636874 3491
-o webflow-collection-item-list webflow default 14632789 4079
-o webflow-collection-list webflow default 14625467 3075
-o webflow-site-list webflow default 14622724 2737
-o webflow-site-publish webflow default 14640371 2360
+o statuspage-component-list statuspage default 14405347 4304
+o statuspage-incident-create statuspage default 14391993 6655
+o statuspage-incident-get statuspage default 14387698 4289
+o statuspage-incident-list statuspage default 14382534 5158
+o statuspage-incident-update statuspage default 14398654 6687
+o stripe-balance-get stripe default 14417404 2591
+o stripe-billing-meter-list stripe default 14471332 9122
+o stripe-charge-get stripe default 14423081 3784
+o stripe-charge-refund-create stripe default 14442247 4638
+o stripe-country-spec-list stripe default 14446891 9165
+o stripe-customer-get stripe default 14420001 3074
+o stripe-event-list stripe default 14456062 9473
+o stripe-exchange-rate-list stripe default 14465541 5785
+o stripe-payment-intent-cancel stripe default 14438297 3944
+o stripe-payment-intent-capture stripe default 14433706 4585
+o stripe-payment-intent-get stripe default 14426871 3802
+o stripe-refund-get stripe default 14430679 3021
+o supabase-auth-settings supabase default 14490892 2955
+o supabase-rows-list supabase default 14487507 3379
+o supabase-schema-describe supabase default 14483567 3934
+o trello-board-get trello default 14500649 3619
+o trello-board-list trello default 14496821 3822
+o trello-board-lists trello default 14504274 1604
+o trello-card-archive trello default 14515752 4364
+o trello-card-create trello default 14510573 5173
+o trello-list-cards trello default 14505884 4683
+o twilio-account-get twilio default 14528929 2969
+o twilio-call-get twilio default 14552056 4476
+o twilio-call-list twilio default 14544136 7914
+o twilio-conference-list twilio default 14584054 7737
+o twilio-message-get twilio default 14539300 4830
+o twilio-message-list twilio default 14531904 7390
+o twilio-recording-get twilio default 14567307 8396
+o twilio-recording-list twilio default 14556538 10763
+o twilio-usage-record-list twilio default 14575709 8339
+o typeform-form-get typeform default 14601492 5108
+o typeform-form-list typeform default 14595787 5699
+o typeform-response-delete typeform default 14617827 3050
+o typeform-response-list typeform default 14606606 11215
+o typeform-user-me typeform default 14593508 2273
+o vercel-deployment-cancel vercel default 14635622 2663
+o vercel-deployment-get vercel default 14632661 2955
+o vercel-deployments-list vercel default 14627361 5294
+o vercel-project-get vercel default 14624392 2963
+o vercel-projects-list vercel default 14622914 1472
+o webflow-collection-get webflow default 14645941 4235
+o webflow-collection-item-get webflow default 14654267 3491
+o webflow-collection-item-list webflow default 14650182 4079
+o webflow-collection-list webflow default 14642860 3075
+o webflow-site-list webflow default 14640117 2737
+o webflow-site-publish webflow default 14657764 2360
 o work-request-create b10x tasks 5118534 6370
 o work-request-get b10x tasks 5124910 4188
 o work-request-list b10x tasks 5129104 8201
@@ -950,44 +953,44 @@ o workspaces-create b10x workspaces 7162697 4532
 o workspaces-delete b10x workspaces 7168588 2089
 o workspaces-get b10x workspaces 7167235 1347
 o workspaces-list b10x workspaces 7161659 1032
-o zendesk-custom-object-list zendesk default 14769857 5894
-o zendesk-custom-status-list zendesk default 14974942 5413
-o zendesk-group-list zendesk default 14946781 3756
-o zendesk-help-center-article-create zendesk help-center 15276761 9386
-o zendesk-help-center-article-get zendesk help-center 15255354 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 15268210 8545
-o zendesk-help-center-article-list zendesk help-center 15246827 8521
-o zendesk-help-center-category-list zendesk help-center 15238086 4211
-o zendesk-help-center-section-list zendesk help-center 15242303 4518
-o zendesk-help-center-translation-list zendesk help-center 15263202 5002
-o zendesk-incremental-organization-list zendesk default 14755635 8641
-o zendesk-incremental-ticket-event-list zendesk default 14764282 5569
-o zendesk-incremental-ticket-list zendesk default 14654930 74662
-o zendesk-incremental-user-list zendesk default 14729598 26031
-o zendesk-messaging-conversation-create zendesk messaging 15286153 10167
-o zendesk-messaging-conversation-get zendesk messaging 15296326 10469
-o zendesk-messaging-conversation-update zendesk messaging 15306801 11165
-o zendesk-messaging-message-create zendesk messaging 15325026 276191
-o zendesk-messaging-message-list zendesk messaging 15601223 158036
-o zendesk-messaging-participant-list zendesk messaging 15317972 7048
-o zendesk-messaging-user-create zendesk messaging 15759265 10089
-o zendesk-messaging-user-get zendesk messaging 15769360 9350
-o zendesk-messaging-user-update zendesk messaging 15778716 9961
-o zendesk-organization-show zendesk default 14940776 5999
-o zendesk-test zendesk default 14980361 23020
-o zendesk-ticket-audit-list zendesk default 14649114 5810
-o zendesk-ticket-comment-list zendesk default 15077125 19828
-o zendesk-ticket-field-list zendesk default 14950543 15042
-o zendesk-ticket-form-list zendesk default 14965591 9345
-o zendesk-ticket-recent-list zendesk default 14775757 71467
-o zendesk-ticket-search zendesk default 15003387 5013
-o zendesk-ticket-show zendesk default 15008406 68713
-o zendesk-ticket-update zendesk default 15096959 141121
-o zendesk-user-show zendesk default 14919274 21496
-o zendesk-view-ticket-list zendesk default 14847230 72038
-o zoom-meeting-delete zoom default 15790592 2358
-o zoom-user-get zoom default 15792956 5881
-payload 15799119
+o zendesk-custom-object-list zendesk default 14787250 5894
+o zendesk-custom-status-list zendesk default 14992335 5413
+o zendesk-group-list zendesk default 14964174 3756
+o zendesk-help-center-article-create zendesk help-center 15294154 9386
+o zendesk-help-center-article-get zendesk help-center 15272747 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 15285603 8545
+o zendesk-help-center-article-list zendesk help-center 15264220 8521
+o zendesk-help-center-category-list zendesk help-center 15255479 4211
+o zendesk-help-center-section-list zendesk help-center 15259696 4518
+o zendesk-help-center-translation-list zendesk help-center 15280595 5002
+o zendesk-incremental-organization-list zendesk default 14773028 8641
+o zendesk-incremental-ticket-event-list zendesk default 14781675 5569
+o zendesk-incremental-ticket-list zendesk default 14672323 74662
+o zendesk-incremental-user-list zendesk default 14746991 26031
+o zendesk-messaging-conversation-create zendesk messaging 15303546 10167
+o zendesk-messaging-conversation-get zendesk messaging 15313719 10469
+o zendesk-messaging-conversation-update zendesk messaging 15324194 11165
+o zendesk-messaging-message-create zendesk messaging 15342419 276191
+o zendesk-messaging-message-list zendesk messaging 15618616 158036
+o zendesk-messaging-participant-list zendesk messaging 15335365 7048
+o zendesk-messaging-user-create zendesk messaging 15776658 10089
+o zendesk-messaging-user-get zendesk messaging 15786753 9350
+o zendesk-messaging-user-update zendesk messaging 15796109 9961
+o zendesk-organization-show zendesk default 14958169 5999
+o zendesk-test zendesk default 14997754 23020
+o zendesk-ticket-audit-list zendesk default 14666507 5810
+o zendesk-ticket-comment-list zendesk default 15094518 19828
+o zendesk-ticket-field-list zendesk default 14967936 15042
+o zendesk-ticket-form-list zendesk default 14982984 9345
+o zendesk-ticket-recent-list zendesk default 14793150 71467
+o zendesk-ticket-search zendesk default 15020780 5013
+o zendesk-ticket-show zendesk default 15025799 68713
+o zendesk-ticket-update zendesk default 15114352 141121
+o zendesk-user-show zendesk default 14936667 21496
+o zendesk-view-ticket-list zendesk default 14864623 72038
+o zoom-meeting-delete zoom default 15807985 2358
+o zoom-user-get zoom default 15810349 5881
+payload 15816512
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -310754,6 +310757,59 @@ payload 15799119
       "user_env": [
         "JIRA_USER"
       ]
+    },
+    {
+      "description": "Atlassian OAuth 2.0 access token granted by a signed-in user and bounded by that user's Jira permissions",
+      "name": "jira.user_oauth",
+      "oauth2": {
+        "authorize_path": "/authorize",
+        "endpoint": "login",
+        "grants": [
+          "authorization_code",
+          "refresh_token"
+        ],
+        "scopes": [
+          "offline_access",
+          "read:jira-work",
+          "read:me",
+          "write:jira-work"
+        ],
+        "token_path": "/oauth/token"
+      },
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "user"
+    },
+    {
+      "description": "Atlassian service-account OAuth 2.0 access token for the tenant-shared read-only issue projection",
+      "name": "jira.service_oauth",
+      "oauth2": {
+        "authorize_path": "/authorize",
+        "endpoint": "login",
+        "grants": [
+          "client_credentials"
+        ],
+        "scopes": [
+          "read:jira-work"
+        ],
+        "token_path": "/oauth/token"
+      },
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    },
+    {
+      "description": "Scoped Atlassian service-account API token for the tenant-shared read-only issue projection",
+      "env": [
+        "JIRA_SERVICE_API_TOKEN"
+      ],
+      "name": "jira.service_api_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
     }
   ],
   "authority": "com.atlassian.jira",
@@ -310803,19 +310859,123 @@ payload 15799119
   "default_auth": [
     [
       "jira.api_token"
+    ],
+    [
+      "jira.user_oauth"
+    ],
+    [
+      "jira.service_oauth"
+    ],
+    [
+      "jira.service_api_token"
     ]
   ],
-  "description": "Jira Cloud issue tracking: read and create issues, comment on them, and drive workflow transitions",
+  "default_auth_requirements": [
+    {
+      "credentials": [
+        "jira.api_token"
+      ]
+    },
+    {
+      "credentials": [
+        "jira.user_oauth"
+      ],
+      "scopes": {
+        "jira.user_oauth": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "jira.service_oauth"
+      ],
+      "scopes": {
+        "jira.service_oauth": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "jira.service_api_token"
+      ],
+      "scopes": {
+        "jira.service_api_token": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    }
+  ],
+  "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
   "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
       ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
       "contract": {
-        "description": "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content",
+        "description": "Read one Jira issue by key (`PROJ-123`) — summary, description, status, assignee, reporter and every other configured field. Hosted project admission requires a key rather than a numeric id. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this legacy catalog operation cannot encode. Text fields are wiki markup, not rich content",
         "input_schema": {
           "properties": {
             "issue_key": {
@@ -310829,7 +310989,7 @@ payload 15799119
         }
       },
       "credential_requirement": "declared",
-      "description": "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content",
+      "description": "Read one Jira issue by key (`PROJ-123`) — summary, description, status, assignee, reporter and every other configured field. Hosted project admission requires a key rather than a numeric id. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this legacy catalog operation cannot encode. Text fields are wiki markup, not rich content",
       "direction": "read",
       "effects": [
         "read",
@@ -310847,12 +311007,14 @@ payload 15799119
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -310914,8 +311076,22 @@ payload 15799119
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Create a Jira issue in a project. Visible to everyone with access to the project and notifies its watchers. Only project, summary and issue type are set: a description cannot be sent yet (see the connector's notes), so file the detail as a comment afterwards. Returns the new issue's id, key and self URL",
@@ -310963,7 +311139,9 @@ payload 15799119
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}$",
             "type": "string"
           },
           "symbol": "project_key",
@@ -310975,6 +311153,7 @@ payload 15799119
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 255,
             "minLength": 1,
             "type": "string"
           },
@@ -310987,6 +311166,7 @@ payload 15799119
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 128,
             "minLength": 1,
             "type": "string"
           },
@@ -311063,7 +311243,59 @@ payload 15799119
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Read the comments on a Jira issue, oldest first. Returns Jira's first default-sized page only: paging needs the `startAt` and `maxResults` query parameters this connector cannot encode, so an issue with a long discussion is truncated. Comment bodies are wiki markup",
@@ -311098,12 +311330,14 @@ payload 15799119
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -311194,8 +311428,22 @@ payload 15799119
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Add a comment to a Jira issue. The comment is visible to everyone who can see the issue — including customers on a service-management portal — and notifies its watchers; restricting it to a project role or group is not supported yet. The body is Jira wiki markup (`*bold*`, `{code}`), not Markdown and not rich content",
@@ -311234,12 +311482,14 @@ payload 15799119
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -311251,6 +311501,7 @@ payload 15799119
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32768,
             "minLength": 1,
             "type": "string"
           },
@@ -311329,7 +311580,59 @@ payload 15799119
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List the workflow transitions available on a Jira issue right now, with the id and target status of each. Call this before `jira-issue-transition`: transition ids are per-workflow, not global, and only the transitions valid from the issue's current status are returned",
@@ -311364,12 +311667,14 @@ payload 15799119
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -311449,8 +311754,22 @@ payload 15799119
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Move a Jira issue through a workflow transition — the way an issue is closed, reopened or advanced. Get the transition id from `jira-issue-transitions-list` first; ids are per-workflow and only transitions valid from the current status are accepted. The status change is visible on every board showing the issue, notifies watchers, and may fire project automation. Answers `204` with an empty body on success",
@@ -311489,12 +311808,14 @@ payload 15799119
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -311506,7 +311827,9 @@ payload 15799119
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[0-9]+$",
             "type": "string"
           },
           "symbol": "transition_id",
@@ -311538,6 +311861,400 @@ payload 15799119
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Replace an issue's summary through Jira's documented edit endpoint. This curated operation cannot submit Jira's raw fields/update maps or clear unrelated fields",
+        "input_schema": {
+          "properties": {
+            "issue_key": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issue_key",
+            "summary"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Replace an issue's summary through Jira's documented edit endpoint. This curated operation cannot submit Jira's raw fields/update maps or clear unrelated fields",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-edit",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The issue key, e.g. `PROJ-123`",
+          "name": "issue_key",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "issue_key",
+          "wire": "issueIdOrKey"
+        },
+        {
+          "description": "Replacement one-line issue summary",
+          "name": "summary",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "summary",
+          "wire": "fields.summary"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "fields": {
+              "summary": {
+                "$param": "summary"
+              }
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/rest/api/2/issue/{issue_key}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Replace one Jira comment body. The text is Jira wiki markup; visibility cannot be changed and delete is not exposed",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "comment_id": {
+              "type": "string"
+            },
+            "issue_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issue_key",
+            "comment_id",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Replace one Jira comment body. The text is Jira wiki markup; visibility cannot be changed and delete is not exposed",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-comment-edit",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The issue key, e.g. `PROJ-123`",
+          "name": "issue_key",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "issue_key",
+          "wire": "issueIdOrKey"
+        },
+        {
+          "description": "The numeric Jira comment id, represented as a string",
+          "name": "comment_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "comment_id",
+          "wire": "id"
+        },
+        {
+          "description": "Replacement comment text in Jira wiki markup",
+          "name": "body",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 32768,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "body"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "body": {
+              "$param": "body"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/rest/api/2/issue/{issue_key}/comment/{comment_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Create one named Jira issue link between two admitted project issues. It cannot add a comment, delete a link, or submit raw link data",
+        "input_schema": {
+          "properties": {
+            "inward_issue_key": {
+              "type": "string"
+            },
+            "link_type": {
+              "type": "string"
+            },
+            "outward_issue_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "link_type",
+            "inward_issue_key",
+            "outward_issue_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create one named Jira issue link between two admitted project issues. It cannot add a comment, delete a link, or submit raw link data",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-link-add",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Exact Jira issue-link type name, e.g. `Blocks`",
+          "name": "link_type",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "link_type",
+          "wire": "type.name"
+        },
+        {
+          "description": "Issue key on the inward side of the link",
+          "name": "inward_issue_key",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "inward_issue_key",
+          "wire": "inwardIssue.key"
+        },
+        {
+          "description": "Issue key on the outward side of the link",
+          "name": "outward_issue_key",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "outward_issue_key",
+          "wire": "outwardIssue.key"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "inwardIssue": {
+              "key": {
+                "$param": "inward_issue_key"
+              }
+            },
+            "outwardIssue": {
+              "key": {
+                "$param": "outward_issue_key"
+              }
+            },
+            "type": {
+              "name": {
+                "$param": "link_type"
+              }
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/rest/api/2/issueLink"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,
@@ -311551,11 +312268,19 @@ payload 15799119
       ],
       "base_url": "https://{site}.atlassian.net",
       "gid": "com.atlassian.jira:2",
+      "legacy": true,
       "name": "default",
       "tags": [
         "issue-tracking",
         "project-management"
       ]
+    },
+    {
+      "api_version": "2",
+      "base_url": "https://auth.atlassian.com",
+      "description": "Atlassian OAuth 2.0 authorization and token service; its credential responses are never Connector operations",
+      "gid": "com.atlassian.jira/login:2",
+      "name": "login"
     }
   ],
   "vendor": "Jira"
