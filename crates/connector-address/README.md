@@ -2,7 +2,8 @@
 
 **How a connector, its services, its operations and a tenant's credentials are named.**
 
-Part of [b10x/connectors](https://github.com/b10x/connectors), which compiles reviewed
+Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
+`foundation/connectors`, which compiles reviewed
 connector declarations into canonical catalog documents.
 
 ```toml
@@ -88,7 +89,7 @@ that stores connections.
 
 A compiler, a store, or a client. It holds no value, opens no socket and reads no file — an address
 is a **name**.
-[`connector-spec`](https://github.com/b10x/b10x/tree/main/foundation/connectors/crates/connector-spec)
+[`connector-spec`](../connector-spec)
 produces these addresses from a connector definition;
 [`connector-secrets`](https://crates.io/crates/codewandler-connector-secrets) resolves a
 `CredentialRef` to a value and re-exports every name here, so a consumer never has to name two

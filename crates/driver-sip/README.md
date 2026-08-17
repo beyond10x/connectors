@@ -19,5 +19,5 @@ references, and terminates the dialog. Environment fields configure the reviewed
 caller/model input and the example is not a general dial proxy.
 
 The crate's production dependencies contain sipx but not RTVBP. Its test-only dependency closure
-joins `rtvbp-voice-endpoint` solely for the model-free repository conformance call; neither adapter
+joins `rtvbp-voice-endpoint` solely for the model-free cross-component conformance call; neither adapter
 imports or implements the other's protocol semantics.

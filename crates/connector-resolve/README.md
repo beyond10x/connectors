@@ -3,7 +3,8 @@
 Derives a connector's HTTP **request plan** from the connectors catalog document — no engine,
 no transport, no socket.
 
-Part of [b10x/connectors](https://github.com/b10x/connectors). It is an internal,
+Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
+`foundation/connectors`. It is an internal,
 pre-v1 crate in this private workspace, not a published predecessor package.
 
 Each operation in the catalogue publishes a closed, total request template: a method, a URL, headers,

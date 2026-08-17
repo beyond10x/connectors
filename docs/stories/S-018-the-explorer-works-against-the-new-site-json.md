@@ -35,7 +35,7 @@ There is **no `flux` key on an operation and no `core` object anywhere**. The si
 
 None of this failed during M1 because **the node tests are not in the cargo gate and were not run**.
 `ci_gate.test.mjs` cannot pass here at all: it asserts that a workflow under `.github/workflows/`
-runs the web suite, and this repository has no `.github/` directory (S-020).
+runs the web suite, and the monorepo has no `.github/` directory (S-020).
 
 ## Acceptance
 

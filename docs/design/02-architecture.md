@@ -32,7 +32,7 @@ The catalog dirs (`providers/`, `specs/`, `catalog/`, `scripts/`, `connectors.lo
 from the predecessor **as text, largely unmodified**. M1 therefore contains transitional
 hand-authored provider declarations. The target invariant is stricter: every canonical connector
 document is deterministically reproducible from a provenance-bearing source spec plus reviewed
-overlays. An official machine-readable spec is preferred; where none exists, the repository owns
+overlays. An official machine-readable spec is preferred; where none exists, the component owns
 and marks the authored spec instead of hiding the missing source behind a hand-written output.
 
 ## 2. The workspace
@@ -71,7 +71,7 @@ Day-one changes, from the precedents analysis and the predecessor's own stories:
 | `crates/domain` | the nouns of design 01 as types: entities, closed vocabularies (risk, effects, audit actions…), ports (traits) for every store, and the **proof-type gates** (admission → grant → dispatch). No IO, no HTTP, no persistence. |
 | `crates/protocol` | versioned wire contracts: protocol identities (`connectors.api.v1`, `connectors.invoke-request.v1`, …), request/response DTOs, strict conformance (`deny_unknown_fields`, bounded diagnostics). The single source for SDK generation later. |
 | `crates/service` | use-cases over ports: connection lifecycle, connect sessions, acquisition, grant admission and CAS mutation, invocation assembly (document → plan → placed request), event routing, delivery queues. Pure logic; testable without a socket. |
-| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, personal-local authentication or the released B10x Identity verifier adapter, SQLite + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. It never implements OIDC login or Identity session/service-credential storage. |
+| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, personal-local authentication or the released B10x Identity verifier adapter, injected state + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. It never implements OIDC login or Identity session/service-credential storage. |
 
 The predecessor's two-crate split (host/server) was right; its failure mode was god modules
 (one 10.7k-line route file). The four-crate split above moves the pressure points (`service`,
@@ -206,7 +206,8 @@ including external-provider references and satellite generation binding, is defi
 
 - **Relational state** — the stable admitted tenant/principal references required for receiver-owned
   records, integrations, connection registry, grants (CAS-revisioned), channels, events,
-  deliveries, and connector audit — in **one SQLite database** under the state root. There is no
+  deliveries, and connector audit. Personal placement uses the owner-only local state backends;
+  hosted placement requires one service-owned **PostgreSQL database**. There is no
   Organization, membership, Identity login-session, upstream-token, service-principal credential,
   or reusable service-bearer verifier store. WAL mode, one writer, migrations embedded.
 - **Credentials** — never in the database. `connector-secrets` owner-bound file store (personal/
@@ -254,11 +255,11 @@ before readiness, and injects the resulting `CredentialSource` into the SIP sess
 unauthenticated SIP remains possible only when both the credential binding and Vault are disabled.
 
 The predecessor scattered connector state across seven owner-only JSON files plus two SQLite
-databases — each individually justified, collectively unqueryable. One connector database + one
-credential-store port + one pack is the whole Connectors-owned inventory here; the port may retain
-sealed values itself or resolve an opaque external-provider binding. Identity persistence is not a
-fourth store hidden in this process. SaaS-scale Postgres is a port swap decided when saas is real,
-not before.
+databases — each individually justified, collectively unqueryable. One connector state authority +
+one credential-store port + one pack is the whole Connectors-owned inventory here; the hosted
+authority is PostgreSQL and the credential port may retain sealed values itself or resolve an
+opaque external-provider binding. Identity persistence is not another store hidden in this
+process. PostgreSQL adoption does not itself claim SaaS isolation, HA, or restore readiness.
 
 ## 5. The one invocation path
 
@@ -307,7 +308,8 @@ HTTP, Flux, an ambient executable or another placement.
 - **Webhook terminator**: one inbound endpoint; per-provider verification + attribution from
   declarative catalog rules (the new grammar — designed against the five existing bindings and
   the Nango corpus before generalizing; no script escape hatch in v1).
-- **Event store**: SQLite, append-only, provenance (`native`/`polled`) on every row, dedup by
+- **Event store**: append-only durable state (local backend in personal placement, PostgreSQL in
+  hosted placement), provenance (`native`/`polled`) on every row, dedup by
   delivery id, the data/operational family split from design 01.
 - **Deliveries**: durable per-endpoint queues; Svix envelope (`id`, `timestamp`, HMAC over
   `{id}.{timestamp}.{body}`, dedicated key); retries with backoff; **replay-by-id API**.
@@ -376,5 +378,5 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
    catalog is public.
 3. Console timing and shape (operator SPA served by the host, per the predecessor's
    same-origin lesson) — after M3 at the earliest.
-4. SQLite encryption-at-rest for the saas posture (per-tenant envelope keys) — decide with the
-   saas design, shaped for by keeping all secret material out of the database now.
+4. Encryption-at-rest and tenant-isolation evidence for the hosted PostgreSQL posture — decide
+   with the SaaS design while keeping all secret material out of the database.

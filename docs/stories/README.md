@@ -14,7 +14,7 @@ Context these stories assume, read current authority in order:
 [../design/02-architecture.md](../design/02-architecture.md) →
 [../VISION.md](../VISION.md) (historical founding intent), grounded by
 [../research/](../research/). Repository housing is governed by
-[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/main/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
+[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](../../../../architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 ## Status
 
@@ -41,7 +41,7 @@ will spawn children as each milestone is designed.
 | [S-003](S-003-the-lockfile-gets-a-verifier.md) | `catalog check` verifies every addressable hash and refuses unverifiable claims | done | Catalog | catalog-build, connector-spec |
 | [S-015](S-015-retire-the-quirks-umbrella.md) | Retire the `quirks` umbrella — pagination, rate limits and error envelopes are ordinary facts | done | Catalog | catalog, catalog-build, connector-spec |
 | [S-016](S-016-sources-are-processed-by-code.md) | Sources are processed by code: the index is validated, checksummed and refreshed by the tool | ready (5) | Catalog | catalog-build, connector-spec |
-| [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the repository claims it runs | in-progress (6) | Catalog | ci, catalog-build, web |
+| [S-020](S-020-a-ci-gate-exists.md) | A CI gate exists, and it runs what the monorepo claims it runs | in-progress (6) | Catalog | ci, catalog-build, web |
 | [S-018](S-018-the-explorer-works-against-the-new-site-json.md) | The web explorer works against the site JSON M1 actually emits | ready (7) | Catalog | web, catalog-build |
 | [S-017](S-017-mint-source-entries-from-the-mined-catalogs.md) | Mint source entries from the mined competitor catalogs | backlog | Catalog | catalog-build, docs |
 | [S-019](S-019-retire-the-flux-connectors-identity.md) | Retire the flux-connectors identity from the artifacts | done | Catalog | catalog, catalog-build, connector-resolve, web |
@@ -77,13 +77,13 @@ will spawn children as each milestone is designed.
 |---|---|---|
 | `catalog-day-one` | S-001, S-002, S-003, S-015, S-023 | Architecture §2's day-one catalog changes plus the accepted beyond-HTTP fact shape. S-001, S-003, S-015 and S-023 are done; S-002's declaration half landed in the coordinated wave and only its M2 grant-admission half remains blocked. |
 | `catalog-adoptions` | S-004, S-005, S-006 | The three adoptions the precedents analysis ordered by cost/benefit: `token_response_metadata`, header-name rate-limit retry, per-service verification probes. |
-| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open. S-019 and S-022 are done; Rust/governance/catalog CI exists while its web and remaining failing-first arms remain open (S-020), the explorer still needs its new site JSON (S-018), and reverse coverage remains S-021. |
+| `post-m1` | S-018, S-019, S-020, S-021, S-022 | What the M1 import report left open. S-019 and S-022 are done; the monorepo local gate covers Rust/governance/catalogue checks while hosted CI, its web arm, and remaining failing-first evidence remain open (S-020), the explorer still needs its new site JSON (S-018), and reverse coverage remains S-021. |
 | `sources` | S-016, S-017 | The SOURCES.toml machinery: code that validates, checksums, refreshes and probes every external source — and mints new entries by mining the vendored competitor catalogs (Nango providers.yaml, Airbyte, Apideck, a spec directory) with per-field citations. |
 | `build-order` | S-007, S-008, S-009, S-010 | One story per milestone of architecture §9, with that milestone's exit criteria as Acceptance. Containers: each will spawn children. |
 | `carried-constraints` | S-011, S-012, S-013, S-014, S-030 | Design constraints retained from predecessor evidence and restated here: egress aperture, webhook grammar, personal OAuth custody, auth-as-tool-result, and raw-proxy containment. |
 | `beyond-http` | S-023, S-024, S-025, S-026, S-027, S-028 | ADR 0010's delivery order: orthogonal document facts, one plan seam, satellite trust, one real driver, direct-byte establishment, and external artifacts last. SIP/RTVBP is the selected proof and is detailed by the native-voice epic. |
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
-| `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-repository conformance bundles. |
+| `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-component conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 

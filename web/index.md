@@ -31,7 +31,7 @@ import { data as catalog } from './data/catalog.data.mts'
 
 ## The Flux catalogue
 
-The repository publishes a growing connector catalog. Flux is one prospective client, not the owner
+The component publishes a growing connector catalog. Flux is one prospective client, not the owner
 of this catalog or its generic contract.
 
 <CatalogSnapshot :catalog="catalog" />
@@ -67,5 +67,5 @@ an unsafe or incomplete request.
 ## Follow the project
 
 The source, release history, local build instructions, and contribution workflow live in the
-[GitHub repository](https://github.com/b10x/connectors). The public site stays focused
+[private monorepo](https://github.com/b10x/b10x) under `foundation/connectors`. The public site stays focused
 on the connector catalogue and its user-facing contract.
