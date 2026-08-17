@@ -345,6 +345,62 @@ mod tests {
     use super::*;
 
     #[test]
+    fn hosted_deployment_accepts_planner_integration() {
+        let config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "babelforce"
+module_tenant_ids = ["babelforce"]
+[server]
+listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
+[identity]
+origin = "https://identity.code.dev.babelforce.com"
+[authority]
+operator_groups = ["operator"]
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = true
+namespaces = ["b10x"]
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+[vault]
+enabled = true
+mount = "b10x-connectors"
+address = "https://b10x-vault.b10x.svc:8200"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+listen = "0.0.0.0:5060"
+[slack]
+public_origin = "https://code.dev.babelforce.com/api/connectors/v1"
+grant_ref = "grant:slack:workspace-companion"
+initiation = "provider"
+allowed_events = ["app_mention"]
+connect_session_ttl_seconds = 300
+[b10x]
+tenant_member_modules = ["ontology", "planner", "work"]
+module_signing_key_file = "/var/run/b10x-module-auth/private.pem"
+module_signing_key_id = "developer-1"
+module_signing_issuer = "urn:b10x:connectors:b10x:b10x"
+work_origin = "http://b10x-work:8080"
+ontology_origin = "http://b10x-ontology:8080"
+planner_origin = "http://b10x-planner:8080"
+[b10x.connection]
+connection_ref = "connection:b10x:b10x"
+label = "B10x private services"
+grant_ref = "grant:deployment:b10x:b10x"
+initiation = "b10x"
+"#,
+        )
+        .unwrap();
+
+        config.validate().unwrap();
+    }
+
+    #[test]
     fn hosted_integrations_are_explicit_and_fail_closed() {
         let config: HostedServerConfig = toml::from_str(
             r#"
