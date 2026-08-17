@@ -212,6 +212,9 @@ pub struct B10xIntegrationConfig {
     pub workspaces_origin: Option<String>,
     #[serde(default)]
     pub colab_origin: Option<String>,
+    /// Local-personal module id to owner-only Unix socket. This is a transport route, not a Grant.
+    #[serde(default)]
+    pub module_sockets: BTreeMap<String, std::path::PathBuf>,
     #[serde(default)]
     pub ontology_bearer_file: Option<std::path::PathBuf>,
     /// Owner-only file containing the base64url-encoded 32-byte Ed25519 module-signing seed.
@@ -429,6 +432,13 @@ impl B10xIntegrationConfig {
                 .colab_origin
                 .as_deref()
                 .is_some_and(|origin| !private_origin(origin))
+            || self.module_sockets.iter().any(|(module, socket)| {
+                !matches!(
+                    module.as_str(),
+                    "colab" | "ontology" | "planner" | "work" | "workspaces"
+                ) || !socket.is_absolute()
+                    || self.origin_configured(module)
+            })
             || self.tenant_member_modules.as_ref().is_some_and(|modules| {
                 let mut canonical = modules.clone();
                 canonical.sort();
@@ -438,11 +448,7 @@ impl B10xIntegrationConfig {
                         !matches!(
                             module.as_str(),
                             "colab" | "ontology" | "planner" | "work" | "workspaces"
-                        ) || module == "work" && self.work_origin.is_none()
-                            || module == "ontology" && self.ontology_origin.is_none()
-                            || module == "planner" && self.planner_origin.is_none()
-                            || module == "workspaces" && self.workspaces_origin.is_none()
-                            || module == "colab" && self.colab_origin.is_none()
+                        ) || !self.module_configured(module)
                     })
             })
             || ((self.work_origin.is_some()
@@ -464,6 +470,7 @@ impl B10xIntegrationConfig {
                 && self.planner_origin.is_none()
                 && self.workspaces_origin.is_none()
                 && self.colab_origin.is_none()
+                && self.module_sockets.is_empty()
                 && self.audio.is_none()
                 && self.browser.is_none())
         {
@@ -554,6 +561,31 @@ impl B10xIntegrationConfig {
         self.colab_origin
             .as_deref()
             .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+
+    /// Exact owner-only local socket for one module, when configured.
+    #[must_use]
+    pub fn module_socket(&self, module: &str) -> Option<&Path> {
+        self.module_sockets
+            .get(module)
+            .map(std::path::PathBuf::as_path)
+    }
+
+    /// Whether one module has exactly one hosted or local-personal transport route.
+    #[must_use]
+    pub fn module_configured(&self, module: &str) -> bool {
+        self.origin_configured(module) || self.module_sockets.contains_key(module)
+    }
+
+    fn origin_configured(&self, module: &str) -> bool {
+        match module {
+            "work" => self.work_origin.is_some(),
+            "ontology" => self.ontology_origin.is_some(),
+            "planner" => self.planner_origin.is_some(),
+            "workspaces" => self.workspaces_origin.is_some(),
+            "colab" => self.colab_origin.is_some(),
+            _ => false,
+        }
     }
 
     /// Whether a hosted tenant member receives one configured module by deployment policy.

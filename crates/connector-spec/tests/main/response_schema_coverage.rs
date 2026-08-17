@@ -141,7 +141,12 @@ const COVERED_FLOOR: usize = 705;
 // those as honest response-shape absences rather than pretending null constrains a response body;
 // twelve other admitted module operations carry schemas. The measured absence is 126, so 127 keeps
 // the one-operation allowance while the smallest two-operation unschematized arrival still fails.
-const ABSENCE_CEILING: usize = 127;
+// Raised 127 -> 145 with the Workspaces and Colab owner admission. Their generated development
+// manifests add thirteen and five operations respectively, but currently declare `AnyValue` for
+// every successful response. The catalogue rejects that permissive placeholder and preserves all
+// eighteen as honest absences. The measured absence is 144, so 145 retains exactly the single-
+// operation allowance and still refuses the smallest two-operation unschematized arrival.
+const ABSENCE_CEILING: usize = 145;
 
 /// How far [`ABSENCE_CEILING`] may sit above the measured absence. This is the guard's resolution,
 /// and the only number in this file that was chosen rather than read off the catalogue, so it is the

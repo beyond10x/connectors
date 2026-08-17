@@ -19,6 +19,28 @@ The list is an authorization ceiling. An omitted list preserves existing persona
 an explicit empty list exposes no Work or Ontology operations to hosted tenant members. Entries
 must be sorted, unique, supported, and backed by a configured private origin.
 
+Personal-local composition can route the same module operations to owner-only Unix sockets instead
+of hosted origins:
+
+```toml
+[b10x.connection]
+connection_ref = "connection:module:work"
+label = "Work (local)"
+grant_ref = "grant:module:work"
+initiation = "b10x"
+
+[b10x.module_sockets]
+work = "/absolute/private/runtime/work.sock"
+```
+
+One module cannot declare both a socket and an origin. The local route must be an absolute Unix
+socket owned by the current effective user beneath an owner-only real directory. It uses the
+module's fixed local caller admission, so Connector sends neither hosted request JWS nor a bearer;
+the kernel peer/filesystem boundary replaces only transport authentication. The Connection,
+operation description, Grant, approval, and audit boundaries remain Connector-owned. Zwirn's
+managed module composition generates one such value-free deployment per module and reads only the
+exact `b10x` descriptive catalog provider, without enumerating unrelated Integrations.
+
 **2026-08-16 authority amendment.** An origin is invalid unless the three module-signing settings
 are present, and the retired `ontology_bearer_file` is refused. After Identity authority and exact
 operation admission, Connectors signs every Work/Ontology request—including owner event polls—with

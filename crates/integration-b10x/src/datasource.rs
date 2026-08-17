@@ -7,7 +7,7 @@ const PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
 
 impl B10xBackend {
     pub(super) fn workspace_datasource_admitted(&self) -> bool {
-        self.config.workspaces_origin.is_some()
+        self.config.module_configured("workspaces")
             && self.module_admitted("workspaces")
             && self.configured(LIST_OPERATION)
             && self.configured(GET_OPERATION)

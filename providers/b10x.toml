@@ -1304,3 +1304,78 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["private_network", "file_secret"]
 expose = true
+
+[[patch.operations]]
+service = "planning"
+select = "planner_project_register"
+description = "Register one Planner project under an idempotency identity"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_decision_transition"
+description = "Transition one planning decision with optimistic revision admission"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_create"
+description = "Create one typed planning entity under an idempotency identity"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_update"
+description = "Replace one typed planning entity with optimistic revision admission"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_delete"
+description = "Tombstone one typed planning entity with optimistic revision admission"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_entity_restore"
+description = "Restore one tombstoned planning entity with optimistic revision admission"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_story_gate_record"
+description = "Record one story gate result with optimistic revision admission"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_story_transition"
+description = "Transition one story after validating its lifecycle gates"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_apply"
+description = "Apply one admitted repository and database synchronization change set"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_confirm"
+description = "Confirm the resulting repository and database synchronization state"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_conflict_resolve"
+description = "Resolve one repository and database synchronization conflict"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_session_begin"
+description = "Begin one bounded repository synchronization upload session"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_session_apply"
+description = "Apply the admitted change set assembled by one synchronization session"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_session_confirm"
+description = "Confirm the resulting state for one applied synchronization session"
+
+[[patch.operations]]
+service = "planning"
+select = "planner_sync_session_preview"
+description = "Preview the change set assembled by one synchronization session"

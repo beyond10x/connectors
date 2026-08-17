@@ -8,6 +8,7 @@ use protocol::operation::{DescribeRequest, InvokeRequest, OwnerContext, SearchRe
 use std::fs;
 use std::io::Write as _;
 use std::net::TcpListener;
+use std::os::unix::net::UnixListener;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -34,6 +35,7 @@ fn config(root: &Path) -> B10xIntegrationConfig {
         planner_origin: None,
         workspaces_origin: None,
         colab_origin: None,
+        module_sockets: BTreeMap::new(),
         ontology_bearer_file: None,
         module_signing_key_file: Some(signing_key),
         module_signing_key_id: Some("test-1".to_owned()),
@@ -97,6 +99,49 @@ fn fake_http(response_body: &'static str) -> (String, thread::JoinHandle<String>
         String::from_utf8(request).unwrap()
     });
     (origin, task)
+}
+
+fn fake_unix_http(socket: &Path, response_body: &'static str) -> thread::JoinHandle<String> {
+    let listener = UnixListener::bind(socket).unwrap();
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut request = Vec::new();
+        let expected = loop {
+            let mut buffer = [0_u8; 2048];
+            let read = stream.read(&mut buffer).unwrap();
+            assert_ne!(read, 0, "HTTP request ended before its declared body");
+            request.extend_from_slice(&buffer[..read]);
+            assert!(request.len() <= 64 * 1024);
+            let Some(header_end) = request.windows(4).position(|part| part == b"\r\n\r\n") else {
+                continue;
+            };
+            let headers = std::str::from_utf8(&request[..header_end]).unwrap();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().unwrap())
+                })
+                .unwrap_or_default();
+            break header_end + 4 + content_length;
+        };
+        while request.len() < expected {
+            let mut buffer = [0_u8; 2048];
+            let read = stream.read(&mut buffer).unwrap();
+            assert_ne!(read, 0, "HTTP request ended before its declared body");
+            request.extend_from_slice(&buffer[..read]);
+        }
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
+            response_body.len()
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+        String::from_utf8(request).unwrap()
+    })
 }
 
 fn stalling_http(delay: Duration) -> (String, thread::JoinHandle<()>) {
@@ -449,6 +494,30 @@ async fn work_invocation_crosses_the_private_http_boundary_with_signed_authority
     let request = server.join().unwrap();
     assert!(request.starts_with("GET /api/work/v2/requests?"));
     assert!(request.contains("authorization: DLModule "));
+    assert_eq!(audit_outcomes(temporary.path()), ["attempted", "completed"]);
+}
+
+#[tokio::test]
+async fn local_work_invocation_is_constrained_to_the_configured_unix_socket() {
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = temporary.path().join("work.sock");
+    let server = fake_unix_http(&socket, r#"{"items":[],"next_cursor":null}"#);
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.work_origin = None;
+    configured.module_sockets.insert("work".to_owned(), socket);
+    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let output = invoke_read(
+        &backend,
+        "work.requests.list",
+        serde_json::json!({"cursor":"", "limit":1}),
+    )
+    .await;
+    assert_eq!(output, serde_json::json!({"items":[], "next_cursor":null}));
+    let request = server.join().unwrap();
+    assert!(request.starts_with("GET /api/work/v2/requests?"));
+    assert!(!request.to_ascii_lowercase().contains("authorization:"));
     assert_eq!(audit_outcomes(temporary.path()), ["attempted", "completed"]);
 }
 

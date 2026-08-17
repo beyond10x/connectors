@@ -34,6 +34,20 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
          further growth is admitted before the pending format and platform split",
     ),
     (
+        "crates/integration-gitlab/src/backend.rs",
+        2_872,
+        "the first GitLab slice keeps OAuth/PAT custody, connection reconciliation, operation \
+         dispatch, and bounded datasource projections together while their transaction seam \
+         settles; no further growth is admitted before those arms split",
+    ),
+    (
+        "crates/integration-monitoring/src/backend.rs",
+        2_045,
+        "the initial Grafana federation slice keeps governed discovery, bounded Prometheus and \
+         Loki projection, cache refresh, and audit together while the shared datasource seam \
+         settles; no further growth is admitted before those arms split",
+    ),
+    (
         "crates/integration-slack/src/backend.rs",
         2_360,
         "the first hosted companion slice keeps acquisition recovery, Socket Mode supervision, \
