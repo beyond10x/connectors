@@ -146,7 +146,12 @@ const COVERED_FLOOR: usize = 705;
 // every successful response. The catalogue rejects that permissive placeholder and preserves all
 // eighteen as honest absences. The measured absence is 144, so 145 retains exactly the single-
 // operation allowance and still refuses the smallest two-operation unschematized arrival.
-const ABSENCE_CEILING: usize = 145;
+// Raised 145 -> 147 with the Jira delegated-write admission. Atlassian documents issue-summary
+// replacement as `204` with no body and issue-link creation as `201` with no required response
+// body, while comment replacement carries a concrete response schema. The measured absence is
+// 146, so 147 preserves the single-operation allowance and still refuses the smallest
+// two-operation unschematized arrival.
+const ABSENCE_CEILING: usize = 147;
 
 /// How far [`ABSENCE_CEILING`] may sit above the measured absence. This is the guard's resolution,
 /// and the only number in this file that was chosen rather than read off the catalogue, so it is the

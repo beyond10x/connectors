@@ -732,3 +732,40 @@ format = "token"
 secret = true
 docs_url = "https://id.atlassian.com/manage-profile/security/api-tokens"
 binds = "credential.jira.api_token"
+
+# The Atlassian 3LO application is registered once by the deployment operator. These declarations
+# publish the required slots, never their values: the public client id and callback URI are ordinary
+# deployment configuration, while the confidential client secret enters only through secret
+# custody. An end user authorizing a Jira Connection supplies none of them.
+
+[[config]]
+name = "oauth_client_id"
+service = "default"
+label = "Atlassian OAuth application client ID"
+help = "The client ID of the Atlassian OAuth 2.0 (3LO) application registered for this deployment. Supplied once by the deployment operator, not by the user authorizing a Jira Connection"
+format = "text"
+required = false
+docs_url = "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
+binds = "oauth.client_id"
+
+[[config]]
+name = "oauth_redirect_uri"
+service = "default"
+label = "Atlassian OAuth callback URL"
+help = "The callback URL served by this deployment and registered on the Atlassian OAuth application"
+example = "https://connectors.example/api/oauth/callback"
+format = "url"
+required = false
+docs_url = "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
+binds = "oauth.redirect_uri"
+
+[[config]]
+name = "oauth_client_secret"
+service = "default"
+label = "Atlassian OAuth application client secret"
+help = "The client secret issued for the Atlassian OAuth application. Supplied once by the deployment operator and never exposed to the user authorizing a Jira Connection"
+format = "token"
+secret = true
+required = false
+docs_url = "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
+binds = "oauth.client_secret"
