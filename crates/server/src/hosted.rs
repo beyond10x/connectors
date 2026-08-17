@@ -27,49 +27,21 @@ use protocol::event::{
     ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
 };
 use protocol::operation::{
-    OperationError, OperationErrorCode, RequestEnvelope, ResponseEnvelope,
+    ApprovalPosture, DescribeRequest, EffectClass, OperationError, OperationErrorCode,
+    OperationRequest, OperationResult, RequestEnvelope, ResponseEnvelope,
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
-    PrincipalContext,
 };
+
+mod principal;
+
+pub use principal::HostedPrincipal;
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
 const MAX_COMPLETION_BYTES: usize = 8 * 1024;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HostedPrincipal {
-    pub issuer: String,
-    pub tenant_id: String,
-    pub subject: String,
-    pub actor_subject: String,
-    pub email: Option<String>,
-    pub token_id: String,
-    pub scopes: BTreeSet<String>,
-    pub groups: BTreeSet<String>,
-    pub authority_snapshot_sha256: String,
-    pub deployment_id: Option<String>,
-}
-
-impl HostedPrincipal {
-    fn allows(&self, scope: &str) -> bool {
-        self.scopes.contains(scope)
-    }
-
-    fn principal_context(&self) -> Result<PrincipalContext, service::PrincipalContextError> {
-        PrincipalContext::hosted_with_groups(
-            self.tenant_id.clone(),
-            self.subject.clone(),
-            self.actor_subject.clone(),
-            self.email.clone(),
-            self.token_id.clone(),
-            self.authority_snapshot_sha256.clone(),
-            self.groups.clone(),
-        )
-    }
-}
 
 /// Receiver-owned admission policy for effect-bearing hosted Connector request families.
 #[derive(Debug, Clone, Default)]
@@ -193,7 +165,7 @@ fn tenant_member_module_read(request: &protocol::operation::OperationRequest) ->
             | "knowledge-query"
             | "planner/project.list"
             | "planner/board.get"
-            | "planner/search"
+            | "planner/search.project"
             | "planner/entity.get"
             | "planner/entity.list"
             | "planner/story.transition.explain"
@@ -559,7 +531,7 @@ async fn connection(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = match principal.principal_context() {
+    let owner = match principal.principal_context(&request.request_id) {
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
@@ -692,10 +664,82 @@ async fn operation(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = match principal.principal_context() {
+    let owner = match principal.principal_context(&request.request_id) {
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
+    if let OperationRequest::Invoke(invoke) = &request.request {
+        if invoke.approval_evidence_ref.is_some() {
+            return operation_failure(
+                &request.request_id,
+                OperationError::new(
+                    OperationErrorCode::ApprovalDenied,
+                    "approval evidence cannot be accepted until the Connector-owned verifier and one-time redemption store are available",
+                    false,
+                ),
+                StatusCode::FORBIDDEN,
+            );
+        }
+        let description = state
+            .backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: invoke.operation_ref.clone(),
+                }),
+            )
+            .await;
+        match description {
+            Ok(OperationResult::Describe(description))
+                if description.effect == EffectClass::ReadOnly
+                    && description.approval == ApprovalPosture::NotRequired => {}
+            Ok(OperationResult::Describe(_)) => {
+                return operation_failure(
+                    &request.request_id,
+                    OperationError::new(
+                        OperationErrorCode::Unavailable,
+                        "effect-bearing hosted invocation is disabled until Connector Grant and approval decisions are durably enforced",
+                        false,
+                    ),
+                    StatusCode::SERVICE_UNAVAILABLE,
+                );
+            }
+            Ok(_) => {
+                return operation_failure(
+                    &request.request_id,
+                    OperationError::new(
+                        OperationErrorCode::Protocol,
+                        "the Connector backend returned the wrong result while rechecking invocation authority",
+                        false,
+                    ),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                );
+            }
+            Err(error) => {
+                return operation_failure(
+                    &request.request_id,
+                    error,
+                    StatusCode::SERVICE_UNAVAILABLE,
+                );
+            }
+        }
+    }
+    if matches!(
+        &request.request,
+        OperationRequest::SessionStatus(_)
+            | OperationRequest::SessionTerminate(_)
+            | OperationRequest::SessionReconcile(_)
+    ) {
+        return operation_failure(
+            &request.request_id,
+            OperationError::new(
+                OperationErrorCode::Unavailable,
+                "hosted Connector sessions are disabled until Connector Grant, approval, and durable session decisions are enforced",
+                false,
+            ),
+            StatusCode::SERVICE_UNAVAILABLE,
+        );
+    }
     let response = match state.backend.handle(&owner, request.request).await {
         Ok(result) => ResponseEnvelope::success(&request.request_id, result),
         Err(error) => ResponseEnvelope::failure(&request.request_id, error),
@@ -738,7 +782,7 @@ async fn event(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = match principal.principal_context() {
+    let owner = match principal.principal_context(&request.request_id) {
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
@@ -794,7 +838,7 @@ async fn datasource(
             StatusCode::FORBIDDEN,
         );
     }
-    let owner = match principal.principal_context() {
+    let owner = match principal.principal_context(&request.request_id) {
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
@@ -867,8 +911,10 @@ mod tests {
         SearchRequest as DatasourceSearchRequest,
     };
     use protocol::operation::{
-        InvokeRequest, OperationRequest, OperationResult, OwnerContext, SearchRequest,
+        InvocationResult, InvokeRequest, OperationDescription, OperationRequest, OperationResult,
+        OwnerContext, SearchRequest,
     };
+    use service::PrincipalContext;
     use tower::ServiceExt as _;
 
     struct Verifier;
@@ -970,6 +1016,59 @@ mod tests {
         }
     }
 
+    struct GuardBackend;
+
+    #[async_trait]
+    impl ConnectorBackend for GuardBackend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            Ok(())
+        }
+
+        async fn handle(
+            &self,
+            context: &PrincipalContext,
+            request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            assert_eq!(context.issuer(), Some("https://identity.example.test"));
+            assert_eq!(context.token_id(), Some("token-test"));
+            assert_eq!(context.request_id(), Some("request-1"));
+            assert_eq!(context.trace_id(), Some("request-1"));
+            match request {
+                OperationRequest::Describe(request) => {
+                    let read_only = request.operation_ref == "test/read";
+                    Ok(OperationResult::Describe(OperationDescription {
+                        operation_ref: request.operation_ref,
+                        title: "test".to_owned(),
+                        description: "test".to_owned(),
+                        input_schema: serde_json::json!({"type": "object"}),
+                        output_schema: serde_json::json!({"type": "object"}),
+                        effect: if read_only {
+                            EffectClass::ReadOnly
+                        } else {
+                            EffectClass::Mutating
+                        },
+                        approval: if read_only {
+                            ApprovalPosture::NotRequired
+                        } else {
+                            ApprovalPosture::Required
+                        },
+                        connections: Vec::new(),
+                        description_ref: "description:test".to_owned(),
+                    }))
+                }
+                OperationRequest::Invoke(request) => {
+                    Ok(OperationResult::Invoke(InvocationResult {
+                        operation_ref: request.operation_ref,
+                        output: serde_json::json!({"ok": true}),
+                        connector_audit_ref: "audit:test".to_owned(),
+                        execution_ref: None,
+                    }))
+                }
+                _ => unreachable!("guard test sends only describe and invoke"),
+            }
+        }
+    }
+
     fn envelope(tenant_id: &str) -> RequestEnvelope {
         RequestEnvelope {
             protocol: protocol::operation::CONTRACT.to_owned(),
@@ -986,6 +1085,26 @@ mod tests {
                 limit: 10,
             }),
         }
+    }
+
+    fn invocation_envelope(operation_ref: &str, approval: Option<&str>) -> RequestEnvelope {
+        let mut request = envelope("tenant-dev");
+        request.request = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: operation_ref.to_owned(),
+            connection_ref: "connection:test".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: approval.map(str::to_owned),
+        });
+        request
+    }
+
+    fn operation_http_request(envelope: &RequestEnvelope) -> Request<Body> {
+        Request::post("/operations")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::AUTHORIZATION, "Bearer access")
+            .body(Body::from(serde_json::to_vec(envelope).unwrap()))
+            .unwrap()
     }
 
     fn connection_envelope(tenant_id: &str) -> ConnectionRequestEnvelope {
@@ -1145,6 +1264,43 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(app.oneshot(request).await.unwrap().status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn hosted_invocation_is_read_only_until_grants_and_approvals_are_durable() {
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(GuardBackend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
+        let read = invocation_envelope("test/read", None);
+        assert_eq!(
+            app.clone()
+                .oneshot(operation_http_request(&read))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+
+        let effect = invocation_envelope("test/write", None);
+        assert_eq!(
+            app.clone()
+                .oneshot(operation_http_request(&effect))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+
+        let forged_approval = invocation_envelope("test/write", Some("approval:unchecked"));
+        assert_eq!(
+            app.oneshot(operation_http_request(&forged_approval))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
     }
 
     #[tokio::test]

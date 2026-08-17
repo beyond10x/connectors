@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use hosted_state::PostgresState;
 
 use super::*;

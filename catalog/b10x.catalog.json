@@ -58817,7 +58817,7 @@
           "schema": {
             "enum": [
               "exact",
-              "flux_compatible"
+              "line_whitespace_normalized"
             ],
             "type": "string"
           },

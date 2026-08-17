@@ -8,22 +8,15 @@
 //! voice, filesystem path, HTTP origin, bearer, or placement.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::OpenOptions;
-use std::io::Read as _;
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
-use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use connector_resolve::document::{Document, ProtocolDriver};
 use connectors_config::B10xIntegrationConfig;
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
 use driver_audio::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use driver_cdp::LocalBrowserDriver;
-use ed25519_dalek::pkcs8::DecodePrivateKey as _;
-use ed25519_dalek::{Signer as _, SigningKey};
 use protocol::audio::{SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION};
 use protocol::browser::{
     BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_GOTO_OPERATION,
@@ -49,7 +42,6 @@ use protocol::operation::{
     ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
-use serde::Serialize;
 use serde_json::Value;
 use service::{
     admit_audio_plan, admit_browser_address, admit_browser_plan, admit_speech_speak,
@@ -60,12 +52,14 @@ use sha2::{Digest as _, Sha256};
 mod audit;
 mod composition;
 mod datasource;
+mod module_signing;
 mod policy;
 mod surface;
 mod transport;
 mod work_events;
 
 use audit::{AuditEvent, AuditJournal};
+use module_signing::ModuleSigner;
 use policy::{
     all_operation_rows, approval, check_approval, effect, module_operation, operation_row,
     post_dispatch_error, response_schema,
@@ -77,9 +71,8 @@ const PROVIDER: &str = "b10x";
 const WORKSPACES_DATASOURCE: &str = "b10x.workspaces";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 use surface::{
-    WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, MODULE_AUTHORIZATION_SCHEME,
-    MODULE_REQUEST_TTL_SECONDS, MODULE_REQUEST_TYPE, OPERATIONS, PLANNER_EVENT_BINDING,
-    PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL,
+    WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, OPERATIONS,
+    PLANNER_EVENT_BINDING, PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL,
 };
 
 /// Runtime construction failure. Messages deliberately carry no bearer or remote response body.
@@ -113,137 +106,6 @@ pub struct B10xBackend {
     work_events: ModuleEventStore,
     planner_events: ModuleEventStore,
     module_signer: Option<ModuleSigner>,
-}
-
-struct ModuleSigner {
-    issuer: String,
-    kid: String,
-    key: SigningKey,
-}
-
-#[derive(Serialize)]
-struct ModuleProtectedHeader<'a> {
-    alg: &'static str,
-    kid: &'a str,
-    typ: &'static str,
-}
-
-#[derive(Serialize)]
-struct ModuleRequestClaims<'a> {
-    iss: &'a str,
-    aud: &'a str,
-    tenant_id: &'a str,
-    sub: &'a str,
-    act: &'a str,
-    operation: &'a str,
-    method: &'a str,
-    target: &'a str,
-    body_sha256: String,
-    idempotency_key_sha256: Option<String>,
-    authority_snapshot_id: &'a str,
-    authority_snapshot_sha256: &'a str,
-    grants: [&'a str; 1],
-    iat: u64,
-    nbf: u64,
-    exp: u64,
-    jti: String,
-}
-
-impl ModuleSigner {
-    fn load(
-        config: &B10xIntegrationConfig,
-    ) -> Result<Option<Self>, B10xIntegrationError> {
-        if config.work_origin.is_none()
-            && config.ontology_origin.is_none()
-            && config.planner_origin.is_none()
-            && config.workspaces_origin.is_none()
-            && config.colab_origin.is_none()
-        {
-            return Ok(None);
-        }
-        let encoded = read_owner_key(
-            config
-                .module_signing_key_file
-                .as_deref()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
-        )
-        .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
-        let key = if encoded.starts_with("-----BEGIN PRIVATE KEY-----") {
-            SigningKey::from_pkcs8_pem(&encoded)
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?
-        } else {
-            let decoded = URL_SAFE_NO_PAD
-                .decode(encoded)
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
-            let bytes: [u8; 32] = decoded
-                .try_into()
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
-            SigningKey::from_bytes(&bytes)
-        };
-        Ok(Some(Self {
-            issuer: config
-                .module_signing_issuer
-                .clone()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
-            kid: config
-                .module_signing_key_id
-                .clone()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
-            key,
-        }))
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn authorization(
-        &self,
-        context: &PrincipalContext,
-        audience: &str,
-        operation: &str,
-        method: &str,
-        target: &str,
-        body: &[u8],
-        idempotency_key: Option<&str>,
-    ) -> Result<String, OperationError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| unavailable())?
-            .as_secs();
-        let protected = ModuleProtectedHeader {
-            alg: "EdDSA",
-            kid: &self.kid,
-            typ: MODULE_REQUEST_TYPE,
-        };
-        let claims = ModuleRequestClaims {
-            iss: &self.issuer,
-            aud: audience,
-            tenant_id: context.tenant_id(),
-            sub: context.subject(),
-            act: context.actor_subject(),
-            operation,
-            method,
-            target,
-            body_sha256: format!("{:x}", Sha256::digest(body)),
-            idempotency_key_sha256: idempotency_key
-                .map(|value| format!("{:x}", Sha256::digest(value.as_bytes()))),
-            authority_snapshot_id: context.authority_snapshot_id(),
-            authority_snapshot_sha256: context.authority_snapshot_sha256(),
-            grants: [operation],
-            iat: now,
-            nbf: now,
-            exp: now.saturating_add(MODULE_REQUEST_TTL_SECONDS),
-            jti: opaque_ref("module-request")?,
-        };
-        let protected =
-            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&protected).map_err(|_| unavailable())?);
-        let claims =
-            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(|_| unavailable())?);
-        let signing_input = format!("{protected}.{claims}");
-        let signature = self.key.sign(signing_input.as_bytes());
-        Ok(format!(
-            "{MODULE_AUTHORIZATION_SCHEME}{signing_input}.{}",
-            URL_SAFE_NO_PAD.encode(signature.to_bytes())
-        ))
-    }
 }
 
 impl B10xBackend {
@@ -436,6 +298,19 @@ impl B10xBackend {
         let (operation, canonical, _) = self
             .operation(&request.operation_ref)
             .ok_or_else(not_found)?;
+        if canonical == BROWSER_GOTO_OPERATION
+            || (canonical == BROWSER_OPEN_OPERATION
+                && request
+                    .input
+                    .get("url_2")
+                    .is_some_and(|value| !value.is_null()))
+        {
+            return Err(OperationError::new(
+                OperationErrorCode::Unavailable,
+                "browser network navigation is disabled until Connection-bound post-DNS egress confinement is available",
+                false,
+            ));
+        }
         if request.connection_ref != self.config.connection.connection_ref {
             return Err(not_granted());
         }
@@ -456,7 +331,15 @@ impl B10xBackend {
             operation_ref: &request.operation_ref,
             connection_ref: &request.connection_ref,
             tenant_id: context.tenant_id(),
+            subject: context.subject(),
             actor_subject: context.actor_subject(),
+            issuer: context.issuer(),
+            token_id: context.token_id(),
+            deployment_id: context.deployment_id(),
+            request_id: context.request_id(),
+            trace_id: context.trace_id(),
+            authority_snapshot_id: context.authority_snapshot_id(),
+            authority_snapshot_sha256: context.authority_snapshot_sha256(),
             outcome: "attempted",
         };
         // The attempted record is durable before dispatch. If audit custody is unavailable, no
@@ -513,7 +396,15 @@ impl B10xBackend {
                 operation_ref: &request.operation_ref,
                 connection_ref: &request.connection_ref,
                 tenant_id: context.tenant_id(),
+                subject: context.subject(),
                 actor_subject: context.actor_subject(),
+                issuer: context.issuer(),
+                token_id: context.token_id(),
+                deployment_id: context.deployment_id(),
+                request_id: context.request_id(),
+                trace_id: context.trace_id(),
+                authority_snapshot_id: context.authority_snapshot_id(),
+                authority_snapshot_sha256: context.authority_snapshot_sha256(),
                 outcome: "completed",
             })
             .map_err(|_| post_dispatch_error(operation, unavailable()))?;
@@ -1501,37 +1392,6 @@ fn valid_ontology_ref(value: &str) -> bool {
         && value
             .chars()
             .all(|character| !character.is_whitespace() && !character.is_control())
-}
-
-fn read_owner_key(path: &Path) -> Result<String, OperationError> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
-        .open(path)
-        .map_err(|_| not_granted())?;
-    let metadata = file.metadata().map_err(|_| not_granted())?;
-    if !metadata.is_file()
-        || metadata.uid() != rustix::process::geteuid().as_raw()
-        || metadata.permissions().mode() & 0o077 != 0
-        || metadata.len() > 4096
-    {
-        return Err(not_granted());
-    }
-    let mut value = String::new();
-    (&mut file)
-        .take(4097)
-        .read_to_string(&mut value)
-        .map_err(|_| not_granted())?;
-    let value = value.trim_end_matches(['\r', '\n']);
-    if value.len() < 32
-        || value.len() > 4096
-        || value
-            .chars()
-            .any(|character| character.is_control() && !matches!(character, '\r' | '\n'))
-    {
-        return Err(not_granted());
-    }
-    Ok(value.to_owned())
 }
 
 fn same_origin(origin: &str, target: &url::Url) -> bool {

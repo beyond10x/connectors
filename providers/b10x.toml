@@ -63,23 +63,23 @@ description = "Product-neutral conversation rooms and their current workspace at
 [[spec]]
 service = "workspaces"
 path = "specs/b10x/workspaces-v2.openapi.json"
-upstream_version = "workspaces v2 development manifest 362abc0ced24816728f5e0380c34be1ff68697af7fa803b3e41a07d5c433c768"
+upstream_version = "workspaces v2 development manifest 11e7bdc6de9c2c6733216a7b68cef41649bc551e8e4f79373505fd46db28a2e9"
 fetched_at = "2026-08-17T00:00:00Z"
-sha256 = "3f5735472a616c1cbb0470a0473d350de6d081288cf65e4a614d2939a13f1291"
+sha256 = "d210b8966f29686e72c3b154a8d927b51b57a86b22a14d49d44c0e90bf720a97"
 
 [[spec]]
 service = "collaboration"
 path = "specs/b10x/colab-v1.openapi.json"
-upstream_version = "colab v1 development manifest 9398434ee535a9c56791e721ba1744c2dbc46b67406c9d8e3b88cffb63703a70"
+upstream_version = "colab v1 development manifest 46207ef571063a806f4c60ff4b43a848392013c9b0828233ce90f0696e69c143"
 fetched_at = "2026-08-17T00:00:00Z"
-sha256 = "ffbf0660d3ff02c98f925db390814bb192dd4ac1a1d8f9db215b7aa5e713235f"
+sha256 = "ba0e1e1f17bbddf9dbd905754f8dd868f8b35c724a3e8ce864743b720157c6e5"
 
 [[spec]]
 service = "knowledge"
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
-upstream_version = "ontology module v0alpha2 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+upstream_version = "ontology v0alpha2 development manifest f91dab52ccbbc9795e9a8009713ba2c5737e93a59f13667eca0db5e0b92dd8ea"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "38183cbfa4df9b2a87d0a083d3fd0737875ca2f4fc1746f3e56888d3e7145f78"
+sha256 = "4af3c2be3eef57911e1a7e37b6f9fa8c39f3589098e553c4133a8a37558ca93a"
 
 [[patch.operations]]
 service = "knowledge"
@@ -337,9 +337,9 @@ expose = true
 [[spec]]
 service = "tasks"
 path = "specs/b10x/work-v1.openapi.json"
-upstream_version = "work module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+upstream_version = "work v1 development manifest 6e76b0838d2563e1e9e0c844194f3dcbadcaebd10ad4d30d0ffaed30e3eb584d"
 fetched_at = "2026-08-16T00:00:00Z"
-sha256 = "b16026bf25d4f0ff80da89cd9d9ca5b81c1a8479e1d7ef591fa9d2896b953471"
+sha256 = "6993b9ce5614dac5dd1a4f9e58121826fdc4bd7fca056012393381a70fe749bd"
 
 [[spec]]
 kind = "asyncapi"
@@ -492,9 +492,9 @@ group = "Work"
 [[spec]]
 service = "planning"
 path = "specs/b10x/planner-v1.openapi.json"
-upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7b722ffcff59d52"
+upstream_version = "planner v1 development manifest 888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
 fetched_at = "2026-08-17T00:00:00Z"
-sha256 = "e642ccb86a6be6cb7501ebee6ed5a1094eb86d54959b207579ae1346ed5a7e85"
+sha256 = "3e5093746690243865c898d20f4ac66e283b50c0ff018a019f4df6a4f61937f4"
 
 [[spec]]
 kind = "asyncapi"
@@ -515,7 +515,7 @@ prefix = "planner"
 planner_project_register = "planner-project-register"
 planner_project_list = "planner-project-list"
 planner_board_get = "planner-board-get"
-planner_search = "planner-search"
+planner_search_project = "planner-search"
 planner_entity_create = "planner-entity-create"
 planner_entity_get = "planner-entity-get"
 planner_entity_list = "planner-entity-list"
@@ -542,7 +542,7 @@ planner_sync_session_confirm = "planner-sync-session-confirm"
 planner_project_register = "write"
 planner_project_list = "read"
 planner_board_get = "read"
-planner_search = "read"
+planner_search_project = "read"
 planner_entity_create = "write"
 planner_entity_get = "read"
 planner_entity_list = "read"
@@ -621,7 +621,7 @@ expose = true
 
 [[patch.operations]]
 service = "planning"
-select = "planner_search"
+select = "planner_search_project"
 description = "Search typed planning entities inside one registered project"
 direction = "read"
 risk = "low"

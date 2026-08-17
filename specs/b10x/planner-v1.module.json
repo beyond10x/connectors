@@ -13,7 +13,7 @@
     "openapi": {
       "media_type": "application/json",
       "path": "openapi.json",
-      "sha256": "e642ccb86a6be6cb7501ebee6ed5a1094eb86d54959b207579ae1346ed5a7e85"
+      "sha256": "3e5093746690243865c898d20f4ac66e283b50c0ff018a019f4df6a4f61937f4"
     }
   },
   "events": [
@@ -68,6 +68,7 @@
   },
   "operations": [
     {
+      "approval": "required",
       "cli_path": [
         "project",
         "register"
@@ -86,6 +87,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "project",
         "list"
@@ -104,6 +106,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "board",
         "get"
@@ -122,6 +125,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "search"
       ],
@@ -130,15 +134,16 @@
       "effects": [
         "read"
       ],
-      "global_id": "planner/search",
+      "global_id": "planner/search.project",
       "idempotency": "idempotent",
-      "key": "search",
+      "key": "search.project",
       "method": "POST",
-      "openapi_operation_id": "planner_search",
+      "openapi_operation_id": "planner_search_project",
       "path": "/projects/{project}/search",
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "entity",
         "create"
@@ -157,6 +162,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "entity",
         "get"
@@ -175,6 +181,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "entity",
         "list"
@@ -193,6 +200,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "entity",
         "update"
@@ -211,6 +219,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "entity",
         "delete"
@@ -229,6 +238,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "entity",
         "restore"
@@ -247,6 +257,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "story",
         "transition",
@@ -266,6 +277,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "story",
         "gate",
@@ -285,6 +297,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "story",
         "transition"
@@ -303,6 +316,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "decision",
         "transition"
@@ -321,6 +335,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "sync",
         "preview"
@@ -339,6 +354,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "apply"
@@ -357,6 +373,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "confirm"
@@ -375,6 +392,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "sync",
         "conflict",
@@ -394,6 +412,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "conflict",
@@ -413,6 +432,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "search",
         "all"
@@ -431,6 +451,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "session",
@@ -450,6 +471,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "session",
@@ -469,6 +491,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "not-required",
       "cli_path": [
         "sync",
         "session",
@@ -488,6 +511,7 @@
       "risk_floor": "low"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "session",
@@ -507,6 +531,7 @@
       "risk_floor": "medium"
     },
     {
+      "approval": "required",
       "cli_path": [
         "sync",
         "session",
@@ -547,7 +572,7 @@
       "manifest": {
         "media_type": "application/json",
         "path": "ui/planner-board.json",
-        "sha256": "4eff813f69a0899e0bac105b02c31d33004c6fdd5b2fdb69bdd7588440af90f7"
+        "sha256": "a318fd7b9a646f9ff0808bae2f206042bfe6d98da45eca32de56ed094844e203"
       },
       "version": 1
     }

@@ -56,13 +56,6 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
          is admitted before those arms split",
     ),
     (
-        "crates/integration-b10x/src/lib.rs",
-        1_600,
-        "hosted signed-module request verification and the Work event bridge remain in the \
-         integration root until their shared actor-policy construction is extracted; no further \
-         growth is admitted before that split",
-    ),
-    (
         "crates/catalog-build/src/document.rs",
         2_568,
         "canonical lowering pending section-oriented extraction; +27 for the closed `audio_v1` \

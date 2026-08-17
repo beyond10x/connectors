@@ -39,6 +39,11 @@ pub struct PrincipalContext {
     authority_snapshot_id: String,
     authority_snapshot_sha256: String,
     verified_groups: BTreeSet<String>,
+    issuer: Option<String>,
+    token_id: Option<String>,
+    deployment_id: Option<String>,
+    request_id: Option<String>,
+    trace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -149,7 +154,40 @@ impl PrincipalContext {
             authority_snapshot_id,
             authority_snapshot_sha256,
             verified_groups,
+            issuer: None,
+            token_id: None,
+            deployment_id: None,
+            request_id: None,
+            trace_id: None,
         })
+    }
+
+    /// Retain the authenticated request join carried by a hosted receiver. Local adapters do not
+    /// invent these Identity facts; hosted adapters must populate them before dispatch.
+    pub fn with_hosted_provenance(
+        mut self,
+        issuer: String,
+        token_id: String,
+        deployment_id: Option<String>,
+        request_id: String,
+        trace_id: String,
+    ) -> Result<Self, PrincipalContextError> {
+        if !valid_ref(&issuer, 512)
+            || !valid_ref(&token_id, 512)
+            || deployment_id
+                .as_deref()
+                .is_some_and(|value| !valid_ref(value, 512))
+            || !valid_ref(&request_id, 512)
+            || !valid_ref(&trace_id, 512)
+        {
+            return Err(PrincipalContextError);
+        }
+        self.issuer = Some(issuer);
+        self.token_id = Some(token_id);
+        self.deployment_id = deployment_id;
+        self.request_id = Some(request_id);
+        self.trace_id = Some(trace_id);
+        Ok(self)
     }
 
     #[must_use]
@@ -191,6 +229,31 @@ impl PrincipalContext {
     #[must_use]
     pub fn verified_groups(&self) -> &BTreeSet<String> {
         &self.verified_groups
+    }
+
+    #[must_use]
+    pub fn issuer(&self) -> Option<&str> {
+        self.issuer.as_deref()
+    }
+
+    #[must_use]
+    pub fn token_id(&self) -> Option<&str> {
+        self.token_id.as_deref()
+    }
+
+    #[must_use]
+    pub fn deployment_id(&self) -> Option<&str> {
+        self.deployment_id.as_deref()
+    }
+
+    #[must_use]
+    pub fn request_id(&self) -> Option<&str> {
+        self.request_id.as_deref()
+    }
+
+    #[must_use]
+    pub fn trace_id(&self) -> Option<&str> {
+        self.trace_id.as_deref()
     }
 }
 

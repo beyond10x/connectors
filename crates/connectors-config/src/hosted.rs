@@ -291,6 +291,10 @@ pub enum HostedServerConfigError {
     Parse,
     #[error("hosted Connector configuration is incomplete or inconsistent")]
     Invalid,
+    #[error(
+        "credential-bearing hosted network providers are disabled until post-DNS destination confinement is enforced"
+    )]
+    CredentialEgressUnconfined,
 }
 
 impl HostedServerConfig {
@@ -447,6 +451,8 @@ impl HostedServerConfig {
         });
         if !valid_ref(&self.tenant_id, 256)
             || module_tenants != self.module_tenant_ids
+            || (!self.module_tenant_ids.is_empty()
+                && self.module_tenant_ids.as_slice() != std::slice::from_ref(&self.tenant_id))
             || self
                 .module_tenant_ids
                 .iter()
@@ -488,6 +494,9 @@ impl HostedServerConfig {
                 || self.kubernetes.ca_file != default_kubernetes_ca_file())
         {
             return Err(HostedServerConfigError::Invalid);
+        }
+        if vault_required {
+            return Err(HostedServerConfigError::CredentialEgressUnconfined);
         }
         Ok(())
     }
@@ -780,7 +789,10 @@ initiation = "b10x"
         )
         .unwrap();
 
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
     }
 
     #[test]
@@ -897,7 +909,10 @@ password_credential = "sip_password"
 "#,
         )
         .unwrap();
-        enabled.validate().unwrap();
+        assert!(matches!(
+            enabled.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         let mut inconsistent = enabled;
         inconsistent.vault.enabled = false;
@@ -948,7 +963,10 @@ password_credential = "sip_password"
 "#,
         )
         .unwrap();
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         config.sip.credentials.as_mut().unwrap().password_credential = "sip_username".to_owned();
         assert!(config.validate().is_err());
@@ -1001,7 +1019,10 @@ enabled = false
 "#,
         )
         .unwrap();
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         config.grafana.read_groups.reverse();
         assert!(config.validate().is_err());
@@ -1049,7 +1070,10 @@ refresh_skew_seconds = 300
 "#,
         )
         .unwrap();
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         config.gitlab.as_mut().unwrap().oauth_redirect_uri =
             "https://attacker.example/api/connectors/v1/oauth/gitlab/callback".to_owned();
@@ -1101,7 +1125,10 @@ refresh_skew_seconds = 300
 "#,
         )
         .unwrap();
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         config.jira.as_mut().unwrap().allowed_project_keys.reverse();
         assert!(config.validate().is_err());
@@ -1156,7 +1183,10 @@ initiation = "b10x"
 "#,
         )
         .unwrap();
-        config.validate().unwrap();
+        assert!(matches!(
+            config.validate(),
+            Err(HostedServerConfigError::CredentialEgressUnconfined)
+        ));
 
         config.jira.as_mut().unwrap().service_oauth_client_id = Some("not-admitted".to_owned());
         assert!(config.validate().is_err());
