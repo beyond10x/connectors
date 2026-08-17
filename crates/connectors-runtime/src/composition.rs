@@ -1,5 +1,6 @@
 //! Product runtime assembly. Frontends select a mode and supply shutdown; they do not wire adapters.
 
+use std::collections::BTreeSet;
 use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -295,10 +296,20 @@ impl HostedRuntime {
             config.tenant_id.clone(),
         )?);
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
+        let kubernetes_namespace_access = config.kubernetes_namespace_access();
+        let kubernetes_read_groups = kubernetes_namespace_access
+            .iter()
+            .flat_map(|access| access.read_groups.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let kubernetes_restart_groups = kubernetes_namespace_access
+            .iter()
+            .flat_map(|access| access.restart_groups.iter().cloned())
+            .collect::<BTreeSet<_>>();
         if config.kubernetes.enabled {
             backends.push(Arc::new(KubernetesStatusBackend::in_cluster(
                 config.tenant_id.clone(),
-                config.kubernetes.namespaces.clone(),
+                kubernetes_namespace_access,
+                config.authority.operator_groups.clone(),
                 config.kubernetes.token_file.clone(),
                 &config.kubernetes.ca_file,
             )?));
@@ -390,7 +401,8 @@ impl HostedRuntime {
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let admission =
-            server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone());
+            server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone())
+                .with_kubernetes_groups(kubernetes_read_groups, kubernetes_restart_groups);
         let connector_router = server::hosted::router(verifier, backend.clone(), admission);
         let application = if config.server.base_path == "/" {
             connector_router
