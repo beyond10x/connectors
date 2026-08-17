@@ -1,0 +1,55 @@
+{
+  "contract": "b10x.connector-datasource.v0alpha1",
+  "cases": [
+    {
+      "name": "search-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-datasource.v0alpha1",
+        "request_id": "request-datasource-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"search","params":{"query":"kubernetes workloads","limit":10}}
+      }
+    },
+    {
+      "name": "binding-list-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-datasource.v0alpha1",
+        "request_id": "request-datasource-2",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"read","params":{"datasource_ref":"kubernetes.workloads","binding_ref":"binding:kubernetes:0123456789abcdef","description_ref":"description:kubernetes:datasource:0123456789abcdef","read":{"verb":"list","limit":25}}}
+      }
+    },
+    {
+      "name": "exact-get-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-datasource.v0alpha1",
+        "request_id": "request-datasource-3",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"read","params":{"datasource_ref":"kubernetes.workloads","binding_ref":"binding:kubernetes:0123456789abcdef","description_ref":"description:kubernetes:datasource:0123456789abcdef","read":{"verb":"get","key":{"name":"backend"}}}}
+      }
+    },
+    {
+      "name": "wildcard-binding-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-datasource.v0alpha1",
+        "request_id": "request-datasource-bad-1",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"read","params":{"datasource_ref":"kubernetes.workloads","binding_ref":"*","description_ref":"description:kubernetes:datasource:0123456789abcdef","read":{"verb":"list","limit":0}}}
+      }
+    },
+    {
+      "name": "credential-field-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-datasource.v0alpha1",
+        "request_id": "request-datasource-bad-2",
+        "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method":"bindings","params":{"datasource_ref":"kubernetes.workloads","query":"","limit":25,"credential_ref":"tenants/tenant-local/kubernetes/token"}}
+      }
+    }
+  ]
+}

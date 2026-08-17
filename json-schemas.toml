@@ -54,6 +54,12 @@ path = "contracts/connector-event/v0alpha1/connector-event.schema.json"
 path = "contracts/connector-event/v0alpha1/vectors.schema.json"
 
 [[schema]]
+path = "contracts/connector-datasource/v0alpha1/connector-datasource.schema.json"
+
+[[schema]]
+path = "contracts/connector-datasource/v0alpha1/vectors.schema.json"
+
+[[schema]]
 path = "contracts/connector-catalog/v0alpha1/connector-catalog.schema.json"
 
 [[schema]]
@@ -111,6 +117,14 @@ schema = "contracts/connector-event/v0alpha1/vectors.schema.json"
 
 [[document]]
 path = "contracts/connector-event/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-datasource/v0alpha1/vectors.json"
+schema = "contracts/connector-datasource/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-datasource/v0alpha1/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"
 
 [[document]]

@@ -11,14 +11,20 @@ one. Credential read-back, export, value listing, and generic provider-secret re
 methods in this protocol.
 
 `connect_session_create` returns a pending session with a short-lived `completion_endpoint` and may
-also return a loopback-only `browser_completion_url`. Both belong to Connectors, accept one
+also return a Connector-owned `browser_completion_url` (loopback locally or HTTPS when hosted).
+An optional `auth_profile` selects only a provider-declared credential purpose, such as a
+principal Slack user or companion bot; it cannot carry credentials or choose custody. Both
+completion forms belong to Connectors, accept one
 credential-acquisition completion, and disappear. A credential entered in the setup page posts
 directly to the Connector process; Agent only sees the opaque one-use URL. Neither endpoint is the
 durable Connection or the harness's reusable Endpoint. The creator polls
 `connect_session_status`; only a completed terminal status names `connection_ref`, and it names
 nothing else from acquisition.
 
-`search` and `describe` return non-secret Connection lifecycle, initiation, route, and Channel summaries.
+`search` and `describe` return non-secret Connection lifecycle, initiation, route, and Channel
+summaries. Integrations may also publish paired `scope` (`tenant` or `principal`), `actor` (`app`
+or `user`), and the admitted `auth_profile`, so consumers do not conflate organization bots,
+delegated users, and principal-owned apps.
 Initiation answers which side may start; it does not replace a Connector Grant or an Agent endpoint
 grant. Local transport identity and the request's exact owner context remain independent gates.
 

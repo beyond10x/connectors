@@ -248,6 +248,32 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
             };
             serde_json::to_vec(&response).map_err(io::Error::other)?
         }
+        protocol::datasource::CONTRACT => {
+            let request: protocol::datasource::RequestEnvelope = match serde_json::from_slice(frame)
+            {
+                Ok(request) => request,
+                Err(_) => return Ok(None),
+            };
+            if request.validate().is_err() {
+                return Ok(None);
+            }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(context) => context,
+                Err(_) => return Ok(None),
+            };
+            let request_id = request.request_id;
+            let response = match backend.handle_datasource(&context, request.request).await {
+                Ok(response) => {
+                    protocol::datasource::ResponseEnvelope::success(&request_id, response)
+                }
+                Err(error) => protocol::datasource::ResponseEnvelope::failure(&request_id, error),
+            };
+            let response = match response.validate() {
+                Ok(()) => response,
+                Err(error) => protocol::datasource::ResponseEnvelope::failure(request_id, error),
+            };
+            serde_json::to_vec(&response).map_err(io::Error::other)?
+        }
         _ => return Ok(None),
     };
     Ok(Some(bytes))

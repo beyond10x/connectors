@@ -43,24 +43,34 @@ Connection. Neither an agent nor its harness receives the credential or the one-
 endpoint.
 
 For personal-local, the command currently collects only the app-level Socket Mode token. Hosted
-Zwirn instead starts an HTTPS Connect Session and opens the exact same-origin setup page. That page
-accepts the Integration's app-level Socket Mode token plus one workspace's bot and delegated-user
-tokens and submits all three directly to hosted Connectors. The Connector validates that the bot
-and user belong to the same Slack workspace, prepares all credential changes in Vault, commits the
-transaction, and only then publishes a value-free workspace Connection. Zwirn learns only the
-terminal Connection reference.
+Zwirn presents three deliberately separate roles:
 
-In the hosted companion flow, one Integration supervisor owns the Socket Mode WebSocket and routes
-events by Slack workspace to the correct Connection. It stays connected while Zwirn is offline.
-The bot credential receives mentions and performs `chat.postMessage`/reaction writes; the delegated
-user credential performs conversations-history and user-info reads. Mutating operations require
-normal correlated human approval. Zwirn pulls only normalized admitted events with a short-lived
-`connectors.events.read` token; it never receives the Socket Mode ticket or any Slack token.
+- **Organization Slack** is deployment-owned and enabled from value-free policy. Its `xapp`,
+  `xoxb`, and OAuth client secret are provisioned externally into fixed Vault leaves. Its bot token
+  exposes normalized public-channel and user-directory reads to organization members, but the
+  organization bot Connection admits no writes and no event channel.
+- **Connect my Slack account** starts Slack's user-centric OAuth flow. Connectors binds the one-use
+  state to the initiating principal, requires the configured workspace, compares Slack's verified
+  email with the normalized Identity email, and writes the resulting `xoxp` and optional refresh
+  token only to that Connection's Vault instance. This Connection can read the consenting user's
+  private channels and DMs; user-attributed mutations still require normal correlated approval.
+- **Add a companion bot** opens a Connector-owned form for that person's `xapp` and `xoxb` only.
+  The bot must belong to the configured organization workspace. Each successful submission creates
+  another principal-owned Connection, so one person can connect multiple companion apps without
+  sharing a token or Socket supervisor.
+
+Each companion Connection owns its own Socket Mode WebSocket and remains connected while Zwirn is
+offline. Zwirn pulls only that principal's normalized Slack events with a short-lived
+`connectors.events.self` token; tenant-wide module events still require `connectors.events.read`
+and operator admission. A fresh `app_mention` carries one Connector-enforced reply grant pinned to
+the same Connection, channel, and thread. Its event reference is durably claimable once and expires
+after ten minutes. Every other mutation, including a second reply, follows the normal person
+approval path. Neither Zwirn nor the model receives a Socket Mode ticket or Slack token.
 
 The finished product asks only for credentials required by the chosen features:
 
-- **Receive over Socket Mode:** app-level token (`xapp`) for the socket plus bot authorization for
-  the selected events and replies.
+- **Receive over Socket Mode:** one principal-owned companion app-level token (`xapp`) for the
+  socket plus that same companion's bot authorization for selected events and replies.
 - **Act as a person:** a separate principal-owned delegated user OAuth Connection, using Slack's
   user-centric consent flow. Zwirn may use it only through an explicit Grant; Slack sees and audits
   the consenting user. The shared bot token is never silently substituted.

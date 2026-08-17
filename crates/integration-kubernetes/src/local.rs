@@ -275,6 +275,9 @@ impl KubernetesLocalBackend {
                 state: ConnectionState::Authorized,
                 initiation: initiation(self.policy.initiation),
                 route: ConnectionRoute::Direct,
+                scope: None,
+                actor: None,
+                auth_profile: None,
             },
             channels: Vec::new(),
         };
@@ -477,6 +480,9 @@ impl KubernetesLocalBackend {
                     parent_connection_ref: child.parent_connection_ref.clone(),
                     route_adapter: RouteAdapter::KubernetesServiceProxyV1,
                 },
+                scope: None,
+                actor: None,
+                auth_profile: None,
             },
             channels: Vec::new(),
         };
@@ -622,6 +628,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
             operations: true,
             connections: true,
             events: false,
+            datasources: false,
         }
     }
 

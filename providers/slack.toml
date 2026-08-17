@@ -66,7 +66,7 @@ sha256 = "9a967daeabf79901ce5df35244d8e25647b0b8a1026372b001b61d2ea5c49052"
 name = "slack.bot_token"
 scheme = "bearer"
 subject = "app"
-description = "Workspace bot token obtained when a person installs the Zwirn Slack app. Calls are attributed to the app's bot, not to the installer"
+description = "Workspace bot token for either the deployment-owned organization app or one principal-owned companion app. Calls are attributed to that exact bot"
 
 [auth.oauth2]
 endpoint = "login"
@@ -89,7 +89,7 @@ description = "Delegated OAuth token for the consenting Slack member. Zwirn may 
 endpoint = "login"
 authorize_path = "/oauth/v2_user/authorize"
 token_path = "/api/oauth.v2.user.access"
-scopes = ["channels:history", "chat:write", "reactions:write", "users:read"]
+scopes = ["channels:read", "channels:history", "groups:read", "groups:history", "im:read", "im:history", "mpim:read", "mpim:history", "users:read", "users:read.email", "chat:write", "reactions:write"]
 scope_separator = "comma"
 scope_response_pointer = "/authed_user/scope"
 grants = ["authorization_code", "refresh_token"]

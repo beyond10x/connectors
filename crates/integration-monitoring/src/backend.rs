@@ -291,6 +291,7 @@ impl ConnectorBackend for MonitoringBackend {
             operations: true,
             connections: true,
             events: false,
+            datasources: false,
         }
     }
 
@@ -813,6 +814,9 @@ impl MonitoringInner {
             state: ConnectionState::Callable,
             initiation: initiation(self.policy.initiation),
             route: ConnectionRoute::Direct,
+            scope: None,
+            actor: None,
+            auth_profile: None,
         }
     }
 
@@ -835,6 +839,9 @@ impl MonitoringInner {
                 parent_connection_ref: child.parent_connection_ref.clone(),
                 route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
             },
+            scope: None,
+            actor: None,
+            auth_profile: None,
         }
     }
 

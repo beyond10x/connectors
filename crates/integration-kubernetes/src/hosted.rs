@@ -286,6 +286,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
             operations: true,
             connections: true,
             events: false,
+            datasources: false,
         }
     }
 
@@ -539,6 +540,9 @@ fn control_connection() -> ControlConnectionSummary {
         state: ConnectionState::Callable,
         initiation: vec![ConnectionInitiator::B10x],
         route: ConnectionRoute::Direct,
+        scope: None,
+        actor: None,
+        auth_profile: None,
     }
 }
 

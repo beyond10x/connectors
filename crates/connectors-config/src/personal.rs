@@ -141,7 +141,20 @@ pub struct SipConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SlackIntegrationConfig {
+    /// Legacy/local grant and compatibility fallback for companion-bot authority.
     pub grant_ref: String,
+    #[serde(default)]
+    pub org_read_grant_ref: Option<String>,
+    #[serde(default)]
+    pub user_grant_ref: Option<String>,
+    #[serde(default)]
+    pub companion_grant_ref: Option<String>,
+    #[serde(default)]
+    pub expected_team_id: Option<String>,
+    #[serde(default)]
+    pub oauth_client_id: Option<String>,
+    #[serde(default)]
+    pub oauth_redirect_uri: Option<String>,
     pub initiation: InitiationConfig,
     pub allowed_events: Vec<String>,
     #[serde(default = "default_connect_session_ttl_seconds")]
@@ -539,11 +552,56 @@ fn private_origin(value: &str) -> bool {
 }
 
 impl SlackIntegrationConfig {
+    #[must_use]
+    pub fn grant_for_profile(&self, profile: &str) -> &str {
+        match profile {
+            "slack.org_bot" => self
+                .org_read_grant_ref
+                .as_deref()
+                .unwrap_or(&self.grant_ref),
+            "slack.org_user" => self.user_grant_ref.as_deref().unwrap_or(&self.grant_ref),
+            "slack.companion_bot" => self
+                .companion_grant_ref
+                .as_deref()
+                .unwrap_or(&self.grant_ref),
+            _ => &self.grant_ref,
+        }
+    }
+
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
         let mut events = self.allowed_events.clone();
         events.sort();
         events.dedup();
+        let valid_optional_ref =
+            |value: &Option<String>| value.as_deref().is_none_or(|value| config_ref(value, 512));
+        let valid_team = self.expected_team_id.as_deref().is_none_or(|team| {
+            (2..=64).contains(&team.len()) && team.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        });
+        let valid_client = self.oauth_client_id.as_deref().is_none_or(|client| {
+            !client.is_empty()
+                && client.len() <= 256
+                && client
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.')
+        });
+        let valid_redirect = self.oauth_redirect_uri.as_deref().is_none_or(|redirect| {
+            url::Url::parse(redirect).is_ok_and(|url| {
+                url.scheme() == "https"
+                    && url.host_str().is_some()
+                    && url.username().is_empty()
+                    && url.password().is_none()
+                    && url.query().is_none()
+                    && url.fragment().is_none()
+            })
+        });
         if !config_ref(&self.grant_ref, 512)
+            || !valid_optional_ref(&self.org_read_grant_ref)
+            || !valid_optional_ref(&self.user_grant_ref)
+            || !valid_optional_ref(&self.companion_grant_ref)
+            || !valid_team
+            || !valid_client
+            || !valid_redirect
+            || self.oauth_client_id.is_some() != self.oauth_redirect_uri.is_some()
             || matches!(self.initiation, InitiationConfig::B10x)
             || events != self.allowed_events
             || events.is_empty()

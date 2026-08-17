@@ -7,6 +7,9 @@ use async_trait::async_trait;
 use protocol::connection::{
     ConnectionError, ConnectionErrorCode, ConnectionRequest, ConnectionResult,
 };
+use protocol::datasource::{
+    DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult, DatasourceSummary,
+};
 use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
 use protocol::operation::{
     OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
@@ -48,6 +51,13 @@ impl BackendRegistry {
         self.backends
             .iter()
             .filter(|backend| backend.owns_event(request))
+            .collect()
+    }
+
+    fn datasource_claims(&self, request: &DatasourceRequest) -> Vec<&Arc<dyn ConnectorBackend>> {
+        self.backends
+            .iter()
+            .filter(|backend| backend.owns_datasource(request))
             .collect()
     }
 
@@ -278,6 +288,62 @@ impl ConnectorBackend for BackendRegistry {
             .await
     }
 
+    async fn handle_datasource(
+        &self,
+        context: &PrincipalContext,
+        request: DatasourceRequest,
+    ) -> Result<DatasourceResult, DatasourceError> {
+        if let DatasourceRequest::Search(search) = request {
+            let mut definitions = BTreeMap::<String, DatasourceSummary>::new();
+            for backend in &self.backends {
+                if !backend.capabilities().datasources {
+                    continue;
+                }
+                let result = backend
+                    .handle_datasource(context, DatasourceRequest::Search(search.clone()))
+                    .await?;
+                let DatasourceResult::Search { definitions: found } = result else {
+                    return Err(datasource_protocol(
+                        "datasource search backend returned a wrong result",
+                    ));
+                };
+                for definition in found {
+                    if definitions
+                        .insert(definition.datasource_ref.clone(), definition)
+                        .is_some()
+                    {
+                        return Err(datasource_protocol(
+                            "multiple Integrations published one datasource reference",
+                        ));
+                    }
+                }
+            }
+            return Ok(DatasourceResult::Search {
+                definitions: definitions
+                    .into_values()
+                    .take(usize::from(search.limit))
+                    .collect(),
+            });
+        }
+        let claims = self.datasource_claims(&request);
+        let backend = match claims.as_slice() {
+            [backend] => backend,
+            [] => {
+                return Err(DatasourceError::new(
+                    DatasourceErrorCode::NotFound,
+                    "no Integration owns this datasource",
+                    false,
+                ))
+            }
+            _ => {
+                return Err(datasource_protocol(
+                    "multiple Integrations claimed one datasource request",
+                ))
+            }
+        };
+        backend.handle_datasource(context, request).await
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: self
@@ -292,6 +358,10 @@ impl ConnectorBackend for BackendRegistry {
                 .backends
                 .iter()
                 .any(|backend| backend.capabilities().events),
+            datasources: self
+                .backends
+                .iter()
+                .any(|backend| backend.capabilities().datasources),
         }
     }
 
@@ -306,6 +376,11 @@ impl ConnectorBackend for BackendRegistry {
 
     fn owns_event(&self, request: &EventRequest) -> bool {
         matches!(request, EventRequest::Search(_)) || !self.event_claims(request).is_empty()
+    }
+
+    fn owns_datasource(&self, request: &DatasourceRequest) -> bool {
+        matches!(request, DatasourceRequest::Search(_))
+            || !self.datasource_claims(request).is_empty()
     }
 
     fn owns_hosted_completion(&self, session_ref: &str) -> bool {
@@ -473,6 +548,10 @@ fn operation_protocol(message: &'static str) -> OperationError {
     OperationError::new(OperationErrorCode::Protocol, message, false)
 }
 
+fn datasource_protocol(message: &'static str) -> DatasourceError {
+    DatasourceError::new(DatasourceErrorCode::Protocol, message, false)
+}
+
 fn connection_protocol(message: &'static str) -> ConnectionError {
     ConnectionError::new(ConnectionErrorCode::Protocol, message, false)
 }
@@ -602,6 +681,7 @@ mod tests {
                     operations: false,
                     connections: true,
                     events: false,
+                    datasources: false,
                 },
                 operations: Vec::new(),
                 description: None,
@@ -622,6 +702,7 @@ mod tests {
                     operations: false,
                     connections: false,
                     events: true,
+                    datasources: false,
                 },
                 operations: Vec::new(),
                 description: None,
@@ -642,6 +723,7 @@ mod tests {
                     operations: true,
                     connections: true,
                     events: true,
+                    datasources: false,
                 },
                 operations: Vec::new(),
                 description: None,
@@ -788,6 +870,7 @@ mod tests {
             "tenant-test".to_owned(),
             "principal-test".to_owned(),
             "actor-test".to_owned(),
+            None,
             "snapshot-test".to_owned(),
             "a".repeat(64),
         )
@@ -839,6 +922,9 @@ mod tests {
             state: ConnectionState::Callable,
             initiation: vec![ConnectionInitiator::B10x],
             route: ConnectionRoute::Direct,
+            scope: None,
+            actor: None,
+            auth_profile: None,
         }
     }
 
@@ -884,6 +970,7 @@ mod tests {
             operations: false,
             connections: true,
             events: false,
+            datasources: false,
         });
         let result = registry(vec![
             Arc::clone(&first),

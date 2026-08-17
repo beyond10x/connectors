@@ -165,6 +165,7 @@ impl LocalClient {
                     connection::ConnectSessionCreateRequest {
                         integration_ref,
                         label,
+                        auth_profile: None,
                     },
                 ),
             )

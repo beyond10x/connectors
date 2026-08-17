@@ -96,6 +96,9 @@ pub struct MaterializeRequest {
 pub struct ConnectSessionCreateRequest {
     pub integration_ref: String,
     pub label: String,
+    /// Provider-declared acquisition profile. It selects credential purpose, never a credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_profile: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,6 +115,22 @@ pub enum ConnectionState {
     Callable,
     Degraded,
     Revoked,
+}
+
+/// Durable authority owner for a Connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionScope {
+    Tenant,
+    Principal,
+}
+
+/// External actor whose identity the provider observes for calls through a Connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionActor {
+    App,
+    User,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -169,6 +188,13 @@ pub struct ConnectionSummary {
     pub state: ConnectionState,
     pub initiation: Vec<ConnectionInitiator>,
     pub route: ConnectionRoute,
+    /// Ownership and actor metadata are value-free and must not be inferred from token prefixes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<ConnectionScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<ConnectionActor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_profile: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -378,6 +404,17 @@ impl RequestEnvelope {
                 if request.label.trim().is_empty() || request.label.len() > 256 {
                     return Err(invalid_input("connection label is invalid"));
                 }
+                if request.auth_profile.as_deref().is_some_and(|profile| {
+                    profile.is_empty()
+                        || profile.len() > 128
+                        || !profile.bytes().all(|byte| {
+                            byte.is_ascii_lowercase()
+                                || byte.is_ascii_digit()
+                                || matches!(byte, b'.' | b'-' | b'_')
+                        })
+                }) {
+                    return Err(invalid_input("connection auth profile is invalid"));
+                }
             }
             ConnectionRequest::ConnectSessionStatus(request) => {
                 require_ref(&request.connect_session_ref)?;
@@ -585,6 +622,16 @@ fn validate_summary(summary: &ConnectionSummary) -> Result<(), ConnectionError> 
         || summary.label.len() > 256
         || summary.initiation.is_empty()
         || summary.initiation.len() > 2
+        || summary.auth_profile.as_deref().is_some_and(|profile| {
+            profile.is_empty()
+                || profile.len() > 128
+                || !profile.bytes().all(|byte| {
+                    byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit()
+                        || matches!(byte, b'.' | b'-' | b'_')
+                })
+        })
+        || summary.scope.is_some() != summary.actor.is_some()
     {
         return Err(protocol_refusal());
     }
@@ -772,6 +819,9 @@ mod tests {
             state: ConnectionState::Callable,
             initiation: vec![ConnectionInitiator::B10x],
             route,
+            scope: None,
+            actor: None,
+            auth_profile: None,
         }
     }
 

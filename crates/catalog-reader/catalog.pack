@@ -1,5 +1,5 @@
 connectors-catalog-pack 1
-digest sha256 223855ae04e8910f60319a7e2cbb0bdd18435050f60b20a41aa8a616de3b4763
+digest sha256 c2a4aa5feeb31670bebc387984b91c76f617648e14e241b3dee831a59742520a
 schema 2
 providers 60
 operations 901
@@ -52,17 +52,17 @@ p salesforce 13956445 19139
 p sendgrid 13975584 15743
 p sentry 13991327 27677
 p shopify 14019004 27381
-p slack 14046385 233816
-p statuspage 14280201 29637
-p stripe 14309838 70748
-p supabase 14380586 13445
-p trello 14394031 26240
-p twilio 14420271 71632
-p typeform 14491903 28975
-p vercel 14520878 17444
-p webflow 14538322 21941
-p zendesk 14560263 1146605
-p zoom 15706868 9415
+p slack 14046385 234033
+p statuspage 14280418 29637
+p stripe 14310055 70748
+p supabase 14380803 13445
+p trello 14394248 26240
+p twilio 14420488 71632
+p typeform 14492120 28975
+p vercel 14521095 17444
+p webflow 14538539 21941
+p zendesk 14560480 1146605
+p zoom 15707085 9415
 o airtable-record-create airtable default 5060 4705
 o airtable-record-delete airtable default 14746 3734
 o airtable-record-get airtable default 731 4323
@@ -859,67 +859,67 @@ o shopify-order-get shopify default 14020892 6452
 o shopify-product-get shopify default 14027350 4772
 o shopify-product-update shopify default 14032128 5269
 o sip-dial b10x default 4957931 2823
-o slack-admin-app-requests-list slack admin 14202052 4516
-o slack-admin-conversations-search slack admin 14206574 64081
-o slack-admin-teams-list slack admin 14270661 4007
-o slack-admin-users-list slack admin 14274674 4451
-o slack-chat-post-message slack default 14057691 45357
-o slack-conversations-history slack default 14103054 49463
-o slack-reactions-add slack default 14196117 5929
-o slack-users-info slack default 14152523 43588
+o slack-admin-app-requests-list slack admin 14202269 4516
+o slack-admin-conversations-search slack admin 14206791 64081
+o slack-admin-teams-list slack admin 14270878 4007
+o slack-admin-users-list slack admin 14274891 4451
+o slack-chat-post-message slack default 14057908 45357
+o slack-conversations-history slack default 14103271 49463
+o slack-reactions-add slack default 14196334 5929
+o slack-users-info slack default 14152740 43588
 o speech-speak b10x default 4960760 2907
 o speech-status b10x default 4963673 2246
-o statuspage-component-list statuspage default 14305118 4304
-o statuspage-incident-create statuspage default 14291764 6655
-o statuspage-incident-get statuspage default 14287469 4289
-o statuspage-incident-list statuspage default 14282305 5158
-o statuspage-incident-update statuspage default 14298425 6687
-o stripe-balance-get stripe default 14317175 2591
-o stripe-billing-meter-list stripe default 14371103 9122
-o stripe-charge-get stripe default 14322852 3784
-o stripe-charge-refund-create stripe default 14342018 4638
-o stripe-country-spec-list stripe default 14346662 9165
-o stripe-customer-get stripe default 14319772 3074
-o stripe-event-list stripe default 14355833 9473
-o stripe-exchange-rate-list stripe default 14365312 5785
-o stripe-payment-intent-cancel stripe default 14338068 3944
-o stripe-payment-intent-capture stripe default 14333477 4585
-o stripe-payment-intent-get stripe default 14326642 3802
-o stripe-refund-get stripe default 14330450 3021
-o supabase-auth-settings supabase default 14390663 2955
-o supabase-rows-list supabase default 14387278 3379
-o supabase-schema-describe supabase default 14383338 3934
-o trello-board-get trello default 14400420 3619
-o trello-board-list trello default 14396592 3822
-o trello-board-lists trello default 14404045 1604
-o trello-card-archive trello default 14415523 4364
-o trello-card-create trello default 14410344 5173
-o trello-list-cards trello default 14405655 4683
-o twilio-account-get twilio default 14428700 2969
-o twilio-call-get twilio default 14451827 4476
-o twilio-call-list twilio default 14443907 7914
-o twilio-conference-list twilio default 14483825 7737
-o twilio-message-get twilio default 14439071 4830
-o twilio-message-list twilio default 14431675 7390
-o twilio-recording-get twilio default 14467078 8396
-o twilio-recording-list twilio default 14456309 10763
-o twilio-usage-record-list twilio default 14475480 8339
-o typeform-form-get typeform default 14501263 5108
-o typeform-form-list typeform default 14495558 5699
-o typeform-response-delete typeform default 14517598 3050
-o typeform-response-list typeform default 14506377 11215
-o typeform-user-me typeform default 14493279 2273
-o vercel-deployment-cancel vercel default 14535393 2663
-o vercel-deployment-get vercel default 14532432 2955
-o vercel-deployments-list vercel default 14527132 5294
-o vercel-project-get vercel default 14524163 2963
-o vercel-projects-list vercel default 14522685 1472
-o webflow-collection-get webflow default 14545712 4235
-o webflow-collection-item-get webflow default 14554038 3491
-o webflow-collection-item-list webflow default 14549953 4079
-o webflow-collection-list webflow default 14542631 3075
-o webflow-site-list webflow default 14539888 2737
-o webflow-site-publish webflow default 14557535 2360
+o statuspage-component-list statuspage default 14305335 4304
+o statuspage-incident-create statuspage default 14291981 6655
+o statuspage-incident-get statuspage default 14287686 4289
+o statuspage-incident-list statuspage default 14282522 5158
+o statuspage-incident-update statuspage default 14298642 6687
+o stripe-balance-get stripe default 14317392 2591
+o stripe-billing-meter-list stripe default 14371320 9122
+o stripe-charge-get stripe default 14323069 3784
+o stripe-charge-refund-create stripe default 14342235 4638
+o stripe-country-spec-list stripe default 14346879 9165
+o stripe-customer-get stripe default 14319989 3074
+o stripe-event-list stripe default 14356050 9473
+o stripe-exchange-rate-list stripe default 14365529 5785
+o stripe-payment-intent-cancel stripe default 14338285 3944
+o stripe-payment-intent-capture stripe default 14333694 4585
+o stripe-payment-intent-get stripe default 14326859 3802
+o stripe-refund-get stripe default 14330667 3021
+o supabase-auth-settings supabase default 14390880 2955
+o supabase-rows-list supabase default 14387495 3379
+o supabase-schema-describe supabase default 14383555 3934
+o trello-board-get trello default 14400637 3619
+o trello-board-list trello default 14396809 3822
+o trello-board-lists trello default 14404262 1604
+o trello-card-archive trello default 14415740 4364
+o trello-card-create trello default 14410561 5173
+o trello-list-cards trello default 14405872 4683
+o twilio-account-get twilio default 14428917 2969
+o twilio-call-get twilio default 14452044 4476
+o twilio-call-list twilio default 14444124 7914
+o twilio-conference-list twilio default 14484042 7737
+o twilio-message-get twilio default 14439288 4830
+o twilio-message-list twilio default 14431892 7390
+o twilio-recording-get twilio default 14467295 8396
+o twilio-recording-list twilio default 14456526 10763
+o twilio-usage-record-list twilio default 14475697 8339
+o typeform-form-get typeform default 14501480 5108
+o typeform-form-list typeform default 14495775 5699
+o typeform-response-delete typeform default 14517815 3050
+o typeform-response-list typeform default 14506594 11215
+o typeform-user-me typeform default 14493496 2273
+o vercel-deployment-cancel vercel default 14535610 2663
+o vercel-deployment-get vercel default 14532649 2955
+o vercel-deployments-list vercel default 14527349 5294
+o vercel-project-get vercel default 14524380 2963
+o vercel-projects-list vercel default 14522902 1472
+o webflow-collection-get webflow default 14545929 4235
+o webflow-collection-item-get webflow default 14554255 3491
+o webflow-collection-item-list webflow default 14550170 4079
+o webflow-collection-list webflow default 14542848 3075
+o webflow-site-list webflow default 14540105 2737
+o webflow-site-publish webflow default 14557752 2360
 o work-request-create b10x tasks 5118534 6370
 o work-request-get b10x tasks 5124910 4188
 o work-request-list b10x tasks 5129104 8201
@@ -927,44 +927,44 @@ o work-task-create b10x tasks 5137311 7586
 o work-task-get b10x tasks 5144903 4524
 o work-task-list b10x tasks 5149433 8970
 o work-task-status-update b10x tasks 5158409 6492
-o zendesk-custom-object-list zendesk default 14687021 5894
-o zendesk-custom-status-list zendesk default 14892106 5413
-o zendesk-group-list zendesk default 14863945 3756
-o zendesk-help-center-article-create zendesk help-center 15193925 9386
-o zendesk-help-center-article-get zendesk help-center 15172518 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 15185374 8545
-o zendesk-help-center-article-list zendesk help-center 15163991 8521
-o zendesk-help-center-category-list zendesk help-center 15155250 4211
-o zendesk-help-center-section-list zendesk help-center 15159467 4518
-o zendesk-help-center-translation-list zendesk help-center 15180366 5002
-o zendesk-incremental-organization-list zendesk default 14672799 8641
-o zendesk-incremental-ticket-event-list zendesk default 14681446 5569
-o zendesk-incremental-ticket-list zendesk default 14572094 74662
-o zendesk-incremental-user-list zendesk default 14646762 26031
-o zendesk-messaging-conversation-create zendesk messaging 15203317 10167
-o zendesk-messaging-conversation-get zendesk messaging 15213490 10469
-o zendesk-messaging-conversation-update zendesk messaging 15223965 11165
-o zendesk-messaging-message-create zendesk messaging 15242190 276191
-o zendesk-messaging-message-list zendesk messaging 15518387 158036
-o zendesk-messaging-participant-list zendesk messaging 15235136 7048
-o zendesk-messaging-user-create zendesk messaging 15676429 10089
-o zendesk-messaging-user-get zendesk messaging 15686524 9350
-o zendesk-messaging-user-update zendesk messaging 15695880 9961
-o zendesk-organization-show zendesk default 14857940 5999
-o zendesk-test zendesk default 14897525 23020
-o zendesk-ticket-audit-list zendesk default 14566278 5810
-o zendesk-ticket-comment-list zendesk default 14994289 19828
-o zendesk-ticket-field-list zendesk default 14867707 15042
-o zendesk-ticket-form-list zendesk default 14882755 9345
-o zendesk-ticket-recent-list zendesk default 14692921 71467
-o zendesk-ticket-search zendesk default 14920551 5013
-o zendesk-ticket-show zendesk default 14925570 68713
-o zendesk-ticket-update zendesk default 15014123 141121
-o zendesk-user-show zendesk default 14836438 21496
-o zendesk-view-ticket-list zendesk default 14764394 72038
-o zoom-meeting-delete zoom default 15707756 2358
-o zoom-user-get zoom default 15710120 5881
-payload 15716283
+o zendesk-custom-object-list zendesk default 14687238 5894
+o zendesk-custom-status-list zendesk default 14892323 5413
+o zendesk-group-list zendesk default 14864162 3756
+o zendesk-help-center-article-create zendesk help-center 15194142 9386
+o zendesk-help-center-article-get zendesk help-center 15172735 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 15185591 8545
+o zendesk-help-center-article-list zendesk help-center 15164208 8521
+o zendesk-help-center-category-list zendesk help-center 15155467 4211
+o zendesk-help-center-section-list zendesk help-center 15159684 4518
+o zendesk-help-center-translation-list zendesk help-center 15180583 5002
+o zendesk-incremental-organization-list zendesk default 14673016 8641
+o zendesk-incremental-ticket-event-list zendesk default 14681663 5569
+o zendesk-incremental-ticket-list zendesk default 14572311 74662
+o zendesk-incremental-user-list zendesk default 14646979 26031
+o zendesk-messaging-conversation-create zendesk messaging 15203534 10167
+o zendesk-messaging-conversation-get zendesk messaging 15213707 10469
+o zendesk-messaging-conversation-update zendesk messaging 15224182 11165
+o zendesk-messaging-message-create zendesk messaging 15242407 276191
+o zendesk-messaging-message-list zendesk messaging 15518604 158036
+o zendesk-messaging-participant-list zendesk messaging 15235353 7048
+o zendesk-messaging-user-create zendesk messaging 15676646 10089
+o zendesk-messaging-user-get zendesk messaging 15686741 9350
+o zendesk-messaging-user-update zendesk messaging 15696097 9961
+o zendesk-organization-show zendesk default 14858157 5999
+o zendesk-test zendesk default 14897742 23020
+o zendesk-ticket-audit-list zendesk default 14566495 5810
+o zendesk-ticket-comment-list zendesk default 14994506 19828
+o zendesk-ticket-field-list zendesk default 14867924 15042
+o zendesk-ticket-form-list zendesk default 14882972 9345
+o zendesk-ticket-recent-list zendesk default 14693138 71467
+o zendesk-ticket-search zendesk default 14920768 5013
+o zendesk-ticket-show zendesk default 14925787 68713
+o zendesk-ticket-update zendesk default 15014340 141121
+o zendesk-user-show zendesk default 14836655 21496
+o zendesk-view-ticket-list zendesk default 14764611 72038
+o zoom-meeting-delete zoom default 15707973 2358
+o zoom-user-get zoom default 15710337 5881
+payload 15716500
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -359768,7 +359768,7 @@ payload 15716283
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
-      "description": "Workspace bot token obtained when a person installs the Zwirn Slack app. Calls are attributed to the app's bot, not to the installer",
+      "description": "Workspace bot token for either the deployment-owned organization app or one principal-owned companion app. Calls are attributed to that exact bot",
       "name": "slack.bot_token",
       "oauth2": {
         "authorize_path": "/oauth/v2/authorize",
@@ -359805,10 +359805,18 @@ payload 15716283
         "scope_response_pointer": "/authed_user/scope",
         "scope_separator": "comma",
         "scopes": [
+          "channels:read",
           "channels:history",
+          "groups:read",
+          "groups:history",
+          "im:read",
+          "im:history",
+          "mpim:read",
+          "mpim:history",
+          "users:read",
+          "users:read.email",
           "chat:write",
-          "reactions:write",
-          "users:read"
+          "reactions:write"
         ],
         "token_path": "/api/oauth.v2.user.access"
       },

@@ -42,7 +42,12 @@ pub struct HostedServerConfig {
 #[serde(deny_unknown_fields)]
 pub struct HostedSlackConfig {
     pub public_origin: String,
-    pub grant_ref: String,
+    pub team_id: String,
+    pub oauth_client_id: String,
+    pub oauth_redirect_uri: String,
+    pub org_read_grant_ref: String,
+    pub user_grant_ref: String,
+    pub companion_grant_ref: String,
     pub initiation: InitiationConfig,
     pub allowed_events: Vec<String>,
     #[serde(default = "default_connect_session_ttl_seconds")]
@@ -53,7 +58,13 @@ impl HostedSlackConfig {
     #[must_use]
     pub fn policy(&self) -> SlackIntegrationConfig {
         SlackIntegrationConfig {
-            grant_ref: self.grant_ref.clone(),
+            grant_ref: self.companion_grant_ref.clone(),
+            org_read_grant_ref: Some(self.org_read_grant_ref.clone()),
+            user_grant_ref: Some(self.user_grant_ref.clone()),
+            companion_grant_ref: Some(self.companion_grant_ref.clone()),
+            expected_team_id: Some(self.team_id.clone()),
+            oauth_client_id: Some(self.oauth_client_id.clone()),
+            oauth_redirect_uri: Some(self.oauth_redirect_uri.clone()),
             initiation: self.initiation,
             allowed_events: self.allowed_events.clone(),
             connect_session_ttl_seconds: self.connect_session_ttl_seconds,
@@ -94,12 +105,27 @@ pub struct HostedStorageConfig {
 #[serde(deny_unknown_fields)]
 pub struct HostedKubernetesConfig {
     pub enabled: bool,
+    /// Deprecated operator-only compatibility surface. Use `namespace_access` for group grants.
     #[serde(default)]
     pub namespaces: Vec<String>,
+    /// Exact namespace and Identity-group grants. Wildcards are deliberately unsupported.
+    #[serde(default)]
+    pub namespace_access: Vec<KubernetesNamespaceAccessConfig>,
     #[serde(default = "default_kubernetes_token_file")]
     pub token_file: PathBuf,
     #[serde(default = "default_kubernetes_ca_file")]
     pub ca_file: PathBuf,
+}
+
+/// Receiver-owned Kubernetes grant for one exact namespace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KubernetesNamespaceAccessConfig {
+    pub namespace: String,
+    #[serde(default)]
+    pub read_groups: Vec<String>,
+    #[serde(default)]
+    pub restart_groups: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,12 +255,17 @@ impl HostedServerConfig {
             || self.identity.origin.len() > 2_048
             || !valid_base_path(&self.server.base_path)
             || !self.storage.state_root.is_absolute()
-            || (self.kubernetes.enabled != !self.kubernetes.namespaces.is_empty())
+            || (self.kubernetes.enabled
+                != (!self.kubernetes.namespaces.is_empty()
+                    || !self.kubernetes.namespace_access.is_empty()))
+            || (!self.kubernetes.namespaces.is_empty()
+                && !self.kubernetes.namespace_access.is_empty())
             || self
                 .kubernetes
                 .namespaces
                 .iter()
                 .any(|namespace| !valid_dns_label(namespace, 63))
+            || !valid_namespace_access(&self.kubernetes.namespace_access)
             || (self.sip.enabled != sip_complete)
             || !sip_credentials_valid
             || (self.vault.enabled && !vault_complete)
@@ -267,6 +298,44 @@ impl HostedServerConfig {
             self.module_tenant_ids.clone()
         }
     }
+
+    /// Resolve the compatibility namespace list into the same exact policy shape.
+    #[must_use]
+    pub fn kubernetes_namespace_access(&self) -> Vec<KubernetesNamespaceAccessConfig> {
+        if self.kubernetes.namespace_access.is_empty() {
+            self.kubernetes
+                .namespaces
+                .iter()
+                .map(|namespace| KubernetesNamespaceAccessConfig {
+                    namespace: namespace.clone(),
+                    read_groups: Vec::new(),
+                    restart_groups: Vec::new(),
+                })
+                .collect()
+        } else {
+            self.kubernetes.namespace_access.clone()
+        }
+    }
+}
+
+fn valid_namespace_access(access: &[KubernetesNamespaceAccessConfig]) -> bool {
+    let namespaces = access
+        .iter()
+        .map(|entry| entry.namespace.as_str())
+        .collect::<Vec<_>>();
+    let mut canonical = namespaces.clone();
+    canonical.sort_unstable();
+    canonical.dedup();
+    namespaces == canonical
+        && access.iter().all(|entry| {
+            valid_dns_label(&entry.namespace, 63)
+                && valid_groups(&entry.read_groups)
+                && valid_groups(&entry.restart_groups)
+                && entry
+                    .restart_groups
+                    .iter()
+                    .all(|group| entry.read_groups.contains(group))
+        })
 }
 
 fn valid_groups(groups: &[String]) -> bool {
@@ -376,7 +445,12 @@ enabled = false
 listen = "0.0.0.0:5060"
 [slack]
 public_origin = "https://code.dev.babelforce.com/api/connectors/v1"
-grant_ref = "grant:slack:workspace-companion"
+team_id = "T01234567"
+oauth_client_id = "123456789.987654321"
+oauth_redirect_uri = "https://code.dev.babelforce.com/api/connectors/v1/oauth/slack/callback"
+org_read_grant_ref = "grant:slack:org-read"
+user_grant_ref = "grant:slack:org-user"
+companion_grant_ref = "grant:slack:workspace-companion"
 initiation = "provider"
 allowed_events = ["app_mention"]
 connect_session_ttl_seconds = 300
@@ -445,6 +519,39 @@ listen = "0.0.0.0:5060"
 "#,
         )
         .unwrap();
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn kubernetes_namespace_groups_are_exact_sorted_and_restart_is_a_read_subset() {
+        let config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = true
+[[kubernetes.namespace_access]]
+namespace = "latest"
+read_groups = ["dev", "sre"]
+restart_groups = ["sre"]
+[sip]
+enabled = false
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+        assert_eq!(config.kubernetes_namespace_access()[0].namespace, "latest");
+
+        let mut invalid = config.clone();
+        invalid.kubernetes.namespace_access[0].restart_groups = vec!["operator".to_owned()];
+        assert!(invalid.validate().is_err());
+        invalid.kubernetes.namespace_access[0].restart_groups = vec!["sre".to_owned()];
+        invalid.kubernetes.namespaces = vec!["legacy".to_owned()];
         assert!(invalid.validate().is_err());
     }
 

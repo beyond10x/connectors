@@ -9,7 +9,7 @@ mod personal;
 pub use hosted::{
     HostedAuthorityConfig, HostedIdentityConfig, HostedKubernetesConfig, HostedListenerConfig,
     HostedServerConfig, HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig,
-    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig,
+    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig, KubernetesNamespaceAccessConfig,
 };
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,

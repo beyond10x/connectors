@@ -28,7 +28,7 @@
         "protocol": "b10x.connector-connection.v0alpha1",
         "request_id": "request-connect-1",
         "context": {"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-        "request": {"method":"connect_session_create","params":{"integration_ref":"slack","label":"Development Slack"}}
+        "request": {"method":"connect_session_create","params":{"integration_ref":"slack","label":"Development Slack companion","auth_profile":"slack.companion_bot"}}
       }
     },
     {

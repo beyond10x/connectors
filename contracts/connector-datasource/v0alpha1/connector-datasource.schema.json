@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/contracts/connector-datasource/v0alpha1/connector-datasource.schema.json",
+  "title": "B10x ConnectorDatasource v0alpha1 frame",
+  "oneOf": [{"$ref":"#/$defs/request_envelope"},{"$ref":"#/$defs/response_envelope"}],
+  "$defs": {
+    "ref":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[^\\s\\u0000-\\u001f\\u007f]+$"},
+    "owner":{"type":"object","additionalProperties":false,"required":["tenant_id","agent_id","agent_revision","authority_snapshot_id","authority_snapshot_sha256"],"properties":{"tenant_id":{"$ref":"#/$defs/ref"},"agent_id":{"$ref":"#/$defs/ref"},"agent_revision":{"type":"integer","minimum":1},"authority_snapshot_id":{"$ref":"#/$defs/ref"},"authority_snapshot_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},
+    "request_envelope":{"type":"object","additionalProperties":false,"required":["protocol","request_id","context","request"],"properties":{"protocol":{"const":"b10x.connector-datasource.v0alpha1"},"request_id":{"type":"string","minLength":1,"maxLength":128},"context":{"$ref":"#/$defs/owner"},"request":{"$ref":"#/$defs/request"}}},
+    "request":{"oneOf":[
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"search"},"params":{"type":"object","additionalProperties":false,"required":["query","limit"],"properties":{"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":25}}}}},
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"describe"},"params":{"type":"object","additionalProperties":false,"required":["datasource_ref"],"properties":{"datasource_ref":{"$ref":"#/$defs/ref"}}}}},
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"bindings"},"params":{"type":"object","additionalProperties":false,"required":["datasource_ref","query","limit"],"properties":{"datasource_ref":{"$ref":"#/$defs/ref"},"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":25}}}}},
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"read"},"params":{"type":"object","additionalProperties":false,"required":["datasource_ref","binding_ref","description_ref","read"],"properties":{"datasource_ref":{"$ref":"#/$defs/ref"},"binding_ref":{"$ref":"#/$defs/ref"},"description_ref":{"$ref":"#/$defs/ref"},"read":{"oneOf":[{"type":"object","additionalProperties":false,"required":["verb","limit"],"properties":{"verb":{"const":"list"},"limit":{"type":"integer","minimum":1,"maximum":25},"cursor":{"$ref":"#/$defs/ref"}}},{"type":"object","additionalProperties":false,"required":["verb","key"],"properties":{"verb":{"const":"get"},"key":true}}]}}}}}
+    ]},
+    "response_envelope":{"type":"object","additionalProperties":false,"required":["protocol","request_id","status"],"properties":{"protocol":{"const":"b10x.connector-datasource.v0alpha1"},"request_id":{"type":"string","minLength":1,"maxLength":128},"status":{"enum":["ok","error"]},"response":{"type":"object"},"error":{"$ref":"#/$defs/error"}},"oneOf":[{"required":["response"],"not":{"required":["error"]}},{"required":["error"],"not":{"required":["response"]}}]},
+    "error":{"type":"object","additionalProperties":false,"required":["code","message","retriable"],"properties":{"code":{"enum":["unavailable","not_found","not_granted","invalid_input","stale_authority","cursor_expired","result_too_large","protocol"]},"message":{"type":"string","minLength":1,"maxLength":4096},"retriable":{"type":"boolean"}}}
+  }
+}

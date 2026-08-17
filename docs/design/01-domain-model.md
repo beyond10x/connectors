@@ -306,9 +306,11 @@ Connectors audience-scope vocabulary is:
 - `connectors.catalog.read`
 - `connectors.invoke`
 - `connectors.events.read`
+- `connectors.events.self`
 - `connectors.audit.read`
 - `connectors.integrations.manage`
 - `connectors.connections.manage`
+- `connectors.connections.self`
 - `connectors.grants.manage`
 - `connectors.channels.manage`
 - `connectors.deliveries.manage`
