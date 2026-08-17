@@ -28,6 +28,8 @@ pub struct HostedServerConfig {
     pub storage: HostedStorageConfig,
     pub kubernetes: HostedKubernetesConfig,
     #[serde(default)]
+    pub grafana: HostedGrafanaConfig,
+    #[serde(default)]
     pub vault: HostedVaultConfig,
     pub sip: HostedSipConfig,
     #[serde(default)]
@@ -128,6 +130,54 @@ pub struct KubernetesNamespaceAccessConfig {
     pub restart_groups: Vec<String>,
 }
 
+/// Deployment-managed, read-only Grafana federation policy. Datasource UIDs remain sealed behind
+/// their digests; the Integration resolves the current UID only after reading the exact origin.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedGrafanaConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub origin: Option<String>,
+    #[serde(default)]
+    pub connection_ref: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub grant_ref: Option<String>,
+    #[serde(default)]
+    pub read_groups: Vec<String>,
+    #[serde(default)]
+    pub targets: Vec<HostedGrafanaTargetConfig>,
+    #[serde(default = "default_grafana_reconcile_interval_seconds")]
+    pub reconcile_interval_seconds: u64,
+}
+
+impl Default for HostedGrafanaConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            origin: None,
+            connection_ref: None,
+            label: None,
+            grant_ref: None,
+            read_groups: Vec::new(),
+            targets: Vec::new(),
+            reconcile_interval_seconds: default_grafana_reconcile_interval_seconds(),
+        }
+    }
+}
+
+/// One exact Grafana datasource allowed to become a mediated read-only Connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedGrafanaTargetConfig {
+    pub provider: String,
+    pub uid_sha256: String,
+    pub connection_ref: String,
+    pub label: String,
+    pub grant_ref: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostedSipConfig {
@@ -225,7 +275,8 @@ impl HostedServerConfig {
                     && origin.path() == self.server.base_path
             }) && slack.policy().validate().is_ok()
         });
-        let vault_required = self.sip.credentials.is_some() || self.slack.is_some();
+        let vault_required =
+            self.sip.credentials.is_some() || self.slack.is_some() || self.grafana.enabled;
         let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
         let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
             credentials.authority == NATIVE_SIP_AUTHORITY
@@ -266,6 +317,7 @@ impl HostedServerConfig {
                 .iter()
                 .any(|namespace| !valid_dns_label(namespace, 63))
             || !valid_namespace_access(&self.kubernetes.namespace_access)
+            || !valid_grafana(&self.grafana)
             || (self.sip.enabled != sip_complete)
             || !sip_credentials_valid
             || (self.vault.enabled && !vault_complete)
@@ -338,6 +390,78 @@ fn valid_namespace_access(access: &[KubernetesNamespaceAccessConfig]) -> bool {
         })
 }
 
+fn valid_grafana(config: &HostedGrafanaConfig) -> bool {
+    let empty = config.origin.is_none()
+        && config.connection_ref.is_none()
+        && config.label.is_none()
+        && config.grant_ref.is_none()
+        && config.read_groups.is_empty()
+        && config.targets.is_empty();
+    if !config.enabled {
+        return empty
+            && config.reconcile_interval_seconds == default_grafana_reconcile_interval_seconds();
+    }
+    let Some(origin) = config
+        .origin
+        .as_deref()
+        .and_then(|origin| url::Url::parse(origin).ok())
+    else {
+        return false;
+    };
+    let origin_valid = origin.scheme() == "https"
+        && origin.host_str().is_some()
+        && origin.username().is_empty()
+        && origin.password().is_none()
+        && origin.query().is_none()
+        && origin.fragment().is_none()
+        && matches!(origin.path(), "" | "/");
+    let target_keys = config
+        .targets
+        .iter()
+        .map(|target| {
+            (
+                target.provider.as_str(),
+                target.connection_ref.as_str(),
+                target.uid_sha256.as_str(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut canonical = target_keys.clone();
+    canonical.sort_unstable();
+    canonical.dedup();
+    origin_valid
+        && config
+            .connection_ref
+            .as_deref()
+            .is_some_and(|value| valid_ref(value, 512))
+        && config
+            .label
+            .as_deref()
+            .is_some_and(|value| valid_display(value, 256))
+        && config
+            .grant_ref
+            .as_deref()
+            .is_some_and(|value| valid_ref(value, 512))
+        && valid_groups(&config.read_groups)
+        && !config.read_groups.is_empty()
+        && !config.targets.is_empty()
+        && target_keys == canonical
+        && (60..=3600).contains(&config.reconcile_interval_seconds)
+        && config.targets.iter().all(|target| {
+            matches!(
+                target.provider.as_str(),
+                "prometheus" | "loki" | "alertmanager"
+            ) && target.uid_sha256.len() == 64
+                && target
+                    .uid_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+                && valid_ref(&target.connection_ref, 512)
+                && valid_display(&target.label, 256)
+                && valid_ref(&target.grant_ref, 512)
+        })
+}
+
 fn valid_groups(groups: &[String]) -> bool {
     let mut canonical = groups.to_vec();
     canonical.sort();
@@ -358,6 +482,10 @@ fn default_vault_mount() -> String {
 }
 
 fn default_connect_session_ttl_seconds() -> u64 {
+    300
+}
+
+fn default_grafana_reconcile_interval_seconds() -> u64 {
     300
 }
 
@@ -388,6 +516,10 @@ fn default_kubernetes_ca_file() -> PathBuf {
 
 fn valid_ref(value: &str, maximum: usize) -> bool {
     !value.is_empty() && value.len() <= maximum && value.bytes().all(|byte| byte.is_ascii_graphic())
+}
+
+fn valid_display(value: &str, maximum: usize) -> bool {
+    !value.trim().is_empty() && value.len() <= maximum && !value.chars().any(char::is_control)
 }
 
 fn valid_dns_label(value: &str, maximum: usize) -> bool {
@@ -649,6 +781,58 @@ password_credential = "sip_password"
         config.sip.credentials.as_mut().unwrap().authority = "org.asterisk.ari".to_owned();
         assert!(config.validate().is_err());
         config.sip.credentials = None;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn hosted_grafana_requires_vault_exact_groups_and_digest_bound_targets() {
+        let mut config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[grafana]
+enabled = true
+origin = "https://grafana.example.test"
+connection_ref = "connection:grafana:global"
+label = "Global infrastructure Grafana"
+grant_ref = "grant:grafana:global-read"
+read_groups = ["dev", "sre"]
+reconcile_interval_seconds = 300
+[[grafana.targets]]
+provider = "prometheus"
+uid_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+connection_ref = "connection:prometheus:dev"
+label = "Prometheus · dev"
+grant_ref = "grant:prometheus:dev-read"
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        config.grafana.read_groups.reverse();
+        assert!(config.validate().is_err());
+        config.grafana.read_groups.reverse();
+        config.grafana.targets[0].uid_sha256 = "not-a-digest".to_owned();
+        assert!(config.validate().is_err());
+        config.grafana.targets[0].uid_sha256 = "a".repeat(64);
+        config.vault.enabled = false;
         assert!(config.validate().is_err());
     }
 

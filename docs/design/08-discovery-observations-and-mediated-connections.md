@@ -255,3 +255,24 @@ counts typed `not_granted` refusals without weakening them. `integration-monitor
 recognized observation to a target Provider and requires that Provider's independently configured
 Grant. `connectors-runtime` injects an in-memory credential capability for this alpha, so the CLI
 does not own monitoring policy or credential lifetime.
+
+## 2026-08-17 amendment: deployment-managed hosted Grafana
+
+Hosted Connectors may declare one exact Grafana origin and a closed datasource allowlist. The
+configuration carries only provider type plus datasource-UID SHA-256; reconciliation resolves and
+seals the matching UID inside `integration-monitoring`. Stable deployment-owned Connection refs do
+not change across restart. Missing, renamed, or type-changed sources become degraded and never widen
+to an untyped proxy.
+
+Identity-verified `dev` and `sre` groups receive read authority, with the separately configured
+operator groups retained as an override. The hosted transport performs the broad group admission;
+the Integration repeats tenant, group, provider, Connection, and current-observation checks for
+every read. Unauthorized aggregate searches return no monitoring entries.
+
+Provider responses are not the public result contract. The Integration allowlists and bounds
+dashboard metadata, metric labels/samples, log lines, alert metadata, and datasource health. It
+removes data-source UIDs, backend origins, raw dashboard/query objects, free-form provider errors,
+secure configuration, and credentials. Loki and alert text receives deterministic pattern
+redaction, but remains operationally sensitive because arbitrary text cannot be proven secret-free.
+Hosted attempted/completed audit evidence is stored through the bounded PostgreSQL hosted-state
+port; personal-local mode retains the owner-only file journal.

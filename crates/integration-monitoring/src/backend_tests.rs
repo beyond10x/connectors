@@ -281,6 +281,7 @@ alertmanager = "grant:alertmanager"
                     protocol::connection::ConnectSessionCreateRequest {
                         integration_ref: GRAFANA.to_owned(),
                         label: "Infrastructure Grafana".to_owned(),
+                        auth_profile: None,
                     },
                 ),
             )
@@ -304,11 +305,7 @@ alertmanager = "grant:alertmanager"
         assert_eq!(response, "{\"accepted\":true}\n");
         assert!(!endpoint.exists());
         assert_eq!(
-            store
-                .get(&credential_ref)
-                .await
-                .unwrap()
-                .expose_secret(),
+            store.get(&credential_ref).await.unwrap().expose_secret(),
             "SENTINEL-NOT-A-REAL-SECRET"
         );
         let status = backend
@@ -344,8 +341,10 @@ alertmanager = "grant:alertmanager"
             grafana_credential_ref(&owner).unwrap(),
             Arc::clone(&executor),
         );
-        for (session, label) in [("connect-session:one", "One"), ("connect-session:two", "Two")]
-        {
+        for (session, label) in [
+            ("connect-session:one", "One"),
+            ("connect-session:two", "Two"),
+        ] {
             lock(&backend.inner.sessions)
                 .reserve(
                     session.to_owned(),
@@ -369,12 +368,11 @@ alertmanager = "grant:alertmanager"
                 .complete_connection("connect-session:two", &Secret::new("second"))
                 .await
         });
-        assert!(tokio::time::timeout(
-            Duration::from_millis(25),
-            executor.entered.notified()
-        )
-        .await
-        .is_err());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(25), executor.entered.notified())
+                .await
+                .is_err()
+        );
         assert_eq!(executor.calls.load(Ordering::SeqCst), 1);
         executor.release.notify_one();
 
@@ -456,16 +454,201 @@ alertmanager = "grant:alertmanager"
         let connection_error = backend
             .handle_connection(
                 &owner,
-                ConnectionRequest::CandidateSearch(
-                    protocol::connection::CandidateSearchRequest {
-                        integration_ref: "elsewhere".to_owned(),
-                        query: String::new(),
-                        limit: 1,
-                    },
-                ),
+                ConnectionRequest::CandidateSearch(protocol::connection::CandidateSearchRequest {
+                    integration_ref: "elsewhere".to_owned(),
+                    query: String::new(),
+                    limit: 1,
+                }),
             )
             .await
             .unwrap_err();
         assert_eq!(connection_error.code, ConnectionErrorCode::NotFound);
+    }
+
+    #[tokio::test]
+    async fn hosted_federation_is_digest_bound_group_scoped_and_has_no_connect_session() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let service_owner = PrincipalContext::hosted(
+            "tenant-hosted".to_owned(),
+            "service:connectors-monitoring".to_owned(),
+            "service:connectors-monitoring".to_owned(),
+            None,
+            "deployment:monitoring".to_owned(),
+            "0".repeat(64),
+        )
+        .unwrap();
+        let credential_ref = grafana_credential_ref(&service_owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        store
+            .put(&credential_ref, &Secret::new("SENTINEL-NOT-A-REAL-SECRET"))
+            .await
+            .unwrap();
+        let hosted = HostedGrafanaConfig {
+            enabled: true,
+            origin: Some("https://grafana.example".to_owned()),
+            connection_ref: Some("connection:grafana:global".to_owned()),
+            label: Some("Global infrastructure Grafana".to_owned()),
+            grant_ref: Some("grant:grafana:read".to_owned()),
+            read_groups: vec!["dev".to_owned(), "sre".to_owned()],
+            targets: vec![
+                HostedGrafanaTargetConfig {
+                    provider: "alertmanager".to_owned(),
+                    uid_sha256: "a".repeat(64),
+                    connection_ref: "connection:alertmanager:missing".to_owned(),
+                    label: "Alertmanager · missing".to_owned(),
+                    grant_ref: "grant:alertmanager:read".to_owned(),
+                },
+                HostedGrafanaTargetConfig {
+                    provider: "prometheus".to_owned(),
+                    uid_sha256: format!("{:x}", Sha256::digest(b"prom-main")),
+                    connection_ref: "connection:prometheus:main".to_owned(),
+                    label: "Prometheus · main".to_owned(),
+                    grant_ref: "grant:prometheus:read".to_owned(),
+                },
+            ],
+            reconcile_interval_seconds: 300,
+        };
+        let backend = MonitoringBackend::open_hosted_with_executor(
+            service_owner,
+            hosted,
+            vec!["operator".to_owned()],
+            root.path(),
+            store,
+            Arc::new(FakeExecutor::default()),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let dev = PrincipalContext::hosted_with_groups(
+            "tenant-hosted".to_owned(),
+            "user:developer".to_owned(),
+            "agent:zwirn".to_owned(),
+            None,
+            "authority:dev".to_owned(),
+            "1".repeat(64),
+            BTreeSet::from(["dev".to_owned()]),
+        )
+        .unwrap();
+        let outsider = PrincipalContext::hosted_with_groups(
+            "tenant-hosted".to_owned(),
+            "user:outsider".to_owned(),
+            "agent:zwirn".to_owned(),
+            None,
+            "authority:outsider".to_owned(),
+            "2".repeat(64),
+            BTreeSet::from(["viewer".to_owned()]),
+        )
+        .unwrap();
+        let searched = backend
+            .handle_connection(
+                &dev,
+                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                    query: String::new(),
+                    limit: 16,
+                }),
+            )
+            .await
+            .unwrap();
+        let ConnectionResult::Search { connections } = searched else {
+            panic!("expected hosted connections")
+        };
+        assert_eq!(connections.len(), 3);
+        assert_eq!(
+            connections
+                .iter()
+                .find(|connection| connection.connection_ref == "connection:prometheus:main")
+                .unwrap()
+                .state,
+            ConnectionState::Callable
+        );
+        assert_eq!(
+            connections
+                .iter()
+                .find(|connection| connection.connection_ref == "connection:alertmanager:missing")
+                .unwrap()
+                .state,
+            ConnectionState::Degraded
+        );
+        let hidden = backend
+            .handle_connection(
+                &outsider,
+                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                    query: String::new(),
+                    limit: 16,
+                }),
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(hidden, ConnectionResult::Search { connections } if connections.is_empty())
+        );
+        assert!(backend
+            .handle_connection(
+                &dev,
+                ConnectionRequest::ConnectSessionCreate(
+                    protocol::connection::ConnectSessionCreateRequest {
+                        integration_ref: GRAFANA.to_owned(),
+                        label: "Another Grafana".to_owned(),
+                        auth_profile: None,
+                    },
+                ),
+            )
+            .await
+            .is_err());
+        backend.shutdown().await;
+    }
+
+    #[test]
+    fn safe_projections_drop_provider_secrets_and_redact_free_text() {
+        let datasources = project_output(
+            GRAFANA_DATASOURCES_LIST,
+            &serde_json::json!([{
+                "uid":"secret-internal-uid",
+                "name":"Metrics",
+                "type":"prometheus",
+                "url":"https://internal.example",
+                "secureJsonData":{"token":"SENTINEL"}
+            }]),
+        )
+        .unwrap();
+        let encoded = datasources.to_string();
+        assert!(!encoded.contains("secret-internal-uid"));
+        assert!(!encoded.contains("internal.example"));
+        assert!(!encoded.contains("SENTINEL"));
+
+        let loki = project_output(
+            monitoring_model::LOKI_QUERY_RANGE,
+            &serde_json::json!({
+                "status":"success",
+                "data":{"resultType":"streams","result":[{
+                    "stream":{"cluster":"dev","customer_email":"private@example.test"},
+                    "values":[["1","authorization: Bearer SENTINEL"]]
+                }]}
+            }),
+        )
+        .unwrap();
+        let line = &loki["lines"][0];
+        assert_eq!(line["line"], "[redacted]");
+        assert_eq!(line["redacted"], true);
+        assert!(line["labels"].get("customer_email").is_none());
+        assert!(!loki.to_string().contains("SENTINEL"));
+
+        let alerts = project_output(
+            monitoring_model::ALERTMANAGER_ALERTS_LIST,
+            &serde_json::json!([{
+                "labels":{"alertname":"Down","customer":"private"},
+                "annotations":{"summary":"token=SENTINEL","runbook":"https://private"},
+                "status":{"state":"active"},
+                "startsAt":"2026-08-17T00:00:00Z",
+                "endsAt":"2026-08-17T01:00:00Z",
+                "generatorURL":"https://internal.example"
+            }]),
+        )
+        .unwrap();
+        assert!(!alerts.to_string().contains("SENTINEL"));
+        assert!(!alerts.to_string().contains("internal.example"));
+        assert_eq!(alerts["alerts"][0]["summary_redacted"], true);
     }
 }

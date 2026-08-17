@@ -305,6 +305,13 @@ impl HostedRuntime {
             .iter()
             .flat_map(|access| access.restart_groups.iter().cloned())
             .collect::<BTreeSet<_>>();
+        let monitoring_enabled = config.grafana.enabled;
+        let monitoring_read_groups = config
+            .grafana
+            .read_groups
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
         if config.kubernetes.enabled {
             backends.push(Arc::new(KubernetesStatusBackend::in_cluster(
                 config.tenant_id.clone(),
@@ -367,6 +374,24 @@ impl HostedRuntime {
                 hosted_state.clone(),
             )?));
         }
+        if config.grafana.enabled {
+            let store = credential_stores
+                .values
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            backends.push(Arc::new(
+                MonitoringBackend::open_hosted(
+                    config.tenant_id.clone(),
+                    config.grafana.clone(),
+                    config.authority.operator_groups.clone(),
+                    &config.storage.state_root,
+                    store,
+                    hosted_state.clone(),
+                )
+                .await?,
+            ));
+        }
         let b10x_enabled = config.b10x.is_some();
         let admitted_module_tenants = config.admitted_module_tenants();
         if let Some(b10x) = config.b10x {
@@ -402,7 +427,8 @@ impl HostedRuntime {
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let admission =
             server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone())
-                .with_kubernetes_groups(kubernetes_read_groups, kubernetes_restart_groups);
+                .with_kubernetes_groups(kubernetes_read_groups, kubernetes_restart_groups)
+                .with_monitoring_groups(monitoring_read_groups);
         let connector_router = server::hosted::router(verifier, backend.clone(), admission);
         let application = if config.server.base_path == "/" {
             connector_router
@@ -416,6 +442,7 @@ impl HostedRuntime {
             "base_path": config.server.base_path,
             "identity_audience": server::hosted::CONNECTORS_AUDIENCE,
             "kubernetes_enabled": config.kubernetes.enabled,
+            "monitoring_enabled": monitoring_enabled,
             "vault_enabled": config.vault.enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,

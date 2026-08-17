@@ -1855,6 +1855,7 @@ dependencies = [
  "domain",
  "getrandom 0.3.4",
  "hex",
+ "hosted-state",
  "monitoring-model",
  "protocol",
  "reqwest",
