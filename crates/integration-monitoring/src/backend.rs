@@ -40,7 +40,9 @@ use service::{
 use sha2::{Digest as _, Sha256};
 use tokio::task::JoinHandle;
 
-use connectors_config::{GrafanaIntegrationConfig, InitiationConfig};
+use connectors_config::{
+    GrafanaIntegrationConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig, InitiationConfig,
+};
 use monitoring_model::{
     audiences_for_operation, document_text, effect, operation_document, operation_ids,
     provider_for_operation, response_schema, supported_operation, target_provider, title,
@@ -52,6 +54,7 @@ use crate::errors::*;
 const GRAFANA_CREDENTIAL: &str = "grafana.service_account_token";
 const GRAFANA_AUTHORITY: &str = "com.grafana.api";
 const GRAFANA_CREDENTIAL_LEAF: &str = "service_account_token";
+const AUDIT_STATE_KEY: &str = "monitoring.audit";
 const DEFAULT_SERVICE: &str = "default";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
 const MAX_CONNECT_SESSIONS: usize = 16;
@@ -149,7 +152,9 @@ pub struct MonitoringBackend {
 
 struct MonitoringInner {
     owner: PrincipalContext,
+    access: MonitoringAccess,
     policy: GrafanaIntegrationConfig,
+    hosted_targets: Option<Vec<HostedGrafanaTargetConfig>>,
     state_root: PathBuf,
     state: Mutex<MonitoringState>,
     sessions: Mutex<ConnectSessionLifecycle>,
@@ -159,6 +164,17 @@ struct MonitoringInner {
     tasks: Mutex<Vec<JoinHandle<()>>>,
     executor: Arc<dyn HttpExecutor>,
     audit: Mutex<()>,
+    hosted_state: Option<hosted_state::PostgresState>,
+}
+
+#[derive(Clone)]
+enum MonitoringAccess {
+    ExactOwner,
+    HostedGroups {
+        tenant_id: String,
+        read_groups: BTreeSet<String>,
+        operator_groups: BTreeSet<String>,
+    },
 }
 
 #[derive(Clone, Default)]
@@ -240,6 +256,131 @@ impl MonitoringBackend {
         ))
     }
 
+    /// Construct a deployment-managed Grafana federation. The token must already be present in the
+    /// caller-owned SecretStore; there is deliberately no hosted Connect Session for this route.
+    pub async fn open_hosted(
+        tenant_id: String,
+        policy: HostedGrafanaConfig,
+        operator_groups: Vec<String>,
+        state_root: &Path,
+        credential_store: Arc<dyn SecretStore>,
+        hosted_state: hosted_state::PostgresState,
+    ) -> Result<Self, MonitoringError> {
+        ensure_owner_directory(state_root)?;
+        let owner = PrincipalContext::hosted(
+            tenant_id.clone(),
+            "service:connectors-monitoring".to_owned(),
+            "service:connectors-monitoring".to_owned(),
+            None,
+            "deployment:monitoring".to_owned(),
+            "0".repeat(64),
+        )
+        .map_err(|_| MonitoringError::new("hosted-principal"))?;
+        let client = reqwest::Client::builder()
+            .redirect(Policy::none())
+            .no_proxy()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .user_agent("b10x-connectors/0.1")
+            .build()
+            .map_err(|_| MonitoringError::new("http-client"))?;
+        Self::open_hosted_with_executor(
+            owner,
+            policy,
+            operator_groups,
+            state_root,
+            credential_store,
+            Arc::new(ReqwestExecutor { client }),
+            Some(hosted_state),
+        )
+        .await
+    }
+
+    async fn open_hosted_with_executor<E: HttpExecutor>(
+        owner: PrincipalContext,
+        hosted: HostedGrafanaConfig,
+        operator_groups: Vec<String>,
+        state_root: &Path,
+        credential_store: Arc<dyn SecretStore>,
+        executor: Arc<E>,
+        hosted_state: Option<hosted_state::PostgresState>,
+    ) -> Result<Self, MonitoringError> {
+        let credential_ref = grafana_credential_ref(&owner)?;
+        let origin = hosted
+            .origin
+            .clone()
+            .ok_or_else(|| MonitoringError::new("hosted-policy"))?;
+        let parent = ParentConnection {
+            connection_ref: hosted
+                .connection_ref
+                .clone()
+                .ok_or_else(|| MonitoringError::new("hosted-policy"))?,
+            label: hosted
+                .label
+                .clone()
+                .ok_or_else(|| MonitoringError::new("hosted-policy"))?,
+        };
+        let grant_ref = hosted
+            .grant_ref
+            .clone()
+            .ok_or_else(|| MonitoringError::new("hosted-policy"))?;
+        let read_groups = hosted.read_groups.iter().cloned().collect();
+        let targets = hosted.targets.clone();
+        let interval = hosted.reconcile_interval_seconds;
+        let policy = GrafanaIntegrationConfig {
+            origin,
+            grant_ref,
+            initiation: InitiationConfig::B10x,
+            target_grants: BTreeMap::new(),
+            connect_session_ttl_seconds: 300,
+        };
+        let backend = Self {
+            inner: Arc::new(MonitoringInner {
+                owner: owner.clone(),
+                access: MonitoringAccess::HostedGroups {
+                    tenant_id: owner.tenant_id().to_owned(),
+                    read_groups,
+                    operator_groups: operator_groups.into_iter().collect(),
+                },
+                policy,
+                hosted_targets: Some(targets),
+                state_root: state_root.to_path_buf(),
+                state: Mutex::new(MonitoringState {
+                    parent: Some(parent),
+                    ..MonitoringState::default()
+                }),
+                sessions: Mutex::new(
+                    ConnectSessionLifecycle::new(GRAFANA, MAX_CONNECT_SESSIONS)
+                        .expect("static Connect Session policy is valid"),
+                ),
+                completion: tokio::sync::Mutex::new(()),
+                credential_store,
+                credential_ref,
+                tasks: Mutex::new(Vec::new()),
+                executor,
+                audit: Mutex::new(()),
+                hosted_state,
+            }),
+        };
+        backend
+            .inner
+            .reconcile_hosted_targets()
+            .await
+            .map_err(|_| MonitoringError::new("hosted-discovery"))?;
+        let inner = Arc::clone(&backend.inner);
+        lock(&backend.inner.tasks).push(tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(Duration::from_secs(interval));
+            ticker.tick().await;
+            loop {
+                ticker.tick().await;
+                if inner.reconcile_hosted_targets().await.is_err() {
+                    inner.degrade_hosted_targets();
+                }
+            }
+        }));
+        Ok(backend)
+    }
+
     fn with_executor<E: HttpExecutor>(
         owner: PrincipalContext,
         policy: GrafanaIntegrationConfig,
@@ -251,7 +392,9 @@ impl MonitoringBackend {
         Self {
             inner: Arc::new(MonitoringInner {
                 owner,
+                access: MonitoringAccess::ExactOwner,
                 policy,
+                hosted_targets: None,
                 state_root: state_root.to_path_buf(),
                 state: Mutex::new(MonitoringState::default()),
                 sessions: Mutex::new(
@@ -264,6 +407,7 @@ impl MonitoringBackend {
                 tasks: Mutex::new(Vec::new()),
                 executor,
                 audit: Mutex::new(()),
+                hosted_state: None,
             }),
         }
     }
@@ -318,7 +462,9 @@ impl ConnectorBackend for MonitoringBackend {
             ConnectionRequest::Materialize(request) => {
                 self.inner.has_observation(&request.observation_ref)
             }
-            ConnectionRequest::ConnectSessionCreate(request) => request.integration_ref == GRAFANA,
+            ConnectionRequest::ConnectSessionCreate(request) => {
+                self.inner.hosted_targets.is_none() && request.integration_ref == GRAFANA
+            }
             ConnectionRequest::ConnectSessionStatus(request) => {
                 self.inner.has_session(&request.connect_session_ref)
             }
@@ -335,15 +481,22 @@ impl ConnectorBackend for MonitoringBackend {
         self.inner.check_operation_context(context)?;
         match request {
             OperationRequest::Search(request) => {
+                if !self.inner.admits(context) {
+                    return Ok(OperationResult::Search {
+                        operations: Vec::new(),
+                    });
+                }
                 let mut operations = self.inner.search_operations(&request.query);
                 operations.sort_by(|left, right| left.operation_ref.cmp(&right.operation_ref));
                 operations.truncate(usize::from(request.limit));
                 Ok(OperationResult::Search { operations })
             }
             OperationRequest::Describe(request) if supported_operation(&request.operation_ref) => {
+                self.inner.require_operation_access(context)?;
                 self.inner.describe(context, request)
             }
             OperationRequest::Invoke(request) if supported_operation(&request.operation_ref) => {
+                self.inner.require_operation_access(context)?;
                 self.inner.invoke(context, request).await
             }
             _ => Err(operation_not_found()),
@@ -358,19 +511,27 @@ impl ConnectorBackend for MonitoringBackend {
         self.inner.check_connection_context(context)?;
         match request {
             ConnectionRequest::Search(request) => {
+                if !self.inner.admits(context) {
+                    return Ok(ConnectionResult::Search {
+                        connections: Vec::new(),
+                    });
+                }
                 let mut connections = self.inner.search_connections(&request.query);
                 connections.sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
                 connections.truncate(usize::from(request.limit));
                 Ok(ConnectionResult::Search { connections })
             }
-            ConnectionRequest::Describe(request) => self
-                .inner
-                .describe_connection(&request.connection_ref)
-                .map(ConnectionResult::Describe)
-                .ok_or_else(connection_not_found),
+            ConnectionRequest::Describe(request) => {
+                self.inner.require_connection_access(context)?;
+                self.inner
+                    .describe_connection(&request.connection_ref)
+                    .map(ConnectionResult::Describe)
+                    .ok_or_else(connection_not_found)
+            }
             ConnectionRequest::ObservationSearch(request)
                 if self.inner.is_parent(&request.source_connection_ref) =>
             {
+                self.inner.require_connection_access(context)?;
                 Ok(ConnectionResult::ObservationSearch {
                     observations: self
                         .inner
@@ -380,13 +541,15 @@ impl ConnectorBackend for MonitoringBackend {
             ConnectionRequest::Materialize(request)
                 if self.inner.has_observation(&request.observation_ref) =>
             {
+                self.inner.require_connection_access(context)?;
                 self.inner
                     .materialize(&request.observation_ref)
                     .map(ConnectionResult::Materialize)
             }
             ConnectionRequest::ConnectSessionCreate(request)
-                if request.integration_ref == GRAFANA =>
+                if request.integration_ref == GRAFANA && self.inner.hosted_targets.is_none() =>
             {
+                self.inner.require_connection_access(context)?;
                 self.inner
                     .create_session(request.label)
                     .await
@@ -395,6 +558,7 @@ impl ConnectorBackend for MonitoringBackend {
             ConnectionRequest::ConnectSessionStatus(request)
                 if self.inner.has_session(&request.connect_session_ref) =>
             {
+                self.inner.require_connection_access(context)?;
                 self.inner
                     .session_status(&request.connect_session_ref)
                     .map(ConnectionResult::ConnectSessionStatus)
@@ -420,7 +584,7 @@ impl ConnectorBackend for MonitoringBackend {
 
 impl MonitoringInner {
     fn check_operation_context(&self, actual: &PrincipalContext) -> Result<(), OperationError> {
-        if actual == &self.owner {
+        if self.same_authority_partition(actual) {
             Ok(())
         } else {
             Err(OperationError::new(
@@ -432,7 +596,7 @@ impl MonitoringInner {
     }
 
     fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
-        if actual == &self.owner {
+        if self.same_authority_partition(actual) {
             Ok(())
         } else {
             Err(ConnectionError::new(
@@ -440,6 +604,48 @@ impl MonitoringInner {
                 "owner authority snapshot is not current",
                 false,
             ))
+        }
+    }
+
+    fn same_authority_partition(&self, actual: &PrincipalContext) -> bool {
+        match &self.access {
+            MonitoringAccess::ExactOwner => actual == &self.owner,
+            MonitoringAccess::HostedGroups { tenant_id, .. } => actual.tenant_id() == tenant_id,
+        }
+    }
+
+    fn require_operation_access(&self, actual: &PrincipalContext) -> Result<(), OperationError> {
+        self.admits(actual).then_some(()).ok_or_else(|| {
+            OperationError::new(
+                OperationErrorCode::NotGranted,
+                "monitoring Connection is not granted to this principal",
+                false,
+            )
+        })
+    }
+
+    fn require_connection_access(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
+        self.admits(actual).then_some(()).ok_or_else(|| {
+            ConnectionError::new(
+                ConnectionErrorCode::NotGranted,
+                "monitoring Connection is not granted to this principal",
+                false,
+            )
+        })
+    }
+
+    fn admits(&self, actual: &PrincipalContext) -> bool {
+        match &self.access {
+            MonitoringAccess::ExactOwner => actual == &self.owner,
+            MonitoringAccess::HostedGroups {
+                tenant_id,
+                read_groups,
+                operator_groups,
+            } => {
+                actual.tenant_id() == tenant_id
+                    && (!read_groups.is_disjoint(actual.verified_groups())
+                        || !operator_groups.is_disjoint(actual.verified_groups()))
+            }
         }
     }
 
@@ -519,6 +725,21 @@ impl MonitoringInner {
         if operation.protocol_driver() != ProtocolDriver::HttpV1 {
             return Err(operation_unavailable());
         }
+        let audit_ref = format!(
+            "audit:monitoring:{}",
+            random_uuid().map_err(|_| operation_unavailable())?
+        );
+        self.append_audit(AuditEvent {
+            audit_ref: &audit_ref,
+            operation_ref: &request.operation_ref,
+            connection_ref: &request.connection_ref,
+            parent_connection_ref: None,
+            route_adapter: None,
+            tenant_id: context.tenant_id(),
+            agent_id: context.actor_subject(),
+            outcome: "attempted",
+        })
+        .map_err(|_| operation_unavailable())?;
 
         let (result, parent_ref, adapter) = if provider == GRAFANA {
             let parent = lock(&self.state)
@@ -531,9 +752,13 @@ impl MonitoringInner {
                 .execute_direct(context, &parent, &token, operation, request.input)
                 .await?;
             if request.operation_ref == GRAFANA_DATASOURCES_LIST {
-                self.reconcile_observations(&parent.connection_ref, &value)?;
+                if self.hosted_targets.is_some() {
+                    self.reconcile_hosted_output(&parent.connection_ref, &value)?;
+                } else {
+                    self.reconcile_observations(&parent.connection_ref, &value)?;
+                }
             }
-            (value, None, None)
+            (project_output(&request.operation_ref, &value)?, None, None)
         } else {
             let child = lock(&self.state)
                 .children
@@ -549,15 +774,11 @@ impl MonitoringInner {
                 .execute_mediated(context, &child, &token, operation, request.input)
                 .await?;
             (
-                value,
+                project_output(&request.operation_ref, &value)?,
                 Some(child.parent_connection_ref.clone()),
                 Some(DomainRouteAdapter::GrafanaDatasourceProxyV1.as_str()),
             )
         };
-        let audit_ref = format!(
-            "audit:monitoring:{}",
-            random_uuid().map_err(|_| operation_unavailable())?
-        );
         self.append_audit(AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
@@ -961,6 +1182,119 @@ impl MonitoringInner {
         })
     }
 
+    async fn reconcile_hosted_targets(&self) -> Result<(), OperationError> {
+        let parent = lock(&self.state)
+            .parent
+            .clone()
+            .ok_or_else(operation_not_granted)?;
+        let token = self.load_credential().await?;
+        let operation =
+            operation_document(GRAFANA_DATASOURCES_LIST).ok_or_else(operation_unavailable)?;
+        let output = self
+            .execute_direct(
+                &self.owner,
+                &parent,
+                &token,
+                operation,
+                serde_json::json!({}),
+            )
+            .await?;
+        self.reconcile_hosted_output(&parent.connection_ref, &output)
+    }
+
+    fn reconcile_hosted_output(
+        &self,
+        source_connection_ref: &str,
+        output: &Value,
+    ) -> Result<(), OperationError> {
+        let targets = self.hosted_targets.as_ref().ok_or_else(operation_invalid)?;
+        let items = output.as_array().ok_or_else(operation_invalid)?;
+        if items.len() > 5000 {
+            return Err(operation_invalid());
+        }
+        let mut discovered = BTreeMap::<(String, String), (String, String)>::new();
+        for item in items {
+            let object = item.as_object().ok_or_else(operation_invalid)?;
+            let uid = object
+                .get("uid")
+                .and_then(Value::as_str)
+                .filter(|uid| safe_datasource_uid(uid))
+                .ok_or_else(operation_invalid)?;
+            let provider = object
+                .get("type")
+                .and_then(Value::as_str)
+                .map(str::to_ascii_lowercase)
+                .filter(|kind| valid_observed_type(kind))
+                .ok_or_else(operation_invalid)?;
+            let title = object
+                .get("name")
+                .and_then(Value::as_str)
+                .filter(|title| valid_title(title))
+                .ok_or_else(operation_invalid)?;
+            discovered.insert(
+                (provider, format!("{:x}", Sha256::digest(uid.as_bytes()))),
+                (uid.to_owned(), title.to_owned()),
+            );
+        }
+        let evidence_sha256 = format!(
+            "{:x}",
+            Sha256::digest(
+                serde_json::to_vec(&discovered.iter().collect::<Vec<_>>())
+                    .map_err(|_| operation_invalid())?
+            )
+        );
+        let mut state = lock(&self.state);
+        state.evidence_generation = state.evidence_generation.saturating_add(1).max(1);
+        let generation = state.evidence_generation;
+        state.observations.clear();
+        state.children.clear();
+        for target in targets {
+            let observation_ref = format!(
+                "observation:grafana:{}",
+                digest_prefix(
+                    format!("{source_connection_ref}\0{}", target.connection_ref).as_bytes()
+                )
+            );
+            let found = discovered.get(&(target.provider.clone(), target.uid_sha256.clone()));
+            let resource_binding = found.map_or_else(String::new, |(uid, _)| uid.clone());
+            state.observations.insert(
+                observation_ref.clone(),
+                StoredObservation {
+                    observation_ref: observation_ref.clone(),
+                    source_connection_ref: source_connection_ref.to_owned(),
+                    observed_type: target.provider.clone(),
+                    title: target.label.clone(),
+                    resource_binding: resource_binding.clone(),
+                    target_provider: Some(target.provider.clone()),
+                    active: found.is_some(),
+                    evidence_generation: generation,
+                    evidence_sha256: evidence_sha256.clone(),
+                    connection_ref: Some(target.connection_ref.clone()),
+                },
+            );
+            state.children.insert(
+                target.connection_ref.clone(),
+                ChildConnection {
+                    connection_ref: target.connection_ref.clone(),
+                    label: target.label.clone(),
+                    provider: target.provider.clone(),
+                    grant_ref: target.grant_ref.clone(),
+                    parent_connection_ref: source_connection_ref.to_owned(),
+                    observation_ref,
+                    resource_binding,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    fn degrade_hosted_targets(&self) {
+        let mut state = lock(&self.state);
+        for observation in state.observations.values_mut() {
+            observation.active = false;
+        }
+    }
+
     async fn create_session(
         self: &Arc<Self>,
         label: String,
@@ -1185,6 +1519,21 @@ impl MonitoringInner {
 
     fn append_audit(&self, event: AuditEvent<'_>) -> Result<(), MonitoringError> {
         let _guard = lock(&self.audit);
+        let mut line = serde_json::to_vec(&serde_json::json!({
+            "at_unix_ms": now_ms().ok_or_else(|| MonitoringError::new("clock"))?,
+            "event": event,
+        }))
+        .map_err(|_| MonitoringError::new("audit"))?;
+        line.push(b'\n');
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .append(AUDIT_STATE_KEY, &line, MAX_AUDIT_BYTES as usize)
+                .map(|_| ())
+                .map_err(|error| match error {
+                    hosted_state::StateError::Capacity => MonitoringError::new("audit-bound"),
+                    _ => MonitoringError::new("audit"),
+                });
+        }
         let path = self.state_root.join("monitoring-audit.jsonl");
         let mut file = OpenOptions::new()
             .create(true)
@@ -1200,12 +1549,6 @@ impl MonitoringInner {
         {
             return Err(MonitoringError::new("audit"));
         }
-        let mut line = serde_json::to_vec(&serde_json::json!({
-            "at_unix_ms": now_ms().ok_or_else(|| MonitoringError::new("clock"))?,
-            "event": event,
-        }))
-        .map_err(|_| MonitoringError::new("audit"))?;
-        line.push(b'\n');
         if metadata
             .len()
             .checked_add(line.len() as u64)
@@ -1319,6 +1662,339 @@ fn valid_observed_type(value: &str) -> bool {
 
 fn valid_title(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
+}
+
+fn project_output(operation: &str, raw: &Value) -> Result<Value, OperationError> {
+    let projected = match operation {
+        monitoring_model::GRAFANA_DATASOURCES_LIST => project_datasources(raw)?,
+        monitoring_model::GRAFANA_DASHBOARDS_LIST => project_dashboard_list(raw)?,
+        monitoring_model::GRAFANA_DASHBOARD_GET => project_dashboard(raw)?,
+        monitoring_model::PROMETHEUS_QUERY_RANGE => project_prometheus(raw)?,
+        monitoring_model::LOKI_QUERY_RANGE => project_loki(raw)?,
+        monitoring_model::ALERTMANAGER_ALERTS_LIST => project_alerts(raw)?,
+        _ => return Err(operation_not_found()),
+    };
+    if serde_json::to_vec(&projected).map_or(true, |bytes| {
+        bytes.len() > protocol::operation::MAX_RESULT_BYTES
+    }) {
+        return Err(operation_unavailable());
+    }
+    Ok(projected)
+}
+
+fn project_datasources(raw: &Value) -> Result<Value, OperationError> {
+    let sources = raw
+        .as_array()
+        .ok_or_else(operation_invalid)?
+        .iter()
+        .take(500)
+        .filter_map(|source| {
+            let object = source.as_object()?;
+            let name = bounded_text(object.get("name")?.as_str()?, 256);
+            let provider = bounded_text(object.get("type")?.as_str()?, 128);
+            (!name.is_empty() && !provider.is_empty()).then(|| {
+                serde_json::json!({
+                    "name": name,
+                    "provider": provider,
+                    "status": "available",
+                    "callable": matches!(provider.as_str(), "prometheus" | "loki" | "alertmanager"),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(
+        serde_json::json!({"sources": sources, "complete": raw.as_array().is_some_and(|items| items.len() <= 500)}),
+    )
+}
+
+fn project_dashboard_list(raw: &Value) -> Result<Value, OperationError> {
+    let object = raw.as_object().ok_or_else(operation_invalid)?;
+    let items = object
+        .get("items")
+        .and_then(Value::as_array)
+        .ok_or_else(operation_invalid)?;
+    let dashboards = items
+        .iter()
+        .take(500)
+        .filter_map(project_dashboard_summary)
+        .collect::<Vec<_>>();
+    let next_cursor = object
+        .get("metadata")
+        .and_then(Value::as_object)
+        .and_then(|metadata| metadata.get("continue"))
+        .and_then(Value::as_str)
+        .map(|value| bounded_text(value, 4096));
+    Ok(serde_json::json!({
+        "dashboards": dashboards,
+        "next_cursor": next_cursor,
+        "complete": items.len() <= 500 && next_cursor.is_none(),
+    }))
+}
+
+fn project_dashboard_summary(value: &Value) -> Option<Value> {
+    let object = value.as_object()?;
+    let metadata = object.get("metadata")?.as_object()?;
+    let spec = object.get("spec")?.as_object()?;
+    let uid = bounded_text(metadata.get("name")?.as_str()?, 256);
+    let title = bounded_text(spec.get("title")?.as_str()?, 256);
+    let tags = spec
+        .get("tags")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .take(32)
+        .map(|tag| bounded_text(tag, 128))
+        .collect::<Vec<_>>();
+    Some(serde_json::json!({"uid": uid, "title": title, "tags": tags}))
+}
+
+fn project_dashboard(raw: &Value) -> Result<Value, OperationError> {
+    let object = raw.as_object().ok_or_else(operation_invalid)?;
+    let metadata = object
+        .get("metadata")
+        .and_then(Value::as_object)
+        .ok_or_else(operation_invalid)?;
+    let spec = object
+        .get("spec")
+        .and_then(Value::as_object)
+        .ok_or_else(operation_invalid)?;
+    let panels = spec
+        .get("panels")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(500)
+        .filter_map(|panel| {
+            let panel = panel.as_object()?;
+            Some(serde_json::json!({
+                "title": bounded_text(panel.get("title").and_then(Value::as_str).unwrap_or("Untitled"), 256),
+                "kind": bounded_text(panel.get("type").and_then(Value::as_str).unwrap_or("unknown"), 64),
+            }))
+        })
+        .collect::<Vec<_>>();
+    let tags = spec
+        .get("tags")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .take(32)
+        .map(|tag| bounded_text(tag, 128))
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "uid": bounded_text(metadata.get("name").and_then(Value::as_str).unwrap_or(""), 256),
+        "title": bounded_text(spec.get("title").and_then(Value::as_str).unwrap_or("Untitled"), 256),
+        "description": redact_text(spec.get("description").and_then(Value::as_str).unwrap_or(""), 1024).0,
+        "tags": tags,
+        "panels": panels,
+        "panels_truncated": spec.get("panels").and_then(Value::as_array).is_some_and(|items| items.len() > 500),
+    }))
+}
+
+fn project_prometheus(raw: &Value) -> Result<Value, OperationError> {
+    let object = raw.as_object().ok_or_else(operation_invalid)?;
+    if object.get("status").and_then(Value::as_str) != Some("success") {
+        return Err(operation_unavailable());
+    }
+    let data = object
+        .get("data")
+        .and_then(Value::as_object)
+        .ok_or_else(operation_invalid)?;
+    let result = data
+        .get("result")
+        .and_then(Value::as_array)
+        .ok_or_else(operation_invalid)?;
+    let series = result
+        .iter()
+        .take(500)
+        .filter_map(|series| {
+            let series = series.as_object()?;
+            let labels = project_labels(series.get("metric"));
+            let samples = series
+                .get("values")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .take(2_000)
+                .filter_map(project_sample)
+                .collect::<Vec<_>>();
+            let instant = series.get("value").and_then(project_sample);
+            Some(serde_json::json!({"labels": labels, "samples": samples, "value": instant}))
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "status": "success",
+        "result_type": bounded_text(data.get("resultType").and_then(Value::as_str).unwrap_or("unknown"), 32),
+        "series": series,
+        "truncated": result.len() > 500,
+    }))
+}
+
+fn project_sample(value: &Value) -> Option<Value> {
+    let pair = value.as_array()?;
+    (pair.len() == 2).then(|| {
+        serde_json::json!({
+            "timestamp": pair[0].clone(),
+            "value": bounded_text(pair[1].as_str().unwrap_or(""), 128),
+        })
+    })
+}
+
+fn project_loki(raw: &Value) -> Result<Value, OperationError> {
+    let object = raw.as_object().ok_or_else(operation_invalid)?;
+    if object.get("status").and_then(Value::as_str) != Some("success") {
+        return Err(operation_unavailable());
+    }
+    let data = object
+        .get("data")
+        .and_then(Value::as_object)
+        .ok_or_else(operation_invalid)?;
+    let streams = data
+        .get("result")
+        .and_then(Value::as_array)
+        .ok_or_else(operation_invalid)?;
+    let mut lines = Vec::new();
+    for stream in streams.iter().take(500) {
+        let Some(stream) = stream.as_object() else {
+            continue;
+        };
+        let labels = project_labels(stream.get("stream"));
+        for pair in stream
+            .get("values")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if lines.len() == 1_000 {
+                break;
+            }
+            let Some(pair) = pair.as_array().filter(|pair| pair.len() == 2) else {
+                continue;
+            };
+            let (line, redacted) = redact_text(pair[1].as_str().unwrap_or(""), 8 * 1024);
+            lines.push(serde_json::json!({
+                "timestamp": pair[0].clone(),
+                "labels": labels,
+                "line": line,
+                "redacted": redacted,
+                "truncated": pair[1].as_str().is_some_and(|value| value.len() > 8 * 1024),
+            }));
+        }
+        if lines.len() == 1_000 {
+            break;
+        }
+    }
+    Ok(serde_json::json!({
+        "result_type": bounded_text(data.get("resultType").and_then(Value::as_str).unwrap_or("streams"), 32),
+        "lines": lines,
+        "truncated": lines.len() == 1_000 || streams.len() > 500,
+    }))
+}
+
+fn project_alerts(raw: &Value) -> Result<Value, OperationError> {
+    let alerts = raw
+        .as_array()
+        .ok_or_else(operation_invalid)?
+        .iter()
+        .take(500)
+        .filter_map(|alert| {
+            let alert = alert.as_object()?;
+            let annotations = alert.get("annotations").and_then(Value::as_object);
+            let (summary, summary_redacted) = redact_text(
+                annotations
+                    .and_then(|values| values.get("summary"))
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+                512,
+            );
+            let status = alert
+                .get("status")
+                .and_then(Value::as_object)
+                .and_then(|status| status.get("state"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            Some(serde_json::json!({
+                "labels": project_labels(alert.get("labels")),
+                "summary": summary,
+                "summary_redacted": summary_redacted,
+                "state": bounded_text(status, 64),
+                "starts_at": bounded_text(alert.get("startsAt").and_then(Value::as_str).unwrap_or(""), 64),
+                "ends_at": bounded_text(alert.get("endsAt").and_then(Value::as_str).unwrap_or(""), 64),
+            }))
+        })
+        .collect::<Vec<_>>();
+    Ok(serde_json::json!({
+        "alerts": alerts,
+        "complete": raw.as_array().is_some_and(|items| items.len() <= 500),
+    }))
+}
+
+fn project_labels(value: Option<&Value>) -> Value {
+    const ALLOWED: [&str; 12] = [
+        "__name__",
+        "alertname",
+        "cluster",
+        "container",
+        "deployment",
+        "instance",
+        "job",
+        "namespace",
+        "pod",
+        "service",
+        "severity",
+        "status",
+    ];
+    let labels = value
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter(|(key, _)| ALLOWED.contains(&key.as_str()))
+        .filter_map(|(key, value)| {
+            value
+                .as_str()
+                .map(|value| (key.clone(), Value::String(redact_text(value, 256).0)))
+        })
+        .collect::<serde_json::Map<_, _>>();
+    Value::Object(labels)
+}
+
+fn bounded_text(value: &str, maximum: usize) -> String {
+    value
+        .chars()
+        .filter(|character| !character.is_control() || matches!(character, '\n' | '\t'))
+        .take(maximum)
+        .collect()
+}
+
+fn redact_text(value: &str, maximum: usize) -> (String, bool) {
+    let lowered = value.to_ascii_lowercase();
+    let sensitive = [
+        "authorization:",
+        "bearer ",
+        "password=",
+        "password:",
+        "secret=",
+        "secret:",
+        "token=",
+        "token:",
+        "api_key=",
+        "api-key:",
+        "-----begin private key-----",
+    ]
+    .iter()
+    .any(|pattern| lowered.contains(pattern))
+        || value
+            .split('.')
+            .filter(|segment| segment.len() > 16)
+            .count()
+            >= 3
+            && value.starts_with("eyJ");
+    if sensitive {
+        ("[redacted]".to_owned(), true)
+    } else {
+        (bounded_text(value, maximum), false)
+    }
 }
 
 fn digest_prefix(value: &[u8]) -> String {

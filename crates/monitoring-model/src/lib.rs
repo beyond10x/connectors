@@ -87,17 +87,88 @@ pub fn audiences_for_operation(operation: &str) -> Vec<String> {
 }
 
 pub fn response_schema(provider: &str, operation: &str) -> Result<Value, OperationError> {
-    let value: Value = serde_json::from_str(document_text(provider)).map_err(|_| unavailable())?;
-    value["operations"]
-        .as_array()
-        .and_then(|operations| {
-            operations
-                .iter()
-                .find(|candidate| candidate["id"] == operation)
+    if provider != provider_for_operation(operation) {
+        return Err(unavailable());
+    }
+    safe_response_schema(operation).ok_or_else(unavailable)
+}
+
+fn safe_response_schema(operation: &str) -> Option<Value> {
+    let string = || serde_json::json!({"type":"string"});
+    let closed = |properties: Value, required: Value| {
+        serde_json::json!({
+            "type":"object",
+            "additionalProperties":false,
+            "properties":properties,
+            "required":required,
         })
-        .and_then(|operation| operation.get("response_schema"))
-        .cloned()
-        .ok_or_else(unavailable)
+    };
+    match operation {
+        GRAFANA_DATASOURCES_LIST => Some(closed(
+            serde_json::json!({
+                "sources":{"type":"array","maxItems":500,"items":closed(
+                    serde_json::json!({"name":string(),"provider":string(),"status":string(),"callable":{"type":"boolean"}}),
+                    serde_json::json!(["name","provider","status","callable"])
+                )},
+                "complete":{"type":"boolean"}
+            }),
+            serde_json::json!(["sources", "complete"]),
+        )),
+        GRAFANA_DASHBOARDS_LIST => Some(closed(
+            serde_json::json!({
+                "dashboards":{"type":"array","maxItems":500,"items":closed(
+                    serde_json::json!({"uid":string(),"title":string(),"tags":{"type":"array","maxItems":32,"items":string()}}),
+                    serde_json::json!(["uid","title","tags"])
+                )},
+                "next_cursor":{"type":["string","null"]},
+                "complete":{"type":"boolean"}
+            }),
+            serde_json::json!(["dashboards", "next_cursor", "complete"]),
+        )),
+        GRAFANA_DASHBOARD_GET => Some(closed(
+            serde_json::json!({
+                "uid":string(),"title":string(),"description":string(),
+                "tags":{"type":"array","maxItems":32,"items":string()},
+                "panels":{"type":"array","maxItems":500,"items":closed(
+                    serde_json::json!({"title":string(),"kind":string()}),
+                    serde_json::json!(["title","kind"])
+                )},
+                "panels_truncated":{"type":"boolean"}
+            }),
+            serde_json::json!([
+                "uid",
+                "title",
+                "description",
+                "tags",
+                "panels",
+                "panels_truncated"
+            ]),
+        )),
+        PROMETHEUS_QUERY_RANGE => Some(closed(
+            serde_json::json!({
+                "status":{"const":"success"},"result_type":string(),
+                "series":{"type":"array","maxItems":500,"items":{"type":"object"}},
+                "truncated":{"type":"boolean"}
+            }),
+            serde_json::json!(["status", "result_type", "series", "truncated"]),
+        )),
+        LOKI_QUERY_RANGE => Some(closed(
+            serde_json::json!({
+                "result_type":string(),
+                "lines":{"type":"array","maxItems":1000,"items":{"type":"object"}},
+                "truncated":{"type":"boolean"}
+            }),
+            serde_json::json!(["result_type", "lines", "truncated"]),
+        )),
+        ALERTMANAGER_ALERTS_LIST => Some(closed(
+            serde_json::json!({
+                "alerts":{"type":"array","maxItems":500,"items":{"type":"object"}},
+                "complete":{"type":"boolean"}
+            }),
+            serde_json::json!(["alerts", "complete"]),
+        )),
+        _ => None,
+    }
 }
 
 #[must_use]
@@ -151,19 +222,19 @@ pub fn validate_input(operation: &str, input: &Value) -> Result<(), OperationErr
         GRAFANA_DASHBOARD_GET => string("namespace", 256) && string("uid", 256),
         GRAFANA_DATASOURCES_LIST | ALERTMANAGER_ALERTS_LIST => object.is_empty(),
         PROMETHEUS_QUERY_RANGE => {
-            string("query", 16 * 1024)
+            string("query", 8 * 1024)
                 && string("start", 64)
                 && string("end", 64)
                 && string("step", 64)
         }
         LOKI_QUERY_RANGE => {
-            string("query", 16 * 1024)
+            string("query", 8 * 1024)
                 && string("start", 64)
                 && string("end", 64)
                 && object
                     .get("limit")
                     .and_then(Value::as_u64)
-                    .is_some_and(|limit| (1..=5000).contains(&limit))
+                    .is_some_and(|limit| (1..=1000).contains(&limit))
                 && object
                     .get("direction")
                     .and_then(Value::as_str)

@@ -76,6 +76,7 @@ pub struct HostedAdmissionPolicy {
     operator_groups: BTreeSet<String>,
     kubernetes_read_groups: BTreeSet<String>,
     kubernetes_restart_groups: BTreeSet<String>,
+    monitoring_read_groups: BTreeSet<String>,
 }
 
 impl HostedAdmissionPolicy {
@@ -85,6 +86,7 @@ impl HostedAdmissionPolicy {
             operator_groups: operator_groups.into_iter().collect(),
             kubernetes_read_groups: BTreeSet::new(),
             kubernetes_restart_groups: BTreeSet::new(),
+            monitoring_read_groups: BTreeSet::new(),
         }
     }
 
@@ -101,6 +103,14 @@ impl HostedAdmissionPolicy {
         self
     }
 
+    /// Add the broad receiver gate for the deployment-managed monitoring integration. The
+    /// Integration repeats the exact tenant, group, Connection, and provider checks itself.
+    #[must_use]
+    pub fn with_monitoring_groups(mut self, read_groups: impl IntoIterator<Item = String>) -> Self {
+        self.monitoring_read_groups = read_groups.into_iter().collect();
+        self
+    }
+
     fn admits_operator(&self, principal: &HostedPrincipal) -> bool {
         !self.operator_groups.is_empty() && !self.operator_groups.is_disjoint(&principal.groups)
     }
@@ -113,6 +123,7 @@ impl HostedAdmissionPolicy {
         self.admits_operator(principal)
             || tenant_member_module_read(request)
             || self.admits_kubernetes_operation(principal, request)
+            || self.admits_monitoring_operation(principal, request)
     }
 
     fn admits_kubernetes_operation(
@@ -129,6 +140,26 @@ impl HostedAdmissionPolicy {
             _ => return false,
         };
         !groups.is_empty() && !groups.is_disjoint(&principal.groups)
+    }
+
+    fn admits_monitoring_operation(
+        &self,
+        principal: &HostedPrincipal,
+        request: &protocol::operation::OperationRequest,
+    ) -> bool {
+        let protocol::operation::OperationRequest::Invoke(invoke) = request else {
+            return false;
+        };
+        matches!(
+            invoke.operation_ref.as_str(),
+            "grafana-dashboards-list"
+                | "grafana-dashboard-get"
+                | "grafana-datasources-list"
+                | "prometheus-query-range"
+                | "loki-query-range"
+                | "alertmanager-alerts-list"
+        ) && !self.monitoring_read_groups.is_empty()
+            && !self.monitoring_read_groups.is_disjoint(&principal.groups)
     }
 }
 
@@ -1245,5 +1276,34 @@ mod tests {
                 "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"
             );
         }
+    }
+
+    #[test]
+    fn monitoring_transport_gate_admits_only_configured_groups_or_operator() {
+        let policy = HostedAdmissionPolicy::new(["operator".to_owned()])
+            .with_monitoring_groups(["dev".to_owned(), "sre".to_owned()]);
+        let request = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: "prometheus-query-range".to_owned(),
+            connection_ref: "connection:prometheus:dev".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: None,
+        });
+        let principal = |group: &str| HostedPrincipal {
+            issuer: "https://identity.example.test".to_owned(),
+            tenant_id: "tenant-dev".to_owned(),
+            subject: "person:test".to_owned(),
+            actor_subject: "person:test".to_owned(),
+            email: None,
+            token_id: "token-test".to_owned(),
+            scopes: BTreeSet::new(),
+            groups: BTreeSet::from([group.to_owned()]),
+            authority_snapshot_sha256: "b".repeat(64),
+            deployment_id: None,
+        };
+        assert!(policy.admits_operation(&principal("dev"), &request));
+        assert!(policy.admits_operation(&principal("sre"), &request));
+        assert!(policy.admits_operation(&principal("operator"), &request));
+        assert!(!policy.admits_operation(&principal("viewer"), &request));
     }
 }
