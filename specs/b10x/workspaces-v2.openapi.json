@@ -15,6 +15,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_list_input"
         },
@@ -50,6 +51,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_create_input"
         },
@@ -111,6 +113,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_get_input"
         },
@@ -156,6 +159,7 @@
         ],
         "x-b10x-risk-floor": "high",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_delete_input"
         },
@@ -215,6 +219,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_checkouts_list_input"
         },
@@ -260,6 +265,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_checkouts_create_input"
         },
@@ -329,6 +335,7 @@
         ],
         "x-b10x-risk-floor": "high",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspaces_checkouts_delete_input"
         },
@@ -396,6 +403,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_exec_start_input"
         },
@@ -473,6 +481,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_file_edit_input"
         },
@@ -558,6 +567,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_file_patch_input"
         },
@@ -643,6 +653,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_file_read_input"
         },
@@ -720,6 +731,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_file_replace_input"
         },
@@ -805,6 +817,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/workspace_tree_list_input"
         },
@@ -1296,7 +1309,7 @@
             "type": "string",
             "enum": [
               "exact",
-              "flux_compatible"
+              "line_whitespace_normalized"
             ]
           }
         }
@@ -1379,7 +1392,7 @@
             "type": "string",
             "enum": [
               "exact",
-              "flux_compatible"
+              "line_whitespace_normalized"
             ]
           }
         }
@@ -1460,7 +1473,7 @@
             "type": "string",
             "enum": [
               "exact",
-              "flux_compatible"
+              "line_whitespace_normalized"
             ]
           }
         }
@@ -1568,7 +1581,7 @@
             "type": "string",
             "enum": [
               "exact",
-              "flux_compatible"
+              "line_whitespace_normalized"
             ]
           }
         }

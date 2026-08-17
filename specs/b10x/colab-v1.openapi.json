@@ -15,6 +15,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/colab_room_create_input"
         },
@@ -76,6 +77,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "idempotent",
+        "x-b10x-approval": "not-required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/colab_workspace_list_input"
         },
@@ -121,6 +123,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/colab_workspace_attach_input"
         },
@@ -190,6 +193,7 @@
         ],
         "x-b10x-risk-floor": "low",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/colab_workspace_current_set_input"
         },
@@ -259,6 +263,7 @@
         ],
         "x-b10x-risk-floor": "medium",
         "x-b10x-idempotency": "keyed",
+        "x-b10x-approval": "required",
         "x-b10x-input-schema": {
           "$ref": "#/components/schemas/colab_workspace_detach_input"
         },

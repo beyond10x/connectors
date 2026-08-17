@@ -19792,7 +19792,7 @@
         "title": "Problem",
         "type": "object"
       },
-      "planner_search_body": {
+      "planner_search_project_body": {
         "$defs": {
           "EntityKind": {
             "enum": [
@@ -19854,7 +19854,7 @@
               "kinds": {
                 "default": [],
                 "items": {
-                  "$ref": "#/components/schemas/planner_search_body/$defs/EntityKind"
+                  "$ref": "#/components/schemas/planner_search_project_body/$defs/EntityKind"
                 },
                 "type": "array"
               },
@@ -19874,7 +19874,7 @@
               "related_to": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/planner_search_body/$defs/ItemRef"
+                    "$ref": "#/components/schemas/planner_search_project_body/$defs/ItemRef"
                   },
                   {
                     "type": "null"
@@ -19917,7 +19917,7 @@
           "kinds": {
             "default": [],
             "items": {
-              "$ref": "#/components/schemas/planner_search_body/$defs/EntityKind"
+              "$ref": "#/components/schemas/planner_search_project_body/$defs/EntityKind"
             },
             "type": "array"
           },
@@ -19937,7 +19937,7 @@
           "related_to": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/planner_search_body/$defs/ItemRef"
+                "$ref": "#/components/schemas/planner_search_project_body/$defs/ItemRef"
               },
               {
                 "type": "null"
@@ -19964,7 +19964,7 @@
         },
         "type": "object"
       },
-      "planner_search_input": {
+      "planner_search_project_input": {
         "$defs": {
           "EntityKind": {
             "enum": [
@@ -20026,7 +20026,7 @@
               "kinds": {
                 "default": [],
                 "items": {
-                  "$ref": "#/components/schemas/planner_search_input/$defs/EntityKind"
+                  "$ref": "#/components/schemas/planner_search_project_input/$defs/EntityKind"
                 },
                 "type": "array"
               },
@@ -20046,7 +20046,7 @@
               "related_to": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/planner_search_input/$defs/ItemRef"
+                    "$ref": "#/components/schemas/planner_search_project_input/$defs/ItemRef"
                   },
                   {
                     "type": "null"
@@ -20078,10 +20078,10 @@
         "additionalProperties": false,
         "properties": {
           "body": {
-            "$ref": "#/components/schemas/planner_search_input/$defs/SearchQuery"
+            "$ref": "#/components/schemas/planner_search_project_input/$defs/SearchQuery"
           },
           "path": {
-            "$ref": "#/components/schemas/planner_search_input/$defs/ProjectPath"
+            "$ref": "#/components/schemas/planner_search_project_input/$defs/ProjectPath"
           }
         },
         "required": [
@@ -20091,7 +20091,7 @@
         "title": "PathBody",
         "type": "object"
       },
-      "planner_search_output": {
+      "planner_search_project_output": {
         "$defs": {
           "EntityKey": {
             "additionalProperties": false,
@@ -20100,7 +20100,7 @@
                 "type": "string"
               },
               "kind": {
-                "$ref": "#/components/schemas/planner_search_output/$defs/EntityKind"
+                "$ref": "#/components/schemas/planner_search_project_output/$defs/EntityKind"
               },
               "project": {
                 "type": "string"
@@ -20134,7 +20134,7 @@
                 "type": "boolean"
               },
               "key": {
-                "$ref": "#/components/schemas/planner_search_output/$defs/EntityKey"
+                "$ref": "#/components/schemas/planner_search_project_output/$defs/EntityKey"
               },
               "revision": {
                 "format": "uint64",
@@ -20175,7 +20175,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/planner_search_output/$defs/SearchResult"
+              "$ref": "#/components/schemas/planner_search_project_output/$defs/SearchResult"
             },
             "type": "array"
           },
@@ -20192,7 +20192,7 @@
         "title": "Page",
         "type": "object"
       },
-      "planner_search_path": {
+      "planner_search_project_path": {
         "$defs": {
           "EntityKind": {
             "enum": [
@@ -20254,7 +20254,7 @@
               "kinds": {
                 "default": [],
                 "items": {
-                  "$ref": "#/components/schemas/planner_search_path/$defs/EntityKind"
+                  "$ref": "#/components/schemas/planner_search_project_path/$defs/EntityKind"
                 },
                 "type": "array"
               },
@@ -20274,7 +20274,7 @@
               "related_to": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/planner_search_path/$defs/ItemRef"
+                    "$ref": "#/components/schemas/planner_search_project_path/$defs/ItemRef"
                   },
                   {
                     "type": "null"
@@ -20313,7 +20313,7 @@
         ],
         "type": "object"
       },
-      "planner_search_problem": {
+      "planner_search_project_problem": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
           "code": {
@@ -41202,6 +41202,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -41261,6 +41262,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41308,6 +41310,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -41385,6 +41388,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41464,6 +41468,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -41531,6 +41536,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41616,6 +41622,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41677,6 +41684,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -41760,6 +41768,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41845,6 +41854,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -41859,14 +41869,14 @@
     },
     "/api/planner/v1/projects/{project}/search": {
       "post": {
-        "operationId": "planner_search",
+        "operationId": "planner_search_project",
         "parameters": [
           {
             "in": "path",
             "name": "project",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/planner_search_path/properties/project"
+              "$ref": "#/components/schemas/planner_search_project_path/properties/project"
             }
           }
         ],
@@ -41874,7 +41884,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/planner_search_body"
+                "$ref": "#/components/schemas/planner_search_project_body"
               }
             }
           },
@@ -41885,7 +41895,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/planner_search_output"
+                  "$ref": "#/components/schemas/planner_search_project_output"
                 }
               }
             },
@@ -41895,21 +41905,22 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/planner_search_problem"
+                  "$ref": "#/components/schemas/planner_search_project_problem"
                 }
               }
             },
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
         ],
-        "x-b10x-global-id": "planner/search",
+        "x-b10x-global-id": "planner/search.project",
         "x-b10x-idempotency": "idempotent",
         "x-b10x-input-schema": {
-          "$ref": "#/components/schemas/planner_search_input"
+          "$ref": "#/components/schemas/planner_search_project_input"
         },
         "x-b10x-risk-floor": "low"
       }
@@ -41979,6 +41990,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42056,6 +42068,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42121,6 +42134,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -42176,6 +42190,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -42223,6 +42238,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -42284,6 +42300,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42345,6 +42362,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42404,6 +42422,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42451,6 +42470,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -42512,6 +42532,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42571,6 +42592,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42630,6 +42652,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42687,6 +42710,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -42734,6 +42758,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"

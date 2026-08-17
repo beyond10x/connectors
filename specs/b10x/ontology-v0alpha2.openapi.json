@@ -3476,6 +3476,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -3521,6 +3522,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -3580,6 +3582,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -3635,6 +3638,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -3702,6 +3706,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -3761,6 +3766,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -3808,6 +3814,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write",
@@ -3856,6 +3863,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write"
@@ -3903,6 +3911,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -3950,6 +3959,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write",
@@ -3998,6 +4008,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write",
@@ -4046,6 +4057,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write",
@@ -4094,6 +4106,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"
@@ -4141,6 +4154,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "required",
         "x-b10x-direction": "write",
         "x-b10x-effects": [
           "write",
@@ -4189,6 +4203,7 @@
             "description": "Typed module problem"
           }
         },
+        "x-b10x-approval": "not-required",
         "x-b10x-direction": "read",
         "x-b10x-effects": [
           "read"

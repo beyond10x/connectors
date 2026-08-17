@@ -6,9 +6,11 @@ use protocol::datasource::{
 };
 use protocol::operation::{DescribeRequest, InvokeRequest, OwnerContext, SearchRequest};
 use std::fs;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use std::net::TcpListener;
+use std::os::unix::fs::PermissionsExt as _;
 use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 

@@ -34,7 +34,15 @@ pub(super) struct AuditEvent<'a> {
     pub(super) operation_ref: &'a str,
     pub(super) connection_ref: &'a str,
     pub(super) tenant_id: &'a str,
+    pub(super) subject: &'a str,
     pub(super) actor_subject: &'a str,
+    pub(super) issuer: Option<&'a str>,
+    pub(super) token_id: Option<&'a str>,
+    pub(super) deployment_id: Option<&'a str>,
+    pub(super) request_id: Option<&'a str>,
+    pub(super) trace_id: Option<&'a str>,
+    pub(super) authority_snapshot_id: &'a str,
+    pub(super) authority_snapshot_sha256: &'a str,
     pub(super) outcome: &'a str,
 }
 
