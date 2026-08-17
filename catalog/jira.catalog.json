@@ -110,6 +110,46 @@
       "required": true,
       "secret": true,
       "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "oauth.client_id",
+      "docs_url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+      "format": "text",
+      "help": "The client ID of the Atlassian OAuth 2.0 (3LO) application registered for this deployment. Supplied once by the deployment operator, not by the user authorizing a Jira Connection",
+      "label": "Atlassian OAuth application client ID",
+      "level": "operator",
+      "name": "oauth_client_id",
+      "required": false,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "oauth.redirect_uri",
+      "docs_url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+      "example": "https://connectors.example/api/oauth/callback",
+      "format": "url",
+      "help": "The callback URL served by this deployment and registered on the Atlassian OAuth application",
+      "label": "Atlassian OAuth callback URL",
+      "level": "operator",
+      "name": "oauth_redirect_uri",
+      "required": false,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "oauth.client_secret",
+      "docs_url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+      "format": "token",
+      "help": "The client secret issued for the Atlassian OAuth application. Supplied once by the deployment operator and never exposed to the user authorizing a Jira Connection",
+      "label": "Atlassian OAuth application client secret",
+      "level": "operator",
+      "name": "oauth_client_secret",
+      "required": false,
+      "secret": true,
+      "service": "default"
     }
   ],
   "connector": "jira",
