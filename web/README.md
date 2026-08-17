@@ -5,7 +5,7 @@ Publishing automation has not yet been restored; the repair is tracked in
 [S-018](../docs/stories/S-018-the-explorer-works-against-the-new-site-json.md).
 
 **The Node toolchain is contained here.** `package.json`, `package-lock.json` and `node_modules` all
-live under `web/`; nothing about the Rust workspace at the repository root knows or cares that this
+live under `web/`; nothing about the Rust workspace at the component root knows or cares that this
 directory exists.
 
 ## Build
@@ -30,7 +30,7 @@ npm test         # the explorer's contract with the catalogue — run after `npm
 `public/catalog.json` and the built HTML in `.vitepress/dist`, so it must follow a build.
 
 S-018 and S-020 own the future CI web job. Until both land, these commands are local diagnostics and
-the repository does not claim that a broken site is mechanically gated.
+the component does not claim that a broken site is mechanically gated.
 
 ## Layout
 
@@ -49,7 +49,7 @@ the repository does not claim that a broken site is mechanically gated.
 
 This site is for connector consumers. It explains available services and operations, their call
 contracts, safety metadata, credentials, hosts, and current availability. Internal designs, roadmap
-and story mechanics, crate architecture, and agent instructions belong in the repository docs and
+and story mechanics, crate architecture, and agent instructions belong in the component docs and
 must not be linked or reproduced on the public pages.
 
 The migrated theme references `public/brand/{icon,mark}.svg`, but neither those public copies nor a
@@ -73,7 +73,7 @@ verified to fail when the base is wrong.
 
 **No hand-written catalogue data.** Everything the site says about providers and connector
 operations must come from generated files, not from markdown or a `.vue` component. A
-second, hand-maintained copy of the catalogue is the exact failure this repository exists to correct.
+second, hand-maintained copy of the catalogue is the exact failure this component exists to correct.
 
 `public/catalog.json` is a generated, gitignored work product written by
 `cargo run -p catalog-cli -- build`; it is not a committed artifact today. S-018 owns the site input

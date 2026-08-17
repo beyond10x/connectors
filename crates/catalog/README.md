@@ -2,7 +2,8 @@
 
 **The connector catalogue as typed `&'static` data, served from the embedded catalog pack.**
 
-Part of [b10x/connectors](https://github.com/b10x/connectors). An internal workspace
+Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
+`foundation/connectors`. An internal workspace
 member: nothing here publishes.
 
 ```rust

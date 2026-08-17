@@ -3,7 +3,8 @@
 Dependency-free reader for the connectors **catalog pack** — every connector's canonical
 document, compiled into one embedded, versioned, digest-checked file.
 
-The pack is built by [`catalog build`](https://github.com/b10x/connectors)
+The pack is built by `catalog build` in the private
+[B10x monorepo](https://github.com/b10x/b10x) at `foundation/connectors`
 from the reviewed per-provider documents (`catalog/<name>.catalog.json`). This crate embeds the
 pack that matches its own release and serves it with **zero non-optional dependencies**: no JSON
 parser, no compression codec, no hash crate — the container is offset-indexed UTF-8 and the

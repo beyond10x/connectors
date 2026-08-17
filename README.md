@@ -10,13 +10,13 @@ runtime maturity.
 **Status: pre-v1, foundation phase.** The catalog family and personal-local runtime build. Bounded
 hosted Operation, Connection, and Event APIs are available for Identity-authenticated,
 deployment-owned Integrations. Receiver-owned operator-group, exact-scope, Integration, Connection,
-and Grant admission gates hosted Slack setup, invocation, and events. The repository does not claim
+and Grant admission gates hosted Slack setup, invocation, and events. The component does not claim
 the full SaaS or satellite surface.
 
 - [docs/VISION.md](docs/VISION.md) — what this is, why, principles, non-goals.
 - [docs/design/01-domain-model.md](docs/design/01-domain-model.md) — the nouns and their
   invariants.
-- [docs/design/02-architecture.md](docs/design/02-architecture.md) — repository layers, ports,
+- [docs/design/02-architecture.md](docs/design/02-architecture.md) — component layers, ports,
   postures, and build order.
 - [docs/design/03-beyond-http.md](docs/design/03-beyond-http.md) — interaction shapes, closed
   drivers, placement, and the direct byte-plane split.
@@ -32,7 +32,7 @@ the full SaaS or satellite surface.
 - [docs/research/](docs/research/) — the platform-category survey and mined catalog-as-text
   precedents (with vendored primary sources under `docs/research/vendor/`).
 
-This repository consolidates and succeeds `flux-connectors` and `flux-exchange`. The catalog and
+This component consolidates and succeeds `flux-connectors` and `flux-exchange`. The catalog and
 ingestion pipeline migrate here largely as-is; the platform is a fresh design informed by what
 those codebases proved and what they got wrong.
 
@@ -121,8 +121,8 @@ Hosted Slack requires the Vault SecretStore. Its prepared transaction stages all
 credentials in Vault, durably commits them, and only then publishes value-free Connection metadata.
 The app-level `xapp` credential belongs to the Slack Integration and its Socket Mode supervisor;
 each workspace Connection binds its `xoxb` bot credential and delegated `xoxp` user credential.
-Configuration, the Connector state PVC, logs, audit, Agent, and model-facing contracts never store
-or return those values. Kubernetes Deployment status still needs no provider secret and uses its
+Configuration, the Connector PostgreSQL database, logs, audit, Agent, and model-facing contracts
+never store or return those values. Kubernetes Deployment status still needs no provider secret and uses its
 bounded ServiceAccount RBAC directly.
 
 A local Zwirn client can use the hosted placement after Identity login:

@@ -4,9 +4,9 @@
 
 **Inputs:** [Design 01](01-domain-model.md) · [Design 02](02-architecture.md) ·
 [Design 06](06-personal-slack-socket-mode.md) ·
-[`b10x/architecture` RFC 0004](https://github.com/b10x/b10x/blob/main/architecture/rfcs/0004-satellite-federation.md) ·
-[`b10x/architecture` RFC 0013](https://github.com/b10x/b10x/blob/main/architecture/rfcs/0013-credential-custody-follows-connector-placement.md) ·
-[`b10x/architecture` ADR 0032](https://github.com/b10x/b10x/blob/main/architecture/adr/0032-central-managed-credential-custody-is-bounded.md)
+[`b10x/architecture` RFC 0004](../../../../architecture/rfcs/0004-satellite-federation.md) ·
+[`b10x/architecture` RFC 0013](../../../../architecture/rfcs/0013-credential-custody-follows-connector-placement.md) ·
+[`b10x/architecture` ADR 0032](../../../../architecture/adr/0032-central-managed-credential-custody-is-bounded.md)
 
 **2026-08-15 decision boundary.** ADR 0032 accepts only the central Connector-managed Vault KV v2
 topology, its ownership and server-derived binding, value-free projection, no-retrieval, no-fallback,

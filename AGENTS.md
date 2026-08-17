@@ -1,10 +1,11 @@
 # AGENTS.md
 
-Orientation for agents (and humans) working in this repository.
+Orientation for agents (and humans) working in this component.
 
 ## Status
 
-Pre-v1, design phase: **the documents are the product**. Read current authority in order:
+Pre-v1 implementation phase: the catalog, platform service, hosted integrations, and product
+binaries are implemented alongside their design authority. Read current authority in order:
 [docs/design/01-domain-model.md](docs/design/01-domain-model.md) →
 [docs/design/02-architecture.md](docs/design/02-architecture.md) →
 [docs/VISION.md](docs/VISION.md) (historical founding intent). The research corpus
@@ -24,12 +25,12 @@ parallel, up to five at once. When a wave is narrow, say plainly what caps it: i
 graph rather than caution, name the blocked stories and what unblocks each.
 
 **Deferred by Timo on 2026-08-13:** a family-level architecture review across the `architecture`,
-`connectors` and `substrate` repositories — how everything connects — postponed until `substrate`'s
+`connectors` and `substrate` components — how everything connects — postponed until `substrate`'s
 documents are finished. Pick it up when Timo says substrate is done.
 
 ## Commits
 
-- This repository is private. Its visibility must not change without Timo's explicit approval.
+- The monorepo is private. Its visibility must not change without Timo's explicit approval.
 - Lowercase `area: summary` titles (`docs:`, `research:`, `scripts:`, `chore:`), body with
   bullet points. Write messages via `git commit -F -` with a quoted heredoc, never `-m` with
   backticks.
@@ -41,7 +42,7 @@ documents are finished. Pick it up when Timo says substrate is done.
 **Anything not typed by Timo commits and pushes as the bot — including agent sessions and CI.**
 Only Timo at the keyboard pushes as a human. The bot is the org-owned GitHub App
 **b10x-bot** (permissions: contents, workflows, metadata — nothing more). No PATs, machine
-accounts, or long-lived repository credentials.
+accounts, or long-lived source-control credentials.
 
 For agents that means: work normally, but commit via `scripts/as-bot.sh commit …` and push via
 `scripts/as-bot.sh push …` — never plain `git commit`/`git push`.
@@ -83,7 +84,7 @@ non-negotiable; the mechanics arrive with M1 (`catalog …`). Read VISION.md
 principles 1–3 and the Provider/Operation sections of the domain model first.
 
 1. **Pick the source mode.** Use an official machine-readable specification whenever one exists.
-   When none exists, author the missing specification in this repository from authoritative vendor
+   When none exists, author the missing specification in this component from authoritative vendor
    documentation. OpenAPI ingest is for very large surfaces — and ingest **selects nothing by
    default**: a 398-operation document with no patch yields zero operations, deliberately.
 2. **Specs are authoritative and truthfully owned.** Every connector begins in `specs/`. A spec is
@@ -159,65 +160,19 @@ and consumer list in the same change; do not claim the invariant suite checks th
 
 ## Gate
 
-`.github/workflows/ci.yml` is the authoritative gate for repository governance and the landed Rust
-surface. It runs the following commands on every pull request and push to `main`:
+The monorepo-local gate is authoritative. From the repository root run:
 
 ```text
-python3 scripts/check-links.py
-python3 scripts/check-stories.py
-cargo fetch --locked
-cargo fetch --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
-cargo fetch --manifest-path crates/driver-sip/Cargo.toml --locked
-cargo fetch --manifest-path crates/driver-audio/Cargo.toml --locked
-cargo fetch --manifest-path crates/driver-cdp/Cargo.toml --locked
-cargo fetch --manifest-path crates/voice-runtime/Cargo.toml --locked
-cargo fetch --manifest-path crates/connectors-runtime/Cargo.toml --locked
-cargo fetch --manifest-path crates/connectors-cli/Cargo.toml --locked
-cargo build --workspace --locked
-cargo build --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
-cargo build --manifest-path crates/driver-sip/Cargo.toml --locked
-cargo build --manifest-path crates/driver-audio/Cargo.toml --locked
-cargo build --manifest-path crates/driver-cdp/Cargo.toml --locked
-cargo build --manifest-path crates/voice-runtime/Cargo.toml --locked
-cargo build --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked
-cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked
-cargo test --locked -p catalog-build --test main json_governance::
-cargo test --workspace --locked --no-fail-fast
-cargo test --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --locked
-cargo test --manifest-path crates/driver-sip/Cargo.toml --locked
-cargo test --manifest-path crates/driver-audio/Cargo.toml --locked
-cargo test --manifest-path crates/driver-cdp/Cargo.toml --locked
-cargo test --manifest-path crates/voice-runtime/Cargo.toml --locked
-cargo test --manifest-path crates/connectors-runtime/Cargo.toml --workspace --locked --no-fail-fast
-cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/driver-sip/Cargo.toml --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/driver-audio/Cargo.toml --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/driver-cdp/Cargo.toml --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/voice-runtime/Cargo.toml --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/connectors-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
-cargo clippy --manifest-path crates/connectors-cli/Cargo.toml --all-targets --locked -- -D warnings
-cargo fmt --all --check
-cargo fmt --manifest-path crates/rtvbp-voice-endpoint/Cargo.toml --all --check
-cargo fmt --manifest-path crates/driver-sip/Cargo.toml --all --check
-cargo fmt --manifest-path crates/driver-audio/Cargo.toml --all --check
-cargo fmt --manifest-path crates/driver-cdp/Cargo.toml --all --check
-cargo fmt --manifest-path crates/voice-runtime/Cargo.toml --all --check
-cargo fmt --manifest-path crates/connectors-runtime/Cargo.toml --all --check
-cargo fmt --manifest-path crates/connectors-cli/Cargo.toml --all --check
-cargo run --locked -p catalog-cli -- build
-cargo run --locked -p catalog-cli -- diff
-cargo run --locked -p catalog-cli -- check
+bash scripts/check-local.sh --all
 ```
 
-A separate job builds and tests with Rust 1.88.0, the declared MSRV. `catalog check` independently
-rehashes the provider declarations, vendored specs, lock rows and generated artifacts; it runs
-offline after build and diff. The web job remains owned jointly by S-018/S-020 and is not described
-as enforced. Stable releases remain gated by architecture ADR 0020 while private forge rules are
-unavailable.
+For a focused Connectors iteration, run `python3 scripts/check-links.py`,
+`python3 scripts/check-stories.py`, the affected Cargo workspace's locked test/clippy/fmt commands,
+and `cargo run --locked --offline -p catalog-cli -- check` from `foundation/connectors`. The root
+gate remains required before treating the monorepo change as green. `catalog check` independently
+rehashes provider declarations, vendored specs, lock rows, and generated artifacts.
 
-`json-schemas.toml` is the closed inventory for JSON. Every repository-owned JSON document names a
+`json-schemas.toml` is the closed inventory for JSON. Every component-owned JSON document names a
 local schema, and the dedicated governance gate validates it with the pinned Draft 2020-12
 implementation. Every JSON Schema declares and validates against that same meta-schema. Imported
 vendor specs are listed by exact path as `vendored-source`: the gate syntax-checks their bytes but
@@ -242,13 +197,10 @@ The agent instruction is therefore short:
 
 ## Boundaries
 
-- **M1 has landed: the catalog builds here.** `cargo build --workspace` and
-  `cargo test --workspace` are green, and `catalog build` compiles `providers/` plus the vendored
-  spec cache into `catalog/`, the pack, `connectors.lock` and the site projection. Do not scaffold
-  crates ahead of the remaining build order in
-  [02-architecture.md §9](docs/design/02-architecture.md) — the platform family (`domain`,
-  `protocol`, `service`, `server`) is M2's, and the user-facing `connectors` binary arrives with it.
-  `catalog` is the repository-maintenance CLI and is never a release artifact.
+- The catalog, platform family (`domain`, `protocol`, `service`, `server`), hosted runtime and
+  integrations, and user-facing `connectors` binary have landed. `catalog` remains the
+  component-maintenance CLI and is never a release artifact. Extend the existing named owner
+  crates; do not recreate their responsibilities in a parallel package.
 - **No `codewandler-flux-*` crate may enter this workspace**, in any dependency kind — not as a
   dependency, not as a dev-dependency, not behind an off-by-default feature.
   `crates/catalog-build/tests/main/engine_free.rs` asserts it three ways.
@@ -264,7 +216,7 @@ The agent instruction is therefore short:
   [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
   references: mine them, copy from them per the architecture inventory, and never edit them from
   here. The durable housing decision is
-  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/main/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
+  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](../../architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 `predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
 navigable authority. The surrounding comment must restate the rule the current implementation uses;

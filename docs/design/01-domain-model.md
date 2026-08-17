@@ -260,7 +260,7 @@ external secret provider. An organization deployment uses its configured encrypt
 store, an external secret provider, or workload identity. A development-only owner-permissioned
 file backend may prove transaction and recovery behavior, but is not a releasable credential
 posture. [Design 07](07-credential-custody-topologies.md) proposes the placement and custody matrix
-for cross-repository decision.
+for cross-component decision.
 
 - *Invariant:* a credential never crosses to a client, appears in a log, an audit record, an
   error, or a catalog artifact. Placement (where it goes in a request) and subject/hazard (what

@@ -3,12 +3,12 @@
 **Status:** personal-local alpha operation serving and development SIP/RTVBP path implemented; stable serving gated · **Date:** 2026-08-14
 
 **Authority:**
-[architecture ADR 0024](https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
-[architecture ADR 0026](https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md) ·
-[architecture RFC 0009](https://github.com/b10x/b10x/blob/main/architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md) ·
-[development vectors](https://github.com/b10x/b10x/blob/main/architecture/specifications/draft/voice-session-v1/README.md)
+[architecture ADR 0024](../../../../architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
+[architecture ADR 0026](../../../../architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md) ·
+[architecture RFC 0009](../../../../architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md) ·
+[development vectors](../../../../architecture/specifications/draft/voice-session-v1/README.md)
 
-This document turns the accepted cross-repository boundary into a Connectors implementation shape.
+This document turns the accepted cross-component boundary into a Connectors implementation shape.
 The platform-family plan/dispatch seam, alpha `VoiceSession` owner bundle, one-shot authority, and
 memory RTVBP endpoint now exist. The exact `sipx` driver, proof-bearing admission, locally
 bounded WebSocket endpoints, application adapter, and a supervised runtime leaf now also exist.
@@ -149,7 +149,7 @@ connectors binary ─▶ server local operation port
 ```
 
 `domain::voice` separates a protocol-neutral internal `TelephonySession` from the released
-cross-repository `VoiceSession` semantics. `driver-sip` implements the first.
+cross-component `VoiceSession` semantics. `driver-sip` implements the first.
 `rtvbp-voice-endpoint` maps the second onto the generic RTVBP runtime while consuming the first.
 `server` alone joins Grant admission with deployment-selected SIP and application routes into a
 non-serializable `AdmittedVoicePlan`. `voice-runtime` alone consumes that proof and composes the two
@@ -352,7 +352,7 @@ replacement or a reviewed maintained fork and a repinned owner bundle.
 2. Complete S-032's remaining loopback matrix: registration, inbound dialog, DTMF, authentication
    refusal, reconnect, learned-peer refusal, and overload/interruption teardown. Outbound ringing
    cancellation, including observed SIP CANCEL, is now covered.
-3. Complete S-033's cross-repository lifecycle vectors, including lease, revocation, generation
+3. Complete S-033's cross-component lifecycle vectors, including lease, revocation, generation
    drain, and an outward satellite/unserved fixture. The local WebSocket now proves immediate
    causal overload and bounded joined teardown even when writes never progress.
 4. The repository-authored B10x Provider declaration, generated `sip-dial` member, source

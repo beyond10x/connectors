@@ -3,7 +3,8 @@
 **The connector IR and its two front-ends: provider TOML and OpenAPI ingest. Performs no network
 IO.**
 
-Part of [b10x/connectors](https://github.com/b10x/connectors), which compiles reviewed
+Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
+`foundation/connectors`, which compiles reviewed
 connector declarations into canonical catalog documents.
 
 ```toml
@@ -30,7 +31,7 @@ crates.io to deliver a few hundred lines of vocabulary.
 
 ## What it is not
 
-In the publish closure. This crate is this repository's compiler, not something a consumer adds; the
+In the publish closure. This crate is this component's compiler, not something a consumer adds; the
 crates.io closure is `connector-address`, `connector-catalog`, `connector-secrets` and
 `connector-pack`, derived from the manifests. Versions 0.7.0 and 0.8.0 went out before the
 vocabulary was extracted and cannot be withdrawn; nothing new is published from here.
