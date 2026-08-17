@@ -284,6 +284,20 @@ treat connector admission as substrate admission.
 Structural rules, each with a fence or a type making it non-optional:
 - `crates/server`'s egress module is the **only** place a vendor socket is opened; a dependency
   fence classifies every crate as network/no-network and fails on drift.
+- **Post-DNS egress amendment (2026-08-17):** `service` owns one transport-neutral egress port;
+  released HTTP integrations receive that capability from `connectors-runtime` and cannot depend
+  on `server`. The sole `server::egress` implementation matches deployment-owned scheme, host, and
+  port before resolution; rejects an entire empty, mixed, local, reserved, or out-of-scope DNS
+  answer; disables redirects and ambient proxies; bounds selected response headers and bodies; and
+  pins HTTP and WebSocket sockets to the admitted answer while retaining the hostname for TLS.
+  Slack admits only public `slack.com` HTTP and Slack-owned Socket Mode hosts. Grafana admits one
+  exact operator-selected origin, including a private routed address but never process-local,
+  link-local, multicast, or documentation space. The exhaustive gate scans both released
+  integrations for a direct `server` dependency and raw HTTP client, DNS, TCP, or WebSocket calls,
+  and proves `server` remains the physical port implementation. Hosted configuration and Helm must
+  carry `connection_bound_post_dns_v1`; omission fails closed. This releases only Slack and Grafana
+  transport. SIP, GitLab, Jira, browser navigation, and effect-bearing hosted operations retain
+  their independent fences.
 - **Native-voice amendment (2026-08-14):** the selected `sipx-transport` API owns its sockets and
   performs its own `bind(Config)`. `server`/`service` remains the only admission, destination-policy,
   credential and composition path, but the closed `driver-sip` crate is the one named exception

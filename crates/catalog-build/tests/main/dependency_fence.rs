@@ -399,6 +399,65 @@ fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
     );
 }
 
+/// Credential-bearing integrations may assemble requests, but the service port plus its server
+/// implementation own every DNS lookup and outbound socket. This is deliberately a source fence
+/// as well as a review rule: adding a convenient raw client to a released integration must break
+/// the exhaustive local gate.
+#[test]
+fn released_http_integrations_cannot_bypass_connection_bound_egress() {
+    let root = workspace_root();
+    for integration in ["integration-monitoring", "integration-slack"] {
+        let directory = root.join("crates").join(integration);
+        let manifest_path = directory.join("Cargo.toml");
+        let manifest = std::fs::read_to_string(&manifest_path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display()));
+        let document: toml::Value = manifest
+            .parse()
+            .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+        let dependencies = document
+            .get("dependencies")
+            .and_then(toml::Value::as_table)
+            .expect("Integration dependencies");
+        assert!(
+            dependencies.contains_key("service") && !dependencies.contains_key("server"),
+            "{integration} must consume the service-owned egress port without depending on server"
+        );
+
+        let mut uses_egress = false;
+        for source in rust_sources_below(&directory.join("src")) {
+            let text = std::fs::read_to_string(&source)
+                .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
+            uses_egress |= text.contains("EgressTransport");
+            for forbidden in [
+                "reqwest::Client",
+                "connect_async",
+                "client_async",
+                "TcpStream::connect",
+                "lookup_host",
+            ] {
+                assert!(
+                    !text.contains(forbidden),
+                    "{} bypasses the Connection-bound egress SDK with `{forbidden}`",
+                    source.display()
+                );
+            }
+        }
+        assert!(
+            uses_egress,
+            "{integration} does not consume the Connection-bound egress port"
+        );
+    }
+    let server_sources = rust_sources_below(&root.join("crates/server/src"));
+    assert!(
+        server_sources.iter().any(|source| {
+            std::fs::read_to_string(source)
+                .expect("server source")
+                .contains("impl EgressTransport for ConnectionEgress")
+        }),
+        "server must remain the physical implementation of the Connection-bound egress port"
+    );
+}
+
 /// sipx owns real sockets, so its closure and bind call stay in one explicitly isolated crate.
 #[test]
 fn the_sipx_network_dependency_is_exactly_pinned_and_isolated() {

@@ -7,6 +7,7 @@ pub mod authority;
 mod browser;
 mod connect_session;
 mod dispatch;
+mod egress;
 mod planning;
 mod runtime;
 mod sip;
@@ -27,6 +28,10 @@ pub use connect_session::{
 pub use dispatch::{
     AuditSink, BuiltInDriver, CredentialSet, DispatchError, DispatchPolicy, DispatchResult,
     Dispatcher, SensitiveValue,
+};
+pub use egress::{
+    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError, EgressWebSocket,
+    EgressWebSocketFrame,
 };
 pub use planning::{plan_operation, PlanError, PlanningEnvironment};
 pub use runtime::{

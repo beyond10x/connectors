@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use base64::Engine as _;
 use connect_session_transport::{
     remove_endpoint, BoundCompletionEndpoint, CompletionTransportError,
 };
@@ -20,7 +21,6 @@ use connector_secrets::{
     SecretProposalDigest, SecretTransactionGeneration, SecretTransactionId, SecretTransactionState,
     TenantLayout,
 };
-use futures_util::{SinkExt as _, StreamExt as _};
 use hosted_state::PostgresState;
 use protocol::connection::{
     ChannelState, ChannelSummary as ConnectionChannelSummary, ConnectSessionStatus,
@@ -44,19 +44,18 @@ use protocol::operation::{
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
-use reqwest::redirect::Policy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use tokio::sync::{watch, Notify};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::tungstenite::protocol::{Message, WebSocketConfig};
 use zeroize::Zeroizing;
 
 use connectors_config::{InitiationConfig, SlackIntegrationConfig};
 use service::{
     BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectSessionLifecycle,
-    ConnectSessionLifecycleError, ConnectSessionTerminal, ConnectorBackend, HostedCompletionError,
+    ConnectSessionLifecycleError, ConnectSessionTerminal, ConnectorBackend, EgressHttpRequest,
+    EgressTransport, EgressWebSocket, EgressWebSocketFrame, HostedCompletionError,
     HostedCompletionPage, HostedCompletionSubmission, PrincipalContext,
 };
 
@@ -149,13 +148,13 @@ struct SlackInner {
     supervisors_started: Mutex<std::collections::BTreeSet<String>>,
     shutdown: watch::Sender<bool>,
     tasks: Mutex<Vec<JoinHandle<()>>>,
-    http: reqwest::Client,
+    egress: Arc<dyn EgressTransport>,
     supervision_enabled: bool,
 }
 
 #[derive(Clone)]
 enum PrincipalAdmission {
-    Exact(PrincipalContext),
+    Exact(Box<PrincipalContext>),
     Tenant(String),
 }
 
@@ -185,19 +184,14 @@ struct OAuthPending {
     expires_at_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum SlackConnectionProfile {
+    #[default]
     Legacy,
     OrgBot,
     OrgUser,
     CompanionBot,
-}
-
-impl Default for SlackConnectionProfile {
-    fn default() -> Self {
-        Self::Legacy
-    }
 }
 
 impl SlackConnectionProfile {
@@ -421,16 +415,18 @@ impl SlackBackend {
         policy: SlackIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, SlackError> {
-        Self::open_inner(
-            PrincipalAdmission::Exact(owner),
-            CompletionMode::Local,
+        Self::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Exact(Box::new(owner)),
+            completion_mode: CompletionMode::Local,
             policy,
             state_root,
             credential_store,
-            None,
-            true,
-        )
+            egress,
+            hosted_state: None,
+            supervision_enabled: true,
+        })
         .await
     }
 
@@ -443,16 +439,18 @@ impl SlackBackend {
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
         hosted_state: PostgresState,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, SlackError> {
-        Self::open_inner(
-            PrincipalAdmission::Tenant(tenant_id),
-            CompletionMode::Hosted { public_origin },
+        Self::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Tenant(tenant_id),
+            completion_mode: CompletionMode::Hosted { public_origin },
             policy,
             state_root,
             credential_store,
-            Some(hosted_state),
-            true,
-        )
+            egress,
+            hosted_state: Some(hosted_state),
+            supervision_enabled: true,
+        })
         .await
     }
 
@@ -464,27 +462,30 @@ impl SlackBackend {
         credential_store: Arc<dyn PreparedSecretStore>,
         supervision_enabled: bool,
     ) -> Result<Self, SlackError> {
-        Self::open_inner(
-            PrincipalAdmission::Exact(owner),
-            CompletionMode::Local,
+        Self::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Exact(Box::new(owner)),
+            completion_mode: CompletionMode::Local,
             policy,
             state_root,
             credential_store,
-            None,
+            egress: test_egress(),
+            hosted_state: None,
             supervision_enabled,
-        )
+        })
         .await
     }
 
-    async fn open_inner(
-        admission: PrincipalAdmission,
-        completion_mode: CompletionMode,
-        policy: SlackIntegrationConfig,
-        state_root: &Path,
-        credential_store: Arc<dyn PreparedSecretStore>,
-        hosted_state: Option<PostgresState>,
-        supervision_enabled: bool,
-    ) -> Result<Self, SlackError> {
+    async fn open_inner(context: SlackOpenContext<'_>) -> Result<Self, SlackError> {
+        let SlackOpenContext {
+            admission,
+            completion_mode,
+            policy,
+            state_root,
+            credential_store,
+            egress,
+            hosted_state,
+            supervision_enabled,
+        } = context;
         let metadata = read_state(&state_root.join("connections.json"), hosted_state.as_ref())?;
         let event_store = Arc::new(EventStore::open(
             state_root.join("events.jsonl"),
@@ -494,14 +495,6 @@ impl SlackBackend {
             state_root.join("slack-reply-claims.jsonl"),
             hosted_state.clone(),
         )?;
-        let http = reqwest::Client::builder()
-            .redirect(Policy::none())
-            .no_proxy()
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(15))
-            .user_agent("b10x-connectors/0.1")
-            .build()
-            .map_err(|_| SlackError::new("http-client"))?;
         let (shutdown, _) = watch::channel(false);
         let inner = Arc::new(SlackInner {
             admission,
@@ -526,7 +519,7 @@ impl SlackBackend {
             supervisors_started: Mutex::new(std::collections::BTreeSet::new()),
             shutdown,
             tasks: Mutex::new(Vec::new()),
-            http,
+            egress,
             supervision_enabled,
         });
         inner.recover_pending().await?;
@@ -547,6 +540,17 @@ impl SlackBackend {
             .filter(|connection| self.inner.connection_is_admitted(connection))
             .count()
     }
+}
+
+struct SlackOpenContext<'a> {
+    admission: PrincipalAdmission,
+    completion_mode: CompletionMode,
+    policy: SlackIntegrationConfig,
+    state_root: &'a Path,
+    credential_store: Arc<dyn PreparedSecretStore>,
+    egress: Arc<dyn EgressTransport>,
+    hosted_state: Option<PostgresState>,
+    supervision_enabled: bool,
 }
 
 #[async_trait]
@@ -719,7 +723,11 @@ impl ConnectorBackend for SlackBackend {
                 return Err(error);
             }
         };
-        let evidence = match self.inner.verify_companion_credentials(&credentials).await {
+        let evidence = match self
+            .inner
+            .verify_companion_credentials(session_ref, &credentials)
+            .await
+        {
             Ok(evidence) => evidence,
             Err(error) => {
                 let _ =
@@ -1498,19 +1506,18 @@ const fn datasource_scope_label(profile: SlackConnectionProfile) -> &'static str
     }
 }
 
+type DatasourceRequestPlan = (
+    &'static str,
+    Vec<(String, String)>,
+    DatasourceRecordView,
+    Option<String>,
+);
+
 fn datasource_request_plan(
     datasource_ref: &str,
     profile: SlackConnectionProfile,
     read: &DatasourceRead,
-) -> Result<
-    (
-        &'static str,
-        Vec<(String, String)>,
-        DatasourceRecordView,
-        Option<String>,
-    ),
-    DatasourceError,
-> {
+) -> Result<DatasourceRequestPlan, DatasourceError> {
     match (datasource_ref, read) {
         ("slack.conversations", DatasourceRead::List { limit, cursor }) => {
             let types = match profile {
@@ -1873,30 +1880,16 @@ fn normalize_email(value: &str) -> Option<String> {
         .then_some(value)
 }
 
-async fn bounded_response(
-    response: &mut reqwest::Response,
-    maximum: usize,
-) -> Result<Vec<u8>, SlackError> {
-    if !response.status().is_success()
-        || response
-            .content_length()
-            .is_some_and(|length| length > maximum as u64)
-    {
-        return Err(SlackError::new("provider-response"));
+fn bearer_request(method: &str, url: String, token: &Secret) -> connector_resolve::Request {
+    connector_resolve::Request {
+        method: method.to_owned(),
+        url,
+        headers: BTreeMap::from([(
+            "Authorization".to_owned(),
+            format!("Bearer {}", token.expose_secret()),
+        )]),
+        body: None,
     }
-    let mut bytes =
-        Vec::with_capacity(response.content_length().unwrap_or(0).min(maximum as u64) as usize);
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|_| SlackError::new("provider-response"))?
-    {
-        if bytes.len().saturating_add(chunk.len()) > maximum {
-            return Err(SlackError::new("provider-response"));
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    Ok(bytes)
 }
 
 fn operation_not_found() -> OperationError {
@@ -2071,6 +2064,35 @@ fn validate_socket_url(value: &str) -> Result<(), SlackError> {
         return Err(SlackError::new("socket-ticket-url"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+struct RefusingEgress;
+
+#[cfg(test)]
+#[async_trait]
+impl EgressTransport for RefusingEgress {
+    async fn execute(
+        &self,
+        _authority_ref: &str,
+        _request: EgressHttpRequest,
+    ) -> Result<service::EgressHttpResponse, service::EgressTransportError> {
+        Err(service::EgressTransportError::Refused)
+    }
+
+    async fn connect_websocket(
+        &self,
+        _authority_ref: &str,
+        _url: String,
+        _maximum_message_bytes: usize,
+    ) -> Result<Box<dyn EgressWebSocket>, service::EgressTransportError> {
+        Err(service::EgressTransportError::Refused)
+    }
+}
+
+#[cfg(test)]
+fn test_egress() -> Arc<dyn EgressTransport> {
+    Arc::new(RefusingEgress)
 }
 
 fn random_uuid() -> Result<String, SlackError> {

@@ -84,22 +84,46 @@ impl SlackInner {
                 .get(&client_secret_ref)
                 .await
                 .map_err(|_| SlackError::new("oauth-config"))?;
-            let mut response = self
-                .http
-                .post(USER_OAUTH_ACCESS)
-                .basic_auth(client_id, Some(client_secret.expose_secret()))
-                .form(&[
-                    ("code", code.expect("checked OAuth code")),
-                    ("redirect_uri", redirect_uri),
-                    ("grant_type", "authorization_code"),
-                ])
-                .send()
+            let body = url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("code", code.expect("checked OAuth code"))
+                .append_pair("redirect_uri", redirect_uri)
+                .append_pair("grant_type", "authorization_code")
+                .finish();
+            let authorization = format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD
+                    .encode(format!("{client_id}:{}", client_secret.expose_secret()))
+            );
+            let exchange = connector_resolve::Request {
+                method: "POST".to_owned(),
+                url: USER_OAUTH_ACCESS.to_owned(),
+                headers: BTreeMap::from([
+                    ("Authorization".to_owned(), authorization),
+                    (
+                        "Content-Type".to_owned(),
+                        "application/x-www-form-urlencoded".to_owned(),
+                    ),
+                ]),
+                body: Some(body),
+            };
+            let response = self
+                .egress
+                .execute(
+                    &session_ref,
+                    EgressHttpRequest {
+                        request: exchange,
+                        maximum_response_bytes: MAX_AUTH_TEST_RESPONSE_BYTES,
+                        response_headers: Vec::new(),
+                    },
+                )
                 .await
                 .map_err(|_| SlackError::new("oauth-exchange"))?;
             drop(client_secret);
-            let bytes = bounded_response(&mut response, MAX_AUTH_TEST_RESPONSE_BYTES).await?;
-            let exchanged: UserOAuthResponse =
-                serde_json::from_slice(&bytes).map_err(|_| SlackError::new("oauth-exchange"))?;
+            if !response.is_success() {
+                return Err(SlackError::new("oauth-exchange"));
+            }
+            let exchanged: UserOAuthResponse = serde_json::from_slice(&response.body)
+                .map_err(|_| SlackError::new("oauth-exchange"))?;
             let actor = exchanged
                 .authed_user
                 .ok_or_else(|| SlackError::new("oauth-refused"))?;
@@ -118,7 +142,9 @@ impl SlackInner {
                 return Err(SlackError::new("credential-workspace"));
             }
             let access_token = Secret::new(access_token);
-            let slack_email = self.slack_user_email(&access_token, &actor.id).await?;
+            let slack_email = self
+                .slack_user_email(&session_ref, &access_token, &actor.id)
+                .await?;
             let expected_email = pending
                 .owner
                 .email
@@ -162,20 +188,29 @@ impl SlackInner {
 
     pub(super) async fn slack_user_email(
         &self,
+        authority_ref: &str,
         token: &Secret,
         user_id: &str,
     ) -> Result<String, SlackError> {
-        let mut response = self
-            .http
-            .get(USERS_INFO)
-            .bearer_auth(token.expose_secret())
-            .query(&[("user", user_id)])
-            .send()
+        let mut target = url::Url::parse(USERS_INFO).map_err(|_| SlackError::new("oauth-email"))?;
+        target.query_pairs_mut().append_pair("user", user_id);
+        let response = self
+            .egress
+            .execute(
+                authority_ref,
+                EgressHttpRequest {
+                    request: bearer_request("GET", target.into(), token),
+                    maximum_response_bytes: MAX_AUTH_TEST_RESPONSE_BYTES,
+                    response_headers: Vec::new(),
+                },
+            )
             .await
             .map_err(|_| SlackError::new("oauth-email"))?;
-        let bytes = bounded_response(&mut response, MAX_AUTH_TEST_RESPONSE_BYTES).await?;
+        if !response.is_success() {
+            return Err(SlackError::new("oauth-email"));
+        }
         let info: SlackUserInfoResponse =
-            serde_json::from_slice(&bytes).map_err(|_| SlackError::new("oauth-email"))?;
+            serde_json::from_slice(&response.body).map_err(|_| SlackError::new("oauth-email"))?;
         if !info.ok {
             return Err(SlackError::new("oauth-email"));
         }
@@ -210,7 +245,7 @@ impl SlackInner {
         if !valid_slack_token(bot.expose_secret(), "xoxb-") {
             return Err(SlackError::new("org-bot-credential"));
         }
-        let evidence = self.auth_test(&bot).await?;
+        let evidence = self.auth_test("connection:slack:org-bot", &bot).await?;
         drop(bot);
         if !evidence.is_bot || evidence.team_id != expected_team_id {
             return Err(SlackError::new("credential-workspace"));
@@ -280,7 +315,7 @@ impl SlackInner {
 
     pub(super) fn context_admitted(&self, actual: &PrincipalContext) -> bool {
         match &self.admission {
-            PrincipalAdmission::Exact(owner) => owner == actual,
+            PrincipalAdmission::Exact(owner) => owner.as_ref() == actual,
             PrincipalAdmission::Tenant(tenant) => tenant == actual.tenant_id(),
         }
     }
@@ -572,21 +607,30 @@ impl SlackInner {
             .begin(audit)
             .map_err(|_| datasource_unavailable())?;
         let dispatched = async {
-            let mut response = self
-                .http
-                .get(endpoint)
-                .bearer_auth(credential.expose_secret())
-                .query(params)
-                .send()
+            let mut target = url::Url::parse(endpoint).map_err(|_| datasource_unavailable())?;
+            target.query_pairs_mut().extend_pairs(
+                params
+                    .iter()
+                    .map(|(name, value)| (name.as_str(), value.as_str())),
+            );
+            let response = self
+                .egress
+                .execute(
+                    &connection.connection_ref,
+                    EgressHttpRequest {
+                        request: bearer_request("GET", target.into(), credential),
+                        maximum_response_bytes: protocol::datasource::MAX_RESULT_BYTES,
+                        response_headers: Vec::new(),
+                    },
+                )
                 .await
                 .map_err(|_| datasource_unavailable())?;
-            let status = response.status();
-            let bytes = bounded_response(&mut response, protocol::datasource::MAX_RESULT_BYTES)
-                .await
-                .map_err(|_| datasource_unavailable())?;
+            if !response.is_success() {
+                return Err(datasource_unavailable());
+            }
             let value: Value =
-                serde_json::from_slice(&bytes).map_err(|_| datasource_unavailable())?;
-            if status != reqwest::StatusCode::OK || value.get("ok") != Some(&Value::Bool(true)) {
+                serde_json::from_slice(&response.body).map_err(|_| datasource_unavailable())?;
+            if value.get("ok") != Some(&Value::Bool(true)) {
                 return Err(datasource_slack_refusal(&value));
             }
             Ok(value)
@@ -832,15 +876,7 @@ impl SlackInner {
         {
             return Err(operation_not_granted());
         }
-        let method = reqwest::Method::from_bytes(plan.request.method.as_bytes())
-            .map_err(|_| operation_unavailable())?;
-        let mut outbound = self.http.request(method, target);
-        for (name, value) in plan.request.headers {
-            outbound = outbound.header(name, value);
-        }
-        if let Some(body) = plan.request.body {
-            outbound = outbound.body(body);
-        }
+        let outbound = plan.request;
         if let Some(event_ref) = event_reply_claim {
             self.reply_claims
                 .claim(&event_ref, now_ms().ok_or_else(operation_unavailable)?)
@@ -871,30 +907,29 @@ impl SlackInner {
             .begin(audit)
             .map_err(|_| operation_unavailable())?;
         let dispatched = async {
-            let mut response = outbound.send().await.map_err(|_| operation_unavailable())?;
-            if !response.status().is_success()
-                || response
-                    .content_length()
-                    .is_some_and(|length| length > protocol::operation::MAX_RESULT_BYTES as u64)
-            {
-                return Err(operation_unavailable());
-            }
-            let mut bytes = Vec::new();
-            while let Some(chunk) = response
-                .chunk()
+            let response = self
+                .egress
+                .execute(
+                    &request.connection_ref,
+                    EgressHttpRequest {
+                        request: outbound,
+                        maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
+                        response_headers: Vec::new(),
+                    },
+                )
                 .await
-                .map_err(|_| operation_unavailable())?
-            {
-                if bytes.len().saturating_add(chunk.len()) > protocol::operation::MAX_RESULT_BYTES {
-                    return Err(OperationError::new(
+                .map_err(|error| match error {
+                    service::EgressTransportError::ResponseTooLarge => OperationError::new(
                         OperationErrorCode::ResultTooLarge,
                         "Slack operation result exceeds the admitted bound",
                         false,
-                    ));
-                }
-                bytes.extend_from_slice(&chunk);
+                    ),
+                    service::EgressTransportError::Refused => operation_unavailable(),
+                })?;
+            if !response.is_success() {
+                return Err(operation_unavailable());
             }
-            serde_json::from_slice(&bytes).map_err(|_| operation_unavailable())
+            serde_json::from_slice(&response.body).map_err(|_| operation_unavailable())
         }
         .await;
         let output = match dispatched {

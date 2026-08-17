@@ -253,8 +253,7 @@ struct PersonalTokenInfo {
 }
 
 impl GitlabBackend {
-    /// Open a hosted adapter. Configuration contains references and policy only; token values stay
-    /// behind the injected prepared Secret Store.
+    /// Open a hosted adapter with policy-only configuration and injected secret custody.
     pub async fn open_hosted(
         tenant_id: String,
         policy: HostedGitlabConfig,
@@ -1049,7 +1048,8 @@ impl GitlabInner {
     }
 
     async fn recover_pending(&self) -> Result<(), GitlabError> {
-        for pending in lock(&self.metadata).pending.clone() {
+        let pending_transactions = lock(&self.metadata).pending.clone();
+        for pending in pending_transactions {
             let transaction = decode_transaction(&pending.transaction_id)?;
             match self
                 .credential_store

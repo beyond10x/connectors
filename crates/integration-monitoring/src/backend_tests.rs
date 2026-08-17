@@ -56,7 +56,11 @@ mod tests {
 
     #[async_trait]
     impl HttpExecutor for FakeExecutor {
-        async fn execute(&self, request: Request) -> Result<Value, MonitoringError> {
+        async fn execute(
+            &self,
+            _connection_ref: &str,
+            request: Request,
+        ) -> Result<Value, MonitoringError> {
             let output = if request.url.contains("/api/datasources")
                 && !request.url.contains("/proxy/")
             {
@@ -75,7 +79,11 @@ mod tests {
 
     #[async_trait]
     impl HttpExecutor for BlockingExecutor {
-        async fn execute(&self, _request: Request) -> Result<Value, MonitoringError> {
+        async fn execute(
+            &self,
+            _connection_ref: &str,
+            _request: Request,
+        ) -> Result<Value, MonitoringError> {
             let call = self.calls.fetch_add(1, Ordering::SeqCst);
             if call == 0 {
                 self.entered.notify_one();

@@ -673,6 +673,7 @@ dependencies = [
  "identity-http",
  "integration-b10x",
  "integration-gitlab",
+ "integration-jira",
  "integration-kubernetes",
  "integration-monitoring",
  "integration-sip",
@@ -1952,6 +1953,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-jira"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "catalog",
+ "connector-resolve",
+ "connector-secrets",
+ "connectors-config",
+ "getrandom 0.3.4",
+ "hex",
+ "hosted-state",
+ "jsonschema 0.33.0",
+ "protocol",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "service",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "integration-kubernetes"
 version = "0.1.0"
 dependencies = [
@@ -1993,7 +2020,6 @@ dependencies = [
  "hosted-state",
  "monitoring-model",
  "protocol",
- "reqwest",
  "rustix",
  "serde",
  "serde_json",
@@ -2001,7 +2027,6 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 2.0.20",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -2037,12 +2062,12 @@ name = "integration-slack"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64",
  "catalog",
  "connect-session-transport",
  "connector-resolve",
  "connector-secrets",
  "connectors-config",
- "futures-util",
  "getrandom 0.3.4",
  "hex",
  "hosted-state",
@@ -2056,7 +2081,6 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 2.0.20",
  "tokio",
- "tokio-tungstenite 0.28.0",
  "url",
  "zeroize",
 ]
@@ -3740,12 +3764,15 @@ dependencies = [
  "fs2",
  "futures-util",
  "protocol",
+ "reqwest",
  "rustix",
  "serde",
  "serde_json",
  "service",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-tungstenite 0.28.0",
+ "url",
 ]
 
 [[package]]
