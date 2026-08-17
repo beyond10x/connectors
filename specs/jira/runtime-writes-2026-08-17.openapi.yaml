@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: Jira Cloud v2 curated delegated-write surface (B10x-authored)
+  version: "2026-08-17"
+  description: Repository-authored source evidence for the three Jira mutations added to B10x's established v2 issue catalog. It intentionally narrows Atlassian's flexible request objects to the exact fields the runtime admits.
+x-b10x-origin: repository-authored
+x-b10x-coverage: exact added Jira delegated-write surface
+servers:
+  - url: https://example.atlassian.net
+security:
+  - userOAuth: [read:jira-work, write:jira-work]
+paths:
+  /rest/api/2/issue/{issueIdOrKey}:
+    put:
+      operationId: jira_issue_edit_summary
+      summary: Replace only an issue summary
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put
+      parameters:
+        - $ref: '#/components/parameters/IssueIdOrKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [fields]
+              properties:
+                fields:
+                  type: object
+                  additionalProperties: false
+                  required: [summary]
+                  properties:
+                    summary:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+      responses:
+        "204":
+          description: Issue updated successfully; no response body.
+  /rest/api/2/issue/{issueIdOrKey}/comment/{id}:
+    put:
+      operationId: jira_issue_comment_edit
+      summary: Replace only a comment's v2 wiki-text body
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-id-put
+      parameters:
+        - $ref: '#/components/parameters/IssueIdOrKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]+$'
+            maxLength: 32
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 32768
+      responses:
+        "200":
+          description: Updated comment.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                required: [id, body]
+                properties:
+                  id: {type: string}
+                  body: {type: string}
+                  created: {type: string}
+                  updated: {type: string}
+  /rest/api/2/issueLink:
+    post:
+      operationId: jira_issue_link_add
+      summary: Create one named issue link without a comment
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-links/#api-rest-api-2-issuelink-post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type, inwardIssue, outwardIssue]
+              properties:
+                type:
+                  $ref: '#/components/schemas/LinkType'
+                inwardIssue:
+                  $ref: '#/components/schemas/IssueKey'
+                outwardIssue:
+                  $ref: '#/components/schemas/IssueKey'
+      responses:
+        "201":
+          description: Issue link created successfully; no response body is required.
+components:
+  securitySchemes:
+    userOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.atlassian.com/authorize
+          tokenUrl: https://auth.atlassian.com/oauth/token
+          scopes:
+            read:jira-work: Read Jira issue data available to the user.
+            write:jira-work: Write Jira issue data on behalf of the user.
+  parameters:
+    IssueIdOrKey:
+      name: issueIdOrKey
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 64
+  schemas:
+    LinkType:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+    IssueKey:
+      type: object
+      additionalProperties: false
+      required: [key]
+      properties:
+        key:
+          type: string
+          minLength: 3
+          maxLength: 64

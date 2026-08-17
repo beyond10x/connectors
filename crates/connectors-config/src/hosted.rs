@@ -37,7 +37,41 @@ pub struct HostedServerConfig {
     #[serde(default)]
     pub gitlab: Option<HostedGitlabConfig>,
     #[serde(default)]
+    pub jira: Option<HostedJiraConfig>,
+    #[serde(default)]
     pub b10x: Option<B10xIntegrationConfig>,
+}
+
+/// Value-free hosted Jira Cloud policy. Organization credentials are deployment-owned and may
+/// serve only the bounded issue datasource; delegated credentials are principal-owned and may
+/// additionally invoke the curated operation surface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedJiraConfig {
+    pub cloud_id: String,
+    pub site_origin: String,
+    pub public_origin: String,
+    pub allowed_project_keys: Vec<String>,
+    pub shared_auth: JiraSharedAuth,
+    #[serde(default)]
+    pub service_oauth_client_id: Option<String>,
+    pub user_oauth_client_id: String,
+    pub oauth_redirect_uri: String,
+    pub organization_read_grant_ref: String,
+    pub user_grant_ref: String,
+    pub initiation: InitiationConfig,
+    #[serde(default = "default_connect_session_ttl_seconds")]
+    pub connect_session_ttl_seconds: u64,
+    #[serde(default = "default_jira_refresh_skew_seconds")]
+    pub refresh_skew_seconds: u64,
+}
+
+/// Deployment-selected organization credential kind. Values remain in the Secret Store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JiraSharedAuth {
+    ServiceOauth,
+    ServiceApiToken,
 }
 
 /// Value-free policy for delegated GitLab user Connections.
@@ -329,9 +363,67 @@ impl HostedServerConfig {
                 && (60..=900).contains(&gitlab.connect_session_ttl_seconds)
                 && (60..=900).contains(&gitlab.refresh_skew_seconds)
         });
+        let jira_valid = self.jira.as_ref().is_none_or(|jira| {
+            let site = url::Url::parse(&jira.site_origin);
+            let public_origin = url::Url::parse(&jira.public_origin);
+            let redirect = url::Url::parse(&jira.oauth_redirect_uri);
+            let callback_valid = public_origin
+                .as_ref()
+                .ok()
+                .zip(redirect.as_ref().ok())
+                .is_some_and(|(public_origin, redirect)| {
+                    public_origin.scheme() == "https"
+                        && public_origin.host_str().is_some()
+                        && public_origin.username().is_empty()
+                        && public_origin.password().is_none()
+                        && public_origin.query().is_none()
+                        && public_origin.fragment().is_none()
+                        && public_origin.path() == self.server.base_path
+                        && redirect.scheme() == public_origin.scheme()
+                        && redirect.host_str() == public_origin.host_str()
+                        && redirect.port_or_known_default() == public_origin.port_or_known_default()
+                        && redirect.username().is_empty()
+                        && redirect.password().is_none()
+                        && redirect.query().is_none()
+                        && redirect.fragment().is_none()
+                        && redirect.path()
+                            == format!("{}/oauth/jira/callback", self.server.base_path)
+                                .replace("//", "/")
+                });
+            let projects = &jira.allowed_project_keys;
+            let mut canonical_projects = projects.clone();
+            canonical_projects.sort();
+            canonical_projects.dedup();
+            site.is_ok_and(|site| {
+                valid_https_origin(&site)
+                    && site
+                        .host_str()
+                        .is_some_and(|host| host.ends_with(".atlassian.net"))
+            }) && callback_valid
+                && valid_ref(&jira.cloud_id, 128)
+                && !projects.is_empty()
+                && projects == &canonical_projects
+                && projects
+                    .iter()
+                    .all(|project| valid_jira_project_key(project))
+                && match jira.shared_auth {
+                    JiraSharedAuth::ServiceOauth => jira
+                        .service_oauth_client_id
+                        .as_deref()
+                        .is_some_and(|value| valid_ref(value, 256)),
+                    JiraSharedAuth::ServiceApiToken => jira.service_oauth_client_id.is_none(),
+                }
+                && valid_ref(&jira.user_oauth_client_id, 256)
+                && valid_ref(&jira.organization_read_grant_ref, 512)
+                && valid_ref(&jira.user_grant_ref, 512)
+                && jira.organization_read_grant_ref != jira.user_grant_ref
+                && (60..=900).contains(&jira.connect_session_ttl_seconds)
+                && (60..=900).contains(&jira.refresh_skew_seconds)
+        });
         let vault_required = self.sip.credentials.is_some()
             || self.slack.is_some()
             || self.gitlab.is_some()
+            || self.jira.is_some()
             || self.grafana.enabled;
         let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
         let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
@@ -387,6 +479,7 @@ impl HostedServerConfig {
             || !valid_groups(&self.authority.operator_groups)
             || !slack_valid
             || !gitlab_valid
+            || !jira_valid
         {
             return Err(HostedServerConfigError::Invalid);
         }
@@ -580,6 +673,18 @@ fn valid_https_origin(origin: &url::Url) -> bool {
 
 fn default_gitlab_refresh_skew_seconds() -> u64 {
     300
+}
+
+fn default_jira_refresh_skew_seconds() -> u64 {
+    300
+}
+
+fn valid_jira_project_key(value: &str) -> bool {
+    (1..=32).contains(&value.len())
+        && value.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
 fn default_kubernetes_ca_file() -> PathBuf {
@@ -952,6 +1057,108 @@ refresh_skew_seconds = 300
         config.gitlab.as_mut().unwrap().oauth_redirect_uri =
             "https://code.example.test/api/connectors/v1/oauth/gitlab/callback".to_owned();
         config.vault.enabled = false;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn hosted_jira_separates_organization_and_user_authority() {
+        let mut config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+[jira]
+cloud_id = "11111111-2222-3333-4444-555555555555"
+site_origin = "https://example.atlassian.net"
+public_origin = "https://code.example.test/api/connectors/v1"
+allowed_project_keys = ["OPS", "SUPPORT"]
+shared_auth = "service_oauth"
+service_oauth_client_id = "jira-service-client"
+user_oauth_client_id = "jira-user-client"
+oauth_redirect_uri = "https://code.example.test/api/connectors/v1/oauth/jira/callback"
+organization_read_grant_ref = "grant:jira:organization-read"
+user_grant_ref = "grant:jira:delegated-user"
+initiation = "provider"
+connect_session_ttl_seconds = 300
+refresh_skew_seconds = 300
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        config.jira.as_mut().unwrap().allowed_project_keys.reverse();
+        assert!(config.validate().is_err());
+        config.jira.as_mut().unwrap().allowed_project_keys.reverse();
+        config.jira.as_mut().unwrap().user_grant_ref = "grant:jira:organization-read".to_owned();
+        assert!(config.validate().is_err());
+        config.jira.as_mut().unwrap().user_grant_ref = "grant:jira:delegated-user".to_owned();
+        config.jira.as_mut().unwrap().oauth_redirect_uri =
+            "https://attacker.example/api/connectors/v1/oauth/jira/callback".to_owned();
+        assert!(config.validate().is_err());
+        config.jira.as_mut().unwrap().oauth_redirect_uri =
+            "https://code.example.test/api/connectors/v1/oauth/jira/callback".to_owned();
+        config.vault.enabled = false;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn hosted_jira_service_api_token_excludes_a_service_oauth_client_id() {
+        let mut config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+[jira]
+cloud_id = "11111111-2222-3333-4444-555555555555"
+site_origin = "https://example.atlassian.net"
+public_origin = "https://code.example.test/api/connectors/v1"
+allowed_project_keys = ["OPS"]
+shared_auth = "service_api_token"
+user_oauth_client_id = "jira-user-client"
+oauth_redirect_uri = "https://code.example.test/api/connectors/v1/oauth/jira/callback"
+organization_read_grant_ref = "grant:jira:organization-read"
+user_grant_ref = "grant:jira:delegated-user"
+initiation = "b10x"
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        config.jira.as_mut().unwrap().service_oauth_client_id = Some("not-admitted".to_owned());
         assert!(config.validate().is_err());
     }
 

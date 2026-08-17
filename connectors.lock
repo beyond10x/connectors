@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "9c88cc4758edda3d40726d9d447248c96fdf3e0141ac66a649307b89e398a2b1"
+sha256 = "996f6b0040896b89347262cfa4b49342bf773fae6ec6c16a06f57227c98382f9"
 
 [[provider]]
 id = "airtable"
@@ -385,11 +385,11 @@ ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 [[provider]]
 id = "jira"
 generator = "connectors 0.1.0"
-toml_sha256 = "fd9bf3dc00d3c462579b01d9118025aacc9673bd61a505b80d49a72c26666f23"
-ir_sha256 = "8e4471ccf34b828be4ed412981371db97fbdd3a0ce53f779669a8ee8feaf938b"
+toml_sha256 = "a90055d9d8ea421d0553e3fa3459e5bb4f9ce80de87d45b71b5ae8aed6a2e5ba"
+ir_sha256 = "ba25aeb1912b38583e64c9c7404012a1ef5493d6647512d37571e0ebab3f5b86"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "046ba5cb81017bea8241f4166a6f7d94a047319d33ce3e5fc6475eb7ff1a615f"
+"catalog/jira.catalog.json" = "d8fd0459da48d06bebe6e5a6e36797f08b55b97f43a0bfa9021114b46b2188ea"
 
 [[provider]]
 id = "klaviyo"

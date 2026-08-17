@@ -13,6 +13,7 @@ use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_b10x::{B10xBackend, B10xIntegrationError};
 use integration_gitlab::GitlabBackend;
+use integration_jira::JiraBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
 use integration_sip::{
@@ -46,6 +47,8 @@ pub enum RuntimeError {
     Slack(#[from] integration_slack::SlackError),
     #[error(transparent)]
     Gitlab(#[from] integration_gitlab::GitlabError),
+    #[error(transparent)]
+    Jira(#[from] integration_jira::JiraError),
     #[error(transparent)]
     Monitoring(#[from] integration_monitoring::MonitoringError),
     #[error(transparent)]
@@ -443,6 +446,23 @@ impl HostedRuntime {
                 .await?,
             ));
         }
+        let jira_enabled = config.jira.is_some();
+        if let Some(jira) = config.jira {
+            let store = credential_stores
+                .prepared
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            backends.push(Arc::new(
+                JiraBackend::open_hosted(
+                    config.tenant_id.clone(),
+                    jira,
+                    store,
+                    hosted_state.clone(),
+                )
+                .await?,
+            ));
+        }
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let admission =
@@ -469,6 +489,7 @@ impl HostedRuntime {
             "b10x_enabled": b10x_enabled,
             "slack_enabled": slack_enabled,
             "gitlab_enabled": gitlab_enabled,
+            "jira_enabled": jira_enabled,
         });
         Ok(Self {
             listener,

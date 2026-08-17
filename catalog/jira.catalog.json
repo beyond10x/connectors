@@ -14,6 +14,59 @@
       "user_env": [
         "JIRA_USER"
       ]
+    },
+    {
+      "description": "Atlassian OAuth 2.0 access token granted by a signed-in user and bounded by that user's Jira permissions",
+      "name": "jira.user_oauth",
+      "oauth2": {
+        "authorize_path": "/authorize",
+        "endpoint": "login",
+        "grants": [
+          "authorization_code",
+          "refresh_token"
+        ],
+        "scopes": [
+          "offline_access",
+          "read:jira-work",
+          "read:me",
+          "write:jira-work"
+        ],
+        "token_path": "/oauth/token"
+      },
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "user"
+    },
+    {
+      "description": "Atlassian service-account OAuth 2.0 access token for the tenant-shared read-only issue projection",
+      "name": "jira.service_oauth",
+      "oauth2": {
+        "authorize_path": "/authorize",
+        "endpoint": "login",
+        "grants": [
+          "client_credentials"
+        ],
+        "scopes": [
+          "read:jira-work"
+        ],
+        "token_path": "/oauth/token"
+      },
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    },
+    {
+      "description": "Scoped Atlassian service-account API token for the tenant-shared read-only issue projection",
+      "env": [
+        "JIRA_SERVICE_API_TOKEN"
+      ],
+      "name": "jira.service_api_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
     }
   ],
   "authority": "com.atlassian.jira",
@@ -63,19 +116,123 @@
   "default_auth": [
     [
       "jira.api_token"
+    ],
+    [
+      "jira.user_oauth"
+    ],
+    [
+      "jira.service_oauth"
+    ],
+    [
+      "jira.service_api_token"
     ]
   ],
-  "description": "Jira Cloud issue tracking: read and create issues, comment on them, and drive workflow transitions",
+  "default_auth_requirements": [
+    {
+      "credentials": [
+        "jira.api_token"
+      ]
+    },
+    {
+      "credentials": [
+        "jira.user_oauth"
+      ],
+      "scopes": {
+        "jira.user_oauth": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "jira.service_oauth"
+      ],
+      "scopes": {
+        "jira.service_oauth": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    },
+    {
+      "credentials": [
+        "jira.service_api_token"
+      ],
+      "scopes": {
+        "jira.service_api_token": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    }
+  ],
+  "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
   "generator": "connectors 0.1.0",
   "operations": [
     {
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
       ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
       "contract": {
-        "description": "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content",
+        "description": "Read one Jira issue by key (`PROJ-123`) — summary, description, status, assignee, reporter and every other configured field. Hosted project admission requires a key rather than a numeric id. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this legacy catalog operation cannot encode. Text fields are wiki markup, not rich content",
         "input_schema": {
           "properties": {
             "issue_key": {
@@ -89,7 +246,7 @@
         }
       },
       "credential_requirement": "declared",
-      "description": "Read one Jira issue by key (`PROJ-123`) or numeric id — summary, description, status, assignee, reporter and every other configured field. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this connector cannot encode. Text fields are wiki markup, not rich content",
+      "description": "Read one Jira issue by key (`PROJ-123`) — summary, description, status, assignee, reporter and every other configured field. Hosted project admission requires a key rather than a numeric id. Returns Jira's full default field set, including custom fields, because narrowing it needs the `fields` query parameter this legacy catalog operation cannot encode. Text fields are wiki markup, not rich content",
       "direction": "read",
       "effects": [
         "read",
@@ -107,12 +264,14 @@
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -174,8 +333,22 @@
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Create a Jira issue in a project. Visible to everyone with access to the project and notifies its watchers. Only project, summary and issue type are set: a description cannot be sent yet (see the connector's notes), so file the detail as a comment afterwards. Returns the new issue's id, key and self URL",
@@ -223,7 +396,9 @@
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}$",
             "type": "string"
           },
           "symbol": "project_key",
@@ -235,6 +410,7 @@
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 255,
             "minLength": 1,
             "type": "string"
           },
@@ -247,6 +423,7 @@
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 128,
             "minLength": 1,
             "type": "string"
           },
@@ -323,7 +500,59 @@
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Read the comments on a Jira issue, oldest first. Returns Jira's first default-sized page only: paging needs the `startAt` and `maxResults` query parameters this connector cannot encode, so an issue with a long discussion is truncated. Comment bodies are wiki markup",
@@ -358,12 +587,14 @@
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -454,8 +685,22 @@
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Add a comment to a Jira issue. The comment is visible to everyone who can see the issue — including customers on a service-management portal — and notifies its watchers; restricting it to a project role or group is not supported yet. The body is Jira wiki markup (`*bold*`, `{code}`), not Markdown and not rich content",
@@ -494,12 +739,14 @@
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -511,6 +758,7 @@
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32768,
             "minLength": 1,
             "type": "string"
           },
@@ -589,7 +837,59 @@
       "auth": [
         [
           "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ],
+        [
+          "jira.service_api_token"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "List the workflow transitions available on a Jira issue right now, with the id and target status of each. Call this before `jira-issue-transition`: transition ids are per-workflow, not global, and only the transitions valid from the issue's current status are returned",
@@ -624,12 +924,14 @@
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -709,8 +1011,22 @@
     {
       "auth": [
         [
-          "jira.api_token"
+          "jira.user_oauth"
         ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
       ],
       "contract": {
         "description": "Move a Jira issue through a workflow transition — the way an issue is closed, reopened or advanced. Get the transition id from `jira-issue-transitions-list` first; ids are per-workflow and only transitions valid from the current status are accepted. The status change is visible on every board showing the issue, notifies watchers, and may fire project automation. Answers `204` with an empty body on success",
@@ -749,12 +1065,14 @@
       "interaction_shape": "unary",
       "params": [
         {
-          "description": "The issue key, e.g. `PROJ-123`, or its numeric id",
+          "description": "The issue key, e.g. `PROJ-123`",
           "name": "issue_key",
           "position": "path",
           "required": true,
           "schema": {
-            "minLength": 1,
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
             "type": "string"
           },
           "symbol": "issue_key",
@@ -766,7 +1084,9 @@
           "position": "body",
           "required": true,
           "schema": {
+            "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[0-9]+$",
             "type": "string"
           },
           "symbol": "transition_id",
@@ -798,6 +1118,400 @@
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Replace an issue's summary through Jira's documented edit endpoint. This curated operation cannot submit Jira's raw fields/update maps or clear unrelated fields",
+        "input_schema": {
+          "properties": {
+            "issue_key": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issue_key",
+            "summary"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Replace an issue's summary through Jira's documented edit endpoint. This curated operation cannot submit Jira's raw fields/update maps or clear unrelated fields",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-edit",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The issue key, e.g. `PROJ-123`",
+          "name": "issue_key",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "issue_key",
+          "wire": "issueIdOrKey"
+        },
+        {
+          "description": "Replacement one-line issue summary",
+          "name": "summary",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "summary",
+          "wire": "fields.summary"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "fields": {
+              "summary": {
+                "$param": "summary"
+              }
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/rest/api/2/issue/{issue_key}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Replace one Jira comment body. The text is Jira wiki markup; visibility cannot be changed and delete is not exposed",
+        "input_schema": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "comment_id": {
+              "type": "string"
+            },
+            "issue_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issue_key",
+            "comment_id",
+            "body"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Replace one Jira comment body. The text is Jira wiki markup; visibility cannot be changed and delete is not exposed",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-comment-edit",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The issue key, e.g. `PROJ-123`",
+          "name": "issue_key",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "issue_key",
+          "wire": "issueIdOrKey"
+        },
+        {
+          "description": "The numeric Jira comment id, represented as a string",
+          "name": "comment_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "comment_id",
+          "wire": "id"
+        },
+        {
+          "description": "Replacement comment text in Jira wiki markup",
+          "name": "body",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 32768,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "body"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "body": {
+              "$param": "body"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/rest/api/2/issue/{issue_key}/comment/{comment_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.user_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "write:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Create one named Jira issue link between two admitted project issues. It cannot add a comment, delete a link, or submit raw link data",
+        "input_schema": {
+          "properties": {
+            "inward_issue_key": {
+              "type": "string"
+            },
+            "link_type": {
+              "type": "string"
+            },
+            "outward_issue_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "link_type",
+            "inward_issue_key",
+            "outward_issue_key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create one named Jira issue link between two admitted project issues. It cannot add a comment, delete a link, or submit raw link data",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "site": [
+          "host"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-link-add",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Exact Jira issue-link type name, e.g. `Blocks`",
+          "name": "link_type",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "link_type",
+          "wire": "type.name"
+        },
+        {
+          "description": "Issue key on the inward side of the link",
+          "name": "inward_issue_key",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "inward_issue_key",
+          "wire": "inwardIssue.key"
+        },
+        {
+          "description": "Issue key on the outward side of the link",
+          "name": "outward_issue_key",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "outward_issue_key",
+          "wire": "outwardIssue.key"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "inwardIssue": {
+              "key": {
+                "$param": "inward_issue_key"
+              }
+            },
+            "outwardIssue": {
+              "key": {
+                "$param": "outward_issue_key"
+              }
+            },
+            "type": {
+              "name": {
+                "$param": "link_type"
+              }
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/rest/api/2/issueLink"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,
@@ -811,11 +1525,19 @@
       ],
       "base_url": "https://{site}.atlassian.net",
       "gid": "com.atlassian.jira:2",
+      "legacy": true,
       "name": "default",
       "tags": [
         "issue-tracking",
         "project-management"
       ]
+    },
+    {
+      "api_version": "2",
+      "base_url": "https://auth.atlassian.com",
+      "description": "Atlassian OAuth 2.0 authorization and token service; its credential responses are never Connector operations",
+      "gid": "com.atlassian.jira/login:2",
+      "name": "login"
     }
   ],
   "vendor": "Jira"

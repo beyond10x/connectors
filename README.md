@@ -28,6 +28,8 @@ the full SaaS or satellite surface.
   Slack connection flow.
 - [docs/guides/connect-gitlab.md](docs/guides/connect-gitlab.md) — connect GitLab as yourself or as
   a bounded automation identity.
+- [docs/guides/connect-jira.md](docs/guides/connect-jira.md) — deployment-owned read-only Jira and
+  delegated, approval-gated user writes.
 - [docs/stories/README.md](docs/stories/README.md) — sequenced design and implementation backlog.
 - [docs/research/](docs/research/) — the platform-category survey and mined catalog-as-text
   precedents (with vendored primary sources under `docs/research/vendor/`).
