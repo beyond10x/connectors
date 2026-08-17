@@ -7,13 +7,13 @@ provider_sha256 = "6e7ab6a94794c6e5426052c42381bff27c7e680953d427ed46ff6895616e3
 coverage = "exact-shipped-native-and-module-operation-event-capability-surface"
 purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work, Ontology, and Planner module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte from immutable b10x/modules revisions and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
 references = [
-  "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
-  "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
-  "https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
-  "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
-  "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
-  "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
-  "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0018-connectors-satellite-federation.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+  "https://github.com/b10x/b10x/blob/main/architecture/adr/0039-work-is-the-standalone-request-and-task-domain.md",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52",
   "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52/modules/planner/contracts/planner/v1",
 ]

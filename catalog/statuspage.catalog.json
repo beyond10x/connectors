@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Statuspage API key, sent as the Authorization header after the literal scheme word `OAuth ` — a static key from the account's own API settings, not an OAuth2 access token",

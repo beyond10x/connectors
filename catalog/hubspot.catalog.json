@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "HubSpot private-app access token (pat-…) with crm.objects.contacts.read/write, crm.objects.companies.read and crm.objects.deals.read",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "OpenRouter API key, sent as a bearer token",

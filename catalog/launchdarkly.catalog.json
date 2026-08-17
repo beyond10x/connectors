@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "LaunchDarkly API access token, sent as the entire value of the Authorization header with no scheme word in front of it — LaunchDarkly rejects a `Bearer `-prefixed value",

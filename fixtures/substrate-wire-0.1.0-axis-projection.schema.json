@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/substrate-wire-0.1.0-axis-projection.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/connectors/fixtures/substrate-wire-0.1.0-axis-projection.schema.json",
   "title": "connectors projection of substrate-wire 0.1.0 execution axes",
   "type": "object",
   "additionalProperties": false,

@@ -14,7 +14,7 @@ Context these stories assume, read current authority in order:
 [../design/02-architecture.md](../design/02-architecture.md) →
 [../VISION.md](../VISION.md) (historical founding intent), grounded by
 [../research/](../research/). Repository housing is governed by
-[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
+[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/main/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 ## Status
 

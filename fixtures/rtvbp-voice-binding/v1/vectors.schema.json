@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/rtvbp-voice-binding/v1/vectors.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/connectors/fixtures/rtvbp-voice-binding/v1/vectors.schema.json",
   "type": "array",
   "minItems": 1,
   "items": {

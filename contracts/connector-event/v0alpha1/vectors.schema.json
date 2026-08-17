@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/connectors/blob/main/contracts/connector-event/v0alpha1/vectors.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/connectors/contracts/connector-event/v0alpha1/vectors.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["contract", "cases"],
