@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM rust:1.88-bookworm AS builder
+FROM rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 AS builder
 WORKDIR /src
 COPY . .
 # The target directory is a persistent BuildKit cache. Git archives carry commit timestamps, so a
@@ -13,7 +13,7 @@ RUN --mount=type=cache,id=b10x-cargo-registry,target=/usr/local/cargo/registry \
     cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked --release && \
     install -D /src/crates/connectors-cli/target/release/connectors /out/connectors
 
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:adcd20c7b4c988b73cbfbddb26d2eee574571e6d7c9ffea29b3821e0690efb77
 ARG SOURCE_SHA=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_SHA
 COPY --from=builder /out/connectors /usr/local/bin/connectors
