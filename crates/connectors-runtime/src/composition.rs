@@ -12,6 +12,7 @@ use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_b10x::{B10xBackend, B10xIntegrationError};
+use integration_gitlab::GitlabBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
 use integration_sip::{
@@ -43,6 +44,8 @@ pub enum RuntimeError {
     Operation(#[from] protocol::operation::OperationError),
     #[error(transparent)]
     Slack(#[from] integration_slack::SlackError),
+    #[error(transparent)]
+    Gitlab(#[from] integration_gitlab::GitlabError),
     #[error(transparent)]
     Monitoring(#[from] integration_monitoring::MonitoringError),
     #[error(transparent)]
@@ -423,6 +426,23 @@ impl HostedRuntime {
                 .await?,
             ));
         }
+        let gitlab_enabled = config.gitlab.is_some();
+        if let Some(gitlab) = config.gitlab {
+            let store = credential_stores
+                .prepared
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            backends.push(Arc::new(
+                GitlabBackend::open_hosted(
+                    config.tenant_id.clone(),
+                    gitlab,
+                    store,
+                    hosted_state.clone(),
+                )
+                .await?,
+            ));
+        }
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let admission =
@@ -448,6 +468,7 @@ impl HostedRuntime {
             "sip_listen": config.sip.listen,
             "b10x_enabled": b10x_enabled,
             "slack_enabled": slack_enabled,
+            "gitlab_enabled": gitlab_enabled,
         });
         Ok(Self {
             listener,

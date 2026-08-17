@@ -35,7 +35,27 @@ pub struct HostedServerConfig {
     #[serde(default)]
     pub slack: Option<HostedSlackConfig>,
     #[serde(default)]
+    pub gitlab: Option<HostedGitlabConfig>,
+    #[serde(default)]
     pub b10x: Option<B10xIntegrationConfig>,
+}
+
+/// Value-free policy for delegated GitLab user Connections.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedGitlabConfig {
+    /// Exact self-managed GitLab origin; the Integration appends `/api/v4` itself.
+    pub origin: String,
+    /// Public Connectors origin used to construct one-use setup pages.
+    pub public_origin: String,
+    pub oauth_client_id: String,
+    pub oauth_redirect_uri: String,
+    pub user_grant_ref: String,
+    pub initiation: InitiationConfig,
+    #[serde(default = "default_connect_session_ttl_seconds")]
+    pub connect_session_ttl_seconds: u64,
+    #[serde(default = "default_gitlab_refresh_skew_seconds")]
+    pub refresh_skew_seconds: u64,
 }
 
 /// Value-free hosted Slack policy. Every credential still arrives through a Connect Session and
@@ -275,8 +295,44 @@ impl HostedServerConfig {
                     && origin.path() == self.server.base_path
             }) && slack.policy().validate().is_ok()
         });
-        let vault_required =
-            self.sip.credentials.is_some() || self.slack.is_some() || self.grafana.enabled;
+        let gitlab_valid = self.gitlab.as_ref().is_none_or(|gitlab| {
+            let origin = url::Url::parse(&gitlab.origin);
+            let public_origin = url::Url::parse(&gitlab.public_origin);
+            let redirect = url::Url::parse(&gitlab.oauth_redirect_uri);
+            let callback_valid = public_origin
+                .as_ref()
+                .ok()
+                .zip(redirect.as_ref().ok())
+                .is_some_and(|(public_origin, redirect)| {
+                    public_origin.scheme() == "https"
+                        && public_origin.host_str().is_some()
+                        && public_origin.username().is_empty()
+                        && public_origin.password().is_none()
+                        && public_origin.query().is_none()
+                        && public_origin.fragment().is_none()
+                        && public_origin.path() == self.server.base_path
+                        && redirect.scheme() == public_origin.scheme()
+                        && redirect.host_str() == public_origin.host_str()
+                        && redirect.port_or_known_default() == public_origin.port_or_known_default()
+                        && redirect.username().is_empty()
+                        && redirect.password().is_none()
+                        && redirect.query().is_none()
+                        && redirect.fragment().is_none()
+                        && redirect.path()
+                            == format!("{}/oauth/gitlab/callback", self.server.base_path)
+                                .replace("//", "/")
+                });
+            origin.is_ok_and(|origin| valid_https_origin(&origin))
+                && callback_valid
+                && valid_ref(&gitlab.oauth_client_id, 256)
+                && valid_ref(&gitlab.user_grant_ref, 512)
+                && (60..=900).contains(&gitlab.connect_session_ttl_seconds)
+                && (60..=900).contains(&gitlab.refresh_skew_seconds)
+        });
+        let vault_required = self.sip.credentials.is_some()
+            || self.slack.is_some()
+            || self.gitlab.is_some()
+            || self.grafana.enabled;
         let sip_complete = self.sip.listen.is_some() && self.sip.deployment_config.is_some();
         let sip_credentials_valid = self.sip.credentials.as_ref().is_none_or(|credentials| {
             credentials.authority == NATIVE_SIP_AUTHORITY
@@ -330,6 +386,7 @@ impl HostedServerConfig {
                 .is_some_and(|b10x| b10x.validate().is_err())
             || !valid_groups(&self.authority.operator_groups)
             || !slack_valid
+            || !gitlab_valid
         {
             return Err(HostedServerConfigError::Invalid);
         }
@@ -508,6 +565,21 @@ fn valid_base_path(value: &str) -> bool {
                         byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
                     })
             }))
+}
+
+fn valid_https_origin(origin: &url::Url) -> bool {
+    origin.scheme() == "https"
+        && origin.host_str().is_some()
+        && origin.port_or_known_default() == Some(443)
+        && origin.username().is_empty()
+        && origin.password().is_none()
+        && origin.query().is_none()
+        && origin.fragment().is_none()
+        && matches!(origin.path(), "" | "/")
+}
+
+fn default_gitlab_refresh_skew_seconds() -> u64 {
+    300
 }
 
 fn default_kubernetes_ca_file() -> PathBuf {
@@ -832,6 +904,53 @@ enabled = false
         config.grafana.targets[0].uid_sha256 = "not-a-digest".to_owned();
         assert!(config.validate().is_err());
         config.grafana.targets[0].uid_sha256 = "a".repeat(64);
+        config.vault.enabled = false;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn hosted_gitlab_requires_vault_and_a_same_origin_callback() {
+        let mut config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = true
+address = "https://b10x-vault.b10x.svc:8200"
+mount = "b10x-connectors"
+role = "b10x-connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/b10x-vault-ca/ca.crt"
+[sip]
+enabled = false
+[gitlab]
+origin = "https://gitlab.example.test"
+public_origin = "https://code.example.test/api/connectors/v1"
+oauth_client_id = "gitlab-oauth-application"
+oauth_redirect_uri = "https://code.example.test/api/connectors/v1/oauth/gitlab/callback"
+user_grant_ref = "grant:gitlab:delegated-user"
+initiation = "provider"
+connect_session_ttl_seconds = 300
+refresh_skew_seconds = 300
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        config.gitlab.as_mut().unwrap().oauth_redirect_uri =
+            "https://attacker.example/api/connectors/v1/oauth/gitlab/callback".to_owned();
+        assert!(config.validate().is_err());
+        config.gitlab.as_mut().unwrap().oauth_redirect_uri =
+            "https://code.example.test/api/connectors/v1/oauth/gitlab/callback".to_owned();
         config.vault.enabled = false;
         assert!(config.validate().is_err());
     }

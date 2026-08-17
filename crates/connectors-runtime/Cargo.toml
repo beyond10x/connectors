@@ -19,6 +19,7 @@ members = [
     "../hosted-vault",
     "../identity-http",
     "../integration-kubernetes",
+    "../integration-gitlab",
     "../integration-b10x",
     "../integration-monitoring",
     "../integration-sip",
@@ -36,6 +37,7 @@ hosted-vault = { version = "0.1.0", path = "../hosted-vault" }
 hosted-state = { version = "0.1.0", path = "../hosted-state" }
 identity-http = { version = "0.1.0", path = "../identity-http" }
 integration-kubernetes = { version = "0.1.0", path = "../integration-kubernetes" }
+integration-gitlab = { version = "0.1.0", path = "../integration-gitlab" }
 integration-b10x = { version = "0.1.0", path = "../integration-b10x" }
 integration-monitoring = { version = "0.1.0", path = "../integration-monitoring" }
 integration-sip = { version = "0.1.0", path = "../integration-sip" }

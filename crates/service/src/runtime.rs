@@ -285,6 +285,15 @@ pub enum HostedCompletionError {
     Unavailable,
 }
 
+/// Receiver-declared admission posture for starting one Connect Session profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectSessionAccess {
+    /// Any authenticated principal carrying the self-service connection scope may start the flow.
+    SelfService,
+    /// Only a Connector operator may start the flow.
+    Operator,
+}
+
 impl BackendCapabilities {
     pub const OPERATIONS: Self = Self {
         operations: true,
@@ -319,6 +328,14 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    /// Declare who may start a backend-owned Connect Session profile.
+    fn connect_session_access(
+        &self,
+        _request: &protocol::connection::ConnectSessionCreateRequest,
+    ) -> ConnectSessionAccess {
+        ConnectSessionAccess::Operator
+    }
+
     fn owns_event(&self, _request: &EventRequest) -> bool {
         false
     }
@@ -347,12 +364,13 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         Err(HostedCompletionError::NotFound)
     }
 
-    fn owns_hosted_oauth_state(&self, _state: &str) -> bool {
+    fn owns_hosted_oauth_state(&self, _integration_ref: &str, _state: &str) -> bool {
         false
     }
 
     async fn complete_hosted_oauth(
         &self,
+        _integration_ref: &str,
         _state: &str,
         _code: Option<&str>,
         _error: Option<&str>,

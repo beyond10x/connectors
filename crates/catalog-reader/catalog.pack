@@ -1,8 +1,8 @@
 connectors-catalog-pack 1
-digest sha256 c2a4aa5feeb31670bebc387984b91c76f617648e14e241b3dee831a59742520a
+digest sha256 531c4ccef76b41c27798c9d4bc4a55ad4213834737a44c3d439ac98971b1e77e
 schema 2
 providers 60
-operations 901
+operations 906
 p airtable 0 18824
 p alertmanager 18824 2464
 p algolia 21288 25154
@@ -27,42 +27,42 @@ p fly 10281920 22606
 p freshdesk 10304526 58961
 p front 10363487 25675
 p github 10389162 293279
-p gitlab 10682441 65589
-p google 10748030 36906
-p grafana 10784936 17922
-p hubspot 10802858 20204
-p intercom 10823062 30446
-p jira 10853508 28101
-p klaviyo 10881609 38483
-p launchdarkly 10920092 25175
-p loki 10945267 5070
-p mailchimp 10950337 40755
-p microsoft_graph 10991092 1085798
-p miro 12076890 32577
-p newrelic 12109467 29399
-p notion 12138866 18678
-p okta 12157544 22136
-p openai 12179680 1682758
-p openrouter 13862438 12929
-p pagerduty 13875367 37535
-p postmark 13912902 20035
-p prometheus 13932937 4885
-p resend 13937822 18623
-p salesforce 13956445 19139
-p sendgrid 13975584 15743
-p sentry 13991327 27677
-p shopify 14019004 27381
-p slack 14046385 234033
-p statuspage 14280418 29637
-p stripe 14310055 70748
-p supabase 14380803 13445
-p trello 14394248 26240
-p twilio 14420488 71632
-p typeform 14492120 28975
-p vercel 14521095 17444
-p webflow 14538539 21941
-p zendesk 14560480 1146605
-p zoom 15707085 9415
+p gitlab 10682441 88059
+p google 10770500 36906
+p grafana 10807406 17922
+p hubspot 10825328 20204
+p intercom 10845532 30446
+p jira 10875978 28101
+p klaviyo 10904079 38483
+p launchdarkly 10942562 25175
+p loki 10967737 5070
+p mailchimp 10972807 40755
+p microsoft_graph 11013562 1085798
+p miro 12099360 32577
+p newrelic 12131937 29399
+p notion 12161336 18678
+p okta 12180014 22136
+p openai 12202150 1682758
+p openrouter 13884908 12929
+p pagerduty 13897837 37535
+p postmark 13935372 20035
+p prometheus 13955407 4885
+p resend 13960292 18623
+p salesforce 13978915 19139
+p sendgrid 13998054 15743
+p sentry 14013797 27677
+p shopify 14041474 27381
+p slack 14068855 234033
+p statuspage 14302888 29637
+p stripe 14332525 70748
+p supabase 14403273 13445
+p trello 14416718 26240
+p twilio 14442958 71632
+p typeform 14514590 28975
+p vercel 14543565 17444
+p webflow 14561009 21941
+p zendesk 14582950 1146605
+p zoom 15729555 9415
 o airtable-record-create airtable default 5060 4705
 o airtable-record-delete airtable default 14746 3734
 o airtable-record-get airtable default 731 4323
@@ -683,99 +683,104 @@ o github-repo-get github default 10392583 4594
 o github-user-get github default 10612933 13261
 o github-user-repo-list github default 10655509 26404
 o github-workflow-run-list github default 10519796 74753
-o gitlab-branch-list gitlab default 10741549 5868
-o gitlab-group-list gitlab default 10692940 6415
-o gitlab-issue-create gitlab default 10721217 6589
-o gitlab-issue-get gitlab default 10715131 6080
-o gitlab-issue-list gitlab default 10707509 7616
-o gitlab-merge-request-list gitlab default 10727812 7643
-o gitlab-pipeline-get gitlab default 10735461 6082
-o gitlab-project-list gitlab default 10699361 8142
+o gitlab-branch-list gitlab default 10764019 5868
+o gitlab-group-get gitlab default 10708245 4040
+o gitlab-group-list gitlab default 10701824 6415
+o gitlab-issue-create gitlab default 10738396 6589
+o gitlab-issue-get gitlab default 10732310 6080
+o gitlab-issue-list gitlab default 10724688 7616
+o gitlab-merge-request-get gitlab default 10752640 5285
+o gitlab-merge-request-list gitlab default 10744991 7643
+o gitlab-pipeline-get gitlab default 10757931 6082
+o gitlab-project-get gitlab default 10720439 4243
+o gitlab-project-list gitlab default 10712291 8142
 o gitlab-user-get gitlab default 10688921 4013
-o google-calendar-calendar-get google calendar 10775210 3684
-o google-calendar-event-get google calendar 10761767 6563
-o google-calendar-event-insert google calendar 10768336 6868
-o google-drive-file-get google drive 10778900 2298
-o google-drive-file-update google drive 10781204 2814
-o google-gmail-labels-list google gmail 10757698 4063
-o google-gmail-message-get google gmail 10748807 4995
-o google-gmail-message-send google gmail 10753808 3884
-o grafana-dashboard-get grafana default 10792257 3146
-o grafana-dashboards-list grafana default 10787761 4490
-o grafana-datasource-query grafana default 10797507 5033
-o grafana-datasources-list grafana default 10795409 2092
-o hubspot-company-get hubspot default 10815559 3550
-o hubspot-contact-create hubspot default 10808134 3927
-o hubspot-contact-get hubspot default 10803639 4489
-o hubspot-contact-update hubspot default 10812067 3486
-o hubspot-deal-get hubspot default 10819115 3622
-o intercom-contact-create intercom default 10831030 5231
-o intercom-contact-get intercom default 10825006 6018
-o intercom-contact-note-create intercom default 10848990 4274
-o intercom-conversation-get intercom default 10836267 6016
-o intercom-conversation-reply intercom default 10842289 6695
-o jira-issue-comment-add jira default 10869075 4337
-o jira-issue-comment-list jira default 10864200 4869
-o jira-issue-create jira default 10859564 4630
-o jira-issue-get jira default 10855668 3890
-o jira-issue-transition jira default 10878083 3122
-o jira-issue-transitions-list jira default 10873418 4659
-o klaviyo-account-list klaviyo default 10883557 4885
-o klaviyo-event-create klaviyo default 10913013 6792
-o klaviyo-list-list klaviyo default 10909101 3906
-o klaviyo-profile-create klaviyo default 10900171 8924
-o klaviyo-profile-get klaviyo default 10894851 5314
-o klaviyo-profile-list klaviyo default 10888448 6397
+o gitlab-user-get-by-id gitlab default 10697784 4034
+o gitlab-user-list gitlab default 10692940 4838
+o google-calendar-calendar-get google calendar 10797680 3684
+o google-calendar-event-get google calendar 10784237 6563
+o google-calendar-event-insert google calendar 10790806 6868
+o google-drive-file-get google drive 10801370 2298
+o google-drive-file-update google drive 10803674 2814
+o google-gmail-labels-list google gmail 10780168 4063
+o google-gmail-message-get google gmail 10771277 4995
+o google-gmail-message-send google gmail 10776278 3884
+o grafana-dashboard-get grafana default 10814727 3146
+o grafana-dashboards-list grafana default 10810231 4490
+o grafana-datasource-query grafana default 10819977 5033
+o grafana-datasources-list grafana default 10817879 2092
+o hubspot-company-get hubspot default 10838029 3550
+o hubspot-contact-create hubspot default 10830604 3927
+o hubspot-contact-get hubspot default 10826109 4489
+o hubspot-contact-update hubspot default 10834537 3486
+o hubspot-deal-get hubspot default 10841585 3622
+o intercom-contact-create intercom default 10853500 5231
+o intercom-contact-get intercom default 10847476 6018
+o intercom-contact-note-create intercom default 10871460 4274
+o intercom-conversation-get intercom default 10858737 6016
+o intercom-conversation-reply intercom default 10864759 6695
+o jira-issue-comment-add jira default 10891545 4337
+o jira-issue-comment-list jira default 10886670 4869
+o jira-issue-create jira default 10882034 4630
+o jira-issue-get jira default 10878138 3890
+o jira-issue-transition jira default 10900553 3122
+o jira-issue-transitions-list jira default 10895888 4659
+o klaviyo-account-list klaviyo default 10906027 4885
+o klaviyo-event-create klaviyo default 10935483 6792
+o klaviyo-list-list klaviyo default 10931571 3906
+o klaviyo-profile-create klaviyo default 10922641 8924
+o klaviyo-profile-get klaviyo default 10917321 5314
+o klaviyo-profile-list klaviyo default 10910918 6397
 o knowledge-explain b10x knowledge 5000176 3681
 o knowledge-query b10x knowledge 4981949 18221
 o knowledge-snapshot b10x knowledge 5003863 18480
-o launchdarkly-environment-list launchdarkly default 10925359 4327
-o launchdarkly-flag-get launchdarkly default 10935121 4098
-o launchdarkly-flag-list launchdarkly default 10929692 5423
-o launchdarkly-flag-toggle launchdarkly default 10939225 5711
-o launchdarkly-project-list launchdarkly default 10921652 3701
-o loki-query-range loki default 10946110 3881
-o mailchimp-audience-get mailchimp default 10959662 3936
-o mailchimp-audience-list mailchimp default 10954942 4714
-o mailchimp-audience-member-get mailchimp default 10970616 6149
-o mailchimp-audience-member-list mailchimp default 10963604 7006
-o mailchimp-audience-member-upsert mailchimp default 10976771 8988
-o mailchimp-campaign-list mailchimp default 10985765 4969
-o mailchimp-ping mailchimp default 10952872 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11018702 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 11908113 159938
-o microsoft_graph-calendar-event-create microsoft_graph calendar 11011425 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 11004879 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 12071792 4039
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12068057 3729
-o microsoft_graph-files-item-get microsoft_graph files 11022460 5482
-o microsoft_graph-files-item-update microsoft_graph files 11027948 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 11001566 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 10992853 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 11032739 875368
-o microsoft_graph-mail-message-reply microsoft_graph mail 10998455 3105
-o miro-board-item-get miro default 12091149 7877
-o miro-board-item-list miro default 12081149 9994
-o miro-board-list miro default 12078292 2851
-o miro-sticky-note-create miro default 12099032 3738
-o miro-sticky-note-delete miro default 12107153 1954
-o miro-sticky-note-update miro default 12102776 4371
-o newrelic-alert-policy-list newrelic default 12121311 3047
-o newrelic-alert-violation-list newrelic default 12124364 4217
-o newrelic-application-get newrelic default 12117145 4160
-o newrelic-application-list newrelic default 12112478 4661
-o newrelic-deployment-create newrelic default 12132283 6216
-o newrelic-deployment-list newrelic default 12128587 3690
-o notion-database-query notion default 12145834 3464
-o notion-page-create notion default 12152495 4755
-o notion-page-get notion default 12142480 3348
-o notion-search notion default 12149304 3185
-o notion-user-me notion default 12140444 2030
-o okta-group-list okta default 12168575 3824
-o okta-user-deactivate okta default 12176235 3102
-o okta-user-get okta default 12164840 3729
-o okta-user-group-list okta default 12172405 3824
-o okta-user-list okta default 12159859 4975
+o launchdarkly-environment-list launchdarkly default 10947829 4327
+o launchdarkly-flag-get launchdarkly default 10957591 4098
+o launchdarkly-flag-list launchdarkly default 10952162 5423
+o launchdarkly-flag-toggle launchdarkly default 10961695 5711
+o launchdarkly-project-list launchdarkly default 10944122 3701
+o loki-query-range loki default 10968580 3881
+o mailchimp-audience-get mailchimp default 10982132 3936
+o mailchimp-audience-list mailchimp default 10977412 4714
+o mailchimp-audience-member-get mailchimp default 10993086 6149
+o mailchimp-audience-member-list mailchimp default 10986074 7006
+o mailchimp-audience-member-upsert mailchimp default 10999241 8988
+o mailchimp-campaign-list mailchimp default 11008235 4969
+o mailchimp-ping mailchimp default 10975342 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11041172 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 11930583 159938
+o microsoft_graph-calendar-event-create microsoft_graph calendar 11033895 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 11027349 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 12094262 4039
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12090527 3729
+o microsoft_graph-files-item-get microsoft_graph files 11044930 5482
+o microsoft_graph-files-item-update microsoft_graph files 11050418 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 11024036 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 11015323 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 11055209 875368
+o microsoft_graph-mail-message-reply microsoft_graph mail 11020925 3105
+o miro-board-item-get miro default 12113619 7877
+o miro-board-item-list miro default 12103619 9994
+o miro-board-list miro default 12100762 2851
+o miro-sticky-note-create miro default 12121502 3738
+o miro-sticky-note-delete miro default 12129623 1954
+o miro-sticky-note-update miro default 12125246 4371
+o newrelic-alert-policy-list newrelic default 12143781 3047
+o newrelic-alert-violation-list newrelic default 12146834 4217
+o newrelic-application-get newrelic default 12139615 4160
+o newrelic-application-list newrelic default 12134948 4661
+o newrelic-deployment-create newrelic default 12154753 6216
+o newrelic-deployment-list newrelic default 12151057 3690
+o notion-database-query notion default 12168304 3464
+o notion-page-create notion default 12174965 4755
+o notion-page-get notion default 12164950 3348
+o notion-search notion default 12171774 3185
+o notion-user-me notion default 12162914 2030
+o okta-group-list okta default 12191045 3824
+o okta-user-deactivate okta default 12198705 3102
+o okta-user-get okta default 12187310 3729
+o okta-user-group-list okta default 12194875 3824
+o okta-user-list okta default 12182329 4975
 o ontology-branch-create b10x knowledge 5026240 21208
 o ontology-branch-list b10x knowledge 5022349 3885
 o ontology-branch-schema-extend b10x knowledge 5047454 2727
@@ -788,24 +793,24 @@ o ontology-proposal-evaluate b10x knowledge 5102895 6624
 o ontology-proposal-get b10x knowledge 5096396 6493
 o ontology-proposal-promote b10x knowledge 5110974 2095
 o ontology-schema-register b10x knowledge 5113075 5453
-o openai-batch-list openai default 13849282 12904
-o openai-chat-completion openai default 12184650 5224
-o openai-embeddings-create openai default 12189880 4010
-o openai-file-list openai default 13843981 5295
-o openai-model-get openai default 12182540 2104
-o openai-models-list openai default 12180371 2163
-o openai-response-get openai default 12193896 1212702
-o openai-response-input-item-list openai default 13406604 437371
-o openrouter-chat-completion openrouter default 13867407 5888
-o openrouter-credits-get openrouter default 13873301 1808
-o openrouter-model-endpoints-list openrouter default 13864789 2612
-o openrouter-models-list openrouter default 13863146 1637
-o pagerduty-incident-acknowledge pagerduty default 13902778 5034
-o pagerduty-incident-get pagerduty default 13885504 5736
-o pagerduty-incident-list pagerduty default 13876955 8543
-o pagerduty-incident-resolve pagerduty default 13907818 4790
-o pagerduty-oncall-list pagerduty default 13897626 5146
-o pagerduty-service-list pagerduty default 13891246 6374
+o openai-batch-list openai default 13871752 12904
+o openai-chat-completion openai default 12207120 5224
+o openai-embeddings-create openai default 12212350 4010
+o openai-file-list openai default 13866451 5295
+o openai-model-get openai default 12205010 2104
+o openai-models-list openai default 12202841 2163
+o openai-response-get openai default 12216366 1212702
+o openai-response-input-item-list openai default 13429074 437371
+o openrouter-chat-completion openrouter default 13889877 5888
+o openrouter-credits-get openrouter default 13895771 1808
+o openrouter-model-endpoints-list openrouter default 13887259 2612
+o openrouter-models-list openrouter default 13885616 1637
+o pagerduty-incident-acknowledge pagerduty default 13925248 5034
+o pagerduty-incident-get pagerduty default 13907974 5736
+o pagerduty-incident-list pagerduty default 13899425 8543
+o pagerduty-incident-resolve pagerduty default 13930288 4790
+o pagerduty-oncall-list pagerduty default 13920096 5146
+o pagerduty-service-list pagerduty default 13913716 6374
 o planner-board-get b10x planning 5169866 199621
 o planner-decision-transition b10x planning 7166142 143251
 o planner-entity-create b10x planning 7309399 182342
@@ -831,95 +836,95 @@ o planner-sync-session-begin b10x planning 9329360 4580
 o planner-sync-session-confirm b10x planning 9745951 2302
 o planner-sync-session-preview b10x planning 9748259 414852
 o planner-sync-session-upload b10x planning 7108918 52735
-o postmark-bounce-get postmark server 13929276 3209
-o postmark-bounce-list postmark server 13924389 4881
-o postmark-deliverystats-get postmark server 13921775 2608
-o postmark-email-send postmark server 13914429 7340
-o prometheus-query-range prometheus default 13933796 3681
-o resend-domain-get resend default 13951042 5175
-o resend-domain-list resend default 13947717 3319
-o resend-email-get resend default 13942902 4809
-o resend-email-send resend default 13938673 4223
-o salesforce-record-create salesforce default 13964631 3265
-o salesforce-record-get salesforce default 13961201 3424
-o salesforce-record-update salesforce default 13967902 2958
-o salesforce-sobject-describe salesforce default 13970866 4425
-o salesforce-whoami salesforce default 13958360 2835
-o sendgrid-email-validate sendgrid default 13986885 4143
-o sendgrid-suppression-bounce-list sendgrid default 13983468 3411
-o sendgrid-template-get sendgrid default 13981099 2363
-o sendgrid-template-list sendgrid default 13976942 4151
-o sentry-issue-event-latest sentry default 14011749 6935
-o sentry-issue-get sentry default 13992056 7008
-o sentry-issue-update sentry default 13999070 6365
-o sentry-project-get sentry default 14005441 6302
-o shopify-customer-get shopify default 14037403 5180
-o shopify-inventory-level-list shopify default 14042589 3461
-o shopify-order-get shopify default 14020892 6452
-o shopify-product-get shopify default 14027350 4772
-o shopify-product-update shopify default 14032128 5269
+o postmark-bounce-get postmark server 13951746 3209
+o postmark-bounce-list postmark server 13946859 4881
+o postmark-deliverystats-get postmark server 13944245 2608
+o postmark-email-send postmark server 13936899 7340
+o prometheus-query-range prometheus default 13956266 3681
+o resend-domain-get resend default 13973512 5175
+o resend-domain-list resend default 13970187 3319
+o resend-email-get resend default 13965372 4809
+o resend-email-send resend default 13961143 4223
+o salesforce-record-create salesforce default 13987101 3265
+o salesforce-record-get salesforce default 13983671 3424
+o salesforce-record-update salesforce default 13990372 2958
+o salesforce-sobject-describe salesforce default 13993336 4425
+o salesforce-whoami salesforce default 13980830 2835
+o sendgrid-email-validate sendgrid default 14009355 4143
+o sendgrid-suppression-bounce-list sendgrid default 14005938 3411
+o sendgrid-template-get sendgrid default 14003569 2363
+o sendgrid-template-list sendgrid default 13999412 4151
+o sentry-issue-event-latest sentry default 14034219 6935
+o sentry-issue-get sentry default 14014526 7008
+o sentry-issue-update sentry default 14021540 6365
+o sentry-project-get sentry default 14027911 6302
+o shopify-customer-get shopify default 14059873 5180
+o shopify-inventory-level-list shopify default 14065059 3461
+o shopify-order-get shopify default 14043362 6452
+o shopify-product-get shopify default 14049820 4772
+o shopify-product-update shopify default 14054598 5269
 o sip-dial b10x default 4957931 2823
-o slack-admin-app-requests-list slack admin 14202269 4516
-o slack-admin-conversations-search slack admin 14206791 64081
-o slack-admin-teams-list slack admin 14270878 4007
-o slack-admin-users-list slack admin 14274891 4451
-o slack-chat-post-message slack default 14057908 45357
-o slack-conversations-history slack default 14103271 49463
-o slack-reactions-add slack default 14196334 5929
-o slack-users-info slack default 14152740 43588
+o slack-admin-app-requests-list slack admin 14224739 4516
+o slack-admin-conversations-search slack admin 14229261 64081
+o slack-admin-teams-list slack admin 14293348 4007
+o slack-admin-users-list slack admin 14297361 4451
+o slack-chat-post-message slack default 14080378 45357
+o slack-conversations-history slack default 14125741 49463
+o slack-reactions-add slack default 14218804 5929
+o slack-users-info slack default 14175210 43588
 o speech-speak b10x default 4960760 2907
 o speech-status b10x default 4963673 2246
-o statuspage-component-list statuspage default 14305335 4304
-o statuspage-incident-create statuspage default 14291981 6655
-o statuspage-incident-get statuspage default 14287686 4289
-o statuspage-incident-list statuspage default 14282522 5158
-o statuspage-incident-update statuspage default 14298642 6687
-o stripe-balance-get stripe default 14317392 2591
-o stripe-billing-meter-list stripe default 14371320 9122
-o stripe-charge-get stripe default 14323069 3784
-o stripe-charge-refund-create stripe default 14342235 4638
-o stripe-country-spec-list stripe default 14346879 9165
-o stripe-customer-get stripe default 14319989 3074
-o stripe-event-list stripe default 14356050 9473
-o stripe-exchange-rate-list stripe default 14365529 5785
-o stripe-payment-intent-cancel stripe default 14338285 3944
-o stripe-payment-intent-capture stripe default 14333694 4585
-o stripe-payment-intent-get stripe default 14326859 3802
-o stripe-refund-get stripe default 14330667 3021
-o supabase-auth-settings supabase default 14390880 2955
-o supabase-rows-list supabase default 14387495 3379
-o supabase-schema-describe supabase default 14383555 3934
-o trello-board-get trello default 14400637 3619
-o trello-board-list trello default 14396809 3822
-o trello-board-lists trello default 14404262 1604
-o trello-card-archive trello default 14415740 4364
-o trello-card-create trello default 14410561 5173
-o trello-list-cards trello default 14405872 4683
-o twilio-account-get twilio default 14428917 2969
-o twilio-call-get twilio default 14452044 4476
-o twilio-call-list twilio default 14444124 7914
-o twilio-conference-list twilio default 14484042 7737
-o twilio-message-get twilio default 14439288 4830
-o twilio-message-list twilio default 14431892 7390
-o twilio-recording-get twilio default 14467295 8396
-o twilio-recording-list twilio default 14456526 10763
-o twilio-usage-record-list twilio default 14475697 8339
-o typeform-form-get typeform default 14501480 5108
-o typeform-form-list typeform default 14495775 5699
-o typeform-response-delete typeform default 14517815 3050
-o typeform-response-list typeform default 14506594 11215
-o typeform-user-me typeform default 14493496 2273
-o vercel-deployment-cancel vercel default 14535610 2663
-o vercel-deployment-get vercel default 14532649 2955
-o vercel-deployments-list vercel default 14527349 5294
-o vercel-project-get vercel default 14524380 2963
-o vercel-projects-list vercel default 14522902 1472
-o webflow-collection-get webflow default 14545929 4235
-o webflow-collection-item-get webflow default 14554255 3491
-o webflow-collection-item-list webflow default 14550170 4079
-o webflow-collection-list webflow default 14542848 3075
-o webflow-site-list webflow default 14540105 2737
-o webflow-site-publish webflow default 14557752 2360
+o statuspage-component-list statuspage default 14327805 4304
+o statuspage-incident-create statuspage default 14314451 6655
+o statuspage-incident-get statuspage default 14310156 4289
+o statuspage-incident-list statuspage default 14304992 5158
+o statuspage-incident-update statuspage default 14321112 6687
+o stripe-balance-get stripe default 14339862 2591
+o stripe-billing-meter-list stripe default 14393790 9122
+o stripe-charge-get stripe default 14345539 3784
+o stripe-charge-refund-create stripe default 14364705 4638
+o stripe-country-spec-list stripe default 14369349 9165
+o stripe-customer-get stripe default 14342459 3074
+o stripe-event-list stripe default 14378520 9473
+o stripe-exchange-rate-list stripe default 14387999 5785
+o stripe-payment-intent-cancel stripe default 14360755 3944
+o stripe-payment-intent-capture stripe default 14356164 4585
+o stripe-payment-intent-get stripe default 14349329 3802
+o stripe-refund-get stripe default 14353137 3021
+o supabase-auth-settings supabase default 14413350 2955
+o supabase-rows-list supabase default 14409965 3379
+o supabase-schema-describe supabase default 14406025 3934
+o trello-board-get trello default 14423107 3619
+o trello-board-list trello default 14419279 3822
+o trello-board-lists trello default 14426732 1604
+o trello-card-archive trello default 14438210 4364
+o trello-card-create trello default 14433031 5173
+o trello-list-cards trello default 14428342 4683
+o twilio-account-get twilio default 14451387 2969
+o twilio-call-get twilio default 14474514 4476
+o twilio-call-list twilio default 14466594 7914
+o twilio-conference-list twilio default 14506512 7737
+o twilio-message-get twilio default 14461758 4830
+o twilio-message-list twilio default 14454362 7390
+o twilio-recording-get twilio default 14489765 8396
+o twilio-recording-list twilio default 14478996 10763
+o twilio-usage-record-list twilio default 14498167 8339
+o typeform-form-get typeform default 14523950 5108
+o typeform-form-list typeform default 14518245 5699
+o typeform-response-delete typeform default 14540285 3050
+o typeform-response-list typeform default 14529064 11215
+o typeform-user-me typeform default 14515966 2273
+o vercel-deployment-cancel vercel default 14558080 2663
+o vercel-deployment-get vercel default 14555119 2955
+o vercel-deployments-list vercel default 14549819 5294
+o vercel-project-get vercel default 14546850 2963
+o vercel-projects-list vercel default 14545372 1472
+o webflow-collection-get webflow default 14568399 4235
+o webflow-collection-item-get webflow default 14576725 3491
+o webflow-collection-item-list webflow default 14572640 4079
+o webflow-collection-list webflow default 14565318 3075
+o webflow-site-list webflow default 14562575 2737
+o webflow-site-publish webflow default 14580222 2360
 o work-request-create b10x tasks 5118534 6370
 o work-request-get b10x tasks 5124910 4188
 o work-request-list b10x tasks 5129104 8201
@@ -927,44 +932,44 @@ o work-task-create b10x tasks 5137311 7586
 o work-task-get b10x tasks 5144903 4524
 o work-task-list b10x tasks 5149433 8970
 o work-task-status-update b10x tasks 5158409 6492
-o zendesk-custom-object-list zendesk default 14687238 5894
-o zendesk-custom-status-list zendesk default 14892323 5413
-o zendesk-group-list zendesk default 14864162 3756
-o zendesk-help-center-article-create zendesk help-center 15194142 9386
-o zendesk-help-center-article-get zendesk help-center 15172735 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 15185591 8545
-o zendesk-help-center-article-list zendesk help-center 15164208 8521
-o zendesk-help-center-category-list zendesk help-center 15155467 4211
-o zendesk-help-center-section-list zendesk help-center 15159684 4518
-o zendesk-help-center-translation-list zendesk help-center 15180583 5002
-o zendesk-incremental-organization-list zendesk default 14673016 8641
-o zendesk-incremental-ticket-event-list zendesk default 14681663 5569
-o zendesk-incremental-ticket-list zendesk default 14572311 74662
-o zendesk-incremental-user-list zendesk default 14646979 26031
-o zendesk-messaging-conversation-create zendesk messaging 15203534 10167
-o zendesk-messaging-conversation-get zendesk messaging 15213707 10469
-o zendesk-messaging-conversation-update zendesk messaging 15224182 11165
-o zendesk-messaging-message-create zendesk messaging 15242407 276191
-o zendesk-messaging-message-list zendesk messaging 15518604 158036
-o zendesk-messaging-participant-list zendesk messaging 15235353 7048
-o zendesk-messaging-user-create zendesk messaging 15676646 10089
-o zendesk-messaging-user-get zendesk messaging 15686741 9350
-o zendesk-messaging-user-update zendesk messaging 15696097 9961
-o zendesk-organization-show zendesk default 14858157 5999
-o zendesk-test zendesk default 14897742 23020
-o zendesk-ticket-audit-list zendesk default 14566495 5810
-o zendesk-ticket-comment-list zendesk default 14994506 19828
-o zendesk-ticket-field-list zendesk default 14867924 15042
-o zendesk-ticket-form-list zendesk default 14882972 9345
-o zendesk-ticket-recent-list zendesk default 14693138 71467
-o zendesk-ticket-search zendesk default 14920768 5013
-o zendesk-ticket-show zendesk default 14925787 68713
-o zendesk-ticket-update zendesk default 15014340 141121
-o zendesk-user-show zendesk default 14836655 21496
-o zendesk-view-ticket-list zendesk default 14764611 72038
-o zoom-meeting-delete zoom default 15707973 2358
-o zoom-user-get zoom default 15710337 5881
-payload 15716500
+o zendesk-custom-object-list zendesk default 14709708 5894
+o zendesk-custom-status-list zendesk default 14914793 5413
+o zendesk-group-list zendesk default 14886632 3756
+o zendesk-help-center-article-create zendesk help-center 15216612 9386
+o zendesk-help-center-article-get zendesk help-center 15195205 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 15208061 8545
+o zendesk-help-center-article-list zendesk help-center 15186678 8521
+o zendesk-help-center-category-list zendesk help-center 15177937 4211
+o zendesk-help-center-section-list zendesk help-center 15182154 4518
+o zendesk-help-center-translation-list zendesk help-center 15203053 5002
+o zendesk-incremental-organization-list zendesk default 14695486 8641
+o zendesk-incremental-ticket-event-list zendesk default 14704133 5569
+o zendesk-incremental-ticket-list zendesk default 14594781 74662
+o zendesk-incremental-user-list zendesk default 14669449 26031
+o zendesk-messaging-conversation-create zendesk messaging 15226004 10167
+o zendesk-messaging-conversation-get zendesk messaging 15236177 10469
+o zendesk-messaging-conversation-update zendesk messaging 15246652 11165
+o zendesk-messaging-message-create zendesk messaging 15264877 276191
+o zendesk-messaging-message-list zendesk messaging 15541074 158036
+o zendesk-messaging-participant-list zendesk messaging 15257823 7048
+o zendesk-messaging-user-create zendesk messaging 15699116 10089
+o zendesk-messaging-user-get zendesk messaging 15709211 9350
+o zendesk-messaging-user-update zendesk messaging 15718567 9961
+o zendesk-organization-show zendesk default 14880627 5999
+o zendesk-test zendesk default 14920212 23020
+o zendesk-ticket-audit-list zendesk default 14588965 5810
+o zendesk-ticket-comment-list zendesk default 15016976 19828
+o zendesk-ticket-field-list zendesk default 14890394 15042
+o zendesk-ticket-form-list zendesk default 14905442 9345
+o zendesk-ticket-recent-list zendesk default 14715608 71467
+o zendesk-ticket-search zendesk default 14943238 5013
+o zendesk-ticket-show zendesk default 14948257 68713
+o zendesk-ticket-update zendesk default 15036810 141121
+o zendesk-user-show zendesk default 14859125 21496
+o zendesk-view-ticket-list zendesk default 14787081 72038
+o zoom-meeting-delete zoom default 15730443 2358
+o zoom-user-get zoom default 15732807 5881
+payload 15738970
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -302098,6 +302103,409 @@ payload 15716500
         }
       ],
       "contract": {
+        "description": "List GitLab users visible to the delegated user; reserved as a bounded datasource backing read",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "page",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List GitLab users visible to the delegated user; reserved as a bounded datasource backing read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-user-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "1-based page number",
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "description": "Results per page, at most 100",
+          "name": "per_page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          }
+        ],
+        "url": "{base}/users"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "avatar_url": {
+              "format": "uri",
+              "type": "string"
+            },
+            "bot": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            },
+            "web_url": {
+              "format": "uri",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "username",
+            "state"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Get one GitLab user by numeric id; reserved as a bounded datasource backing read",
+        "input_schema": {
+          "properties": {
+            "user_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "user_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one GitLab user by numeric id; reserved as a bounded datasource backing read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-user-get-by-id",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The user's numeric GitLab id",
+          "name": "user_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "user_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/users/{user_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "avatar_url": {
+            "format": "uri",
+            "type": "string"
+          },
+          "bot": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "state"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
         "description": "List the groups the authenticated user is a member of, optionally narrowed by a search term",
         "input_schema": {
           "properties": {
@@ -302266,6 +302674,191 @@ payload 15716500
           "type": "object"
         },
         "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Get one reachable group by numeric id; reserved as a bounded datasource backing read",
+        "input_schema": {
+          "properties": {
+            "group_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "group_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one reachable group by numeric id; reserved as a bounded datasource backing read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-group-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The group's numeric GitLab id",
+          "name": "group_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "group_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/groups/{group_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "full_path": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "full_path"
+        ],
+        "type": "object"
       },
       "risk": "low",
       "semantic_effects": [],
@@ -302586,6 +303179,197 @@ payload 15716500
           "type": "object"
         },
         "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Get one reachable project by numeric id; reserved as a bounded datasource backing read",
+        "input_schema": {
+          "properties": {
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one reachable project by numeric id; reserved as a bounded datasource backing read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-project-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/projects/{project_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "default_branch": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "path_with_namespace": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path_with_namespace"
+        ],
+        "type": "object"
       },
       "risk": "low",
       "semantic_effects": [],
@@ -303702,6 +304486,238 @@ payload 15716500
           "type": "object"
         },
         "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Get one project merge request by IID; reserved as a bounded datasource backing read",
+        "input_schema": {
+          "properties": {
+            "merge_request_iid": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id",
+            "merge_request_iid"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one project merge request by IID; reserved as a bounded datasource backing read",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-merge-request-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "description": "The project-scoped merge request number",
+          "name": "merge_request_iid",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "merge_request_iid"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/projects/{project_id}/merge_requests/{merge_request_iid}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "author": {
+            "type": "object"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "iid": {
+            "type": "integer"
+          },
+          "merged_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "iid",
+          "project_id",
+          "title",
+          "state"
+        ],
+        "type": "object"
       },
       "risk": "low",
       "semantic_effects": [],
