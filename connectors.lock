@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "d7ff748910fa20217344c006f4d17572cbfd1b67a8a5d4d63526133dbff0340c"
+sha256 = "8af2ed7c855a20e6fc09147c06a6f3a8f73ef38dd17eb90bb6900bc992a64db1"
 
 [[provider]]
 id = "airtable"
@@ -191,8 +191,20 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 [[provider]]
 id = "b10x"
 generator = "connectors 0.1.0"
-toml_sha256 = "6e7ab6a94794c6e5426052c42381bff27c7e680953d427ed46ff6895616e3575"
-ir_sha256 = "aeab296dc85c1075f1d12eb3746b4992979b6338f9f17b898382fd32b9d3ff1d"
+toml_sha256 = "cb7cfcabc0586d5cc8d70e4cdbe90c4fe835ac4c029867126efab15e759af881"
+ir_sha256 = "34cfb081ddb6dd73d9fc835d33f3a5a3fdd87783e835f64e7c8cd010a7ba43b2"
+
+[[provider.specs]]
+path = "specs/b10x/workspaces-v2.openapi.json"
+service = "workspaces"
+upstream_version = "workspaces v2 development manifest 362abc0ced24816728f5e0380c34be1ff68697af7fa803b3e41a07d5c433c768"
+sha256 = "3f5735472a616c1cbb0470a0473d350de6d081288cf65e4a614d2939a13f1291"
+
+[[provider.specs]]
+path = "specs/b10x/colab-v1.openapi.json"
+service = "collaboration"
+upstream_version = "colab v1 development manifest 9398434ee535a9c56791e721ba1744c2dbc46b67406c9d8e3b88cffb63703a70"
+sha256 = "ffbf0660d3ff02c98f925db390814bb192dd4ac1a1d8f9db215b7aa5e713235f"
 
 [[provider.specs]]
 path = "specs/b10x/ontology-v0alpha2.openapi.json"
@@ -225,7 +237,7 @@ upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7
 sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "22909439669fd366e08dc8afa054d3799627699e6687380126838b3aeeac4af2"
+"catalog/b10x.catalog.json" = "624672957ef16a335d516aa9e2fdfe6f8f88109f6ff6afd2cf661170374c5228"
 
 [[provider]]
 id = "datadog"

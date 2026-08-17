@@ -66,6 +66,24 @@ fn module_global_alias(value: &str) -> Option<&'static str> {
         "ontology/proposal.evaluate" => "ontology-proposal-evaluate",
         "ontology/proposal.approval.record" => "ontology-proposal-approval-record",
         "ontology/proposal.promote" => "ontology-proposal-promote",
+        "workspaces/workspace.list" => "workspaces-list",
+        "workspaces/workspace.create" => "workspaces-create",
+        "workspaces/workspace.get" => "workspaces-get",
+        "workspaces/workspace.delete" => "workspaces-delete",
+        "workspaces/checkout.list" => "workspaces-checkouts-list",
+        "workspaces/checkout.create" => "workspaces-checkouts-create",
+        "workspaces/checkout.delete" => "workspaces-checkouts-delete",
+        "workspaces/file.read" => "workspace-file-read",
+        "workspaces/file.list" => "workspace-tree-list",
+        "workspaces/file.replace" => "workspace-file-replace",
+        "workspaces/file.edit" => "workspace-file-edit",
+        "workspaces/file.patch" => "workspace-file-patch",
+        "workspaces/exec.start" => "workspace-exec-start",
+        "colab/room.create" => "colab-room-create",
+        "colab/workspace.list" => "colab-workspace-list",
+        "colab/workspace.attach" => "colab-workspace-attach",
+        "colab/workspace.current.set" => "colab-workspace-current-set",
+        "colab/workspace.detach" => "colab-workspace-detach",
         _ => return None,
     })
 }
@@ -119,6 +137,24 @@ pub(super) fn module_operation(canonical: &str) -> Option<&'static str> {
         "ontology-proposal-evaluate" => "ontology/proposal.evaluate",
         "ontology-proposal-approval-record" => "ontology/proposal.approval.record",
         "ontology-proposal-promote" => "ontology/proposal.promote",
+        "workspaces-list" => "workspaces/workspace.list",
+        "workspaces-create" => "workspaces/workspace.create",
+        "workspaces-get" => "workspaces/workspace.get",
+        "workspaces-delete" => "workspaces/workspace.delete",
+        "workspaces-checkouts-list" => "workspaces/checkout.list",
+        "workspaces-checkouts-create" => "workspaces/checkout.create",
+        "workspaces-checkouts-delete" => "workspaces/checkout.delete",
+        "workspace-file-read" => "workspaces/file.read",
+        "workspace-tree-list" => "workspaces/file.list",
+        "workspace-file-replace" => "workspaces/file.replace",
+        "workspace-file-edit" => "workspaces/file.edit",
+        "workspace-file-patch" => "workspaces/file.patch",
+        "workspace-exec-start" => "workspaces/exec.start",
+        "colab-room-create" => "colab/room.create",
+        "colab-workspace-list" => "colab/workspace.list",
+        "colab-workspace-attach" => "colab/workspace.attach",
+        "colab-workspace-current-set" => "colab/workspace.current.set",
+        "colab-workspace-detach" => "colab/workspace.detach",
         _ => return None,
     })
 }
@@ -136,6 +172,12 @@ pub(super) fn response_schema(catalog: &Value, canonical: &str) -> Result<Value,
         .as_object()
         .and_then(|fields| fields.get("response_schema"))
         .cloned()
+        .or_else(|| {
+            (canonical.starts_with("workspaces-")
+                || canonical.starts_with("workspace-")
+                || canonical.starts_with("colab-"))
+            .then(|| serde_json::json!({"type": "object"}))
+        })
         .or_else(|| {
             matches!(
                 canonical,
@@ -182,6 +224,8 @@ pub(super) fn approval(canonical: &str) -> ApprovalPosture {
             | "ontology-proposal-approval-record"
             | "ontology-proposal-promote"
             | "ontology-schema-register"
+            | "workspaces-delete"
+            | "workspaces-checkouts-delete"
     ) {
         ApprovalPosture::Required
     } else {

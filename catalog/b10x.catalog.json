@@ -57658,6 +57658,2228 @@
     {
       "auth": [],
       "contract": {
+        "description": "List logical workspaces visible to the admitted principal",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List logical workspaces visible to the admitted principal",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/workspaces/v2/workspaces"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Create one logical workspace under an idempotency identity",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "expires_at_ms": {},
+            "name": {
+              "type": "string"
+            },
+            "retention": {
+              "type": "string"
+            },
+            "source": {}
+          },
+          "required": [
+            "Idempotency_Key",
+            "expires_at_ms",
+            "name",
+            "retention",
+            "source"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Create one logical workspace under an idempotency identity",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "expires_at_ms",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "expires_at_ms"
+        },
+        {
+          "name": "name",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "name": "retention",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "managed",
+              "ephemeral"
+            ],
+            "type": "string"
+          },
+          "symbol": "retention"
+        },
+        {
+          "name": "source",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "canonical_url": {
+                    "type": "string"
+                  },
+                  "connection": {
+                    "type": "string"
+                  },
+                  "default_branch": {
+                    "type": "string"
+                  },
+                  "forge": {
+                    "enum": [
+                      "git-hub",
+                      "git-lab"
+                    ],
+                    "type": "string"
+                  },
+                  "repository": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "forge",
+                  "canonical_url",
+                  "repository",
+                  "connection",
+                  "default_branch"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": "source"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "expires_at_ms": {
+              "$param": "expires_at_ms"
+            },
+            "name": {
+              "$param": "name"
+            },
+            "retention": {
+              "$param": "retention"
+            },
+            "source": {
+              "$param": "source"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/workspaces/v2/workspaces"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Read one visible logical workspace",
+        "input_schema": {
+          "properties": {
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Read one visible logical workspace",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Destroy one logical workspace after all physical checkouts are absent",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "Idempotency_Key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Destroy one logical workspace after all physical checkouts are absent",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-delete",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
+        },
+        "method": "DELETE",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "high",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List physical checkout records for one visible workspace",
+        "input_schema": {
+          "properties": {
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List physical checkout records for one visible workspace",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-checkouts-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Provision one Substrate-backed physical checkout",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "branch": {},
+            "source_ticket": {},
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "Idempotency_Key",
+            "branch",
+            "source_ticket"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Provision one Substrate-backed physical checkout",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-checkouts-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "branch",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "branch"
+        },
+        {
+          "name": "source_ticket",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "source_ticket"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "branch": {
+              "$param": "branch"
+            },
+            "source_ticket": {
+              "$param": "source_ticket"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_file",
+        "write_db"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Destroy one physical checkout and its confined files",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "Idempotency_Key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Destroy one physical checkout and its confined files",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspaces-checkouts-delete",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
+        },
+        "method": "DELETE",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "high",
+      "semantic_effects": [
+        "write_file",
+        "write_db"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Read one bounded checkout file slice with its complete-content digest",
+        "input_schema": {
+          "properties": {
+            "checkout": {
+              "type": "string"
+            },
+            "limit": {},
+            "offset": {},
+            "path": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "path",
+            "offset",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Read one bounded checkout file slice with its complete-content digest",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-file-read",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "path",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "path"
+        },
+        {
+          "name": "offset",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "offset"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "limit"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "offset",
+            "value": {
+              "$param": "offset"
+            }
+          },
+          {
+            "name": "path",
+            "value": {
+              "$param": "path"
+            }
+          }
+        ],
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/files"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List one bounded descriptor-confined checkout tree without following symlinks",
+        "input_schema": {
+          "properties": {
+            "checkout": {
+              "type": "string"
+            },
+            "include_hidden": {},
+            "limit_items": {},
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "limit_items",
+            "include_hidden"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List one bounded descriptor-confined checkout tree without following symlinks",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-tree-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "limit_items",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "limit_items"
+        },
+        {
+          "name": "include_hidden",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "symbol": "include_hidden"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "include_hidden",
+            "value": {
+              "$param": "include_hidden"
+            }
+          },
+          {
+            "name": "limit_items",
+            "value": {
+              "$param": "limit_items"
+            }
+          }
+        ],
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/tree"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Replace a checkout file only when its expected absent or digest state still holds",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "content_base64": {
+              "type": "string"
+            },
+            "create_parents": {},
+            "expected": {},
+            "path": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "path",
+            "Idempotency_Key",
+            "content_base64",
+            "create_parents",
+            "expected"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Replace a checkout file only when its expected absent or digest state still holds",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-file-replace",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "path",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "path"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "content_base64",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "content_base64"
+        },
+        {
+          "name": "create_parents",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "symbol": "create_parents"
+        },
+        {
+          "name": "expected",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "const": "absent",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "const": "sha256",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "sha256"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "symbol": "expected"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "content_base64": {
+              "$param": "content_base64"
+            },
+            "create_parents": {
+              "$param": "create_parents"
+            },
+            "expected": {
+              "$param": "expected"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "query": [
+          {
+            "name": "path",
+            "value": {
+              "$param": "path"
+            }
+          }
+        ],
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/files"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_file"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Apply a digest-bound unique text replacement and return a bounded diff",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "expected_sha256": {
+              "type": "string"
+            },
+            "match_policy": {
+              "type": "string"
+            },
+            "new_text": {
+              "type": "string"
+            },
+            "old_text": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "path",
+            "Idempotency_Key",
+            "expected_sha256",
+            "match_policy",
+            "new_text",
+            "old_text"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Apply a digest-bound unique text replacement and return a bounded diff",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-file-edit",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "path",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "path"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "expected_sha256",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "expected_sha256"
+        },
+        {
+          "name": "match_policy",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "exact",
+              "flux_compatible"
+            ],
+            "type": "string"
+          },
+          "symbol": "match_policy"
+        },
+        {
+          "name": "new_text",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "new_text"
+        },
+        {
+          "name": "old_text",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "old_text"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "expected_sha256": {
+              "$param": "expected_sha256"
+            },
+            "match_policy": {
+              "$param": "match_policy"
+            },
+            "new_text": {
+              "$param": "new_text"
+            },
+            "old_text": {
+              "$param": "old_text"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "query": [
+          {
+            "name": "path",
+            "value": {
+              "$param": "path"
+            }
+          }
+        ],
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-edits"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_file"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Apply digest-bound original-line edits and return a bounded diff",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "edits": {
+              "items": {},
+              "type": "array"
+            },
+            "expected_sha256": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "path",
+            "Idempotency_Key",
+            "edits",
+            "expected_sha256"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Apply digest-bound original-line edits and return a bounded diff",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-file-patch",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "path",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "path"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "edits",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "items": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "insert_before",
+                      "type": "string"
+                    },
+                    "line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "line",
+                    "text"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "insert_after",
+                      "type": "string"
+                    },
+                    "line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "line",
+                    "text"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "end_line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "const": "replace_range",
+                      "type": "string"
+                    },
+                    "start_line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "start_line",
+                    "end_line",
+                    "text"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "end_line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "const": "delete_range",
+                      "type": "string"
+                    },
+                    "start_line": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "start_line",
+                    "end_line"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "symbol": "edits"
+        },
+        {
+          "name": "expected_sha256",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "expected_sha256"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "edits": {
+              "$param": "edits"
+            },
+            "expected_sha256": {
+              "$param": "expected_sha256"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "query": [
+          {
+            "name": "path",
+            "value": {
+              "$param": "path"
+            }
+          }
+        ],
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-patches"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_file"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Run one argv-only bounded no-network command in the current checkout",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "argv": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "cpu_millis": {},
+            "memory_bytes": {},
+            "output_bytes": {},
+            "processes": {},
+            "timeout_ms": {},
+            "workspace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "checkout",
+            "Idempotency_Key",
+            "argv",
+            "cpu_millis",
+            "memory_bytes",
+            "output_bytes",
+            "processes",
+            "timeout_ms"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Run one argv-only bounded no-network command in the current checkout",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "workspace-exec-start",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "workspace",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "workspace"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "argv",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "symbol": "argv"
+        },
+        {
+          "name": "cpu_millis",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "cpu_millis"
+        },
+        {
+          "name": "memory_bytes",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "memory_bytes"
+        },
+        {
+          "name": "output_bytes",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "output_bytes"
+        },
+        {
+          "name": "processes",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "processes"
+        },
+        {
+          "name": "timeout_ms",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symbol": "timeout_ms"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "argv": {
+              "$param": "argv"
+            },
+            "cpu_millis": {
+              "$param": "cpu_millis"
+            },
+            "memory_bytes": {
+              "$param": "memory_bytes"
+            },
+            "output_bytes": {
+              "$param": "output_bytes"
+            },
+            "processes": {
+              "$param": "processes"
+            },
+            "timeout_ms": {
+              "$param": "timeout_ms"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/execs"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_file"
+      ],
+      "service": "workspaces"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Create one product-neutral conversation room",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "access": {
+              "type": "string"
+            },
+            "project": {},
+            "title": {}
+          },
+          "required": [
+            "Idempotency_Key",
+            "access",
+            "project",
+            "title"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Create one product-neutral conversation room",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "colab-room-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "access",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "type": "string"
+          },
+          "symbol": "access"
+        },
+        {
+          "name": "project",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "project"
+        },
+        {
+          "name": "title",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": "title"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "access": {
+              "$param": "access"
+            },
+            "project": {
+              "$param": "project"
+            },
+            "title": {
+              "$param": "title"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/colab/v2/rooms"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "collaboration"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List workspace checkout references attached to one conversation",
+        "input_schema": {
+          "properties": {
+            "room": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "room"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "List workspace checkout references attached to one conversation",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "colab-workspace-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "room",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "room"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/api/colab/v2/rooms/{room}/workspaces"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "collaboration"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Attach one Workspaces-owned checkout reference to a conversation",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {},
+            "make_current": {},
+            "room": {
+              "type": "string"
+            },
+            "workspace": {}
+          },
+          "required": [
+            "room",
+            "Idempotency_Key",
+            "checkout",
+            "make_current",
+            "workspace"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Attach one Workspaces-owned checkout reference to a conversation",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "colab-workspace-attach",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "room",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "room"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "checkout",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "checkout_id"
+            ],
+            "type": "object"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "name": "make_current",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "symbol": "make_current"
+        },
+        {
+          "name": "workspace",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id"
+            ],
+            "type": "object"
+          },
+          "symbol": "workspace"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "checkout": {
+              "$param": "checkout"
+            },
+            "make_current": {
+              "$param": "make_current"
+            },
+            "workspace": {
+              "$param": "workspace"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/colab/v2/rooms/{room}/workspaces"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "collaboration"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Select one already-attached checkout as the conversation current checkout",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {},
+            "room": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "room",
+            "Idempotency_Key",
+            "checkout"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Select one already-attached checkout as the conversation current checkout",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "colab-workspace-current-set",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "room",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "room"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        },
+        {
+          "name": "checkout",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "checkout_id"
+            ],
+            "type": "object"
+          },
+          "symbol": "checkout"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "checkout": {
+              "$param": "checkout"
+            }
+          }
+        },
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          },
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/api/colab/v2/rooms/{room}/workspaces/current"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "collaboration"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Detach one Workspaces-owned checkout reference from a conversation",
+        "input_schema": {
+          "properties": {
+            "Idempotency_Key": {
+              "type": "string"
+            },
+            "checkout": {
+              "type": "string"
+            },
+            "room": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "room",
+            "checkout",
+            "Idempotency_Key"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Detach one Workspaces-owned checkout reference from a conversation",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "expose": true,
+      "id": "colab-workspace-detach",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "room",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "room"
+        },
+        {
+          "name": "checkout",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "symbol": "checkout"
+        },
+        {
+          "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+          "name": "Idempotency-Key",
+          "position": "header",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "symbol": "Idempotency_Key"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "headers": {
+          "Idempotency-Key": {
+            "$param": "Idempotency-Key"
+          }
+        },
+        "method": "DELETE",
+        "url": "{base}/api/colab/v2/rooms/{room}/workspaces/{checkout}"
+      },
+      "required_capabilities": [
+        "private_network",
+        "file_secret"
+      ],
+      "risk": "medium",
+      "semantic_effects": [
+        "write_db"
+      ],
+      "service": "collaboration"
+    },
+    {
+      "auth": [],
+      "contract": {
         "description": "",
         "input_schema": {
           "properties": {
@@ -135915,6 +138137,22 @@
       "name": "planning",
       "tags": [
         "project-management"
+      ]
+    },
+    {
+      "base_url": "https://b10x.io",
+      "description": "Logical workspaces, Substrate-backed checkouts, digest-bound files, and bounded execution",
+      "name": "workspaces",
+      "tags": [
+        "developer-tools"
+      ]
+    },
+    {
+      "base_url": "https://b10x.io",
+      "description": "Product-neutral conversation rooms and their current workspace attachments",
+      "name": "collaboration",
+      "tags": [
+        "messaging"
       ]
     }
   ],

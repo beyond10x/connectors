@@ -1,0 +1,974 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "colab module API",
+    "version": "0.1.0-dev.1"
+  },
+  "paths": {
+    "/api/colab/v2/rooms": {
+      "post": {
+        "operationId": "colab_room_create",
+        "x-b10x-global-id": "colab/room.create",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/colab_room_create_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_room_create_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_room_create_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/colab_room_create_input"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/colab/v2/rooms/{room}/workspaces": {
+      "get": {
+        "operationId": "colab_workspace_list",
+        "x-b10x-global-id": "colab/workspace.list",
+        "x-b10x-direction": "read",
+        "x-b10x-effects": [
+          "read"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "idempotent",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/colab_workspace_list_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_list_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_list_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/colab_workspace_list_input/properties/room"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "colab_workspace_attach",
+        "x-b10x-global-id": "colab/workspace.attach",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/colab_workspace_attach_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_attach_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_attach_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/colab_workspace_attach_path/properties/room"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/colab_workspace_attach_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/colab/v2/rooms/{room}/workspaces/current": {
+      "put": {
+        "operationId": "colab_workspace_current_set",
+        "x-b10x-global-id": "colab/workspace.current.set",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "low",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/colab_workspace_current_set_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_current_set_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_current_set_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/colab_workspace_current_set_path/properties/room"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/colab_workspace_current_set_body"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/colab/v2/rooms/{room}/workspaces/{checkout}": {
+      "delete": {
+        "operationId": "colab_workspace_detach",
+        "x-b10x-global-id": "colab/workspace.detach",
+        "x-b10x-direction": "write",
+        "x-b10x-effects": [
+          "write"
+        ],
+        "x-b10x-risk-floor": "medium",
+        "x-b10x-idempotency": "keyed",
+        "x-b10x-input-schema": {
+          "$ref": "#/components/schemas/colab_workspace_detach_input"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful owner response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_detach_output"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Typed module problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/colab_workspace_detach_problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/colab_workspace_detach_input/properties/room"
+            }
+          },
+          {
+            "name": "checkout",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/colab_workspace_detach_input/properties/checkout"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable caller identity for one logical write; reusing it with different input is refused",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "colab_room_create_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "CreateRoomContractBody",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "access": {
+            "$ref": "#/components/schemas/colab_room_create_input/$defs/RoomAccessContract"
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "access"
+        ],
+        "$defs": {
+          "RoomAccessContract": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          }
+        }
+      },
+      "colab_room_create_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "colab_room_create_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "colab_workspace_attach_body": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/colab_workspace_attach_body/$defs/LogicalWorkspaceContractRef"
+          },
+          "checkout": {
+            "$ref": "#/components/schemas/colab_workspace_attach_body/$defs/WorkspaceCheckoutContractRef"
+          },
+          "make_current": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspace",
+          "checkout"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "AttachWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "$ref": "#/components/schemas/colab_workspace_attach_body/$defs/LogicalWorkspaceContractRef"
+              },
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_attach_body/$defs/WorkspaceCheckoutContractRef"
+              },
+              "make_current": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "LogicalWorkspaceContractRef": {
+            "type": "object",
+            "properties": {
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace_id"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_attach_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/colab_workspace_attach_input/$defs/RoomPath"
+          },
+          "body": {
+            "$ref": "#/components/schemas/colab_workspace_attach_input/$defs/AttachWorkspaceContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "body"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "AttachWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "$ref": "#/components/schemas/colab_workspace_attach_input/$defs/LogicalWorkspaceContractRef"
+              },
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_attach_input/$defs/WorkspaceCheckoutContractRef"
+              },
+              "make_current": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "LogicalWorkspaceContractRef": {
+            "type": "object",
+            "properties": {
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace_id"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_attach_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "colab_workspace_attach_path": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "room"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "AttachWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "workspace": {
+                "$ref": "#/components/schemas/colab_workspace_attach_path/$defs/LogicalWorkspaceContractRef"
+              },
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_attach_path/$defs/WorkspaceCheckoutContractRef"
+              },
+              "make_current": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace",
+              "checkout"
+            ]
+          },
+          "LogicalWorkspaceContractRef": {
+            "type": "object",
+            "properties": {
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "workspace_id"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_attach_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "colab_workspace_current_set_body": {
+        "type": "object",
+        "properties": {
+          "checkout": {
+            "$ref": "#/components/schemas/colab_workspace_current_set_body/$defs/WorkspaceCheckoutContractRef"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "checkout"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "SetCurrentWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_current_set_body/$defs/WorkspaceCheckoutContractRef"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_current_set_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "PathBody",
+        "type": "object",
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/colab_workspace_current_set_input/$defs/RoomPath"
+          },
+          "body": {
+            "$ref": "#/components/schemas/colab_workspace_current_set_input/$defs/SetCurrentWorkspaceContractBody"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "body"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "SetCurrentWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_current_set_input/$defs/WorkspaceCheckoutContractRef"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_current_set_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "colab_workspace_current_set_path": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "room"
+        ],
+        "$defs": {
+          "RoomPath": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "room"
+            ]
+          },
+          "SetCurrentWorkspaceContractBody": {
+            "type": "object",
+            "properties": {
+              "checkout": {
+                "$ref": "#/components/schemas/colab_workspace_current_set_path/$defs/WorkspaceCheckoutContractRef"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout"
+            ]
+          },
+          "WorkspaceCheckoutContractRef": {
+            "type": "object",
+            "properties": {
+              "checkout_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "checkout_id"
+            ]
+          }
+        }
+      },
+      "colab_workspace_current_set_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "colab_workspace_detach_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "WorkspaceAttachmentPath",
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string"
+          },
+          "checkout": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "room",
+          "checkout"
+        ]
+      },
+      "colab_workspace_detach_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "colab_workspace_detach_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      },
+      "colab_workspace_list_input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "RoomPath",
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "room"
+        ]
+      },
+      "colab_workspace_list_output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AnyValue"
+      },
+      "colab_workspace_list_problem": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Problem",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": true,
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "status",
+          "retryable"
+        ]
+      }
+    }
+  }
+}

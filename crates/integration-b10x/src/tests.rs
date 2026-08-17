@@ -1,5 +1,9 @@
 use super::*;
 use connectors_config::{B10xConnectionConfig, InitiationConfig};
+use protocol::datasource::{
+    BindingSearchRequest, DatasourceRead, DatasourceRequest, DatasourceResult,
+    DescribeRequest as DatasourceDescribeRequest, ReadRequest,
+};
 use protocol::operation::{DescribeRequest, InvokeRequest, OwnerContext, SearchRequest};
 use std::fs;
 use std::io::Write as _;
@@ -28,6 +32,8 @@ fn config(root: &Path) -> B10xIntegrationConfig {
         work_origin: Some("http://127.0.0.1:4180".to_owned()),
         ontology_origin: None,
         planner_origin: None,
+        workspaces_origin: None,
+        colab_origin: None,
         ontology_bearer_file: None,
         module_signing_key_file: Some(signing_key),
         module_signing_key_id: Some("test-1".to_owned()),
@@ -203,6 +209,77 @@ async fn search_projects_only_configured_capabilities() {
     assert_eq!(connections[0].integration_ref, PROVIDER);
     assert_eq!(connections[0].state, ConnectionState::Callable);
     assert_eq!(connections[0].route, ConnectionRoute::Direct);
+}
+
+#[tokio::test]
+async fn workspace_datasource_projects_only_the_logical_read_model() {
+    let (origin, server) = fake_http(
+        r#"{"api_version":"workspaces.b10x.io/v2","request_id":"owner-request","result":{"items":[{"id":"wsp_example","tenant":"tenant:secret","owner":"user:secret","name":"Example","retention":"managed","source":{"forge":"git-hub","canonical_url":"https://github.com/b10x/b10x","repository":"b10x/b10x","connection":"connection:forge:secret","default_branch":"main"},"state":"active","created_at_ms":1,"updated_at_ms":2,"expires_at_ms":null}]}}"#,
+    );
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.workspaces_origin = Some(origin);
+    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    assert!(backend.capabilities().datasources);
+
+    let DatasourceResult::Describe(description) = backend
+        .handle_datasource(
+            &principal(),
+            DatasourceRequest::Describe(DatasourceDescribeRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource description expected")
+    };
+    let DatasourceResult::Bindings { bindings } = backend
+        .handle_datasource(
+            &principal(),
+            DatasourceRequest::Bindings(BindingSearchRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+                query: String::new(),
+                limit: 1,
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource binding expected")
+    };
+    let DatasourceResult::Read(page) = backend
+        .handle_datasource(
+            &principal(),
+            DatasourceRequest::Read(ReadRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+                binding_ref: bindings[0].binding_ref.clone(),
+                description_ref: description.description_ref,
+                read: DatasourceRead::List {
+                    limit: 10,
+                    cursor: None,
+                },
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource page expected")
+    };
+    assert_eq!(page.records.len(), 1);
+    assert_eq!(
+        page.records[0].key,
+        serde_json::json!({"id": "wsp_example"})
+    );
+    assert!(page.records[0].value.get("tenant").is_none());
+    assert!(page.records[0].value.get("owner").is_none());
+    assert!(page.records[0].value["source"].get("connection").is_none());
+    let request = server.join().unwrap();
+    assert!(request.starts_with("GET /api/workspaces/v2/workspaces HTTP/1.1"));
+    assert!(request
+        .to_ascii_lowercase()
+        .contains("authorization: dlmodule "));
 }
 
 #[test]

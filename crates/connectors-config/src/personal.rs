@@ -209,6 +209,10 @@ pub struct B10xIntegrationConfig {
     #[serde(default)]
     pub planner_origin: Option<String>,
     #[serde(default)]
+    pub workspaces_origin: Option<String>,
+    #[serde(default)]
+    pub colab_origin: Option<String>,
+    #[serde(default)]
     pub ontology_bearer_file: Option<std::path::PathBuf>,
     /// Owner-only file containing the base64url-encoded 32-byte Ed25519 module-signing seed.
     #[serde(default)]
@@ -417,21 +421,35 @@ impl B10xIntegrationConfig {
                 .planner_origin
                 .as_deref()
                 .is_some_and(|origin| !private_origin(origin))
+            || self
+                .workspaces_origin
+                .as_deref()
+                .is_some_and(|origin| !private_origin(origin))
+            || self
+                .colab_origin
+                .as_deref()
+                .is_some_and(|origin| !private_origin(origin))
             || self.tenant_member_modules.as_ref().is_some_and(|modules| {
                 let mut canonical = modules.clone();
                 canonical.sort();
                 canonical.dedup();
                 canonical != *modules
                     || modules.iter().any(|module| {
-                        !matches!(module.as_str(), "ontology" | "planner" | "work")
-                            || module == "work" && self.work_origin.is_none()
+                        !matches!(
+                            module.as_str(),
+                            "colab" | "ontology" | "planner" | "work" | "workspaces"
+                        ) || module == "work" && self.work_origin.is_none()
                             || module == "ontology" && self.ontology_origin.is_none()
                             || module == "planner" && self.planner_origin.is_none()
+                            || module == "workspaces" && self.workspaces_origin.is_none()
+                            || module == "colab" && self.colab_origin.is_none()
                     })
             })
             || ((self.work_origin.is_some()
                 || self.ontology_origin.is_some()
-                || self.planner_origin.is_some())
+                || self.planner_origin.is_some()
+                || self.workspaces_origin.is_some()
+                || self.colab_origin.is_some())
                 && (self.module_signing_key_file.is_none()
                     || self
                         .module_signing_key_id
@@ -444,6 +462,8 @@ impl B10xIntegrationConfig {
             || (self.work_origin.is_none()
                 && self.ontology_origin.is_none()
                 && self.planner_origin.is_none()
+                && self.workspaces_origin.is_none()
+                && self.colab_origin.is_none()
                 && self.audio.is_none()
                 && self.browser.is_none())
         {
@@ -516,6 +536,22 @@ impl B10xIntegrationConfig {
     #[must_use]
     pub fn planner_origin(&self) -> Option<String> {
         self.planner_origin
+            .as_deref()
+            .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+
+    /// Canonical Workspaces origin without a trailing slash.
+    #[must_use]
+    pub fn workspaces_origin(&self) -> Option<String> {
+        self.workspaces_origin
+            .as_deref()
+            .map(|origin| origin.trim_end_matches('/').to_owned())
+    }
+
+    /// Canonical Colab origin without a trailing slash.
+    #[must_use]
+    pub fn colab_origin(&self) -> Option<String> {
+        self.colab_origin
             .as_deref()
             .map(|origin| origin.trim_end_matches('/').to_owned())
     }
