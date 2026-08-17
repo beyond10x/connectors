@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/connectors/contracts/voice-session/v0alpha1/voice-session.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/contracts/voice-session/v0alpha1/voice-session.schema.json",
   "title": "B10x VoiceSession v0alpha1 message",
   "type": "object",
   "additionalProperties": false,

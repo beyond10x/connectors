@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/connectors/web/package-lock.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/web/package-lock.schema.json",
   "title": "npm package-lock document used by the connectors documentation site",
   "type": "object",
   "additionalProperties": false,

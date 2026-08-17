@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "d3f6c202242b8c5a1663c59acd9802314466a59e1457f441854f996b71ad7fae"
+sha256 = "57539e18720c2a50baa457d4e058ebcc8d04a7d171f9a02bdcad356003f67c20"
 
 [[provider]]
 id = "airtable"
@@ -15,7 +15,7 @@ toml_sha256 = "be9421f8ea60be77952d4d1a2587636d1328fccc3dd86dd48292c0d2a2771d4c"
 ir_sha256 = "5f2374b87646f8ac4579df789c27d22c5b7f7877bd07b5ed9305d9a0269262a8"
 
 [provider.artifacts]
-"catalog/airtable.catalog.json" = "c9f424f969eabc3390cc3748d4627db50f55556afce00dbb09ede17b4d4e0a9e"
+"catalog/airtable.catalog.json" = "ee391108ad543b22f55cee9ff478f39506d0eb4dac09f38231e60efa791da93c"
 
 [[provider]]
 id = "alertmanager"
@@ -33,7 +33,7 @@ upstream_version = "0.31.0"
 sha256 = "081c702b33459ec2af24df9095b82b3a4cca515a8292e05699aae8fea180d7b4"
 
 [provider.artifacts]
-"catalog/alertmanager.catalog.json" = "51cec4ecc8ee987b1fc2792e4854dbab70e487171372c98c3e6718be69061857"
+"catalog/alertmanager.catalog.json" = "0464ea9e32bf5c2dd426071e0b4d409a29ff0dedba5372b275e4e6a46c1ba527"
 
 [[provider]]
 id = "algolia"
@@ -42,7 +42,7 @@ toml_sha256 = "c18e5a55835d814e5e4210e8d90ebaf14b50129e6034190cea698b16438f31a8"
 ir_sha256 = "870da3accccdb6cbc72dd0100b3e611cafd631c72fcb4eb1a5331a5113f0d9cc"
 
 [provider.artifacts]
-"catalog/algolia.catalog.json" = "6a85b53396e2fe49fc505658b7146384fb1a6202a132dbb3479b0959ac3ece11"
+"catalog/algolia.catalog.json" = "8807fcb85f0141d4124cdb3f8d512394aadd8ea2aa45ad31b85102079cb63356"
 
 [[provider]]
 id = "anthropic"
@@ -63,7 +63,7 @@ upstream_version = "2023-06-01"
 sha256 = "8280d48e48dd33a3c5f9d899dbc03d4154e23928c4aa9b304ceceda3791ad718"
 
 [provider.artifacts]
-"catalog/anthropic.catalog.json" = "3da63820db7cf8a972f213e673c9236085154574ab86f1d9eb3b02cac9fc1954"
+"catalog/anthropic.catalog.json" = "5c1ae82284a6ed79dac3739cd1ff371514a06841cfba2ab11b29d59ba0a148c4"
 
 [[provider]]
 id = "asana"
@@ -72,7 +72,7 @@ toml_sha256 = "ef9cf99b50dc5cc0654b2314455dcb61cf4f812921b5e6ebe09fcc0368367b38"
 ir_sha256 = "21af0bddb2ee8cedb5393870e297554f71c4ee673e5a987eb295005360b3bd1e"
 
 [provider.artifacts]
-"catalog/asana.catalog.json" = "04d01668c5fc99ebaa9dadd804ab53e762c2eb0ddacb59e7d02ad276931eb696"
+"catalog/asana.catalog.json" = "8591e93c8a6b41c13a0da74792c531f834b9371062d40434a4e21ac12712b723"
 
 [[provider]]
 id = "asterisk"
@@ -90,7 +90,7 @@ upstream_version = "22.10.1"
 sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
 
 [provider.artifacts]
-"catalog/asterisk.catalog.json" = "632c24d809c198ca29d560b4fa7be8c702b4e3fd852a8f9d872f1d104d310c6d"
+"catalog/asterisk.catalog.json" = "957947a43cd30b3d834f6dbce892d44d4ff067dff9d687b09f8c11f525744ba2"
 
 [[provider]]
 id = "babelforce"
@@ -123,7 +123,7 @@ upstream_version = "3.63.10"
 sha256 = "031327359000bd70d6b2ab012868971cc834812e5f61f5157531e7cb5daa4d85"
 
 [provider.artifacts]
-"catalog/babelforce.catalog.json" = "cf2e1158f817471b26d3d3b873dd8b00396fc0784f4ecc03314b2e494eb0ebe1"
+"catalog/babelforce.catalog.json" = "bf393e81781da80ad9c1e2b7880dcc55b98fa4ba8cb74fbbb91dd544727681fd"
 
 [[provider]]
 id = "bitbucket"
@@ -132,7 +132,7 @@ toml_sha256 = "39b18f7e55ca78a912993ef7220891c9aee63d18c13460639978107e9ca6ed44"
 ir_sha256 = "ba3f94ed5fe5d3562d6958e69675a248750323c37acca708bc36b58e45cb5de8"
 
 [provider.artifacts]
-"catalog/bitbucket.catalog.json" = "b5ca63f245159e7fd181c4f319db6c28acb0683abc6e2b6b3e3d2a7c8264004d"
+"catalog/bitbucket.catalog.json" = "6923b0ed534b02e14e3e8ef8765ce63d75d43c935b9fbe8ae34063c15ddc1878"
 
 [[provider]]
 id = "box"
@@ -141,7 +141,7 @@ toml_sha256 = "1537304fa3c0e9597e527dcaa9a7c46b699307918d14d27ba999a7bcc50333ad"
 ir_sha256 = "39dfbd08f3aa229e26f2dd21be5670e7fbb23bddc9d3c220c994badebb589b13"
 
 [provider.artifacts]
-"catalog/box.catalog.json" = "27532d292d633d6446d50f4987075a495de975841b69e053ff68e613d85d5b8c"
+"catalog/box.catalog.json" = "9bd9b75b716f25e5f06be3668bb32b5cee0d64eb87058ebc2edd6fa325a5bfab"
 
 [[provider]]
 id = "calendly"
@@ -150,7 +150,7 @@ toml_sha256 = "3b66cdb86f218ff60d61b25d49039c882ebc2e0592107b5eb0e6d2cbbf1390e2"
 ir_sha256 = "cd852640b0ca764c90325440a2889e2a179ea4472686ba194d989e022177ebd2"
 
 [provider.artifacts]
-"catalog/calendly.catalog.json" = "7ae9fb21f6e96c4684efca78089f0e0b41ec0065eed3983f87644a765eefd3aa"
+"catalog/calendly.catalog.json" = "a2046a509ece9d3ebcb07e238a014d36d232884019eefd2d942725b7d355b24c"
 
 [[provider]]
 id = "clickup"
@@ -159,7 +159,7 @@ toml_sha256 = "335681cd335e7ccafd26060afc665245460a21fc05754f71c850c7551f7edd78"
 ir_sha256 = "f1c8af389f85347d521f52732753b4450e1edacbad14f10c2e2bb1d5132e5471"
 
 [provider.artifacts]
-"catalog/clickup.catalog.json" = "8898c68e3cae3df848cf7534ddeb568d5cc6941ddccfea595302da15f5a3f881"
+"catalog/clickup.catalog.json" = "cbb27c6981b8ca235ca8903677193b6c4d35a5a8591bd41f9af1ed98bf223c4e"
 
 [[provider]]
 id = "cloudflare"
@@ -168,7 +168,7 @@ toml_sha256 = "11e77a64a05c8248253073349aff3ca4aa3b63203d1f04a9401192c770915f0f"
 ir_sha256 = "5ec8959f98f8d96a333885e8b13966652059949c6aa23a7b06d25e6fc07d6ddd"
 
 [provider.artifacts]
-"catalog/cloudflare.catalog.json" = "48c358f86ad88b4841a9f7d2afad541c42d4f70c1581347767acf60ac9e83d6f"
+"catalog/cloudflare.catalog.json" = "e0e237b9c36be18b908bcc612562ce73520c1a0339e12e772739bf9121a39be3"
 
 [[provider]]
 id = "confluence"
@@ -177,7 +177,7 @@ toml_sha256 = "f140f430c8c20fdf15cbcdd2af6396648e923fb9763af6cf57abc153f572ace3"
 ir_sha256 = "83701fe1a6494075bbe6debaa859cf21204a5bce3957095abfb0fa8b33a2dd0e"
 
 [provider.artifacts]
-"catalog/confluence.catalog.json" = "7ac5f5efc3c9a25929693be30e942bfa3c06425f643e01919d14966788435da2"
+"catalog/confluence.catalog.json" = "ff98fa96741386581045235f86072ea4ace82bdeaf360c210f8b569e936aa6f9"
 
 [[provider]]
 id = "contentful"
@@ -186,7 +186,7 @@ toml_sha256 = "240055e8bf27bdb3c597940ff04ff6007b4981f33f45fb462f2e2b23d38a8206"
 ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 
 [provider.artifacts]
-"catalog/contentful.catalog.json" = "278a36d205b54c45c25f594568a39ccdf16fc1516a8eb0c0b6aacea2a383e432"
+"catalog/contentful.catalog.json" = "8e6821e45f9e83787ff5727f82ea277bf1d0a1319650bed45c72f11539bf9390"
 
 [[provider]]
 id = "b10x"
@@ -225,7 +225,7 @@ upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7
 sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "5920f9b9fe47348f56903e3973183a60a56cbabfd93595282b5a451691b1381a"
+"catalog/b10x.catalog.json" = "22909439669fd366e08dc8afa054d3799627699e6687380126838b3aeeac4af2"
 
 [[provider]]
 id = "datadog"
@@ -234,7 +234,7 @@ toml_sha256 = "699352ff97763967bd5829aab97ccb08c29c21a5bcbcbacf84563be173705e87"
 ir_sha256 = "c70d27d3431340a653ae6726e1dc9785f577c7ed8bf73ae6b9bb42d3cf344588"
 
 [provider.artifacts]
-"catalog/datadog.catalog.json" = "7d4e216b6a72720f9873375455644875d75b742757ca2724042b17f9298052ac"
+"catalog/datadog.catalog.json" = "dd12db0e108720e5577ba5f2531b6546bd537b37ddabd3aac55e6515e87abff1"
 
 [[provider]]
 id = "discord"
@@ -243,7 +243,7 @@ toml_sha256 = "aec1988eddb888472b61731581422b7ade9f389560971e91fca4804eeb1548a6"
 ir_sha256 = "6ca3ac2c298a10befd62bb5dd9df3007fedb0c70f7e81dc8e28e1c633e40f53e"
 
 [provider.artifacts]
-"catalog/discord.catalog.json" = "bd6b1b462316d90b1cb6e0e92fcb81129f1c39e505fc0cf9ff6baeb29d72487e"
+"catalog/discord.catalog.json" = "7fcb83a48f2f236f22489fefdf2ddaf234e8edfd56d825735274a3eb38feb11f"
 
 [[provider]]
 id = "docusign"
@@ -252,7 +252,7 @@ toml_sha256 = "6feeea7396151c7a7ae9b8c6feb317691ad6debc5ea999e19f0f7db1390dcac6"
 ir_sha256 = "1a0f8670417f32e4b2cb127f99ae47984da9a8271e150f6048f79ee447797784"
 
 [provider.artifacts]
-"catalog/docusign.catalog.json" = "0fec2c7dfc19a7266983fe019c7248854026ca616cd9163b4c22c0e3ed82173d"
+"catalog/docusign.catalog.json" = "1241db6c1828c6ff9573191a02694088d2a0e5f93532e0cd0dc673bebceffb74"
 
 [[provider]]
 id = "dropbox"
@@ -261,7 +261,7 @@ toml_sha256 = "e42e082740df42bd44458a787c7737034e9329dca47845fbddb781289b46c207"
 ir_sha256 = "177099c3c8d5fc0cf01d5b3571038f7ebdda04b9a0f1bc56b06419ff0b454cff"
 
 [provider.artifacts]
-"catalog/dropbox.catalog.json" = "58b6827b3fde9cb5311f8abd344db95e60959bf6cdca4592b0418ccb96430358"
+"catalog/dropbox.catalog.json" = "5456ca230c5fc6617f0ccae88782afccb40ad311b0bb57e918229f338b54158a"
 
 [[provider]]
 id = "figma"
@@ -270,7 +270,7 @@ toml_sha256 = "201247152d530ccccf974f66988278138a1010e2e7655e9fc5c197cc59a4851e"
 ir_sha256 = "e8892d40e1f666549f73ddeb7f220840bea07639377206acb11bd9ace0554e85"
 
 [provider.artifacts]
-"catalog/figma.catalog.json" = "6d3100e96e154412185b0b3f6b9df86658615b95aed7244a1bafd513c7027536"
+"catalog/figma.catalog.json" = "57961a23e419587fb7d360c76b33c745add7010fdad3c12dbbd06bcaf9fa8527"
 
 [[provider]]
 id = "fly"
@@ -279,7 +279,7 @@ toml_sha256 = "6388740dd20f48e62fd193f848b1be751932a0e6a9cda1c2871b125311b60b05"
 ir_sha256 = "e8b9c0c3bc86083860c13c80c3e1049c613cfa5833eacb649c5e31b64924dbca"
 
 [provider.artifacts]
-"catalog/fly.catalog.json" = "144b5148c747d411a13bf921d36fb36ff81a9506f114c770026f0236753160d8"
+"catalog/fly.catalog.json" = "c94f008f5103b0d0b29db66976ec8a5b9d4fb68e273c846ab5cd5b4c0c7bba81"
 
 [[provider]]
 id = "freshdesk"
@@ -288,7 +288,7 @@ toml_sha256 = "4aa89c55f9d7b63c7a49263d0ed6049150ade78416723502c9c38e9e71111d97"
 ir_sha256 = "610f83106133614d56a5445eafcdbfbf14ec8c03e7bf47469c5f2df6b3aca4d4"
 
 [provider.artifacts]
-"catalog/freshdesk.catalog.json" = "eff70991ca6f346eebb066859fbc545439da862b53a4f85cb867de91edc2dabc"
+"catalog/freshdesk.catalog.json" = "d26086f757573623d421a7fb26bd4f436aaa051edbc069782fa16553ca7a5985"
 
 [[provider]]
 id = "front"
@@ -297,7 +297,7 @@ toml_sha256 = "6b77f14415cbe6a1fedd775092368fba3f9c27dfb18c26299adc7048e662e41c"
 ir_sha256 = "3ab0e9a0d4d66c469e7b07e8d41070c22ddbcaf7308a15b8c6daa57e2b7d580d"
 
 [provider.artifacts]
-"catalog/front.catalog.json" = "578e62f315f177db261ca32ce41bb50985010164d623c2f51139b388431cd69e"
+"catalog/front.catalog.json" = "21c52217f9335ba8485267c51ad35a1d1d1d4b6dc1881ee908e9662674cbe27c"
 
 [[provider]]
 id = "github"
@@ -316,7 +316,7 @@ upstream_version = "1.1.4"
 sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 
 [provider.artifacts]
-"catalog/github.catalog.json" = "7e95cccb1d9f5042deebdc1381c2fba4d4278af27c4cf44ceaeefe3e96c7fb71"
+"catalog/github.catalog.json" = "e32221b146bae0fe0b73806e2ba9077b476795d5c85e16f1ba9bc5590a37f750"
 
 [[provider]]
 id = "gitlab"
@@ -325,7 +325,7 @@ toml_sha256 = "82e8b8dd70a7a7ee3bd96c19dd153fa395940f0fd4e9376a074a1aabb07a828f"
 ir_sha256 = "cb42313bb160ab05cb37395ad05c25cfd145e5ea132d60640b359863834a675f"
 
 [provider.artifacts]
-"catalog/gitlab.catalog.json" = "dad86e30e0f66f8ed2308e8652b332fe0cfbbe822c54da37ee404778ca8e784e"
+"catalog/gitlab.catalog.json" = "c5a88b458af50efa5d4386fe70b97f49a539ccd323cdd0b27be21c60772534bb"
 
 [[provider]]
 id = "google"
@@ -334,7 +334,7 @@ toml_sha256 = "0177a0c4548f9e6b6670d89f0914ae10669bfb2ad570d208405f71b2b79f192f"
 ir_sha256 = "e27b75931e47c8876a1a8dcc7fa0cd636762afd82d4ce747dd91cc20287bd746"
 
 [provider.artifacts]
-"catalog/google.catalog.json" = "0fc7623298559c9a4de56921a43064265ac24d0fa032974d9f916e8b4a113611"
+"catalog/google.catalog.json" = "ab38fd9768f44d3a65aa032bff525f3a10383c8388567e4a660bb8f10cd823c8"
 
 [[provider]]
 id = "grafana"
@@ -350,7 +350,7 @@ upstream_version = "Grafana 12+ HTTP API"
 sha256 = "f177be5b01888799fbc5aa6a7b6195958f2da0082c2f5823a23f2368524422c5"
 
 [provider.artifacts]
-"catalog/grafana.catalog.json" = "449d5ad53bee3c13bad9abeeb14cfffc341c37beabc1f481dcdc1265f9269ba1"
+"catalog/grafana.catalog.json" = "9776da67e73040d2efbbe84f32d7bc14bcb857081537a9b7490d089efa2080e6"
 
 [[provider]]
 id = "hubspot"
@@ -359,7 +359,7 @@ toml_sha256 = "17ef962bc8812a7beebd4f58a88e6e452526c7d2f87daca228939915649ca985"
 ir_sha256 = "375e63a99f482644f7ce01cfcfb1fa60bf343068c9f0933d9f01098d149f5800"
 
 [provider.artifacts]
-"catalog/hubspot.catalog.json" = "14664309c67c8a1947faf11731361c7a315047277060c9abf6ff6a3a578302a9"
+"catalog/hubspot.catalog.json" = "15d44a89bff51088541031e3be6cf6b4289138490f3361725789b912ae46e12e"
 
 [[provider]]
 id = "intercom"
@@ -368,7 +368,7 @@ toml_sha256 = "58e81abf84e47c99241638309ba41400bb9ba8a230ae74fd5ba554f615041ae4"
 ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 
 [provider.artifacts]
-"catalog/intercom.catalog.json" = "a98d922ef0c2e0d8b36b466c88608ab1e85b1cb2f8957ad15e6695d8f65cd3f9"
+"catalog/intercom.catalog.json" = "d25ad469cf85366dd679d4c2a9e6530f0ebcf3818c6c5ceb0d41291b0737f814"
 
 [[provider]]
 id = "jira"
@@ -377,7 +377,7 @@ toml_sha256 = "fd9bf3dc00d3c462579b01d9118025aacc9673bd61a505b80d49a72c26666f23"
 ir_sha256 = "8e4471ccf34b828be4ed412981371db97fbdd3a0ce53f779669a8ee8feaf938b"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "b3c757d84edfd053d1f2825cbfed1c8eb27ad8334d4cc1014afe82bd82a726f7"
+"catalog/jira.catalog.json" = "046ba5cb81017bea8241f4166a6f7d94a047319d33ce3e5fc6475eb7ff1a615f"
 
 [[provider]]
 id = "klaviyo"
@@ -386,7 +386,7 @@ toml_sha256 = "aa87df9a2613508dbda305dd89d5d2fb3007b939b963fc9960b1520affb8f64f"
 ir_sha256 = "e4e84b4a13c495d56f5d7252c2a7c8f9358778d91fb47bad98d963bd105dfc93"
 
 [provider.artifacts]
-"catalog/klaviyo.catalog.json" = "bb5190f7ad7261309da7d2b6b9c9fccab7e502fc4f75c8b5eb91ae74df659231"
+"catalog/klaviyo.catalog.json" = "f961258be85d701b009cd46f246295552046c2d28dbe527a059b02d461c46de5"
 
 [[provider]]
 id = "launchdarkly"
@@ -395,7 +395,7 @@ toml_sha256 = "79c1ee59d69a8345725e47d7f549666f97256358655d4c1430268326798c0044"
 ir_sha256 = "a02bbce6d5e33efe6dafda974bfaa07d6330f4f5d31a75e4334faf2e239e7aaa"
 
 [provider.artifacts]
-"catalog/launchdarkly.catalog.json" = "9ad82b4034e4faa477f31ba00a2fbeace0d64186779e16eccc8131b8bb9eb253"
+"catalog/launchdarkly.catalog.json" = "ef6ce43bfbc0a721b921e40834f78f7d09684cb32078a2df76c3ad74cc5a0c45"
 
 [[provider]]
 id = "loki"
@@ -411,7 +411,7 @@ upstream_version = "Loki HTTP API"
 sha256 = "79224c49c4befbb69a938104f249d160c5b8e773aa400dbc96943183bf35c560"
 
 [provider.artifacts]
-"catalog/loki.catalog.json" = "a7cb391dd6a849c0a91c091c8460b75cf00a11b556069a54eae2920190817fd7"
+"catalog/loki.catalog.json" = "ec3bd29a2c504ac1c2719e501cf3f24c9745cf451e44c51d224a553016a98a75"
 
 [[provider]]
 id = "mailchimp"
@@ -420,7 +420,7 @@ toml_sha256 = "181f84562364f68fb2f23ed7f1126e8828ea2bac1219ef2d412fcaa7beb8e7bf"
 ir_sha256 = "cbb82558f71cb76a6744b4aa88ccae489e1873cdb8254596efb876e9abb64495"
 
 [provider.artifacts]
-"catalog/mailchimp.catalog.json" = "353167bbd384c6244ccc96cfce29c785ca02172154f027d7b6acd95e9786e585"
+"catalog/mailchimp.catalog.json" = "3b591f15c2e62ecce10b2438fe55de3e57e73d3484f57499faa3c3ca21deef73"
 
 [[provider]]
 id = "microsoft_graph"
@@ -443,7 +443,7 @@ upstream_version = "v1.0"
 sha256 = "d3cf91ee72c4f23f7b1a80b5d7796462bef5ea448dd268d328233b8f0479f57a"
 
 [provider.artifacts]
-"catalog/microsoft_graph.catalog.json" = "a06270d5d5f7f692eb69ebc21d1ea520c5c0f0b0ca8a6da214b00ad1251f32c8"
+"catalog/microsoft_graph.catalog.json" = "f09a0f32954245347465173b5ad9216be47cbae13dbbffce48fd603382d6aec7"
 
 [[provider]]
 id = "miro"
@@ -452,7 +452,7 @@ toml_sha256 = "ba07988ccfe9d826887336d652a9b3a2f101352074e9d4e439d4fab120e227ce"
 ir_sha256 = "c9ce71d5c074d9c7566a6c6966b61249dcb51b9f23475a49e2d7f46e82371a7a"
 
 [provider.artifacts]
-"catalog/miro.catalog.json" = "626c37c67b5db5a76b9ea093af4a7e224d44eeca6b038a5a0fcb2265e27cc378"
+"catalog/miro.catalog.json" = "98bf986fa937c38a53e85f4ffa9198a922c080687ba7f8cf79309e2dcf79a3f5"
 
 [[provider]]
 id = "newrelic"
@@ -461,7 +461,7 @@ toml_sha256 = "66e510be2326246dfdc1939bb99bef48aad6ecc9cba0a77cc6aa91145ce83c6f"
 ir_sha256 = "6cd7e7ca6a1306d03dc0b2b9cf4f68013f37f094f6917423745a7bfce26d82cc"
 
 [provider.artifacts]
-"catalog/newrelic.catalog.json" = "bedde221462e3c08e466343581882805d88eee22256cf4b901b41937d8800eef"
+"catalog/newrelic.catalog.json" = "5a5a3708080149aa9c4b23a6d2756e54f86e0b5cffa973e9a06d9aa9f0dc923f"
 
 [[provider]]
 id = "notion"
@@ -470,7 +470,7 @@ toml_sha256 = "0296a15427d1505ea64a26a1b8d689fbd26dc3016436c2c3b703cb7d6cb66e4a"
 ir_sha256 = "c5d2d58f5bac0b6adda94005f9556440f6398ebd57cea726a5b26778db59ad93"
 
 [provider.artifacts]
-"catalog/notion.catalog.json" = "cee73bf2f8a26e8ef4f455f9aae8ec8ece18f236a34659e391ae7aaf30d3c0ee"
+"catalog/notion.catalog.json" = "af1ea4cb13e771a52f0ab37b05bc2da8f380a4dc7cfeaebb5a229fe3562dc7ae"
 
 [[provider]]
 id = "okta"
@@ -479,7 +479,7 @@ toml_sha256 = "d358e5156bbf4c65ce74292ec1e4a9476d8de31de4321f79f9dedeb63923a59f"
 ir_sha256 = "031460a3a061e9b974eb605ff4d29af9b123345900eca4962f2f07a7760acd17"
 
 [provider.artifacts]
-"catalog/okta.catalog.json" = "3881067bef297da9e2e0edf195e1f1403b661ab96ab34f1c51deded5c992e471"
+"catalog/okta.catalog.json" = "379c5ca38f331a8b9fb6d1e763cb160997621b710183452878a42371b1c70e53"
 
 [[provider]]
 id = "openai"
@@ -497,7 +497,7 @@ upstream_version = "2.3.0"
 sha256 = "bf253f99bca25941f6b7a5ce0c4a0634b89677502067bfbadb82727690c596a6"
 
 [provider.artifacts]
-"catalog/openai.catalog.json" = "f151ccd0a3c0d446fddd66bfc2cdd13044cb9f87f44d8ad2df0c7dc9b079457b"
+"catalog/openai.catalog.json" = "7ad7f349c9fe46927a6cd8db3e8d606bdb8d0b7d78d935743715ddaa76dfec0a"
 
 [[provider]]
 id = "openrouter"
@@ -506,7 +506,7 @@ toml_sha256 = "c9be3bbc14d6454200495367925b783cdda2ce9e6ab5d859a083912c8520403d"
 ir_sha256 = "33be4bb5d8ddc9e0c5a2339f341a79be6d9ffc104a5a83222d90bbd68f42a98d"
 
 [provider.artifacts]
-"catalog/openrouter.catalog.json" = "2b7e081b6fa0a885d7fa0a81d23c287e0e12934746486d5dafd2cc6589035d3d"
+"catalog/openrouter.catalog.json" = "9b3b1d46d6e8b6f30a755e8193a8d3c01abbb89421e54bfe4332b505e26259a2"
 
 [[provider]]
 id = "pagerduty"
@@ -515,7 +515,7 @@ toml_sha256 = "9d0244b872fce79e0192d84eb30702098a57abd9d33791e314aba77206d9c5b2"
 ir_sha256 = "8951126c52675a8061dc226ea9ee94859c60454db0ed17a169ecd9821d145153"
 
 [provider.artifacts]
-"catalog/pagerduty.catalog.json" = "93ef5940022681552d794c55502967d09669594084a118f6b1b4fb1f8c53e087"
+"catalog/pagerduty.catalog.json" = "296e21921a9033c31ecef15754083dc5cc9e58a55722556606100eec53d97c47"
 
 [[provider]]
 id = "postmark"
@@ -524,7 +524,7 @@ toml_sha256 = "a4a2fff3654497edc64cae4e61f81103d65be55e6e57caf038e416319f4c4ec2"
 ir_sha256 = "23f1262a764a5debfb40386b8dd6fe97f0789756fed075acfd71761617e4766f"
 
 [provider.artifacts]
-"catalog/postmark.catalog.json" = "08e9e0037785d140fbaae3c78878b1f6e5c2c58fcc80f284f7f27cbcc46d4b1f"
+"catalog/postmark.catalog.json" = "6dcb41f7abe46fa7c27e1acbb14bf80284528362d64c44e524d80c34fa689263"
 
 [[provider]]
 id = "prometheus"
@@ -540,7 +540,7 @@ upstream_version = "Prometheus HTTP API"
 sha256 = "f045ee79177b03bb75f5881a6613f194e9afa8eb723a762cd9c5f767b8b85c44"
 
 [provider.artifacts]
-"catalog/prometheus.catalog.json" = "2c96cafa5d2ef46938bff33557b8f707abc861867496116f6c9e9e97eca913d6"
+"catalog/prometheus.catalog.json" = "d5be2ebaf3f64b79642521b89365250bd1138d1ff453f0d9ba014cd94138d857"
 
 [[provider]]
 id = "resend"
@@ -549,7 +549,7 @@ toml_sha256 = "18f3e50bfdbfd80cf47387074a946bfae20830bdfc5893a968ed74ca1f7b3ce8"
 ir_sha256 = "fed86be4013d0d6e73c79c214157b774fc5e8c4598d3d3289895eb382f67b5df"
 
 [provider.artifacts]
-"catalog/resend.catalog.json" = "e58f7d961db356952cf4e68ee543af9c04402b50c0dc59f05ae96639b6a3e6a1"
+"catalog/resend.catalog.json" = "23121672854839823af513c2a580f8d1ed865352dce405eb2dde2a536b86a196"
 
 [[provider]]
 id = "salesforce"
@@ -558,7 +558,7 @@ toml_sha256 = "e5cd92edc9992e48cb1859ee5edb3676c68d1a34a32dc476378076c0bde7597d"
 ir_sha256 = "87011dc7c8bb21d1597d671a89c5c73fbdc106c96f48252a535d9e45a1420ab9"
 
 [provider.artifacts]
-"catalog/salesforce.catalog.json" = "1b99dfa20809d42ba5413063eb0aa747ffc93d4d168137b6a0fba9df7b7e2c68"
+"catalog/salesforce.catalog.json" = "f2e88bd9d0ca78918fba6377a3dc093e4b9879c6f1ba63f8dbb8feae8b520bfa"
 
 [[provider]]
 id = "sendgrid"
@@ -567,7 +567,7 @@ toml_sha256 = "47b609063b65c112b2d8f716d90f2cf71c3e7e919692555bd69f0ac251875a68"
 ir_sha256 = "22b7ef52ad480b68fbf888887569162cbdc86e95382f01ccae089c584ba9122b"
 
 [provider.artifacts]
-"catalog/sendgrid.catalog.json" = "20becd3b1b1659eca3285624fde5bd911d20f3ffff056d6ffd0187c85c4aac01"
+"catalog/sendgrid.catalog.json" = "245ddf5c4073f77e5cdc5c2b0fb56f84da4b3aa2e92ffbd59f7664eecf3d1d8a"
 
 [[provider]]
 id = "sentry"
@@ -576,7 +576,7 @@ toml_sha256 = "28bd73df199c973a4ae13856a6c47936f2562fb27701e3d85ef14b08b2983ea9"
 ir_sha256 = "b4aab482416c394dad21749405d28dbb5e675a67ce439efa14d6d196caf2c9c5"
 
 [provider.artifacts]
-"catalog/sentry.catalog.json" = "8d2e0ff257b1b938573ba896b535b0c6a278656a5943b28f9d6e677bd9ab13bb"
+"catalog/sentry.catalog.json" = "5719153f84ed09d8cb666ea94ce6ddb361a82828a5d46e7c19aa3491029b3f5e"
 
 [[provider]]
 id = "shopify"
@@ -585,7 +585,7 @@ toml_sha256 = "d8ac7af000ecece8d00e643dc8e480c0ce4fdf8766750e4f29d7c6e18db09726"
 ir_sha256 = "f3c4aa8d851678564f424fdbdbfa47559f7a4a79a340ff02a6d491e3f0fd2478"
 
 [provider.artifacts]
-"catalog/shopify.catalog.json" = "bb24d0f0c3454a9a2c7ea9cb3a9d01d21e8d647b88ead5ae9cfae3d3560b3001"
+"catalog/shopify.catalog.json" = "7f6b45a1b2d9ea50a31f4d79ceb4c281410663d43a5e4a9cd751a3282b7f9a0c"
 
 [[provider]]
 id = "slack"
@@ -614,7 +614,7 @@ upstream_version = "2026-08-15"
 sha256 = "9a967daeabf79901ce5df35244d8e25647b0b8a1026372b001b61d2ea5c49052"
 
 [provider.artifacts]
-"catalog/slack.catalog.json" = "c944103d10944eaacac2889a33b4fa74c1b83de429cda1a547ce00b3e21c9211"
+"catalog/slack.catalog.json" = "5881a0aa585d6cf0abcf9ac3b660d042f46e6d168785c34cf7bf074009635a90"
 
 [[provider]]
 id = "statuspage"
@@ -623,7 +623,7 @@ toml_sha256 = "24d08024850f7d04554cf23dda88ef1b31d883614772488c290130f311f17975"
 ir_sha256 = "4674a9b5c38d84ebeca9953a12eec28fc12317738b6ff430c02cce85983ea1d3"
 
 [provider.artifacts]
-"catalog/statuspage.catalog.json" = "fa6173b2e35bb18e4e43629dd6d31d2bba7479a5cd462d8c9b23c460867d4238"
+"catalog/statuspage.catalog.json" = "2456b71e935a43092735fa79de85fb66bf44834f6ef5a710c7539026f6e81218"
 
 [[provider]]
 id = "stripe"
@@ -641,7 +641,7 @@ upstream_version = "2026-07-29.dahlia"
 sha256 = "3b3d858f1a02a2ac0116cc10a296a7d374fe7c9d8b4a68a5419712e0bb3fbf41"
 
 [provider.artifacts]
-"catalog/stripe.catalog.json" = "13cc3a8fde72bc4ebe97ce88533d917856756e2bce666b1fb14b30f0e2fdd05e"
+"catalog/stripe.catalog.json" = "f43fdd04103e799c3ece9ab4885a69b81d3a6feb63c8bcd354fc3633888b80d2"
 
 [[provider]]
 id = "supabase"
@@ -650,7 +650,7 @@ toml_sha256 = "5e6430c9d9bb22b699e9a9e9efd4ece191c6c36a171d3173d73b1d436fb03d7f"
 ir_sha256 = "f2ab5c32535c375f77fc50eea1de0fe8a89f47de0eb87f26aaa2eb5784df1c6c"
 
 [provider.artifacts]
-"catalog/supabase.catalog.json" = "aef1f0bea8aaeb9a2195d83ac4ff8719f40ad77e02ff2197064c05a054391054"
+"catalog/supabase.catalog.json" = "a2183dceaa36c48d4e807873172b4d595f9335cad0872676a364e0a7dd2d7519"
 
 [[provider]]
 id = "trello"
@@ -659,7 +659,7 @@ toml_sha256 = "a336500567fdfe8428550197aed8a64a4c73d6a3c15bbf9c8b90371420ff978b"
 ir_sha256 = "ef6f489a8b262cf5d535534567d41186367f349218b0e0f6fd4c30a1bf03b3d5"
 
 [provider.artifacts]
-"catalog/trello.catalog.json" = "0c01970eb48394f2dbe8340d3dbb4ba3bc8ece8dd5db21ba5bf842f6cb80f791"
+"catalog/trello.catalog.json" = "c6e493c3d5590f5af4905eb331e752444b397b34b5b5204b58b4442658756e92"
 
 [[provider]]
 id = "twilio"
@@ -677,7 +677,7 @@ upstream_version = "1.0.0"
 sha256 = "2ab609f9daeddae92f339c6c8d646dae9058f8f11baa53fab12e98fd3f37700d"
 
 [provider.artifacts]
-"catalog/twilio.catalog.json" = "a5755a6bebe0c2596726f30f48ccbc72e4cb6ac1a8b3d81a0ffe74964d879117"
+"catalog/twilio.catalog.json" = "ded6dadd4017351cf6dd96ba12630c16841bab735b1c9a32b279346006e1ec1b"
 
 [[provider]]
 id = "typeform"
@@ -686,7 +686,7 @@ toml_sha256 = "a7a1847831762c6cdcfd82a445a4f922cd709c40f2d34c1477f06e091e01b104"
 ir_sha256 = "c4d1bb66ac6e76e27c98d558df2910c51a18226803fdcd02715a5f5975710758"
 
 [provider.artifacts]
-"catalog/typeform.catalog.json" = "bb03b52458b0f457902477e5a14a92b2fc4afd479092a4562d7b6120f2fdc72d"
+"catalog/typeform.catalog.json" = "fdd97ed1fbe6b3b3305edd5c3c866a5f248c415ca0f410e34f91a14a1211725b"
 
 [[provider]]
 id = "vercel"
@@ -695,7 +695,7 @@ toml_sha256 = "51698f29ba7dd7689b3fc4af0ea3fa5a3a1e1a1af1b39e24328e8689f93be1e8"
 ir_sha256 = "528c7334b3c9677f3d3f0aca75dd95d66d076efc87219bca367bf30045735315"
 
 [provider.artifacts]
-"catalog/vercel.catalog.json" = "fc24d1d4b47a63c54db44ed8feaefbb6a86293a23636b3cc2931b7f4faf29a9a"
+"catalog/vercel.catalog.json" = "f4363169e8f9b9054de3b41995ecf145c8b4d9eca38f53b7fdc776e5776c6a1b"
 
 [[provider]]
 id = "webflow"
@@ -704,7 +704,7 @@ toml_sha256 = "cedce787730e1383b50f75f390c8315aea690a5cc465741dc1e4186b8af34c1b"
 ir_sha256 = "aef62bbf76b724d9507279ee9a298e9b7c654612a6170a421be3bb3f41476bb1"
 
 [provider.artifacts]
-"catalog/webflow.catalog.json" = "f2027cdb56e39a4276faac9af2a6a9dbbd8ef4e94e9ebdb0f41af196dfe1937c"
+"catalog/webflow.catalog.json" = "a92fa43b614121d7764281befb05a5fba6eb49cf3ae60bfed0f73a1b28fd9bee"
 
 [[provider]]
 id = "zendesk"
@@ -734,7 +734,7 @@ upstream_version = "17.12.1"
 sha256 = "cde5a1f4d54038bb4d52df965f0eb7824c2074be2a5a36835dfc20c82f121da6"
 
 [provider.artifacts]
-"catalog/zendesk.catalog.json" = "a0838120d75be6ddd5129de77b81ffc3750261cbbeccdccc919507c760d93fed"
+"catalog/zendesk.catalog.json" = "0f169c4bacf17453476be1ecd828412e22fa2a0fa2ffd4352dd39b7d40fc7ee0"
 
 [[provider]]
 id = "zoom"
@@ -743,4 +743,4 @@ toml_sha256 = "8651659af68181afae1f27cc686c446d2429ec47c5caeaa1bfd751dc275780bd"
 ir_sha256 = "7cf5866afd584a8b7c67ac5820e9884627235fe780278dc8fef6906f1fb90642"
 
 [provider.artifacts]
-"catalog/zoom.catalog.json" = "5d8a88bb3aabdc3e5c8451594df23b5287ffa5e02792d522f664009c0ca6dfa3"
+"catalog/zoom.catalog.json" = "1ac6f2c217919f3b3b1a21c0cb19a19f75c5ecc33d867fd357f417bdafcb9b71"

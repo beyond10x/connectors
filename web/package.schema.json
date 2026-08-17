@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/connectors/web/package.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/web/package.schema.json",
   "title": "connectors documentation site package manifest",
   "type": "object",
   "additionalProperties": false,

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/connectors/contracts/artifact-bundle.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/contracts/artifact-bundle.schema.json",
   "title": "B10x immutable contract or binding bundle",
   "type": "object",
   "additionalProperties": false,
