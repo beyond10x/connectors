@@ -3,10 +3,10 @@
 **Status:** personal-local alpha operation serving and development SIP/RTVBP path implemented; stable serving gated · **Date:** 2026-08-14
 
 **Authority:**
-[architecture ADR 0024](https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
-[architecture ADR 0026](https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md) ·
-[architecture RFC 0009](https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md) ·
-[development vectors](https://github.com/b10x/architecture/blob/main/specifications/draft/voice-session-v1/README.md)
+[architecture ADR 0024](https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md) ·
+[architecture ADR 0026](https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md) ·
+[architecture RFC 0009](https://github.com/b10x/b10x/blob/main/architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md) ·
+[development vectors](https://github.com/b10x/b10x/blob/main/architecture/specifications/draft/voice-session-v1/README.md)
 
 This document turns the accepted cross-repository boundary into a Connectors implementation shape.
 The platform-family plan/dispatch seam, alpha `VoiceSession` owner bundle, one-shot authority, and

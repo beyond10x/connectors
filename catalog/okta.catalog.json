@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Okta API token, sent as `Authorization: SSWS <token>`. The `SSWS ` scheme word is supplied by the connector; the token is the value alone",

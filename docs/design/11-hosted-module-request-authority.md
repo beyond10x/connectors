@@ -45,4 +45,4 @@ part of the protected header. A rotation may configure a bounded public-key over
 private Identity, database, SIP, Slack, and provider credentials are never reused.
 
 This design implements
-[Architecture ADR 0041](https://github.com/b10x/architecture/blob/main/adr/0041-hosted-domain-modules-require-connector-signed-request-authority.md).
+[Architecture ADR 0041](https://github.com/b10x/b10x/blob/main/architecture/adr/0041-hosted-domain-modules-require-connector-signed-request-authority.md).

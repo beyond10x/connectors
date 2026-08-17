@@ -264,7 +264,7 @@ The agent instruction is therefore short:
   [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
   references: mine them, copy from them per the architecture inventory, and never edit them from
   here. The durable housing decision is
-  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md).
+  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/main/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 `predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
 navigable authority. The surrounding comment must restate the rule the current implementation uses;

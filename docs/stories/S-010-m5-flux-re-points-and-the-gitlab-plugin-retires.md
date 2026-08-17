@@ -27,7 +27,7 @@ fixed; only the trust domain and release origin change.
       **published protocol identities**: authenticate once, discover the effective catalogue and
       project it to tools, invoke, subscribe. This repository depends on nothing of flux — the
       dependency arrow exists only at runtime, in one direction, over versioned contracts
-      ([dependency rules](https://github.com/b10x/architecture/blob/main/architecture/dependency-rules.md)).
+      ([dependency rules](https://github.com/b10x/b10x/blob/main/architecture/architecture/dependency-rules.md)).
 - [ ] flux's CLI manages a **personal-posture** instance: verified download, supervised local
       process, zero-configuration `connectors serve`, owner-bound state — carrying forward the
       predecessor's managed-local-install requirement without its ~31k-LOC local-management
@@ -58,9 +58,9 @@ fixed; only the trust domain and release origin change.
 - Provenance: an unpublished Flux plugin-retirement record supplied the original routing table and
   wave order. It is not required authority: the fixture, parity, precondition, and same-release
   deletion rules are restated in this story. B10x's durable ownership and dependency
-  decisions are [ADR 0009 — b10x/agent is provider- and harness-agnostic](https://github.com/b10x/architecture/blob/main/adr/0009-b10x-agent-is-provider-and-harness-agnostic.md),
-  [ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/architecture/blob/main/adr/0006-b10x-supersedes-selfdirect-housing.md),
-  and the [dependency rules](https://github.com/b10x/architecture/blob/main/architecture/dependency-rules.md).
+  decisions are [ADR 0009 — b10x/agent is provider- and harness-agnostic](https://github.com/b10x/b10x/blob/main/architecture/adr/0009-b10x-agent-is-provider-and-harness-agnostic.md),
+  [ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/main/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md),
+  and the [dependency rules](https://github.com/b10x/b10x/blob/main/architecture/architecture/dependency-rules.md).
 - gitlab is wave 1 because its connector is shipped and frozen migration fixtures
   already exist. Waves 2–6 (slack/jira/confluence/opsgenie, the observability set behind declared
   destinations, aws/huggingface's new credential schemes, kubernetes/docker/sql/websearch, and the
