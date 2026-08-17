@@ -50,6 +50,8 @@ struct VerificationResponse {
     scope: String,
     dl_principal_kind: String,
     dl_tenant: String,
+    #[serde(default)]
+    email: Option<String>,
     groups: Vec<String>,
     #[serde(default)]
     dl_deployment: Option<String>,
@@ -176,6 +178,12 @@ impl IdentityVerifier for IdentityHttpVerifier {
             || !valid_ref(&admitted.sub, 512)
             || !valid_ref(&admitted.act.sub, 512)
             || !valid_ref(&admitted.jti, 512)
+            || admitted.email.as_deref().is_some_and(|email| {
+                email.len() > 254
+                    || !email.is_ascii()
+                    || email.chars().any(char::is_whitespace)
+                    || email.split('@').count() != 2
+            })
             || admitted
                 .dl_deployment
                 .as_deref()
@@ -189,6 +197,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
             tenant_id: admitted.dl_tenant,
             subject: admitted.sub,
             actor_subject: admitted.act.sub,
+            email: admitted.email,
             token_id: admitted.jti,
             scopes,
             groups,
@@ -225,13 +234,15 @@ fn valid_access_token(value: &str) -> bool {
 }
 
 fn validate_scopes(value: &str) -> Option<BTreeSet<String>> {
-    const ALLOWED: [&str; 9] = [
+    const ALLOWED: [&str; 11] = [
         "connectors.audit.read",
         "connectors.catalog.read",
         "connectors.channels.manage",
         "connectors.connections.manage",
+        "connectors.connections.self",
         "connectors.deliveries.manage",
         "connectors.events.read",
+        "connectors.events.self",
         "connectors.grants.manage",
         "connectors.integrations.manage",
         "connectors.invoke",

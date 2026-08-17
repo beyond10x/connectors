@@ -78,6 +78,11 @@ fn connector_event_bundle_is_immutable() {
 }
 
 #[test]
+fn connector_datasource_bundle_is_immutable() {
+    check("contracts/connector-datasource/v0alpha1/bundle.json");
+}
+
+#[test]
 fn connector_catalog_bundle_is_immutable() {
     check("contracts/connector-catalog/v0alpha1/bundle.json");
 }
@@ -196,6 +201,26 @@ fn connector_event_vectors_match_the_strict_reader() {
             result.is_ok(),
             vector.valid,
             "event vector `{}` disagrees with the reader: {result:?}",
+            vector.name
+        );
+    }
+}
+
+#[test]
+fn connector_datasource_vectors_match_the_strict_reader() {
+    let path = root().join("contracts/connector-datasource/v0alpha1/vectors.json");
+    let vectors: OperationVectors =
+        serde_json::from_slice(&fs::read(path).expect("vectors are readable"))
+            .expect("vectors parse");
+    assert_eq!(vectors.contract, protocol::datasource::CONTRACT);
+    for vector in vectors.cases {
+        let result = serde_json::from_value::<protocol::datasource::RequestEnvelope>(vector.frame)
+            .map_err(|error| error.to_string())
+            .and_then(|request| request.validate().map_err(|error| error.to_string()));
+        assert_eq!(
+            result.is_ok(),
+            vector.valid,
+            "datasource vector `{}` disagrees with the reader: {result:?}",
             vector.name
         );
     }

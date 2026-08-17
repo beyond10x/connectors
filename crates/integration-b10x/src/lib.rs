@@ -344,6 +344,9 @@ impl B10xBackend {
             state: ConnectionState::Callable,
             initiation,
             route: ConnectionRoute::Direct,
+            scope: None,
+            actor: None,
+            auth_profile: None,
         }
     }
 
@@ -1055,6 +1058,7 @@ impl ConnectorBackend for B10xBackend {
             operations: true,
             connections: true,
             events: self.config.work_origin.is_some() || self.config.planner_origin.is_some(),
+            datasources: false,
         }
     }
 

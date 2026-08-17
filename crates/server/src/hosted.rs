@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
+use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
@@ -18,6 +18,10 @@ use protocol::connection::{
     ConnectionError, ConnectionErrorCode, RequestEnvelope as ConnectionRequestEnvelope,
     ResponseEnvelope as ConnectionResponseEnvelope, MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES,
 };
+use protocol::datasource::{
+    DatasourceError, DatasourceErrorCode, RequestEnvelope as DatasourceRequestEnvelope,
+    ResponseEnvelope as DatasourceResponseEnvelope, MAX_FRAME_BYTES as DATASOURCE_MAX_FRAME_BYTES,
+};
 use protocol::event::{
     EventError, EventErrorCode, RequestEnvelope as EventRequestEnvelope,
     ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
@@ -26,7 +30,7 @@ use protocol::operation::{
     OperationError, OperationErrorCode, RequestEnvelope, ResponseEnvelope,
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use service::{
     ConnectorBackend, HostedCompletionError, HostedCompletionSubmission, PrincipalContext,
 };
@@ -40,6 +44,7 @@ pub struct HostedPrincipal {
     pub tenant_id: String,
     pub subject: String,
     pub actor_subject: String,
+    pub email: Option<String>,
     pub token_id: String,
     pub scopes: BTreeSet<String>,
     pub groups: BTreeSet<String>,
@@ -53,12 +58,14 @@ impl HostedPrincipal {
     }
 
     fn principal_context(&self) -> Result<PrincipalContext, service::PrincipalContextError> {
-        PrincipalContext::hosted(
+        PrincipalContext::hosted_with_groups(
             self.tenant_id.clone(),
             self.subject.clone(),
             self.actor_subject.clone(),
+            self.email.clone(),
             self.token_id.clone(),
             self.authority_snapshot_sha256.clone(),
+            self.groups.clone(),
         )
     }
 }
@@ -67,6 +74,8 @@ impl HostedPrincipal {
 #[derive(Debug, Clone, Default)]
 pub struct HostedAdmissionPolicy {
     operator_groups: BTreeSet<String>,
+    kubernetes_read_groups: BTreeSet<String>,
+    kubernetes_restart_groups: BTreeSet<String>,
 }
 
 impl HostedAdmissionPolicy {
@@ -74,7 +83,22 @@ impl HostedAdmissionPolicy {
     pub fn new(operator_groups: impl IntoIterator<Item = String>) -> Self {
         Self {
             operator_groups: operator_groups.into_iter().collect(),
+            kubernetes_read_groups: BTreeSet::new(),
+            kubernetes_restart_groups: BTreeSet::new(),
         }
+    }
+
+    /// Add the broad receiver gate for configured Kubernetes groups. The Integration performs the
+    /// exact namespace check again before every read or mutation.
+    #[must_use]
+    pub fn with_kubernetes_groups(
+        mut self,
+        read_groups: impl IntoIterator<Item = String>,
+        restart_groups: impl IntoIterator<Item = String>,
+    ) -> Self {
+        self.kubernetes_read_groups = read_groups.into_iter().collect();
+        self.kubernetes_restart_groups = restart_groups.into_iter().collect();
+        self
     }
 
     fn admits_operator(&self, principal: &HostedPrincipal) -> bool {
@@ -86,7 +110,25 @@ impl HostedAdmissionPolicy {
         principal: &HostedPrincipal,
         request: &protocol::operation::OperationRequest,
     ) -> bool {
-        self.admits_operator(principal) || tenant_member_module_read(request)
+        self.admits_operator(principal)
+            || tenant_member_module_read(request)
+            || self.admits_kubernetes_operation(principal, request)
+    }
+
+    fn admits_kubernetes_operation(
+        &self,
+        principal: &HostedPrincipal,
+        request: &protocol::operation::OperationRequest,
+    ) -> bool {
+        let protocol::operation::OperationRequest::Invoke(invoke) = request else {
+            return false;
+        };
+        let groups = match invoke.operation_ref.as_str() {
+            "kubernetes.deployment.status" => &self.kubernetes_read_groups,
+            "kubernetes.deployment.rollout-restart" => &self.kubernetes_restart_groups,
+            _ => return false,
+        };
+        !groups.is_empty() && !groups.is_disjoint(&principal.groups)
     }
 }
 
@@ -206,16 +248,84 @@ pub fn router(
             post(event).layer(DefaultBodyLimit::max(EVENT_MAX_FRAME_BYTES)),
         )
         .route(
+            "/datasources",
+            post(datasource).layer(DefaultBodyLimit::max(DATASOURCE_MAX_FRAME_BYTES)),
+        )
+        .route(
             "/connect-sessions/{session_ref}",
             get(completion_page)
                 .post(complete_session)
                 .layer(DefaultBodyLimit::max(MAX_COMPLETION_BYTES)),
         )
+        .route("/oauth/slack/callback", get(slack_oauth_callback))
         .with_state(HostedState {
             verifier,
             backend,
             policy,
         })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SlackOAuthCallbackQuery {
+    state: String,
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+async fn slack_oauth_callback(
+    State(state): State<HostedState>,
+    Query(query): Query<SlackOAuthCallbackQuery>,
+) -> Response {
+    let valid = |value: &str, maximum: usize| {
+        !value.is_empty()
+            && value.len() <= maximum
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    };
+    if !valid(&query.state, 256)
+        || query.code.as_deref().is_some_and(|code| !valid(code, 1024))
+        || query
+            .error
+            .as_deref()
+            .is_some_and(|error| !valid(error, 128))
+        || query.code.is_some() == query.error.is_some()
+        || !state.backend.owns_hosted_oauth_state(&query.state)
+    {
+        return secure_completion_response(error(
+            StatusCode::BAD_REQUEST,
+            "slack-oauth-callback-invalid",
+        ));
+    }
+    let result = state
+        .backend
+        .complete_hosted_oauth(&query.state, query.code.as_deref(), query.error.as_deref())
+        .await;
+    let (status, message) = match result {
+        Ok(()) => (
+            StatusCode::OK,
+            "Slack account connected. You may close this tab.",
+        ),
+        Err(HostedCompletionError::Refused | HostedCompletionError::Invalid) => (
+            StatusCode::FORBIDDEN,
+            "Slack authorization was refused. Close this tab and start Connect again.",
+        ),
+        Err(HostedCompletionError::NotFound) => (
+            StatusCode::NOT_FOUND,
+            "This Slack authorization is unknown or expired.",
+        ),
+        Err(HostedCompletionError::Unavailable) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Slack authorization is temporarily unavailable. Start Connect again later.",
+        ),
+    };
+    secure_completion_response((status, Html(format!(
+        "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect Slack</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}</style><h1>Connect Slack</h1><p>{message}</p>"
+    )))
+        .into_response())
 }
 
 async fn completion_page(
@@ -368,6 +478,13 @@ async fn connection(
         | protocol::connection::ConnectionRequest::ConnectSessionStatus(_) => {
             "connectors.catalog.read"
         }
+        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
+            if request.auth_profile.as_deref().is_some_and(|profile| {
+                matches!(profile, "slack.org_user" | "slack.companion_bot")
+            }) =>
+        {
+            "connectors.connections.self"
+        }
         protocol::connection::ConnectionRequest::CandidateActivate(_)
         | protocol::connection::ConnectionRequest::Materialize(_)
         | protocol::connection::ConnectionRequest::ConnectSessionCreate(_) => {
@@ -385,12 +502,20 @@ async fn connection(
             StatusCode::FORBIDDEN,
         );
     }
+    let self_service = matches!(
+        &request.request,
+        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
+            if request.auth_profile.as_deref().is_some_and(|profile| {
+                matches!(profile, "slack.org_user" | "slack.companion_bot")
+            })
+    );
     if matches!(
         &request.request,
         protocol::connection::ConnectionRequest::CandidateActivate(_)
             | protocol::connection::ConnectionRequest::Materialize(_)
             | protocol::connection::ConnectionRequest::ConnectSessionCreate(_)
-    ) && !state.policy.admits_operator(&principal)
+    ) && !self_service
+        && !state.policy.admits_operator(&principal)
     {
         return connection_failure(
             &request.request_id,
@@ -566,10 +691,11 @@ async fn event(
             return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
         }
     };
-    if principal.tenant_id != request.context.tenant_id
-        || !principal.allows("connectors.events.read")
-        || !state.policy.admits_operator(&principal)
-    {
+    let operator_read =
+        principal.allows("connectors.events.read") && state.policy.admits_operator(&principal);
+    let self_read =
+        principal.allows("connectors.events.self") && self_service_slack_event(&request.request);
+    if principal.tenant_id != request.context.tenant_id || !(operator_read || self_read) {
         return event_failure(
             &request.request_id,
             EventError::new(
@@ -587,6 +713,70 @@ async fn event(
     let response = match state.backend.handle_event(&owner, request.request).await {
         Ok(result) => EventResponseEnvelope::success(&request.request_id, result),
         Err(error) => EventResponseEnvelope::failure(&request.request_id, error),
+    };
+    Json(response).into_response()
+}
+
+fn self_service_slack_event(request: &protocol::event::EventRequest) -> bool {
+    match request {
+        protocol::event::EventRequest::Search(request) => request.query == "slack",
+        protocol::event::EventRequest::Receive(request) => {
+            request.channel_ref.starts_with("event-channel:slack:")
+        }
+        protocol::event::EventRequest::Replay(request) => {
+            request.event_ref.starts_with("event:slack:")
+        }
+    }
+}
+
+async fn datasource(
+    State(state): State<HostedState>,
+    headers: HeaderMap,
+    Json(request): Json<DatasourceRequestEnvelope>,
+) -> Response {
+    if let Err(error) = request.validate() {
+        return datasource_failure(&request.request_id, error, StatusCode::BAD_REQUEST);
+    }
+    let Some(credential) = bearer(&headers) else {
+        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
+    };
+    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
+        Ok(principal) => principal,
+        Err(IdentityVerificationError::Refused) => {
+            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
+        }
+        Err(IdentityVerificationError::Unavailable) => {
+            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
+        }
+    };
+    if principal.tenant_id != request.context.tenant_id
+        || !principal.allows("connectors.catalog.read")
+    {
+        return datasource_failure(
+            &request.request_id,
+            DatasourceError::new(
+                DatasourceErrorCode::NotGranted,
+                "the verified authority does not admit Connector datasource reads",
+                false,
+            ),
+            StatusCode::FORBIDDEN,
+        );
+    }
+    let owner = match principal.principal_context() {
+        Ok(owner) => owner,
+        Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
+    };
+    let response = match state
+        .backend
+        .handle_datasource(&owner, request.request)
+        .await
+    {
+        Ok(result) => DatasourceResponseEnvelope::success(&request.request_id, result),
+        Err(error) => DatasourceResponseEnvelope::failure(&request.request_id, error),
+    };
+    let response = match response.validate() {
+        Ok(()) => response,
+        Err(error) => DatasourceResponseEnvelope::failure(&request.request_id, error),
     };
     Json(response).into_response()
 }
@@ -624,6 +814,14 @@ fn event_failure(request_id: &str, failure: EventError, status: StatusCode) -> R
         .into_response()
 }
 
+fn datasource_failure(request_id: &str, failure: DatasourceError, status: StatusCode) -> Response {
+    (
+        status,
+        Json(DatasourceResponseEnvelope::failure(request_id, failure)),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;
@@ -632,6 +830,10 @@ mod tests {
     use axum::body::{Body, Bytes};
     use axum::http::Request;
     use protocol::connection::{ConnectionRequest, ConnectionResult};
+    use protocol::datasource::{
+        DatasourceRequest, DatasourceResult, RequestEnvelope as DatasourceRequestEnvelope,
+        SearchRequest as DatasourceSearchRequest,
+    };
     use protocol::operation::{
         InvokeRequest, OperationRequest, OperationResult, OwnerContext, SearchRequest,
     };
@@ -657,6 +859,7 @@ mod tests {
                 issuer: "https://identity.example.test".to_owned(),
                 tenant_id: "tenant-dev".to_owned(),
                 subject: "person:test".to_owned(),
+                email: Some("test@example.com".to_owned()),
                 actor_subject: "person:test".to_owned(),
                 token_id: "token-test".to_owned(),
                 scopes: BTreeSet::from([
@@ -700,6 +903,20 @@ mod tests {
             assert_eq!(context.agent_revision(), None);
             Ok(ConnectionResult::Search {
                 connections: Vec::new(),
+            })
+        }
+
+        async fn handle_datasource(
+            &self,
+            context: &PrincipalContext,
+            _request: DatasourceRequest,
+        ) -> Result<DatasourceResult, DatasourceError> {
+            assert_eq!(
+                context.verified_groups(),
+                &BTreeSet::from(["operator".to_owned()])
+            );
+            Ok(DatasourceResult::Search {
+                definitions: Vec::new(),
             })
         }
     }
@@ -751,6 +968,24 @@ mod tests {
                 authority_snapshot_sha256: "a".repeat(64),
             },
             request: ConnectionRequest::Search(protocol::connection::SearchRequest {
+                query: String::new(),
+                limit: 10,
+            }),
+        }
+    }
+
+    fn datasource_envelope(tenant_id: &str) -> DatasourceRequestEnvelope {
+        DatasourceRequestEnvelope {
+            protocol: protocol::datasource::CONTRACT.to_owned(),
+            request_id: "request-datasource-1".to_owned(),
+            context: OwnerContext {
+                tenant_id: tenant_id.to_owned(),
+                agent_id: "agent-test".to_owned(),
+                agent_revision: 1,
+                authority_snapshot_id: "snapshot-test".to_owned(),
+                authority_snapshot_sha256: "a".repeat(64),
+            },
+            request: DatasourceRequest::Search(DatasourceSearchRequest {
                 query: String::new(),
                 limit: 10,
             }),
@@ -810,6 +1045,38 @@ mod tests {
         assert!(!tenant_member_module_read(&external));
     }
 
+    #[test]
+    fn self_event_scope_is_closed_to_slack_specific_requests() {
+        assert!(self_service_slack_event(
+            &protocol::event::EventRequest::Search(protocol::event::SearchRequest {
+                query: "slack".to_owned(),
+                limit: 10,
+            })
+        ));
+        assert!(self_service_slack_event(
+            &protocol::event::EventRequest::Receive(protocol::event::ReceiveRequest {
+                channel_ref: "event-channel:slack:companion".to_owned(),
+                after: None,
+                limit: 10,
+                wait_ms: 0,
+            })
+        ));
+        assert!(!self_service_slack_event(
+            &protocol::event::EventRequest::Search(protocol::event::SearchRequest {
+                query: String::new(),
+                limit: 10,
+            })
+        ));
+        assert!(!self_service_slack_event(
+            &protocol::event::EventRequest::Receive(protocol::event::ReceiveRequest {
+                channel_ref: "event-channel:b10x:work".to_owned(),
+                after: None,
+                limit: 10,
+                wait_ms: 0,
+            })
+        ));
+    }
+
     #[tokio::test]
     async fn hosted_route_requires_identity_and_exact_tenant_binding() {
         let app = router(
@@ -863,6 +1130,38 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(app.oneshot(request).await.unwrap().status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn hosted_datasource_route_passes_verified_groups_and_exact_tenant() {
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+        );
+        let refused = Request::post("/datasources")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::AUTHORIZATION, "Bearer access")
+            .body(Body::from(
+                serde_json::to_vec(&datasource_envelope("other")).unwrap(),
+            ))
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(refused).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
+
+        let admitted = Request::post("/datasources")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::AUTHORIZATION, "Bearer access")
+            .body(Body::from(
+                serde_json::to_vec(&datasource_envelope("tenant-dev")).unwrap(),
+            ))
+            .unwrap();
+        assert_eq!(
+            app.oneshot(admitted).await.unwrap().status(),
+            StatusCode::OK
+        );
     }
 
     #[tokio::test]

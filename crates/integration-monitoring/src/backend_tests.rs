@@ -440,6 +440,7 @@ alertmanager = "grant:alertmanager"
                 operations: true,
                 connections: true,
                 events: false,
+                datasources: false,
             }
         );
         let operation_error = backend

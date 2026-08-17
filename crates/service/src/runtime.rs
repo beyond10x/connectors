@@ -1,10 +1,14 @@
 //! Transport-independent runtime application port and admitted caller context.
 
+use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
 use async_trait::async_trait;
 use protocol::connection::{
     ConnectionError, ConnectionErrorCode, ConnectionRequest, ConnectionResult,
+};
+use protocol::datasource::{
+    DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
 };
 use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
 use protocol::operation::{OperationError, OperationRequest, OperationResult, OwnerContext};
@@ -19,6 +23,7 @@ use zeroize::Zeroizing;
 pub struct PrincipalIdentity {
     subject: String,
     actor_subject: String,
+    email: Option<String>,
     agent_revision: Option<NonZeroU64>,
 }
 
@@ -33,6 +38,7 @@ pub struct PrincipalContext {
     principal: PrincipalIdentity,
     authority_snapshot_id: String,
     authority_snapshot_sha256: String,
+    verified_groups: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -45,11 +51,15 @@ impl PrincipalContext {
         let revision = NonZeroU64::new(owner.agent_revision).ok_or(PrincipalContextError)?;
         Self::new(
             owner.tenant_id.clone(),
-            owner.agent_id.clone(),
-            owner.agent_id.clone(),
-            Some(revision),
+            PrincipalIdentity {
+                subject: owner.agent_id.clone(),
+                actor_subject: owner.agent_id.clone(),
+                email: None,
+                agent_revision: Some(revision),
+            },
             owner.authority_snapshot_id.clone(),
             owner.authority_snapshot_sha256.clone(),
+            BTreeSet::new(),
         )
     }
 
@@ -58,53 +68,98 @@ impl PrincipalContext {
         tenant_id: String,
         subject: String,
         actor_subject: String,
+        email: Option<String>,
         authority_snapshot_id: String,
         authority_snapshot_sha256: String,
     ) -> Result<Self, PrincipalContextError> {
         Self::new(
             tenant_id,
-            subject,
-            actor_subject,
-            None,
+            PrincipalIdentity {
+                subject,
+                actor_subject,
+                email,
+                agent_revision: None,
+            },
             authority_snapshot_id,
             authority_snapshot_sha256,
+            BTreeSet::new(),
+        )
+    }
+
+    /// Admit one Identity-verified hosted principal and its receiver-visible group facts.
+    pub fn hosted_with_groups(
+        tenant_id: String,
+        subject: String,
+        actor_subject: String,
+        email: Option<String>,
+        authority_snapshot_id: String,
+        authority_snapshot_sha256: String,
+        verified_groups: BTreeSet<String>,
+    ) -> Result<Self, PrincipalContextError> {
+        Self::new(
+            tenant_id,
+            PrincipalIdentity {
+                subject,
+                actor_subject,
+                email,
+                agent_revision: None,
+            },
+            authority_snapshot_id,
+            authority_snapshot_sha256,
+            verified_groups,
         )
     }
 
     fn new(
         tenant_id: String,
-        subject: String,
-        actor_subject: String,
-        agent_revision: Option<NonZeroU64>,
+        principal: PrincipalIdentity,
         authority_snapshot_id: String,
         authority_snapshot_sha256: String,
+        verified_groups: BTreeSet<String>,
     ) -> Result<Self, PrincipalContextError> {
         if !valid_ref(&tenant_id, 512)
-            || !valid_ref(&subject, 512)
-            || !valid_ref(&actor_subject, 512)
+            || !valid_ref(&principal.subject, 512)
+            || !valid_ref(&principal.actor_subject, 512)
+            || principal.email.as_deref().is_some_and(|email| {
+                email.len() > 254
+                    || !email.is_ascii()
+                    || email.chars().any(char::is_whitespace)
+                    || email.split('@').count() != 2
+            })
             || !valid_ref(&authority_snapshot_id, 512)
             || authority_snapshot_sha256.len() != 64
             || !authority_snapshot_sha256
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || verified_groups.iter().any(|group| {
+                group.is_empty()
+                    || group.len() > 64
+                    || !group.bytes().all(|byte| {
+                        byte.is_ascii_lowercase()
+                            || byte.is_ascii_digit()
+                            || matches!(byte, b'_' | b'-')
+                    })
+            })
         {
             return Err(PrincipalContextError);
         }
         Ok(Self {
             tenant_id,
-            principal: PrincipalIdentity {
-                subject,
-                actor_subject,
-                agent_revision,
-            },
+            principal,
             authority_snapshot_id,
             authority_snapshot_sha256,
+            verified_groups,
         })
     }
 
     #[must_use]
     pub fn actor_subject(&self) -> &str {
         &self.principal.actor_subject
+    }
+
+    #[must_use]
+    pub fn email(&self) -> Option<&str> {
+        self.principal.email.as_deref()
     }
 
     #[must_use]
@@ -131,6 +186,12 @@ impl PrincipalContext {
     pub const fn agent_revision(&self) -> Option<NonZeroU64> {
         self.principal.agent_revision
     }
+
+    /// Exact Identity-verified group facts visible only inside the Connector receiver.
+    #[must_use]
+    pub fn verified_groups(&self) -> &BTreeSet<String> {
+        &self.verified_groups
+    }
 }
 
 fn valid_ref(value: &str, maximum: usize) -> bool {
@@ -145,6 +206,7 @@ pub struct BackendCapabilities {
     pub operations: bool,
     pub connections: bool,
     pub events: bool,
+    pub datasources: bool,
 }
 
 /// Value-free readiness failure for one configured Integration dependency.
@@ -204,10 +266,10 @@ impl std::fmt::Debug for HostedCompletionSubmission {
 }
 
 /// Value-free hosted Connect Session page supplied by the owning Integration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostedCompletionPage {
-    pub title: &'static str,
-    pub html: &'static str,
+    pub title: String,
+    pub html: String,
 }
 
 /// Closed refusal vocabulary for capability-authenticated hosted credential completion.
@@ -228,6 +290,7 @@ impl BackendCapabilities {
         operations: true,
         connections: false,
         events: false,
+        datasources: false,
     };
 }
 
@@ -260,6 +323,10 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    fn owns_datasource(&self, _request: &DatasourceRequest) -> bool {
+        false
+    }
+
     fn owns_hosted_completion(&self, _connect_session_ref: &str) -> bool {
         false
     }
@@ -276,6 +343,19 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         _connect_session_ref: &str,
         _capability: &str,
         _submission: HostedCompletionSubmission,
+    ) -> Result<(), HostedCompletionError> {
+        Err(HostedCompletionError::NotFound)
+    }
+
+    fn owns_hosted_oauth_state(&self, _state: &str) -> bool {
+        false
+    }
+
+    async fn complete_hosted_oauth(
+        &self,
+        _state: &str,
+        _code: Option<&str>,
+        _error: Option<&str>,
     ) -> Result<(), HostedCompletionError> {
         Err(HostedCompletionError::NotFound)
     }
@@ -306,6 +386,18 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         Err(EventError::new(
             EventErrorCode::Unavailable,
             "event delivery is not configured",
+            false,
+        ))
+    }
+
+    async fn handle_datasource(
+        &self,
+        _context: &PrincipalContext,
+        _request: DatasourceRequest,
+    ) -> Result<DatasourceResult, DatasourceError> {
+        Err(DatasourceError::new(
+            DatasourceErrorCode::Unavailable,
+            "datasources are not configured",
             false,
         ))
     }
@@ -343,12 +435,14 @@ mod tests {
             "tenant-test".to_owned(),
             "person:owner".to_owned(),
             "service:caller".to_owned(),
+            Some("owner@example.test".to_owned()),
             "token-test".to_owned(),
             "b".repeat(64),
         )
         .unwrap();
         assert_eq!(admitted.subject(), "person:owner");
         assert_eq!(admitted.actor_subject(), "service:caller");
+        assert_eq!(admitted.email(), Some("owner@example.test"));
         assert_eq!(admitted.agent_revision(), None);
     }
 
