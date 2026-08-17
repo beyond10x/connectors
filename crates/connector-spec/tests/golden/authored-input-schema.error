@@ -1,0 +1,5 @@
+providers/authored-input-schema.toml: TOML parse error at line 21, column 1
+   |
+21 | input_schema = { type = "object" }
+   | ^^^^^^^^^^^^
+unknown field `input_schema`, expected one of `id`, `service`, `method`, `direction`, `path`, `description`, `risk`, `idempotency`, `effects`, `semantic_effects`, `interaction_shape`, `protocol_driver`, `placement_requirement`, `implementation_form`, `required_capabilities`, `repeatable_because`, `expose`, `auth`, `params`, `response_schema`, `credential_response`, `produces_credential`, `pagination`, `rate_limit`, `error_envelope`

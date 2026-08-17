@@ -1,0 +1,138 @@
+# Grafana's first B10x surface: dashboard discovery/inspection and bounded read queries.
+#
+# The source is repository-authored from Grafana's official HTTP API references because each
+# Grafana instance serves its own complete Swagger/OpenAPI document and no one upstream file can
+# truthfully describe every supported self-hosted instance. The source covers exactly these four
+# operations, and its provenance names every official reference used.
+#
+# This connector never embeds an instance address or credential. A Connection binds one
+# operator-approved HTTPS origin and resolves the service-account token through Connector custody
+# (local keychain, a wired secret provider, or satellite-local custody). `private_network` is the
+# reachability requirement; deployment policy may fulfill it with a developer-local deployment or a
+# federated satellite. The operation contract is identical in either topology.
+
+id = "grafana"
+vendor = "Grafana"
+authority = "com.grafana.api"
+base_url = "{origin}"
+description = "Grafana 12+: discover and inspect dashboards, list reachable data sources, and run bounded read queries through their backends"
+default_auth = [{ credentials = ["grafana.service_account_token"] }]
+verify = "grafana-datasources-list"
+
+[spec]
+path = "specs/grafana/http-api-2026-08-14.openapi.yaml"
+upstream_version = "Grafana 12+ HTTP API"
+fetched_at = "2026-08-14T00:00:00Z"
+sha256 = "f177be5b01888799fbc5aa6a7b6195958f2da0082c2f5823a23f2368524422c5"
+
+[[auth]]
+name = "grafana.service_account_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Grafana service account token with dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller"
+
+[[services]]
+name = "default"
+tags = ["observability"]
+audiences = ["sre", "developer", "data-analyst"]
+
+[[patch.operations]]
+select = "dashboards_list"
+rename = "grafana-dashboards-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+select = "dashboard_get"
+rename = "grafana-dashboard-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+select = "datasources_list"
+rename = "grafana-datasources-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[patch.operations]]
+select = "datasource_query"
+rename = "grafana-datasource-query"
+direction = "read"
+risk = "medium"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+# Listing data sources produces observations only. These closed mappings allow a control plane to
+# propose mediated Connections governed by target Provider contracts whose fixed route goes through
+# this Grafana Connection. The list operation does not create those Connections and the Grafana
+# grant is never inherited.
+[[discoveries]]
+id = "grafana-data-sources"
+operation = "grafana-datasources-list"
+driver = "grafana_datasource_v1"
+
+[[discoveries.mappings]]
+observed_type = "prometheus"
+target_provider = "prometheus"
+route_adapter = "grafana_datasource_proxy_v1"
+
+[[discoveries.mappings]]
+observed_type = "loki"
+target_provider = "loki"
+route_adapter = "grafana_datasource_proxy_v1"
+
+[[discoveries.mappings]]
+observed_type = "alertmanager"
+target_provider = "alertmanager"
+route_adapter = "grafana_datasource_proxy_v1"
+
+[[config]]
+name = "origin"
+service = "default"
+label = "Grafana origin"
+help = "The operator-approved HTTPS origin of this Grafana instance, without an API path. In private deployments this resolves only at the selected local or federated Connector placement"
+example = "https://grafana.monitoring.example"
+format = "origin"
+required = true
+approval = "operator"
+docs_url = "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/"
+binds = "endpoint.origin"
+
+[[config]]
+name = "service_account_token"
+service = "default"
+label = "Grafana service account token"
+help = "Supply this through the selected Connection's custody: local OS keychain, a wired secret provider, or satellite-local storage. The harness can write it but cannot read it back"
+format = "token"
+required = true
+secret = true
+docs_url = "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/"
+binds = "credential.grafana.service_account_token"

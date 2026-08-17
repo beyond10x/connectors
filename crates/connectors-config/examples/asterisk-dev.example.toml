@@ -1,0 +1,54 @@
+# Documentation template only. Every identity, address, aperture and approval reference is a
+# deployment-owned fact and must be replaced before use.
+
+[owner]
+tenant_id = "tenant-development"
+agent_id = "harness-development"
+agent_revision = 1
+authority_snapshot_id = "snapshot-development-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[connection]
+connection_ref = "connection-asterisk-development"
+label = "Asterisk development cluster"
+grant_ref = "grant-sip-dial-development-1"
+initiation = "b10x"
+approval_evidence_ref = "approval-sip-dial-development-1"
+
+[authority]
+issuer = "https://connectors.development.example"
+key_id = "voice-development-1"
+signing_key_file = "/absolute/owner-only/state/voice-authority.key"
+
+[application]
+actor = "connectors-voice"
+audience = "application-voice"
+deployment = "application-development"
+resource = "voice-channel"
+endpoint = "wss://voice-application.development.example/voice"
+authority_lifetime_seconds = 30
+session_lease_seconds = 300
+connect_address = "192.0.2.20:443"
+tls_server_name = "voice-application.development.example"
+
+[[sip.targets]]
+alias = "asterisk-dev"
+permission_subject = "private:asterisk-development"
+signaling_bind = "192.0.2.10:0"
+sent_by = "192.0.2.10"
+target = "192.0.2.30:5060"
+signaling_transport = "tcp"
+to_uri = "sip:echo@192.0.2.30:5060"
+from_uri = "sip:b10x@192.0.2.10"
+media_advertised = "192.0.2.10"
+media_bind = "192.0.2.10"
+dial_timeout_seconds = 10
+network_mode = "operator_authorized_development"
+signaling_apertures = [
+  { address = "192.0.2.10", first_port = 1, last_port = 65535 },
+  { address = "192.0.2.30", first_port = 5060, last_port = 5060 },
+]
+media_apertures = [
+  { address = "192.0.2.10", first_port = 10000, last_port = 20000 },
+  { address = "192.0.2.30", first_port = 10000, last_port = 20000 },
+]

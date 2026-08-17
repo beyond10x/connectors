@@ -1,0 +1,2 @@
+providers/auth-scope-empty-alternative.toml is not a valid connector definition:
+  - operation "acme-send": auth mechanism 0 gives credential "acme.bot_token" an empty scope set at alternative 0. That alternative is always true and would silently bypass every scoped alternative beside it

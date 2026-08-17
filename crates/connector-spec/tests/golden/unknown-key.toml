@@ -1,0 +1,19 @@
+# A misspelled connector-level key. serde lists every key that would have been valid.
+id = "zendesk"
+vendorr = "Zendesk"
+base_url = "https://acme.zendesk.com"
+
+[[operations]]
+id = "zendesk.test"
+method = "GET"
+direction = "read"
+path = "/api/v2/users/me.json"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+auth = []

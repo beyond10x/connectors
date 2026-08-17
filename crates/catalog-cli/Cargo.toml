@@ -1,0 +1,27 @@
+# The repository-maintenance CLI. A shell over `catalog-build`: everything it can do is a library
+# call, so an integration test drives the same code path `main` does.
+#
+# **Workspace-internal, and it does not take the product's name.** This binary is how the catalogue
+# is rebuilt and reviewed in this repository; it is never a release artifact. `connectors` — the
+# user-facing binary with the `serve`, `admin` and client verbs — arrives with M2 (design 02 §2)
+# and is deliberately not scaffolded here.
+
+[package]
+name = "catalog-cli"
+description = "The `catalog` repository-maintenance binary: build, diff, scaffold and check the catalog artifacts."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "catalog"
+path = "src/main.rs"
+
+[dependencies]
+catalog-build.workspace = true
+anyhow.workspace = true
+clap.workspace = true

@@ -1,0 +1,34 @@
+# The catalogue shim (design 02 §2): the typed `&'static` view of the embedded pack.
+#
+# The predecessor's crate of this name was a shim over the pack *plus* 16,909 lines of generated
+# Rust tables and 835 embedded `.flux` renderings, kept only because its API promised
+# `Operation::flux` — the emitted Flux text the canonical documents deliberately replaced with a
+# request template. The emitter does not migrate, so neither does that storage: the pack is the
+# storage now, and this crate builds the table from it once, on first use.
+
+[package]
+name = "catalog"
+description = "The connector catalogue as typed `&'static` data, served from the embedded catalog pack."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+readme = "README.md"
+
+[lib]
+name = "catalog"
+path = "src/lib.rs"
+
+[dependencies]
+# The catalogue data itself, behind the dependency-free reader. This crate re-exports it whole as
+# `catalog::reader`, and reads every document out of it to build the table.
+catalog-reader.workspace = true
+# Reading the documents. The predecessor's tables were generated Rust precisely so this crate could
+# resolve nothing at all; with the pack as the storage there is JSON to parse, and parsing it with
+# a hand-written reader instead would be a second JSON implementation in a workspace that already
+# depends on this one everywhere else.
+serde = { workspace = true }
+serde_json.workspace = true

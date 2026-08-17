@@ -1,0 +1,865 @@
+# GitHub REST API — five hand-authored public contracts plus eight exact selections from GitHub's
+# first-party OpenAPI document (four collection reads, four discovery reads). The five existing operations stay inline because their ids and Flux
+# bytes are already published; the document is upstream evidence for the new collection reads, not
+# permission to expose its 1,216 operations. Each addition is therefore one `[[patch.operations]]`
+# block and `patch.select` remains empty.
+#
+# ---------------------------------------------------------------------------------------------
+# `Accept: application/vnd.github+json` is declared below, in `[const_headers]`.
+#
+# This was a SCHEMA GAP until C-55: no field could express a constant, non-credential request
+# header, so the requirement survived only as a comment. Pinning a `params.header` with a JSON
+# Schema `const` — the trick that works for a constant *body* field, as `ticket.safe_update` does in
+# `providers/zendesk.toml` — did not work here: the emitter filtered `constant(...)` out of the
+# declared parameter list for body params only, so a `const`-pinned header stayed a caller-supplied
+# argument with the constraint silently dropped. C-55 refuses that spelling outright and adds
+# `const_headers` as the honest one.
+#
+# What this buys is an explicit media type, not dated API-version pinning. GitHub serves requests
+# with no `Accept` header by defaulting to this value, so the operations below were well-formed
+# without it; the explicit header protects the representation contract if that default changes.
+# The generated module currently sends no `X-GitHub-Api-Version`; C-477 owns the compatibility
+# decision because adding it would intentionally move already-published request bytes.
+#
+# `content-type: application/json` remains hard-coded in the emitter and is still not declarable;
+# C-144 tracks the related gap that no connector can send a non-JSON body at all.
+# ---------------------------------------------------------------------------------------------
+
+id = "github"
+vendor = "GitHub"
+
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/com.github.api/<credential>` — and until it was
+# declared `Credentials::reference` refused with `NoCredentialAddress`, so this connector could not
+# authenticate at all.
+#
+# Derived from `github.com`, the vendor's own primary domain, in reverse-DNS form, with the trailing
+# `api` label the already-shipped authorities carry (`com.slack.api`, `com.vercel.api`,
+# `io.fly.api`).
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "com.github.api"
+
+# **No `api_version`: this vendor puts no version segment in the URL at all.** Every operation path
+# below is unversioned (`/repos/{owner}/{repo}`) — GitHub versions its REST API by the `X-GitHub-
+# Api-Version` header and by `Accept` media type, neither of which is a path segment, so there is
+# nothing the file itself spells and nothing to record without asserting a vendor fact from outside
+# it. A `pid` and a credential path render without one; only a `gid` needs both halves.
+
+# One tenant-independent host, so no templating and no endpoint override: `api.github.com` serves
+# every user and organisation. (GitHub Enterprise Server lives at a customer host under a `/api/v3`
+# prefix, which is a different connector rather than an override of this one — the paths differ, not
+# just the authority.) `http_hosts` derives from this single value and is therefore exactly
+# `api.github.com`, never widened.
+base_url = "https://api.github.com"
+
+# C-55: the vendor-constant header, emitted as a literal rather than a caller-supplied argument.
+# An inline table deliberately — a `[const_headers]` section header would scope every provider
+# scalar after it into that table.
+const_headers = { "Accept" = "application/vnd.github+json" }
+
+description = "GitHub REST API: discover the authenticated user, their organisations and reachable repositories; read repositories, commits, issues, pull requests and Actions workflow runs; and write issues and issue comments"
+
+# Either credential authenticates every operation, and the two are alternatives rather than a pair
+# (C-554): a deployment provisions one static token org-wide, or each user completes an OAuth2 grant
+# and acts as themselves. A host picks; this file only says both are valid.
+#
+# The static token's own note is unchanged and still applies to it: GitHub Apps' installation tokens,
+# fine-grained personal access tokens and classic PATs all present identically as
+# `Authorization: Bearer <token>`, so the token *type* is operator configuration rather than
+# connector shape.
+default_auth = [
+  { credentials = ["github.oauth_token"] },
+  { credentials = ["github.token"] },
+]
+
+# The "Test connection" button (C-527). `GET /user` takes no parameters and cannot do anything
+# except prove the token resolves — it returns the authenticated user, which is also what a settings
+# page shows as "connected as …". This connector declared no `verify` at all until now, so a host
+# reading its manifest had nothing to call; a `verify` must be a read, and the loader refuses a
+# `high` or `destructive` one.
+verify = "github-user-get"
+
+# ---------------------------------------------------------------------------------------------
+# First-party REST OpenAPI — pinned, scrubbed and provenanced by C-469.
+#
+# The source bytes are GitHub's commit-pinned `api.github.com.2022-11-28.json`. The vendor script
+# removes every `example`/`examples` value, so a future credential, personal address or telephone
+# example is scrubbed by default while paths, schemas and GitHub's MIT license declaration remain.
+# The complete upstream and vendored hashes live in `specs/github.provenance.toml`; this pointer
+# carries the hash of the exact bytes the offline build ingests.
+# ---------------------------------------------------------------------------------------------
+
+[spec]
+# Every operation this document contributes joins the published `default` service. Stated rather
+# than implied because the `login` service below makes omission a loud error (C-458), which is what
+# stops a selected operation drifting into the address-elided service by silence.
+service = "default"
+path = "specs/github/api.github.com.2022-11-28-2026-08-02.openapi.json"
+source_url = "https://raw.githubusercontent.com/github/rest-api-description/5e28810649ba41b5483753ba74f976f83856a504/descriptions/api.github.com/api.github.com.2022-11-28.json"
+upstream_version = "1.1.4"
+fetched_at = "2026-08-02T00:00:00Z"
+sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
+
+# Only integer pagination is caller-visible on THIS operation, and it stays that way because these
+# are published request bytes rather than because a string would be unsafe — C-30 closed that. An
+# upstream rename still fails closed.
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "issues/list-for-repo"
+direction = "read"
+rename = "github-issue-list"
+description = "List a repository's issues and pull requests with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+omit.query = [
+  "milestone",
+  "state",
+  "assignee",
+  "type",
+  "creator",
+  "mentioned",
+  "issue_field_values",
+  "labels",
+  "sort",
+  "direction",
+  "since",
+]
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "pulls/list-files"
+direction = "read"
+rename = "github-pull-files-list"
+description = "List the files changed by one pull request with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "actions/list-workflow-runs-for-repo"
+direction = "read"
+rename = "github-workflow-run-list"
+description = "List a repository's GitHub Actions workflow runs with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+omit.query = [
+  "actor",
+  "branch",
+  "event",
+  "status",
+  "created",
+  "exclude_pull_requests",
+  "check_suite_id",
+  "head_sha",
+]
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "repos/list-commits"
+direction = "read"
+rename = "github-commit-list"
+description = "List commits in a repository with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+omit.query = ["sha", "path", "author", "committer", "since", "until"]
+
+# ---------------------------------------------------------------------------------------------
+# DISCOVERY — the reads that answer "what can this token reach?" (C-527)
+#
+# Every operation above takes `{owner}` and `{repo}` as given. That is the whole gap this block
+# closes: a caller holding only a token had no way to *find* an organisation or a repository, so the
+# connector could describe a repository it could not help anyone name. These four are the entry
+# points, and `github-user-get` is additionally this connector's `verify` — until now it declared
+# none at all, which is why a settings page had no Test connection read to call.
+#
+# **These carry scalar string filters, and the operations above still do not.** That asymmetry is
+# deliberate, not drift. The omissions above were written when nothing percent-encoded a query value
+# and a `&` in one injected a parameter; C-30 closed that in Flux 0.54 with a structured
+# `http.request(query: ...)` map, so a scalar string is now encoded with RFC 3986 semantics and is
+# safe by construction. Widening the published operations above is a separate change that moves
+# request bytes already in the catalogue, and it is not this story's.
+#
+# Arrays remain refused, which is why nothing here selects one.
+# ---------------------------------------------------------------------------------------------
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "users/get-authenticated"
+direction = "read"
+rename = "github-user-get"
+description = "Get the authenticated user — the identity the configured token acts as"
+risk = "low"
+idempotency = "idempotent"
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "orgs/list-for-authenticated-user"
+direction = "read"
+rename = "github-org-list"
+description = "List the organisations the authenticated user belongs to, with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "repos/list-for-org"
+direction = "read"
+rename = "github-org-repo-list"
+description = "List an organisation's repositories, filtered by type and ordered, with bounded integer pagination"
+risk = "low"
+idempotency = "idempotent"
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+select = "repos/list-for-authenticated-user"
+direction = "read"
+rename = "github-user-repo-list"
+description = "List the repositories the authenticated user can access, filtered by visibility, affiliation and type"
+risk = "low"
+idempotency = "idempotent"
+# `since` and `before` are RFC 3339 timestamps that page by repository *creation* date, and they
+# interact with `sort`/`direction` in a way the vendor documents only in prose. Omitted rather than
+# published as two more caller-visible knobs whose combined behaviour this file cannot state.
+omit.query = ["since", "before"]
+
+# ---------------------------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "github.token"
+scheme = "bearer"
+# The static secret. Gated and registered with flux's redactor by the host; never read here.
+env = ["GITHUB_TOKEN"]
+description = "GitHub token sent as a bearer — a GitHub App installation token, a fine-grained PAT, or a classic PAT"
+
+[[auth]]
+# **The delegated credential: an operator registers one OAuth application, and each person grants
+# it** (C-554). The static token above stays for the org-wide arrangement where one credential is
+# provisioned once; this is the "on behalf of" arrangement, where a signed-in user completes the
+# grant and the host stores the result for that user alone.
+#
+# Both are declared because they are genuinely different deployments of the same connector, and
+# `default_auth` admits either. Nothing here chooses between them — that is the host's, and it is
+# why `subject` exists.
+name = "github.oauth_token"
+scheme = "bearer"
+subject = "user"
+description = "GitHub OAuth2 access token obtained on behalf of a signed-in user. Bounded by that user's own permissions, never by the application's"
+
+# The host runs every grant; nothing this repository emits performs OAuth. `endpoint` names the
+# declared `login` service rather than carrying a URL, which is the property that keeps the token
+# exchange inside the egress allow-list — `http_hosts` derives from declared base URLs, so a URL
+# written here would name a host nothing had admitted.
+#
+# ---------------------------------------------------------------------------------------------
+# VERIFIED AGAINST GITHUB'S PUBLISHED DOCUMENTATION, 2026-08-12. Every endpoint fact below was read
+# from the vendor's own pages on that date rather than recalled:
+#
+#   - Authorizing OAuth apps —
+#     https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+#     gives the browser leg as `GET https://github.com/login/oauth/authorize` and the exchange as
+#     `POST https://github.com/login/oauth/access_token`, and describes `scope` as "A space-delimited
+#     list of scopes."
+#   - Scopes for OAuth apps —
+#     https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
+#     is the source for every scope definition quoted below.
+#
+# **The auth host is not the API host, which is the whole reason `login` exists.** Every operation
+# in this connector goes to `api.github.com`; the two paths below are served by `github.com`. The
+# same page shows the split directly — it documents the token being used against
+# `GET https://api.github.com/user` after being obtained from `github.com`.
+# ---------------------------------------------------------------------------------------------
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/login/oauth/authorize"
+token_path = "/login/oauth/access_token"
+
+# ---------------------------------------------------------------------------------------------
+# SCOPES — the minimum the thirteen operations below need, derived one at a time from GitHub's own
+# per-endpoint statements rather than chosen as a comfortable superset.
+#
+# Only three of the thirteen endpoints document a classic scope at all; for the rest the requirement
+# comes from the canonical scope definitions, and that difference is recorded here rather than
+# smoothed over.
+#
+# `repo` — "Grants full access to public and private repositories including read and write access to
+#   code, commit statuses, repository invitations, collaborators, deployment statuses, and repository
+#   webhooks." Documented *explicitly* for `github-workflow-run-list`: the workflow-runs page
+#   (https://docs.github.com/en/rest/actions/workflow-runs) says "OAuth app tokens and personal
+#   access tokens (classic) need the repo scope to use this endpoint with a private repository."
+#   It covers every other repository-scoped read here and both writes.
+#
+#   **It is broader than this connector is, and there is no narrower classic scope that reaches a
+#   private repository at all.** `public_repo` is defined as "Limits access to public repositories",
+#   and GitHub's classic model publishes no read-only private-repository scope — so a connector that
+#   must read a private repository asks for `repo` or asks for nothing usable. The narrowing GitHub
+#   does offer is fine-grained permissions, which belong to a *different* app model that takes no
+#   scopes at all (see the grant note below). Recorded because a reader should know this is the
+#   vendor's floor and not this file's convenience.
+#
+# `read:org` — "Read-only access to organization membership, organization projects, and team
+#   membership." Documented *explicitly* for `github-org-list`: the orgs page
+#   (https://docs.github.com/en/rest/orgs/orgs) says "this API requires at least user or read:org
+#   scope for OAuth app tokens and personal access tokens (classic). Requests with insufficient
+#   scope will receive a 403 Forbidden response." Of the two the vendor names, `read:org` is the
+#   read-only one, so it is the one requested.
+#
+# THREE SCOPES DELIBERATELY NOT REQUESTED, each because a documented requirement does not exist:
+#
+#   - `read:user` / `user`. No REST page for any operation here names `read:user`. The users page
+#     (https://docs.github.com/en/rest/users/users) says only that "OAuth app tokens and personal
+#     access tokens (classic) need the `user` scope in order for the response to include private
+#     profile information" — so the public profile needs no scope, and `github-user-get` declares no
+#     private profile field. `user` is additionally defined as "read/write access to profile info",
+#     which is write access this connector has no operation for.
+#   - `public_repo`. Strictly weaker than `repo` and would exclude every private repository, so
+#     requesting it beside `repo` adds nothing.
+#   - `workflow`. Defined as "Grants the ability to add and update GitHub Actions workflow files".
+#     `github-workflow-run-list` *reads* runs, which the vendor's own sentence above places under
+#     `repo`; nothing here commits a workflow file.
+# ---------------------------------------------------------------------------------------------
+scopes = ["repo", "read:org"]
+
+# ---------------------------------------------------------------------------------------------
+# GRANTS — `authorization_code` only, and the absence of `refresh_token` is a decision with a
+# source, not an omission.
+#
+# **GitHub has two app models and they differ on exactly these two fields.** Verified 2026-08-12:
+#
+#   - A **classic OAuth app** takes `scope` on the authorize request, and its user access token does
+#     not expire on a timer and comes with no refresh token. GitHub's token-expiration page
+#     (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/token-expiration-and-revocation)
+#     states the only lifetime it has: "GitHub will automatically revoke an OAuth token or personal
+#     access token when the token hasn't been used in one year."
+#   - A **GitHub App** issues expiring user access tokens *with* refresh tokens — "User access tokens
+#     created by a GitHub App will expire after eight hours by default, and then must be regenerated
+#     using the included refresh token", with `grant_type=refresh_token` POSTed to the same
+#     `https://github.com/login/oauth/access_token`
+#     (https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens).
+#     Two conditions attach: it is opt-in — "You will only receive a refresh token if your GitHub App
+#     has opted in to expiring user access tokens" — and, decisively for this file, that model takes
+#     **no scopes**: "Unlike a traditional OAuth token, the user access token does not use scopes.
+#     Instead, it uses fine-grained permissions"
+#     (https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app).
+#
+# **`scopes` above is what settles it.** A declaration carrying scopes describes the classic OAuth
+# app, and a classic OAuth app's token does not refresh. Declaring `refresh_token` anyway would be a
+# promise the vendor will not honour — a host would store a refresh token it was never issued and
+# schedule a renewal that cannot succeed — and this repository's rule is that a marking nothing reads
+# is worse than none.
+#
+# The counterpart is worth stating so the decision is reversible on purpose rather than by drift:
+# **targeting the GitHub App model instead means deleting `scopes`, not adding a grant.** The two
+# fields are alternatives in the vendor's own design, and a declaration carrying both would describe
+# no GitHub app that exists.
+#
+# GitLab's `refresh_token` is not a precedent for adding one here: its access token expires in two
+# hours and its refresh grant is what keeps an unattended fleet alive. GitHub's classic token has no
+# such clock.
+# ---------------------------------------------------------------------------------------------
+grants = ["authorization_code"]
+
+# NO `client_id` VALUE, and none is possible: a registration identity is per-deployment, the
+# canonical document has no field for one, and the loader refuses a declared value naming that rule
+# (C-536). The requirement reaches an operator as `[[config]]` instead — see the three
+# `oauth.*`-binding fields at the end of this file.
+
+# ---------------------------------------------------------------------------------------------
+# Operations — 13: five established calls, four spec-backed collection reads, and four discovery
+# reads (C-527).
+#
+# WHY THE ESTABLISHED OPERATIONS CARRY NO STRING QUERY, AND THE NEW ONES DO. This block used to say
+# that nothing in the pipeline percent-encodes a query value — the emitter interpolated it verbatim
+# into a `fmt` template — which made every string filter an injection and `zendesk-ticket-search`
+# the standing demonstration. **C-30 closed that in Flux 0.54.** A scalar query value now travels in
+# the structured `http.request(query: …)` map with RFC 3986 semantics, and the URL carries path data
+# only.
+#
+# So the omissions above are no longer a safety property; they are a **compatibility** one. Those
+# operations' request bytes are published, and widening them moves bytes already in the catalogue —
+# a separate reviewed change, not a side effect of adding new reads. The discovery reads below are
+# new, so they carry the filters the vendor offers.
+#
+# Arrays remain refused: their wire shape is undeclared and C-30 refuses one with
+# `UnencodableQueryValue` rather than guessing a vendor convention.
+#
+# The path surface is safe for its own reason, unchanged: `{owner}` and `{repo}` are GitHub names
+# restricted to `[A-Za-z0-9._-]`, and `{issue_number}` / `{pull_number}` are integers. None can
+# carry a character that changes the shape of the request.
+#
+# `crates/connector-flux/tests/github_connector.rs` asserts the real property on every operation —
+# every query parameter is a scalar, and no query value reaches the URL — so this stays a property
+# of the connector rather than of this comment.
+#
+# Op ids are hyphen-separated, not dotted: flux-lang's `is_valid_decl_name` admits ASCII
+# alphanumerics, `_` and `-` only (C-8, C-23).
+# ---------------------------------------------------------------------------------------------
+
+[[services]]
+# C-153. `default` is the reserved implicit service, and a provider with one API surface
+# declares no services at all — so this entry exists for exactly one reason: a tag attaches
+# to a service, and there is no other service here to attach it to. It carries service
+# discovery metadata only, which keeps `default` implicit and this file emitting the same
+# `github.flux` it emitted before.
+#
+# `legacy = true` (C-458) is what preserves that after `login` was added below: it keeps the
+# published, address-elided `default` service exactly as it was while a named sibling exists, at the
+# cost of every member having to state `service` explicitly — which is the point, since a new member
+# must not enter the address-elided service by silence.
+name = "default"
+legacy = true
+tags = ["source-control", "issue-tracking"]
+audiences = ["developer"]
+
+[[services]]
+# **The vendor's OAuth2 endpoints, which are not on the API host** (C-554).
+#
+# Declared as a service because that is how this repository names an endpoint whose base URL differs
+# from the connector's, and because `http_hosts` derives from declared base URLs — a token exchange
+# against a host nothing declared is one the egress gate refuses. `OAuth2Spec.endpoint` above names
+# this service rather than carrying a URL of its own, which is the property that keeps it that way:
+# a field holding a destination is a field that can hold a destination somebody chose.
+#
+# **The base URL is a literal, and that is the consumer contract** (X-154's `NoDeclaredDefault`).
+# Exchange composes the authorize URL at startup from the artifact alone, so a `{placeholder}` with
+# no declared default is a composition that cannot complete. Here the honest declaration *is* a
+# literal: `github.com` is one fixed host, exactly as `api.github.com` is at connector level.
+# (GitHub Enterprise Server would be a different connector — its API paths differ, not just its
+# host — so there is no self-managed origin for this value to vary over, which is the one way this
+# differs from gitlab's `{origin}`.)
+#
+# It declares no operations, and must not. An authorize endpoint is a browser redirect and a token
+# endpoint's response body *is* a credential, so neither is a connector operation — AGENTS.md
+# § Authentication contract. The host runs the grant; this service exists so the host knows where.
+name = "login"
+description = "GitHub's OAuth2 authorize and token endpoints, served by github.com rather than by the API host."
+base_url = "https://github.com"
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "github-repo-get"
+method = "GET"
+direction = "read"
+path = "/repos/{owner}/{repo}"
+description = "Get one repository's metadata, including its default branch, visibility and permissions"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "owner"
+description = "The repository owner — a user or organisation login"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "repo"
+description = "The repository name, without the owner prefix"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# ---------------------------------------------------------------------------------------------
+# RESPONSE SHAPES (C-126) — from GitHub's own REST reference, per endpoint:
+#
+#   docs.github.com/en/rest/repos/repos#get-a-repository
+#   docs.github.com/en/rest/issues/issues#get-an-issue
+#   docs.github.com/en/rest/issues/issues#create-an-issue
+#   docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+#   docs.github.com/en/rest/issues/comments#create-an-issue-comment
+#
+# Every field declared below is in the schema those pages publish (`full-repository`, `issue`,
+# `pull-request`, `issue-comment`). Three deliberate omissions, because each one would be an
+# invention:
+#
+# - **`assignee`, singular.** The live API returns it and the *webhook* payload schema documents it,
+#   but the REST issue schema on the page above does not, so only the documented `assignees` array is
+#   declared. This is the smallest and most tempting guess in the file, and it is the one to refuse.
+# - **A closed enum on `visibility`.** The page documents `public` and `private` only, while an
+#   enterprise repository is `internal`. A closed enum built from an incomplete list would reject a
+#   real value, so the member is typed `string` and the values live in its description.
+# - **Nullability of `pushed_at` and `merge_commit_sha`.** Not stated on either page. Left unstated
+#   here rather than asserted in either direction.
+#
+# GitHub returns very large objects — a repository has upwards of a hundred members — so what is
+# enumerated is the identity, the state and the fields a flow branches on. A JSON Schema `properties`
+# map does not claim to be exhaustive, and none of these declares `additionalProperties: false`.
+# ---------------------------------------------------------------------------------------------
+
+# The repository. `default_branch` and `permissions` are what a flow actually needs before it acts:
+# the first is where a change would land, and the second is whether this token could make one at all —
+# a token with `pull` only reads, and finding that out from `permissions.push` is cheaper than finding
+# it out from a 403 on a write.
+[operations.response_schema]
+type = "object"
+required = ["id", "name", "full_name", "private", "owner"]
+properties = { id = { type = "integer", description = "The repository's global id, stable across renames" }, node_id = { type = "string" }, name = { type = "string" }, full_name = { type = "string", description = "`owner/repo`, which is how every other operation here addresses it" }, private = { type = "boolean" }, visibility = { type = "string", description = "`public` or `private` per the reference; an enterprise repository can also be `internal`, so this is deliberately not a closed enum" }, owner = { type = "object", description = "The owning user or organisation: `login`, `id`, `type` (`User` or `Organization`), `avatar_url`, `html_url`" }, html_url = { type = "string", format = "uri" }, description = { type = "string", description = "Null when the repository has none" }, fork = { type = "boolean" }, archived = { type = "boolean", description = "An archived repository is read-only — a write against it fails, so check this before `github-issue-create`" }, disabled = { type = "boolean" }, default_branch = { type = "string" }, language = { type = "string", description = "The dominant language, or null" }, open_issues_count = { type = "integer", description = "Open issues **and** open pull requests, since GitHub counts a PR as an issue" }, stargazers_count = { type = "integer" }, pushed_at = { type = "string", format = "date-time" }, permissions = { type = "object", description = "What the authenticated token can do here: `admin`, `push` and `pull` are always present, `maintain` and `triage` only sometimes. Absent entirely for an unauthenticated read" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "github-issue-get"
+method = "GET"
+direction = "read"
+path = "/repos/{owner}/{repo}/issues/{issue_number}"
+# Worth stating on the contract a model reads: GitHub models a pull request as an issue, so this
+# endpoint answers for a PR number too, returning the issue view of it (with a `pull_request` key).
+# It is not an error and not a redirect — `github-pull-get` is the endpoint that returns the diff,
+# merge state and review metadata.
+description = "Get one issue by number. GitHub treats a pull request as an issue, so a PR number returns that PR's issue view; use github-pull-get for its merge and review state"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "owner"
+description = "The repository owner — a user or organisation login"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "repo"
+description = "The repository name, without the owner prefix"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "issue_number"
+description = "The issue number within the repository — the number in its URL, not its global id"
+required = true
+schema = { type = "integer", format = "uint64", minimum = 1 }
+
+# `pull_request` IS THE MEMBER THAT MATTERS HERE, and GitHub documents it in those terms: "'Issues'
+# endpoints may return both issues and pull requests in the response. You can identify pull requests
+# by the `pull_request` key. Be aware that the id of a pull request returned from 'Issues' endpoints
+# will be an issue id."
+#
+# So the response is a **discriminated** shape and the discriminator is the *presence* of an optional
+# member — which is exactly the fact this operation's `description` states in prose and which nothing
+# machine-readable said until now. A flow that treats every answer as an issue will treat a PR as one
+# too, and will do it while holding an `id` that addresses neither the PR resource nor anything else
+# useful.
+#
+# `state` plus `state_reason` is the other pair worth having: `closed` alone does not say whether the
+# issue was fixed or dismissed, and `not_planned` versus `completed` is the difference.
+[operations.response_schema]
+type = "object"
+required = ["id", "number", "state", "title", "labels"]
+properties = { id = { type = "integer", description = "The issue's global id. For a pull request read through this endpoint it is an **issue** id and does not address the PR resource" }, node_id = { type = "string" }, number = { type = "integer", description = "The per-repository number — what this operation's `issue_number` takes" }, state = { type = "string", description = "`open` or `closed`" }, state_reason = { type = "string", description = "Why it closed: `completed`, `not_planned`, `duplicate` or `reopened`. Null on an open issue, and the difference between a fixed issue and a dismissed one" }, title = { type = "string" }, body = { type = "string", description = "The issue body as Markdown; null when the author wrote none" }, user = { type = "object", description = "Who opened it: `login`, `id`, `type`" }, labels = { type = "array", description = "The applied labels, each `{id, name, color, description}`", items = { type = "object" } }, assignees = { type = "array", description = "Everyone assigned. The reference's issue schema documents this array and does **not** document a singular `assignee`, so none is declared here even though the API returns one", items = { type = "object" } }, milestone = { type = "object", description = "The milestone, or null" }, comments = { type = "integer", description = "How many comments it has — a count, not the comments" }, locked = { type = "boolean" }, draft = { type = "boolean" }, html_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, closed_at = { type = "string", format = "date-time", description = "Null while open" }, pull_request = { type = "object", description = "PRESENT ONLY IF THIS IS A PULL REQUEST — `{url, html_url, diff_url, patch_url, merged_at}`. Its presence is how GitHub says the answer is a PR; read its merge and review state with `github-pull-get`, and note that `merged_at` here is null for an open or closed-unmerged PR" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "github-pull-get"
+method = "GET"
+direction = "read"
+path = "/repos/{owner}/{repo}/pulls/{pull_number}"
+description = "Get one pull request by number, with its merge state, head and base refs and review counts"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "owner"
+description = "The repository owner — a user or organisation login"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "repo"
+description = "The repository name, without the owner prefix"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "pull_number"
+description = "The pull request number within the repository"
+required = true
+schema = { type = "integer", format = "uint64", minimum = 1 }
+
+# `mergeable` IS THREE-VALUED, and the reference says why: "If the value is null, then GitHub has
+# started a background job to compute the mergeability. After giving the job time to complete,
+# resubmit the request."
+#
+# That is the single most consequential fact in this file for a flow author. `null` is not "no": a
+# gate written as `mergeable == false → refuse` and `else → merge` sends the *unknown* case down the
+# merge path on the first read of any recently pushed PR, because the first read is the one that
+# triggers the computation. Publishing the member as a plain boolean would hide that; publishing it
+# with this description is the whole value of the schema.
+#
+# `merged` is the one to branch on for "did this land" — it is a settled boolean, unlike `mergeable`,
+# and unlike `state`, which reads `closed` whether a PR was merged or abandoned.
+[operations.response_schema]
+type = "object"
+required = ["id", "number", "state", "title"]
+properties = { id = { type = "integer", description = "The pull request's own id — distinct from the issue id `github-issue-get` returns for the same number" }, number = { type = "integer" }, state = { type = "string", description = "`open` or `closed`. A merged PR is `closed`, so this cannot distinguish merged from abandoned — read `merged`" }, title = { type = "string" }, body = { type = "string", description = "The description as Markdown, or null" }, draft = { type = "boolean" }, merged = { type = "boolean", description = "Whether it landed. This is the settled answer; `mergeable` below is about whether it *could*" }, mergeable = { type = "boolean", description = "THREE-VALUED: true, false, or **null meaning not yet computed** — GitHub starts a background job on first read and the reference says to resubmit the request. Treat null as unknown, never as false" }, mergeable_state = { type = "string", description = "GitHub's word for the merge situation, e.g. `clean`, `dirty`, `blocked`, `behind`, `unknown`" }, merged_at = { type = "string", format = "date-time", description = "When it merged, or null" }, merge_commit_sha = { type = "string", description = "The resulting commit once merged. Its nullability before a merge is not documented, so nothing is asserted here" }, head = { type = "object", description = "The source of the change: `{ref, sha, label, repo}` — `repo` is a different repository for a fork PR" }, base = { type = "object", description = "Where it would land: `{ref, sha, label, repo}`" }, additions = { type = "integer" }, deletions = { type = "integer" }, changed_files = { type = "integer" }, commits = { type = "integer" }, review_comments = { type = "integer", description = "Line-level review comments. Conversation comments are counted separately and are what `github-issue-comment-add` writes" }, user = { type = "object", description = "Who opened it" }, html_url = { type = "string", format = "uri" } }
+
+# ---------------------------------------------------------------------------------------------
+# The two writes. **Both publish to a surface the world can read**, and their `risk` says so.
+#
+# `risk = "high"` — "writes a reviewer would want to see first" — rather than the `medium` the
+# zendesk writes carry, and the difference is not cosmetic. A zendesk comment defaults to an
+# internal note (`public = false`); a GitHub issue or comment is visible to anyone who can see the
+# repository the moment it is created, is attributed to whoever owns the token, and immediately
+# emails and notifies every subscriber and every account it mentions. Deleting it afterwards does
+# not unsend that. On a public repository the audience is everyone. flux's approval gate reads this
+# field, so `medium` here would mean an agent posting publicly under a maintainer's name without a
+# human seeing it first; `high` is the honest setting and the fail-safe direction.
+#
+# `idempotency = "non_idempotent"` because it is the truth and because a retry around either of
+# these would otherwise be sound-looking and wrong: replaying a create makes a second issue, not the
+# same one. GitHub offers no idempotency key on these endpoints, so `conditional` would be a claim
+# with nothing behind it. (The emitter also refuses an authored write that declares itself
+# `idempotent` or `risk = "low"` — `check_write_metadata`.)
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "github-issue-create"
+method = "POST"
+direction = "write"
+path = "/repos/{owner}/{repo}/issues"
+description = "Open a new issue on a repository. The issue is immediately visible to everyone who can see the repository and notifies its subscribers"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "owner"
+description = "The repository owner — a user or organisation login"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "repo"
+description = "The repository name, without the owner prefix"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# The body is flat — GitHub takes these at the root of the JSON object — so no `wire` path is needed
+# on any of them. Contrast zendesk, whose every write field declares one.
+[[operations.params.body]]
+name = "title"
+description = "The issue title; the only required field"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "body"
+description = "The issue body as GitHub-flavoured Markdown"
+required = false
+schema = { type = "string" }
+
+# GitHub accepts `labels` as either an array of names or an array of objects, and `assignees` as an
+# array of logins. Only the array-of-names form is declared: it is the one a caller means, and a
+# `oneOf` would land on Flux's `Any` (`crates/connector-flux/src/types.rs`), which would type the
+# parameter as "anything at all" in the op signature for no gain. A label that does not exist on the
+# repository is created by this call rather than rejected.
+[[operations.params.body]]
+name = "labels"
+description = "Label names to apply; a name the repository does not have yet is created"
+required = false
+schema = { type = "array", items = { type = "string", minLength = 1 } }
+
+[[operations.params.body]]
+name = "assignees"
+description = "User logins to assign; GitHub silently drops any login without push access to the repository"
+required = false
+schema = { type = "array", items = { type = "string", minLength = 1 } }
+
+# `201 Created`, and the body is the same issue object `github-issue-get` returns. Two members carry
+# the weight: `number`, which is how everything afterwards addresses the issue — including this
+# connector's own `github-issue-comment-add` — and `html_url`, which is the link a human is given.
+#
+# `assignees` is also the confirmation of a silent failure documented on the parameter above: GitHub
+# drops a login without push access rather than refusing the call, so an issue created "assigned to
+# someone" can arrive assigned to nobody, with HTTP 201 and no error. Reading it back is the only way
+# to know.
+[operations.response_schema]
+type = "object"
+required = ["id", "number", "state", "title"]
+properties = { id = { type = "integer", description = "The new issue's global id" }, node_id = { type = "string" }, number = { type = "integer", description = "The per-repository number to address it by afterwards" }, state = { type = "string", description = "`open` on a freshly created issue" }, title = { type = "string" }, body = { type = "string" }, user = { type = "object", description = "The account the token belongs to — a created issue is attributed to it, not to whoever asked for it" }, labels = { type = "array", description = "The labels that were applied. A name the repository did not have is created by this call and appears here", items = { type = "object" } }, assignees = { type = "array", description = "Who was actually assigned. GitHub silently drops a login without push access, so compare this against what was requested rather than assuming it took", items = { type = "object" } }, comments = { type = "integer" }, html_url = { type = "string", format = "uri", description = "The issue's page — the link to give a human" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "github-issue-comment-add"
+method = "POST"
+direction = "write"
+path = "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+# The same endpoint comments on a pull request, for the same reason `github-issue-get` reads one:
+# GitHub's issue and PR numbering is one sequence and PR conversation comments *are* issue comments.
+# A review comment on a specific line is a different endpoint and is not in this selection.
+description = "Add a comment to an issue or pull request. The comment is public to everyone who can see the repository and notifies its participants; GitHub has no private or internal comment here"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "owner"
+description = "The repository owner — a user or organisation login"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "repo"
+description = "The repository name, without the owner prefix"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.path]]
+name = "issue_number"
+description = "The issue or pull request number to comment on"
+required = true
+schema = { type = "integer", format = "uint64", minimum = 1 }
+
+# No `public` flag and no default to get wrong: unlike zendesk's comment-add, which defaults to an
+# internal note, GitHub has no non-public comment on this endpoint. The description says so because
+# a model that assumed a zendesk-like default would be assuming a privacy setting that does not
+# exist.
+[[operations.params.body]]
+name = "body"
+description = "The comment text as GitHub-flavoured Markdown; must not be blank"
+required = true
+schema = { type = "string", minLength = 1 }
+
+# `201 Created`, and the body is the issue-comment object. `html_url` is the deep link to the comment
+# itself rather than to the issue, which is what a flow reports back after posting; `issue_url` is the
+# API URL of what was commented on, and it is the only member that names the target.
+#
+# `author_association` is included because it is the one thing here a reviewer of an automated comment
+# wants: `OWNER`, `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR` or `NONE` says what standing the token's
+# account has in this repository, which is what makes a bot comment read as authoritative or not.
+[operations.response_schema]
+type = "object"
+required = ["id", "body"]
+properties = { id = { type = "integer", description = "The comment's own id — not the issue's" }, node_id = { type = "string" }, body = { type = "string", description = "The comment as posted" }, user = { type = "object", description = "The commenting account, which is whoever the token belongs to" }, author_association = { type = "string", description = "The commenter's standing in the repository: `OWNER`, `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR`, `NONE` and so on" }, html_url = { type = "string", format = "uri", description = "Link to this comment, anchored — not to the issue" }, issue_url = { type = "string", format = "uri", description = "API URL of the issue or pull request that was commented on" }, url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, reactions = { type = "object", description = "Reaction rollup counts, all zero on a new comment" } }
+
+# ---------------------------------------------------------------------------------------------
+# Configuration — the OAuth application, registered once by whoever runs the product (C-554).
+#
+# This connector had no `[[config]]` at all before, because its one credential is a token a tenant
+# pastes and nothing else had to be supplied. An `authorization_code` grant changes that: the three
+# fields below are the registration triple, and without them a host has a grant it cannot start.
+#
+# These are **operator** level and the level is derived, never authored: it is a consequence of
+# binding `oauth.*`. That derivation is the thing protecting an end user here — asking a tenant for a
+# client secret would hand them the product's own credential, which the configuration contract calls
+# out as a real defect in both directions.
+#
+# The client id is public by specification (RFC 6749 §2.2) and the secret is not, which is the whole
+# difference between the first two declarations below.
+#
+# No token field joins them. The static `github.token` credential stays exactly as it was — a value
+# a host resolves from its secret store or `GITHUB_TOKEN`, never a form field this file invents on
+# the way past.
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "oauth_client_id"
+service = "default"
+label = "GitHub OAuth application client ID"
+help = "Register an OAuth app under Settings -> Developer settings -> OAuth Apps, with the callback URL your deployment serves. This is the client ID, which is public"
+format = "text"
+required = false
+docs_url = "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+binds = "oauth.client_id"
+
+[[config]]
+name = "oauth_redirect_uri"
+service = "default"
+# **GitHub does not match this string exactly, and the help says so.** Its own documentation states
+# the rule: "The redirect URL's host (excluding sub-domains) and port must exactly match the callback
+# URL. The redirect URL's path must reference a subdirectory of the callback URL."
+# (https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps, read
+# 2026-08-12.) That is looser than GitLab's exact match, and an operator who assumes GitLab's rule
+# here will register a URL that works and not know why.
+label = "GitHub OAuth callback URL"
+help = "The callback address this deployment serves, registered on the app above. GitHub matches the host (excluding sub-domains) and port exactly and requires the path to be at or below the registered callback URL's path — so a registered `https://host/api/oauth` admits `https://host/api/oauth/callback` but not `https://host/`"
+example = "https://exchange.internal/api/oauth/callback"
+format = "url"
+required = false
+docs_url = "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+binds = "oauth.redirect_uri"
+
+[[config]]
+name = "oauth_client_secret"
+service = "default"
+label = "GitHub OAuth application client secret"
+help = "The client secret issued beside the ID above. GitHub shows it once at generation and never again. Supplied by whoever runs this deployment, never by an end user"
+format = "token"
+secret = true
+required = false
+docs_url = "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+binds = "oauth.client_secret"

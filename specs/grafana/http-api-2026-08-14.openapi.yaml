@@ -1,0 +1,217 @@
+openapi: 3.1.0
+info:
+  title: Grafana HTTP API curated read surface (B10x-authored)
+  version: "2026-08-14"
+  description: Repository-authored source specification derived from the official Grafana HTTP API references carried by each operation. Grafana serves a complete Swagger/OpenAPI description from each running instance; this document intentionally contains only the reviewed cross-instance surface B10x ships.
+x-b10x-origin: repository-authored
+x-b10x-coverage: exact shipped Grafana read and query surface
+x-b10x-auth-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/
+servers:
+  - url: https://grafana.example.com
+security:
+  - serviceAccountToken: []
+paths:
+  /apis/dashboard.grafana.app/v1/namespaces/{namespace}/dashboards:
+    get:
+      operationId: dashboards_list
+      summary: List dashboards in one Grafana organization namespace, with bounded cursor pagination
+      x-b10x-source-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/dashboard/
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          description: Grafana organization namespace. For the default organization this is `default`.
+          schema:
+            type: string
+            minLength: 1
+            pattern: '^[A-Za-z0-9._-]+$'
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of dashboards to return in this page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: continue
+          in: query
+          required: false
+          description: Opaque continuation token returned by an earlier page.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard resource list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  metadata:
+                    type: object
+                    description: List metadata, including the continuation token when another page exists.
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DashboardResource'
+  /apis/dashboard.grafana.app/v1/namespaces/{namespace}/dashboards/{uid}:
+    get:
+      operationId: dashboard_get
+      summary: Retrieve one dashboard resource by UID from a Grafana organization namespace
+      x-b10x-source-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/dashboard/
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          description: Grafana organization namespace. For the default organization this is `default`.
+          schema:
+            type: string
+            minLength: 1
+            pattern: '^[A-Za-z0-9._-]+$'
+        - name: uid
+          in: path
+          required: true
+          description: Dashboard UID, as returned in the resource metadata name by grafana-dashboards-list.
+          schema:
+            type: string
+            minLength: 1
+            pattern: '^[A-Za-z0-9._-]+$'
+      responses:
+        "200":
+          description: Dashboard resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResource'
+  /api/datasources:
+    get:
+      operationId: datasources_list
+      summary: List the data sources available to the authenticated Grafana service account. This is also the bounded connection verification read
+      x-b10x-source-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/
+      responses:
+        "200":
+          description: Data sources visible to the service account. Grafana currently returns at most the instance-configured maximum, 5000 by default.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataSource'
+  /api/ds/query:
+    post:
+      operationId: datasource_query
+      summary: Execute one or more read queries through Grafana data-source backends over an explicit time range
+      x-b10x-source-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/#query-a-data-source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [queries, from, to]
+              properties:
+                from:
+                  type: string
+                  minLength: 1
+                  description: Start of the query range, either epoch milliseconds or a Grafana relative time such as `now-5m`.
+                to:
+                  type: string
+                  minLength: 1
+                  description: End of the query range, either epoch milliseconds or a Grafana relative time such as `now`.
+                queries:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  description: Data-source-specific read queries. Every query identifies its data source and reference id; further fields depend on that data-source plugin.
+                  items:
+                    type: object
+                    required: [refId, datasource]
+                    properties:
+                      refId:
+                        type: string
+                        minLength: 1
+                        maxLength: 16
+                      datasource:
+                        type: object
+                        required: [uid]
+                        properties:
+                          uid:
+                            type: string
+                            minLength: 1
+                      format:
+                        type: string
+                        enum: [time_series, table]
+                      maxDataPoints:
+                        type: integer
+                        minimum: 1
+                        maximum: 100000
+                      intervalMs:
+                        type: integer
+                        minimum: 1
+                    additionalProperties: true
+              additionalProperties: false
+      responses:
+        "200":
+          description: Query results keyed by each query reference id.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: object
+                    description: One data response per query reference id. Frames, series and error detail are data-source-plugin specific.
+components:
+  securitySchemes:
+    serviceAccountToken:
+      type: http
+      scheme: bearer
+      bearerFormat: Grafana service account token
+  schemas:
+    DashboardResource:
+      type: object
+      required: [metadata, spec]
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+          description: Resource metadata. `name` is the dashboard UID and annotations include folder placement.
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            resourceVersion:
+              type: string
+        spec:
+          type: object
+          description: The dashboard definition, including title, tags, panels, variables and time settings.
+    DataSource:
+      type: object
+      required: [id, uid, name, type]
+      properties:
+        id:
+          type: integer
+        uid:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        url:
+          type: string
+        access:
+          type: string
+        isDefault:
+          type: boolean
+        readOnly:
+          type: boolean

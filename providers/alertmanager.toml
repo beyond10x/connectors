@@ -1,0 +1,44 @@
+# Target Provider contract for Alertmanager semantics. A mediated Connection may route every call
+# through Grafana; this declaration does not imply direct backend reachability or credentials.
+id = "alertmanager"
+vendor = "Prometheus Alertmanager"
+authority = "io.prometheus.alertmanager.api"
+base_url = "{origin}/api/v2"
+description = "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection"
+verify = "alertmanager-alerts-list"
+
+[spec]
+path = "specs/alertmanager/http-api-v0.31.0.openapi.yaml"
+source_url = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
+upstream_version = "0.31.0"
+fetched_at = "2026-08-15T00:00:00Z"
+sha256 = "081c702b33459ec2af24df9095b82b3a4cca515a8292e05699aae8fea180d7b4"
+
+[[services]]
+name = "default"
+tags = ["observability", "incident-response"]
+audiences = ["sre", "developer", "support-agent"]
+
+[[patch.operations]]
+select = "getAlerts"
+rename = "alertmanager-alerts-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[config]]
+name = "origin"
+service = "default"
+label = "Alertmanager origin"
+help = "Required only for a direct Connection. A Grafana-mediated Connection resolves no direct origin"
+format = "origin"
+required = true
+approval = "operator"
+docs_url = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
+binds = "endpoint.origin"

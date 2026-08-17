@@ -1,0 +1,46 @@
+# Provenance for vendored research artifacts.
+#
+# These files are third-party primary sources vendored for reference and analysis only
+# (see ../catalog-precedents.md). They are not inputs to any build and are not part of
+# any release artifact. Attribution and license follow each upstream repository.
+
+[[artifact]]
+file = "nango-providers.yaml"
+source = "https://github.com/NangoHQ/nango"
+path = "packages/providers/providers.yaml"
+commit = "5220e066a0b9f0fb627d6a0e114928a799a82876"
+retrieved = "2026-08-13"
+sha256 = "6cce65985c7de0708fefc3b1eee032daf12b2da8b1f55ef3707744511869dfe3"
+license = "Elastic License 2.0 (upstream repo license at retrieval)"
+note = "957 provider entries; auth templates + proxy/pagination/retry/verification metadata as data. The closest catalog-as-text precedent."
+
+[[artifact]]
+file = "airbyte-source-pokeapi-manifest.yaml"
+source = "https://github.com/airbytehq/airbyte"
+path = "airbyte-integrations/connectors/source-pokeapi/manifest.yaml"
+commit = "4021961edaeb419e32270515553a0e6583213e3c"
+retrieved = "2026-08-13"
+sha256 = "92c6c2be8cec4866bbe5800e07435e7ad4a72b5ffa56916a4a2ff3eeade8bba8"
+license = "see upstream repository (connectors licensed separately from the ELv2 platform)"
+note = "Declarative connector manifest interpreted by a generic runtime — the strongest operations-as-text precedent (read-side only)."
+
+[[artifact]]
+file = "pipedream-github-create-issue.mjs"
+source = "https://github.com/PipedreamHQ/pipedream"
+path = "components/github/actions/create-issue/create-issue.mjs"
+branch = "master"
+last_commit = "5409a3d412c9493fb22b18e0208fb571f693d562"
+retrieved = "2026-08-13"
+sha256 = "103a7e76d1310301f974433dbdfb987bebcf4d7f5fd60d708c5a0e6f15be0e28"
+license = "see upstream repository"
+note = "The code-not-data counter-example: a registry component is a JS module with props + run(), so self-hosting the catalog means self-hosting its execution platform."
+
+[[artifact]]
+file = "apideck-connector-api.yml"
+source = "https://github.com/apideck-libraries/openapi-specs"
+path = "connector.yml"
+branch = "master"
+retrieved = "2026-08-13"
+sha256 = "33c6012a0e896fd40a1300552fa76c34cedfef8468e71521957cfde74b4a33c1"
+license = "see upstream repository"
+note = "Catalog-as-queryable-API: the OpenAPI spec of Apideck's Connector API (connector metadata, coverage matrices) rather than a contributable text catalog."

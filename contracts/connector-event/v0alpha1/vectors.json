@@ -1,0 +1,41 @@
+{
+  "contract": "b10x.connector-event.v0alpha1",
+  "cases": [
+    {
+      "name": "search-valid",
+      "valid": true,
+      "frame": {
+        "protocol":"b10x.connector-event.v0alpha1","request_id":"request-event-1",
+        "context":{"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request":{"method":"search","params":{"query":"slack","limit":10}}
+      }
+    },
+    {
+      "name": "receive-valid",
+      "valid": true,
+      "frame": {
+        "protocol":"b10x.connector-event.v0alpha1","request_id":"request-event-2",
+        "context":{"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request":{"method":"receive","params":{"channel_ref":"channel:slack:00000000-0000-4000-8000-000000000001:socket","after":"0","limit":25,"wait_ms":30000}}
+      }
+    },
+    {
+      "name": "invalid-cursor-refuses",
+      "valid": false,
+      "frame": {
+        "protocol":"b10x.connector-event.v0alpha1","request_id":"request-event-bad-1",
+        "context":{"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request":{"method":"receive","params":{"channel_ref":"channel:slack:one:socket","after":"provider-cursor","limit":25,"wait_ms":30000}}
+      }
+    },
+    {
+      "name": "credential-address-refuses",
+      "valid": false,
+      "frame": {
+        "protocol":"b10x.connector-event.v0alpha1","request_id":"request-event-bad-2",
+        "context":{"tenant_id":"tenant-local","agent_id":"agent-dev","agent_revision":1,"authority_snapshot_id":"authority-1","authority_snapshot_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request":{"method":"receive","params":{"channel_ref":"channel:slack:one:socket","after":"0","limit":25,"wait_ms":0,"credential_ref":"tenants/tenant-local/com.slack.api/app_token"}}
+      }
+    }
+  ]
+}

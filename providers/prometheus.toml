@@ -1,0 +1,43 @@
+# Target Provider contract for Prometheus semantics. A mediated Connection may route every call
+# through Grafana; this declaration does not imply direct backend reachability or credentials.
+id = "prometheus"
+vendor = "Prometheus"
+authority = "io.prometheus.api"
+base_url = "{origin}"
+description = "Query Prometheus metrics with bounded native PromQL range semantics, directly or through a mediated Connection"
+verify = "prometheus-query-range"
+
+[spec]
+path = "specs/prometheus/http-api-2026-08-15.openapi.yaml"
+upstream_version = "Prometheus HTTP API"
+fetched_at = "2026-08-15T00:00:00Z"
+sha256 = "f045ee79177b03bb75f5881a6613f194e9afa8eb723a762cd9c5f767b8b85c44"
+
+[[services]]
+name = "default"
+tags = ["observability", "infrastructure"]
+audiences = ["sre", "developer", "data-analyst"]
+
+[[patch.operations]]
+select = "query_range"
+rename = "prometheus-query-range"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[[config]]
+name = "origin"
+service = "default"
+label = "Prometheus origin"
+help = "Required only for a direct Connection. A Grafana-mediated Connection resolves no direct origin"
+format = "origin"
+required = true
+approval = "operator"
+docs_url = "https://prometheus.io/docs/prometheus/latest/querying/api/"
+binds = "endpoint.origin"

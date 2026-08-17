@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/rtvbp-voice-binding/v1/manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact", "version", "profile", "voice_contract", "voice_contract_bundle_sha256", "upstream", "negotiation", "envelope", "roles", "methods", "events", "errors", "media", "bounds", "lifecycle"],
+  "properties": {
+    "artifact": { "const": "rtvbp-voice-binding" },
+    "version": { "const": "v1" },
+    "profile": { "const": "b10x.voice.v1" },
+    "voice_contract": { "const": "b10x.voice-session.v0alpha1" },
+    "voice_contract_bundle_sha256": { "const": "85993e8cfbf70441a02e8c0ec94794fd30436fa143424c67921cc33f65f2c743" },
+    "upstream": {
+      "type": "object", "additionalProperties": false,
+      "required": ["release", "commit", "crate_sha256"],
+      "properties": {
+        "release": { "const": "sdk/rust/v0.1.0" },
+        "commit": { "const": "dc0a60f7425b4899885f372152028457791b1e72" },
+        "crate_sha256": { "const": "7d1d675e359016a5c8711bc0a29783ad9ce57a2f80f47ab5c77bc0152935ff9b" }
+      }
+    },
+    "negotiation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["websocket_subprotocol", "required", "absent_offer", "other_profile"],
+      "properties": {
+        "websocket_subprotocol": { "const": "b10x.voice.v1" },
+        "required": { "const": true },
+        "absent_offer": { "const": "profile_required" },
+        "other_profile": { "const": "product_profile_refused" }
+      }
+    },
+    "envelope": { "const": "classic.v1" },
+    "roles": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client", "server", "redeemer"],
+      "properties": {
+        "client": { "const": "voice_endpoint" },
+        "server": { "const": "application_endpoint" },
+        "redeemer": { "const": "application_endpoint" }
+      }
+    },
+    "methods": { "$ref": "#/$defs/named_entries" },
+    "events": { "$ref": "#/$defs/named_entries" },
+    "errors": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["code", "name"],
+        "properties": { "code": { "type": "integer" }, "name": { "type": "string" } }
+      }
+    },
+    "media": {
+      "type": "object", "additionalProperties": false,
+      "required": ["channel", "rtvbp_format", "sample_format", "sample_rate_hz", "channels", "packet_time_ms", "frame_bytes"],
+      "properties": {
+        "channel": { "const": "audio" }, "rtvbp_format": { "const": "L16/8000/1" },
+        "sample_format": { "const": "pcm_s16le" }, "sample_rate_hz": { "const": 8000 },
+        "channels": { "const": 1 }, "packet_time_ms": { "const": 20 }, "frame_bytes": { "const": 320 }
+      }
+    },
+    "bounds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["control_frame_bytes", "media_frame_bytes", "input_frames", "output_frames", "pending_requests"],
+      "properties": {
+        "control_frame_bytes": { "type": "integer", "minimum": 1 },
+        "media_frame_bytes": { "const": 320 },
+        "input_frames": { "type": "integer", "minimum": 1 },
+        "output_frames": { "type": "integer", "minimum": 1 },
+        "pending_requests": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["early_media", "initialize", "terminal_precedence", "reconnect"],
+      "properties": {
+        "early_media": { "const": "refused" },
+        "initialize": { "const": "exactly_once_before_media" },
+        "terminal_precedence": { "const": "first_serialized_terminal_wins" },
+        "reconnect": { "const": "fresh_authority_required" }
+      }
+    }
+  },
+  "$defs": {
+    "named_entries": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "direction", "payload"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^voice\\.[a-z.]+$" },
+          "direction": { "enum": ["application_to_voice", "voice_to_application"] },
+          "payload": { "type": "string", "pattern": "^[A-Za-z]+$" }
+        }
+      }
+    }
+  }
+}

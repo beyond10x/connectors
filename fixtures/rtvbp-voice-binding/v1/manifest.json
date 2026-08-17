@@ -1,0 +1,40 @@
+{
+  "artifact": "rtvbp-voice-binding",
+  "version": "v1",
+  "profile": "b10x.voice.v1",
+  "voice_contract": "b10x.voice-session.v0alpha1",
+  "voice_contract_bundle_sha256": "85993e8cfbf70441a02e8c0ec94794fd30436fa143424c67921cc33f65f2c743",
+  "upstream": {
+    "release": "sdk/rust/v0.1.0",
+    "commit": "dc0a60f7425b4899885f372152028457791b1e72",
+    "crate_sha256": "7d1d675e359016a5c8711bc0a29783ad9ce57a2f80f47ab5c77bc0152935ff9b"
+  },
+  "negotiation": {
+    "websocket_subprotocol": "b10x.voice.v1",
+    "required": true,
+    "absent_offer": "profile_required",
+    "other_profile": "product_profile_refused"
+  },
+  "envelope": "classic.v1",
+  "roles": {"client": "voice_endpoint", "server": "application_endpoint", "redeemer": "application_endpoint"},
+  "methods": [
+    {"name": "voice.initialize", "direction": "voice_to_application", "payload": "Initialize"},
+    {"name": "voice.output.interrupt", "direction": "application_to_voice", "payload": "InterruptOutput"},
+    {"name": "voice.session.close", "direction": "application_to_voice", "payload": "Close"}
+  ],
+  "events": [
+    {"name": "voice.signal", "direction": "voice_to_application", "payload": "Signal"},
+    {"name": "voice.media.loss", "direction": "voice_to_application", "payload": "MediaLoss"},
+    {"name": "voice.terminated", "direction": "voice_to_application", "payload": "Terminated"}
+  ],
+  "errors": [
+    {"code": -32001, "name": "invalid_state"},
+    {"code": -32002, "name": "invalid_payload"},
+    {"code": -32003, "name": "media_mismatch"},
+    {"code": -32004, "name": "frame_too_large"},
+    {"code": -32005, "name": "media_overload"}
+  ],
+  "media": {"channel": "audio", "rtvbp_format": "L16/8000/1", "sample_format": "pcm_s16le", "sample_rate_hz": 8000, "channels": 1, "packet_time_ms": 20, "frame_bytes": 320},
+  "bounds": {"control_frame_bytes": 16384, "media_frame_bytes": 320, "input_frames": 50, "output_frames": 50, "pending_requests": 16},
+  "lifecycle": {"early_media": "refused", "initialize": "exactly_once_before_media", "terminal_precedence": "first_serialized_terminal_wins", "reconnect": "fresh_authority_required"}
+}

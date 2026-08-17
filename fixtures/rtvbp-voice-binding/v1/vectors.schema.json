@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/rtvbp-voice-binding/v1/vectors.schema.json",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object", "additionalProperties": false,
+    "required": ["case", "offer", "action", "outcome", "code"],
+    "properties": {
+      "case": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+      "offer": { "type": ["string", "null"] },
+      "action": { "type": "string" },
+      "outcome": { "enum": ["accepted", "degraded", "refused"] },
+      "code": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+    }
+  }
+}
+

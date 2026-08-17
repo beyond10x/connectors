@@ -1,0 +1,264 @@
+# Closed inventory for every tracked JSON document in this repository.
+#
+# `schema` entries are JSON Schemas and are validated against the meta-schema named by their own
+# `$schema`. `document` entries are repository-owned JSON and validate against the named local
+# schema. `syntax` entries are imported source inputs: we promise well-formed JSON, not that an
+# upstream vendor conforms to a B10x-owned data model. Syntax-only entries are intentionally
+# exact paths so a newly added JSON file cannot inherit an exemption from its directory.
+
+version = 1
+
+[[schema]]
+path = "catalog/connector-document.schema.json"
+
+[[schema]]
+path = "crates/connector-spec/schema/provider-toml.schema.json"
+
+[[schema]]
+path = "fixtures/substrate-wire-0.1.0-axis-projection.schema.json"
+
+[[schema]]
+path = "web/catalog.schema.json"
+
+[[schema]]
+path = "web/package.schema.json"
+
+[[schema]]
+path = "web/package-lock.schema.json"
+
+[[schema]]
+path = "contracts/voice-session/v0alpha1/voice-session.schema.json"
+
+[[schema]]
+path = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
+path = "contracts/voice-session/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha1/connector-operation.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha1/connector-connection.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-event/v0alpha1/connector-event.schema.json"
+
+[[schema]]
+path = "contracts/connector-event/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "contracts/connector-catalog/v0alpha1/connector-catalog.schema.json"
+
+[[schema]]
+path = "contracts/connector-catalog/v0alpha1/vectors.schema.json"
+
+[[schema]]
+path = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
+
+[[schema]]
+path = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
+
+[[document]]
+pattern = "catalog/*.catalog.json"
+schema = "catalog/connector-document.schema.json"
+
+[[document]]
+path = "fixtures/substrate-wire-0.1.0-axis-projection.json"
+schema = "fixtures/substrate-wire-0.1.0-axis-projection.schema.json"
+
+[[document]]
+path = "web/package.json"
+schema = "web/package.schema.json"
+
+[[document]]
+path = "web/package-lock.json"
+schema = "web/package-lock.schema.json"
+
+[[document]]
+path = "contracts/voice-session/v0alpha1/vectors.json"
+schema = "contracts/voice-session/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/voice-session/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha1/vectors.json"
+schema = "contracts/connector-operation/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha1/vectors.json"
+schema = "contracts/connector-connection/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-event/v0alpha1/vectors.json"
+schema = "contracts/connector-event/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-event/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "contracts/connector-catalog/v0alpha1/vectors.json"
+schema = "contracts/connector-catalog/v0alpha1/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-catalog/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/manifest.json"
+schema = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/vectors.json"
+schema = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
+
+[[document]]
+path = "fixtures/rtvbp-voice-binding/v1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+# Generated and intentionally git-ignored. `catalog build` validates the same bytes before writing;
+# the governance audit validates the file too whenever it exists in the working tree.
+[[generated]]
+path = "web/public/catalog.json"
+schema = "web/catalog.schema.json"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/applications.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/asterisk.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/bridges.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/channels.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/deviceStates.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/endpoints.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/events.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/mailboxes.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/playbacks.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/recordings.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/api-docs/sounds.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/ari-22.10.1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/asterisk/resources.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/ontology-v0alpha1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/work-v0alpha1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/ontology-v0alpha2.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/work-v1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/planner-v1.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/b10x/planner-v1.module.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/github/api.github.com.2022-11-28-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/microsoft_graph/calendar-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/microsoft_graph/mail-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/openai/selected-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/openai/upstream-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/slack/web-api-1.7.0-2026-08-15.swagger.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/slack/admin-api-selected-1.7.0-2026-08-15.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/stripe/openapi-2026-08-02.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/twilio/selected-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/twilio/upstream-2026-08-02.openapi.json"
+origin = "vendored-source"
+
+[[syntax]]
+path = "specs/zendesk/2024-06-01-excerpt.json"
+origin = "vendored-source"

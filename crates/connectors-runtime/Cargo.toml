@@ -1,0 +1,54 @@
+[package]
+name = "connectors-runtime"
+description = "Reusable Connectors daemon composition and explicit Integration dispatch."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+
+[workspace]
+resolver = "3"
+members = [
+    ".",
+    "../connect-session-transport",
+    "../connectors-config",
+    "../hosted-vault",
+    "../identity-http",
+    "../integration-kubernetes",
+    "../integration-b10x",
+    "../integration-monitoring",
+    "../integration-sip",
+    "../integration-slack",
+    "../monitoring-model",
+]
+
+[dependencies]
+async-trait = "0.1"
+axum = { version = "0.8", features = ["json", "tokio"] }
+connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
+connectors-config = { version = "0.1.0", path = "../connectors-config" }
+futures-util = "0.3"
+hosted-vault = { version = "0.1.0", path = "../hosted-vault" }
+identity-http = { version = "0.1.0", path = "../identity-http" }
+integration-kubernetes = { version = "0.1.0", path = "../integration-kubernetes" }
+integration-b10x = { version = "0.1.0", path = "../integration-b10x" }
+integration-monitoring = { version = "0.1.0", path = "../integration-monitoring" }
+integration-sip = { version = "0.1.0", path = "../integration-sip" }
+integration-slack = { version = "0.1.0", path = "../integration-slack" }
+hex = "0.4"
+protocol = { version = "0.1.0", path = "../protocol" }
+rustix = { version = "1.1.4", features = ["process"] }
+serde_json = "1"
+server = { version = "0.1.0", path = "../server" }
+service = { version = "0.1.0", path = "../service" }
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["net", "time"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["macros", "rt"] }

@@ -1,0 +1,47 @@
+openapi: 3.1.0
+info:
+  title: Prometheus HTTP API curated query surface (B10x-authored)
+  version: "2026-08-15"
+  description: Repository-authored source specification for the exact read-only Prometheus operation B10x ships.
+x-b10x-origin: repository-authored
+x-b10x-coverage: exact shipped Prometheus range-query surface
+servers:
+  - url: https://prometheus.example
+paths:
+  /api/v1/query_range:
+    get:
+      operationId: query_range
+      summary: Evaluate a PromQL expression over a bounded caller-selected time range
+      x-b10x-source-reference: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 16384}
+        - name: start
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+        - name: end
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+        - name: step
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+      responses:
+        "200":
+          description: Prometheus API response containing matrix, vector, scalar, or string data.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, enum: [success, error]}
+                  data: {type: object}
+                  errorType: {type: string}
+                  error: {type: string}
+                  warnings: {type: array, items: {type: string}}
+                additionalProperties: false

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/web/package.schema.json",
+  "title": "connectors documentation site package manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "private",
+    "type",
+    "description",
+    "license",
+    "scripts",
+    "devDependencies"
+  ],
+  "properties": {
+    "name": {
+      "const": "b10x-connectors-site"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "private": {
+      "const": true
+    },
+    "type": {
+      "const": "module"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "license": {
+      "const": "MIT OR Apache-2.0"
+    },
+    "scripts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dev",
+        "build",
+        "preview",
+        "test"
+      ],
+      "properties": {
+        "dev": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preview": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "devDependencies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/dependency_version"
+      }
+    }
+  },
+  "$defs": {
+    "dependency_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:[~^<>=*]|[0-9]|[a-z]+:|https?://|git\\+|github:|file:|workspace:).*$"
+    }
+  }
+}

@@ -1,0 +1,628 @@
+#[cfg(test)]
+mod tests {
+    use connector_secrets::{MemoryStore, SecretStore as _};
+    use protocol::connection::ConnectSessionState;
+    use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
+    use tokio::net::UnixStream;
+
+    use super::*;
+
+    const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SECRET";
+
+    struct UnavailableStore;
+
+    #[async_trait]
+    impl connector_secrets::SecretStore for UnavailableStore {
+        async fn ready(&self) -> Result<(), connector_secrets::StoreError> {
+            Err(connector_secrets::StoreError::Unreachable {
+                path: "test:secret-store".to_owned(),
+                reason: SENTINEL.to_owned(),
+            })
+        }
+
+        async fn get(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+        ) -> Result<connector_secrets::Secret, connector_secrets::StoreError> {
+            unreachable!("readiness must not retrieve a credential")
+        }
+
+        async fn put(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+            _secret: &connector_secrets::Secret,
+        ) -> Result<(), connector_secrets::StoreError> {
+            unreachable!("readiness must not write a credential")
+        }
+
+        async fn delete(
+            &self,
+            _reference: &connector_secrets::CredentialRef,
+        ) -> Result<(), connector_secrets::StoreError> {
+            unreachable!("readiness must not delete a credential")
+        }
+    }
+
+    impl connector_secrets::PreparedSecretStore for UnavailableStore {}
+
+    #[test]
+    fn only_the_inner_admitted_event_is_projected() {
+        let payload = serde_json::json!({
+            "token": SENTINEL,
+            "event_id": "Ev01",
+            "event": {
+                "type": "message",
+                "channel_type": "channel",
+                "channel": "C01",
+                "user": "U01",
+                "text": "hello",
+                "ts": "1.0"
+            }
+        });
+        let (_, kind, projected) =
+            project_data_event(Some(&payload), &["message.channels".to_owned()]).unwrap();
+        assert_eq!(kind, "message.channels");
+        let encoded = serde_json::to_string(&projected).unwrap();
+        assert!(!encoded.contains(SENTINEL));
+        assert!(projected.get("event").is_none());
+        assert_eq!(projected["text"], "hello");
+    }
+
+    #[test]
+    fn message_loop_guards_and_closed_event_grants_are_applied_before_storage() {
+        let bot = serde_json::json!({
+            "event_id": "Ev02",
+            "event": {"type": "message", "channel_type": "channel", "bot_id": "B01", "text": "own"}
+        });
+        assert!(project_data_event(Some(&bot), &["message.channels".to_owned()]).is_none());
+        let unknown = serde_json::json!({
+            "event_id": "Ev03",
+            "event": {"type": "reaction_added"}
+        });
+        assert!(project_data_event(Some(&unknown), &["message.channels".to_owned()]).is_none());
+    }
+
+    #[test]
+    fn socket_ticket_destination_is_closed_to_slack_tls_hosts() {
+        assert!(validate_socket_url("wss://wss-primary.slack.com/link/?ticket=sentinel").is_ok());
+        assert!(
+            validate_socket_url("wss://slack.com.example.invalid/link/?ticket=sentinel").is_err()
+        );
+        assert!(validate_socket_url("ws://wss-primary.slack.com/link/?ticket=sentinel").is_err());
+    }
+
+    #[test]
+    fn hosted_completion_requires_the_three_distinct_slack_credentials() {
+        let submission = format!("xapp-{SENTINEL}\nxoxb-{SENTINEL}\nxoxp-{SENTINEL}");
+        let parsed = parse_hosted_submission(submission.as_bytes()).unwrap();
+        assert_eq!(parsed.app_token.expose_secret(), format!("xapp-{SENTINEL}"));
+        assert_eq!(
+            parsed.bot_token.unwrap().expose_secret(),
+            format!("xoxb-{SENTINEL}")
+        );
+        assert_eq!(
+            parsed.user_token.unwrap().expose_secret(),
+            format!("xoxp-{SENTINEL}")
+        );
+        assert!(parse_hosted_submission(format!("xapp-{SENTINEL}").as_bytes()).is_err());
+        assert!(parse_hosted_submission(
+            format!("xapp-{SENTINEL}\nxoxp-{SENTINEL}\nxoxb-{SENTINEL}").as_bytes()
+        )
+        .is_err());
+        let trimmed = parse_hosted_submission(
+            format!("  xapp-{SENTINEL} \r\n xoxb-{SENTINEL}\t\n xoxp-{SENTINEL}  ").as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(
+            trimmed.app_token.expose_secret(),
+            format!("xapp-{SENTINEL}")
+        );
+        assert!(parse_hosted_submission(b"xapp-\nxoxb-value\nxoxp-value").is_err());
+    }
+
+    #[test]
+    fn hosted_setup_page_requires_capability_and_distinguishes_safe_failures() {
+        let page = hosted_setup::HOSTED_SETUP_PAGE;
+        assert!(page.contains("validCapability"));
+        assert!(page.contains("field.value.trim()"));
+        assert!(page.contains("validToken(values[0],'xapp-')"));
+        assert!(page.contains("validToken(values[1],'xoxb-')"));
+        assert!(page.contains("validToken(values[2],'xoxp-')"));
+        assert!(page.contains("response.status===400"));
+        assert!(page.contains("response.status===403"));
+        assert!(page.contains("response.status===503"));
+        assert!(page.contains("Slack or the Secret Store is unavailable"));
+        assert!(!page.contains(SENTINEL));
+    }
+
+    #[test]
+    fn hosted_completion_errors_separate_conflicts_from_store_outages() {
+        for code in [
+            "credential-shape",
+            "credential-verify-refused",
+            "credential-workspace",
+            "connection-conflict",
+            "app-token-conflict",
+        ] {
+            assert_eq!(
+                hosted_completion_error(SlackError::new(code)),
+                HostedCompletionError::Refused
+            );
+        }
+        for code in [
+            "credential-resolve",
+            "credential-verify-unavailable",
+            "credential-prepare",
+            "credential-commit",
+        ] {
+            assert_eq!(
+                hosted_completion_error(SlackError::new(code)),
+                HostedCompletionError::Unavailable
+            );
+        }
+    }
+
+    #[test]
+    fn slack_auth_test_refuses_only_explicit_invalid_credentials() {
+        let explicit = br#"{"ok":false,"error":"invalid_auth"}"#;
+        let error = classify_auth_test_response(reqwest::StatusCode::OK, None, explicit)
+            .unwrap_err();
+        assert_eq!(error.code, "credential-verify-refused");
+        assert_eq!(
+            hosted_completion_error(error),
+            HostedCompletionError::Refused
+        );
+
+        let valid = classify_auth_test_response(
+            reqwest::StatusCode::OK,
+            None,
+            br#"{"ok":true,"team_id":"T012345"}"#,
+        )
+        .unwrap();
+        assert_eq!(valid, "T012345");
+    }
+
+    #[test]
+    fn slack_auth_test_provider_and_transport_failures_are_unavailable() {
+        for (status, body) in [
+            (reqwest::StatusCode::TOO_MANY_REQUESTS, b"rate limited".as_slice()),
+            (reqwest::StatusCode::INTERNAL_SERVER_ERROR, b"failure".as_slice()),
+            (reqwest::StatusCode::OK, b"not-json".as_slice()),
+            (
+                reqwest::StatusCode::OK,
+                br#"{"ok":false,"error":"provider_changed"}"#.as_slice(),
+            ),
+            (reqwest::StatusCode::OK, br#"{"ok":true}"#.as_slice()),
+        ] {
+            let error = classify_auth_test_response(status, None, body).unwrap_err();
+            assert_eq!(error.code, "credential-verify-unavailable");
+            assert_eq!(
+                hosted_completion_error(error),
+                HostedCompletionError::Unavailable
+            );
+        }
+
+        let oversized = vec![b'x'; MAX_AUTH_TEST_RESPONSE_BYTES + 1];
+        assert_eq!(
+            classify_auth_test_response(reqwest::StatusCode::OK, None, &oversized)
+                .unwrap_err()
+                .code,
+            "credential-verify-unavailable"
+        );
+        assert_eq!(
+            classify_auth_test_response(
+                reqwest::StatusCode::OK,
+                Some(MAX_AUTH_TEST_RESPONSE_BYTES as u64 + 1),
+                br#"{"ok":true,"team_id":"T012345"}"#,
+            )
+            .unwrap_err()
+            .code,
+            "credential-verify-unavailable"
+        );
+        assert_eq!(
+            hosted_completion_error(SlackError::new("credential-verify-unavailable")),
+            HostedCompletionError::Unavailable
+        );
+    }
+
+    #[test]
+    fn operation_audit_is_durable_bounded_and_value_free() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let journal = AuditJournal::new(root.path().join("slack-operation-audit.jsonl"));
+        let event = AuditEvent {
+            audit_ref: "audit:slack:test",
+            operation_ref: "slack-chat-post-message",
+            connection_ref: "connection:slack:test",
+            tenant_id: "tenant-test",
+            actor_subject: "subject-test",
+            outcome: "attempted",
+        };
+        journal.begin(event).unwrap();
+        journal
+            .finish(AuditEvent {
+                outcome: "completed",
+                ..event
+            })
+            .unwrap();
+        let stored = fs::read_to_string(root.path().join("slack-operation-audit.jsonl")).unwrap();
+        assert_eq!(stored.lines().count(), 2);
+        assert!(stored.contains("attempted"));
+        assert!(stored.contains("completed"));
+        assert!(!stored.contains(SENTINEL));
+    }
+
+    fn owner() -> PrincipalContext {
+        PrincipalContext::local(&protocol::operation::OwnerContext {
+            tenant_id: "tenant-local".to_owned(),
+            agent_id: "agent-dev".to_owned(),
+            agent_revision: 1,
+            authority_snapshot_id: "authority-1".to_owned(),
+            authority_snapshot_sha256: "a".repeat(64),
+        })
+        .unwrap()
+    }
+
+    fn policy() -> SlackIntegrationConfig {
+        SlackIntegrationConfig {
+            grant_ref: "grant:slack-inbound".to_owned(),
+            initiation: InitiationConfig::Provider,
+            allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
+            connect_session_ttl_seconds: 30,
+        }
+    }
+
+    #[tokio::test]
+    async fn standalone_adapter_claims_only_its_connection_and_event_families() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            backend.capabilities(),
+            BackendCapabilities {
+                operations: true,
+                connections: true,
+                events: true,
+            }
+        );
+        let operation = OperationRequest::Search(protocol::operation::SearchRequest {
+            query: String::new(),
+            limit: 10,
+        });
+        assert!(!backend.owns_operation(&operation));
+        assert!(matches!(
+            backend.handle(&owner(), operation).await.unwrap(),
+            OperationResult::Search { operations } if operations.is_empty()
+        ));
+
+        let candidate_search = ConnectionRequest::CandidateSearch(
+            protocol::connection::CandidateSearchRequest {
+                integration_ref: INTEGRATION_REF.to_owned(),
+                query: String::new(),
+                limit: 10,
+            },
+        );
+        assert!(!backend.owns_connection(&candidate_search));
+        assert_eq!(
+            backend
+                .handle_connection(&owner(), candidate_search)
+                .await
+                .unwrap_err()
+                .code,
+            ConnectionErrorCode::NotFound
+        );
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn one_use_completion_publishes_only_value_free_connection_state() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let credential_store = Arc::new(MemoryStore::new());
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            credential_store.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+        let created = backend
+            .handle_connection(
+                &owner(),
+                ConnectionRequest::ConnectSessionCreate(
+                    protocol::connection::ConnectSessionCreateRequest {
+                        integration_ref: INTEGRATION_REF.to_owned(),
+                        label: "Development Slack".to_owned(),
+                    },
+                ),
+            )
+            .await
+            .unwrap();
+        let ConnectionResult::ConnectSessionCreate(created) = created else {
+            panic!("wrong result");
+        };
+        assert!(
+            created
+                .browser_completion_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("http://127.0.0.1:"))
+        );
+        let endpoint = PathBuf::from(created.completion_endpoint.clone().unwrap());
+        let submitted = format!("xapp-{SENTINEL}");
+        let mut stream = UnixStream::connect(&endpoint).await.unwrap();
+        stream.write_all(submitted.as_bytes()).await.unwrap();
+        stream.write_all(b"\n").await.unwrap();
+        let mut response = String::new();
+        BufReader::new(&mut stream)
+            .read_line(&mut response)
+            .await
+            .unwrap();
+        assert_eq!(response, "{\"accepted\":true}\n");
+        assert!(!endpoint.exists());
+        assert!(UnixStream::connect(&endpoint).await.is_err());
+
+        let status = backend
+            .handle_connection(
+                &owner(),
+                ConnectionRequest::ConnectSessionStatus(
+                    protocol::connection::ConnectSessionStatusRequest {
+                        connect_session_ref: created.connect_session_ref,
+                    },
+                ),
+            )
+            .await
+            .unwrap();
+        let ConnectionResult::ConnectSessionStatus(status) = status else {
+            panic!("wrong result");
+        };
+        assert_eq!(status.state, ConnectSessionState::Completed);
+        assert!(status.completion_endpoint.is_none());
+        assert!(status.browser_completion_url.is_none());
+        let connection_ref = status.connection_ref.unwrap();
+        let description = backend
+            .handle_connection(
+                &owner(),
+                ConnectionRequest::Describe(protocol::connection::DescribeRequest {
+                    connection_ref,
+                }),
+            )
+            .await
+            .unwrap();
+        let ConnectionResult::Describe(description) = description else {
+            panic!("wrong result");
+        };
+        assert_eq!(description.summary.state, ConnectionState::Authorized);
+        assert_eq!(description.channels[0].state, ChannelState::Starting);
+
+        let metadata = fs::read_to_string(root.path().join("connections.json")).unwrap();
+        assert!(!metadata.contains(SENTINEL));
+        assert!(!metadata.contains("completion_endpoint"));
+        let credential = credential_store
+            .get(&backend.inner.app_credential_ref().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(credential.expose_secret(), submitted);
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn hosted_sessions_expire_and_release_pending_capacity_without_submission() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let created = backend
+            .inner
+            .create_session(&owner(), "Development Slack".to_owned())
+            .await
+            .unwrap();
+        lock(&backend.inner.hosted_sessions)
+            .get_mut(&created.connect_session_ref)
+            .unwrap()
+            .expires_at_unix_ms = 1;
+
+        let status = backend
+            .inner
+            .session_status(&created.connect_session_ref)
+            .unwrap();
+        assert_eq!(status.state, ConnectSessionState::Expired);
+        assert!(status.browser_completion_url.is_none());
+        assert!(!lock(&backend.inner.hosted_sessions).contains_key(&created.connect_session_ref));
+        assert!(!lock(&backend.inner.session_owners).contains_key(&created.connect_session_ref));
+        assert!(matches!(
+            backend.hosted_completion_page(&created.connect_session_ref),
+            Err(HostedCompletionError::NotFound)
+        ));
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn invalid_hosted_capability_cannot_consume_a_connect_session() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let created = backend
+            .inner
+            .create_session(&owner(), "Development Slack".to_owned())
+            .await
+            .unwrap();
+        assert_eq!(
+            backend
+                .complete_hosted_session(
+                    &created.connect_session_ref,
+                    &"0".repeat(64),
+                    HostedCompletionSubmission::new(
+                        format!("xapp-{SENTINEL}\nxoxb-{SENTINEL}\nxoxp-{SENTINEL}").into_bytes(),
+                    ),
+                )
+                .await,
+            Err(HostedCompletionError::Refused)
+        );
+        assert!(backend.owns_hosted_completion(&created.connect_session_ref));
+        assert!(matches!(
+            backend.hosted_completion_page(&created.connect_session_ref),
+            Ok(HostedCompletionPage {
+                title: "Connect Slack",
+                ..
+            })
+        ));
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn slack_readiness_is_value_free_and_tracks_the_secret_store() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_inner(
+            PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            CompletionMode::Hosted {
+                public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
+            },
+            policy(),
+            root.path(),
+            Arc::new(UnavailableStore),
+            false,
+        )
+        .await
+        .unwrap();
+        let error = backend.ready().await.unwrap_err();
+        assert!(!error.to_string().contains(SENTINEL));
+        backend.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn event_is_durable_and_deduplicated_before_pull_and_replay() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let store = EventStore::open(root.path().join("events.jsonl")).unwrap();
+        let connection = StoredConnection {
+            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
+            instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
+            label: "Development Slack".to_owned(),
+            grant_ref: "grant:slack-inbound".to_owned(),
+            initiation: InitiationConfig::Provider,
+            allowed_events: vec!["message.channels".to_owned()],
+            owner_subject: owner().subject().to_owned(),
+            team_id: String::new(),
+        };
+        let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
+        store
+            .append(&connection, "Ev01", "message.channels", payload.clone())
+            .unwrap();
+        store
+            .append(&connection, "Ev01", "message.channels", payload)
+            .unwrap();
+        let (events, cursor) = store
+            .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)
+            .await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(cursor, 1);
+        assert_eq!(events[0].provenance, EventProvenance::Native);
+        assert_eq!(store.replay(&events[0].event_ref), Some(events[0].clone()));
+
+        let reopened = EventStore::open(root.path().join("events.jsonl")).unwrap();
+        let (events, cursor) = reopened
+            .receive(&channel_ref(&connection), 0, 10, Duration::ZERO)
+            .await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(cursor, 1);
+    }
+
+    #[tokio::test]
+    async fn stale_grant_metadata_cannot_reenter_any_connection_or_event_surface() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let connection = StoredConnection {
+            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000002".to_owned(),
+            instance_id: "00000000-0000-4000-8000-000000000002".to_owned(),
+            label: "Stale Slack".to_owned(),
+            grant_ref: "grant:replaced".to_owned(),
+            initiation: InitiationConfig::Provider,
+            allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
+            owner_subject: owner().subject().to_owned(),
+            team_id: String::new(),
+        };
+        lock(&backend.inner.metadata)
+            .connections
+            .push(connection.clone());
+        backend
+            .inner
+            .event_store
+            .append(
+                &connection,
+                "Ev-stale",
+                "message.channels",
+                serde_json::json!({"type":"message","text":"stale"}),
+            )
+            .unwrap();
+        let event_ref = backend
+            .inner
+            .event_store
+            .replay("event:slack:00000000-0000-4000-8000-000000000002:1")
+            .map(|event| event.event_ref)
+            .unwrap_or_else(|| {
+                lock(&backend.inner.event_store.events)[0]
+                    .event
+                    .event_ref
+                    .clone()
+            });
+
+        assert_eq!(backend.connection_count(), 0);
+        assert!(!backend.owns_connection(&ConnectionRequest::Describe(
+            protocol::connection::DescribeRequest {
+                connection_ref: connection.connection_ref.clone(),
+            },
+        )));
+        assert!(!backend.owns_event(&EventRequest::Receive(protocol::event::ReceiveRequest {
+            channel_ref: channel_ref(&connection),
+            after: None,
+            limit: 1,
+            wait_ms: 0,
+        })));
+        assert!(!backend.owns_event(&EventRequest::Replay(protocol::event::ReplayRequest {
+            event_ref,
+        })));
+        backend.shutdown().await;
+    }
+}

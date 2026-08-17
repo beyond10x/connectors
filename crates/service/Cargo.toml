@@ -1,0 +1,23 @@
+[package]
+name = "service"
+description = "Pure Connectors use cases, including zero-I/O closed-driver planning."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+base64.workspace = true
+connector-resolve.workspace = true
+domain.workspace = true
+ed25519-dalek.workspace = true
+protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true
