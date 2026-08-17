@@ -116,4 +116,17 @@ mod tests {
         assert!(!json.contains("callable"));
         assert!(!json.contains("connection_ref"));
     }
+
+    #[test]
+    fn b10x_provider_satisfies_the_catalog_wire_contract() {
+        let result = handle(CatalogRequest::Describe(
+            protocol::catalog::DescribeRequest {
+                provider_ref: "b10x".to_owned(),
+            },
+        ))
+        .unwrap();
+        protocol::catalog::ResponseEnvelope::success("catalog-b10x-test", result)
+            .validate()
+            .unwrap();
+    }
 }

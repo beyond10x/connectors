@@ -672,6 +672,7 @@ dependencies = [
  "hosted-vault",
  "identity-http",
  "integration-b10x",
+ "integration-gitlab",
  "integration-kubernetes",
  "integration-monitoring",
  "integration-sip",
@@ -1925,6 +1926,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-gitlab"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "catalog",
+ "connector-resolve",
+ "connector-secrets",
+ "connectors-config",
+ "getrandom 0.3.4",
+ "hex",
+ "hosted-state",
+ "jsonschema 0.33.0",
+ "protocol",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "service",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "integration-kubernetes"
 version = "0.1.0"
 dependencies = [
@@ -1963,6 +1990,7 @@ dependencies = [
  "domain",
  "getrandom 0.3.4",
  "hex",
+ "hosted-state",
  "monitoring-model",
  "protocol",
  "reqwest",

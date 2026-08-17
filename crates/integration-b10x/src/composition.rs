@@ -59,6 +59,9 @@ impl B10xBackend {
         state_root: &Path,
         hosted_state: Option<PostgresState>,
     ) -> Result<Self, B10xIntegrationError> {
+        for socket in config.module_sockets.values() {
+            transport::validate_module_socket(socket)?;
+        }
         let legacy_event_tenant = match &admission {
             PrincipalAdmission::Exact(principal) => Some(principal.tenant_id().to_owned()),
             PrincipalAdmission::Tenants(tenants) if tenants.len() == 1 => {

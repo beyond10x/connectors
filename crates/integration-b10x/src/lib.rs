@@ -62,6 +62,7 @@ mod composition;
 mod datasource;
 mod policy;
 mod surface;
+mod transport;
 mod work_events;
 
 use audit::{AuditEvent, AuditJournal};
@@ -69,6 +70,7 @@ use policy::{
     all_operation_rows, approval, check_approval, effect, module_operation, operation_row,
     post_dispatch_error, response_schema,
 };
+use transport::{module_client, module_id, module_origin};
 use work_events::ModuleEventStore;
 
 const PROVIDER: &str = "b10x";
@@ -285,22 +287,22 @@ impl B10xBackend {
             | BROWSER_SCREENSHOT_OPERATION
             | BROWSER_CLOSE_OPERATION => self.browser.is_some(),
             "knowledge-query" | "knowledge-explain" | "knowledge-snapshot" => {
-                self.module_admitted("ontology") && self.config.ontology_origin.is_some()
+                self.module_admitted("ontology") && self.config.module_configured("ontology")
             }
             value if value.starts_with("ontology-") => {
-                self.module_admitted("ontology") && self.config.ontology_origin.is_some()
+                self.module_admitted("ontology") && self.config.module_configured("ontology")
             }
             value if value.starts_with("work-") => {
-                self.module_admitted("work") && self.config.work_origin.is_some()
+                self.module_admitted("work") && self.config.module_configured("work")
             }
             value if value.starts_with("planner-") => {
-                self.module_admitted("planner") && self.config.planner_origin.is_some()
+                self.module_admitted("planner") && self.config.module_configured("planner")
             }
             value if value.starts_with("workspaces-") || value.starts_with("workspace-") => {
-                self.module_admitted("workspaces") && self.config.workspaces_origin.is_some()
+                self.module_admitted("workspaces") && self.config.module_configured("workspaces")
             }
             value if value.starts_with("colab-") => {
-                self.module_admitted("colab") && self.config.colab_origin.is_some()
+                self.module_admitted("colab") && self.config.module_configured("colab")
             }
             _ => false,
         }
@@ -555,17 +557,27 @@ impl B10xBackend {
             ),
             ProtocolDriver::HttpV1 => {
                 let origin = self.origin(canonical).ok_or_else(unavailable)?;
-                let mut capabilities = BTreeSet::from([Capability::PrivateNetwork]);
+                let module = module_id(canonical).ok_or_else(not_granted)?;
+                let local_socket = self.config.module_socket(module);
+                let mut capabilities = if local_socket.is_some() {
+                    // The reviewed catalog classifies module HTTP as private-network I/O. The
+                    // local adapter additionally proves that dispatch is constrained to one Unix
+                    // socket; it retains the catalog capability so the common zero-I/O planner
+                    // can validate the same operation contract in both placements.
+                    BTreeSet::from([Capability::PrivateNetwork, Capability::UnixSocket])
+                } else {
+                    BTreeSet::from([Capability::PrivateNetwork])
+                };
                 // Every private module request is signed with the deployment-owned key loaded
                 // from its projected file. The plan must account for that file-secret authority,
                 // not just Ontology's separate bearer-file case.
-                if module_operation(canonical).is_some() {
+                if local_socket.is_none() && module_operation(canonical).is_some() {
                     capabilities.insert(Capability::FileSecret);
                 }
                 (
                     BTreeSet::from([DriverId::HttpV1]),
                     capabilities,
-                    vec![origin],
+                    vec![local_socket.map_or(origin, |path| path.display().to_string())],
                 )
             }
             ProtocolDriver::SipV1 => return Err(unavailable()),
@@ -773,23 +785,25 @@ impl B10xBackend {
             } else {
                 "urn:b10x:module:ontology"
             };
-        let authorization = self
-            .module_signer
-            .as_ref()
-            .ok_or_else(not_granted)?
-            .authorization(
-                context,
-                audience,
-                operation,
-                &request_method,
-                &target_binding,
-                body.as_bytes(),
-                idempotency_key,
-            )?;
-        let mut outbound = self
-            .client
-            .request(method, target)
-            .header(reqwest::header::AUTHORIZATION, authorization);
+        let module = module_id(canonical).ok_or_else(not_granted)?;
+        let client = self.module_client(module).map_err(|_| unavailable())?;
+        let mut outbound = client.request(method, target);
+        if self.config.module_socket(module).is_none() {
+            let authorization = self
+                .module_signer
+                .as_ref()
+                .ok_or_else(not_granted)?
+                .authorization(
+                    context,
+                    audience,
+                    operation,
+                    &request_method,
+                    &target_binding,
+                    body.as_bytes(),
+                    idempotency_key,
+                )?;
+            outbound = outbound.header(reqwest::header::AUTHORIZATION, authorization);
+        }
         for (name, value) in plan.request.headers {
             outbound = outbound.header(name, value);
         }
@@ -829,23 +843,29 @@ impl B10xBackend {
     }
 
     fn origin(&self, canonical: &str) -> Option<String> {
-        if is_ontology_operation(canonical) {
-            self.config.ontology_origin()
-        } else if canonical.starts_with("work-") {
-            self.config.work_origin()
-        } else if canonical.starts_with("planner-") {
-            self.config.planner_origin()
-        } else if canonical.starts_with("workspaces-") || canonical.starts_with("workspace-") {
-            self.config.workspaces_origin()
-        } else if canonical.starts_with("colab-") {
-            self.config.colab_origin()
-        } else {
-            None
-        }
+        module_origin(&self.config, canonical)
+    }
+
+    fn module_client(&self, module: &str) -> Result<reqwest::Client, B10xIntegrationError> {
+        module_client(
+            &self.config,
+            &self.client,
+            module,
+            HTTP_CONNECT_TIMEOUT,
+            HTTP_TOTAL_TIMEOUT,
+        )
     }
 
     async fn refresh_work_events(&self, context: &PrincipalContext) -> Result<(), EventError> {
-        let origin = self.config.work_origin().ok_or_else(event_not_granted)?;
+        let origin = self
+            .config
+            .work_origin()
+            .or_else(|| {
+                self.config
+                    .module_socket("work")
+                    .map(|_| "http://localhost".to_owned())
+            })
+            .ok_or_else(event_not_granted)?;
         let mut url = reqwest::Url::parse(&format!("{origin}/api/work/v2/events"))
             .map_err(|_| event_protocol())?;
         {
@@ -859,27 +879,28 @@ impl B10xBackend {
             Some(query) => format!("{}?{query}", url.path()),
             None => url.path().to_owned(),
         };
-        let authorization = self
-            .module_signer
-            .as_ref()
-            .ok_or_else(event_not_granted)?
-            .authorization(
-                context,
-                "urn:b10x:module:work",
-                "module.events.read",
-                "GET",
-                &target,
-                &[],
-                None,
-            )
-            .map_err(|_| event_not_granted())?;
-        let response = self
-            .client
-            .get(url)
-            .header(reqwest::header::AUTHORIZATION, authorization)
-            .send()
-            .await
+        let client = self
+            .module_client("work")
             .map_err(|_| event_unavailable())?;
+        let mut request = client.get(url);
+        if self.config.module_socket("work").is_none() {
+            let authorization = self
+                .module_signer
+                .as_ref()
+                .ok_or_else(event_not_granted)?
+                .authorization(
+                    context,
+                    "urn:b10x:module:work",
+                    "module.events.read",
+                    "GET",
+                    &target,
+                    &[],
+                    None,
+                )
+                .map_err(|_| event_not_granted())?;
+            request = request.header(reqwest::header::AUTHORIZATION, authorization);
+        }
+        let response = request.send().await.map_err(|_| event_unavailable())?;
         if response.status() == reqwest::StatusCode::CONFLICT {
             return Err(EventError::new(
                 EventErrorCode::Protocol,
@@ -941,7 +962,15 @@ impl B10xBackend {
     }
 
     async fn refresh_planner_events(&self, context: &PrincipalContext) -> Result<(), EventError> {
-        let origin = self.config.planner_origin().ok_or_else(event_not_granted)?;
+        let origin = self
+            .config
+            .planner_origin()
+            .or_else(|| {
+                self.config
+                    .module_socket("planner")
+                    .map(|_| "http://localhost".to_owned())
+            })
+            .ok_or_else(event_not_granted)?;
         let mut url = reqwest::Url::parse(&format!("{origin}/api/planner/v1/events"))
             .map_err(|_| event_protocol())?;
         {
@@ -955,27 +984,28 @@ impl B10xBackend {
             Some(query) => format!("{}?{query}", url.path()),
             None => url.path().to_owned(),
         };
-        let authorization = self
-            .module_signer
-            .as_ref()
-            .ok_or_else(event_not_granted)?
-            .authorization(
-                context,
-                "urn:b10x:module:planner",
-                "module.events.read",
-                "GET",
-                &target,
-                &[],
-                None,
-            )
-            .map_err(|_| event_not_granted())?;
-        let response = self
-            .client
-            .get(url)
-            .header(reqwest::header::AUTHORIZATION, authorization)
-            .send()
-            .await
+        let client = self
+            .module_client("planner")
             .map_err(|_| event_unavailable())?;
+        let mut request = client.get(url);
+        if self.config.module_socket("planner").is_none() {
+            let authorization = self
+                .module_signer
+                .as_ref()
+                .ok_or_else(event_not_granted)?
+                .authorization(
+                    context,
+                    "urn:b10x:module:planner",
+                    "module.events.read",
+                    "GET",
+                    &target,
+                    &[],
+                    None,
+                )
+                .map_err(|_| event_not_granted())?;
+            request = request.header(reqwest::header::AUTHORIZATION, authorization);
+        }
+        let response = request.send().await.map_err(|_| event_unavailable())?;
         if response.status() == reqwest::StatusCode::CONFLICT {
             return Err(EventError::new(
                 EventErrorCode::Protocol,
@@ -1086,7 +1116,8 @@ impl ConnectorBackend for B10xBackend {
         BackendCapabilities {
             operations: true,
             connections: true,
-            events: self.config.work_origin.is_some() || self.config.planner_origin.is_some(),
+            events: self.config.module_configured("work")
+                || self.config.module_configured("planner"),
             datasources: self.workspace_datasource_admitted(),
         }
     }

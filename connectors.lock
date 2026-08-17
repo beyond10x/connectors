@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "8af2ed7c855a20e6fc09147c06a6f3a8f73ef38dd17eb90bb6900bc992a64db1"
+sha256 = "9c88cc4758edda3d40726d9d447248c96fdf3e0141ac66a649307b89e398a2b1"
 
 [[provider]]
 id = "airtable"
@@ -191,8 +191,8 @@ ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 [[provider]]
 id = "b10x"
 generator = "connectors 0.1.0"
-toml_sha256 = "cb7cfcabc0586d5cc8d70e4cdbe90c4fe835ac4c029867126efab15e759af881"
-ir_sha256 = "34cfb081ddb6dd73d9fc835d33f3a5a3fdd87783e835f64e7c8cd010a7ba43b2"
+toml_sha256 = "8fdc42153f9d49266ce54bef98ff7672b215b41aea9b2520e2dce713d67b430a"
+ir_sha256 = "19ccec5b6fba5bf7c4423c04cb4090639f21dc96a08f1b06cd6cb2e6e875498f"
 
 [[provider.specs]]
 path = "specs/b10x/workspaces-v2.openapi.json"
@@ -237,7 +237,7 @@ upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7
 sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "624672957ef16a335d516aa9e2fdfe6f8f88109f6ff6afd2cf661170374c5228"
+"catalog/b10x.catalog.json" = "8cafc3609b5f5d789a1fcec6794f16eac421b8aa76607fed7cdec9b5a1bb3a06"
 
 [[provider]]
 id = "datadog"

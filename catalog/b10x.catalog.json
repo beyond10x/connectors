@@ -59880,7 +59880,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Register one Planner project under an idempotency identity",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -59906,6 +59906,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Register one Planner project under an idempotency identity",
       "direction": "write",
       "effects": [
         "write",
@@ -60062,7 +60063,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Transition one planning decision with optimistic revision admission",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -60090,6 +60091,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Transition one planning decision with optimistic revision admission",
       "direction": "write",
       "effects": [
         "write",
@@ -64399,7 +64401,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Create one typed planning entity under an idempotency identity",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -64419,6 +64421,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Create one typed planning entity under an idempotency identity",
       "direction": "write",
       "effects": [
         "write",
@@ -69755,7 +69758,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Replace one typed planning entity with optimistic revision admission",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -69787,6 +69790,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Replace one typed planning entity with optimistic revision admission",
       "direction": "write",
       "effects": [
         "write",
@@ -75166,7 +75170,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Tombstone one typed planning entity with optimistic revision admission",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -75196,6 +75200,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Tombstone one typed planning entity with optimistic revision admission",
       "direction": "write",
       "effects": [
         "write",
@@ -79460,7 +79465,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Restore one tombstoned planning entity with optimistic revision admission",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -79490,6 +79495,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Restore one tombstoned planning entity with optimistic revision admission",
       "direction": "write",
       "effects": [
         "write",
@@ -83754,7 +83760,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Record one story gate result with optimistic revision admission",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -83786,6 +83792,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Record one story gate result with optimistic revision admission",
       "direction": "write",
       "effects": [
         "write",
@@ -88058,7 +88065,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Transition one story after validating its lifecycle gates",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -88088,6 +88095,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Transition one story after validating its lifecycle gates",
       "direction": "write",
       "effects": [
         "write",
@@ -93952,7 +93960,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Apply one admitted repository and database synchronization change set",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -93985,6 +93993,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Apply one admitted repository and database synchronization change set",
       "direction": "write",
       "effects": [
         "write",
@@ -109996,7 +110005,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Confirm the resulting repository and database synchronization state",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -110033,6 +110042,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Confirm the resulting repository and database synchronization state",
       "direction": "write",
       "effects": [
         "write",
@@ -111365,7 +111375,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Resolve one repository and database synchronization conflict",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -111383,6 +111393,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Resolve one repository and database synchronization conflict",
       "direction": "write",
       "effects": [
         "write",
@@ -117829,7 +117840,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Begin one bounded repository synchronization upload session",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -117861,6 +117872,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Begin one bounded repository synchronization upload session",
       "direction": "write",
       "effects": [
         "write",
@@ -118014,7 +118026,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Apply the admitted change set assembled by one synchronization session",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -118032,6 +118044,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Apply the admitted change set assembled by one synchronization session",
       "direction": "write",
       "effects": [
         "write",
@@ -127963,7 +127976,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Confirm the resulting state for one applied synchronization session",
         "input_schema": {
           "properties": {
             "Idempotency_Key": {
@@ -127981,6 +127994,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Confirm the resulting state for one applied synchronization session",
       "direction": "write",
       "effects": [
         "write",
@@ -128052,7 +128066,7 @@
     {
       "auth": [],
       "contract": {
-        "description": "",
+        "description": "Preview the change set assembled by one synchronization session",
         "input_schema": {
           "properties": {
             "session": {
@@ -128066,6 +128080,7 @@
         }
       },
       "credential_requirement": "no-credential",
+      "description": "Preview the change set assembled by one synchronization session",
       "direction": "read",
       "effects": [
         "read",
