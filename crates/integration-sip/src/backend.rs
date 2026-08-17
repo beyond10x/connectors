@@ -13,6 +13,7 @@ use connector_resolve::document::{Document, HostEffect, ProtocolDriver};
 use domain::{
     voice::TerminationReason, AdmittedOperation, Capability, ConnectionAuthority, DriverId,
 };
+use hosted_state::PostgresState;
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
@@ -37,6 +38,7 @@ const B10X_DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 const MAX_LIVE_SESSIONS: usize = 64;
 const MAX_SESSION_RECORDS: usize = 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
+const AUDIT_STATE_KEY: &str = "sip.audit";
 
 /// Redaction-safe failure before an established session handle exists.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -95,6 +97,7 @@ struct SessionRecord {
 
 struct AuditJournal {
     path: PathBuf,
+    hosted_state: Option<PostgresState>,
     writer: Mutex<()>,
 }
 
@@ -114,6 +117,27 @@ struct AuditEvent<'a> {
 impl AuditJournal {
     fn append(&self, event: AuditEvent<'_>) -> Result<(), std::io::Error> {
         let _guard = lock(&self.writer);
+        let mut line = serde_json::to_vec(&serde_json::json!({
+            "at_unix_seconds": SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(std::io::Error::other)?
+                .as_secs(),
+            "event": event,
+        }))
+        .map_err(std::io::Error::other)?;
+        line.push(b'\n');
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .append(AUDIT_STATE_KEY, &line, MAX_AUDIT_BYTES as usize)
+                .map(|_| ())
+                .map_err(|error| match error {
+                    hosted_state::StateError::Capacity => std::io::Error::new(
+                        std::io::ErrorKind::FileTooLarge,
+                        "connector audit bound reached",
+                    ),
+                    _ => std::io::Error::other(error),
+                });
+        }
         let parent = self.path.parent().ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "audit path has no parent")
         })?;
@@ -143,15 +167,6 @@ impl AuditJournal {
                 "unsafe audit file",
             ));
         }
-        let mut line = serde_json::to_vec(&serde_json::json!({
-            "at_unix_seconds": SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(std::io::Error::other)?
-                .as_secs(),
-            "event": event,
-        }))
-        .map_err(std::io::Error::other)?;
-        line.push(b'\n');
         if metadata
             .len()
             .checked_add(line.len() as u64)
@@ -173,6 +188,25 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         config: PersonalVoiceConfig,
         launcher: Arc<L>,
         state_root: &Path,
+    ) -> Result<Self, OperationError> {
+        Self::new_inner(config, launcher, state_root, None)
+    }
+
+    /// Construct hosted SIP audit state against the service-owned PostgreSQL database.
+    pub fn new_postgres(
+        config: PersonalVoiceConfig,
+        launcher: Arc<L>,
+        state_root: &Path,
+        hosted_state: PostgresState,
+    ) -> Result<Self, OperationError> {
+        Self::new_inner(config, launcher, state_root, Some(hosted_state))
+    }
+
+    fn new_inner(
+        config: PersonalVoiceConfig,
+        launcher: Arc<L>,
+        state_root: &Path,
+        hosted_state: Option<PostgresState>,
     ) -> Result<Self, OperationError> {
         let principal = config.principal_context().map_err(|_| unavailable())?;
         let document = Document::parse(B10X_DOCUMENT).map_err(|_| unavailable())?;
@@ -204,6 +238,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             sessions: Mutex::new(BTreeMap::new()),
             audit: Arc::new(AuditJournal {
                 path: state_root.join("connector-audit.jsonl"),
+                hosted_state,
                 writer: Mutex::new(()),
             }),
             live_capacity: Arc::new(Semaphore::new(MAX_LIVE_SESSIONS)),

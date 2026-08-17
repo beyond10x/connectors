@@ -6,14 +6,17 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use hosted_state::PostgresState;
 use serde::Serialize;
 
 use super::lock;
 
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
+const AUDIT_STATE_KEY: &str = "b10x.audit";
 
 pub(super) struct AuditJournal {
     path: PathBuf,
+    hosted_state: Option<PostgresState>,
     state: Mutex<AuditJournalState>,
 }
 
@@ -36,11 +39,42 @@ pub(super) struct AuditEvent<'a> {
 }
 
 impl AuditJournal {
-    pub(super) fn new(path: PathBuf) -> Self {
+    pub(super) fn new(path: PathBuf, hosted_state: Option<PostgresState>) -> Self {
         Self {
             path,
+            hosted_state,
             state: Mutex::new(AuditJournalState::default()),
         }
+    }
+
+    fn current_len(&self) -> Result<u64, std::io::Error> {
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .read(AUDIT_STATE_KEY, MAX_AUDIT_BYTES as usize)
+                .map_err(std::io::Error::other)?
+                .map_or(Ok(0), |body| {
+                    u64::try_from(body.len()).map_err(std::io::Error::other)
+                });
+        }
+        Ok(self.open_file()?.metadata()?.len())
+    }
+
+    fn append(&self, bytes: &[u8]) -> Result<(), std::io::Error> {
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .append(AUDIT_STATE_KEY, bytes, MAX_AUDIT_BYTES as usize)
+                .map(|_| ())
+                .map_err(|error| match error {
+                    hosted_state::StateError::Capacity => std::io::Error::new(
+                        std::io::ErrorKind::FileTooLarge,
+                        "connector audit bound reached",
+                    ),
+                    _ => std::io::Error::other(error),
+                });
+        }
+        let mut file = self.open_file()?;
+        file.write_all(bytes)?;
+        file.sync_data()
     }
 
     /// Durably record an attempted effect and reserve room for its terminal outcome.
@@ -75,8 +109,7 @@ impl AuditJournal {
             .values()
             .try_fold(0_u64, |sum, value| sum.checked_add(*value))
             .ok_or_else(|| std::io::Error::other("Connector audit reservation overflow"))?;
-        let mut file = self.open_file()?;
-        let current = file.metadata()?.len();
+        let current = self.current_len()?;
         let attempted_bytes = u64::try_from(attempted.len()).map_err(std::io::Error::other)?;
         if current
             .checked_add(outstanding)
@@ -89,8 +122,7 @@ impl AuditJournal {
                 "connector audit bound reached",
             ));
         }
-        file.write_all(&attempted)?;
-        file.sync_data()?;
+        self.append(&attempted)?;
         state
             .terminal_reservations
             .insert(event.audit_ref.to_owned(), terminal_reservation);
@@ -129,10 +161,8 @@ impl AuditJournal {
             .try_fold(0_u64, |sum, value| sum.checked_add(*value))
             .and_then(|sum| sum.checked_sub(reservation))
             .ok_or_else(|| std::io::Error::other("Connector audit reservation overflow"))?;
-        let mut file = self.open_file()?;
-        if file
-            .metadata()?
-            .len()
+        if self
+            .current_len()?
             .checked_add(outstanding_other)
             .and_then(|length| length.checked_add(terminal_bytes))
             .is_none_or(|length| length > MAX_AUDIT_BYTES)
@@ -142,8 +172,7 @@ impl AuditJournal {
                 "connector audit bound reached",
             ));
         }
-        file.write_all(&terminal)?;
-        file.sync_data()?;
+        self.append(&terminal)?;
         state.terminal_reservations.remove(event.audit_ref);
         Ok(())
     }

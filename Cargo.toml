@@ -44,6 +44,7 @@ exclude = [
     "crates/driver-sip",
     "crates/rtvbp-voice-endpoint",
     "crates/voice-runtime",
+    "crates/hosted-state",
     "crates/connectors-config",
     "crates/connect-session-transport",
     "crates/connectors-runtime",

@@ -13,6 +13,7 @@ use connector_secrets::{
     SecretTransactionId, SecretTransactionState, StoreError, TenantLayout,
     MAX_TERMINAL_TRANSACTIONS,
 };
+use hosted_state::PostgresState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
@@ -23,8 +24,13 @@ const MAX_JOURNAL_BYTES: u64 = 4 * 1024 * 1024;
 /// addresses; the local journal contains addresses and states only, never credential values.
 pub struct PreparedVaultStore {
     inner: Arc<dyn SecretStore>,
-    journal_path: PathBuf,
+    storage: JournalStorage,
     journal: Mutex<Journal>,
+}
+
+enum JournalStorage {
+    File(PathBuf),
+    Postgres { state: PostgresState, key: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,9 +96,44 @@ impl PreparedVaultStore {
         let journal = read_journal(&journal_path)?;
         Ok(Self {
             inner,
-            journal_path,
+            storage: JournalStorage::File(journal_path),
             journal: Mutex::new(journal),
         })
+    }
+
+    /// Open a value-free prepared transaction journal in the service-owned PostgreSQL database.
+    pub fn open_postgres(
+        inner: Arc<dyn SecretStore>,
+        state: PostgresState,
+        key: impl Into<String>,
+    ) -> Result<Self, StoreError> {
+        let key = key.into();
+        let journal = match state
+            .read(&key, MAX_JOURNAL_BYTES as usize)
+            .map_err(database_journal_error)?
+        {
+            Some(bytes) => decode_journal(&bytes, "<postgresql>")?,
+            None => Journal::default(),
+        };
+        Ok(Self {
+            inner,
+            storage: JournalStorage::Postgres { state, key },
+            journal: Mutex::new(journal),
+        })
+    }
+
+    fn persist(&self, journal: &Journal) -> Result<(), StoreError> {
+        match &self.storage {
+            JournalStorage::File(path) => write_journal(path, journal),
+            JournalStorage::Postgres { state, key } => {
+                let bytes = serde_json::to_vec(journal).map_err(|_| {
+                    journal_error_label("<postgresql>", "journal could not be encoded")
+                })?;
+                state
+                    .replace(key, &bytes, MAX_JOURNAL_BYTES as usize)
+                    .map_err(database_journal_error)
+            }
+        }
     }
 
     /// Resolve incomplete commits and remove incomplete staging before the store is exposed.
@@ -109,7 +150,7 @@ impl PreparedVaultStore {
                 Phase::Committing => {
                     self.publish(&journal.transactions[index]).await?;
                     journal.transactions[index].phase = Phase::Committed;
-                    write_journal(&self.journal_path, &journal)?;
+                    self.persist(&journal)?;
                     journal_changed = false;
                     self.remove_staged(&journal.transactions[index]).await?;
                 }
@@ -120,7 +161,7 @@ impl PreparedVaultStore {
             }
         }
         if journal_changed {
-            write_journal(&self.journal_path, &journal)?;
+            self.persist(&journal)?;
         }
         Ok(())
     }
@@ -265,7 +306,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                 phase: Phase::Staging,
                 entries,
             });
-            write_journal(&self.journal_path, &journal)
+            self.persist(&journal)
                 .map_err(|_| PreparedSecretError::Backend)?;
         }
         for (staged, value) in staged_values {
@@ -286,7 +327,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                     {
                         transaction.phase = Phase::Aborted;
                     }
-                    let _ = write_journal(&self.journal_path, &journal);
+                    let _ = self.persist(&journal);
                 }
                 return Err(PreparedSecretError::Backend);
             }
@@ -298,7 +339,8 @@ impl PreparedSecretStore for PreparedVaultStore {
             .find(|item| item.id == key)
             .ok_or(PreparedSecretError::Backend)?;
         transaction.phase = Phase::Prepared;
-        write_journal(&self.journal_path, &journal).map_err(|_| PreparedSecretError::Backend)?;
+        self.persist(&journal)
+            .map_err(|_| PreparedSecretError::Backend)?;
         Ok(SecretTransactionState::Prepared)
     }
 
@@ -348,7 +390,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                 Phase::Prepared | Phase::Committing => transaction.phase = Phase::Committing,
             }
             let transaction = transaction.clone();
-            write_journal(&self.journal_path, &journal)
+            self.persist(&journal)
                 .map_err(|_| PreparedSecretError::Backend)?;
             transaction
         };
@@ -363,7 +405,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                 .find(|item| item.id == key)
                 .ok_or(PreparedSecretError::Backend)?;
             stored.phase = Phase::Committed;
-            write_journal(&self.journal_path, &journal)
+            self.persist(&journal)
                 .map_err(|_| PreparedSecretError::Backend)?;
         }
         let _ = self.remove_staged(&transaction).await;
@@ -404,7 +446,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                     phase: Phase::Aborted,
                     entries: Vec::new(),
                 });
-                write_journal(&self.journal_path, &journal)
+                self.persist(&journal)
                     .map_err(|_| PreparedSecretError::Backend)?;
                 return Ok(SecretTransactionState::Absent);
             }
@@ -419,7 +461,8 @@ impl PreparedSecretStore for PreparedVaultStore {
             .find(|item| item.id == key)
             .ok_or(PreparedSecretError::Backend)?;
         stored.phase = Phase::Aborted;
-        write_journal(&self.journal_path, &journal).map_err(|_| PreparedSecretError::Backend)?;
+        self.persist(&journal)
+            .map_err(|_| PreparedSecretError::Backend)?;
         Ok(SecretTransactionState::Absent)
     }
 
@@ -443,7 +486,8 @@ impl PreparedSecretStore for PreparedVaultStore {
         journal
             .transactions
             .retain(|transaction| transaction.generation > retired_through);
-        write_journal(&self.journal_path, &journal).map_err(|_| PreparedSecretError::Backend)
+        self.persist(&journal)
+            .map_err(|_| PreparedSecretError::Backend)
     }
 }
 
@@ -509,10 +553,17 @@ fn read_journal(path: &Path) -> Result<Journal, StoreError> {
         .take(MAX_JOURNAL_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| journal_error(path, &error.to_string()))?;
-    let journal: Journal = serde_json::from_slice(&bytes)
-        .map_err(|_| journal_error(path, "journal payload is invalid"))?;
+    decode_journal(&bytes, &path.display().to_string())
+}
+
+fn decode_journal(bytes: &[u8], location: &str) -> Result<Journal, StoreError> {
+    let journal: Journal = serde_json::from_slice(bytes)
+        .map_err(|_| journal_error_label(location, "journal payload is invalid"))?;
     if journal.version != JOURNAL_VERSION {
-        return Err(journal_error(path, "journal version is unsupported"));
+        return Err(journal_error_label(
+            location,
+            "journal version is unsupported",
+        ));
     }
     Ok(journal)
 }
@@ -583,10 +634,18 @@ fn remove_incomplete_temporary(path: &Path) -> Result<(), StoreError> {
 }
 
 fn journal_error(path: &Path, reason: &str) -> StoreError {
+    journal_error_label(&path.display().to_string(), reason)
+}
+
+fn journal_error_label(location: &str, reason: &str) -> StoreError {
     StoreError::Unreachable {
-        path: path.display().to_string(),
+        path: location.to_owned(),
         reason: reason.to_owned(),
     }
+}
+
+fn database_journal_error(error: hosted_state::StateError) -> StoreError {
+    journal_error_label("<postgresql>", &error.to_string())
 }
 
 #[cfg(test)]

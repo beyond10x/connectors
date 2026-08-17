@@ -20,6 +20,7 @@ use connector_secrets::{
     TenantLayout,
 };
 use futures_util::{SinkExt as _, StreamExt as _};
+use hosted_state::PostgresState;
 use protocol::connection::{
     ChannelState, ChannelSummary as ConnectionChannelSummary, ConnectSessionStatus,
     ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
@@ -69,6 +70,9 @@ const MAX_STATE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_EVENT_STORE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_STORED_EVENTS: usize = 10_000;
+const CONNECTION_STATE_KEY: &str = "slack.connections";
+const EVENT_STATE_KEY: &str = "slack.events";
+const AUDIT_STATE_KEY: &str = "slack.audit";
 const MAX_SOCKET_MESSAGE_BYTES: usize = 1024 * 1024;
 const APPS_CONNECTIONS_OPEN: &str = "https://slack.com/api/apps.connections.open";
 const AUTH_TEST: &str = "https://slack.com/api/auth.test";
@@ -103,6 +107,7 @@ struct SlackInner {
     completion_mode: CompletionMode,
     policy: SlackIntegrationConfig,
     state_root: PathBuf,
+    hosted_state: Option<PostgresState>,
     credential_store: Arc<dyn PreparedSecretStore>,
     metadata: Mutex<StateFile>,
     sessions: Mutex<ConnectSessionLifecycle>,
@@ -187,12 +192,14 @@ struct PendingCommit {
 
 struct EventStore {
     path: PathBuf,
+    hosted_state: Option<PostgresState>,
     events: Mutex<Vec<StoredEvent>>,
     notify: Notify,
 }
 
 struct AuditJournal {
     path: PathBuf,
+    hosted_state: Option<PostgresState>,
     state: Mutex<AuditJournalState>,
 }
 
@@ -255,6 +262,7 @@ impl SlackBackend {
             policy,
             state_root,
             credential_store,
+            None,
             true,
         )
         .await
@@ -268,6 +276,7 @@ impl SlackBackend {
         policy: SlackIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
+        hosted_state: PostgresState,
     ) -> Result<Self, SlackError> {
         Self::open_inner(
             PrincipalAdmission::Tenant(tenant_id),
@@ -275,6 +284,7 @@ impl SlackBackend {
             policy,
             state_root,
             credential_store,
+            Some(hosted_state),
             true,
         )
         .await
@@ -294,6 +304,7 @@ impl SlackBackend {
             policy,
             state_root,
             credential_store,
+            None,
             supervision_enabled,
         )
         .await
@@ -305,10 +316,14 @@ impl SlackBackend {
         policy: SlackIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
+        hosted_state: Option<PostgresState>,
         supervision_enabled: bool,
     ) -> Result<Self, SlackError> {
-        let metadata = read_state(&state_root.join("connections.json"))?;
-        let event_store = Arc::new(EventStore::open(state_root.join("events.jsonl"))?);
+        let metadata = read_state(&state_root.join("connections.json"), hosted_state.as_ref())?;
+        let event_store = Arc::new(EventStore::open(
+            state_root.join("events.jsonl"),
+            hosted_state.clone(),
+        )?);
         let http = reqwest::Client::builder()
             .redirect(Policy::none())
             .no_proxy()
@@ -323,6 +338,7 @@ impl SlackBackend {
             completion_mode,
             policy,
             state_root: state_root.to_path_buf(),
+            hosted_state: hosted_state.clone(),
             credential_store,
             metadata: Mutex::new(metadata),
             sessions: Mutex::new(
@@ -333,7 +349,7 @@ impl SlackBackend {
             hosted_sessions: Mutex::new(BTreeMap::new()),
             hosted_completion_lock: tokio::sync::Mutex::new(()),
             event_store,
-            audit: AuditJournal::new(state_root.join("slack-operation-audit.jsonl")),
+            audit: AuditJournal::new(state_root.join("slack-operation-audit.jsonl"), hosted_state),
             channel_states: Mutex::new(BTreeMap::new()),
             integration_channel_state: Mutex::new(ChannelState::Starting),
             supervisor_started: Mutex::new(false),
@@ -700,6 +716,14 @@ impl ConnectorBackend for SlackBackend {
 }
 
 impl SlackInner {
+    fn persist_metadata(&self, state: &StateFile) -> Result<(), SlackError> {
+        write_state(
+            &self.state_root.join("connections.json"),
+            self.hosted_state.as_ref(),
+            state,
+        )
+    }
+
     fn tenant_id(&self) -> &str {
         match &self.admission {
             PrincipalAdmission::Exact(owner) => owner.tenant_id(),
@@ -1327,7 +1351,7 @@ impl SlackInner {
                 transaction_id: transaction_hex.clone(),
                 connection: connection.clone(),
             });
-            let persisted = write_state(&self.state_root.join("connections.json"), &state).is_ok();
+            let persisted = self.persist_metadata(&state).is_ok();
             if !persisted {
                 state
                     .pending
@@ -1354,7 +1378,7 @@ impl SlackInner {
             state
                 .connections
                 .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
-            if let Err(error) = write_state(&self.state_root.join("connections.json"), &state) {
+            if let Err(error) = self.persist_metadata(&state) {
                 *state = prior;
                 return Err(error);
             }
@@ -1375,7 +1399,7 @@ impl SlackInner {
         state.next_transaction_generation = generation_value
             .checked_add(1)
             .ok_or_else(|| SlackError::new("transaction-generation"))?;
-        write_state(&self.state_root.join("connections.json"), &state)?;
+        self.persist_metadata(&state)?;
         let mut nonce = [0_u8; 24];
         getrandom::fill(&mut nonce).map_err(|_| SlackError::new("randomness"))?;
         Ok((SecretTransactionId::new(generation, nonce), generation))
@@ -1403,7 +1427,7 @@ impl SlackInner {
                     state
                         .pending
                         .retain(|candidate| candidate.transaction_id != record.transaction_id);
-                    write_state(&self.state_root.join("connections.json"), &state)?;
+                    self.persist_metadata(&state)?;
                     continue;
                 }
             }
@@ -1421,7 +1445,7 @@ impl SlackInner {
                     .connections
                     .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
             }
-            write_state(&self.state_root.join("connections.json"), &state)?;
+            self.persist_metadata(&state)?;
         }
         Ok(())
     }
@@ -1696,11 +1720,43 @@ impl SlackInner {
 }
 
 impl AuditJournal {
-    fn new(path: PathBuf) -> Self {
+    fn new(path: PathBuf, hosted_state: Option<PostgresState>) -> Self {
         Self {
             path,
+            hosted_state,
             state: Mutex::new(AuditJournalState::default()),
         }
+    }
+
+    fn current_len(&self) -> Result<u64, SlackError> {
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .read(AUDIT_STATE_KEY, MAX_AUDIT_BYTES as usize)
+                .map_err(|_| SlackError::new("audit-store"))?
+                .map_or(Ok(0), |body| {
+                    u64::try_from(body.len()).map_err(|_| SlackError::new("audit-bound"))
+                });
+        }
+        open_owner_append(&self.path)?
+            .metadata()
+            .map(|metadata| metadata.len())
+            .map_err(|_| SlackError::new("audit-store"))
+    }
+
+    fn append_line(&self, line: &[u8]) -> Result<(), SlackError> {
+        if let Some(hosted_state) = &self.hosted_state {
+            return hosted_state
+                .append(AUDIT_STATE_KEY, line, MAX_AUDIT_BYTES as usize)
+                .map(|_| ())
+                .map_err(|error| match error {
+                    hosted_state::StateError::Capacity => SlackError::new("audit-bound"),
+                    _ => SlackError::new("audit-store"),
+                });
+        }
+        let mut file = open_owner_append(&self.path)?;
+        file.write_all(line)
+            .and_then(|()| file.sync_data())
+            .map_err(|_| SlackError::new("audit-store"))
     }
 
     fn begin(&self, event: AuditEvent<'_>) -> Result<(), SlackError> {
@@ -1728,11 +1784,7 @@ impl AuditJournal {
             .values()
             .try_fold(0_u64, |sum, value| sum.checked_add(*value))
             .ok_or_else(|| SlackError::new("audit-bound"))?;
-        let mut file = open_owner_append(&self.path)?;
-        let current = file
-            .metadata()
-            .map_err(|_| SlackError::new("audit-store"))?
-            .len();
+        let current = self.current_len()?;
         let attempted_bytes =
             u64::try_from(attempted.len()).map_err(|_| SlackError::new("audit-bound"))?;
         if current
@@ -1743,9 +1795,7 @@ impl AuditJournal {
         {
             return Err(SlackError::new("audit-bound"));
         }
-        file.write_all(&attempted)
-            .and_then(|()| file.sync_data())
-            .map_err(|_| SlackError::new("audit-store"))?;
+        self.append_line(&attempted)?;
         state
             .terminal_reservations
             .insert(event.audit_ref.to_owned(), terminal_reservation);
@@ -1774,20 +1824,15 @@ impl AuditJournal {
             .try_fold(0_u64, |sum, value| sum.checked_add(*value))
             .and_then(|sum| sum.checked_sub(reservation))
             .ok_or_else(|| SlackError::new("audit-bound"))?;
-        let mut file = open_owner_append(&self.path)?;
-        if file
-            .metadata()
-            .map_err(|_| SlackError::new("audit-store"))?
-            .len()
+        if self
+            .current_len()?
             .checked_add(outstanding_other)
             .and_then(|length| length.checked_add(terminal_bytes))
             .is_none_or(|length| length > MAX_AUDIT_BYTES)
         {
             return Err(SlackError::new("audit-bound"));
         }
-        file.write_all(&terminal)
-            .and_then(|()| file.sync_data())
-            .map_err(|_| SlackError::new("audit-store"))?;
+        self.append_line(&terminal)?;
         state.terminal_reservations.remove(event.audit_ref);
         Ok(())
     }
@@ -1804,10 +1849,19 @@ fn audit_line(event: AuditEvent<'_>, at_unix_ms: u64) -> Result<Vec<u8>, SlackEr
 }
 
 impl EventStore {
-    fn open(path: PathBuf) -> Result<Self, SlackError> {
-        let events = read_events(&path)?;
+    fn open(path: PathBuf, hosted_state: Option<PostgresState>) -> Result<Self, SlackError> {
+        let events = if let Some(hosted_state) = &hosted_state {
+            let bytes = hosted_state
+                .read(EVENT_STATE_KEY, MAX_EVENT_STORE_BYTES as usize)
+                .map_err(|_| SlackError::new("event-store"))?
+                .unwrap_or_default();
+            decode_events(&bytes)?
+        } else {
+            read_events(&path)?
+        };
         Ok(Self {
             path,
+            hosted_state,
             events: Mutex::new(events),
             notify: Notify::new(),
         })
@@ -1849,20 +1903,29 @@ impl EventStore {
         };
         let mut line = serde_json::to_vec(&stored).map_err(|_| SlackError::new("event-store"))?;
         line.push(b'\n');
-        let mut file = open_owner_append(&self.path)?;
-        let current = file
-            .metadata()
-            .map_err(|_| SlackError::new("event-store"))?
-            .len();
-        if current
-            .checked_add(line.len() as u64)
-            .is_none_or(|size| size > MAX_EVENT_STORE_BYTES)
-        {
-            return Err(SlackError::new("event-store-capacity"));
+        if let Some(hosted_state) = &self.hosted_state {
+            hosted_state
+                .append(EVENT_STATE_KEY, &line, MAX_EVENT_STORE_BYTES as usize)
+                .map_err(|error| match error {
+                    hosted_state::StateError::Capacity => SlackError::new("event-store-capacity"),
+                    _ => SlackError::new("event-store"),
+                })?;
+        } else {
+            let mut file = open_owner_append(&self.path)?;
+            let current = file
+                .metadata()
+                .map_err(|_| SlackError::new("event-store"))?
+                .len();
+            if current
+                .checked_add(line.len() as u64)
+                .is_none_or(|size| size > MAX_EVENT_STORE_BYTES)
+            {
+                return Err(SlackError::new("event-store-capacity"));
+            }
+            file.write_all(&line)
+                .and_then(|()| file.sync_data())
+                .map_err(|_| SlackError::new("event-store"))?;
         }
-        file.write_all(&line)
-            .and_then(|()| file.sync_data())
-            .map_err(|_| SlackError::new("event-store"))?;
         events.push(stored);
         drop(events);
         self.notify.notify_waiters();
@@ -2114,17 +2177,32 @@ fn now_ms() -> Option<u64> {
         .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }
 
-fn read_state(path: &Path) -> Result<StateFile, SlackError> {
+fn read_state(path: &Path, hosted_state: Option<&PostgresState>) -> Result<StateFile, SlackError> {
+    if let Some(hosted_state) = hosted_state {
+        let Some(bytes) = hosted_state
+            .read(CONNECTION_STATE_KEY, MAX_STATE_BYTES as usize)
+            .map_err(|_| SlackError::new("connection-state"))?
+        else {
+            let state = StateFile::default();
+            write_state(path, Some(hosted_state), &state)?;
+            return Ok(state);
+        };
+        return decode_state(&bytes);
+    }
     let Some(mut file) = open_owner_read(path, MAX_STATE_BYTES)? else {
         let state = StateFile::default();
-        write_state(path, &state)?;
+        write_state(path, None, &state)?;
         return Ok(state);
     };
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
         .map_err(|_| SlackError::new("connection-state"))?;
+    decode_state(&bytes)
+}
+
+fn decode_state(bytes: &[u8]) -> Result<StateFile, SlackError> {
     let mut state: StateFile =
-        serde_json::from_slice(&bytes).map_err(|_| SlackError::new("connection-state"))?;
+        serde_json::from_slice(bytes).map_err(|_| SlackError::new("connection-state"))?;
     if !matches!(state.version, 1 | STATE_VERSION) || state.next_transaction_generation == 0 {
         return Err(SlackError::new("connection-state-version"));
     }
@@ -2132,15 +2210,24 @@ fn read_state(path: &Path) -> Result<StateFile, SlackError> {
     Ok(state)
 }
 
-fn write_state(path: &Path, state: &StateFile) -> Result<(), SlackError> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| SlackError::new("connection-state"))?;
-    ensure_owner_directory(parent)?;
+fn write_state(
+    path: &Path,
+    hosted_state: Option<&PostgresState>,
+    state: &StateFile,
+) -> Result<(), SlackError> {
     let bytes = serde_json::to_vec(state).map_err(|_| SlackError::new("connection-state"))?;
     if bytes.len() as u64 > MAX_STATE_BYTES {
         return Err(SlackError::new("connection-state-bound"));
     }
+    if let Some(hosted_state) = hosted_state {
+        return hosted_state
+            .replace(CONNECTION_STATE_KEY, &bytes, MAX_STATE_BYTES as usize)
+            .map_err(|_| SlackError::new("connection-state"));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| SlackError::new("connection-state"))?;
+    ensure_owner_directory(parent)?;
     let temporary = parent.join(".connections.json.tmp");
     refuse_existing_non_owner_file(&temporary)?;
     let mut file = OpenOptions::new()
@@ -2169,6 +2256,11 @@ fn read_events(path: &Path) -> Result<Vec<StoredEvent>, SlackError> {
     let mut text = String::new();
     file.read_to_string(&mut text)
         .map_err(|_| SlackError::new("event-store"))?;
+    decode_events(text.as_bytes())
+}
+
+fn decode_events(bytes: &[u8]) -> Result<Vec<StoredEvent>, SlackError> {
+    let text = std::str::from_utf8(bytes).map_err(|_| SlackError::new("event-store"))?;
     let mut events = Vec::new();
     for line in text.lines() {
         if line.is_empty() || events.len() >= MAX_STORED_EVENTS {
