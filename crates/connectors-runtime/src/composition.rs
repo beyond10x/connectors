@@ -21,8 +21,9 @@ use integration_sip::{
 };
 use integration_slack::SlackBackend;
 use serde_json::{json, Value};
+use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
-use service::ConnectorBackend;
+use service::{ConnectorBackend, EgressTransport};
 
 use crate::BackendRegistry;
 
@@ -61,6 +62,8 @@ pub enum RuntimeError {
     Identity(#[from] identity_http::IdentityVerifierConfigError),
     #[error(transparent)]
     Daemon(#[from] server::local::LocalDaemonError),
+    #[error(transparent)]
+    Egress(#[from] server::egress::EgressError),
     #[error("the personal credential store could not be opened")]
     CredentialStore,
     #[error("CONNECTORS_DATABASE_URL is required for hosted Connector state")]
@@ -169,7 +172,9 @@ impl PersonalRuntime {
                     .expect("credential consumer selected the shared store")
                     .monitoring
                     .clone();
-                let backend = MonitoringBackend::open(owner.clone(), grafana, &state_root, store)?;
+                let egress = monitoring_egress(&grafana.canonical_origin())?;
+                let backend =
+                    MonitoringBackend::open(owner.clone(), grafana, &state_root, store, egress)?;
                 monitoring_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
@@ -195,7 +200,8 @@ impl PersonalRuntime {
                     .expect("credential consumer selected the shared store")
                     .prepared
                     .clone();
-                let backend = SlackBackend::open(owner, slack, &state_root, store).await?;
+                let backend =
+                    SlackBackend::open(owner, slack, &state_root, store, slack_egress()?).await?;
                 slack_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
@@ -386,6 +392,11 @@ impl HostedRuntime {
                 .as_ref()
                 .ok_or(connectors_config::HostedServerConfigError::Invalid)?
                 .clone();
+            let grafana_origin = config
+                .grafana
+                .origin
+                .as_deref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
             backends.push(Arc::new(
                 MonitoringBackend::open_hosted(
                     config.tenant_id.clone(),
@@ -394,6 +405,7 @@ impl HostedRuntime {
                     &config.storage.state_root,
                     store,
                     hosted_state.clone(),
+                    monitoring_egress(grafana_origin)?,
                 )
                 .await?,
             ));
@@ -425,6 +437,7 @@ impl HostedRuntime {
                     &config.storage.state_root,
                     store,
                     hosted_state.clone(),
+                    slack_egress()?,
                 )
                 .await?,
             ));
@@ -481,6 +494,7 @@ impl HostedRuntime {
             "listen": config.server.listen,
             "base_path": config.server.base_path,
             "identity_audience": server::hosted::CONNECTORS_AUDIENCE,
+            "egress_policy": config.egress.policy,
             "kubernetes_enabled": config.kubernetes.enabled,
             "monitoring_enabled": monitoring_enabled,
             "vault_enabled": config.vault.enabled,
@@ -516,6 +530,22 @@ impl HostedRuntime {
         served?;
         Ok(())
     }
+}
+
+fn monitoring_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
+    let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
+    Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
+}
+
+fn slack_egress() -> Result<Arc<dyn EgressTransport>, RuntimeError> {
+    let rules = [
+        DestinationRule::exact_origin("https://slack.com", AddressScope::Public),
+        DestinationRule::exact_origin("wss://slack.com", AddressScope::Public),
+        DestinationRule::dns_suffix("wss", ".slack.com", 443, AddressScope::Public),
+    ]
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(Arc::new(ConnectionEgress::new(rules)?))
 }
 
 pub fn default_state_root() -> Result<PathBuf, RuntimeError> {

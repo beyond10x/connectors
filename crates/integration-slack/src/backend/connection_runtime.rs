@@ -532,6 +532,7 @@ impl SlackInner {
 
     pub(super) async fn verify_companion_credentials(
         &self,
+        authority_ref: &str,
         credentials: &SlackCredentials,
     ) -> Result<WorkspaceEvidence, SlackError> {
         let bot = credentials
@@ -544,7 +545,7 @@ impl SlackInner {
         {
             return Err(SlackError::new("credential-shape"));
         }
-        let evidence = self.auth_test(bot).await?;
+        let evidence = self.auth_test(authority_ref, bot).await?;
         if !evidence.is_bot {
             return Err(SlackError::new("credential-subject"));
         }
@@ -559,41 +560,34 @@ impl SlackInner {
         Ok(evidence)
     }
 
-    pub(super) async fn auth_test(&self, token: &Secret) -> Result<WorkspaceEvidence, SlackError> {
-        let mut response = self
-            .http
-            .post(AUTH_TEST)
-            .bearer_auth(token.expose_secret())
-            .send()
+    pub(super) async fn auth_test(
+        &self,
+        authority_ref: &str,
+        token: &Secret,
+    ) -> Result<WorkspaceEvidence, SlackError> {
+        let response = self
+            .egress
+            .execute(
+                authority_ref,
+                EgressHttpRequest {
+                    request: bearer_request("POST", AUTH_TEST.to_owned(), token),
+                    maximum_response_bytes: MAX_AUTH_TEST_RESPONSE_BYTES,
+                    response_headers: vec!["x-oauth-scopes".to_owned()],
+                },
+            )
             .await
             .map_err(|_| SlackError::new("credential-verify-unavailable"))?;
-        if !response.status().is_success()
-            || response
-                .content_length()
-                .is_some_and(|length| length > MAX_AUTH_TEST_RESPONSE_BYTES as u64)
-        {
+        if !response.is_success() {
             return Err(SlackError::new("credential-verify-unavailable"));
         }
-        let status = response.status();
-        let content_length = response.content_length();
         let scopes = response
-            .headers()
-            .get("x-oauth-scopes")
-            .and_then(|value| value.to_str().ok())
+            .header("x-oauth-scopes")
             .map(parse_scopes)
             .unwrap_or_default();
-        let mut bytes = Zeroizing::new(Vec::with_capacity(MAX_AUTH_TEST_RESPONSE_BYTES));
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| SlackError::new("credential-verify-unavailable"))?
-        {
-            if bytes.len().saturating_add(chunk.len()) > MAX_AUTH_TEST_RESPONSE_BYTES {
-                return Err(SlackError::new("credential-verify-unavailable"));
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        let identity = classify_auth_test_response(status, content_length, &bytes)?;
+        let status = reqwest::StatusCode::from_u16(response.status)
+            .map_err(|_| SlackError::new("credential-verify-unavailable"))?;
+        let body = Zeroizing::new(response.body);
+        let identity = classify_auth_test_response(status, Some(body.len() as u64), &body)?;
         Ok(WorkspaceEvidence {
             team_id: identity.team_id,
             subject_id: identity.subject_id,
@@ -708,38 +702,23 @@ impl SlackInner {
             .get(&credential_ref)
             .await
             .map_err(|_| SlackError::new("credential-resolve"))?;
-        let mut response = self
-            .http
-            .post(APPS_CONNECTIONS_OPEN)
-            .bearer_auth(token.expose_secret())
-            .send()
+        let response = self
+            .egress
+            .execute(
+                &connection.connection_ref,
+                EgressHttpRequest {
+                    request: bearer_request("POST", APPS_CONNECTIONS_OPEN.to_owned(), &token),
+                    maximum_response_bytes: 64 * 1024,
+                    response_headers: Vec::new(),
+                },
+            )
             .await
             .map_err(|_| SlackError::new("socket-ticket-request"))?;
         drop(token);
-        if !response.status().is_success()
-            || response
-                .content_length()
-                .is_some_and(|size| size > 64 * 1024)
-        {
+        if !response.is_success() {
             return Err(SlackError::new("socket-ticket-response"));
         }
-        let mut bytes = Zeroizing::new(Vec::with_capacity(
-            response.content_length().unwrap_or(0).min(64 * 1024) as usize,
-        ));
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| SlackError::new("socket-ticket-response"))?
-        {
-            if bytes
-                .len()
-                .checked_add(chunk.len())
-                .is_none_or(|size| size > 64 * 1024)
-            {
-                return Err(SlackError::new("socket-ticket-response"));
-            }
-            bytes.extend_from_slice(&chunk);
-        }
+        let bytes = Zeroizing::new(response.body);
         let ticket: SocketTicket = serde_json::from_slice(&bytes)
             .map_err(|_| SlackError::new("socket-ticket-response"))?;
         if !ticket.ok {
@@ -751,48 +730,47 @@ impl SlackInner {
                 .ok_or_else(|| SlackError::new("socket-ticket-response"))?,
         );
         validate_socket_url(&url)?;
-        let websocket = WebSocketConfig::default()
-            .max_message_size(Some(MAX_SOCKET_MESSAGE_BYTES))
-            .max_frame_size(Some(MAX_SOCKET_MESSAGE_BYTES));
-        let (mut socket, _) =
-            tokio_tungstenite::connect_async_with_config(&*url, Some(websocket), false)
-                .await
-                .map_err(|_| SlackError::new("socket-connect"))?;
+        let mut socket = self
+            .egress
+            .connect_websocket(
+                &connection.connection_ref,
+                url.to_string(),
+                MAX_SOCKET_MESSAGE_BYTES,
+            )
+            .await
+            .map_err(|_| SlackError::new("socket-connect"))?;
         self.set_connection_state(&connection.connection_ref, ChannelState::Connected);
         loop {
             tokio::select! {
                 changed = shutdown.changed() => {
                     if changed.is_err() || *shutdown.borrow() {
-                        let _ = socket.close(None).await;
+                        let _ = socket.close().await;
                         return Ok(());
                     }
                 }
-                message = socket.next() => {
+                message = socket.receive() => {
                     match message {
-                        Some(Ok(Message::Text(text))) => {
-                            self.handle_socket_text(connection, text.as_ref(), &mut socket).await?;
+                        Ok(EgressWebSocketFrame::Text(text)) => {
+                            self.handle_socket_text(connection, &text, socket.as_mut()).await?;
                         }
-                        Some(Ok(Message::Ping(payload))) => {
-                            socket.send(Message::Pong(payload)).await.map_err(|_| SlackError::new("socket-write"))?;
+                        Ok(EgressWebSocketFrame::Ping(payload)) => {
+                            socket.send_pong(payload).await.map_err(|_| SlackError::new("socket-write"))?;
                         }
-                        Some(Ok(Message::Close(_))) | None => return Err(SlackError::new("socket-closed")),
-                        Some(Ok(_)) => {}
-                        Some(Err(_)) => return Err(SlackError::new("socket-read")),
+                        Ok(EgressWebSocketFrame::Closed) => return Err(SlackError::new("socket-closed")),
+                        Ok(EgressWebSocketFrame::Other) => {}
+                        Err(_) => return Err(SlackError::new("socket-read")),
                     }
                 }
             }
         }
     }
 
-    pub(super) async fn handle_socket_text<S>(
+    pub(super) async fn handle_socket_text(
         &self,
         connection: &StoredConnection,
         text: &str,
-        socket: &mut S,
-    ) -> Result<(), SlackError>
-    where
-        S: futures_util::Sink<Message> + Unpin,
-    {
+        socket: &mut dyn EgressWebSocket,
+    ) -> Result<(), SlackError> {
         if text.len() > MAX_SOCKET_MESSAGE_BYTES {
             return Err(SlackError::new("socket-message-bound"));
         }
@@ -831,7 +809,7 @@ impl SlackInner {
         }))
         .map_err(|_| SlackError::new("socket-ack"))?;
         socket
-            .send(Message::Text(acknowledgement.into()))
+            .send_text(acknowledgement)
             .await
             .map_err(|_| SlackError::new("socket-ack"))
     }

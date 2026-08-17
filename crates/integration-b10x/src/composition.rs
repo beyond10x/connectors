@@ -13,7 +13,7 @@ impl B10xBackend {
     ) -> Result<Self, B10xIntegrationError> {
         Self::new(
             config,
-            PrincipalAdmission::Exact(principal),
+            PrincipalAdmission::Exact(Box::new(principal)),
             state_root,
             None,
         )

@@ -31,11 +31,11 @@ use protocol::operation::{
     OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
     OperationSummary,
 };
-use reqwest::redirect::Policy;
 use serde_json::Value;
 use service::{
     plan_operation, BackendCapabilities, BackendReadinessError, ConnectSessionLifecycle,
-    ConnectSessionTerminal, ConnectorBackend, PlanningEnvironment, PrincipalContext,
+    ConnectSessionTerminal, ConnectorBackend, EgressHttpRequest, EgressTransport,
+    PlanningEnvironment, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 use tokio::task::JoinHandle;
@@ -74,74 +74,43 @@ impl MonitoringError {
     }
 }
 
-/// HTTP seam used by the production reqwest transport and deterministic conformance tests.
+/// HTTP seam used by the injected runtime egress port and deterministic conformance tests.
 #[async_trait]
 trait HttpExecutor: Send + Sync + 'static {
-    async fn execute(&self, request: Request) -> Result<Value, MonitoringError>;
+    async fn execute(
+        &self,
+        connection_ref: &str,
+        request: Request,
+    ) -> Result<Value, MonitoringError>;
 }
 
-struct ReqwestExecutor {
-    client: reqwest::Client,
+struct PortExecutor {
+    egress: Arc<dyn EgressTransport>,
 }
 
 #[async_trait]
-impl HttpExecutor for ReqwestExecutor {
-    async fn execute(&self, request: Request) -> Result<Value, MonitoringError> {
-        let method = reqwest::Method::from_bytes(request.method.as_bytes())
-            .map_err(|_| MonitoringError::new("http-method"))?;
-        let parsed =
-            url::Url::parse(&request.url).map_err(|_| MonitoringError::new("http-destination"))?;
-        if parsed.scheme() != "https"
-            || parsed.host_str().is_none()
-            || !parsed.username().is_empty()
-            || parsed.password().is_some()
-            || parsed.fragment().is_some()
-        {
-            return Err(MonitoringError::new("http-destination"));
-        }
-        let mut outbound = self.client.request(method, parsed);
-        for (name, value) in request.headers {
-            let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
-                .map_err(|_| MonitoringError::new("http-header"))?;
-            let value = reqwest::header::HeaderValue::from_str(&value)
-                .map_err(|_| MonitoringError::new("http-header"))?;
-            outbound = outbound.header(name, value);
-        }
-        if let Some(body) = request.body {
-            outbound = outbound.body(body);
-        }
-        let mut response = outbound
-            .send()
+impl HttpExecutor for PortExecutor {
+    async fn execute(
+        &self,
+        connection_ref: &str,
+        request: Request,
+    ) -> Result<Value, MonitoringError> {
+        let response = self
+            .egress
+            .execute(
+                connection_ref,
+                EgressHttpRequest {
+                    request,
+                    maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
+                    response_headers: Vec::new(),
+                },
+            )
             .await
             .map_err(|_| MonitoringError::new("http-request"))?;
-        if !response.status().is_success()
-            || response
-                .content_length()
-                .is_some_and(|size| size > protocol::operation::MAX_RESULT_BYTES as u64)
-        {
+        if !response.is_success() {
             return Err(MonitoringError::new("http-response"));
         }
-        let mut bytes = Vec::with_capacity(
-            response
-                .content_length()
-                .unwrap_or(0)
-                .min(protocol::operation::MAX_RESULT_BYTES as u64) as usize,
-        );
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| MonitoringError::new("http-response"))?
-        {
-            if bytes
-                .len()
-                .checked_add(chunk.len())
-                .is_none_or(|size| size > protocol::operation::MAX_RESULT_BYTES)
-            {
-                return Err(MonitoringError::new("http-response-bound"));
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        serde_json::from_slice(&bytes).map_err(|_| MonitoringError::new("http-json"))
+        serde_json::from_slice(&response.body).map_err(|_| MonitoringError::new("http-json"))
     }
 }
 
@@ -235,24 +204,17 @@ impl MonitoringBackend {
         policy: GrafanaIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn SecretStore>,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, MonitoringError> {
         ensure_owner_directory(state_root)?;
         let credential_ref = grafana_credential_ref(&owner)?;
-        let client = reqwest::Client::builder()
-            .redirect(Policy::none())
-            .no_proxy()
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
-            .user_agent("b10x-connectors/0.1")
-            .build()
-            .map_err(|_| MonitoringError::new("http-client"))?;
         Ok(Self::with_executor(
             owner,
             policy,
             state_root,
             credential_store,
             credential_ref,
-            Arc::new(ReqwestExecutor { client }),
+            Arc::new(PortExecutor { egress }),
         ))
     }
 
@@ -265,6 +227,7 @@ impl MonitoringBackend {
         state_root: &Path,
         credential_store: Arc<dyn SecretStore>,
         hosted_state: hosted_state::PostgresState,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, MonitoringError> {
         ensure_owner_directory(state_root)?;
         let owner = PrincipalContext::hosted(
@@ -276,21 +239,13 @@ impl MonitoringBackend {
             "0".repeat(64),
         )
         .map_err(|_| MonitoringError::new("hosted-principal"))?;
-        let client = reqwest::Client::builder()
-            .redirect(Policy::none())
-            .no_proxy()
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
-            .user_agent("b10x-connectors/0.1")
-            .build()
-            .map_err(|_| MonitoringError::new("http-client"))?;
         Self::open_hosted_with_executor(
             owner,
             policy,
             operator_groups,
             state_root,
             credential_store,
-            Arc::new(ReqwestExecutor { client }),
+            Arc::new(PortExecutor { egress }),
             Some(hosted_state),
         )
         .await
@@ -858,7 +813,7 @@ impl MonitoringInner {
             return Err(operation_not_granted());
         }
         self.executor
-            .execute(request.request)
+            .execute(&parent.connection_ref, request.request)
             .await
             .map_err(|_| operation_unavailable())
     }
@@ -934,7 +889,7 @@ impl MonitoringInner {
         connector_resolve::auth::place(&operation.id, &credential, &mut request)
             .map_err(|_| operation_unavailable())?;
         self.executor
-            .execute(request)
+            .execute(&child.parent_connection_ref, request)
             .await
             .map_err(|_| operation_unavailable())
     }

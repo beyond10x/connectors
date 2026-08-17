@@ -498,17 +498,18 @@ mod tests {
     async fn hosted_sessions_expire_and_release_pending_capacity_without_submission() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = SlackBackend::open_inner(
-            PrincipalAdmission::Tenant("tenant-local".to_owned()),
-            CompletionMode::Hosted {
+        let backend = SlackBackend::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            completion_mode: CompletionMode::Hosted {
                 public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
             },
-            policy(),
-            root.path(),
-            Arc::new(MemoryStore::new()),
-            None,
-            false,
-        )
+            policy: policy(),
+            state_root: root.path(),
+            credential_store: Arc::new(MemoryStore::new()),
+            egress: test_egress(),
+            hosted_state: None,
+            supervision_enabled: false,
+        })
         .await
         .unwrap();
         let created = backend
@@ -544,17 +545,18 @@ mod tests {
     async fn invalid_hosted_capability_cannot_consume_a_connect_session() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = SlackBackend::open_inner(
-            PrincipalAdmission::Tenant("tenant-local".to_owned()),
-            CompletionMode::Hosted {
+        let backend = SlackBackend::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            completion_mode: CompletionMode::Hosted {
                 public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
             },
-            policy(),
-            root.path(),
-            Arc::new(MemoryStore::new()),
-            None,
-            false,
-        )
+            policy: policy(),
+            state_root: root.path(),
+            credential_store: Arc::new(MemoryStore::new()),
+            egress: test_egress(),
+            hosted_state: None,
+            supervision_enabled: false,
+        })
         .await
         .unwrap();
         let created = backend
@@ -590,17 +592,18 @@ mod tests {
     async fn slack_readiness_is_value_free_and_tracks_the_secret_store() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let backend = SlackBackend::open_inner(
-            PrincipalAdmission::Tenant("tenant-local".to_owned()),
-            CompletionMode::Hosted {
+        let backend = SlackBackend::open_inner(SlackOpenContext {
+            admission: PrincipalAdmission::Tenant("tenant-local".to_owned()),
+            completion_mode: CompletionMode::Hosted {
                 public_origin: url::Url::parse("https://connectors.example.test").unwrap(),
             },
-            policy(),
-            root.path(),
-            Arc::new(UnavailableStore),
-            None,
-            false,
-        )
+            policy: policy(),
+            state_root: root.path(),
+            credential_store: Arc::new(UnavailableStore),
+            egress: test_egress(),
+            hosted_state: None,
+            supervision_enabled: false,
+        })
         .await
         .unwrap();
         let error = backend.ready().await.unwrap_err();

@@ -1912,7 +1912,6 @@ dependencies = [
  "hosted-state",
  "monitoring-model",
  "protocol",
- "reqwest",
  "rustix",
  "serde",
  "serde_json",
@@ -1922,7 +1921,6 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "toml",
- "url",
 ]
 
 [[package]]
@@ -1960,12 +1958,12 @@ name = "integration-slack"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64",
  "catalog",
  "connect-session-transport",
  "connector-resolve",
  "connector-secrets",
  "connectors-config",
- "futures-util",
  "getrandom 0.3.4",
  "hex",
  "hosted-state",
@@ -1980,7 +1978,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
- "tokio-tungstenite 0.28.0",
  "url",
  "zeroize",
 ]
@@ -3631,12 +3628,15 @@ dependencies = [
  "fs2",
  "futures-util",
  "protocol",
+ "reqwest",
  "rustix",
  "serde",
  "serde_json",
  "service",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-tungstenite 0.28.0",
+ "url",
 ]
 
 [[package]]

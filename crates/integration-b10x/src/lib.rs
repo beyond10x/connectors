@@ -86,7 +86,7 @@ pub enum B10xIntegrationError {
 
 #[derive(Clone)]
 enum PrincipalAdmission {
-    Exact(PrincipalContext),
+    Exact(Box<PrincipalContext>),
     Tenants(BTreeSet<String>),
 }
 
@@ -135,7 +135,7 @@ impl B10xBackend {
 
     fn context_admitted(&self, context: &PrincipalContext) -> bool {
         match &self.admission {
-            PrincipalAdmission::Exact(expected) => expected == context,
+            PrincipalAdmission::Exact(expected) => expected.as_ref() == context,
             PrincipalAdmission::Tenants(tenants) => tenants.contains(context.tenant_id()),
         }
     }

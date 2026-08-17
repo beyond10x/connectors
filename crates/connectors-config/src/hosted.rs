@@ -26,6 +26,8 @@ pub struct HostedServerConfig {
     #[serde(default)]
     pub authority: HostedAuthorityConfig,
     pub storage: HostedStorageConfig,
+    #[serde(default)]
+    pub egress: HostedEgressConfig,
     pub kubernetes: HostedKubernetesConfig,
     #[serde(default)]
     pub grafana: HostedGrafanaConfig,
@@ -40,6 +42,23 @@ pub struct HostedServerConfig {
     pub jira: Option<HostedJiraConfig>,
     #[serde(default)]
     pub b10x: Option<B10xIntegrationConfig>,
+}
+
+/// Deployment acknowledgement for the transport invariant enforced by credential-bearing
+/// Integrations. Unknown or omitted policies remain disabled so older configuration fails closed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedEgressConfig {
+    #[serde(default)]
+    pub policy: HostedEgressPolicy,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedEgressPolicy {
+    #[default]
+    Disabled,
+    ConnectionBoundPostDnsV1,
 }
 
 /// Value-free hosted Jira Cloud policy. Organization credentials are deployment-owned and may
@@ -292,7 +311,7 @@ pub enum HostedServerConfigError {
     #[error("hosted Connector configuration is incomplete or inconsistent")]
     Invalid,
     #[error(
-        "credential-bearing hosted network providers are disabled until post-DNS destination confinement is enforced"
+        "credential-bearing hosted provider has no enforced Connection-bound post-DNS transport"
     )]
     CredentialEgressUnconfined,
 }
@@ -495,7 +514,13 @@ impl HostedServerConfig {
         {
             return Err(HostedServerConfigError::Invalid);
         }
-        if vault_required {
+        let supported_credential_egress = self.slack.is_some() || self.grafana.enabled;
+        let unsupported_credential_egress =
+            self.sip.credentials.is_some() || self.gitlab.is_some() || self.jira.is_some();
+        if unsupported_credential_egress
+            || (supported_credential_egress
+                && self.egress.policy != HostedEgressPolicy::ConnectionBoundPostDnsV1)
+        {
             return Err(HostedServerConfigError::CredentialEgressUnconfined);
         }
         Ok(())
@@ -746,6 +771,8 @@ origin = "https://identity.code.dev.babelforce.com"
 operator_groups = ["operator"]
 [storage]
 state_root = "/var/lib/b10x-connectors"
+[egress]
+policy = "connection_bound_post_dns_v1"
 [kubernetes]
 enabled = true
 namespaces = ["b10x"]
@@ -789,8 +816,11 @@ initiation = "b10x"
         )
         .unwrap();
 
+        config.validate().unwrap();
+        let mut missing_policy = config;
+        missing_policy.egress.policy = HostedEgressPolicy::Disabled;
         assert!(matches!(
-            config.validate(),
+            missing_policy.validate(),
             Err(HostedServerConfigError::CredentialEgressUnconfined)
         ));
     }
@@ -831,6 +861,8 @@ listen = "0.0.0.0:8080"
 origin = "https://identity.example.test"
 [storage]
 state_root = "/var/lib/b10x-connectors"
+[egress]
+policy = "connection_bound_post_dns_v1"
 [kubernetes]
 enabled = false
 namespaces = ["b10x"]
@@ -990,6 +1022,8 @@ listen = "0.0.0.0:8080"
 origin = "https://identity.example.test"
 [storage]
 state_root = "/var/lib/b10x-connectors"
+[egress]
+policy = "connection_bound_post_dns_v1"
 [kubernetes]
 enabled = false
 namespaces = []
@@ -1019,10 +1053,7 @@ enabled = false
 "#,
         )
         .unwrap();
-        assert!(matches!(
-            config.validate(),
-            Err(HostedServerConfigError::CredentialEgressUnconfined)
-        ));
+        config.validate().unwrap();
 
         config.grafana.read_groups.reverse();
         assert!(config.validate().is_err());
