@@ -88,7 +88,7 @@ that stores connections.
 
 A compiler, a store, or a client. It holds no value, opens no socket and reads no file — an address
 is a **name**.
-[`connector-spec`](https://github.com/b10x/b10x/tree/main/connectors/crates/connector-spec)
+[`connector-spec`](https://github.com/b10x/b10x/tree/main/foundation/connectors/crates/connector-spec)
 produces these addresses from a connector definition;
 [`connector-secrets`](https://crates.io/crates/codewandler-connector-secrets) resolves a
 `CredentialRef` to a value and re-exports every name here, so a consumer never has to name two

@@ -1333,13 +1333,13 @@
       ]
     }
   },
-  "$id": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json",
+  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One canonical, deterministic catalog document per provider (Decision 0022, C-536): the complete published connector surface, including an explicit request template per operation. The template vocabulary is closed and total — literal values, `{var}` interpolation over caller parameters and endpoint slots, and `$param` splices — and the oauth2 object deliberately has no field for a registration value: the client identifier and secret are per-deployment, published only as operator-level configuration requirements through the `binds` grammar.",
   "properties": {
     "$schema": {
-      "const": "https://github.com/b10x/b10x/blob/main/connectors/catalog/connector-document.schema.json"
+      "const": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json"
     },
     "auth": {
       "items": {
