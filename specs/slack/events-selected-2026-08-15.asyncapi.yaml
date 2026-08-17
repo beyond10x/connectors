@@ -1,0 +1,76 @@
+asyncapi: 3.0.0
+info:
+  title: Slack Events API — reviewed selection
+  version: 2026-08-15
+  description: >-
+    Repository-authored exact projection of the normalized inner event objects B10x admits.
+    Slack does not currently publish a maintained AsyncAPI document. The outer event_callback and
+    Socket Mode envelopes are transport concerns and are deliberately not the event payload here.
+x-b10x-origin: repository-authored
+x-b10x-references:
+  - https://docs.slack.dev/apis/events-api/
+  - https://docs.slack.dev/reference/events/app_mention/
+  - https://docs.slack.dev/reference/events/message.channels/
+channels:
+  events:
+    address: slack.events
+    messages:
+      app_mention:
+        $ref: '#/components/messages/app_mention'
+      message_channels:
+        $ref: '#/components/messages/message_channels'
+components:
+  messages:
+    app_mention:
+      name: app_mention
+      title: App mention
+      summary: Someone mentioned the app in a channel it is a member of
+      x-slack-required-scopes:
+        - app_mentions:read
+      payload:
+        type: object
+        additionalProperties: true
+        properties:
+          type:
+            const: app_mention
+          user:
+            type: string
+          text:
+            type: string
+          channel:
+            type: string
+          ts:
+            type: string
+          thread_ts:
+            type: string
+        required: [type, user, text, channel, ts]
+    message_channels:
+      name: message.channels
+      title: Public-channel message
+      summary: A message was posted in a public channel the app is a member of
+      x-slack-wire-event-type: message
+      x-slack-required-scopes:
+        - channels:history
+      payload:
+        type: object
+        additionalProperties: true
+        properties:
+          type:
+            const: message
+          channel_type:
+            const: channel
+          subtype:
+            type: string
+          bot_id:
+            type: string
+          user:
+            type: string
+          text:
+            type: string
+          channel:
+            type: string
+          ts:
+            type: string
+          thread_ts:
+            type: string
+        required: [type, channel, ts]

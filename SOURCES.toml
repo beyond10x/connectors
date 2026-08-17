@@ -1,0 +1,233 @@
+# SOURCES.toml — the single index of everything this repository derives from.
+#
+# One [[source]] entry per source: what kind and origin it has, where its upstream bytes or
+# authoritative references live, how it is refreshed or reviewed, where its byte-level pins sit
+# (`pins` points at the detail record; hashes are not duplicated here), and which files consume it.
+# Hand-bootstrapped 2026-08-13 from the M1 import
+# report; S-016 makes this live machinery (`catalog sources check | refresh | diff`), at which
+# point a drifted pin or an unindexed vendored file fails the build. Until then this file is
+# maintained alongside every vendoring change (AGENTS.md "Refreshing a source").
+#
+[[source]]
+id = "predecessor-flux-connectors"
+kind = "predecessor-import"
+upstream = "git@github.com:codewandler/flux-connectors.git"
+commit = "3650a136b33660243579a9c923c521e18918fa67"
+retrieved = "2026-08-13"
+refresh = "manual"
+consumers = ["providers/", "specs/", "catalog/", "connectors.lock", "web/", "scripts/", "crates/connector-address/", "crates/connector-spec/", "crates/catalog-reader/", "crates/connector-resolve/", "crates/connector-secrets/", "crates/catalog/", "crates/catalog-build/"]
+note = "one-time import at M1; left behind: connector-flux emitter (34.6k LOC), connector-pack, connectors-api, catalog generated tables (17k LOC) + ops/*.flux (835), connectors/* emitted modules+manifests (140), release/publish scripts, migration-check + core-catalogue verbs, per-provider test files (folded into one invariants file). crates/catalog rebuilt over the pack instead of trimmed; crates/catalog-cli is new (clap derive). Byte-differential passed: pack sha256 b9b21eac… identical to predecessor at this commit."
+
+[[source]]
+id = "anthropic-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://platform.claude.com/docs/en/manage-claude/authentication",
+  "https://platform.claude.com/docs/en/manage-claude/overview",
+  "https://platform.claude.com/docs/en/api/versioning",
+  "https://platform.claude.com/docs/en/api/models/list",
+  "https://platform.claude.com/docs/en/api/admin/organizations/me",
+  "https://platform.claude.com/docs/en/api/admin/users/list",
+  "https://platform.claude.com/docs/en/api/admin/users/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/api_keys/list",
+  "https://platform.claude.com/docs/en/api/admin/invites/list",
+]
+refresh = "authored-review"
+pins = "specs/anthropic.provenance.toml"
+consumers = ["providers/anthropic.toml", "catalog/anthropic.catalog.json", "crates/connector-spec/tests/main/openapi_ingest.rs"]
+note = "Two repository-authored OpenAPI 3.1/YAML documents cover the exact shipped Models and read-only Admin API surfaces. Each endpoint cites its official Anthropic reference; reviewed overlays retain stable ids, policy facts and deliberate query omissions."
+
+[[source]]
+id = "grafana-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/dashboard/",
+  "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/",
+]
+refresh = "authored-review"
+pins = "specs/grafana.provenance.toml"
+consumers = ["providers/grafana.toml", "catalog/grafana.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Grafana 12+ dashboard and bounded data-source query surface. Each endpoint cites Grafana's official reference; instance-local Swagger remains the authority for deployment-specific additions."
+
+[[source]]
+id = "prometheus-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://prometheus.io/docs/prometheus/latest/querying/api/",
+  "https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries",
+]
+refresh = "authored-review"
+pins = "specs/prometheus.provenance.toml"
+consumers = ["providers/prometheus.toml", "catalog/prometheus.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Prometheus range-query contract."
+
+[[source]]
+id = "loki-authored-openapi"
+kind = "openapi-spec"
+origin = "repository-authored"
+references = [
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+  "https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-logs-within-a-range-of-time",
+]
+refresh = "authored-review"
+pins = "specs/loki.provenance.toml"
+consumers = ["providers/loki.toml", "catalog/loki.catalog.json"]
+note = "One repository-authored OpenAPI 3.1 document covers the exact shipped Loki range-query contract."
+
+[[source]]
+id = "alertmanager-openapi"
+kind = "openapi-spec"
+origin = "vendor"
+upstream = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
+refresh = "manual"
+pins = "specs/alertmanager.provenance.toml"
+consumers = ["providers/alertmanager.toml", "catalog/alertmanager.catalog.json"]
+note = "Pins Alertmanager's official v0.31.0 Swagger 2 source and the reviewed OpenAPI 3 projection of the one read operation B10x ships."
+
+[[source]]
+id = "slack-web-and-events"
+kind = "api-spec"
+origin = "mixed-vendor-and-repository-authored"
+upstream = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+references = [
+  "https://docs.slack.dev/authentication/tokens/",
+  "https://docs.slack.dev/apis/events-api/",
+  "https://docs.slack.dev/reference/scopes/connections.write/",
+  "https://docs.slack.dev/reference/events/app_mention/",
+  "https://docs.slack.dev/reference/events/message.channels/",
+  "https://docs.slack.dev/reference/scopes/admin.apps.read/",
+  "https://docs.slack.dev/reference/methods/admin.teams.list/",
+]
+refresh = "scripts/vendor-slack-spec.py"
+pins = "specs/slack.provenance.toml"
+consumers = ["providers/slack.toml", "catalog/slack.catalog.json", "crates/integration-slack/src/backend.rs"]
+note = "Pins Slack's exact live Swagger 2 bytes and deterministic curated OpenAPI 3 projections for four workspace and four read-only Admin operations. Slack publishes no maintained Events AsyncAPI document, so the exact two-event AsyncAPI source is repository-authored from current official references and is explicitly marked as such."
+
+[[source]]
+id = "asterisk-ari"
+kind = "vendor-protocol-source"
+origin = "vendor"
+upstream = "https://github.com/asterisk/asterisk (tag 22.10.1)"
+refresh = "scripts/vendor-asterisk-ari.py"
+pins = "specs/asterisk/provenance.toml"
+consumers = ["providers/asterisk.toml", "catalog/asterisk.catalog.json", "crates/driver-sip/examples/sip_dial_characterize.rs"]
+note = "Pins Asterisk's complete ARI Swagger source plus its PJSIP and RTP sample configurations. The samples are interoperability evidence for an optional configured Asterisk peer; Asterisk owns no native sip.dial capability."
+
+[[source]]
+id = "b10x-owned-contracts"
+kind = "provider-openapi-and-asyncapi-contracts"
+origin = "repository-authored"
+upstream = "https://github.com/b10x/modules at commit 719a8a321ee9828332b002f4b7b722ffcff59d52"
+references = [
+  "https://github.com/b10x/architecture/blob/main/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0026-native-voice-contracts-are-protocol-neutral.md",
+  "https://github.com/b10x/architecture/blob/main/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0018-connectors-satellite-federation.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+  "https://github.com/b10x/architecture/blob/main/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52",
+  "https://github.com/b10x/modules/tree/719a8a321ee9828332b002f4b7b722ffcff59d52/modules/planner/contracts/planner/v1",
+]
+refresh = "authored-review"
+pins = "specs/b10x.provenance.toml"
+consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ontology-v0alpha1.openapi.json", "specs/b10x/ontology-v0alpha2.openapi.json", "specs/b10x/work-v0alpha1.openapi.json", "specs/b10x/work-v1.openapi.json", "specs/b10x/work-v1.asyncapi.yaml", "specs/b10x/planner-v1.openapi.json", "specs/b10x/planner-v1.asyncapi.yaml", "specs/b10x/planner-v1.module.json", "crates/integration-sip/", "crates/integration-b10x/", "crates/driver-sip/", "crates/driver-audio/", "crates/driver-cdp/"]
+note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus explicitly selected operations and events from exact Work, Ontology, and Planner module contracts. The modules retain durable domain-owner identities while implementation source lives in b10x/modules. Deployment Connections resolve all peers and private HTTP origins, while persistence remains behind each module runtime. The v0alpha1 bytes remain temporarily as migration evidence and are not active Provider inputs. Browser interaction remains outside this surface."
+
+[[source]]
+id = "babelforce-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-babelforce-specs.sh"
+pins = "specs/babelforce.provenance.toml"
+consumers = ["providers/babelforce.toml", "catalog/babelforce.catalog.json"]
+
+[[source]]
+id = "github-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-github-spec.sh"
+pins = "specs/github.provenance.toml"
+consumers = ["providers/github.toml", "catalog/github.catalog.json"]
+
+[[source]]
+id = "microsoft-graph-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-microsoft-graph-spec.py"
+pins = "specs/microsoft_graph.provenance.toml"
+consumers = ["providers/microsoft_graph.toml", "catalog/microsoft_graph.catalog.json"]
+
+[[source]]
+id = "openai-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-openai-spec.py"
+pins = "specs/openai.provenance.toml"
+consumers = ["providers/openai.toml", "catalog/openai.catalog.json"]
+
+[[source]]
+id = "stripe-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-stripe-spec.sh"
+pins = "specs/stripe.provenance.toml"
+consumers = ["providers/stripe.toml", "catalog/stripe.catalog.json"]
+
+[[source]]
+id = "twilio-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-twilio-spec.py"
+pins = "specs/twilio.provenance.toml"
+consumers = ["providers/twilio.toml", "catalog/twilio.catalog.json"]
+
+[[source]]
+id = "zendesk-openapi"
+kind = "openapi-spec"
+upstream = "recorded in pins"
+refresh = "scripts/vendor-zendesk-specs.sh"
+pins = "specs/zendesk.provenance.toml"
+consumers = ["providers/zendesk.toml", "catalog/zendesk.catalog.json"]
+
+[[source]]
+id = "nango-providers-catalog"
+kind = "provider-catalog"
+upstream = "https://github.com/NangoHQ/nango — packages/providers/providers.yaml"
+refresh = "manual"
+pins = "docs/research/vendor/provenance.toml"
+consumers = ["docs/research/catalog-precedents.md", "docs/research/vendor/nango-providers.yaml"]
+note = "mining input for S-017 `catalog sources mint`"
+
+[[source]]
+id = "airbyte-declarative-manifest-example"
+kind = "reference-artifact"
+upstream = "https://github.com/airbytehq/airbyte — source-pokeapi/manifest.yaml"
+refresh = "manual"
+pins = "docs/research/vendor/provenance.toml"
+consumers = ["docs/research/catalog-precedents.md", "docs/research/vendor/airbyte-source-pokeapi-manifest.yaml"]
+
+[[source]]
+id = "apideck-connector-api-spec"
+kind = "reference-artifact"
+upstream = "https://github.com/apideck-libraries/openapi-specs — connector.yml"
+refresh = "manual"
+pins = "docs/research/vendor/provenance.toml"
+consumers = ["docs/research/catalog-precedents.md", "docs/research/vendor/apideck-connector-api.yml"]
+
+[[source]]
+id = "pipedream-component-example"
+kind = "reference-artifact"
+upstream = "https://github.com/PipedreamHQ/pipedream — components/github/actions/create-issue"
+refresh = "manual"
+pins = "docs/research/vendor/provenance.toml"
+consumers = ["docs/research/catalog-precedents.md", "docs/research/vendor/pipedream-github-create-issue.mjs"]

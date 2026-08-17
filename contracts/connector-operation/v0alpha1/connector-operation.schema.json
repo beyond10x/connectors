@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://b10x.dev/contracts/connector-operation/v0alpha1/connector-operation.schema.json",
+  "title": "B10x ConnectorOperation v0alpha1 frame",
+  "oneOf": [
+    {"$ref": "#/$defs/requestEnvelope"},
+    {"$ref": "#/$defs/responseEnvelope"}
+  ],
+  "$defs": {
+    "reference": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[!-~]+$"},
+    "shortReference": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[!-~]+$"},
+    "requestId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[!-~]+$"},
+    "ownerContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "agent_id", "agent_revision", "authority_snapshot_id", "authority_snapshot_sha256"],
+      "properties": {
+        "tenant_id": {"$ref": "#/$defs/shortReference"},
+        "agent_id": {"$ref": "#/$defs/shortReference"},
+        "agent_revision": {"type": "integer", "minimum": 1},
+        "authority_snapshot_id": {"$ref": "#/$defs/shortReference"},
+        "authority_snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "searchParams": {
+      "type": "object", "additionalProperties": false, "required": ["query", "limit"],
+      "properties": {"query": {"type": "string", "maxLength": 512}, "limit": {"type": "integer", "minimum": 1, "maximum": 25}}
+    },
+    "describeParams": {
+      "type": "object", "additionalProperties": false, "required": ["operation_ref"],
+      "properties": {"operation_ref": {"$ref": "#/$defs/reference"}}
+    },
+    "invokeParams": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_ref", "connection_ref", "description_ref", "input"],
+      "properties": {
+        "operation_ref": {"$ref": "#/$defs/reference"},
+        "connection_ref": {"$ref": "#/$defs/reference"},
+        "description_ref": {"$ref": "#/$defs/reference"},
+        "input": true,
+        "approval_evidence_ref": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "sessionParams": {
+      "type": "object", "additionalProperties": false, "required": ["execution_ref"],
+      "properties": {"execution_ref": {"$ref": "#/$defs/reference"}}
+    },
+    "terminateParams": {
+      "type": "object", "additionalProperties": false, "required": ["execution_ref", "reason"],
+      "properties": {
+        "execution_ref": {"$ref": "#/$defs/reference"},
+        "reason": {"enum": ["completed", "cancelled", "revoked"]}
+      }
+    },
+    "operationRequest": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "search"}, "params": {"$ref": "#/$defs/searchParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "describe"}, "params": {"$ref": "#/$defs/describeParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "invoke"}, "params": {"$ref": "#/$defs/invokeParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "session_status"}, "params": {"$ref": "#/$defs/sessionParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "session_terminate"}, "params": {"$ref": "#/$defs/terminateParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "session_reconcile"}, "params": {"$ref": "#/$defs/sessionParams"}}}
+      ]
+    },
+    "requestEnvelope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "request_id", "context", "request"],
+      "properties": {
+        "protocol": {"const": "b10x.connector-operation.v0alpha1"},
+        "request_id": {"$ref": "#/$defs/requestId"},
+        "context": {"$ref": "#/$defs/ownerContext"},
+        "request": {"$ref": "#/$defs/operationRequest"}
+      }
+    },
+    "effect": {"enum": ["read_only", "mutating", "destructive"]},
+    "approval": {"enum": ["not_required", "required"]},
+    "connectionSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["connection_ref", "label", "provider", "audiences"],
+      "properties": {
+        "connection_ref": {"$ref": "#/$defs/reference"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "provider": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[!-~]+$"},
+        "audiences": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[!-~]+$"}}
+      }
+    },
+    "operationSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_ref", "title", "effect", "approval", "connections"],
+      "properties": {
+        "operation_ref": {"$ref": "#/$defs/reference"}, "title": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "effect": {"$ref": "#/$defs/effect"}, "approval": {"$ref": "#/$defs/approval"},
+        "connections": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/connectionSummary"}}
+      }
+    },
+    "description": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_ref", "title", "description", "input_schema", "output_schema", "effect", "approval", "connections", "description_ref"],
+      "properties": {
+        "operation_ref": {"$ref": "#/$defs/reference"}, "title": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "description": {"type": "string", "maxLength": 16384}, "input_schema": true, "output_schema": true,
+        "effect": {"$ref": "#/$defs/effect"}, "approval": {"$ref": "#/$defs/approval"},
+        "connections": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/connectionSummary"}},
+        "description_ref": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "invocation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_ref", "output", "connector_audit_ref"],
+      "properties": {
+        "operation_ref": {"$ref": "#/$defs/reference"}, "output": true,
+        "connector_audit_ref": {"$ref": "#/$defs/reference"}, "execution_ref": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "sessionStatus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["execution_ref", "operation_ref", "connection_ref", "state", "connector_audit_ref"],
+      "properties": {
+        "execution_ref": {"$ref": "#/$defs/reference"}, "operation_ref": {"$ref": "#/$defs/reference"},
+        "connection_ref": {"$ref": "#/$defs/reference"},
+        "state": {"enum": ["establishing", "established", "terminating", "terminated", "outcome_unknown"]},
+        "termination": {"enum": ["completed", "cancelled", "revoked", "lease_expired", "remote_ended", "failed", "outcome_unknown"]},
+        "connector_audit_ref": {"$ref": "#/$defs/reference"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"enum": ["establishing", "established", "terminating"]}}}, "then": {"not": {"required": ["termination"]}}},
+        {"if": {"properties": {"state": {"const": "terminated"}}}, "then": {"required": ["termination"], "properties": {"termination": {"enum": ["completed", "cancelled", "revoked", "lease_expired", "remote_ended", "failed"]}}}},
+        {"if": {"properties": {"state": {"const": "outcome_unknown"}}}, "then": {"required": ["termination"], "properties": {"termination": {"const": "outcome_unknown"}}}}
+      ]
+    },
+    "operationResult": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["result", "value"], "properties": {"result": {"const": "search"}, "value": {"type": "object", "additionalProperties": false, "required": ["operations"], "properties": {"operations": {"type": "array", "maxItems": 25, "items": {"$ref": "#/$defs/operationSummary"}}}}}},
+        {"type": "object", "additionalProperties": false, "required": ["result", "value"], "properties": {"result": {"const": "describe"}, "value": {"$ref": "#/$defs/description"}}},
+        {"type": "object", "additionalProperties": false, "required": ["result", "value"], "properties": {"result": {"const": "invoke"}, "value": {"$ref": "#/$defs/invocation"}}},
+        {"type": "object", "additionalProperties": false, "required": ["result", "value"], "properties": {"result": {"enum": ["session_status", "session_terminate", "session_reconcile"]}, "value": {"$ref": "#/$defs/sessionStatus"}}}
+      ]
+    },
+    "error": {
+      "type": "object", "additionalProperties": false, "required": ["code", "message", "retriable"],
+      "properties": {
+        "code": {"enum": ["unavailable", "not_found", "not_granted", "invalid_input", "stale_authority", "approval_required", "approval_denied", "result_too_large", "protocol", "outcome_unknown"]},
+        "message": {"type": "string", "minLength": 1, "maxLength": 4096}, "retriable": {"type": "boolean"}
+      }
+    },
+    "responseEnvelope": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["protocol", "request_id", "status", "response"], "properties": {"protocol": {"const": "b10x.connector-operation.v0alpha1"}, "request_id": {"$ref": "#/$defs/requestId"}, "status": {"const": "ok"}, "response": {"$ref": "#/$defs/operationResult"}}},
+        {"type": "object", "additionalProperties": false, "required": ["protocol", "request_id", "status", "error"], "properties": {"protocol": {"const": "b10x.connector-operation.v0alpha1"}, "request_id": {"$ref": "#/$defs/requestId"}, "status": {"const": "error"}, "error": {"$ref": "#/$defs/error"}}}
+      ]
+    }
+  }
+}

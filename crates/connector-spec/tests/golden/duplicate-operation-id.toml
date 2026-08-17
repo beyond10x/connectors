@@ -1,0 +1,47 @@
+# The op id is the public name callers and models use, so two operations cannot share one.
+#
+# `non_idempotent` rather than the `conditional` this mirrored from `providers/zendesk.toml`: C-186
+# requires a mutating `conditional` to state its condition, and a fixture that trips two unrelated
+# refusals produces a snapshot in which the one it is named for is harder to find.
+id = "zendesk"
+base_url = "https://acme.zendesk.com"
+
+[[operations]]
+id = "zendesk.ticket.update"
+method = "PUT"
+direction = "write"
+path = "/api/v2/tickets/{ticket_id}.json"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+auth = []
+
+[[operations.params.path]]
+name = "ticket_id"
+required = true
+schema = { type = "integer" }
+
+[[operations]]
+id = "zendesk.ticket.update"
+method = "PUT"
+direction = "write"
+path = "/api/v2/tickets/{ticket_id}.json"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+auth = []
+
+[[operations.params.path]]
+name = "ticket_id"
+required = true
+schema = { type = "integer" }

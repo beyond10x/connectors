@@ -1,0 +1,703 @@
+openapi: 3.1.0
+info:
+  title: Anthropic Admin API (B10x-authored)
+  version: "2023-06-01"
+  description: Repository-authored source specification derived from the official Anthropic references carried by each operation. Anthropic does not publish these OpenAPI bytes.
+x-b10x-origin: repository-authored
+x-b10x-coverage: exact shipped read-only Anthropic Admin API surface
+x-b10x-auth-references:
+  - https://platform.claude.com/docs/en/manage-claude/overview
+  - https://platform.claude.com/docs/en/manage-claude/authentication
+servers:
+  - url: https://api.anthropic.com
+security:
+  - adminApiKey: []
+paths:
+  /v1/organizations/me:
+    get:
+      operationId: organization_get
+      summary: Get the organization this Admin API key belongs to. Takes no parameters; useful for confirming which organization a key resolves to
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/organizations/me
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  type:
+                    const: organization
+                required:
+                  - id
+                  - type
+                  - name
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/organizations/users:
+    get:
+      operationId: organization_members_list
+      summary: List the people in this organization, with each member's name, email address, organization role and the date they joined. Returns personal data about real individuals. Unpaginated — this connector cannot request a further page, so on an organization larger than one page this is a sample and not a roster
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/users/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: One entry per member of the organization
+                    items:
+                      properties:
+                        added_at:
+                          description: When the member joined the organization
+                          format: date-time
+                          type: string
+                        email:
+                          description: The member's email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                          type: string
+                        id:
+                          description: The member's stable user id, and what anthropic-organization-member-get and anthropic-workspace-member-get address them by. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                          type: string
+                        name:
+                          description: The member's name as Anthropic holds it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                          type: string
+                        role:
+                          description: 'The member''s organization role — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user. An open set in practice: Anthropic has added to it and this connector does not constrain the value'
+                          type: string
+                        type:
+                          const: user
+                      required:
+                        - id
+                        - type
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    description: True when the organization has more members than this unpaginated call returned
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: email
+          in: query
+          required: false
+          description: Filter by the member email address.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+  /v1/organizations/users/{user_id}:
+    get:
+      operationId: organization_member_get
+      summary: Retrieve one organization member by user id, returning their name, email address, organization role and join date. Returns personal data about a real individual
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/users/retrieve
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  added_at:
+                    description: When the member joined the organization
+                    format: date-time
+                    type: string
+                  email:
+                    description: The member's email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                    type: string
+                  id:
+                    description: The user id, echoed back. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                    type: string
+                  name:
+                    description: The member's name as Anthropic holds it. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                    type: string
+                  role:
+                    description: The member's organization role — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user. An open set in practice; this connector does not constrain the value
+                    type: string
+                  type:
+                    const: user
+                required:
+                  - id
+                  - type
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: The member's user id, as returned in `id` by anthropic-organization-members-list or in `user_id` by anthropic-workspace-members-list
+          schema:
+            minLength: 1
+            type: string
+  /v1/organizations/workspaces:
+    get:
+      operationId: workspaces_list
+      summary: List the organization's workspaces. Unpaginated and excludes archived workspaces by default — this connector cannot request a further page or ask for archived ones
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/workspaces/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: 'One entry per workspace: `id`, `name`, `type: "workspace"`, `created_at`, `archived_at` (absent unless the workspace is archived), plus `data_residency` and user-defined `tags` objects'
+                    items:
+                      properties:
+                        created_at:
+                          format: date-time
+                          type: string
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        type:
+                          const: workspace
+                      required:
+                        - id
+                        - type
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    description: True when the organization has more workspaces than this unpaginated call returned
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: include_archived
+          in: query
+          required: false
+          description: Whether archived workspaces are included.
+          schema:
+            type: boolean
+  /v1/organizations/workspaces/{workspace_id}:
+    get:
+      operationId: workspace_get
+      summary: Retrieve one workspace by id, including its name, creation date, whether it is archived, and its data-residency configuration. Unlike anthropic-workspaces-list this reaches an archived workspace, since the id is given rather than filtered for
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/workspaces/retrieve
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  archived_at:
+                    description: When the workspace was archived, or null if it is not archived
+                    format: date-time
+                    type: string
+                  compartment_id:
+                    description: This workspace's encryption-compartment identifier, referenced in a customer-managed KMS key policy on AWS. An identifier, never key material
+                    type: string
+                  created_at:
+                    format: date-time
+                    type: string
+                  data_residency:
+                    description: Where this workspace's data is stored and which inference geos it permits
+                    properties:
+                      allowed_inference_geos:
+                        description: 'The permitted inference geos: either an array of geo names or the string `unrestricted`. Left untyped rather than given a type, because the vendor documents it as either shape and this file states only what it can name with confidence'
+                      default_inference_geo:
+                        description: The inference geo applied when a request names none
+                        type: string
+                      workspace_geo:
+                        description: The region this workspace's data is stored in. Immutable after creation
+                        type: string
+                    type: object
+                  display_color:
+                    description: The hex colour the Anthropic Console shows this workspace in
+                    type: string
+                  external_key_id:
+                    description: The customer-managed encryption key configuration attached to this workspace, when one is. An identifier, never key material
+                    type: string
+                  id:
+                    description: The workspace id, echoed back
+                    type: string
+                  name:
+                    type: string
+                  tags:
+                    description: User-defined string key-value tags on the workspace. Keys may not begin with `anthropic`. Left otherwise untyped — the keys are the operator's own
+                    type: object
+                  type:
+                    const: workspace
+                required:
+                  - id
+                  - type
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          description: The workspace id, as returned in `id` by anthropic-workspaces-list
+          schema:
+            minLength: 1
+            type: string
+  /v1/organizations/workspaces/{workspace_id}/members:
+    get:
+      operationId: workspace_members_list
+      summary: List who belongs to one workspace and the role each holds in it. Returns the user ids of real individuals; resolve one to a name and email with anthropic-organization-member-get. Unpaginated — this connector cannot request a further page, so on a workspace larger than one page this is a sample and not a roster
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/workspaces/members/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: One entry per member of the workspace
+                    items:
+                      properties:
+                        type:
+                          const: workspace_member
+                        user_id:
+                          description: The member's organization-wide user id, and what anthropic-organization-member-get resolves to a name and email address. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                          type: string
+                        workspace_id:
+                          description: The workspace this membership is in — the same id that was passed in
+                          type: string
+                        workspace_role:
+                          description: The member's role in this workspace — one of workspace_admin, workspace_billing, workspace_developer, workspace_restricted_developer, workspace_user. Distinct from the organization-wide `role` on anthropic-organization-members-list
+                          type: string
+                      required:
+                        - type
+                        - user_id
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    description: True when the workspace has more members than this unpaginated call returned
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          description: The workspace id, as returned in `id` by anthropic-workspaces-list
+          schema:
+            minLength: 1
+            type: string
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+  /v1/organizations/workspaces/{workspace_id}/members/{user_id}:
+    get:
+      operationId: workspace_member_get
+      summary: Retrieve one person's membership of one workspace, and the role they hold in it. This is the direct answer to whether a given user is in a given workspace; it returns the user id of a real individual
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/workspaces/members/retrieve
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  type:
+                    const: workspace_member
+                  user_id:
+                    description: The member's organization-wide user id, echoed back. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                    type: string
+                  workspace_id:
+                    description: The workspace this membership is in — the same id that was passed in
+                    type: string
+                  workspace_role:
+                    description: The member's role in this workspace — one of workspace_admin, workspace_billing, workspace_developer, workspace_restricted_developer, workspace_user
+                    type: string
+                required:
+                  - type
+                  - user_id
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: workspace_id
+          in: path
+          required: true
+          description: The workspace id, as returned in `id` by anthropic-workspaces-list
+          schema:
+            minLength: 1
+            type: string
+        - name: user_id
+          in: path
+          required: true
+          description: The member's user id, as returned in `id` by anthropic-organization-members-list
+          schema:
+            minLength: 1
+            type: string
+  /v1/organizations/api_keys:
+    get:
+      operationId: api_keys_list
+      summary: List the organization's API keys, with each key's name, status and a redacted hint — never the key itself. Unpaginated and unfiltered
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/api_keys/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: 'One entry per API key: `id`, `name`, `status` (`active`, `inactive`, `archived` or `expired`), `type: "api_key"`, `created_at`, `expires_at` (absent for a key that never expires), `partial_key_hint` (a partially redacted display string, safe to show in a UI — never the key), `workspace_id` (absent for a key on the default workspace), and `created_by`/`principal` objects each `{id, type}`'
+                    items:
+                      properties:
+                        created_at:
+                          format: date-time
+                          type: string
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        status:
+                          description: One of active, inactive, archived, expired
+                          type: string
+                        type:
+                          const: api_key
+                      required:
+                        - id
+                        - type
+                        - status
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: status
+          in: query
+          required: false
+          description: Filter by the vendor status value.
+          schema:
+            type: string
+        - name: workspace_id
+          in: query
+          required: false
+          description: Filter by workspace id.
+          schema:
+            type: string
+        - name: created_by_user_id
+          in: query
+          required: false
+          description: Filter by the user id that created the key.
+          schema:
+            type: string
+  /v1/organizations/invites:
+    get:
+      operationId: invites_list
+      summary: List the organization's invites, with the email address invited, the role offered, and whether the invite is still pending. Returns personal data — an email address for a real person. Unpaginated and unfiltered by status, so a `pending` invite must be selected from the returned entries rather than asked for
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/admin/invites/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: One entry per invite, in whatever status the vendor holds it
+                    items:
+                      properties:
+                        accepted_at:
+                          description: When the invite was accepted, or null if it has not been
+                          format: date-time
+                          type: string
+                        email:
+                          description: The email address the invitation was sent to. Identifies a named person — read it for what the calling flow needs and do not persist it beyond that
+                          type: string
+                        expires_at:
+                          description: When the invite expires
+                          format: date-time
+                          type: string
+                        id:
+                          description: The invite's own id — an identifier for the invitation, not for the person
+                          type: string
+                        invited_at:
+                          description: When the invite was created
+                          format: date-time
+                          type: string
+                        rbac_group_ids:
+                          description: RBAC group ids to assign on acceptance, `[]` when none. A Claude Enterprise beta field; present but empty on organizations not using it
+                          items:
+                            type: string
+                          type: array
+                        role:
+                          description: The organization role the invitee is offered — one of admin, billing, claude_code_user, developer, managed, membership_admin, owner, primary_owner, user
+                          type: string
+                        status:
+                          description: One of accepted, deleted, expired, pending. This call cannot filter on it
+                          type: string
+                        type:
+                          const: invite
+                      required:
+                        - id
+                        - type
+                        - status
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    description: True when the organization has more invites than this unpaginated call returned
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: status
+          in: query
+          required: false
+          description: Filter by the vendor status value.
+          schema:
+            type: string
+components:
+  securitySchemes:
+    adminApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    Error:
+      type: object
+      required:
+        - type
+        - error
+      properties:
+        type:
+          const: error
+        error:
+          type: object
+          required:
+            - type
+            - message
+          properties:
+            type:
+              type: string
+            message:
+              type: string

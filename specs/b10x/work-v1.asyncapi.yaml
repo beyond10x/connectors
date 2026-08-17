@@ -1,0 +1,326 @@
+asyncapi: 3.0.0
+channels:
+  moduleEvents:
+    address: /api/work/v2/events
+    messages:
+      work_request_created:
+        $ref: '#/components/messages/work_request_created'
+      work_task_created:
+        $ref: '#/components/messages/work_task_created'
+      work_task_status_changed:
+        $ref: '#/components/messages/work_task_status_changed'
+components:
+  messages:
+    work_request_created:
+      name: work_request_created
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $defs:
+              RequestStatus:
+                enum:
+                - open
+                - planned
+                - active
+                - completed
+                - cancelled
+                type: string
+              TypedRef:
+                additionalProperties: false
+                properties:
+                  kind:
+                    type: string
+                  value:
+                    type: string
+                required:
+                - kind
+                - value
+                type: object
+              WorkRequest:
+                additionalProperties: false
+                properties:
+                  created_at_ms:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  created_by_actor:
+                    type: string
+                  created_by_subject:
+                    type: string
+                  description:
+                    type: string
+                  id:
+                    type: string
+                  references:
+                    items:
+                      $ref: '#/components/messages/work_request_created/payload/properties/data/$defs/TypedRef'
+                    type: array
+                  revision:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  status:
+                    $ref: '#/components/messages/work_request_created/payload/properties/data/$defs/RequestStatus'
+                  tenant_id:
+                    type: string
+                  title:
+                    type: string
+                  updated_at_ms:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  updated_by_actor:
+                    type: string
+                  updated_by_subject:
+                    type: string
+                required:
+                - tenant_id
+                - id
+                - revision
+                - title
+                - description
+                - status
+                - references
+                - created_at_ms
+                - updated_at_ms
+                - created_by_subject
+                - updated_by_subject
+                - created_by_actor
+                - updated_by_actor
+                type: object
+            $schema: https://json-schema.org/draft/2020-12/schema
+            additionalProperties: false
+            properties:
+              request:
+                $ref: '#/components/messages/work_request_created/payload/properties/data/$defs/WorkRequest'
+            required:
+            - request
+            title: RequestCreated
+            type: object
+          id:
+            type: string
+          key:
+            const: request.created
+          module:
+            const: work
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: work/request.created
+    work_task_created:
+      name: work_task_created
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $defs:
+              TaskStatus:
+                enum:
+                - pending
+                - ready
+                - running
+                - blocked
+                - completed
+                - failed
+                - cancelled
+                type: string
+              TypedRef:
+                additionalProperties: false
+                properties:
+                  kind:
+                    type: string
+                  value:
+                    type: string
+                required:
+                - kind
+                - value
+                type: object
+              WorkTask:
+                additionalProperties: false
+                properties:
+                  created_at_ms:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  created_by_actor:
+                    type: string
+                  created_by_subject:
+                    type: string
+                  depends_on:
+                    items:
+                      type: string
+                    type: array
+                  description:
+                    type: string
+                  id:
+                    type: string
+                  references:
+                    items:
+                      $ref: '#/components/messages/work_task_created/payload/properties/data/$defs/TypedRef'
+                    type: array
+                  request_id:
+                    type: string
+                  revision:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  status:
+                    $ref: '#/components/messages/work_task_created/payload/properties/data/$defs/TaskStatus'
+                  tenant_id:
+                    type: string
+                  title:
+                    type: string
+                  updated_at_ms:
+                    format: uint64
+                    minimum: 0
+                    type: integer
+                  updated_by_actor:
+                    type: string
+                  updated_by_subject:
+                    type: string
+                required:
+                - tenant_id
+                - id
+                - request_id
+                - revision
+                - title
+                - description
+                - status
+                - depends_on
+                - references
+                - created_at_ms
+                - updated_at_ms
+                - created_by_subject
+                - updated_by_subject
+                - created_by_actor
+                - updated_by_actor
+                type: object
+            $schema: https://json-schema.org/draft/2020-12/schema
+            additionalProperties: false
+            properties:
+              task:
+                $ref: '#/components/messages/work_task_created/payload/properties/data/$defs/WorkTask'
+            required:
+            - task
+            title: TaskCreated
+            type: object
+          id:
+            type: string
+          key:
+            const: task.created
+          module:
+            const: work
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: work/task.created
+    work_task_status_changed:
+      name: work_task_status_changed
+      payload:
+        additionalProperties: false
+        properties:
+          cursor:
+            minLength: 1
+            type: string
+          data:
+            $defs:
+              TaskStatus:
+                enum:
+                - pending
+                - ready
+                - running
+                - blocked
+                - completed
+                - failed
+                - cancelled
+                type: string
+            $schema: https://json-schema.org/draft/2020-12/schema
+            additionalProperties: false
+            properties:
+              previous_status:
+                $ref: '#/components/messages/work_task_status_changed/payload/properties/data/$defs/TaskStatus'
+              request_id:
+                type: string
+              revision:
+                format: uint64
+                minimum: 0
+                type: integer
+              status:
+                $ref: '#/components/messages/work_task_status_changed/payload/properties/data/$defs/TaskStatus'
+              task_id:
+                type: string
+            required:
+            - task_id
+            - request_id
+            - previous_status
+            - status
+            - revision
+            title: TaskStatusChanged
+            type: object
+          id:
+            type: string
+          key:
+            const: task.status-changed
+          module:
+            const: work
+          occurred_at:
+            format: date-time
+            type: string
+          protocol:
+            const: b10x.module-event.v1
+          schema_version:
+            const: 1
+        required:
+        - protocol
+        - id
+        - module
+        - key
+        - schema_version
+        - occurred_at
+        - cursor
+        - data
+        type: object
+      title: work/task.status-changed
+info:
+  title: work module events
+  version: 0.2.0-dev.1
+operations:
+  receiveModuleEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/moduleEvents'

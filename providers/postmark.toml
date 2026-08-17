@@ -1,0 +1,393 @@
+# Postmark API — hand-authored, curated to the surface this pipeline can express honestly.
+#
+# WHY THIS IS NOT A `[spec]` POINTER. Postmark publishes hand-written reference prose at
+# postmarkapp.com/developer rather than a vendored OpenAPI document, so there is nothing to point
+# `[spec]` at even once ingest (C-4) and the overlay (C-6) land. Drift against the vendor's own docs
+# is therefore undetectable by machine, the same caveat zendesk, freshdesk, github and notion already
+# carry (`docs/designs/provider-operation-inventory.md` §6.7). Checked against
+# postmarkapp.com/developer/api/{email,bounce,server}-api and postmarkapp.com/developer/api/servers-api
+# on 2026-07-31.
+#
+# ---------------------------------------------------------------------------------------------
+# WITHHELD BY RULE: the Account API surface, which returned live Server Tokens in plaintext (C-430).
+# ---------------------------------------------------------------------------------------------
+#
+# **This connector emits 4 operations, and 2 more are named here with the reason** — the same
+# three-category accounting `providers/babelforce.toml` uses (emitted / inexpressible / withheld):
+#
+#   * **`postmark-server-list` and `postmark-server-get` are withheld.** Both returned `ApiTokens`:
+#     that server's own live Server Token(s) **in plaintext**, and on the list, for every server on
+#     the account. `AGENTS.md` § Authentication contract: *"Any operation whose declared response
+#     carries a token — not only an OAuth one — is withheld until C-136's diversion lands"*, because
+#     the host's redactor holds only values the host itself resolved and cannot know a secret minted
+#     by the very call returning it. Withheld 2026-08-01, having shipped in v0.9.0.
+#   * The bounce filters below are the ordinary *inexpressible* category — C-30's query gap.
+#
+# **The previous version of this comment argued for declaring the field and shipping the operation,
+# and it was wrong.** It said, correctly, that omitting `ApiTokens` from `response_schema` "would not
+# hide it at runtime (the vendor still returns it; a caller reading the raw response still sees it)
+# and would hide the *warning* from every reader who only ever sees this connector's declared
+# contract". Both halves of that are true and neither of them licenses returning the token. The
+# choice was never "omit the field or declare it" — it was "return the token or do not", and the
+# operation is what returns it. Describing a credential is not withholding it.
+#
+# **What this costs, stated plainly rather than buried.** Postmark's whole Account API surface goes
+# with the two operations: the `account` service (a service with no operation emits an empty module
+# and an `operations = []` manifest, which `crates/connector-spec/tests/services.rs` refuses — the
+# same fall `providers/babelforce.toml` records for its `auth` service), the
+# `postmark.account_token` credential, and the `account_token` config field that asked a human for
+# it. A connector "asks for everything it needs and nothing it cannot use", and after the withholding
+# there is nothing left that can use an Account Token.
+#
+# **So does the two-credential finding below.** It is kept as a record of what was measured, because
+# the finding is about the mechanism rather than about Postmark, but note before reading it: **this
+# connector no longer demonstrates it.** `crates/connector-flux/tests/postmark_connector.rs` measured
+# the partition on a live two-service connector and can no longer do so. **C-136 does NOT restore these**
+# — it diverts the whole result of an operation that exists to mint a credential, and `ApiTokens` arrives
+# beside the server this call exists to return. `Servers[].ApiTokens` also carries N servers' tokens, which
+# one credential address cannot name. **C-432 does not restore them either** — it settled the choice
+# between the two credential declarations (the discriminator is **purpose, not shape**, so a
+# credential arriving incidentally stays `credential_response`'s case) and it did not make a marked
+# response shippable. C-79 is the mechanism; what would restore both
+# the operations and the demonstration; restore them in the same commit that deletes their entries
+# from `crates/connector-spec/tests/credential_response.rs`.
+#
+# ---------------------------------------------------------------------------------------------
+# C-180'S QUESTION: IS A CREDENTIAL ALREADY ADDRESSABLE PER SERVICE, OR DOES THIS CONNECTOR NEED A
+# NEW MECHANISM? MEASURED, AND THE ANSWER IS: IT ALREADY HOLDS, ONE LEVEL DOWN FROM WHERE THE STORY
+# NOTE POINTS. **Historical from 2026-08-01** — see the withholding block above.
+# ---------------------------------------------------------------------------------------------
+#
+# Postmark genuinely partitions its surface by credential rather than sending both together:
+# `X-Postmark-Server-Token` authenticates sending and per-server message history; a completely
+# separate `X-Postmark-Account-Token` authenticates account-wide administration (creating, listing
+# and inspecting servers). The two are never accepted on the same request — sending with the account
+# token is a 401, and listing servers with a server token is a 401 the other way.
+#
+# **Where the partition actually lives.** It is tempting to look for it on [`CredentialRef`]
+# (`crates/connector-spec/src/credential.rs`), since a credential path already carries a `service`
+# segment (`tenants/<tenant>/<authority>/<service>/<credential>`) and the module docs call that
+# "deliberate headroom: a vendor whose surfaces authenticate separately is expressible the day one
+# appears", reached from `Connector::credential_ref_for`. But `credential_ref_for` always renders the
+# reserved `DEFAULT_SERVICE` for *every* declared credential, whatever service its operations belong
+# to — its own doc comment says so: "a credential is declared at **provider** level ... nothing today
+# needs [a service segment], because credential names are unique within a provider and already
+# distinguish the case." Postmark did not change that; `postmark.server_token` and
+# `postmark.account_token` both resolved through `credential_ref_for` to a path under the elided
+# default service, telling two credentials apart by leaf name alone (`server_token` vs
+# `account_token`), not by a service segment.
+#
+# **What actually kept the two tokens from ever traveling on the same request is a different,
+# already-shipped mechanism: per-operation `auth`.** `Operation::auth` lets an operation override the
+# connector's `default_auth` with its own alternatives list; every operation in the `account` service
+# did exactly that, naming `postmark.account_token` and nothing else, while every operation in
+# `server` declares no `auth` of its own and inherits `default_auth`'s `postmark.server_token`. That
+# override is already general — babelforce's own `[[patch.operations]] auth = [...]` overlay entry
+# uses it on a different axis — so **no change to connector-spec was needed to ship this
+# connector**, and the two-credential partition was enforced at the operation level, which the
+# `[[services]]` split already requires operations to declare correctly (`validate_member_service`,
+# `crates/connector-spec/src/provider.rs`).
+#
+# One more consequence of that split is worth naming: `server` is still a *named* service below, not
+# the elided implicit `default`, even though a single-service Postmark connector would be happy to
+# leave it unnamed. It stays named because renaming it would move every operation's gid and every
+# emitted artifact for a connector whose surface merely narrowed. `AGENTS.md`'s service contract is
+# explicit that a provider declaring any named service loses the implicit `default` entirely — every
+# operation and config field must then name one of the provider's declared services, `server`
+# included. That is a separate, narrower rule from the credential-addressing question above; it
+# decides how operations are grouped, not which token they authenticate with.
+#
+# So the finding for C-177 (Contentful) is: **the address headroom exists but is unused **and**
+# unnecessary** — a connector whose services authenticate separately needs only distinct credential
+# names and a per-operation `auth` override, both of which already ship. Nothing here should be read
+# as recommending `credential_ref_for` grow a per-credential service; that would need a reason no
+# shipped connector has yet given it, since the leaf name already disambiguates every case this
+# repository has met.
+#
+# ---------------------------------------------------------------------------------------------
+# WHAT SHIPS: 4 operations, all Server Token — send an email, read delivery stats, list bounces, get
+# one bounce. The two Account Token operations are withheld; see the block above.
+# ---------------------------------------------------------------------------------------------
+#
+# `postmark-email-send` ships where SendGrid's own send operation could not (`providers/sendgrid.toml`
+# header comment): Postmark's send envelope is flat — `From`, `To`, `Subject`, `HtmlBody`, `TextBody`
+# are all top-level string fields, not SendGrid's `personalizations[].to[]` / `content[]` array
+# nesting — so every field this connector selects is a body-root scalar `wire` can name directly, with
+# no array this pipeline's two-variant `BodyNode` (`crates/connector-flux/src/op.rs`) would have to
+# fake. `To` accepts a single comma-separated string of up to 50 addresses, per the vendor; still a
+# scalar, never an array.
+#
+# **No recipient address, no sender address, and no example value shaped like a real one appears
+# anywhere in this file** — not in an `example`, not in a description, not in a response_schema
+# literal. `From`/`To`/`Cc`/`Bcc`/`ReplyTo` on the send operation are the caller's own input, and
+# every address a *response* can carry (a bounced recipient, an echoed `To`) is documented as
+# personal data with no example, the convention `providers/sendgrid.toml`'s bounce list already
+# carries.
+#
+# **`GET /servers` and `GET /servers/{id}` return `ApiTokens` in the real payload** — the Account
+# API's own mechanism for retrieving a server's Server Token in plaintext — and that is why neither
+# is declared here any more. See the withholding block above; `providers/zoom.toml`'s `start_url`
+# fell to the same rule in the same commit. `providers/zendesk.toml`'s `authenticity_token` did not
+# and must not: that connector documents it as *"not a credential for this API"*, and a rule that
+# cannot tell those two apart is a rule authors work around rather than obey.
+#
+# Only `count`/`offset` (both plain integers) are curated onto `postmark-bounce-list`; Postmark's own
+# `emailFilter`, `tag` and `messageID` filters are free text this pipeline's `fmt`-based query
+# interpolation cannot percent-encode (C-30), the same reasoning that keeps Fly's optional query
+# parameters and SendGrid's free-text filters out of their own connectors.
+#
+# `verify` is `postmark-deliverystats-get`: a bounded, argument-free Server Token read, so a settings
+# page can confirm the sending credential without touching the Account Token at all.
+
+id = "postmark"
+vendor = "Postmark"
+authority = "com.postmarkapp.api"
+
+# **No `api_version`: this vendor puts no version segment in the URL at all.** Every operation path
+# below is unversioned (`/email`, `/bounces`), so there is nothing the file itself spells and
+# nothing to record without asserting a vendor fact from outside it. A `pid` and a credential path
+# render without one; only a `gid` needs both halves.
+base_url = "https://api.postmarkapp.com"
+description = "Postmark transactional email: send a message, read delivery stats and bounces. Listing and inspecting servers is withheld — the Account API returns live Server Tokens in plaintext (C-430)"
+verify = "postmark-deliverystats-get"
+
+# The sending credential, and now the only one. It was the connector default while the `account`
+# service's operations overrode it explicitly; every operation that remains inherits it.
+default_auth = [{ credentials = ["postmark.server_token"] }]
+
+# One named service, and no implicit `default` beside it: the service contract
+# (`AGENTS.md`) is explicit that a provider declaring any named service has no implicit `default` left
+# for an operation to fall into, so every operation and config field below names `server` even though
+# a single-service provider would have been happy to leave it elided. It stays named after the
+# `account` surface was withheld because eliding it now would move every operation's gid.
+[[services]]
+name = "server"
+tags = ["email"]
+description = "Postmark's own \"Server API\" naming: send mail and read one server's delivery stats and bounces. Authenticates with the Server Token; the Account Token cannot reach this surface at all"
+
+# **There is deliberately no `[[services]]` entry for `account`.** Both of the Account API operations
+# it carried are withheld by rule (C-430 — they return live Server Tokens in plaintext), so the
+# service would carry zero operations, and `crates/connector-spec/tests/services.rs` refuses that
+# outright: a build emits an empty module and an `operations = []` manifest for it. The same fall
+# `providers/babelforce.toml` records for its `auth` service, for the same reason.
+
+# ---------------------------------------------------------------------------------------------
+# Credentials — one. `postmark.account_token` stood beside it until 2026-08-01 and went with the
+# Account API surface: nothing this connector emits can use an Account Token, and a connector "asks
+# for everything it needs and nothing it cannot use". See the withholding block in the header.
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "postmark.server_token"
+scheme = { header = { name = "X-Postmark-Server-Token" } }
+env = ["POSTMARK_SERVER_TOKEN"]
+description = "Postmark Server API token, scoped to one server. Authenticates sending and that server's own message history; cannot list or manage servers"
+
+# ---------------------------------------------------------------------------------------------
+# Operations — `server` service (Server Token): send, delivery stats, bounces
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "postmark-email-send"
+service = "server"
+method = "POST"
+direction = "write"
+path = "/email"
+description = "Send a single email immediately from the token's server. Delivered within seconds and cannot be recalled"
+risk = "high"
+idempotency = "non_idempotent"
+
+[[operations.params.body]]
+name = "from"
+wire = "From"
+description = "The sending address. Must be a Sender Signature or verified domain address on this server — the caller's own input, never an example value here"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "to"
+wire = "To"
+description = "Recipient address(es), comma-separated, up to 50. The caller's own input, never an example value here"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[operations.params.body]]
+name = "cc"
+wire = "Cc"
+description = "Additional recipients, comma-separated. The caller's own input, never an example value here"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "bcc"
+wire = "Bcc"
+description = "Blind-copied recipients, comma-separated. The caller's own input, never an example value here"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "subject"
+wire = "Subject"
+description = "The email's subject line"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "text_body"
+wire = "TextBody"
+description = "The plain-text body. Postmark requires at least one of `text_body` or `html_body`; this schema cannot express that cross-field rule and does not enforce it"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "html_body"
+wire = "HtmlBody"
+description = "The HTML body. Postmark requires at least one of `text_body` or `html_body`; this schema cannot express that cross-field rule and does not enforce it"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "reply_to"
+wire = "ReplyTo"
+description = "Reply-To address, when replies should not go to `from`. The caller's own input, never an example value here"
+required = false
+schema = { type = "string" }
+
+[[operations.params.body]]
+name = "tag"
+wire = "Tag"
+description = "A short label for categorizing this message in Postmark's activity view and statistics"
+required = false
+schema = { type = "string" }
+
+[operations.response_schema]
+type = "object"
+required = ["To", "SubmittedAt", "MessageID", "ErrorCode", "Message"]
+properties = { To = { type = "string", description = "Echoes the recipient(s) this message was sent to — personal data, never an example value" }, SubmittedAt = { type = "string", description = "When Postmark accepted the message for delivery" }, MessageID = { type = "string", description = "Postmark's id for this send; the handle for later bounce or delivery-stat lookups" }, ErrorCode = { type = "integer", description = "0 on success" }, Message = { type = "string", description = "Human-readable status, \"OK\" on success" } }
+
+[operations.error_envelope]
+message_pointer = "/Message"
+code_pointer = "/ErrorCode"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "postmark-deliverystats-get"
+service = "server"
+method = "GET"
+direction = "read"
+path = "/deliverystats"
+description = "Get delivery statistics for this server: total inactive addresses and a breakdown of bounces by type. Also this connector's `verify` — a bounded read that runs unattended, needing no argument"
+risk = "low"
+idempotency = "idempotent"
+
+[operations.response_schema]
+type = "object"
+required = ["InactiveMails", "Bounces"]
+properties = { InactiveMails = { type = "integer", description = "Recipient addresses currently marked inactive on this server" }, Bounces = { type = "array", description = "One entry per bounce type, plus a leading \"All\" total with no `Type` field", items = { type = "object", required = ["Name", "Count"], properties = { Type = { type = "string", description = "Absent on the leading \"All\" total entry" }, Name = { type = "string" }, Count = { type = "integer" } } } } }
+
+[operations.error_envelope]
+message_pointer = "/Message"
+code_pointer = "/ErrorCode"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "postmark-bounce-list"
+service = "server"
+method = "GET"
+direction = "read"
+path = "/bounces"
+description = "List bounces recorded on this server, most recent first"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.query]]
+name = "count"
+description = "Number of bounces to return; Postmark requires this on every call"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 500 }
+
+[[operations.params.query]]
+name = "offset"
+description = "Number of bounces to skip, for paging; Postmark requires this on every call"
+required = true
+schema = { type = "integer", minimum = 0 }
+
+# No `example` anywhere below: every entry is a real recipient's bounce record, and this repository
+# must never carry a captured or plausible instance of one.
+[operations.response_schema]
+type = "object"
+required = ["TotalCount", "Bounces"]
+properties = { TotalCount = { type = "integer" }, Bounces = { type = "array", items = { type = "object", required = ["ID", "Type", "Name", "Email", "Inactive", "CanActivate"], properties = { ID = { type = "integer" }, Type = { type = "string", description = "e.g. HardBounce, SoftBounce, SpamComplaint" }, TypeCode = { type = "integer" }, Name = { type = "string" }, Tag = { type = "string", description = "The message's tag, when it had one" }, MessageID = { type = "string" }, ServerID = { type = "integer" }, Description = { type = "string" }, Details = { type = "string" }, Email = { type = "string", description = "The bounced recipient's own address — personal data, never an example value" }, From = { type = "string", description = "The sending address the bounced message used — never an example value" }, BouncedAt = { type = "string" }, DumpAvailable = { type = "boolean", description = "Whether the raw SMTP dump can be fetched separately" }, Inactive = { type = "boolean" }, CanActivate = { type = "boolean" }, Subject = { type = "string" } } } } }
+
+[operations.error_envelope]
+message_pointer = "/Message"
+code_pointer = "/ErrorCode"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "postmark-bounce-get"
+service = "server"
+method = "GET"
+direction = "read"
+path = "/bounces/{bounce_id}"
+description = "Get one recorded bounce by id"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "bounce_id"
+description = "The bounce's id, from postmark-bounce-list or postmark-email-send's follow-up lookups"
+required = true
+schema = { type = "integer" }
+
+# No `example` anywhere below: this is a real recipient's bounce record.
+[operations.response_schema]
+type = "object"
+required = ["ID", "Type", "Name", "Email", "Inactive", "CanActivate"]
+properties = { ID = { type = "integer" }, Type = { type = "string" }, TypeCode = { type = "integer" }, Name = { type = "string" }, Tag = { type = "string" }, MessageID = { type = "string" }, ServerID = { type = "integer" }, Description = { type = "string" }, Details = { type = "string" }, Email = { type = "string", description = "The bounced recipient's own address — personal data, never an example value" }, From = { type = "string", description = "The sending address the bounced message used — never an example value" }, BouncedAt = { type = "string" }, DumpAvailable = { type = "boolean" }, Inactive = { type = "boolean" }, CanActivate = { type = "boolean" }, Subject = { type = "string" } }
+
+[operations.error_envelope]
+message_pointer = "/Message"
+code_pointer = "/ErrorCode"
+
+# ---------------------------------------------------------------------------------------------
+# Configuration — what a product asks a human for before any of the above can run
+# ---------------------------------------------------------------------------------------------
+
+[[config]]
+name = "server_token"
+service = "server"
+label = "Postmark Server Token"
+help = "Find it on the server's API Tokens tab in the Postmark dashboard. Grants sending and that server's own message history only — it cannot list or manage servers"
+format = "token"
+secret = true
+docs_url = "https://postmarkapp.com/support/article/1008-what-are-the-account-server-api-tokens"
+binds = "credential.postmark.server_token"
+

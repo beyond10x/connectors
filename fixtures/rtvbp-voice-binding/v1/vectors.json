@@ -1,0 +1,11 @@
+[
+  {"case":"exact-profile","offer":"b10x.voice.v1","action":"initialize","outcome":"accepted","code":"session_ready"},
+  {"case":"missing-profile","offer":null,"action":"upgrade","outcome":"refused","code":"profile_required"},
+  {"case":"product-profile","offer":"babelforce.v1","action":"upgrade","outcome":"refused","code":"product_profile_refused"},
+  {"case":"early-media","offer":"b10x.voice.v1","action":"media_before_initialize","outcome":"refused","code":"invalid_state"},
+  {"case":"wrong-media","offer":"b10x.voice.v1","action":"initialize_wrong_media","outcome":"refused","code":"media_mismatch"},
+  {"case":"oversize-control","offer":"b10x.voice.v1","action":"control_over_16384_bytes","outcome":"refused","code":"frame_too_large"},
+  {"case":"bounded-input-loss","offer":"b10x.voice.v1","action":"input_queue_over_50_frames","outcome":"degraded","code":"media_loss_bounded"},
+  {"case":"terminal-race","offer":"b10x.voice.v1","action":"two_serialized_terminal_actions","outcome":"accepted","code":"terminal_unchanged"}
+]
+

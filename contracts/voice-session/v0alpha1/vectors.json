@@ -1,0 +1,12 @@
+[
+  {"case":"initialize","from":"created","action":"initialize","to":"ready","outcome":"accepted","code":"session_ready"},
+  {"case":"duplicate-initialize","from":"ready","action":"initialize","to":"ready","outcome":"refused","code":"invalid_state"},
+  {"case":"media-before-ready","from":"created","action":"input_media","to":"created","outcome":"refused","code":"invalid_state"},
+  {"case":"bounded-input-loss","from":"ready","action":"input_overflow","to":"ready","outcome":"degraded","code":"media_loss_bounded"},
+  {"case":"output-overload","from":"ready","action":"output_overload","to":"closing","outcome":"degraded","code":"media_overload"},
+  {"case":"barge-in","from":"ready","action":"interrupt_output","to":"ready","outcome":"accepted","code":"playback_interrupted"},
+  {"case":"close","from":"ready","action":"close","to":"closed","outcome":"accepted","code":"session_closed"},
+  {"case":"terminal-is-once","from":"closed","action":"close","to":"closed","outcome":"accepted","code":"terminal_unchanged"},
+  {"case":"media-after-close","from":"closed","action":"input_media","to":"closed","outcome":"refused","code":"session_terminated"}
+]
+

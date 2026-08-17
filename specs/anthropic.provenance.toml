@@ -1,0 +1,43 @@
+version = 1
+
+# These are B10x-authored source documents. Anthropic publishes the cited HTML reference
+# pages, not these OpenAPI bytes. Each operation carries its exact endpoint reference in the YAML;
+# the shared authentication and version references are recorded here.
+
+[[spec]]
+path = "specs/anthropic/models-2023-06-01.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-13"
+reviewed_at = "2026-08-13"
+sha256 = "38e054bae8e051a58493b6978bcab5a64b15c0544588218fa789646d01b431df"
+coverage = "exact-shipped-surface"
+purpose = "Authoritative source for the two Anthropic Models API operations shipped by providers/anthropic.toml. Optional pagination inputs remain in the source and are explicitly omitted by the reviewed overlay."
+references = [
+  "https://platform.claude.com/docs/en/manage-claude/authentication",
+  "https://platform.claude.com/docs/en/api/versioning",
+  "https://platform.claude.com/docs/en/api/models/list",
+  "https://platform.claude.com/docs/en/api/models/retrieve",
+]
+
+[[spec]]
+path = "specs/anthropic/admin-2023-06-01.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-08-13"
+reviewed_at = "2026-08-13"
+sha256 = "8280d48e48dd33a3c5f9d899dbc03d4154e23928c4aa9b304ceceda3791ad718"
+coverage = "exact-shipped-surface"
+purpose = "Authoritative source for the nine read-only Anthropic Admin API operations shipped by providers/anthropic.toml. Optional filters and pagination inputs remain in the source and are explicitly omitted by the reviewed overlay."
+references = [
+  "https://platform.claude.com/docs/en/manage-claude/overview",
+  "https://platform.claude.com/docs/en/manage-claude/authentication",
+  "https://platform.claude.com/docs/en/api/versioning",
+  "https://platform.claude.com/docs/en/api/admin/organizations/me",
+  "https://platform.claude.com/docs/en/api/admin/users/list",
+  "https://platform.claude.com/docs/en/api/admin/users/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/list",
+  "https://platform.claude.com/docs/en/api/admin/workspaces/members/retrieve",
+  "https://platform.claude.com/docs/en/api/admin/api_keys/list",
+  "https://platform.claude.com/docs/en/api/admin/invites/list",
+]

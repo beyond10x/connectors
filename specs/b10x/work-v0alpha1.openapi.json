@@ -1,0 +1,288 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "B10x Work API",
+    "version": "v0alpha1",
+    "description": "Bounded request, task, and event coordination. Work records coordination state; it does not execute performers, store Connector credentials, or grant authority."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/api/work/v1/requests": {
+      "post": {
+        "operationId": "createWorkRequest",
+        "summary": "Create or replay one work request",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Created request or idempotent replay", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkRequest" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "get": {
+        "operationId": "listWorkRequests",
+        "summary": "List work requests",
+        "parameters": [
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": { "description": "Request page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkRequestPage" } } } },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/requests/{id}": {
+      "get": {
+        "operationId": "getWorkRequest",
+        "summary": "Get one work request",
+        "parameters": [{ "$ref": "#/components/parameters/WorkId" }],
+        "responses": {
+          "200": { "description": "Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkRequest" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/requests/{id}/tasks": {
+      "post": {
+        "operationId": "createWorkTask",
+        "summary": "Create or replay one task under a request",
+        "parameters": [
+          { "$ref": "#/components/parameters/WorkId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateTask" } } }
+        },
+        "responses": {
+          "200": { "description": "Created task or idempotent replay", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkTask" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/tasks": {
+      "get": {
+        "operationId": "listWorkTasks",
+        "summary": "List work tasks",
+        "parameters": [
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": { "description": "Task page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkTaskPage" } } } },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/tasks/{id}": {
+      "get": {
+        "operationId": "getWorkTask",
+        "summary": "Get one work task",
+        "parameters": [{ "$ref": "#/components/parameters/WorkId" }],
+        "responses": {
+          "200": { "description": "Task", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkTask" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/tasks/{id}/status": {
+      "patch": {
+        "operationId": "updateWorkTaskStatus",
+        "summary": "Update task status with optimistic revision checking",
+        "parameters": [{ "$ref": "#/components/parameters/WorkId" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTaskStatus" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated task", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkTask" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/work/v1/events": {
+      "get": {
+        "operationId": "listWorkEvents",
+        "summary": "List ordered work events after a sequence",
+        "parameters": [
+          { "name": "after_sequence", "in": "query", "required": false, "schema": { "type": "integer", "format": "uint64", "minimum": 0, "default": 0 } },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": { "description": "Event page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkEventPage" } } } },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "WorkId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/WorkId" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[!-~]+$" }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 128 }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+      }
+    },
+    "responses": {
+      "BadRequest": { "description": "Invalid bounded input", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "Work record not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Conflict": { "description": "Revision conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "InternalError": { "description": "Storage or transport failure", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "WorkId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.:-]+$" },
+      "TypedRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": { "$ref": "#/components/schemas/WorkId" },
+          "value": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      },
+      "RequestStatus": { "type": "string", "enum": ["open", "planned", "active", "completed", "cancelled"] },
+      "TaskStatus": { "type": "string", "enum": ["pending", "ready", "running", "blocked", "completed", "failed", "cancelled"] },
+      "AggregateKind": { "type": "string", "enum": ["request", "task"] },
+      "CreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 65536 },
+          "description": { "type": "string", "maxLength": 65536, "default": "" },
+          "references": { "type": "array", "maxItems": 128, "items": { "$ref": "#/components/schemas/TypedRef" }, "default": [] }
+        }
+      },
+      "CreateTask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 65536 },
+          "description": { "type": "string", "maxLength": 65536, "default": "" },
+          "depends_on": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/components/schemas/WorkId" }, "default": [] },
+          "references": { "type": "array", "maxItems": 128, "items": { "$ref": "#/components/schemas/TypedRef" }, "default": [] }
+        }
+      },
+      "UpdateTaskStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["expected_revision", "status"],
+        "properties": {
+          "expected_revision": { "type": "integer", "format": "uint64", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/TaskStatus" }
+        }
+      },
+      "WorkRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "revision", "title", "description", "status", "references", "created_at_ms", "updated_at_ms"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/WorkId" },
+          "revision": { "type": "integer", "format": "uint64", "minimum": 1 },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/RequestStatus" },
+          "references": { "type": "array", "items": { "$ref": "#/components/schemas/TypedRef" } },
+          "created_at_ms": { "type": "integer", "format": "uint64", "minimum": 0 },
+          "updated_at_ms": { "type": "integer", "format": "uint64", "minimum": 0 }
+        }
+      },
+      "WorkTask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "request_id", "revision", "title", "description", "status", "depends_on", "references", "created_at_ms", "updated_at_ms"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/WorkId" },
+          "request_id": { "$ref": "#/components/schemas/WorkId" },
+          "revision": { "type": "integer", "format": "uint64", "minimum": 1 },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/TaskStatus" },
+          "depends_on": { "type": "array", "items": { "$ref": "#/components/schemas/WorkId" } },
+          "references": { "type": "array", "items": { "$ref": "#/components/schemas/TypedRef" } },
+          "created_at_ms": { "type": "integer", "format": "uint64", "minimum": 0 },
+          "updated_at_ms": { "type": "integer", "format": "uint64", "minimum": 0 }
+        }
+      },
+      "WorkEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "aggregate_kind", "aggregate_id", "aggregate_revision", "kind", "at_ms"],
+        "properties": {
+          "sequence": { "type": "integer", "format": "uint64", "minimum": 1 },
+          "aggregate_kind": { "$ref": "#/components/schemas/AggregateKind" },
+          "aggregate_id": { "$ref": "#/components/schemas/WorkId" },
+          "aggregate_revision": { "type": "integer", "format": "uint64", "minimum": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "at_ms": { "type": "integer", "format": "uint64", "minimum": 0 }
+        }
+      },
+      "WorkRequestPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "next_cursor"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/WorkRequest" } },
+          "next_cursor": { "type": ["string", "null"] }
+        }
+      },
+      "WorkTaskPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "next_cursor"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/WorkTask" } },
+          "next_cursor": { "type": ["string", "null"] }
+        }
+      },
+      "WorkEventPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "next_cursor"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/WorkEvent" } },
+          "next_cursor": { "type": ["string", "null"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}

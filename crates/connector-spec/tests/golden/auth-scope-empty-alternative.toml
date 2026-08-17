@@ -1,0 +1,24 @@
+# An empty set would say that a scope-gated credential needs no proven scope and therefore makes the
+# requirement read stronger than it is.
+id = "acme"
+base_url = "https://api.acme.test"
+
+[[auth]]
+name = "acme.bot_token"
+scheme = "bearer"
+entry = "connect_session"
+
+[[operations]]
+id = "acme-send"
+method = "POST"
+direction = "write"
+path = "/send"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+auth = [{ credentials = ["acme.bot_token"], scopes = { "acme.bot_token" = [[]] } }]

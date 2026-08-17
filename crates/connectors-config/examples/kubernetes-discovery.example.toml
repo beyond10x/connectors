@@ -1,0 +1,19 @@
+[owner]
+tenant_id = "tenant-local"
+agent_id = "agent-dev"
+agent_revision = 1
+authority_snapshot_id = "authority-dev-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[kubernetes]
+grant_ref = "grant:kubernetes:local-discovery"
+initiation = "b10x"
+namespaces = ["monitoring"]
+allow_exec_auth = false
+resource_limit = 256
+
+[kubernetes.target_grants]
+grafana = "grant:grafana:cluster-service"
+prometheus = "grant:prometheus:cluster-service"
+loki = "grant:loki:cluster-service"
+alertmanager = "grant:alertmanager:cluster-service"

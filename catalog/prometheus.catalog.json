@@ -1,0 +1,203 @@
+{
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "authority": "io.prometheus.api",
+  "config": [
+    {
+      "approval": "operator",
+      "binds": "endpoint.origin",
+      "docs_url": "https://prometheus.io/docs/prometheus/latest/querying/api/",
+      "format": "origin",
+      "help": "Required only for a direct Connection. A Grafana-mediated Connection resolves no direct origin",
+      "label": "Prometheus origin",
+      "level": "connection",
+      "name": "origin",
+      "required": true,
+      "secret": false,
+      "service": "default"
+    }
+  ],
+  "connector": "prometheus",
+  "description": "Query Prometheus metrics with bounded native PromQL range semantics, directly or through a mediated Connection",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Evaluate a PromQL expression over a bounded caller-selected time range",
+        "input_schema": {
+          "properties": {
+            "end": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query",
+            "start",
+            "end",
+            "step"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Evaluate a PromQL expression over a bounded caller-selected time range",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "prometheus-query-range",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "query",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "query"
+        },
+        {
+          "name": "start",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "start"
+        },
+        {
+          "name": "end",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "end"
+        },
+        {
+          "name": "step",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "step"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "end",
+            "value": {
+              "$param": "end"
+            }
+          },
+          {
+            "name": "query",
+            "value": {
+              "$param": "query"
+            }
+          },
+          {
+            "name": "start",
+            "value": {
+              "$param": "start"
+            }
+          },
+          {
+            "name": "step",
+            "value": {
+              "$param": "step"
+            }
+          }
+        ],
+        "url": "{base}/api/v1/query_range"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "object"
+          },
+          "error": {
+            "type": "string"
+          },
+          "errorType": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "success",
+              "error"
+            ],
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "sre",
+        "developer",
+        "data-analyst"
+      ],
+      "base_url": "{origin}",
+      "name": "default",
+      "tags": [
+        "observability",
+        "infrastructure"
+      ]
+    }
+  ],
+  "vendor": "Prometheus",
+  "verify": "prometheus-query-range"
+}

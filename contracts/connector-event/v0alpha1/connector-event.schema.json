@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/contracts/connector-event/v0alpha1/connector-event.schema.json",
+  "title": "B10x ConnectorEvent v0alpha1 frame",
+  "oneOf": [{"$ref":"#/$defs/request_envelope"},{"$ref":"#/$defs/response_envelope"}],
+  "$defs": {
+    "ref":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[^\\s\\u0000-\\u001f\\u007f]+$"},
+    "owner":{"type":"object","additionalProperties":false,"required":["tenant_id","agent_id","agent_revision","authority_snapshot_id","authority_snapshot_sha256"],"properties":{"tenant_id":{"$ref":"#/$defs/ref"},"agent_id":{"$ref":"#/$defs/ref"},"agent_revision":{"type":"integer","minimum":1},"authority_snapshot_id":{"$ref":"#/$defs/ref"},"authority_snapshot_sha256":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"}}},
+    "request_envelope":{"type":"object","additionalProperties":false,"required":["protocol","request_id","context","request"],"properties":{"protocol":{"const":"b10x.connector-event.v0alpha1"},"request_id":{"type":"string","minLength":1,"maxLength":128},"context":{"$ref":"#/$defs/owner"},"request":{"$ref":"#/$defs/request"}}},
+    "request":{"oneOf":[
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"search"},"params":{"type":"object","additionalProperties":false,"required":["query","limit"],"properties":{"query":{"type":"string","maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":64}}}}},
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"receive"},"params":{"type":"object","additionalProperties":false,"required":["channel_ref","limit","wait_ms"],"properties":{"channel_ref":{"$ref":"#/$defs/ref"},"after":{"type":"string","pattern":"^[0-9]+$","maxLength":128},"limit":{"type":"integer","minimum":1,"maximum":100},"wait_ms":{"type":"integer","minimum":0,"maximum":30000}}}}},
+      {"type":"object","additionalProperties":false,"required":["method","params"],"properties":{"method":{"const":"replay"},"params":{"type":"object","additionalProperties":false,"required":["event_ref"],"properties":{"event_ref":{"$ref":"#/$defs/ref"}}}}}
+    ]},
+    "data_event":{"type":"object","additionalProperties":false,"required":["event_ref","channel_ref","connection_ref","integration_ref","event_type","provenance","received_at_unix_ms","payload"],"properties":{"event_ref":{"$ref":"#/$defs/ref"},"channel_ref":{"$ref":"#/$defs/ref"},"connection_ref":{"$ref":"#/$defs/ref"},"integration_ref":{"$ref":"#/$defs/ref"},"event_type":{"$ref":"#/$defs/ref"},"provenance":{"enum":["native","polled"]},"received_at_unix_ms":{"type":"integer","minimum":0},"payload":true}},
+    "response_envelope":{"type":"object","additionalProperties":false,"required":["protocol","request_id","status"],"properties":{"protocol":{"const":"b10x.connector-event.v0alpha1"},"request_id":{"type":"string","minLength":1,"maxLength":128},"status":{"enum":["ok","error"]},"response":{"type":"object"},"error":{"$ref":"#/$defs/error"}},"oneOf":[{"required":["response"],"not":{"required":["error"]}},{"required":["error"],"not":{"required":["response"]}}]},
+    "error":{"type":"object","additionalProperties":false,"required":["code","message","retriable"],"properties":{"code":{"enum":["unavailable","not_found","not_granted","invalid_input","stale_authority","protocol"]},"message":{"type":"string","minLength":1,"maxLength":4096},"retriable":{"type":"boolean"}}}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "bundle": "b10x.rtvbp-voice-binding",
+  "version": "v1",
+  "stability": "alpha",
+  "files": [
+    {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/README.md","bytes":1098,"sha256":"3ce7d1a28fbe7dd422f6e4f6ca453efc20442ff97a565011db497aadce989929"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.schema.json","bytes":4307,"sha256":"6feb5cf3c4b339578f5472962cc67001bbcf4ae25208786944fe07320868ca4d"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.json","bytes":2143,"sha256":"d97a2d77f0d9c2d7b3a6c73b2d98f2a642f26fbbdc234c063545d6582d84bb24"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.schema.json","bytes":667,"sha256":"5cc8f030184c103528c7295d7aabbc3e6ad48b35c683b73ebdb44c3fb280a401"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.json","bytes":1072,"sha256":"e3a2f0dc514dae5651646bf193a016232cc62c813bffd5d1ec588190bc67d2e4"}
+  ]
+}

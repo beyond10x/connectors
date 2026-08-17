@@ -1,0 +1,36 @@
+[package]
+name = "driver-sip"
+description = "Development-gated sipx implementation of the neutral TelephonySession port."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+
+[workspace]
+resolver = "3"
+members = ["."]
+
+[dependencies]
+async-trait = "0.1"
+bytes = "1"
+domain = { version = "0.1.0", path = "../domain" }
+service = { version = "0.1.0", path = "../service" }
+sipx-call = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
+sipx-media = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
+sipx-sip = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
+sipx-transport = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["macros", "net", "rt", "sync", "time"] }
+tokio-util = "0.7"
+
+[dev-dependencies]
+connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
+ed25519-dalek = "2"
+protocol = { version = "0.1.0", path = "../protocol" }
+rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
+rtvbp-voice-endpoint = { version = "0.1.0", path = "../rtvbp-voice-endpoint" }
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }

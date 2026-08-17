@@ -1,0 +1,18 @@
+# An operation with no method. There is no default: guessing GET would turn a forgotten `method`
+# into a silently different request.
+id = "zendesk"
+base_url = "https://acme.zendesk.com"
+
+[[operations]]
+id = "zendesk.ticket.show"
+path = "/api/v2/tickets/{ticket_id}.json"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+auth = []

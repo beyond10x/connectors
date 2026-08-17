@@ -1,0 +1,34 @@
+# The build orchestrator (design 02 §2): pipeline, document lowering, pack writer, site projection,
+# diff, scaffold.
+#
+# Extracted from the predecessor's `connector-cli` **minus the Flux emitter and the legacy artifact
+# writers**: no `connector-flux` edge, no `.flux` module or `.connector.toml` manifest, no
+# per-operation renderings, no generated Rust tables, no README rasterisation, no native-plugin
+# migration check. The fences came with it and got stronger — `tests/main/engine_free.rs` now asserts
+# the absence of every `codewandler-flux-*` crate over the *whole workspace* rather than over one
+# crate's subgraph.
+
+[package]
+name = "catalog-build"
+description = "Compiles the reviewed connector declarations into the canonical documents, the catalog pack, the lockfile and the site projection."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+connector-spec.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+jsonschema.workspace = true
+
+[dev-dependencies]
+# The pack reader, so the pack↔document invariant is asserted through the code that actually serves
+# the pack rather than through a second parser written for the test. Dev-only: nothing in the build
+# path reads a pack, it only writes one.
+catalog-reader.workspace = true

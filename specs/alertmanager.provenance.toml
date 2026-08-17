@@ -1,0 +1,21 @@
+version = 1
+
+[[spec]]
+path = "specs/alertmanager/openapi-v0.31.0.yaml"
+origin = "vendor"
+source_url = "https://raw.githubusercontent.com/prometheus/alertmanager/v0.31.0/api/v2/openapi.yaml"
+upstream_version = "v0.31.0"
+fetched_at = "2026-08-15T00:00:00Z"
+upstream_sha256 = "13e407becad18db3163ab3748e011012fe2a1916430dba051e91ca13fc4be19b"
+sha256 = "fc25890a83326532ef75cce497203fe74ce78d97033029a3d870a066b95751e0"
+coverage = "complete-upstream-swagger-source"
+purpose = "Pinned official Alertmanager Swagger 2 source. The local byte copy differs only by one terminal newline required by the repository patch format."
+
+[[spec]]
+path = "specs/alertmanager/http-api-v0.31.0.openapi.yaml"
+origin = "vendor-derived"
+derived_from = "specs/alertmanager/openapi-v0.31.0.yaml"
+reviewed_at = "2026-08-15"
+sha256 = "081c702b33459ec2af24df9095b82b3a4cca515a8292e05699aae8fea180d7b4"
+coverage = "exact-shipped-surface"
+purpose = "OpenAPI 3 projection of the official GET /api/v2/alerts operation selected by providers/alertmanager.toml."

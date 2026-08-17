@@ -1,0 +1,23 @@
+[package]
+name = "connect-session-transport"
+description = "Shared owner-authenticated, bounded Unix transport for Connector credential acquisition."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+workspace = "../connectors-runtime"
+
+[dependencies]
+base64 = "0.22"
+connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["io-util", "net", "time"] }
+zeroize = "1"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["macros", "rt"] }

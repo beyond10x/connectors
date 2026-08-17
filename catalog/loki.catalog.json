@@ -1,0 +1,211 @@
+{
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "authority": "com.grafana.loki.api",
+  "config": [
+    {
+      "approval": "operator",
+      "binds": "endpoint.origin",
+      "docs_url": "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+      "format": "origin",
+      "help": "Required only for a direct Connection. A Grafana-mediated Connection resolves no direct origin",
+      "label": "Loki origin",
+      "level": "connection",
+      "name": "origin",
+      "required": true,
+      "secret": false,
+      "service": "default"
+    }
+  ],
+  "connector": "loki",
+  "description": "Query Loki logs with bounded native LogQL range semantics, directly or through a mediated Connection",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Query LogQL streams or metrics over a bounded caller-selected time range",
+        "input_schema": {
+          "properties": {
+            "direction": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "query": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query",
+            "start",
+            "end",
+            "limit",
+            "direction"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential",
+      "description": "Query LogQL streams or metrics over a bounded caller-selected time range",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "loki-query-range",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "query",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "query"
+        },
+        {
+          "name": "start",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "start"
+        },
+        {
+          "name": "end",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "end"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 5000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "direction",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "enum": [
+              "forward",
+              "backward"
+            ],
+            "type": "string"
+          },
+          "symbol": "direction"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "direction",
+            "value": {
+              "$param": "direction"
+            }
+          },
+          {
+            "name": "end",
+            "value": {
+              "$param": "end"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "query",
+            "value": {
+              "$param": "query"
+            }
+          },
+          {
+            "name": "start",
+            "value": {
+              "$param": "start"
+            }
+          }
+        ],
+        "url": "{base}/loki/api/v1/query_range"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "sre",
+        "developer",
+        "security-engineer"
+      ],
+      "base_url": "{origin}",
+      "name": "default",
+      "tags": [
+        "observability",
+        "infrastructure"
+      ]
+    }
+  ],
+  "vendor": "Grafana Loki",
+  "verify": "loki-query-range"
+}

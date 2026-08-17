@@ -1,0 +1,453 @@
+# Slack Web API, Admin API and Events API.
+#
+# `scripts/vendor-slack-spec.py` pins Slack's live hosted Swagger 2 document, scrubs it, and derives
+# the two exact OpenAPI 3 projections below. The complete source remains vendored for drift review;
+# only the eight operations named here enter the catalog, and every one explicitly states whether
+# it is projected to an agent. Slack currently publishes no maintained Events AsyncAPI document, so
+# the third source is a repository-authored exact two-message AsyncAPI projection grounded in the
+# current official event references. Its origin is recorded in `specs/slack.provenance.toml`.
+
+id = "slack"
+vendor = "Slack"
+authority = "com.slack.api"
+api_version = "v1"
+base_url = "https://slack.com"
+description = "Slack messaging as the installed Zwirn bot or as a consenting user, inbound events, and a curated read-only Enterprise Admin surface"
+default_auth = [{ credentials = ["slack.bot_token"] }]
+verify = "slack-users-info"
+
+[[services]]
+name = "default"
+legacy = true
+tags = ["messaging"]
+audiences = ["developer", "support-agent", "project-manager", "sales-rep"]
+
+[[services]]
+name = "admin"
+description = "Curated read-only Enterprise organization administration"
+tags = ["identity", "messaging"]
+audiences = ["sre", "security-engineer"]
+
+[[services]]
+name = "login"
+description = "Slack OAuth v2 authorization and token endpoints. The host uses this service only while creating or refreshing a Connection"
+base_url = "https://slack.com"
+
+[[spec]]
+service = "default"
+path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
+source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+upstream_version = "1.7.0"
+fetched_at = "2026-08-15T00:00:00Z"
+sha256 = "951705a5eee2911ff60ccc3a7a613fb7c96dbcfe554463829d288bb8951cafba"
+
+[[spec]]
+service = "admin"
+path = "specs/slack/admin-api-selected-1.7.0-2026-08-15.openapi.json"
+source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
+upstream_version = "1.7.0"
+fetched_at = "2026-08-15T00:00:00Z"
+sha256 = "cdf527e2ee12c99869faf00748d8f3ae044f8e137783bdfefd1c9e0f11ffda1b"
+
+[[spec]]
+kind = "asyncapi"
+service = "default"
+path = "specs/slack/events-selected-2026-08-15.asyncapi.yaml"
+upstream_version = "2026-08-15"
+fetched_at = "2026-08-15T00:00:00Z"
+sha256 = "9a967daeabf79901ce5df35244d8e25647b0b8a1026372b001b61d2ea5c49052"
+
+# Credential purposes are deliberately not interchangeable. An `xapp` app token opens Socket
+# Mode; it cannot call messaging methods. An admin token is a user-subject OAuth token obtained by
+# an Enterprise Org Admin/Owner through an org-wide installation; the dedicated purpose and
+# `admin.*` scope requirements prevent an ordinary delegated user token from substituting for it.
+
+[[auth]]
+name = "slack.bot_token"
+scheme = "bearer"
+subject = "app"
+description = "Workspace bot token obtained when a person installs the Zwirn Slack app. Calls are attributed to the app's bot, not to the installer"
+
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/oauth/v2/authorize"
+token_path = "/api/oauth.v2.access"
+scopes = ["app_mentions:read", "channels:history", "chat:write", "reactions:write", "users:read"]
+scope_separator = "comma"
+grants = ["authorization_code", "refresh_token"]
+
+[[auth]]
+name = "slack.user_token"
+scheme = "bearer"
+subject = "user"
+description = "Delegated OAuth token for the consenting Slack member. Zwirn may invoke an admitted operation through this principal-owned Connection, and Slack attributes it to that user"
+
+# Slack's user-centric OAuth flow is intentionally separate from app installation. It returns the
+# user access token at the standard top-level `access_token`, so one Connection receives exactly one
+# credential and there is no hidden bot-token side effect to assign to a different owner.
+[auth.oauth2]
+endpoint = "login"
+authorize_path = "/oauth/v2_user/authorize"
+token_path = "/api/oauth.v2.user.access"
+scopes = ["channels:history", "chat:write", "reactions:write", "users:read"]
+scope_separator = "comma"
+scope_response_pointer = "/authed_user/scope"
+grants = ["authorization_code", "refresh_token"]
+
+[[auth]]
+name = "slack.admin_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "user"
+description = "Enterprise organization user OAuth token obtained through an org-wide Admin/Owner installation with reviewed admin scopes"
+
+[[auth]]
+name = "slack.app_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Slack app-level token used only to open Socket Mode with connections:write"
+
+[[auth]]
+name = "slack.signing_secret"
+scheme = "signing"
+entry = "connect_session"
+subject = "app"
+description = "Slack app signing secret used only to verify inbound Events API requests"
+
+# Agent curation: exactly four ordinary Web API operations. The live document contains 170 paths;
+# source presence grants nothing. Scope claims are reviewed overlays rather than copied blindly from
+# Swagger because parts of Slack's Swagger scope vocabulary retain legacy spellings.
+
+[[patch.operations]]
+service = "default"
+select = "chat_postMessage"
+rename = "slack-chat-post-message"
+description = "Post a text message to a Slack channel. Slack can return HTTP 200 with `ok: false`; inspect `ok` before treating the message as sent"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["chat:write"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["chat:write"]] } },
+]
+omit.body = ["as_user", "attachments", "blocks", "icon_emoji", "icon_url", "link_names", "mrkdwn", "parse", "reply_broadcast", "unfurl_links", "unfurl_media", "username"]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations.params]]
+name = "text"
+position = "body"
+required = true
+description = "Message text in Slack mrkdwn syntax"
+schema = { type = "string", minLength = 1 }
+
+[[patch.operations.params]]
+name = "channel"
+position = "body"
+required = true
+description = "Channel id to post to"
+schema = { type = "string", minLength = 1 }
+
+[[patch.operations]]
+service = "default"
+select = "conversations_history"
+rename = "slack-conversations-history"
+description = "Read a bounded page of recent public-channel messages, newest first. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:history"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["channels:history"]] } },
+]
+omit.query = ["inclusive"]
+pagination = { cursor = { cursor_param = "cursor", next_cursor_pointer = "/response_metadata/next_cursor", max_pages = 10 } }
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations.params]]
+name = "channel"
+position = "query"
+required = true
+schema = { type = "string", minLength = 1 }
+
+[[patch.operations.params]]
+name = "latest"
+position = "query"
+schema = { type = "string" }
+
+[[patch.operations.params]]
+name = "oldest"
+position = "query"
+schema = { type = "string" }
+
+[[patch.operations.params]]
+name = "limit"
+position = "query"
+schema = { type = "integer", minimum = 1, maximum = 999, default = 100 }
+
+[[patch.operations]]
+service = "default"
+select = "users_info"
+rename = "slack-users-info"
+description = "Look up one Slack user by id. Profile email is available only when the token separately carries users:read.email"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["users:read"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["users:read"]] } },
+]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations]]
+service = "default"
+select = "reactions_add"
+rename = "slack-reactions-add"
+description = "Add an emoji reaction to a message, visible to channel members. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["reactions:write"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["reactions:write"]] } },
+]
+error_envelope = { message_pointer = "/error" }
+
+# Agent curation: four read-only Admin API operations. No `admin.*` write is selected or callable.
+# Slack documents admin scopes as User-token scopes granted only by an Enterprise org-wide install.
+
+[[patch.operations]]
+service = "admin"
+select = "admin_apps_requests_list"
+rename = "slack-admin-app-requests-list"
+description = "List pending app-install requests in an Enterprise organization or one workspace"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [{ credentials = ["slack.admin_token"], scopes = { "slack.admin_token" = [["admin.apps:read"]] } }]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations]]
+service = "admin"
+select = "admin_conversations_search"
+rename = "slack-admin-conversations-search"
+description = "Search public or private channels across an Enterprise organization"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [{ credentials = ["slack.admin_token"], scopes = { "slack.admin_token" = [["admin.conversations:read"]] } }]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations]]
+service = "admin"
+select = "admin_teams_list"
+rename = "slack-admin-teams-list"
+description = "List workspaces in an Enterprise organization"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [{ credentials = ["slack.admin_token"], scopes = { "slack.admin_token" = [["admin.teams:read"]] } }]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations]]
+service = "admin"
+select = "admin_users_list"
+rename = "slack-admin-users-list"
+description = "List users in one Enterprise workspace"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [{ credentials = ["slack.admin_token"], scopes = { "slack.admin_token" = [["admin.users:read"]] } }]
+error_envelope = { message_pointer = "/error" }
+
+# Events are selected from the authored AsyncAPI source, not restated inline. The stable local name
+# `message.channels` distinguishes the public-channel subscription from Slack's coarse wire value
+# `message`; `when.channel_type` completes that narrowing.
+
+[[patch.events]]
+service = "default"
+select = "app_mention"
+group = "Messages"
+auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["app_mentions:read"]] } }]
+
+[[patch.events]]
+service = "default"
+select = "message_channels"
+rename = "message.channels"
+wire_value = "message"
+description = "A human message was posted in a public channel the app is a member of; bot and subtype messages are loop-guarded by the channel runtime"
+default = false
+group = "Messages"
+when = { channel_type = { const = "channel" } }
+auth = [{ credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:history"]] } }]
+
+[[channels]]
+name = "socket"
+service = "default"
+transport = "socket"
+description = "Socket Mode: an outbound, app-token-authenticated WebSocket carries Events API envelopes without a public callback URL"
+auth = [{ credentials = ["slack.app_token"], scopes = { "slack.app_token" = [["connections:write"]] } }]
+events = ["app_mention", "message.channels"]
+discriminator = { source = "body", name = "event.type" }
+delivery_id = { source = "body", name = "event_id" }
+
+[channels.payload]
+text = "event.text"
+user = "event.user"
+channel = "event.channel"
+thread = "event.thread_ts"
+conversation = "event.thread_ts"
+
+[channels.reply]
+operation = "slack-chat-post-message"
+result = "text"
+
+[channels.reply.bind]
+channel = "channel"
+thread_ts = "thread"
+
+[channels.setup]
+docs_url = "https://docs.slack.dev/apis/events-api/using-socket-mode/"
+steps = [
+  "Create or open the Slack app for this installation",
+  "Enable Socket Mode and create an app-level token with connections:write",
+  "Add app_mentions:read and, when selected, channels:history to Bot Token Scopes",
+  "Subscribe to app_mention and, when selected, message.channels",
+  "Install or reinstall the app, then add it to every channel it should observe",
+  "Choose Add Slack and enter each requested credential in the protected prompt",
+]
+
+[[channels]]
+name = "events-api"
+service = "default"
+transport = "webhook"
+description = "Events API webhook: Slack posts signed event_callback envelopes to the Connector-owned callback"
+events = ["app_mention", "message.channels"]
+discriminator = { source = "body", name = "event.type" }
+delivery_id = { source = "body", name = "event_id" }
+
+[channels.verification.hmac]
+algorithm = "sha256"
+encoding = "hex"
+header = "X-Slack-Signature"
+prefix = "v0="
+signed = "v0:{timestamp}:{body}"
+timestamp = { source = "header", name = "X-Slack-Request-Timestamp" }
+secret = "slack.signing_secret"
+tolerance = "5m"
+
+[channels.payload]
+text = "event.text"
+user = "event.user"
+channel = "event.channel"
+thread = "event.thread_ts"
+conversation = "event.thread_ts"
+
+[channels.reply]
+operation = "slack-chat-post-message"
+result = "text"
+
+[channels.reply.bind]
+channel = "channel"
+thread_ts = "thread"
+
+[channels.setup]
+docs_url = "https://docs.slack.dev/apis/events-api/"
+steps = [
+  "Enable Event Subscriptions for the Slack app",
+  "Paste the Connector-owned Request URL and complete Slack's URL verification",
+  "Subscribe to the selected bot events and grant their Bot Token Scopes",
+  "Enter the signing secret in the protected completion flow",
+  "Install or reinstall the app so subscription and scope changes take effect",
+]
+
+# One Slack app registration backs both OAuth Connection choices. These are operator-level slots:
+# the end user sees Slack's consent screen but never sees or supplies the product's client secret.
+
+[[config]]
+name = "oauth_client_id"
+service = "default"
+label = "Slack application client id"
+help = "The client id of the Slack app users install or authorize. Supplied once by the deployment operator, not by an end user"
+format = "text"
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.client_id"
+
+[[config]]
+name = "oauth_redirect_uri"
+service = "default"
+label = "Slack OAuth redirect URI"
+help = "The exact callback URI served by this deployment and registered under the Slack app's OAuth & Permissions settings"
+example = "https://connectors.example/api/oauth/callback"
+format = "url"
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.redirect_uri"
+
+[[config]]
+name = "oauth_client_secret"
+service = "default"
+label = "Slack application client secret"
+help = "The Slack app's client secret. Supplied once by the deployment operator and never exposed to the person authorizing a Connection"
+format = "token"
+secret = true
+required = false
+docs_url = "https://docs.slack.dev/authentication/installing-with-oauth/"
+binds = "oauth.client_secret"

@@ -1,0 +1,12 @@
+{
+  "bundle": "b10x.voice-session",
+  "version": "v0alpha1",
+  "stability": "alpha",
+  "files": [
+    {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
+    {"path":"contracts/voice-session/v0alpha1/README.md","bytes":1347,"sha256":"8137896485306afe05deb1726b5f62717dc642c95d5fa7246ed7be082032e9c1"},
+    {"path":"contracts/voice-session/v0alpha1/voice-session.schema.json","bytes":4795,"sha256":"c242c37e86538dcdd8a1bcb6735055c432e4c7305cb81068df6c566a0ab1fd59"},
+    {"path":"contracts/voice-session/v0alpha1/vectors.schema.json","bytes":793,"sha256":"9f9199de52be66e039ddf08badfc174aad527aea8e877b0bb54d9225ef9c1ea8"},
+    {"path":"contracts/voice-session/v0alpha1/vectors.json","bytes":1153,"sha256":"5a1b5e201f7919bd528646d97fc3c44bba11142f59781e29f04edc6999237614"}
+  ]
+}

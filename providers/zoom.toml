@@ -1,0 +1,373 @@
+# Zoom Meeting API — hand-authored, curated to the surface this pipeline can express honestly.
+#
+# WHY THIS IS NOT A `[spec]` POINTER.
+# The upstream document is Zoom's **Meeting API** reference on developers.zoom.us
+# (`/docs/api/rest/reference/zoom-api/methods`), rendered from the OpenAPI 3 description Zoom
+# publishes through its developer portal. Nothing is vendored under `specs/` for it: ingest (C-4) and
+# fetch (C-14) do not exist yet, and the document describes several hundred operations across
+# meetings, webinars, recordings, reports, users, phone, rooms and account administration — pointing
+# at it without a selection mechanism would be pointing several hundred LLM tools at a paying Zoom
+# account. When C-14's fetch and C-4's ingest land this file becomes `[spec]` plus a
+# `[[patch.operations]]` selection, and **the two operations below are the selection to reproduce.**
+# By Zoom's `operationId`, with the method and path alongside because an id can be renamed upstream
+# while a path cannot:
+#
+#   meetingDelete  DELETE  /v2/meetings/{meetingId}
+#   user           GET     /v2/users/{userId}
+#
+# Two more were selected until 2026-08-01 and are **withheld by rule**, not forgotten — see the
+# withholding block below, which is the accounting a selection must reproduce as an exclusion:
+#
+#   meeting        GET     /v2/meetings/{meetingId}     — returns `start_url`
+#   meetingCreate  POST    /v2/users/{userId}/meetings  — returns `start_url`
+#
+# Until then drift is undetectable by machine, exactly as for every hand-authored provider here
+# (`docs/designs/provider-operation-inventory.md` §6.7).
+#
+# ---------------------------------------------------------------------------------------------
+# THE CREDENTIAL EXPIRES, AND THAT IS THIS CONNECTOR'S REAL DEPENDENCY.
+# ---------------------------------------------------------------------------------------------
+#
+# Zoom's supported server-side credential is a **server-to-server OAuth** app: the operator holds an
+# account id, a client id and a client secret, POSTs them to Zoom's token endpoint with
+# `grant_type=account_credentials`, and receives an access token that **expires in one hour**. That
+# token is `Authorization: Bearer <token>` on every request below, which is what `scheme = "bearer"`
+# declares and the whole of what this file declares.
+#
+# The exchange is *effectful acquisition* and belongs to the host (C-21), never to generated Flux.
+# The three-axis model puts source × acquisition × placement on separate axes precisely so a token
+# grant is not something a connector performs (AGENTS.md's authentication contract,
+# `docs/designs/unified-auth.md`); emitting it would put a client secret and a raw token into
+# model-visible Flux symbols. `crates/connector-flux/tests/zoom_connector.rs`
+# (`no_zoom_module_performs_a_token_exchange`) asserts that no emitted operation names the grant, the
+# client secret, the account id or the exchange vocabulary; a sibling test covers the environment variable.
+#
+# SCHEMA GAP: nothing declares that this token expires, so nothing can renew it.
+# `AuthMethod::oauth2` is the field that would say "the host mints this one", and it is left unset
+# here — but for a *weaker* reason than on the other bearer providers in this repository. Theirs is
+# minted once in a dashboard and does not expire, so its absence costs nothing; a Zoom token dies in
+# an hour. `OAuth2Spec` cannot express the grant either:
+#
+# - `OAuthGrant` has `client_credentials` but not Zoom's `account_credentials`, and the two differ by
+#   a required `account_id` parameter that no field carries;
+# - `OAuth2Spec::endpoint` names a declared endpoint whose base URL the token path resolves against,
+#   and Zoom's token host is not the API host below — a connector declares one `base_url`, so there is
+#   nowhere to put the second host without widening the egress allow-list `http_hosts` derives from;
+# - and C-21, which teaches the host to run a grant at all, is unimplemented.
+#
+# So, plainly: **this connector is declaration-complete and operationally dependent on C-21 in a way
+# a static API key is not.** An operator who sets `ZOOM_ACCESS_TOKEN` finds it stale within the hour
+# and nothing in this repository can refresh it. That is a larger gap than the `$auth` seam every
+# shipped connector shares, and it is stated here rather than implied by silence.
+#
+# ---------------------------------------------------------------------------------------------
+# WITHHELD BY RULE: the two operations that returned the host's ZAK token (C-430).
+# ---------------------------------------------------------------------------------------------
+#
+# **What this connector emits is 2 operations of the 4 it once did, and the other two are named
+# here with the reason** — the same three-category accounting `providers/babelforce.toml` uses
+# (emitted / inexpressible / withheld), rather than an absence a reader has to guess at:
+#
+#   * **`zoom-meeting-get` and `zoom-meeting-create` are withheld.** Zoom's meeting object carries
+#     `start_url` — a URL with the host's ZAK token embedded, which starts the meeting **as the
+#     host** for anyone holding it — and both operations returned it. `AGENTS.md`
+#     § Authentication contract: *"Any operation whose declared response carries a token — not only
+#     an OAuth one — is withheld until C-136's diversion lands"*, because the host's redactor holds
+#     only values the host itself resolved and cannot know a secret minted by the very call
+#     returning it. Withheld 2026-08-01, having shipped in v0.9.0 and every release before it.
+#   * Everything else this connector does not declare is the ordinary *inexpressible* category —
+#     the query-parameter and optional-body gaps below, which are C-30's and C-56's.
+#
+# **This file described the hazard accurately for five releases and returned the field anyway**, and
+# that is the mistake worth recording rather than quietly deleting. The two `response_schema`
+# entries carried `"HOST-PRIVILEGED. Embeds the host's ZAK token … Treat it as a credential"`, which
+# a reader of `web/public/catalog.json` did meet — but a warning in a tool contract is a warning to
+# whoever reads the contract, and the value still arrived in the response either way. Describing a
+# credential is not withholding it. C-79 had carried this exact `start_url` in its frontmatter since
+# it was filed.
+#
+# **Removing the field instead of the operation was considered and refused.** It would have deleted
+# the disclosure while leaving the exposure: `http.request` hands the whole response back
+# (`crates/connector-flux/src/op.rs` emits `return $response`), `connector-pack` "delegates to the
+# transport the host bound and hands back what it produced" (`crates/connector-pack/src/lib.rs`),
+# and nothing between the vendor and a model-visible symbol projects a response at all. Omitting
+# `start_url` from `response_schema` would move it out of the published contract and not out of the
+# payload — strictly worse than the state it replaced.
+#
+# **What brings them back — and it is C-79, not C-136.** Both of these are reads that happen to
+# carry one hazardous field: `start_url` arrives *beside* the meeting the call exists to return.
+# C-136's diversion lifts the whole result of an operation that exists *to* mint a credential and
+# answers with a handle, so applying it here would hand back an address instead of the meeting —
+# deleting the answer rather than the exposure. C-432 settled that as the standing rule: the
+# discriminator between the two declarations is **purpose, not shape**, and a credential arriving
+# incidentally is `credential_response`'s case. So **neither C-136 nor C-432 restores these two.**
+# C-79's response-redaction declaration is the mechanism — the host redacting the location before
+# the value reaches a model-visible symbol, which is host work no part of this repository does
+# today. Restore these two in the same commit that deletes their entries from
+# `crates/connector-spec/tests/credential_response.rs`.
+#
+# ---------------------------------------------------------------------------------------------
+# SCHEMA GAP: no query parameter of any kind (C-30), which is what excludes the meeting list.
+# ---------------------------------------------------------------------------------------------
+#
+# Nothing in this pipeline percent-encodes a query value: the emitter interpolates it verbatim into a
+# `fmt` template and flux registers no encoding op (`crates/connector-flux/src/op.rs`).
+# `zendesk-ticket-search` is the standing demonstration AGENTS.md lists under *Intentional gaps* — a
+# value carrying `&` does not filter, it injects a parameter. Excluded here, pending C-30:
+#
+# - `GET /v2/users/{userId}/meetings`, the meetings **list**, with `type` (`scheduled`, `upcoming`,
+#   `previous_meetings`, …), `page_size`, and the opaque server-issued `next_page_token` cursor.
+#   `type` and `page_size` are an enum and an integer that *would* survive verbatim interpolation
+#   today, which is exactly the trap — a query-assembly path in this connector is where the next
+#   author adds a text filter. (Since C-430 withheld the meeting get, no operation here reads a
+#   meeting at all, so the list is no longer the omission a reader notices first.)
+# - `occurrence_id` on meeting delete, which addresses one occurrence of a recurring meeting.
+#   Recurring meetings are out of scope anyway — see the C-56 block above — so its absence costs
+#   nothing beyond that.
+# - `schedule_for_reminder` /
+#   `cancel_meeting_reminder` on meeting delete. **The two delete flags decide whether Zoom emails the
+#   host and the registrants about the cancellation**, so their absence means whichever default Zoom
+#   applies is what happens; this connector does not get to choose it, and `zoom-meeting-delete`'s own
+#   comment says so rather than leaving a reader to infer it.
+# - `login_type` and `encrypted_email` on user get.
+#
+# The path surface, by contrast, is genuinely safe rather than merely untested, and each parameter is
+# narrowed until it is:
+#
+# - a meeting is addressed by its **numeric** meeting id only. Zoom's get and delete also accept a
+#   meeting **UUID**, and a Zoom UUID is base64 that can contain `/` and `+` — Zoom's own
+#   documentation says such a UUID must be double URL-encoded before it goes into a path. Nothing here
+#   encodes anything, so a UUID would address the wrong resource or corrupt the path outright. The
+#   `schema` admits digits and nothing else.
+# - a user is addressed by `me`, a Zoom user id, or an email address, and the `pattern` admits no
+#   character that could change the shape of the request: no `/`, `?`, `#`, `&`, `:` or `%`.
+#
+# Both are contracts a model reads and a future validator can check; the emitted Flux does not enforce
+# them. That asymmetry between path and query is the whole selection principle for this connector.
+#
+# ---------------------------------------------------------------------------------------------
+# SCHEMA GAP: no optional request-body field can be declared (C-56) — which no longer bites here.
+# ---------------------------------------------------------------------------------------------
+#
+# The emitter binds every declared body field into the payload record unconditionally, so a caller who
+# leaves an optional field alone sends an explicit `null`. Zoom's request validator is not documented
+# to accept `null` in place of an absent member, and a connector that sends one is asking the vendor
+# to be lenient about a request the caller never made — a failure that happens *because* the caller
+# did nothing, which is the worst available mode. Until C-56 teaches the emitter to omit an absent
+# field, this file declares required fields only.
+#
+# **`zoom-meeting-create` was the only operation here with a body, and it is withheld** (C-430), so
+# nothing this connector now emits sends one at all. The gap is recorded rather than deleted because
+# it is what the operation costs when C-136 brings it back: top-level `agenda`, `password`,
+# `default_password`, `timezone`, `schedule_for`, `template_id`, `tracking_fields` and `pre_schedule`;
+# `recurrence`, whose absence is what makes Zoom's recurring meeting types unreachable; and every
+# `settings` option but `waiting_room`, which the operation declared as an always-sent required field
+# because a meeting's access control is not something a caller should inherit silently.
+#
+# It also carried this fleet's one demonstration of C-29 wire paths assembling a **nested** payload —
+# `wire = "settings.waiting_room"` producing `{…, settings: { waiting_room: … }, …}` — with the root
+# holding leaves and a branch together, which neither zendesk (everything under `ticket.`) nor asana
+# (everything under `data.`) exercises. That demonstration goes with the operation;
+# `crates/connector-flux/tests/zoom_connector.rs` asserted it and no longer can. babelforce's
+# agent-status update is the nearest remaining mixed root, and both of its fields are optional.
+
+id = "zoom"
+vendor = "Zoom"
+
+# The reverse-DNS authority this connector publishes under (C-92). It leads every rendered address
+# and every credential path — `tenants/<tenant>/us.zoom.api/<credential>` — and until it was
+# declared `Credentials::reference` refused with `NoCredentialAddress`, so this connector could not
+# authenticate at all.
+#
+# `zoom.us` reverses to `us.zoom`, which reads like a mistake and is not: `us` is the TLD, the same
+# way `io` is in `io.fly.api` and `ai` is in `ai.openrouter.api`. Zoom publishes this identifier
+# itself — their Android SDK packages are `us.zoom.*`. C-92 filed zoom as having "no obvious
+# reverse-DNS form"; the vendor's own namespace supplies it.
+#
+# **Never repointed once published** (`AGENTS.md`: "an address, once published, is not reused"). A
+# different spelling mints a new address and deprecates this one, because tenants provision secrets
+# under this path.
+authority = "us.zoom.api"
+
+# The vendor's own spelling, taken from the operations below — every one of their paths begins
+# `/v2/`. Recorded here so a `gid` renders (`us.zoom.api:v2`); a credential path needs only the
+# authority and deliberately carries no version, so a token survives the vendor's next one.
+api_version = "v2"
+
+# One host for every Zoom account. Unlike zendesk's `{subdomain}` and freshdesk's `{domain}` there is
+# no tenant templating, so `base_url` is a bound literal, `status.rs` reports no
+# `unbound-base-url-template` issue, and the connector already has a valid destination URL.
+#
+# `http_hosts` derives from this single value (`crates/connector-cli/src/catalog.rs`, `host_of`) and is
+# therefore exactly `api.zoom.us`, never widened. Zoom's token endpoint, its web client and its
+# recording downloads are all on other hosts; none is reachable from the operations below, and adding
+# one would widen the egress allow-list for something no operation here does.
+base_url = "https://api.zoom.us"
+
+description = "Zoom meeting administration: cancel a meeting, and read a user. Reading and creating a meeting are withheld — both return the host's ZAK token in `start_url` (C-430)"
+
+# Every operation authenticates the same way.
+default_auth = [{ credentials = ["zoom.access_token"] }]
+
+# ---------------------------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------------------------
+
+[[auth]]
+name = "zoom.access_token"
+scheme = "bearer"
+# The sole secret. Gated and registered with flux's redactor by the host; its value is never read here
+# and never reaches a generated artifact. See the header comment for what nothing here can declare:
+# that this token was minted an hour ago at most.
+env = ["ZOOM_ACCESS_TOKEN"]
+description = "Zoom server-to-server OAuth access token, sent as a bearer. Minted outside flux and supplied through the environment; it expires within the hour and nothing here can refresh it"
+
+# ---------------------------------------------------------------------------------------------
+# Operations — 2 emitted and 2 withheld, all under Zoom's one versioned prefix
+#
+# Curated to what a scheduling flow executes at runtime: read a meeting, create one, cancel one, and
+# resolve the user the meeting belongs to — of which the first two are withheld by rule (C-430) and
+# what remains is the cancel and the user read. Everything else Zoom's Meeting API offers — webinars,
+# recordings, registrants, polls, live streaming, reports, account and group administration — is
+# excluded, and so is every listing endpoint: the same selection principle babelforce's 9-of-163
+# follows (`docs/designs/provider-operation-inventory.md` §5.2).
+#
+# `/v2` is repeated in each `path` rather than declared once. C-49's per-service `api_version` is
+# where it belongs — a service carrying `api_version = "v2"` would leave the version-free remainder
+# here — but no shipped provider declares a service yet, and inventing one for a single-surface
+# provider would mint an address (`com.zoom.api/meetings:v2`) that has to be supported forever. The
+# repetition is asserted instead: every path starts `/v2/`
+# (`zoom_connector.rs::every_zoom_request_targets_one_host_and_carries_no_credential`).
+#
+# The path placeholders are spelled `{meeting_id}` and `{user_id}` while Zoom's reference spells them
+# `meetingId` and `userId`. The placeholder is a local template variable that the emitter rewrites to
+# a Flux symbol and that never reaches the wire — only the *value* travels — so this follows the
+# repository's prevailing snake_case rather than the vendor's casing.
+#
+# Op ids are hyphen-separated, not dotted: flux-lang's `is_valid_decl_name` admits ASCII
+# alphanumerics, `_` and `-` only, so `op zoom.meetings.get` is undeclarable (C-8, C-23).
+# ---------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------
+# `zoom-meeting-get` STOOD HERE, and `zoom-meeting-create` after it. Both are withheld by rule —
+# `start_url` is the host's ZAK token in a URL. See the header block. **C-136 does NOT restore these**:
+# it lands the diversion for an operation that exists TO mint a credential, and returns a handle in place
+# of the whole result. `start_url` arrives beside the meeting this call exists to deliver, so diverting it
+# would delete the answer rather than the exposure. C-79 — declaring that a response FIELD is a
+# credential — is the narrower mechanism these two need, exactly as the header block already said.
+#
+# The one write left.
+#
+# `risk` is set from what it changes and who sees it, not from the HTTP method:
+# `zoom-meeting-delete` is `destructive` — "deletes or otherwise irreversible". Zoom offers no
+# undelete; the meeting id, its join URL and any registrations go with it.
+#
+# `idempotency` is `non_idempotent`. Zoom documents no idempotency key and no idempotency guarantee
+# on the endpoint, so `idempotent` would be a claim with nothing behind it — and here it would be a
+# claim flux acts on. `connector-flux`'s `check_write_metadata` refuses it on this authored write,
+# independently of DELETE transport semantics. A retried cancellation whose first
+# attempt already notified the registrants is not a no-op to the people who received the email. The
+# direction is fail-closed: flux forgoes a safe retry rather than replaying a write.
+# ---------------------------------------------------------------------------------------------
+
+
+[[services]]
+# C-153. `default` is the reserved implicit service, and a provider with one API surface
+# declares no services at all — so this entry exists for exactly one reason: a tag attaches
+# to a service, and there is no other service here to attach it to. It carries `tags` and
+# nothing else, which is what keeps `default` implicit and this file emitting the same
+# `zoom.flux` it emitted before.
+name = "default"
+tags = ["video-conferencing", "scheduling"]
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "zoom-meeting-delete"
+method = "DELETE"
+direction = "write"
+# The two flags that decide whether Zoom emails the host and the registrants about the cancellation —
+# `schedule_for_reminder` and `cancel_meeting_reminder` — are query parameters, which C-30 excludes.
+# So whether anyone is told is Zoom's default rather than this connector's choice, and a caller who
+# needs the registrants notified cannot ask for it here. That is said in the description as well as in
+# this comment: it is the kind of omission a model would otherwise assume away.
+path = "/v2/meetings/{meeting_id}"
+description = "Cancel a meeting. It is gone — Zoom offers no undelete, and the meeting id, its join URL and any registrations go with it. Whether Zoom emails the host or the registrants about the cancellation is left to Zoom's own default; this operation cannot ask for either"
+# Irreversible, and visible: the entry disappears from the host's schedule and the join URL stops
+# working for everyone who was given it.
+risk = "destructive"
+# DELETE is idempotent in RFC transport semantics, but `check_write_metadata` refuses `idempotent`
+# on this authored write. Zoom documents no idempotency
+# guarantee, the second call answers `3001 Meeting does not exist` rather than succeeding, and a retry
+# around a cancellation that already notified people is not a no-op to the people who were notified.
+idempotency = "non_idempotent"
+
+[[operations.params.path]]
+name = "meeting_id"
+description = "The numeric id of the meeting to cancel. A meeting UUID is not accepted: a Zoom UUID is base64 that can carry `/` and would have to be double URL-encoded, and nothing in this pipeline encodes a path"
+required = true
+schema = { type = "integer", format = "int64", minimum = 1 }
+
+# NO `response_schema`, DELIBERATELY (C-126). Zoom answers this one **`204`, "Meeting deleted."**, with
+# no content type and no schema under it — unlike every 200 in the same reference document. There is no
+# body, so there is nothing to describe, and `{}` or `{"type": "object"}` would be worse than absence
+# on two counts: each satisfies a coverage count while saying nothing, and each additionally describes
+# an empty JSON document where in fact none arrives. A cancellation is confirmed by the status code, or
+# by `zoom-meeting-get` answering `3001 Meeting does not exist` afterwards.
+
+[operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+id = "zoom-user-get"
+method = "GET"
+direction = "read"
+path = "/v2/users/{user_id}"
+description = "Get one user — their id, email, name, timezone, licence type and personal meeting id. This is how `me` is resolved to the id a meeting is created under"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "user_id"
+description = "`me` for the token's own user, a Zoom user id, or the user's email address"
+required = true
+schema = { type = "string", pattern = "^[A-Za-z0-9@._+-]+$", minLength = 1 }
+
+# The user object (`developers.zoom.us/docs/api/` → users), and the three types below are the reason
+# this schema earns its place — every one of them is a field a reader would assume wrongly:
+#
+# - **`type` is an integer plan code**, not a string: `1` Basic, `2` Licensed, `4` Unassigned without
+#   Meetings Basic. It is what this operation existed to resolve before `zoom-meeting-create`, because
+#   a Basic user's meetings are capped at 40 minutes — and it stays declared while that operation is
+#   withheld, because the licence is the same fact whoever schedules the meeting.
+# - **`verified` is an integer**, `1` verified and `0` not — while the `verified` inside a
+#   `phone_numbers` entry is a genuine boolean. Two members, one name, two types.
+# - **timestamps are ISO 8601 strings**, not the Unix integers Intercom's sibling connector returns.
+#
+# `phone_number` and `phone_country` are documented as deprecated in favour of `phone_numbers`, so only
+# the latter is declared. And Zoom's schema for this response is `allOf`-composed from two subschemas,
+# which is why the flat member list below is a flattening rather than a transcription.
+#
+# This is personal data about a named individual — email, name, department and phone numbers — and
+# `risk` has no axis for what a read discloses.
+[operations.response_schema]
+type = "object"
+required = ["id"]
+properties = { id = { type = "string", description = "The user's Zoom id — what `me` resolves to, and the `user_id` a meeting is created under" }, email = { type = "string", format = "email", description = "Personal data" }, first_name = { type = "string" }, last_name = { type = "string" }, display_name = { type = "string" }, type = { type = "integer", enum = [1, 2, 4], description = "THE LICENCE, AS AN INTEGER: 1 Basic, 2 Licensed, 4 Unassigned without Meetings Basic. A Basic user's group meetings are time-capped, so this is what to check before scheduling one" }, status = { type = "string", enum = ["pending", "active", "inactive"], description = "`pending` means the person has never activated the account — a meeting created for them still exists, but they cannot host it" }, verified = { type = "integer", enum = [0, 1], description = "AN INTEGER, not a boolean: 1 verified, 0 not. The `verified` inside a `phone_numbers` entry *is* a boolean" }, timezone = { type = "string", description = "IANA name, e.g. `Europe/Berlin`. A meeting created without an explicit timezone uses this one" }, pmi = { type = "integer", format = "int64", description = "The personal meeting id — a standing meeting room. Reusing it means every past participant can rejoin" }, use_pmi = { type = "boolean", description = "Whether new meetings default to the PMI rather than a fresh id" }, dept = { type = "string" }, job_title = { type = "string" }, company = { type = "string" }, language = { type = "string" }, role_name = { type = "string", description = "The Zoom role, e.g. `Owner`, `Admin`, `Member`" }, role_id = { type = "string" }, account_id = { type = "string" }, personal_meeting_url = { type = "string", description = "The join URL for the PMI. A participant link, not a host link — contrast `start_url` on a meeting" }, phone_numbers = { type = "array", description = "Each `{code, country, label, number, verified}`, where `label` is `Mobile`, `Office`, `Home` or `Fax` and `verified` here IS a boolean. Personal data. The flat `phone_number`/`phone_country` members are deprecated and are not declared", items = { type = "object" } }, created_at = { type = "string", format = "date-time", description = "ISO 8601, not Unix seconds. For a `pending` user Zoom's docs warn this reflects the time of the API call rather than account creation" }, last_login_time = { type = "string", format = "date-time", description = "ISO 8601, or absent for a user who never signed in" }, last_client_version = { type = "string" } }
+
+[operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"

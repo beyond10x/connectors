@@ -1,0 +1,65 @@
+{
+  "contract": "b10x.connector-operation.v0alpha1",
+  "cases": [
+    {
+      "name": "search-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-search-1",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method": "search", "params": {"query": "sip", "limit": 10}}
+      }
+    },
+    {
+      "name": "invoke-valid",
+      "valid": true,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-invoke-1",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method": "invoke", "params": {"operation_ref": "sip.dial", "connection_ref": "connection-asterisk-dev", "description_ref": "description-1", "input": {"target": "asterisk-dev"}, "approval_evidence_ref": "approval-1"}}
+      }
+    },
+    {
+      "name": "unknown-field-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-bad-1",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method": "search", "params": {"query": "sip", "limit": 10, "fallback_url": "https://example.invalid"}}
+      }
+    },
+    {
+      "name": "stale-authority-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-bad-2",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "not-a-digest"},
+        "request": {"method": "search", "params": {"query": "sip", "limit": 10}}
+      }
+    },
+    {
+      "name": "model-approval-field-refuses",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-bad-3",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method": "invoke", "params": {"operation_ref": "sip.dial", "connection_ref": "connection-asterisk-dev", "description_ref": "description-1", "input": {"target": "asterisk-dev"}, "approved": true}}
+      }
+    },
+    {
+      "name": "caller-cannot-assert-unknown-outcome",
+      "valid": false,
+      "frame": {
+        "protocol": "b10x.connector-operation.v0alpha1",
+        "request_id": "request-bad-4",
+        "context": {"tenant_id": "tenant-local", "agent_id": "agent-dev", "agent_revision": 1, "authority_snapshot_id": "authority-1", "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        "request": {"method": "session_terminate", "params": {"execution_ref": "execution-1", "reason": "outcome_unknown"}}
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/b10x/connectors/blob/main/contracts/voice-session/v0alpha1/voice-session.schema.json",
+  "title": "B10x VoiceSession v0alpha1 message",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "payload"],
+  "properties": {
+    "operation": {
+      "enum": ["initialize", "ready", "interrupt_output", "acknowledged", "close", "media_loss", "signal", "terminated"]
+    },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "operation": { "const": "initialize" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/initialize" } } } },
+    { "if": { "properties": { "operation": { "const": "ready" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/ready" } } } },
+    { "if": { "properties": { "operation": { "const": "interrupt_output" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/interrupt_output" } } } },
+    { "if": { "properties": { "operation": { "const": "acknowledged" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/acknowledged" } } } },
+    { "if": { "properties": { "operation": { "const": "close" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/close" } } } },
+    { "if": { "properties": { "operation": { "const": "media_loss" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/media_loss" } } } },
+    { "if": { "properties": { "operation": { "const": "signal" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/signal" } } } },
+    { "if": { "properties": { "operation": { "const": "terminated" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/terminated" } } } }
+  ],
+  "$defs": {
+    "reference": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_format", "sample_rate_hz", "channels", "packet_time_ms", "frame_bytes"],
+      "properties": {
+        "sample_format": { "const": "pcm_s16le" },
+        "sample_rate_hz": { "const": 8000 },
+        "channels": { "const": 1 },
+        "packet_time_ms": { "const": 20 },
+        "frame_bytes": { "const": 320 }
+      }
+    },
+    "termination_reason": {
+      "enum": ["completed", "cancelled", "remote_hangup", "authority_revoked", "lease_expired", "media_overload", "transport_lost", "protocol_error"]
+    },
+    "initialize": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call", "session", "channel", "participant", "media"],
+      "properties": {
+        "call": { "$ref": "#/$defs/reference" },
+        "session": { "$ref": "#/$defs/reference" },
+        "channel": { "$ref": "#/$defs/reference" },
+        "participant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "trust"],
+          "properties": {
+            "reference": { "$ref": "#/$defs/reference" },
+            "trust": { "const": "untrusted" },
+            "display": { "type": "string", "maxLength": 256 }
+          }
+        },
+        "media": { "$ref": "#/$defs/media" }
+      }
+    },
+    "ready": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract"],
+      "properties": { "contract": { "const": "b10x.voice-session.v0alpha1" } }
+    },
+    "interrupt_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cause"],
+      "properties": { "cause": { "$ref": "#/$defs/reference" } }
+    },
+    "acknowledged": {
+      "type": "object",
+      "maxProperties": 0
+    },
+    "close": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": { "reason": { "$ref": "#/$defs/termination_reason" } }
+    },
+    "media_loss": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first_sequence", "frames"],
+      "properties": {
+        "first_sequence": { "type": "integer", "minimum": 0 },
+        "frames": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal"],
+      "properties": {
+        "signal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "digits"],
+          "properties": {
+            "kind": { "const": "dtmf" },
+            "digits": { "type": "string", "pattern": "^[0-9*#A-D]{1,32}$" }
+          }
+        }
+      }
+    },
+    "terminated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": { "reason": { "$ref": "#/$defs/termination_reason" } }
+    }
+  }
+}

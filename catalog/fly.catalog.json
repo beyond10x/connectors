@@ -1,0 +1,812 @@
+{
+  "$schema": "https://github.com/b10x/connectors/blob/main/catalog/connector-document.schema.json",
+  "auth": [
+    {
+      "description": "Fly access token, preferably scoped to the app or organization this connection manages",
+      "env": [
+        "FLY_API_TOKEN"
+      ],
+      "name": "fly.api_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "unstated"
+    }
+  ],
+  "authority": "io.fly.api",
+  "connector": "fly",
+  "default_auth": [
+    [
+      "fly.api_token"
+    ]
+  ],
+  "description": "Fly.io Machines: discover regions and inspect, create, start, stop, restart or delete Machines",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List Fly's available regions and identify the nearest one; also verifies the configured access token. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List Fly's available regions and identify the nearest one; also verifies the configured access token",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-regions-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/platform/regions"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "nearest": {
+            "type": "string"
+          },
+          "regions": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List every Machine in one Fly app, without optional state filters or lease details. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List every Machine in one Fly app, without optional state filters or lease details",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machines-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app name whose Machines to list",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/apps/{app_name}/machines"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "private_ip": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Get one Fly Machine's current configuration, state, region, addresses and recent events. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one Fly Machine's current configuration, state, region, addresses and recent events",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "config": {
+            "type": "object"
+          },
+          "events": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "private_ip": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List the recorded lifecycle events for one Fly Machine; this is history, not a durable event subscription. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List the recorded lifecycle events for one Fly Machine; this is history, not a durable event subscription",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-events-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id whose event history to read",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}/events"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "integer"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Create and launch a Fly Machine from one image using Fly's generated name and region placement; this begins billable compute. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "image"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create and launch a Fly Machine from one image using Fly's generated name and region placement; this begins billable compute",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app in which to create the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "OCI image reference for the Machine, such as registry.fly.io/example:deployment-01",
+          "name": "image",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "image",
+          "wire": "config.image"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "config": {
+              "image": {
+                "$param": "image"
+              }
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/apps/{app_name}/machines"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "config": {
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "private_ip": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Start a stopped Fly Machine, restoring service and beginning billable compute. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Start a stopped Fly Machine, restoring service and beginning billable compute",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-start",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id to start",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "POST",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}/start"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Stop a running Fly Machine using the API's default signal and timeout, interrupting its service. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Stop a running Fly Machine using the API's default signal and timeout, interrupting its service",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-stop",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id to stop",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "POST",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}/stop"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Restart a Fly Machine using the API's default signal and timeout, causing a service interruption. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Restart a Fly Machine using the API's default signal and timeout, causing a service interruption",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-restart",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id to restart",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "POST",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}/restart"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "machines"
+    },
+    {
+      "auth": [
+        [
+          "fly.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Permanently delete a stopped Fly Machine. Forced deletion is intentionally unavailable, so a running Machine is refused instead of killed implicitly. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error`, its error code at `/status` in the response body.",
+        "input_schema": {
+          "properties": {
+            "app_name": {
+              "type": "string"
+            },
+            "machine_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "app_name",
+            "machine_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Permanently delete a stopped Fly Machine. Forced deletion is intentionally unavailable, so a running Machine is refused instead of killed implicitly",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "error_envelope": {
+        "code_pointer": "/status",
+        "message_pointer": "/error"
+      },
+      "expose": true,
+      "id": "fly-machine-delete",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Fly app containing the Machine",
+          "name": "app_name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "app_name"
+        },
+        {
+          "description": "Fly Machine id to delete permanently",
+          "name": "machine_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "machine_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "DELETE",
+        "url": "{base}/apps/{app_name}/machines/{machine_id}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "destructive",
+      "semantic_effects": [],
+      "service": "machines"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "api_version": "v1",
+      "base_url": "https://api.machines.dev/v1",
+      "description": "Fly Machines lifecycle and event history",
+      "gid": "io.fly.api/machines:v1",
+      "name": "machines",
+      "tags": [
+        "infrastructure"
+      ]
+    }
+  ],
+  "vendor": "Fly.io",
+  "verify": "fly-regions-list"
+}

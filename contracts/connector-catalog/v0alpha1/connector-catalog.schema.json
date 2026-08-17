@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://b10x.dev/contracts/connector-catalog/v0alpha1/connector-catalog.schema.json",
+  "title": "B10x ConnectorCatalog v0alpha1 frame",
+  "oneOf": [
+    {"$ref": "#/$defs/requestEnvelope"},
+    {"$ref": "#/$defs/responseEnvelope"}
+  ],
+  "$defs": {
+    "reference128": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[!-~]+$"},
+    "reference256": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[!-~]+$"},
+    "reference512": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[!-~]+$"},
+    "ownerContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "agent_id", "agent_revision", "authority_snapshot_id", "authority_snapshot_sha256"],
+      "properties": {
+        "tenant_id": {"$ref": "#/$defs/reference256"},
+        "agent_id": {"$ref": "#/$defs/reference256"},
+        "agent_revision": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
+        "authority_snapshot_id": {"$ref": "#/$defs/reference512"},
+        "authority_snapshot_sha256": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"}
+      }
+    },
+    "searchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "offset", "limit"],
+      "properties": {
+        "query": {"type": "string", "maxLength": 512},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 64}
+      }
+    },
+    "describeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_ref"],
+      "properties": {"provider_ref": {"$ref": "#/$defs/reference256"}}
+    },
+    "catalogRequest": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "search"}, "params": {"$ref": "#/$defs/searchParams"}}},
+        {"type": "object", "additionalProperties": false, "required": ["method", "params"], "properties": {"method": {"const": "describe"}, "params": {"$ref": "#/$defs/describeParams"}}}
+      ]
+    },
+    "requestEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "request_id", "context", "request"],
+      "properties": {
+        "protocol": {"const": "b10x.connector-catalog.v0alpha1"},
+        "request_id": {"$ref": "#/$defs/reference128"},
+        "context": {"$ref": "#/$defs/ownerContext"},
+        "request": {"$ref": "#/$defs/catalogRequest"}
+      }
+    },
+    "providerSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_ref", "authority", "vendor", "description", "audiences", "services", "operation_count", "configurable"],
+      "properties": {
+        "provider_ref": {"$ref": "#/$defs/reference256"},
+        "authority": {"oneOf": [{"$ref": "#/$defs/reference256"}, {"type": "null"}]},
+        "vendor": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "minLength": 1, "maxLength": 16384},
+        "audiences": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/reference128"}},
+        "services": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/reference128"}},
+        "operation_count": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "configurable": {"type": "boolean"}
+      }
+    },
+    "operationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_ref", "service", "description", "risk", "exposed"],
+      "properties": {
+        "operation_ref": {"$ref": "#/$defs/reference256"},
+        "service": {"$ref": "#/$defs/reference128"},
+        "description": {"type": "string", "minLength": 1, "maxLength": 16384},
+        "risk": {"$ref": "#/$defs/reference128"},
+        "exposed": {"type": "boolean"}
+      }
+    },
+    "searchResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "providers"],
+      "properties": {
+        "kind": {"const": "search"},
+        "providers": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/providerSummary"}},
+        "next_offset": {"type": "integer", "minimum": 0, "maximum": 65535}
+      }
+    },
+    "describeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "provider", "operations"],
+      "properties": {
+        "kind": {"const": "describe"},
+        "provider": {"$ref": "#/$defs/providerSummary"},
+        "operations": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/operationSummary"}}
+      }
+    },
+    "catalogResult": {"oneOf": [{"$ref": "#/$defs/searchResult"}, {"$ref": "#/$defs/describeResult"}]},
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"$ref": "#/$defs/reference128"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    },
+    "responseEnvelope": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["protocol", "request_id", "status", "response"], "properties": {"protocol": {"const": "b10x.connector-catalog.v0alpha1"}, "request_id": {"$ref": "#/$defs/reference128"}, "status": {"const": "ok"}, "response": {"$ref": "#/$defs/catalogResult"}}},
+        {"type": "object", "additionalProperties": false, "required": ["protocol", "request_id", "status", "error"], "properties": {"protocol": {"const": "b10x.connector-catalog.v0alpha1"}, "request_id": {"$ref": "#/$defs/reference128"}, "status": {"const": "error"}, "error": {"$ref": "#/$defs/error"}}}
+      ]
+    }
+  }
+}

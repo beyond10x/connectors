@@ -1,0 +1,28 @@
+# C-49: `default` is the name of the implicit service, so declaring it would be a second definition
+# of something that already exists — and the two could then disagree about a base URL or a version.
+#
+# C-120 narrows that to exactly one exception: the entry may carry `roles`, which attach to a service
+# and which a single-surface provider has nowhere else to put. A `description` is not that exception.
+id = "acme"
+vendor = "Acme"
+base_url = "https://api.acme.example"
+
+[[services]]
+name = "default"
+description = "Everything."
+
+[[operations]]
+id = "acme-thing-get"
+service = "default"
+method = "GET"
+direction = "read"
+path = "/v1/things"
+description = "Fetch one thing."
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]

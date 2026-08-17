@@ -1,0 +1,17 @@
+[package]
+name = "monitoring-model"
+description = "Provider-owned monitoring operation metadata shared by direct and mediated routes."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+workspace = "../connectors-runtime"
+
+[dependencies]
+catalog = { version = "0.1.0", path = "../catalog" }
+connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
+protocol = { version = "0.1.0", path = "../protocol" }
+serde_json = "1"

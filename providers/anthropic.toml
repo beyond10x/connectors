@@ -1,0 +1,254 @@
+# Anthropic's documented API and Admin API surfaces.
+#
+# The endpoint and schema facts are compiled from the two B10x-authored OpenAPI documents
+# below. Anthropic does not publish those machine-readable bytes; their provenance records exact
+# official references and repository ownership. This connector deliberately carries no Claude Code,
+# consumer-subscription, or undocumented Console OAuth acquisition. Harness credentials stay with
+# the harness adapter boundary; connector credentials authenticate the documented API surfaces only.
+
+id = "anthropic"
+vendor = "Anthropic"
+authority = "com.anthropic.api"
+api_version = "v1"
+base_url = "https://api.anthropic.com"
+const_headers = { "anthropic-version" = "2023-06-01" }
+description = "Anthropic platform: the model catalogue and a curated read-only Admin API surface"
+default_auth = [{ credentials = ["anthropic.api_key"] }]
+verify = "anthropic-models-list"
+
+[[spec]]
+service = "models"
+path = "specs/anthropic/models-2023-06-01.openapi.yaml"
+upstream_version = "2023-06-01"
+fetched_at = "2026-08-13T00:00:00Z"
+sha256 = "38e054bae8e051a58493b6978bcab5a64b15c0544588218fa789646d01b431df"
+
+[[spec]]
+service = "admin"
+path = "specs/anthropic/admin-2023-06-01.openapi.yaml"
+upstream_version = "2023-06-01"
+fetched_at = "2026-08-13T00:00:00Z"
+sha256 = "8280d48e48dd33a3c5f9d899dbc03d4154e23928c4aa9b304ceceda3791ad718"
+
+[[auth]]
+name = "anthropic.api_key"
+scheme = { header = { name = "x-api-key" } }
+env = ["ANTHROPIC_API_KEY"]
+description = "Anthropic API key, sent as x-api-key"
+
+[[auth]]
+name = "anthropic.admin_key"
+scheme = { header = { name = "x-api-key" } }
+env = ["ANTHROPIC_ADMIN_KEY"]
+description = "Anthropic Admin API key, sent as x-api-key and used only by Admin API operations"
+
+[[config]]
+name = "api_key"
+service = "models"
+label = "API key"
+help = "Create an API key in the Anthropic Console. It authorizes the Models API surface."
+format = "token"
+secret = true
+docs_url = "https://platform.claude.com/docs/en/manage-claude/authentication"
+binds = "credential.anthropic.api_key"
+
+[[config]]
+name = "admin_key"
+service = "admin"
+label = "Admin API key"
+help = "Create an Admin API key in the Anthropic Console. It authorizes the Admin API surface only."
+format = "token"
+secret = true
+docs_url = "https://platform.claude.com/docs/en/manage-claude/overview"
+binds = "credential.anthropic.admin_key"
+
+[[services]]
+name = "models"
+tags = ["ai"]
+description = "The live model catalogue: list available models and retrieve one by id"
+roles = ["llm_catalogue"]
+
+[[services]]
+name = "admin"
+tags = ["ai"]
+description = "Read-only Admin API: organization, members, workspaces, API keys and invites"
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "models"
+select = "models_list"
+rename = "anthropic-models-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+omit.query = ["after_id", "before_id", "limit"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "models"
+select = "model_get"
+rename = "anthropic-model-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "organization_get"
+rename = "anthropic-organization-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "organization_members_list"
+rename = "anthropic-organization-members-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+omit.query = ["after_id", "before_id", "email", "limit"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "organization_member_get"
+rename = "anthropic-organization-member-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "workspaces_list"
+rename = "anthropic-workspaces-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+omit.query = ["after_id", "before_id", "limit", "include_archived"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "workspace_get"
+rename = "anthropic-workspace-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "workspace_members_list"
+rename = "anthropic-workspace-members-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+omit.query = ["after_id", "before_id", "limit"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "workspace_member_get"
+rename = "anthropic-workspace-member-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "api_keys_list"
+rename = "anthropic-api-keys-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+omit.query = ["after_id", "before_id", "limit", "status", "workspace_id", "created_by_user_id"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "admin"
+select = "invites_list"
+rename = "anthropic-invites-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+auth = [{ credentials = ["anthropic.admin_key"] }]
+omit.query = ["after_id", "before_id", "limit", "status"]
+error_envelope = { message_pointer = "/error/message", code_pointer = "/error/type" }

@@ -1,0 +1,30 @@
+[package]
+name = "connectors-cli"
+description = "Thin command-line frontend for reusable Connector client and runtime libraries."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/connectors"
+homepage = "https://github.com/b10x/connectors"
+rust-version = "1.88"
+publish = false
+
+[workspace]
+resolver = "3"
+members = ["."]
+
+[[bin]]
+name = "connectors"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+connectors-client = { version = "0.1.0", path = "../connectors-client" }
+connectors-runtime = { version = "0.1.0", path = "../connectors-runtime" }
+protocol = { version = "0.1.0", path = "../protocol" }
+rpassword = "7"
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "time"] }
+zeroize = "1"

@@ -1,0 +1,167 @@
+openapi: 3.1.0
+info:
+  title: Anthropic Models API (B10x-authored)
+  version: "2023-06-01"
+  description: Repository-authored source specification derived from the official Anthropic references carried by each operation. Anthropic does not publish these OpenAPI bytes.
+x-b10x-origin: repository-authored
+x-b10x-coverage: exact shipped Anthropic Models API surface
+x-b10x-auth-references:
+  - https://platform.claude.com/docs/en/manage-claude/authentication
+servers:
+  - url: https://api.anthropic.com
+security:
+  - apiKey: []
+paths:
+  /v1/models:
+    get:
+      operationId: models_list
+      summary: List the models available to this API key, most recently released first. Unpaginated — this connector cannot request a further page
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/models/list
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  data:
+                    description: 'One entry per model this key can reach. Each carries at least `id` (the string to pass as `model_id` to anthropic-model-get, e.g. `claude-opus-4-6`), `type: "model"`, `display_name`, `created_at`, `max_input_tokens`, `max_tokens`, and a `capabilities` object describing which features (batch, citations, code execution, image/PDF input, structured outputs, extended thinking) this model supports'
+                    items:
+                      properties:
+                        created_at:
+                          format: date-time
+                          type: string
+                        display_name:
+                          type: string
+                        id:
+                          type: string
+                        type:
+                          const: model
+                      required:
+                        - id
+                        - type
+                      type: object
+                    type: array
+                  first_id:
+                    description: First id in `data`. This connector cannot use it as `before_id` — no query parameter is encodable (C-30)
+                    type: string
+                  has_more:
+                    description: True when the account has more models than this unpaginated call returned
+                    type: boolean
+                  last_id:
+                    description: Last id in `data`, likewise unusable as `after_id` here
+                    type: string
+                required:
+                  - data
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: after_id
+          in: query
+          required: false
+          description: Return the page immediately after this opaque object id.
+          schema:
+            type: string
+        - name: before_id
+          in: query
+          required: false
+          description: Return the page immediately before this opaque object id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Number of items to return, from 1 through 1000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+  /v1/models/{model_id}:
+    get:
+      operationId: model_get
+      summary: Retrieve one model by id, or resolve an alias to the model id it currently points at
+      x-b10x-source-reference: https://platform.claude.com/docs/en/api/models/retrieve
+      x-b10x-api-version-header:
+        name: anthropic-version
+        required: true
+        value: "2023-06-01"
+        reference: https://platform.claude.com/docs/en/api/versioning
+      responses:
+        "200":
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                properties:
+                  capabilities:
+                    description: Which features this model supports — batch, citations, code execution, image/PDF input, structured outputs, extended thinking. See anthropic-models-list for why this is described rather than enumerated
+                    type: object
+                  created_at:
+                    description: When the model was released. May be an epoch value if the vendor does not know the release date
+                    format: date-time
+                    type: string
+                  display_name:
+                    type: string
+                  id:
+                    description: The model id, echoed back — or the id the alias resolved to
+                    type: string
+                  max_input_tokens:
+                    type: integer
+                  max_tokens:
+                    description: The maximum value this model accepts for a completion's own max_tokens parameter
+                    type: integer
+                  type:
+                    const: model
+                required:
+                  - id
+                  - type
+                type: object
+        default:
+          description: Anthropic API error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        - name: model_id
+          in: path
+          required: true
+          description: The model id or alias, e.g. `claude-opus-4-6` or `claude-3-5-sonnet-20241022`
+          schema:
+            minLength: 1
+            type: string
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    Error:
+      type: object
+      required:
+        - type
+        - error
+      properties:
+        type:
+          const: error
+        error:
+          type: object
+          required:
+            - type
+            - message
+          properties:
+            type:
+              type: string
+            message:
+              type: string
