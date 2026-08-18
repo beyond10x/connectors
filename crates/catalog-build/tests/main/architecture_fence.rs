@@ -15,13 +15,6 @@ const CLI_TOTAL_LINE_LIMIT: usize = 800;
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.
 const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     (
-        "crates/connector-spec/src/provider.rs",
-        7_291,
-        "legacy provider compiler pending grammar-focused extraction; +23 for the closed `audio_v1` \
-         driver's lowering and its unary-only coherence rule, +27 for the closed `cdp_v1` driver's \
-         lowering and its leased-session-only coherence rule",
-    ),
-    (
         "crates/connector-spec/src/ir.rs",
         2_717,
         "legacy compiler IR pending declaration-family extraction; +14 for the closed `audio_v1` \
