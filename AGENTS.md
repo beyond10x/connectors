@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Orientation for agents (and humans) working in this component.
+Orientation for agents (and humans) working in this component. The root
+[`AGENTS.md`](../../AGENTS.md) applies throughout; this file adds component rules.
 
 ## Status
 
@@ -26,7 +27,9 @@ graph rather than caution, name the blocked stories and what unblocks each.
 
 **Deferred by Timo on 2026-08-13:** a family-level architecture review across the `architecture`,
 `connectors` and `substrate` components — how everything connects — postponed until `substrate`'s
-documents are finished. Pick it up when Timo says substrate is done.
+documents are finished. The procedure now exists as the `architecture-review` run-mode of the
+`b10x` main agent (`.agents/agents/b10x.md`); trigger it when Timo says substrate is
+done.
 
 ## Commits
 
