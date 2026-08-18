@@ -423,8 +423,17 @@ impl SlackInner {
         datasource_ref: &str,
     ) -> String {
         let mut digest = Sha256::new();
-        digest.update(b"b10x/slack-datasource-description/v1\0");
-        digest.update(serde_json::to_vec(context).expect("principal context serializes"));
+        digest.update(b"b10x/slack-datasource-description/v2\0");
+        // Only the stable authority facts participate: the serialized PrincipalContext also
+        // carries per-request provenance (request id, token id, trace id), which made a lease
+        // minted by describe stale by construction for the read that followed it.
+        digest.update(context.tenant_id().as_bytes());
+        digest.update(b"\0");
+        digest.update(context.actor_subject().as_bytes());
+        digest.update(b"\0");
+        digest.update(context.authority_snapshot_id().as_bytes());
+        digest.update(b"\0");
+        digest.update(context.authority_snapshot_sha256().as_bytes());
         digest.update(b"\0");
         digest.update(datasource_ref.as_bytes());
         digest.update(b"\0");
