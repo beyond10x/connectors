@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "05ae19d692ec6cc64d668903daf54742a5778c1e6446c9cd323eb4ae5aba81ae"
+sha256 = "b65826856c6079b6cde3d130032f2ff63abbcf85a5728683413bdb99e2259eba"
 
 [[provider]]
 id = "airtable"
@@ -95,8 +95,8 @@ sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
 [[provider]]
 id = "babelforce"
 generator = "connectors 0.1.0"
-toml_sha256 = "552b087debc770b1bbf9b7058b92ecf9d85a57afcda5aa3f7bbcc3159285c594"
-ir_sha256 = "0da7f9650d1b308b3578e81521ca5e78916dd41ba4a90fdd7d8082418f62a942"
+toml_sha256 = "beac91fc41d4f541c2853a1b10f757d5156a1300840250241d0c75772a8efd9d"
+ir_sha256 = "04f6f7abd00afd21b41a1bd9c3f42443d9e7f13c511c5eecbc9b0ad9a0fa107c"
 
 [[provider.specs]]
 path = "specs/babelforce/manager-2026-07-10.openapi.yaml"
@@ -123,7 +123,7 @@ upstream_version = "3.63.10"
 sha256 = "031327359000bd70d6b2ab012868971cc834812e5f61f5157531e7cb5daa4d85"
 
 [provider.artifacts]
-"catalog/babelforce.catalog.json" = "bf393e81781da80ad9c1e2b7880dcc55b98fa4ba8cb74fbbb91dd544727681fd"
+"catalog/babelforce.catalog.json" = "87267054812807d6009a704845d1c7a2365117954e837a487dca1c8a911d6b57"
 
 [[provider]]
 id = "bitbucket"

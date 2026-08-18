@@ -10,6 +10,7 @@ entry = "connect_session"
 
 [[operations]]
 id = "acme-send"
+description = "Fixture operation"
 method = "POST"
 direction = "write"
 path = "/send"

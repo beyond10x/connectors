@@ -823,6 +823,37 @@ measured = "2026-08-02"
 "updateSelectionConfiguration" = "write"
 "updateTask" = "write"
 
+# The task-automation document leaves these 23 operation-level summaries and descriptions empty.
+# The catalog wire contract requires a non-empty one-line description for every published
+# operation, including operations withheld from model exposure. This stable identity map states
+# only that missing fact without turning the operations into exact selection blocks or changing
+# their document order. Each sentence is bounded by the vendored method/path and request/response
+# schema named by the operation.
+[patch.descriptions.task-automation]
+"changeAgentLock" = "Change the current agent's task lock state and return the resulting agent and lock state"
+"agentActionOnTask" = "Apply an agent action, with an optional reason, to one task assigned to the current agent"
+"tasks" = "List tasks with the declared filter and page controls"
+"submitTask" = "Submit a task with its queue, schedule, selection, completion, and action settings"
+"testing" = "Test declared task actions with supplied input and return their output"
+"readSelectionConfiguration" = "Read the task selection engine and its timeout and rescheduling configuration"
+"createSelectionConfiguration" = "Create the task selection engine and its timeout and rescheduling configuration"
+"updateSelectionConfiguration" = "Replace the task selection engine and its timeout and rescheduling configuration"
+"deleteSelectionConfiguration" = "Delete the task selection configuration"
+"list" = "List customer task logs with the declared type, context, detail, filter, and page controls"
+"agentInteractionDuration" = "Read interaction duration metrics for one agent"
+"agentInteractions" = "Read interaction frequency and journal metrics for one agent"
+"taskJournal" = "Read timing and journal metrics for one task"
+"listScripts" = "List task scripts of one declared type with filter and page controls"
+"submitScript" = "Submit a task script file and metadata for one declared script type"
+"getScript" = "Read one task script by type and code identifier"
+"updateScript" = "Replace one task script's file and metadata by type and code identifier"
+"deleteScript" = "Delete one task script by type and code identifier"
+"submitTaskTemplate" = "Submit a task from one named template with the declared body and style"
+"taskUsage" = "Read task usage time series for a time range, rate, and usage type"
+"taskUsageTypes" = "List task usage types for a time range"
+"task" = "Read one task by task identifier"
+"updateTask" = "Update one task's body by task identifier"
+
 [patch.directions.task-schedule]
 "deleteScheduleTask" = "write"
 "getTaskSchedule" = "read"

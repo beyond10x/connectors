@@ -68,6 +68,9 @@ use crate::{
     RouteAdapter, SemanticEffect, Service, Tag, DEFAULT_SERVICE, MIN_REPEATABILITY_CONDITION,
 };
 
+mod identity_overlay;
+use identity_overlay::{check_descriptions, check_directions, description_for, direction_for};
+
 /// The documented JSON Schema for `providers/<name>.toml`.
 ///
 /// TOML is a JSON-shaped data model, so one schema describes both the TOML an author writes and the
@@ -281,10 +284,11 @@ impl SpecSource {
 /// 1. ingest turns each document into every operation the vendor declares;
 /// 2. every [`OperationSelector`] states what it states about the set it matched, and two selectors
 ///    that state different values for one operation are refused rather than ordered;
-/// 3. the [`OperationPatch`] that names an operation overrides the selector **field by field** —
-///    where the block is silent the selector's statement stands, and where neither speaks the rules
-///    on each field decide;
-/// 4. the result is validated by exactly the pass a hand-authored operation goes through.
+/// 3. identity-stable maps state reviewed fields by service and vendor operation id;
+/// 4. the [`OperationPatch`] that names an operation overrides the selector **field by field** —
+///    where the block is silent the identity-stable map or selector's statement stands, and where
+///    none speaks the rules on each field decide;
+/// 5. the result is validated by exactly the pass a hand-authored operation goes through.
 ///
 /// The published order follows from the same sentence: operations a `[[patch.operations]]` block
 /// names publish in file order, then everything a selector matched publishes in document order, per
@@ -306,6 +310,11 @@ pub struct Patch {
     /// `[patch.directions.manager]` followed by `flushDialer = "write"`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub directions: BTreeMap<String, BTreeMap<String, OperationDirection>>,
+    /// Source-grounded description corrections keyed by stable service and vendor `operationId`.
+    /// This map exists for bulk-selected documents whose source omits descriptions. Unlike an exact
+    /// operation patch it changes no selection or publication order.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub descriptions: BTreeMap<String, BTreeMap<String, String>>,
     /// The operations selected one at a time, each with its corrections.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub operations: Vec<OperationPatch>,
@@ -321,6 +330,7 @@ impl Patch {
         self.select.is_empty()
             && self.naming.is_none()
             && self.directions.is_empty()
+            && self.descriptions.is_empty()
             && self.operations.is_empty()
             && self.events.is_empty()
     }
@@ -334,6 +344,8 @@ impl Patch {
     fn declared(&self) -> &'static str {
         if !self.directions.is_empty() {
             "[patch.directions]"
+        } else if !self.descriptions.is_empty() {
+            "[patch.descriptions]"
         } else if !self.operations.is_empty() {
             "[[patch.operations]]"
         } else if !self.events.is_empty() {
@@ -1565,6 +1577,7 @@ fn publish(
         check_pins(naming, ingested, problems);
     }
     check_directions(&patch.directions, ingested, problems);
+    check_descriptions(&patch.descriptions, ingested, problems);
     let naming = patch.naming.as_ref();
 
     // **2 · select.** What every selector states about every operation it matched, merged — and a
@@ -1656,6 +1669,7 @@ fn publish(
 
         let stated = matched.get(&(document.service.as_str(), select));
         let reviewed_direction = direction_for(patch, &document.service, select);
+        let reviewed_description = description_for(patch, &document.service, select);
         if let Some(reason) = block.defer.as_deref() {
             let mut incompatible = Vec::new();
             if block.rename.is_some() {
@@ -1722,6 +1736,7 @@ fn publish(
             ComposeOverlay {
                 patch: Some(block),
                 reviewed_direction,
+                reviewed_description,
                 selected: stated.is_some(),
                 stated: stated.unwrap_or(&Stated::EMPTY),
                 naming,
@@ -1753,12 +1768,15 @@ fn publish(
                 continue;
             };
             let reviewed_direction = direction_for(patch, &document.service, &spec.operation_id);
+            let reviewed_description =
+                description_for(patch, &document.service, &spec.operation_id);
             if let Some((operation, claim)) = compose(
                 document,
                 spec,
                 ComposeOverlay {
                     patch: None,
                     reviewed_direction,
+                    reviewed_description,
                     selected: true,
                     stated,
                     naming,
@@ -1779,48 +1797,6 @@ fn publish(
     }
 
     (published, operation_specs)
-}
-
-fn direction_for(patch: &Patch, service: &str, operation_id: &str) -> Option<OperationDirection> {
-    patch
-        .directions
-        .get(service)
-        .and_then(|directions| directions.get(operation_id))
-        .copied()
-}
-
-fn check_directions(
-    directions: &BTreeMap<String, BTreeMap<String, OperationDirection>>,
-    ingested: &[IngestedDocument],
-    problems: &mut Vec<String>,
-) {
-    for (service, operations) in directions {
-        let Some(document) = ingested
-            .iter()
-            .find(|document| &document.service == service)
-        else {
-            problems.push(format!(
-                "`[patch.directions.{service}]` names no ingested service. Direction is keyed by \
-                 stable service and vendor `operationId`; available services: {}",
-                ingested
-                    .iter()
-                    .map(|document| document.service.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            continue;
-        };
-        for operation_id in operations.keys() {
-            if document.ingested.operation(operation_id).is_none() {
-                problems.push(format!(
-                    "`[patch.directions.{service}]` names no `operationId` {operation_id:?} in {}. \
-                     A renamed or removed upstream operation must be reviewed rather than silently \
-                     losing its direction",
-                    document.path
-                ));
-            }
-        }
-    }
 }
 
 /// The exact pin that produced one ingested document.
@@ -1882,6 +1858,7 @@ struct ComposeContext<'a> {
 struct ComposeOverlay<'a> {
     patch: Option<&'a OperationPatch>,
     reviewed_direction: Option<OperationDirection>,
+    reviewed_description: Option<&'a str>,
     selected: bool,
     stated: &'a Stated,
     naming: Option<&'a Naming>,
@@ -2132,6 +2109,7 @@ fn compose(
     let ComposeOverlay {
         patch,
         reviewed_direction,
+        reviewed_description,
         selected,
         stated,
         naming,
@@ -2216,6 +2194,22 @@ fn compose(
         ));
         return None;
     };
+
+    let exact_description = patch.and_then(|patch| patch.description.as_deref());
+    if let (Some(exact), Some(reviewed)) = (exact_description, reviewed_description) {
+        if exact != reviewed {
+            problems.push(format!(
+                "{select:?} has conflicting identity-stable descriptions: its \
+                 `[[patch.operations]]` block and `[patch.descriptions.{}]` disagree",
+                document.service
+            ));
+            return None;
+        }
+    }
+    let description = exact_description
+        .or(reviewed_description)
+        .unwrap_or(spec.description.as_str())
+        .to_owned();
 
     // **Risk and idempotency: the block, then the selector, then authored direction.** See
     // [`OperationSelector::idempotency`] for why the last step exists on a read and refuses on a
@@ -2348,9 +2342,7 @@ fn compose(
         service: document.service.clone(),
         request,
         direction,
-        description: patch
-            .and_then(|patch| patch.description.clone())
-            .unwrap_or_else(|| spec.description.clone()),
+        description,
         risk,
         idempotency,
         effects,
@@ -6257,6 +6249,14 @@ fn validate_operations(connector: &Connector, problems: &mut Vec<String>) {
         seen.push(id);
 
         validate_operation_service(connector, operation, problems);
+
+        if operation.description.trim().is_empty() {
+            problems.push(format!(
+                "operation {id:?} has an empty `description`; every published catalog operation \
+                 needs a source-grounded one-line description, including operations not exposed \
+                 to a model"
+            ));
+        }
 
         if operation.effects.is_empty() {
             problems.push(format!(

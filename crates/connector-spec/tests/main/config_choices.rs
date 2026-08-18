@@ -29,6 +29,7 @@ env = ["ACME_API_KEY"]
 
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"

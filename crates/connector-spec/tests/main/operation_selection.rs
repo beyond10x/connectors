@@ -382,6 +382,130 @@ fn an_upstream_operation_id_rename_orphans_direction_and_refuses() {
     );
 }
 
+fn description_document() -> String {
+    r#"{
+  "openapi": "3.0.3",
+  "info": { "title": "Descriptions", "version": "1" },
+  "servers": [{ "url": "https://api.acme.test" }],
+  "paths": {
+    "/v1/first": {
+      "get": {
+        "operationId": "firstThing",
+        "responses": { "200": { "description": "ok" } }
+      }
+    },
+    "/v1/second": {
+      "get": {
+        "operationId": "secondThing",
+        "summary": "The source description remains authoritative",
+        "responses": { "200": { "description": "ok" } }
+      }
+    }
+  }
+}"#
+    .to_owned()
+}
+
+const DESCRIPTION_POINTER: &str = r#"
+id = "acme"
+vendor = "Acme"
+base_url = "https://api.acme.test"
+
+[spec]
+path = "specs/acme/descriptions.json"
+
+[patch.directions.default]
+firstThing = "read"
+secondThing = "read"
+
+[patch.descriptions.default]
+firstThing = "Read the first thing"
+
+[patch.naming]
+rule = "kebab"
+prefix = "acme"
+
+[[patch.select]]
+path_prefix = "/v1"
+methods = ["GET"]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+"#;
+
+/// A missing upstream summary can be corrected without turning the operation into an exact patch.
+/// The map is an identity-stable field overlay, so the selector still publishes document order.
+#[test]
+fn description_corrections_preserve_bulk_selection_and_document_order() {
+    let document = synthetic("specs/acme/descriptions.json", description_document());
+    let connector = load_from(DESCRIPTION_POINTER, &document);
+
+    assert_eq!(ids(&connector), ["acme-first-thing", "acme-second-thing"]);
+    assert_eq!(
+        operation(&connector, "acme-first-thing").description,
+        "Read the first thing"
+    );
+    assert_eq!(
+        operation(&connector, "acme-second-thing").description,
+        "The source description remains authoritative"
+    );
+}
+
+/// Stable correction keys fail closed when the source identity moves, and whitespace is not a
+/// description. Otherwise a vendor rename or an empty review could recreate the hosted failure.
+#[test]
+fn description_corrections_refuse_stale_identities_and_empty_values() {
+    let document = synthetic("specs/acme/descriptions.json", description_document());
+
+    let missing_service = DESCRIPTION_POINTER.replace(
+        "[patch.descriptions.default]",
+        "[patch.descriptions.missing]",
+    );
+    let refusal = refuse_from(&missing_service, &document);
+    assert!(
+        refusal.contains("names no ingested service"),
+        "a stale service must fail closed: {refusal}"
+    );
+
+    let missing_operation = DESCRIPTION_POINTER.replace(
+        "firstThing = \"Read the first thing\"",
+        "missingThing = \"Read the first thing\"",
+    );
+    let refusal = refuse_from(&missing_operation, &document);
+    assert!(
+        refusal.contains("missingThing") && refusal.contains("names no `operationId`"),
+        "a stale operationId must fail closed: {refusal}"
+    );
+
+    let empty = DESCRIPTION_POINTER.replace(
+        "firstThing = \"Read the first thing\"",
+        "firstThing = \"   \"",
+    );
+    let refusal = refuse_from(&empty, &document);
+    assert!(
+        refusal.contains("firstThing") && refusal.contains("an empty description"),
+        "a whitespace correction must fail closed: {refusal}"
+    );
+}
+
+/// Two identity-stable declarations may agree, but disagreement is an authoring conflict rather
+/// than an ordering rule.
+#[test]
+fn description_corrections_refuse_conflicting_exact_patches() {
+    let document = synthetic("specs/acme/descriptions.json", description_document());
+    let definition = format!(
+        "{DESCRIPTION_POINTER}\n[[patch.operations]]\nselect = \"firstThing\"\ndescription = \"A different fact\"\n"
+    );
+    let refusal = refuse_from(&definition, &document);
+    assert!(
+        refusal.contains("conflicting identity-stable descriptions"),
+        "conflicting exact and mapped descriptions must be refused: {refusal}"
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // C-411 · A selector matches a set
 // ---------------------------------------------------------------------------------------------

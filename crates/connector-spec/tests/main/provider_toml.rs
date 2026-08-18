@@ -490,6 +490,7 @@ fn a_file_may_point_at_a_spec_and_still_declare_operations_inline() {
         "{}
 [[operations]]
 id = \"babelforce.health\"
+description = \"Check service availability\"
 method = \"GET\"
 direction = \"read\"
 path = \"/health\"
@@ -545,6 +546,7 @@ env = ["BABELFORCE_ACCESS_TOKEN"]
 
 [[operations]]
 id = "babelforce.call.list"
+description = "List calls"
 method = "GET"
 direction = "read"
 path = "/api/v2/calls/reporting"

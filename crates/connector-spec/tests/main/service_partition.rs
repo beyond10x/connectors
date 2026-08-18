@@ -296,7 +296,7 @@ fn a_provider_file_that_loads_publishes_only_round_tripping_addresses() {
                     "id = \"acme\"\nbase_url = \"https://api.acme.example\"\n\
                      authority = {authority:?}\napi_version = {api_version:?}\n\n\
                      [[services]]\nname = {service:?}\n\n\
-                     [[operations]]\nid = \"acme-thing-get\"\nservice = {service:?}\n\
+                     [[operations]]\nid = \"acme-thing-get\"\ndescription = \"Get one thing\"\nservice = {service:?}\n\
                      method = \"GET\"\ndirection = \"read\"\npath = \"/v1/things\"\nrisk = \"low\"\n\
                      idempotency = \"idempotent\"\neffects = [\"read\", \"network\"]\n\
                      interaction_shape = \"unary\"\nprotocol_driver = \"http_v1\"\n\

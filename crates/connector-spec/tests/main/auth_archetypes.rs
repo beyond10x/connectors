@@ -510,6 +510,7 @@ grants = ["authorization_code"]
 {discriminator}
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"
@@ -626,6 +627,7 @@ grants = ["authorization_code"]
 
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"

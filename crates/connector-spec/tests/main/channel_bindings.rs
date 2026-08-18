@@ -39,6 +39,7 @@ env = ["ACME_WEBHOOK_SECRET"]
 
 [[operations]]
 id = "acme-reply"
+description = "Reply to one event"
 method = "POST"
 direction = "write"
 path = "/reply"
@@ -818,6 +819,7 @@ fn a_duplicate_operation_id_is_reported_once_and_not_also_as_a_namespace_collisi
     let source = fixture(GOOD).replace(
         "[[events]]\nname = \"thing.created\"",
         "[[operations]]\nid = \"acme-reply\"\nmethod = \"GET\"\npath = \"/other\"\nrisk = \"medium\"\n\
+         description = \"Read the other resource\"\n\
          direction = \"read\"\nidempotency = \"non_idempotent\"\neffects = [\"read\", \"network\"]\n\
          interaction_shape = \"unary\"\nprotocol_driver = \"http_v1\"\n\
          placement_requirement = \"connectors_deployment\"\nimplementation_form = \"built_in\"\n\

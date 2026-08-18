@@ -30,6 +30,7 @@ env = ["ACME_TOKEN"]
 
 [[operations]]
 id = "acme-thing-show"
+description = "Show one thing"
 method = "GET"
 direction = "read"
 path = "/things/{{id}}"
@@ -49,6 +50,7 @@ schema = {{ type = "string" }}
 
 [[operations]]
 id = "acme-notify"
+description = "Send one notification"
 method = "POST"
 direction = "write"
 path = "/notify"

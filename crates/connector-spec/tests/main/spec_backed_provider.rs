@@ -263,6 +263,7 @@ fn inline_operations_and_selected_ones_land_in_one_connector() {
         "
 [[operations]]
 id = \"zendesk-hand-written\"
+description = \"Fetch the authenticated user\"
 method = \"GET\"
 direction = \"read\"
 path = \"/api/v2/users/me\"
@@ -369,6 +370,7 @@ base_url = \"https://acme.zendesk.com\"
 
 [[operations]]
 id = \"zendesk-hand-written\"
+description = \"Fetch the authenticated user\"
 method = \"GET\"
 direction = \"read\"
 path = \"/api/v2/users/me\"
@@ -614,6 +616,7 @@ base_url = \"https://acme.zendesk.com\"
 
 [[operations]]
 id = \"zendesk-hand-written\"
+description = \"Fetch the authenticated user\"
 method = \"GET\"
 direction = \"read\"
 path = \"/api/v2/users/me\"

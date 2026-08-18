@@ -15,11 +15,28 @@ id = "acme-read"
 method = "GET"
 direction = "read"
 path = "/v1/items"
+description = "Read items"
 risk = "low"
 idempotency = "idempotent"
 {facts}
 "#
     )
+}
+
+#[test]
+fn every_catalog_operation_requires_a_non_empty_description() {
+    let source = operation(&format!("effects = [\"read\", \"network\"]\n{AXES}"));
+    let missing = source.replace("description = \"Read items\"\n", "");
+    let error = provider::load("providers/acme.toml", &missing)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("empty `description`"), "{error}");
+
+    let whitespace = source.replace("description = \"Read items\"", "description = \"   \\t\"");
+    let error = provider::load("providers/acme.toml", &whitespace)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("empty `description`"), "{error}");
 }
 
 const AXES: &str = r#"interaction_shape = "unary"

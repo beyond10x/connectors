@@ -125,8 +125,11 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
 6. **The judgment calls no spec can make.** `risk` (ordered; when unsure, claim higher),
    `idempotency` (a create that dedupes on an external key is `conditional`), `direction`,
    `effects` (declared, never derived) — the grant system consumes these, so a wrong claim is
-   a security bug. The scaffolder writes `TODO` holes rather than guessing; filling them
-   thoughtfully **is** the review.
+   a security bug. Every published operation also carries a non-empty, source-grounded one-line
+   description, including operations not exposed to a model. When a bulk-selected vendor document
+   omits that fact, use `[patch.descriptions.<service>]` keyed by exact `operationId`; do not turn
+   the operations into exact selection blocks and reorder the catalog. The scaffolder writes
+   `TODO` holes rather than guessing; filling them thoughtfully **is** the review.
 7. **The expose discipline.** Catalogued ≠ projected. Everything selected is callable; only a
    curated handful get `expose = true` and reach a model. The largest predecessor provider
    catalogues 397 operations and exposes **nine** — "389 LLM tools is not a catalogue, it is a
@@ -148,8 +151,9 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
 
 Checklist: identity chosen as permanent · spec origin + provenance explicit ·
 selects split by damage class · risk/idempotency/effects by judgment, not guessed · no auth-flow
-ops, no credential values · expose is a curation · operation traits declared · build + diff clean
-twice · one reviewable commit, by the bot.
+ops, no credential values · every description non-empty and source-grounded · expose is a
+curation · operation traits declared · build + diff clean twice · one reviewable commit, by the
+bot.
 
 ## Refreshing a source
 

@@ -110032,7 +110032,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Change the current agent's task lock state and return the resulting agent and lock state",
         "input_schema": {
           "properties": {
             "lockState": {
@@ -110046,6 +110046,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Change the current agent's task lock state and return the resulting agent and lock state",
       "direction": "write",
       "effects": [
         "write",
@@ -110105,7 +110106,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Apply an agent action, with an optional reason, to one task assigned to the current agent",
         "input_schema": {
           "properties": {
             "agentAction": {
@@ -110127,6 +110128,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Apply an agent action, with an optional reason, to one task assigned to the current agent",
       "direction": "write",
       "effects": [
         "write",
@@ -110759,7 +110761,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "List tasks with the declared filter and page controls",
         "input_schema": {
           "properties": {
             "filter": {
@@ -110781,6 +110783,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "List tasks with the declared filter and page controls",
       "direction": "read",
       "effects": [
         "read",
@@ -111444,7 +111447,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Submit a task with its queue, schedule, selection, completion, and action settings",
         "input_schema": {
           "properties": {
             "actions": {},
@@ -111478,6 +111481,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Submit a task with its queue, schedule, selection, completion, and action settings",
       "direction": "write",
       "effects": [
         "write",
@@ -112632,7 +112636,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Test declared task actions with supplied input and return their output",
         "input_schema": {
           "properties": {
             "actions": {},
@@ -112646,6 +112650,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Test declared task actions with supplied input and return their output",
       "direction": "write",
       "effects": [
         "write",
@@ -113247,7 +113252,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read the task selection engine and its timeout and rescheduling configuration",
         "input_schema": {
           "properties": {},
           "required": [],
@@ -113255,6 +113260,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read the task selection engine and its timeout and rescheduling configuration",
       "direction": "read",
       "effects": [
         "read",
@@ -113326,7 +113332,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Create the task selection engine and its timeout and rescheduling configuration",
         "input_schema": {
           "properties": {
             "accept_timeout": {
@@ -113356,6 +113362,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Create the task selection engine and its timeout and rescheduling configuration",
       "direction": "write",
       "effects": [
         "write",
@@ -113521,7 +113528,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Replace the task selection engine and its timeout and rescheduling configuration",
         "input_schema": {
           "properties": {
             "accept_timeout": {
@@ -113551,6 +113558,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Replace the task selection engine and its timeout and rescheduling configuration",
       "direction": "write",
       "effects": [
         "write",
@@ -113716,7 +113724,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Delete the task selection configuration",
         "input_schema": {
           "properties": {},
           "required": [],
@@ -113724,6 +113732,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Delete the task selection configuration",
       "direction": "write",
       "effects": [
         "write",
@@ -113754,7 +113763,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "List customer task logs with the declared type, context, detail, filter, and page controls",
         "input_schema": {
           "properties": {
             "context": {
@@ -113788,6 +113797,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "List customer task logs with the declared type, context, detail, filter, and page controls",
       "direction": "read",
       "effects": [
         "read",
@@ -113980,7 +113990,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read interaction duration metrics for one agent",
         "input_schema": {
           "properties": {
             "agentId": {
@@ -113994,6 +114004,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read interaction duration metrics for one agent",
       "direction": "read",
       "effects": [
         "read",
@@ -114083,7 +114094,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read interaction frequency and journal metrics for one agent",
         "input_schema": {
           "properties": {
             "agentId": {
@@ -114097,6 +114108,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read interaction frequency and journal metrics for one agent",
       "direction": "read",
       "effects": [
         "read",
@@ -114181,7 +114193,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read timing and journal metrics for one task",
         "input_schema": {
           "properties": {
             "taskId": {
@@ -114195,6 +114207,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read timing and journal metrics for one task",
       "direction": "read",
       "effects": [
         "read",
@@ -114310,7 +114323,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "List task scripts of one declared type with filter and page controls",
         "input_schema": {
           "properties": {
             "filter": {
@@ -114336,6 +114349,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "List task scripts of one declared type with filter and page controls",
       "direction": "read",
       "effects": [
         "read",
@@ -114489,7 +114503,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Submit a task script file and metadata for one declared script type",
         "input_schema": {
           "properties": {
             "file": {
@@ -114509,6 +114523,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Submit a task script file and metadata for one declared script type",
       "direction": "write",
       "effects": [
         "write",
@@ -114658,7 +114673,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read one task script by type and code identifier",
         "input_schema": {
           "properties": {
             "codeId": {
@@ -114680,6 +114695,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read one task script by type and code identifier",
       "direction": "read",
       "effects": [
         "read",
@@ -114809,7 +114825,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Replace one task script's file and metadata by type and code identifier",
         "input_schema": {
           "properties": {
             "codeId": {
@@ -114833,6 +114849,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Replace one task script's file and metadata by type and code identifier",
       "direction": "write",
       "effects": [
         "write",
@@ -114992,7 +115009,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Delete one task script by type and code identifier",
         "input_schema": {
           "properties": {
             "codeId": {
@@ -115010,6 +115027,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Delete one task script by type and code identifier",
       "direction": "write",
       "effects": [
         "write",
@@ -115069,7 +115087,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Submit a task from one named template with the declared body and style",
         "input_schema": {
           "properties": {
             "body": {},
@@ -115089,6 +115107,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Submit a task from one named template with the declared body and style",
       "direction": "write",
       "effects": [
         "write",
@@ -115880,7 +115899,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read task usage time series for a time range, rate, and usage type",
         "input_schema": {
           "properties": {
             "end": {
@@ -115906,6 +115925,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read task usage time series for a time range, rate, and usage type",
       "direction": "read",
       "effects": [
         "read",
@@ -116061,7 +116081,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "List task usage types for a time range",
         "input_schema": {
           "properties": {
             "end": {
@@ -116079,6 +116099,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "List task usage types for a time range",
       "direction": "read",
       "effects": [
         "read",
@@ -116153,7 +116174,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Read one task by task identifier",
         "input_schema": {
           "properties": {
             "taskId": {
@@ -116167,6 +116188,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Read one task by task identifier",
       "direction": "read",
       "effects": [
         "read",
@@ -116763,7 +116785,7 @@
         ]
       ],
       "contract": {
-        "description": "",
+        "description": "Update one task's body by task identifier",
         "input_schema": {
           "properties": {
             "body": {},
@@ -116779,6 +116801,7 @@
         }
       },
       "credential_requirement": "declared",
+      "description": "Update one task's body by task identifier",
       "direction": "write",
       "effects": [
         "write",

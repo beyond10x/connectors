@@ -11,6 +11,7 @@ env = ["ZENDESK_API_TOKEN"]
 
 [[operations]]
 id = "zendesk.test"
+description = "Fixture operation"
 method = "GET"
 direction = "read"
 path = "/api/v2/users/me.json"
