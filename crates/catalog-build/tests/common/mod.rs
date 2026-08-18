@@ -3,7 +3,7 @@
 //! Deliberately dependency-free: the crate has no `tempfile`, and adding one would collide with the
 //! other connector stories in flight.
 //!
-//! # Fixtures live in the build tree, not in `/tmp`
+//! # Fixtures follow the build tree instead of selecting `/tmp` directly
 //!
 //! Every integration binary in this crate builds its trees here, so where they land is a property
 //! of the whole gate rather than of one test. It used to be `std::env::temp_dir()`, keyed on the
@@ -14,10 +14,11 @@
 //! `service_units` and `site_catalog` down together — output that reads exactly like a merge
 //! regression, and twice it was read as one.
 //!
-//! So a fixture root is now derived from `current_exe()`, which follows `CARGO_TARGET_DIR` and is
-//! per-worktree and already git-ignored, under a name no other run repeats. This is the same fix
+//! So a fixture root is now derived from `current_exe()`, which follows `CARGO_TARGET_DIR`, under a
+//! name no other run repeats. The caller may deliberately place that whole target below `TMPDIR`;
+//! fixture containment in the selected build tree is the invariant. This is the same fix
 //! `src/artifact.rs`'s test `scratch()` carries; the two are deliberately one shape, because two
-//! spellings of one rule drift apart. `tests/fixture_hygiene.rs` asserts both halves.
+//! spellings of one rule drift apart.
 
 // Each integration-test binary includes this module and uses a different part of it.
 #![allow(dead_code)]
@@ -95,11 +96,12 @@ impl Fixture {
     /// Create an empty fixture root under the build's own tree.
     ///
     /// Two properties, both learned from a flake that cost two wrong diagnoses (C-143, C-150) and
-    /// both asserted by `tests/fixture_hygiene.rs`:
+    /// both enforced by the path construction below:
     ///
-    /// 1. **Not `env::temp_dir()`.** That is a bounded tmpfs every concurrent agent on the machine
-    ///    writes to; filling it turns a fixture write into a failure in four integration binaries
-    ///    that have nothing to do with the code under test. The build directory is per-worktree.
+    /// 1. **Follow the Cargo build directory rather than selecting `env::temp_dir()` directly.**
+    ///    The process temporary directory can be a bounded tmpfs every concurrent agent on the
+    ///    machine writes to. The caller may deliberately place the whole Cargo target below it, so
+    ///    fixture containment in the selected build directory is the meaningful invariant.
     /// 2. **A name no other run repeats.** A pid is recycled by the kernel and shared by two agents
     ///    running two copies of this binary, so a pid plus a process-local counter — the old scheme
     ///    — is exactly reproducible by a second run. See [`run_unique`].

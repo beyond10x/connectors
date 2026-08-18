@@ -134,9 +134,12 @@ pub(crate) mod tests {
 
     /// Where the fixtures live, and that no two of them ever share a path.
     ///
-    /// `env::temp_dir()` is shared by every concurrent agent on this machine and bounded by a
-    /// tmpfs; the build directory is per-worktree and already git-ignored. A label plus a process id
-    /// is not unique either — a pid is reused, and two agents running the same binary collide.
+    /// The process temporary directory is shared by every concurrent agent on this machine and can
+    /// be a bounded tmpfs; fixtures therefore follow Cargo's build directory instead of choosing
+    /// that process-global location independently. The caller may still place the whole Cargo
+    /// target below `TMPDIR`, so containment in the build directory is the invariant. A label plus
+    /// a process id is not unique either — a pid is reused, and two agents running the same binary
+    /// collide.
     #[test]
     fn fixtures_live_in_the_build_directory_and_never_repeat_a_path() {
         let first = scratch("unique");
@@ -161,11 +164,6 @@ pub(crate) mod tests {
                 "{} is outside the build directory {}",
                 dir.display(),
                 build_dir.display()
-            );
-            assert!(
-                !dir.starts_with(std::env::temp_dir()),
-                "{} is in the shared temporary directory",
-                dir.display()
             );
         }
     }
@@ -210,9 +208,10 @@ pub(crate) mod tests {
     ///
     /// Both properties were learned from a flake that cost two wrong diagnoses (C-143).
     ///
-    /// 1. **Not `env::temp_dir()`.** That is a bounded tmpfs every concurrent agent on the machine
-    ///    writes to; filling it turns a write into a test failure with nothing to do with the code
-    ///    under test. The build directory is per-worktree and already git-ignored.
+    /// 1. **Follow the Cargo build directory rather than selecting `env::temp_dir()` directly.**
+    ///    The process temporary directory can be a bounded tmpfs every concurrent agent on the
+    ///    machine writes to. The caller can deliberately place the whole target below `TMPDIR`, so
+    ///    the meaningful invariant is that fixtures remain inside the selected build directory.
     /// 2. **Removed on every path, including a panic** — hence a `Drop` impl rather than a call at
     ///    the end of each test, which only runs when the test passes.
     pub(crate) fn scratch(label: &str) -> Scratch {
