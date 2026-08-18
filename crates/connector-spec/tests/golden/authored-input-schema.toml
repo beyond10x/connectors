@@ -6,6 +6,7 @@ base_url = "https://acme.zendesk.com"
 
 [[operations]]
 id = "zendesk.ticket.show"
+description = "Fixture operation"
 method = "GET"
 direction = "read"
 path = "/api/v2/tickets/{ticket_id}.json"

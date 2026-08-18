@@ -4,6 +4,7 @@ base_url = "https://services.vendor.com"
 
 [[operations]]
 id = "vendor.agent.list"
+description = "Fixture operation"
 method = "GET"
 direction = "read"
 path = "/api/v2/agents"

@@ -911,6 +911,7 @@ env = ["ACME_WEBHOOK_SECRET"]
 # A connector must describe at least one operation, so the binding has a connector to hang off.
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"

@@ -12,6 +12,7 @@ base_url = "{{origin}}/api/v4"
 
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"

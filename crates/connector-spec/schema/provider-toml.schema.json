@@ -956,6 +956,14 @@
             "additionalProperties": { "$ref": "#/$defs/operationDirection" }
           }
         },
+        "descriptions": {
+          "type": "object",
+          "description": "Source-grounded one-line description corrections keyed first by stable service and then by exact vendor operationId. This changes neither operation selection nor publication order.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "string", "minLength": 1 }
+          }
+        },
         "operations": {
           "type": "array",
           "description": "One entry per operation selected from the spec by name.",

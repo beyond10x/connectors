@@ -551,6 +551,9 @@ async fn liveness() -> &'static str {
 }
 
 async fn readiness(State(state): State<HostedState>) -> Response {
+    if crate::catalog_projection::ready().is_err() {
+        return (StatusCode::SERVICE_UNAVAILABLE, "catalog-invalid\n").into_response();
+    }
     if state.verifier.ready().await.is_err() {
         return (StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable\n").into_response();
     }
@@ -603,6 +606,10 @@ async fn catalog(
     let response = match crate::catalog_projection::handle(request.request) {
         Ok(result) => CatalogResponseEnvelope::success(&request_id, result),
         Err(error) => CatalogResponseEnvelope::failure(&request_id, error),
+    };
+    let response = match response.validate() {
+        Ok(()) => response,
+        Err(error) => CatalogResponseEnvelope::failure(request_id, error),
     };
     Json(response).into_response()
 }

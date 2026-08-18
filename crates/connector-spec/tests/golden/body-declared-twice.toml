@@ -6,6 +6,7 @@ base_url = "https://api.vendor.com"
 
 [[operations]]
 id = "vendor.session.update"
+description = "Fixture operation"
 method = "PUT"
 direction = "write"
 path = "/v2/sessions/{id}"

@@ -12,6 +12,7 @@ env = ["ZENDESK_API_TOKEN"]
 
 [[operations]]
 id = "zendesk.status"
+description = "Fixture operation"
 method = "GET"
 direction = "read"
 path = "/status.json"

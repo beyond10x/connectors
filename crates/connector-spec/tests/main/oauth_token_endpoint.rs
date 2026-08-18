@@ -56,6 +56,7 @@ subject = "user"
 [[operations]]
 service = "api"
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"

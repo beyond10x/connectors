@@ -1,8 +1,12 @@
 //! One deterministic catalog projection shared by local and hosted transports.
 
+use std::sync::OnceLock;
+
 use protocol::catalog::{
     CatalogOperationSummary, CatalogRequest, CatalogResult, ProviderDescription, ProviderSummary,
 };
+
+static CATALOG_READINESS: OnceLock<Result<(), protocol::catalog::CatalogError>> = OnceLock::new();
 
 pub(crate) fn handle(
     request: CatalogRequest,
@@ -55,6 +59,44 @@ pub(crate) fn handle(
             }))
         }
     }
+}
+
+/// Validate every deployment-shipped provider through the exact response contract consumers use.
+///
+/// This is intentionally part of readiness as well as the test suite: a generated catalog can
+/// compile while still violating a semantic wire bound such as a required non-empty description.
+/// A hosted deployment must not advertise readiness when every authenticated Zwirn session would
+/// deterministically reject that catalog.
+pub(crate) fn ready() -> Result<(), protocol::catalog::CatalogError> {
+    CATALOG_READINESS.get_or_init(validate_catalog).clone()
+}
+
+fn validate_catalog() -> Result<(), protocol::catalog::CatalogError> {
+    let search = handle(CatalogRequest::Search(protocol::catalog::SearchRequest {
+        query: String::new(),
+        offset: 0,
+        limit: protocol::catalog::MAX_PROVIDER_RESULTS,
+    }))?;
+    protocol::catalog::ResponseEnvelope::success("catalog-readiness-search", search).validate()?;
+
+    for provider in catalog::providers() {
+        let request_id = format!("catalog-readiness-{}", provider.id);
+        let result = handle(CatalogRequest::Describe(
+            protocol::catalog::DescribeRequest {
+                provider_ref: provider.id.to_owned(),
+            },
+        ))?;
+        protocol::catalog::ResponseEnvelope::success(request_id, result)
+            .validate()
+            .map_err(|error| protocol::catalog::CatalogError {
+                code: error.code,
+                message: format!(
+                    "catalog provider {:?} violates the response contract: {}",
+                    provider.id, error.message
+                ),
+            })?;
+    }
+    Ok(())
 }
 
 fn summary(provider: &catalog::Provider) -> ProviderSummary {
@@ -128,5 +170,10 @@ mod tests {
         protocol::catalog::ResponseEnvelope::success("catalog-b10x-test", result)
             .validate()
             .unwrap();
+    }
+
+    #[test]
+    fn every_shipped_provider_description_satisfies_the_catalog_wire_contract() {
+        ready().unwrap();
     }
 }

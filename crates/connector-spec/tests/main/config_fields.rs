@@ -33,6 +33,7 @@ user_env = ["ACME_USER"]
 
 [[operations]]
 id = "acme-ping"
+description = "Check service availability"
 method = "GET"
 direction = "read"
 path = "/ping"
@@ -621,6 +622,7 @@ env = ["ACME_API_TOKEN"]
 
 [[operations]]
 id = "acme-zone-list"
+description = "List zones"
 method = "GET"
 direction = "read"
 path = "/zones"
@@ -635,6 +637,7 @@ required_capabilities = ["public_network"]
 
 [[operations]]
 id = "acme-record-list"
+description = "List records in one zone"
 method = "GET"
 direction = "read"
 path = "/zones/{{zone_id}}/records"
@@ -939,6 +942,7 @@ env = ["ACME_API_KEY"]
 
 [[operations]]
 id = "acme-index-list"
+description = "List indexes"
 method = "GET"
 direction = "read"
 path = "/1/indexes"

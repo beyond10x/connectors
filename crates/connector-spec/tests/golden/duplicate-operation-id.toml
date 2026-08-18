@@ -8,6 +8,7 @@ base_url = "https://acme.zendesk.com"
 
 [[operations]]
 id = "zendesk.ticket.update"
+description = "Fixture operation"
 method = "PUT"
 direction = "write"
 path = "/api/v2/tickets/{ticket_id}.json"
@@ -28,6 +29,7 @@ schema = { type = "integer" }
 
 [[operations]]
 id = "zendesk.ticket.update"
+description = "Fixture operation"
 method = "PUT"
 direction = "write"
 path = "/api/v2/tickets/{ticket_id}.json"
