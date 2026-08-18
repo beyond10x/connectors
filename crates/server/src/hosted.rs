@@ -747,9 +747,14 @@ async fn operation(
             StatusCode::SERVICE_UNAVAILABLE,
         );
     }
+    let request_id = request.request_id;
     let response = match state.backend.handle(&owner, request.request).await {
-        Ok(result) => ResponseEnvelope::success(&request.request_id, result),
-        Err(error) => ResponseEnvelope::failure(&request.request_id, error),
+        Ok(result) => ResponseEnvelope::success(&request_id, result),
+        Err(error) => ResponseEnvelope::failure(&request_id, error),
+    };
+    let response = match response.validate() {
+        Ok(()) => response,
+        Err(error) => ResponseEnvelope::failure(request_id, error),
     };
     Json(response).into_response()
 }
@@ -923,6 +928,8 @@ mod tests {
     };
     use service::PrincipalContext;
     use tower::ServiceExt as _;
+
+    mod contract_validation;
 
     struct Verifier;
 
