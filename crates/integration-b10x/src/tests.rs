@@ -1,10 +1,13 @@
 use super::*;
+use connector_resolve::document::HostEffect;
 use connectors_config::{B10xConnectionConfig, InitiationConfig};
 use protocol::datasource::{
     BindingSearchRequest, DatasourceRead, DatasourceRequest, DatasourceResult,
     DescribeRequest as DatasourceDescribeRequest, ReadRequest,
 };
-use protocol::operation::{DescribeRequest, InvokeRequest, OwnerContext, SearchRequest};
+use protocol::operation::{
+    ApprovalPosture, DescribeRequest, InvokeRequest, OwnerContext, SearchRequest,
+};
 use std::fs;
 use std::io::{Read as _, Write as _};
 use std::net::TcpListener;
@@ -476,6 +479,23 @@ fn a_mutating_post_dispatch_failure_is_not_declared_retriable() {
     let error = post_dispatch_error(operation, unavailable());
     assert_eq!(error.code, OperationErrorCode::OutcomeUnknown);
     assert!(!error.retriable);
+}
+
+#[test]
+fn every_declared_write_requires_external_approval() {
+    let document = Document::parse(DOCUMENT).unwrap();
+    for (canonical, operation_ref, _) in all_operation_rows() {
+        let operation = document
+            .operation(canonical)
+            .unwrap_or_else(|| panic!("{operation_ref} resolves to a catalog operation"));
+        if operation.effects().contains(&HostEffect::Write) {
+            assert_eq!(
+                approval(canonical, operation.effects()),
+                ApprovalPosture::Required,
+                "{operation_ref} publishes a write effect without required approval"
+            );
+        }
+    }
 }
 
 #[tokio::test]
