@@ -810,4 +810,41 @@ mod tests {
         })));
         backend.shutdown().await;
     }
+
+    #[tokio::test]
+    async fn datasource_description_lease_ignores_request_scoped_provenance() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let plain = owner();
+        let provenanced = owner()
+            .with_hosted_provenance(
+                "https://identity.example.test".to_owned(),
+                "token-after-rotation".to_owned(),
+                None,
+                "request-2".to_owned(),
+                "trace-2".to_owned(),
+            )
+            .unwrap();
+        // A lease minted while serving describe must admit the read that arrives on the NEXT
+        // authenticated request: a fresh request id, trace id, or rotated access token is not
+        // an authority change and must not invalidate it.
+        assert_eq!(
+            backend
+                .inner
+                .datasource_description_ref(&plain, "slack.conversations"),
+            backend
+                .inner
+                .datasource_description_ref(&provenanced, "slack.conversations"),
+        );
+        backend.shutdown().await;
+    }
 }
