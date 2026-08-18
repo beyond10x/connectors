@@ -91,7 +91,10 @@
         "operation_ref": {"$ref": "#/$defs/reference"}, "title": {"type": "string", "minLength": 1, "maxLength": 1024},
         "effect": {"$ref": "#/$defs/effect"}, "approval": {"$ref": "#/$defs/approval"},
         "connections": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/connectionSummary"}}
-      }
+      },
+      "allOf": [
+        {"if": {"properties": {"effect": {"enum": ["mutating", "destructive"]}}}, "then": {"properties": {"approval": {"const": "required"}}}}
+      ]
     },
     "description": {
       "type": "object", "additionalProperties": false,
@@ -102,7 +105,10 @@
         "effect": {"$ref": "#/$defs/effect"}, "approval": {"$ref": "#/$defs/approval"},
         "connections": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/connectionSummary"}},
         "description_ref": {"$ref": "#/$defs/reference"}
-      }
+      },
+      "allOf": [
+        {"if": {"properties": {"effect": {"enum": ["mutating", "destructive"]}}}, "then": {"properties": {"approval": {"const": "required"}}}}
+      ]
     },
     "invocation": {
       "type": "object", "additionalProperties": false,

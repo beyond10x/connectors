@@ -406,6 +406,10 @@ fn validate_summary(summary: &OperationSummary) -> Result<(), OperationError> {
     if !valid_ref(&summary.operation_ref, MAX_REFERENCE_BYTES)
         || summary.title.is_empty()
         || summary.title.len() > 1024
+        || (matches!(
+            summary.effect,
+            EffectClass::Mutating | EffectClass::Destructive
+        ) && summary.approval != ApprovalPosture::Required)
         || summary.connections.len() > 64
         || summary.connections.iter().any(|connection| {
             !valid_ref(&connection.connection_ref, MAX_REFERENCE_BYTES)
@@ -620,5 +624,27 @@ mod tests {
             response.validate().unwrap_err().code,
             OperationErrorCode::Protocol
         );
+    }
+
+    #[test]
+    fn effect_bearing_operations_require_approval() {
+        for effect in [EffectClass::Mutating, EffectClass::Destructive] {
+            let response = ResponseEnvelope::success(
+                "request-search-1",
+                OperationResult::Search {
+                    operations: vec![OperationSummary {
+                        operation_ref: "colab.rooms.create".to_owned(),
+                        title: "Create a conversation room".to_owned(),
+                        effect,
+                        approval: ApprovalPosture::NotRequired,
+                        connections: Vec::new(),
+                    }],
+                },
+            );
+            assert_eq!(
+                response.validate().unwrap_err().code,
+                OperationErrorCode::Protocol
+            );
+        }
     }
 }

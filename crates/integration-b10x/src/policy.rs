@@ -206,27 +206,13 @@ pub(super) fn effect(effects: &[HostEffect]) -> EffectClass {
     }
 }
 
-pub(super) fn approval(canonical: &str) -> ApprovalPosture {
-    if matches!(
-        canonical,
-        SPEECH_SPEAK_OPERATION
-            | BROWSER_SCREENSHOT_OPERATION
-            | "work-request-create"
-            | "work-task-create"
-            | "work-task-status-update"
-            | "ontology-branch-create"
-            | "ontology-branch-schema-extend"
-            | "ontology-claim-assert"
-            | "ontology-claim-retract"
-            | "ontology-pack-install"
-            | "ontology-proposal-create"
-            | "ontology-proposal-evaluate"
-            | "ontology-proposal-approval-record"
-            | "ontology-proposal-promote"
-            | "ontology-schema-register"
-            | "workspaces-delete"
-            | "workspaces-checkouts-delete"
-    ) {
+pub(super) fn approval(canonical: &str, effects: &[HostEffect]) -> ApprovalPosture {
+    if effects.contains(&HostEffect::Write)
+        || matches!(
+            canonical,
+            SPEECH_SPEAK_OPERATION | BROWSER_SCREENSHOT_OPERATION
+        )
+    {
         ApprovalPosture::Required
     } else {
         ApprovalPosture::NotRequired
@@ -235,9 +221,10 @@ pub(super) fn approval(canonical: &str) -> ApprovalPosture {
 
 pub(super) fn check_approval(
     canonical: &str,
+    effects: &[HostEffect],
     evidence: Option<&str>,
 ) -> Result<(), OperationError> {
-    match (approval(canonical), evidence) {
+    match (approval(canonical, effects), evidence) {
         (ApprovalPosture::Required, None) => Err(OperationError::new(
             OperationErrorCode::ApprovalRequired,
             "external approval evidence is required",

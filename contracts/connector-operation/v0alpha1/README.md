@@ -24,7 +24,8 @@ the semantic contract and a later hosted transport must authenticate independent
   never authorization, visibility, entitlement, or a transport selection. Search grants nothing.
 - `describe` returns exact input/output schemas, effect/approval posture, and an opaque
   `description_ref` lease bound to the current catalog, owner snapshot, Connection, Grant, and
-  approval configuration.
+  approval configuration. Every mutating or destructive operation declares that external approval
+  is required; services and clients refuse a response that weakens this invariant.
 - `invoke` requires that lease, an exact Connection, structured input, and (when declared) an
   externally issued approval evidence reference. There is no caller-written `approved` boolean.
 - A session-producing invoke may return an `execution_ref`. `session_status` observes the owning

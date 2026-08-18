@@ -248,7 +248,7 @@ impl B10xBackend {
                     operation_ref: operation_ref.to_owned(),
                     title: title.to_owned(),
                     effect: effect(operation.effects()),
-                    approval: approval(canonical),
+                    approval: approval(canonical, operation.effects()),
                     connections: vec![self.connection()],
                 })
             })
@@ -284,7 +284,7 @@ impl B10xBackend {
             input_schema: operation.input_schema().clone(),
             output_schema: response_schema(&self.catalog, canonical)?,
             effect: effect(operation.effects()),
-            approval: approval(canonical),
+            approval: approval(canonical, operation.effects()),
             connections: vec![self.connection()],
             description_ref: self.description_ref(context, canonical),
         }))
@@ -321,7 +321,11 @@ impl B10xBackend {
                 false,
             ));
         }
-        check_approval(canonical, request.approval_evidence_ref.as_deref())?;
+        check_approval(
+            canonical,
+            operation.effects(),
+            request.approval_evidence_ref.as_deref(),
+        )?;
         validate_json(operation.input_schema(), &request.input).map_err(|_| invalid())?;
         validate_semantic_input(canonical, &request.input)?;
         let plan = self.plan(context, operation, canonical)?;
