@@ -9,9 +9,13 @@
 
 use catalog_reader::{Error, Pack};
 
-/// The committed pack, by the path this crate embeds it from.
+/// The committed pack, resolved from Cargo's package-root test working directory.
+///
+/// Resolve this at runtime: a shared target directory can reuse a test binary across Git
+/// worktrees, so embedding `CARGO_MANIFEST_DIR` would leave the binary pointing at a removed
+/// validation worktree.
 fn committed_pack_path() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("catalog.pack")
+    std::path::PathBuf::from("catalog.pack")
 }
 
 /// A synthetic version-1 pack around `body`, its digest computed independently of the crate under
