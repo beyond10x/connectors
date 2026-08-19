@@ -9,6 +9,7 @@ use protocol::connection::{
 };
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult, DatasourceSummary,
+    SearchRequest as DatasourceSearchRequest,
 };
 use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
 use protocol::operation::{
@@ -52,6 +53,40 @@ impl BackendRegistry {
             .iter()
             .filter(|backend| backend.owns_event(request))
             .collect()
+    }
+
+    /// Collect datasource definitions from every backend that publishes them, refusing a
+    /// reference two Integrations both claim.
+    async fn search_datasources(
+        &self,
+        context: &PrincipalContext,
+        search: &DatasourceSearchRequest,
+    ) -> Result<BTreeMap<String, DatasourceSummary>, DatasourceError> {
+        let mut definitions = BTreeMap::<String, DatasourceSummary>::new();
+        for backend in &self.backends {
+            if !backend.capabilities().datasources {
+                continue;
+            }
+            let result = backend
+                .handle_datasource(context, DatasourceRequest::Search(search.clone()))
+                .await?;
+            let DatasourceResult::Search { definitions: found } = result else {
+                return Err(datasource_protocol(
+                    "datasource search backend returned a wrong result",
+                ));
+            };
+            for definition in found {
+                if definitions
+                    .insert(definition.datasource_ref.clone(), definition)
+                    .is_some()
+                {
+                    return Err(datasource_protocol(
+                        "multiple Integrations published one datasource reference",
+                    ));
+                }
+            }
+        }
+        Ok(definitions)
     }
 
     fn datasource_claims(&self, request: &DatasourceRequest) -> Vec<&Arc<dyn ConnectorBackend>> {
@@ -301,29 +336,17 @@ impl ConnectorBackend for BackendRegistry {
         request: DatasourceRequest,
     ) -> Result<DatasourceResult, DatasourceError> {
         if let DatasourceRequest::Search(search) = request {
-            let mut definitions = BTreeMap::<String, DatasourceSummary>::new();
-            for backend in &self.backends {
-                if !backend.capabilities().datasources {
-                    continue;
-                }
-                let result = backend
-                    .handle_datasource(context, DatasourceRequest::Search(search.clone()))
-                    .await?;
-                let DatasourceResult::Search { definitions: found } = result else {
-                    return Err(datasource_protocol(
-                        "datasource search backend returned a wrong result",
-                    ));
+            let mut definitions = self.search_datasources(context, &search).await?;
+            // A caller that asks with a topical word ("connector", "read") and gets nothing back
+            // concludes the deployment has no datasources at all — the exact wrong reading, made
+            // twice by review agents against the live workbench. The query narrows an admitted
+            // set; when it narrows to nothing, the admitted set is the honest answer.
+            if definitions.is_empty() && !search.query.is_empty() {
+                let unfiltered = DatasourceSearchRequest {
+                    query: String::new(),
+                    limit: search.limit,
                 };
-                for definition in found {
-                    if definitions
-                        .insert(definition.datasource_ref.clone(), definition)
-                        .is_some()
-                    {
-                        return Err(datasource_protocol(
-                            "multiple Integrations published one datasource reference",
-                        ));
-                    }
-                }
+                definitions = self.search_datasources(context, &unfiltered).await?;
             }
             return Ok(DatasourceResult::Search {
                 definitions: definitions
@@ -913,6 +936,77 @@ mod tests {
             "a".repeat(64),
         )
         .unwrap()
+    }
+
+    /// A backend that publishes one datasource and filters search the way the real ones do.
+    struct SearchableDatasourceBackend;
+
+    #[async_trait]
+    impl ConnectorBackend for SearchableDatasourceBackend {
+        async fn ready(&self) -> Result<(), BackendReadinessError> {
+            Ok(())
+        }
+
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            _request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            unreachable!("this fixture publishes datasources only")
+        }
+
+        fn capabilities(&self) -> BackendCapabilities {
+            BackendCapabilities {
+                datasources: true,
+                ..BackendCapabilities::default()
+            }
+        }
+
+        async fn handle_datasource(
+            &self,
+            _context: &PrincipalContext,
+            request: DatasourceRequest,
+        ) -> Result<DatasourceResult, DatasourceError> {
+            let DatasourceRequest::Search(search) = request else {
+                unreachable!("this fixture answers search only");
+            };
+            let summary = DatasourceSummary {
+                datasource_ref: "slack.conversations".to_owned(),
+                title: "Slack conversations".to_owned(),
+                access_mode: protocol::datasource::AccessMode::Live,
+                verbs: vec![protocol::datasource::ReadVerb::List],
+            };
+            let matches = search.query.is_empty()
+                || summary
+                    .title
+                    .to_ascii_lowercase()
+                    .contains(&search.query.to_ascii_lowercase());
+            Ok(DatasourceResult::Search {
+                definitions: if matches { vec![summary] } else { Vec::new() },
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn a_topical_datasource_query_that_matches_nothing_returns_the_admitted_set() {
+        // Two review agents read an empty search result as "this deployment has no datasources"
+        // and stopped there. The query narrows; it never hides the surface.
+        let registry = BackendRegistry::new(vec![Arc::new(SearchableDatasourceBackend)]);
+        let found = registry
+            .handle_datasource(
+                &context(),
+                DatasourceRequest::Search(DatasourceSearchRequest {
+                    query: "connector".to_owned(),
+                    limit: 10,
+                }),
+            )
+            .await
+            .unwrap();
+        let DatasourceResult::Search { definitions } = found else {
+            panic!("search returns definitions");
+        };
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0].datasource_ref, "slack.conversations");
     }
 
     #[test]
