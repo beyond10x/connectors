@@ -215,7 +215,7 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                 return Ok(None);
             }
             let request_id = request.request_id;
-            let response = match crate::catalog_projection::handle(request.request) {
+            let response = match crate::catalog_projection::handle(request.request, &*backend) {
                 Ok(result) => protocol::catalog::ResponseEnvelope::success(&request_id, result),
                 Err(error) => protocol::catalog::ResponseEnvelope::failure(&request_id, error),
             };

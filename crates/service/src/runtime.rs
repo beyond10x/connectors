@@ -435,6 +435,16 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         ConnectSessionAccess::Operator
     }
 
+    /// The self-service setup flows this backend can complete for the named provider right now.
+    ///
+    /// This is a runtime answer, not a declaration: a backend whose deployment lacks the OAuth
+    /// configuration a flow needs returns nothing for it, so a product never shows a person a
+    /// control that would refuse. The default is nothing, because a backend that has not thought
+    /// about self-service does not offer it.
+    fn setup_profiles(&self, _provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
+        Vec::new()
+    }
+
     fn owns_event(&self, _request: &EventRequest) -> bool {
         false
     }

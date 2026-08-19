@@ -603,7 +603,7 @@ async fn catalog(
             .into_response();
     }
     let request_id = request.request_id;
-    let response = match crate::catalog_projection::handle(request.request) {
+    let response = match crate::catalog_projection::handle(request.request, &*state.backend) {
         Ok(result) => CatalogResponseEnvelope::success(&request_id, result),
         Err(error) => CatalogResponseEnvelope::failure(&request_id, error),
     };
