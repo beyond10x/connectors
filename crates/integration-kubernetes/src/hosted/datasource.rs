@@ -11,18 +11,81 @@ impl KubernetesStatusBackend {
         }
     }
 
+    /// Resolves the namespace one binding ref names, or says which of two different things went
+    /// wrong.
+    ///
+    /// These were one refusal — "Kubernetes datasource binding is not granted" — and a reviewing
+    /// agent carried it to an operator as a missing grant when the binding ref was simply not a
+    /// binding ref at all. A ref that names no namespace is the caller's mistake and says so; a
+    /// namespace the principal cannot read is a real grant gap and names the namespace, the
+    /// groups that carry read, and that group membership can arrive late.
     fn binding_namespace<'a>(
         &'a self,
         context: &PrincipalContext,
         binding_ref: &str,
     ) -> Result<&'a str, DatasourceError> {
-        self.namespace_access
-            .keys()
-            .find(|namespace| {
-                self.can_read(context, namespace) && namespace_binding_ref(namespace) == binding_ref
-            })
-            .map(String::as_str)
-            .ok_or_else(|| datasource_not_granted("Kubernetes datasource binding is not granted"))
+        let Some((namespace, access)) = self
+            .namespace_access
+            .iter()
+            .find(|(namespace, _)| namespace_binding_ref(namespace) == binding_ref)
+        else {
+            return Err(DatasourceError::new(
+                DatasourceErrorCode::InvalidInput,
+                format!(
+                    "`{binding_ref}` is not a binding of `{DATASOURCE}`; list its bindings and read through one of those"
+                ),
+                false,
+            ));
+        };
+        if !self.can_read(context, namespace) {
+            return Err(
+                self.namespace_read_grant_missing(std::iter::once((namespace.as_str(), access)))
+            );
+        }
+        Ok(namespace.as_str())
+    }
+
+    /// The refusal for a principal whose groups grant read on no configured namespace.
+    fn missing_read_grant(&self) -> DatasourceError {
+        self.namespace_read_grant_missing(
+            self.namespace_access
+                .iter()
+                .map(|(namespace, access)| (namespace.as_str(), access)),
+        )
+    }
+
+    /// One refusal naming every namespace at stake and the Identity groups that carry read on it.
+    ///
+    /// Retriable, because group membership is not a property of this deployment: the same
+    /// principal read one namespace in one turn against the deployed build and none five minutes
+    /// later, so a caller told "not granted" flatly would escalate a condition that clears.
+    fn namespace_read_grant_missing<'a>(
+        &self,
+        namespaces: impl Iterator<Item = (&'a str, &'a NamespaceAccess)>,
+    ) -> DatasourceError {
+        let mut named = Vec::new();
+        for (namespace, access) in namespaces {
+            let mut carriers = access.read_groups.iter().cloned().collect::<Vec<_>>();
+            carriers.extend(self.operator_groups.iter().cloned());
+            carriers.sort();
+            carriers.dedup();
+            named.push(format!("`{namespace}` (one of: {})", carriers.join(", ")));
+        }
+        if named.is_empty() {
+            return DatasourceError::new(
+                DatasourceErrorCode::NotGranted,
+                format!("this deployment configures no readable namespace for `{DATASOURCE}`"),
+                false,
+            );
+        }
+        DatasourceError::new(
+            DatasourceErrorCode::NotGranted,
+            format!(
+                "reading `{DATASOURCE}` needs Identity group membership for {}. Ask whoever administers your Identity groups to add you, then retry.",
+                named.join("; ")
+            ),
+            true,
+        )
     }
 
     fn resolve_cursor(
@@ -49,7 +112,7 @@ impl KubernetesStatusBackend {
         })?;
         if state.namespace != namespace
             || state.principal_subject != context.subject()
-            || state.authority_snapshot_sha256 != context.authority_snapshot_sha256()
+            || state.authority_seed != context.stable_authority_seed()
         {
             return Err(datasource_not_granted(
                 "Kubernetes datasource cursor belongs to different authority",
@@ -72,13 +135,14 @@ impl KubernetesStatusBackend {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        let digest = Sha256::digest(format!(
-            "{DATASOURCE}\0{}\0{}\0{}\0{provider_cursor}\0{nonce}",
-            context.subject(),
-            context.authority_snapshot_sha256(),
-            namespace,
-        ));
-        let cursor_ref = format!("cursor:kubernetes:{}", hex::encode(&digest[..20]));
+        let mut digest = Sha256::new();
+        digest.update(b"b10x/kubernetes-datasource-cursor/v2\0");
+        digest.update(context.stable_authority_seed());
+        digest.update(format!("\0{namespace}\0{provider_cursor}\0{nonce}").as_bytes());
+        let cursor_ref = format!(
+            "cursor:kubernetes:{}",
+            hex::encode(&digest.finalize()[..20])
+        );
         let mut cursors = self
             .cursors
             .lock()
@@ -96,7 +160,7 @@ impl KubernetesStatusBackend {
             CursorState {
                 namespace: namespace.to_owned(),
                 principal_subject: context.subject().to_owned(),
-                authority_snapshot_sha256: context.authority_snapshot_sha256().to_owned(),
+                authority_seed: context.stable_authority_seed(),
                 provider_cursor,
                 expires_at: now + CURSOR_TTL,
             },
@@ -109,13 +173,16 @@ impl KubernetesStatusBackend {
         context: &PrincipalContext,
         request: ReadRequest,
     ) -> Result<DatasourceResult, DatasourceError> {
-        if request.datasource_ref != DATASOURCE
-            || request.description_ref != datasource_description_ref(context)
-        {
+        if request.datasource_ref != DATASOURCE {
+            return Err(datasource_not_found("Kubernetes datasource was not found"));
+        }
+        if request.description_ref != datasource_description_ref(context) {
+            // Recoverable in one call, and the caller is told which one. It used to say only
+            // "authority is stale", which reads like something an operator has to repair.
             return Err(DatasourceError::new(
                 DatasourceErrorCode::StaleAuthority,
-                "Kubernetes datasource authority is stale",
-                false,
+                "the Kubernetes datasource description lease has moved on; describe it again and retry the read",
+                true,
             ));
         }
         let namespace = self
@@ -358,10 +425,17 @@ impl ConnectorBackend for KubernetesStatusBackend {
                 .collect();
                 Ok(DatasourceResult::Search { definitions })
             }
+            // A principal without a read grant used to fall through to "Kubernetes datasource was
+            // not found" — the datasource exists, the grant does not, and only one of those is
+            // something the person can act on.
             DatasourceRequest::Describe(DatasourceDescribeRequest { datasource_ref })
-                if datasource_ref == DATASOURCE && self.has_read_access(context) =>
+                if datasource_ref == DATASOURCE =>
             {
-                Ok(DatasourceResult::Describe(datasource_description(context)))
+                if self.has_read_access(context) {
+                    Ok(DatasourceResult::Describe(datasource_description(context)))
+                } else {
+                    Err(self.missing_read_grant())
+                }
             }
             DatasourceRequest::Bindings(BindingSearchRequest {
                 datasource_ref,
@@ -518,16 +592,22 @@ fn datasource_description(context: &PrincipalContext) -> DatasourceDescription {
     }
 }
 
-fn datasource_description_ref(context: &PrincipalContext) -> String {
-    let digest = Sha256::digest(format!(
-        "{DATASOURCE}\0{}\0{}\0{}",
-        context.authority_snapshot_id(),
-        context.authority_snapshot_sha256(),
-        datasource_projection_sha256(),
-    ));
+/// The description lease for the workload datasource.
+///
+/// Seeded from the stable authority and never from the authority snapshot id or sha: the hosted
+/// receiver fills those from the access token, every datasource request travels on the cached
+/// `connectors.catalog.read` token, and that token is refreshed inside five minutes. A describe
+/// and the read that follows can therefore straddle a refresh, and seeding the lease from the
+/// token made that ordinary event look like an authority change.
+pub(crate) fn datasource_description_ref(context: &PrincipalContext) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"b10x/kubernetes-datasource-description/v2\0");
+    digest.update(context.stable_authority_seed());
+    digest.update(b"\0");
+    digest.update(datasource_projection_sha256().as_bytes());
     format!(
         "description:kubernetes:datasource:{}",
-        hex::encode(&digest[..16])
+        hex::encode(&digest.finalize()[..16])
     )
 }
 

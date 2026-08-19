@@ -444,6 +444,136 @@ async fn workspace_datasource_projects_only_the_logical_read_model() {
         .contains("authorization: dlmodule "));
 }
 
+fn hosted_principal(token_id: &str, envelope_sha: char) -> PrincipalContext {
+    // Shaped exactly as the hosted receiver builds it: the snapshot id is the access-token id
+    // and the snapshot sha hashes the introspection envelope, so both differ on the next token
+    // while the admitted authority is identical (`server::hosted::principal`).
+    PrincipalContext::hosted_with_groups(
+        "tenant-test".to_owned(),
+        "person:owner".to_owned(),
+        "person:owner".to_owned(),
+        Some("owner@example.test".to_owned()),
+        token_id.to_owned(),
+        envelope_sha.to_string().repeat(64),
+        BTreeSet::from(["dev".to_owned()]),
+    )
+    .unwrap()
+}
+
+/// The workspace read failed in the deployed build with
+/// `StaleAuthority: workspace datasource definition or binding is stale`, minutes before the
+/// identical read succeeded. Datasource requests all travel on the cached `connectors.catalog.read`
+/// token, which lives at most five minutes; a describe and a read that straddle its refresh arrive
+/// on different tokens. The description lease must not notice — the operation lease in this same
+/// backend already derives from the stable authority seed and does not.
+#[tokio::test]
+async fn a_workspace_read_survives_the_access_token_rotation_between_describe_and_read() {
+    let (origin, server) = fake_http(
+        r#"{"api_version":"workspaces.b10x.io/v2","request_id":"owner-request","result":{"items":[{"id":"wsp_example","tenant":"tenant:secret","owner":"user:secret","name":"Example","retention":"managed","source":null,"state":"active","created_at_ms":1,"updated_at_ms":2,"expires_at_ms":null}]}}"#,
+    );
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.workspaces_origin = Some(origin);
+    let backend =
+        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+            .unwrap();
+
+    let describing = hosted_principal("token-catalog-1", 'c');
+    let DatasourceResult::Describe(description) = backend
+        .handle_datasource(
+            &describing,
+            DatasourceRequest::Describe(DatasourceDescribeRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource description expected")
+    };
+    let DatasourceResult::Bindings { bindings } = backend
+        .handle_datasource(
+            &describing,
+            DatasourceRequest::Bindings(BindingSearchRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+                query: String::new(),
+                limit: 1,
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource binding expected")
+    };
+
+    let reading = hosted_principal("token-catalog-2", 'd');
+    let DatasourceResult::Read(page) = backend
+        .handle_datasource(
+            &reading,
+            DatasourceRequest::Read(ReadRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+                binding_ref: bindings[0].binding_ref.clone(),
+                description_ref: description.description_ref,
+                read: DatasourceRead::List {
+                    limit: 10,
+                    cursor: None,
+                },
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("a read on the next access token must not be refused as stale")
+    };
+    assert_eq!(page.records.len(), 1);
+    server.join().unwrap();
+}
+
+/// An unrecognised binding ref is not a stale lease. Reporting it as one taught a reviewing agent
+/// to ask an operator to re-authorize a Connector lease that was current.
+#[tokio::test]
+async fn an_unknown_workspace_binding_is_named_rather_than_reported_as_stale() {
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let mut configured = config(temporary.path());
+    configured.workspaces_origin = Some("http://127.0.0.1:1".to_owned());
+    let backend =
+        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+            .unwrap();
+    let context = hosted_principal("token-catalog-1", 'c');
+    let DatasourceResult::Describe(description) = backend
+        .handle_datasource(
+            &context,
+            DatasourceRequest::Describe(DatasourceDescribeRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("datasource description expected")
+    };
+    let refused = backend
+        .handle_datasource(
+            &context,
+            DatasourceRequest::Read(ReadRequest {
+                datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
+                binding_ref: WORKSPACES_DATASOURCE.to_owned(),
+                description_ref: description.description_ref,
+                read: DatasourceRead::List {
+                    limit: 10,
+                    cursor: None,
+                },
+            }),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, DatasourceErrorCode::InvalidInput);
+    assert!(refused.message.contains("binding"), "{refused:?}");
+    assert!(!refused.message.contains("stale"), "{refused:?}");
+}
+
 #[test]
 fn hosted_tenant_member_defaults_are_an_explicit_module_ceiling() {
     let temporary = tempfile::tempdir().unwrap();

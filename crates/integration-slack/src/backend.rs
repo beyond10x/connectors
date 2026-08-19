@@ -652,9 +652,13 @@ impl ConnectorBackend for SlackBackend {
             DatasourceRequest::Bindings(request) => {
                 SLACK_DATASOURCES.contains(&request.datasource_ref.as_str())
             }
+            // Ownership is a claim about the datasource, never about the binding. Requiring a
+            // Slack-shaped binding ref here dropped a read out of every backend's claim, and the
+            // registry then answered `NotFound: no Integration owns this datasource` for a
+            // datasource this Integration had just described. An unrecognised binding is this
+            // Integration's refusal to make, in words that name the binding.
             DatasourceRequest::Read(request) => {
                 SLACK_DATASOURCES.contains(&request.datasource_ref.as_str())
-                    && request.binding_ref.starts_with("datasource-binding:slack:")
             }
         }
     }
@@ -1921,6 +1925,21 @@ fn datasource_not_granted() -> DatasourceError {
         DatasourceErrorCode::NotGranted,
         "Slack datasource is not granted for this Connection",
         false,
+    )
+}
+
+/// One Slack datasource exists but no Connection of this principal is bound to it.
+///
+/// Retriable: connecting Slack, or a grant landing, clears it without any change to this
+/// deployment. The same principal saw one Slack binding and then none minutes later against the
+/// deployed build, so a flat refusal here would escalate a condition that resolves itself.
+fn datasource_binding_not_granted(datasource_ref: &str) -> DatasourceError {
+    DatasourceError::new(
+        DatasourceErrorCode::NotGranted,
+        format!(
+            "no Slack Connection of this principal is currently bound to `{datasource_ref}`; connect Slack or wait for the grant to be admitted, then retry"
+        ),
+        true,
     )
 }
 
