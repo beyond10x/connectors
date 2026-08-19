@@ -477,11 +477,26 @@ impl SlackInner {
             return Err(datasource_not_found());
         }
         let query = query.to_ascii_lowercase();
-        let mut bindings = self
-            .datasource_connections(context, datasource_ref)
+        let admitted = self.datasource_connections(context, datasource_ref);
+        // The query narrows an already-admitted binding set; it is a hint, never a permission
+        // boundary. A model that asks with a topical word ("conversations") used to get an
+        // empty list and conclude the datasource was not bound at all, so a query that matches
+        // nothing falls back to everything admitted.
+        let matched = admitted
+            .iter()
+            .filter(|connection| {
+                query.is_empty()
+                    || connection.label.to_ascii_lowercase().contains(&query)
+                    || datasource_ref.to_ascii_lowercase().contains(&query)
+            })
+            .count();
+        let mut bindings = admitted
             .into_iter()
             .filter(|connection| {
-                query.is_empty() || connection.label.to_ascii_lowercase().contains(&query)
+                matched == 0
+                    || query.is_empty()
+                    || connection.label.to_ascii_lowercase().contains(&query)
+                    || datasource_ref.to_ascii_lowercase().contains(&query)
             })
             .map(|connection| DatasourceBinding {
                 datasource_ref: datasource_ref.to_owned(),
