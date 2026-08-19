@@ -1,0 +1,518 @@
+# Runpod REST API v2 — the whole published GPU-cloud surface, catalogued from Runpod's own OpenAPI
+# document, with six reads exposed to a model and every write withheld from one.
+#
+# Runpod rents GPUs by the second. That single fact decides most of what follows: the damage an
+# operation here can do is measured in money and in destroyed work, not in a wrong row somewhere,
+# so the selection is split by damage class rather than by resource family, and `expose` is a much
+# shorter list than `select`.
+#
+# ---------------------------------------------------------------------------------------------
+# THE SOURCE
+# ---------------------------------------------------------------------------------------------
+#
+# Runpod publishes a complete OpenAPI 3.1 description of its v2 REST API and documents the URL it
+# is served from (`https://docs.runpod.io/api-reference-v2/overview.md`, "OpenAPI schema"). It is
+# served from the API host itself rather than from a tagged repository, so there is no commit to
+# pin — `specs/runpod.provenance.toml` pins the upstream bytes instead, and
+# `scripts/vendor-runpod-spec.py` refuses to run when they move. 34 paths, 53 operations, every one
+# carrying a unique `operationId` and a non-empty `summary`, which is why no
+# `[patch.descriptions]` block is needed: every published operation's description is the vendor's
+# own sentence about it.
+#
+# The declared scrub is "remove every `example`/`examples` keyword value". Runpod's examples carry
+# a real-looking SSH login (`…@ssh.runpod.io`), a pod host address, `me@example.com`, and the
+# example shape of a container-registry password. None of them is a declaration, and none of them
+# belongs in this repository.
+#
+# ---------------------------------------------------------------------------------------------
+# WHAT IS NOT DECLARED, AND WHY
+# ---------------------------------------------------------------------------------------------
+#
+# **No `rate_limit`.** Runpod's limit is per caller and not a published constant: `RateLimit` and
+# `RateLimit-Policy` (IETF ratelimit-headers draft) travel on every authenticated response and are
+# documented as "omitted for rate-limit-exempt callers", so the quota is a property of the key an
+# operator supplies — a value this repository never sees. The only concrete numbers in the document
+# are inside `examples`, which the scrub removes and which were never normative. `RateLimit` has
+# one member per `minute`/`hour`/`day` window; `Retry-After` accompanies a 429. Declaring one pair
+# of numbers here would either throttle a large account or over-run a small one, which is the same
+# resolution `providers/stripe.toml` reached for its per-key-mode limit.
+#
+# **No `pagination`.** Runpod's list endpoints declare no page, cursor or limit parameter at all —
+# not one of the twenty `list*` operations takes one. There is nothing to declare and inventing a
+# `max_pages` for a loop the vendor does not offer would be a fiction.
+#
+# **The catalog reads publish no filters at all (C-30).** This is the one place this connector is
+# narrower than Runpod's document, and it is worth stating precisely because the six affected
+# operations are otherwise the most useful reads here.
+#
+# `crates/connector-resolve/src/resolve.rs:265` refuses an array-valued query field outright —
+# "A list or a record has no wire spelling and is refused rather than flattened" — and nothing in
+# this repository reads OpenAPI's `style`/`explode`, so Runpod's declared `form`/`explode=false`
+# comma convention is dropped at ingest and cannot be reconstructed. Every catalog filter is either
+# an array (`include`, `product`, `countryCodes`, `cudaVersions`, `regions`, `networkVolumeTypes`,
+# `compliance`) or is documented "Valid only with include=AVAILABILITY (400 otherwise)" and so dies
+# with `include` (`count`, `cloud`, `minCudaVersion`, `vcpuCount`). Publishing any of them would
+# hand a caller — a model, in `runpod-list-gpu-types`' case — a parameter that cannot produce a
+# request, or one that produces a guaranteed `400`.
+#
+# So all 25 are omitted by name, and `listDataCenters` keeps its one scalar filter, `globalNetwork`.
+# **The consequence, stated where a flow author will see it: this connector reads GPU and CPU
+# catalog metadata and prices, and cannot read availability.** Availability is the `AVAILABILITY`
+# expansion and there is no way to ask for it. That is the same resolution `providers/asterisk.toml`
+# reached for twelve ARI operations and the same one github and openai reached for their expansion
+# filters; closing it needs a query-serialization axis on the IR, which is additive rather than a
+# reshape.
+#
+# **`error_envelope` on the six exposed operations only.** Runpod answers errors with RFC 9457
+# `application/problem+json` — `{title, status, detail}` — uniformly across all 51 published
+# operations. `[[patch.select]]` has no trait keys, so declaring it on the other 45 would mean
+# writing 45 exact-selection blocks and giving up the rule-shaped selection this file is built on.
+# It is declared exactly where it changes behaviour: an operation's `error_envelope` extends the
+# contract description a model reads with where the vendor's message actually is
+# (`crates/catalog-build/src/contract.rs:155`), and only six operations reach a model.
+#
+# **The two SSE endpoints are deferred, not selected.** `getPodLogs` and `getWorkerLogs` answer
+# `text/event-stream`, not JSON. Publishing them as `interaction_shape = "unary"` would advertise a
+# single response body for an open stream; no HTTP streaming shape is implemented here yet, so they
+# are withheld with a stated reason rather than misdescribed.
+
+id = "runpod"
+vendor = "Runpod"
+
+# The reverse-DNS authority this connector publishes under. It leads every rendered address and
+# every credential path — `tenants/<tenant>/io.runpod.api/<credential>`.
+#
+# Derived from `runpod.io`, the vendor's own primary domain, in reverse-DNS form, with the trailing
+# `api` label the already-shipped authorities carry (`io.fly.api`, `com.stripe.api`,
+# `com.slack.api`).
+#
+# **Never repointed once published.** A different spelling mints a new address and deprecates this
+# one, because tenants provision secrets under this path.
+authority = "io.runpod.api"
+
+# Runpod's own spelling. Every selected path begins `/v2/`, the document's `info.version` is
+# `2.0.0`, and Runpod's docs title the surface "API v2". A credential path carries no version, so a
+# key survives Runpod's next one.
+api_version = "v2"
+
+# One host for every account. The document declares exactly one server, `https://api.runpod.io`,
+# and the `/v2` prefix lives in the paths rather than in the server URL — so no path-prefix
+# materialization is needed and `base_url` carries no `{placeholder}` an operator must bind.
+#
+# Note this is **not** the host `foundation/llmgw` talks to: that client uses Runpod's v1 REST API
+# at `https://rest.runpod.io/v1` (`foundation/llmgw/src/runpod.rs:60`). Two surfaces of one vendor,
+# and this connector describes the v2 one the user asked for.
+base_url = "https://api.runpod.io"
+
+description = "Runpod GPU cloud: inspect and manage pods, serverless endpoints, clusters, templates, network volumes and registry credentials, and read GPU/CPU catalog metadata, prices and billing history"
+
+# Every operation authenticates the same way: the document declares one root `security` requirement
+# and no operation overrides it. `scripts/vendor-runpod-spec.py` refuses a refresh in which either
+# of those stops being true, so this one line cannot quietly become wrong.
+default_auth = [{ credentials = ["runpod.api_key"] }]
+
+# The "Test connection" button. `GET /v2/account/ssh-keys` takes no parameters at all, so pressing
+# it cannot do anything except prove the key resolves against the account it belongs to. A `verify`
+# operation runs unattended whenever someone opens a settings page, so it must be a read; the
+# loader refuses a `high` or `destructive` one. It returns public keys — the account's registered
+# SSH *public* keys — and no secret.
+verify = "runpod-get-ssh-keys"
+
+[spec]
+path = "specs/runpod/openapi-2026-08-19.json"
+source_url = "https://api.runpod.io/v2/openapi.json"
+upstream_version = "2.0.0"
+fetched_at = "2026-08-19T00:00:00Z"
+sha256 = "e9d5cd72cc53d8f8ea66f8e63f2c78cb4520104b614c99cdeacd7c93833789fd"
+
+# One document, one surface, so the reserved `default` service — declared only to carry its tags
+# and audiences, which is the one thing a single-surface provider may declare it for.
+[[services]]
+name = "default"
+tags = ["infrastructure", "ai"]
+audiences = ["developer", "sre"]
+
+# A Runpod API key is minted by a human in the Runpod console under Settings → API Keys, with a
+# per-key permission of `All`, `Restricted` or `Read Only`
+# (https://docs.runpod.io/get-started/api-keys). Runpod does not store it after creation and its
+# own documentation says to "treat your API key like a password".
+#
+# `subject = "user"`: the key carries the authority of the account whose console minted it. There
+# is no separate app identity to act as and no delegation step — it is a personal/account access
+# token in the sense the schema's `user` describes, and a consumer that needs the distinction must
+# not read this as `app`.
+#
+# The per-key permission is real and this catalogue cannot see it: a `Read Only` key will be
+# refused by every write below with a `403`, which the document describes as the answer when "a
+# valid key lacks access to the requested resource or action". That is a deployment fact, not a
+# catalogue one.
+[[auth]]
+name = "runpod.api_key"
+scheme = "bearer"
+env = ["RUNPOD_API_KEY"]
+subject = "user"
+description = "Runpod API key, created in the Runpod console under Settings → API Keys with the minimum permission the connection needs"
+
+# ---------------------------------------------------------------------------------------------
+# Naming — one rule, no pins
+#
+# `listGpuTypes` becomes `runpod-list-gpu-types`, `getSshKeys` becomes `runpod-get-ssh-keys`. There
+# are no pins because nothing has shipped under a different spelling yet: a pin exists to hold a
+# published id still, and this connector has published none.
+# ---------------------------------------------------------------------------------------------
+
+[patch.naming]
+rule = "kebab"
+prefix = "runpod"
+
+# ---------------------------------------------------------------------------------------------
+# Direction — the reviewed vendor-state axis, keyed by exact `operationId`
+#
+# Deliberately not derived from the HTTP method: membership here cannot change when an upstream
+# method, path, name or description moves. Every GET observes; every POST/PUT/PATCH/DELETE changes
+# vendor state. The two deferred SSE reads are absent because they publish nothing.
+# ---------------------------------------------------------------------------------------------
+
+[patch.directions.default]
+"getSshKeys" = "read"
+"updateSshKeys" = "write"
+"listPods" = "read"
+"createPod" = "write"
+"getPod" = "read"
+"updatePod" = "write"
+"deletePod" = "write"
+"podAction" = "write"
+"listClusters" = "read"
+"createCluster" = "write"
+"getCluster" = "read"
+"updateCluster" = "write"
+"deleteCluster" = "write"
+"listClusterPods" = "read"
+"listEndpoints" = "read"
+"createEndpoint" = "write"
+"getEndpoint" = "read"
+"updateEndpoint" = "write"
+"deleteEndpoint" = "write"
+"listEndpointWorkers" = "read"
+"listEndpointReleases" = "read"
+"listTemplates" = "read"
+"createTemplate" = "write"
+"getTemplate" = "read"
+"updateTemplate" = "write"
+"deleteTemplate" = "write"
+"listNetworkVolumes" = "read"
+"createNetworkVolume" = "write"
+"getNetworkVolume" = "read"
+"updateNetworkVolume" = "write"
+"deleteNetworkVolume" = "write"
+"listRegistries" = "read"
+"createRegistry" = "write"
+"getRegistry" = "read"
+"deleteRegistry" = "write"
+"listDelegations" = "read"
+"createDelegation" = "write"
+"revokeDelegation" = "write"
+"listGpuTypes" = "read"
+"getGpuType" = "read"
+"listCpuTypes" = "read"
+"getCpuType" = "read"
+"listDataCenters" = "read"
+"getDataCenter" = "read"
+"listPublicTemplates" = "read"
+"listBilling" = "read"
+"listPodBilling" = "read"
+"listServerlessBilling" = "read"
+"listEndpointBilling" = "read"
+"listNetworkVolumeBilling" = "read"
+"listClusterBilling" = "read"
+
+# ---------------------------------------------------------------------------------------------
+# Selection — ten statements for 51 operations, split by damage class
+#
+# Nothing is default-selected: without these statements this file would publish zero operations,
+# and a Runpod endpoint added upstream tomorrow becomes an operation only when someone writes it a
+# statement here.
+# ---------------------------------------------------------------------------------------------
+
+# Every read. One statement is honest for all of them: a Runpod GET observes and bills nothing.
+[[patch.select]]
+methods = ["GET"]
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Pod writes. `createPod` starts billable GPU compute; `updatePod` can change the image, disk,
+# ports or mounts of a pod someone is working in; `podAction` moves a pod between states. All three
+# touch running, metered compute, so `high` is one honest claim over the set — and `podAction` is
+# raised further below, because one of its actions deletes.
+[[patch.select]]
+path_prefix = "/v2/pods"
+methods = ["POST", "PATCH"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Cluster creation provisions a multi-node cluster of pods — the largest single spend this
+# connector can commit.
+[[patch.select]]
+path_prefix = "/v2/clusters"
+methods = ["POST"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Its own statement rather than a member of the one above, because it is not the same claim: the
+# document says this endpoint "only changes the cluster name — compute shape, type, and container
+# configuration are fixed at creation". Renaming a resource other systems address by name is a
+# write worth noticing and nothing more.
+[[patch.select]]
+path_prefix = "/v2/clusters"
+methods = ["PATCH"]
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Serverless endpoints autoscale workers. Creating one, or moving its `workers.min`/`scaling`,
+# commits spend that continues without any further call.
+[[patch.select]]
+path_prefix = "/v2/serverless"
+methods = ["POST", "PATCH"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# A network volume is billable persistent storage that "keeps incurring storage charges until it is
+# deleted", and its `size` "may only increase" — so the update is a one-way ratchet on a recurring
+# charge, which is the same damage claim as the create.
+[[patch.select]]
+path_prefix = "/v2/network-volumes"
+methods = ["POST", "PATCH"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Templates are configuration records: a template create or update starts no compute and bills
+# nothing. It can still mislead a later `createPod` that references it, which is why this is
+# `medium` rather than `low`.
+[[patch.select]]
+path_prefix = "/v2/templates"
+methods = ["POST", "PATCH"]
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Both creates under this prefix hand Runpod standing access to a private image source:
+# `createRegistry` stores a registry username and password ("Credentials are write-only"), and
+# `createDelegation` registers an ECR delegation. One claim covers both, and it is the higher one:
+# a caller-supplied secret crossing into a vendor's storage is not a `medium` event.
+[[patch.select]]
+path_prefix = "/v2/registries"
+methods = ["POST"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# The only PUT in the document, and it is a whole-set replacement: "Existing keys not present in
+# the request are removed; send `[]` to remove all keys." A caller that sends one key removes every
+# other, which is how an operator loses SSH access to pods they create afterwards.
+#
+# It is `non_idempotent` rather than `conditional` even though a repeat re-establishes the same key
+# set, because `repeatable_because` — the field that would state that condition — exists only on an
+# authored operation, not on a spec-selected one. Claiming `conditional` without stating why is the
+# one thing that field exists to prevent, so this claims the weaker, honest value.
+[[patch.select]]
+path_prefix = "/v2/account/ssh-keys"
+methods = ["PUT"]
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# Every delete, in one statement, at the top of the scale. Each one is irreversible by the
+# document's own words — a terminated pod "no longer appears in `listPods`" and its host-local
+# storage "is destroyed with it"; a deleted cluster "terminates all of its member pods"; a deleted
+# endpoint cancels "any queued or in-progress jobs"; a deleted network volume "releases its
+# storage".
+#
+# Two members are guarded rather than unconditional: `deleteTemplate` is "Rejected if the template
+# is currently referenced by a pod … or bound to a serverless endpoint", and `deleteRegistry` is
+# "Rejected if any pod currently uses this credential to pull its image". They are claimed
+# `destructive` anyway, which is the direction AGENTS.md licenses — a guard the vendor may relax is
+# not a damage claim this file should rest on, and `deleteRegistry`'s own guard explicitly does not
+# cover templates, which "silently lose the reference".
+[[patch.select]]
+methods = ["DELETE"]
+risk = "destructive"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+
+# ---------------------------------------------------------------------------------------------
+# The exceptions, and only the exceptions
+# ---------------------------------------------------------------------------------------------
+
+# Server-Sent Events, not JSON. Selecting them would publish a unary contract over an open stream.
+[[patch.operations]]
+select = "getPodLogs"
+defer = "The response is text/event-stream; no HTTP streaming interaction shape is implemented."
+
+[[patch.operations]]
+select = "getWorkerLogs"
+defer = "The response is text/event-stream; no HTTP streaming interaction shape is implemented."
+
+# `podAction` is a POST under `/v2/pods` and the selector above claims `high` for that set, which
+# is wrong for this one operation: its `terminate` action is documented as "permanently delete the
+# pod and release its resources (equivalent to `deletePod`)". A caller that can reach this
+# operation can destroy a pod without ever calling a DELETE, so it carries the delete's claim.
+[[patch.operations]]
+select = "podAction"
+risk = "destructive"
+
+# ---------------------------------------------------------------------------------------------
+# Exposure — six of 51
+#
+# All 51 are catalogued, addressable and callable by name. Six reach a model as tools, and every
+# one of them observes: what is running, what one pod is doing, what serverless endpoints exist,
+# what storage is provisioned, what GPUs are available at what price, and what it has all cost.
+#
+# **No write is exposed.** Not `createPod`, not `podAction`, not any delete. On this vendor a
+# mistaken tool call is a GPU-hour bill or destroyed work, and there is no undo — so a write here
+# stays reachable by a caller that names it and is never handed to a model as an option.
+# ---------------------------------------------------------------------------------------------
+
+[[patch.operations]]
+select = "listPods"
+description = "List the Runpod pods this account owns, with each pod's status, machine, cost per hour and endpoints; cluster member pods are excluded unless includeClusterPods is set"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+
+[[patch.operations]]
+select = "getPod"
+description = "Get one Runpod pod by id — its current status, machine, ports, mounts and cost — without changing it"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+
+[[patch.operations]]
+select = "listEndpoints"
+description = "List the serverless endpoints this account owns, with their scaling configuration, worker counts and request URLs"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+
+[[patch.operations]]
+select = "listNetworkVolumes"
+description = "List the network volumes this account owns — persistent storage that keeps billing until it is deleted — with each volume's size, data center and storage tier"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+
+[[patch.operations]]
+select = "listGpuTypes"
+description = "List every Runpod GPU type with its memory, vendor and per-hour prices. This returns the catalog, not live stock: current availability is a Runpod expansion this connector cannot request, so an unavailable GPU is indistinguishable from an available one here"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+omit.query = [
+  "cloud",
+  "count",
+  "countryCodes",
+  "cudaVersions",
+  "include",
+  "minCudaVersion",
+  "product",
+]
+
+[[patch.operations]]
+select = "listBilling"
+description = "Read time-bucketed total Runpod spend for this account across pods, serverless, storage, public endpoints and clusters, for an explicit startTime/endTime window or the most recent lastN buckets"
+expose = true
+error_envelope = { message_pointer = "/detail", code_pointer = "/status" }
+
+# The same C-30 omission on the five catalog reads that reach no model. Stated per operation
+# because `[[patch.select]]` carries no `omit`, and by name because an omission is written down
+# rather than inferred.
+
+[[patch.operations]]
+select = "getGpuType"
+omit.query = [
+  "cloud",
+  "count",
+  "countryCodes",
+  "cudaVersions",
+  "include",
+  "minCudaVersion",
+  "product",
+]
+
+[[patch.operations]]
+select = "listCpuTypes"
+omit.query = ["include", "product", "vcpuCount"]
+
+[[patch.operations]]
+select = "getCpuType"
+omit.query = ["include", "product", "vcpuCount"]
+
+# `globalNetwork` survives: it is the one catalog filter that is a scalar and is not gated on the
+# `AVAILABILITY` expansion, so it composes a request Runpod accepts.
+[[patch.operations]]
+select = "listDataCenters"
+omit.query = ["compliance", "include", "networkVolumeTypes", "regions"]
+
+[[patch.operations]]
+select = "getDataCenter"
+omit.query = ["include"]

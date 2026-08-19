@@ -6,6 +6,9 @@
 node_modules/
 .DS_Store
 
+# Bytecode from the `scripts/vendor-*.py` refreshers, which import `openapi_example_scrub`.
+scripts/__pycache__/
+
 # Generated site output (design 02 §1: "sources; generated output not committed twice").
 # A build rewrites `web/public/catalog.json` from `catalog/`, so committing it would store the same
 # facts twice and make every catalogue change a two-place diff.

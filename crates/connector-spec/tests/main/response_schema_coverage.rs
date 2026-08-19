@@ -87,7 +87,11 @@ use crate::shipped_provider;
 // C-30 withholds twelve Asterisk operations whose array query serialization is undeclared. Nine
 // carried response shapes, leaving 706 covered operations; the floor stays one below that measured
 // count so one honest documented absence can still land without defeating the arrival guard.
-const COVERED_FLOOR: usize = 705;
+// Raised 705 -> 824 with the Runpod admission. Runpod's own OpenAPI document publishes a 2xx
+// schema for 44 of the connector's 51 operations, and the accumulated spec-backed catalogue now
+// measures 825 of 978. Recording the measured figure less one keeps the upward ratchet honest and
+// preserves the single-absence allowance.
+const COVERED_FLOOR: usize = 824;
 
 /// The other half of the same measurement: operations that ship **without** a response shape. This
 /// is the half that notices a connector arriving with no response shapes at all.
@@ -151,7 +155,14 @@ const COVERED_FLOOR: usize = 705;
 // body, while comment replacement carries a concrete response schema. The measured absence is
 // 146, so 147 preserves the single-operation allowance and still refuses the smallest
 // two-operation unschematized arrival.
-const ABSENCE_CEILING: usize = 147;
+// Raised 147 -> 154 with the Runpod admission, and this is the "three or more honest absences"
+// case this constant's doc says owes a sentence. Runpod answers all seven of its DELETEs with
+// `204` and no content, so its vendored document declares no response body for any of them and the
+// connector records seven honest absences rather than a placeholder. Nothing else about Runpod is
+// absent: the other 44 operations carry the schemas its document publishes. The measured absence is
+// 153, so 154 preserves the single-operation allowance and still refuses the smallest
+// two-operation unschematized arrival.
+const ABSENCE_CEILING: usize = 154;
 
 /// How far [`ABSENCE_CEILING`] may sit above the measured absence. This is the guard's resolution,
 /// and the only number in this file that was chosen rather than read off the catalogue, so it is the

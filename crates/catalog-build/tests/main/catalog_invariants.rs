@@ -420,7 +420,9 @@ fn gitlab_user_and_automation_connections_are_distinct_and_scope_gated() {
 
 /// S-015 is a vocabulary migration, not a behavioural edit. The digest began as the pre-migration
 /// inventory of 151 non-empty operation trait sets, normalized without the old umbrella key, and
-/// advances only when a new operation deliberately adds one of those promoted traits.
+/// advances only when a new operation deliberately adds one of those promoted traits. It last
+/// advanced to 161 when `runpod` declared Runpod's RFC 9457 error envelope on its six exposed
+/// reads.
 #[test]
 fn promoted_operation_traits_equal_the_pre_migration_inventory() {
     let (workspace, plan) = full_plan();
@@ -449,11 +451,11 @@ fn promoted_operation_traits_equal_the_pre_migration_inventory() {
             fact["id"].as_str().unwrap()
         )
     });
-    assert_eq!(facts.len(), 155);
+    assert_eq!(facts.len(), 161);
     let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
     assert_eq!(
         digest,
-        "6eed985b7216819fc694c099ea38b3f3708b134f0373f78f196ccdbd961b0746"
+        "f52010fd9050920b04a75c735d35f38800978bd68c5c3792ce3645f103bfae53"
     );
 }
 
