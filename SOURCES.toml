@@ -196,6 +196,16 @@ pins = "specs/openai.provenance.toml"
 consumers = ["providers/openai.toml", "catalog/openai.catalog.json"]
 
 [[source]]
+id = "runpod-openapi"
+kind = "openapi-spec"
+origin = "vendor"
+upstream = "https://api.runpod.io/v2/openapi.json"
+refresh = "scripts/vendor-runpod-spec.py"
+pins = "specs/runpod.provenance.toml"
+consumers = ["providers/runpod.toml", "catalog/runpod.catalog.json"]
+note = "Runpod serves its v2 OpenAPI document from the API host rather than a tagged repository, so the pin is the upstream sha256 rather than a commit; the refresh script refuses when the bytes, the 34/53 inventory, the single server, or the root-only bearer security requirement move."
+
+[[source]]
 id = "stripe-openapi"
 kind = "openapi-spec"
 upstream = "recorded in pins"

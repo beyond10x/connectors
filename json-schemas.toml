@@ -258,6 +258,10 @@ path = "specs/openai/upstream-2026-08-02.openapi.json"
 origin = "vendored-source"
 
 [[syntax]]
+path = "specs/runpod/openapi-2026-08-19.json"
+origin = "vendored-source"
+
+[[syntax]]
 path = "specs/slack/web-api-1.7.0-2026-08-15.swagger.json"
 origin = "vendored-source"
 

@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "b65826856c6079b6cde3d130032f2ff63abbcf85a5728683413bdb99e2259eba"
+sha256 = "c54133898a3c86f72a7fb3cd3ff3863a2bb7df00686052b4ff02cbb26425a658"
 
 [[provider]]
 id = "airtable"
@@ -562,6 +562,24 @@ ir_sha256 = "fed86be4013d0d6e73c79c214157b774fc5e8c4598d3d3289895eb382f67b5df"
 
 [provider.artifacts]
 "catalog/resend.catalog.json" = "23121672854839823af513c2a580f8d1ed865352dce405eb2dde2a536b86a196"
+
+[[provider]]
+id = "runpod"
+generator = "connectors 0.1.0"
+source_url = "https://api.runpod.io/v2/openapi.json"
+upstream_version = "2.0.0"
+spec_sha256 = "e9d5cd72cc53d8f8ea66f8e63f2c78cb4520104b614c99cdeacd7c93833789fd"
+toml_sha256 = "f2c8bdbd95b19dde64886c93cbf747230cfa8cb81a2e7bb331b93e14691d9278"
+ir_sha256 = "1946a11b9a89c643f4a476998fb488616666141ad975ced36bce1ea676e17e85"
+
+[[provider.specs]]
+path = "specs/runpod/openapi-2026-08-19.json"
+source_url = "https://api.runpod.io/v2/openapi.json"
+upstream_version = "2.0.0"
+sha256 = "e9d5cd72cc53d8f8ea66f8e63f2c78cb4520104b614c99cdeacd7c93833789fd"
+
+[provider.artifacts]
+"catalog/runpod.catalog.json" = "f7b29c8d0fe546348e59ec9abe9c1dbf8c8a37e0f999cbd861a783763a20e2d8"
 
 [[provider]]
 id = "salesforce"
