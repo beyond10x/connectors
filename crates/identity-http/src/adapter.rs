@@ -68,7 +68,16 @@ impl IdentityHttpVerifier {
         mut origin: Url,
         expected_tenant: String,
     ) -> Result<Self, IdentityVerifierConfigError> {
-        if origin.scheme() != "https"
+        // Plaintext is admitted for exactly one origin shape, in exactly one kind of build: a
+        // loopback development Connector carrying the `local-identity` feature, which
+        // `crate::local_identity` documents and which a release build cannot compile. Every other
+        // build resolves this constant to `false`, so the HTTPS requirement below and the
+        // `https_only` client are the only paths that exist.
+        #[cfg(feature = "local-identity")]
+        let plaintext_loopback = crate::local_identity::admitted_origin(&origin);
+        #[cfg(not(feature = "local-identity"))]
+        let plaintext_loopback = false;
+        if (origin.scheme() != "https" && !plaintext_loopback)
             || origin.host_str().is_none()
             || !origin.username().is_empty()
             || origin.password().is_some()
@@ -86,7 +95,7 @@ impl IdentityHttpVerifier {
         readiness_endpoint.set_path("/readyz");
         origin.set_path("/v1/access-authority");
         let client = reqwest::Client::builder()
-            .https_only(true)
+            .https_only(!plaintext_loopback)
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(10))
             .redirect(reqwest::redirect::Policy::none())
@@ -298,5 +307,48 @@ mod tests {
             "a".repeat(43)
         )));
         assert!(!valid_access_token("dl_access_v1_short"));
+    }
+
+    /// The deployed posture, asserted in every build including the one that carries the loopback
+    /// exception: a plaintext Identity origin a second machine could address is refused. This is
+    /// the claim the whole `local-identity` guard exists to keep true.
+    #[test]
+    fn a_routable_plaintext_identity_origin_is_refused_in_every_build() {
+        for origin in [
+            "http://identity.example.test",
+            "http://identity.dev.b10x.example",
+            "http://10.0.0.4:18085",
+            "http://[2001:db8::1]:18085",
+            // 127.0.0.1 spelled as a routable name resolves off this machine.
+            "http://loopback.example.test:18085",
+        ] {
+            assert!(
+                IdentityHttpVerifier::new(Url::parse(origin).unwrap(), "tenant-dev".to_owned())
+                    .is_err(),
+                "plaintext Identity origin {origin} must be refused"
+            );
+        }
+    }
+
+    /// Only under the feature, and only for loopback: the local process stack can run the hosted
+    /// surface against its own Identity, and nothing else gains a plaintext door.
+    #[cfg(feature = "local-identity")]
+    #[test]
+    fn the_local_identity_build_admits_only_a_loopback_plaintext_origin() {
+        assert!(IdentityHttpVerifier::new(
+            Url::parse("http://127.0.0.1:18085").unwrap(),
+            "tenant-local".to_owned()
+        )
+        .is_ok());
+        assert!(IdentityHttpVerifier::new(
+            Url::parse("http://localhost:18085").unwrap(),
+            "tenant-local".to_owned()
+        )
+        .is_ok());
+        assert!(IdentityHttpVerifier::new(
+            Url::parse("http://127.0.0.1:18085/v1/access-authority").unwrap(),
+            "tenant-local".to_owned()
+        )
+        .is_err());
     }
 }

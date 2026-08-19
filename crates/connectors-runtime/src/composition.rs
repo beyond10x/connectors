@@ -68,6 +68,12 @@ pub enum RuntimeError {
     CredentialStore,
     #[error("CONNECTORS_DATABASE_URL is required for hosted Connector state")]
     MissingHostedDatabase,
+    /// Raised only by a build carrying `local-identity`. See `identity_http::local_identity`.
+    #[error(
+        "this binary was built with the loopback Identity exception, so it serves only a loopback \
+         listener resolving a loopback plaintext Identity origin"
+    )]
+    LocalIdentityRefused,
     #[error(transparent)]
     HostedState(#[from] hosted_state::StateError),
     #[error(transparent)]
@@ -272,6 +278,15 @@ impl HostedRuntime {
     /// Build the hosted backend registry and bind its TCP listener.
     pub async fn bind(config_path: &Path) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
+        let identity_origin = url::Url::parse(&config.identity.origin)
+            .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
+        // This binary carries the loopback Identity exception, which lets it resolve access tokens
+        // over plaintext HTTP. It refuses to serve anything a second machine could reach, or reach
+        // out to, before it opens a database connection and before it binds a listener.
+        #[cfg(feature = "local-identity")]
+        if !identity_http::local_identity_admitted(&config.server.listen, &identity_origin) {
+            return Err(RuntimeError::LocalIdentityRefused);
+        }
         validate_state_root(&config.storage.state_root)?;
         let database_url =
             env::var("CONNECTORS_DATABASE_URL").map_err(|_| RuntimeError::MissingHostedDatabase)?;
@@ -301,8 +316,6 @@ impl HostedRuntime {
                 prepared: None,
             }
         };
-        let identity_origin = url::Url::parse(&config.identity.origin)
-            .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
         let verifier = Arc::new(IdentityHttpVerifier::new(
             identity_origin,
             config.tenant_id.clone(),
