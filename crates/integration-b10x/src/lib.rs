@@ -645,8 +645,10 @@ impl B10xBackend {
         input: Value,
     ) -> Result<Value, OperationError> {
         let origin = self.origin(canonical).ok_or_else(|| {
-            tracing::warn!(operation = canonical, "no module origin is configured");
-            module_unavailable(canonical, "no module origin is configured for this operation")
+            module_unavailable(
+                canonical,
+                "no module origin is configured for this operation",
+            )
         })?;
         let credentials = Vec::new();
         let plan =
@@ -713,8 +715,7 @@ impl B10xBackend {
         if !body.is_empty() {
             outbound = outbound.body(body);
         }
-        let mut response = outbound.send().await.map_err(|error| {
-            tracing::warn!(operation = canonical, module, %origin, %error, "module request failed");
+        let mut response = outbound.send().await.map_err(|_| {
             module_unavailable(
                 canonical,
                 "the module did not answer; it may be unreachable or still starting",
@@ -731,11 +732,12 @@ impl B10xBackend {
                 .content_length()
                 .is_some_and(|size| size > protocol::operation::MAX_RESULT_BYTES as u64)
         {
-            let status = response.status();
-            tracing::warn!(operation = canonical, module, %status, "module refused the request");
             return Err(module_unavailable(
                 canonical,
-                "the module answered with a failure status",
+                &format!(
+                    "the module answered with status {}",
+                    response.status().as_u16()
+                ),
             ));
         }
         let mut bytes = Vec::new();
