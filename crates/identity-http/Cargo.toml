@@ -10,6 +10,15 @@ rust-version = "1.88"
 publish = false
 workspace = "../connectors-runtime"
 
+[features]
+# A loopback-only plaintext Identity origin for the local process stack, so the hosted surface —
+# token introspection, principal context, description leases, scope checks — can be exercised
+# against an Identity with no certificate any webpki root chain would accept. It is never a default
+# feature, and `src/lib.rs` turns it into a compile error whenever `debug_assertions` is off, which
+# is every release build including the one in `../../Dockerfile`.
+# `../../scripts/check-local-identity-refused.sh` proves that refusal.
+local-identity = []
+
 [dependencies]
 async-trait = "0.1"
 hex = "0.4"

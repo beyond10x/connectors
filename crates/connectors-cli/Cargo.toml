@@ -17,6 +17,13 @@ members = ["."]
 name = "connectors"
 path = "src/main.rs"
 
+[features]
+# The loopback Identity exception, passed through to the adapter that owns it. `serve-hosted` may
+# then resolve access tokens against a plaintext loopback Identity — the local process stack's own.
+# A release build enabling this does not start, it fails to compile: see
+# `../identity-http/src/local_identity.rs` and `../../scripts/check-local-identity-refused.sh`.
+local-identity = ["connectors-runtime/local-identity"]
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 connectors-client = { version = "0.1.0", path = "../connectors-client" }

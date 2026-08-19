@@ -28,6 +28,12 @@ members = [
     "../monitoring-model",
 ]
 
+[features]
+# Passes the loopback Identity exception through to the verifier adapter that owns it. Enabling it
+# in a release build is a compile error raised by `identity-http`; see that crate's
+# `src/local_identity.rs` for the three refusals this feature is held under.
+local-identity = ["identity-http/local-identity"]
+
 [dependencies]
 async-trait = "0.1"
 axum = { version = "0.8", features = ["json", "tokio"] }
