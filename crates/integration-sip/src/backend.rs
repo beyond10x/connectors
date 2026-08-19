@@ -294,7 +294,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         digest.update(b"\0");
         digest.update(self.deployment_sha256.as_bytes());
         digest.update(b"\0");
-        digest.update(serde_json::to_vec(context).expect("owner context serializes"));
+        digest.update(context.stable_authority_seed());
         digest.update(b"\0");
         digest.update(self.config.connection.connection_ref.as_bytes());
         digest.update(b"\0");

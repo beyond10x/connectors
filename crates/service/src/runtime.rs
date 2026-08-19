@@ -255,6 +255,41 @@ impl PrincipalContext {
     pub fn trace_id(&self) -> Option<&str> {
         self.trace_id.as_deref()
     }
+
+    /// The provenance-free authority identity for lease and cursor derivation.
+    ///
+    /// Serializing the whole context into a lease digest made every lease stale by
+    /// construction: `request_id`, `trace_id`, and `token_id` differ on the next
+    /// authenticated request, and access tokens rotate every few minutes. A lease minted
+    /// while serving `describe` must admit the `read` or `invoke` that follows it, so only
+    /// the facts that constitute the admitted authority participate: tenant, principal,
+    /// authority snapshot, and verified groups. Fields are length-framed so adjacent values
+    /// cannot alias.
+    #[must_use]
+    pub fn stable_authority_seed(&self) -> Vec<u8> {
+        let mut seed = Vec::new();
+        let mut push = |part: &str| {
+            seed.extend_from_slice(&(part.len() as u64).to_be_bytes());
+            seed.extend_from_slice(part.as_bytes());
+        };
+        push(&self.tenant_id);
+        push(&self.principal.subject);
+        push(&self.principal.actor_subject);
+        push(self.principal.email.as_deref().unwrap_or(""));
+        push(
+            &self
+                .principal
+                .agent_revision
+                .map(|revision| revision.to_string())
+                .unwrap_or_default(),
+        );
+        push(&self.authority_snapshot_id);
+        push(&self.authority_snapshot_sha256);
+        for group in &self.verified_groups {
+            push(group);
+        }
+        seed
+    }
 }
 
 fn valid_ref(value: &str, maximum: usize) -> bool {
@@ -499,6 +534,41 @@ mod tests {
             authority_snapshot_id: "snapshot-test".to_owned(),
             authority_snapshot_sha256: "a".repeat(64),
         }
+    }
+
+    #[test]
+    fn the_stable_authority_seed_ignores_request_scoped_provenance() {
+        let plain = PrincipalContext::local(&owner(7)).unwrap();
+        let provenanced = PrincipalContext::local(&owner(7))
+            .unwrap()
+            .with_hosted_provenance(
+                "https://identity.example.test".to_owned(),
+                "token-after-rotation".to_owned(),
+                None,
+                "request-2".to_owned(),
+                "trace-2".to_owned(),
+            )
+            .unwrap();
+        // A lease derived while serving one request must admit the next authenticated
+        // request of the same principal: fresh request/trace ids and a rotated access
+        // token are not an authority change.
+        assert_eq!(
+            plain.stable_authority_seed(),
+            provenanced.stable_authority_seed()
+        );
+        let other_principal = PrincipalContext::hosted(
+            "tenant-test".to_owned(),
+            "person:other".to_owned(),
+            "person:other".to_owned(),
+            None,
+            "snapshot-test".to_owned(),
+            "a".repeat(64),
+        )
+        .unwrap();
+        assert_ne!(
+            plain.stable_authority_seed(),
+            other_principal.stable_authority_seed()
+        );
     }
 
     #[test]
