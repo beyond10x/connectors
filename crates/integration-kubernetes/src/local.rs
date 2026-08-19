@@ -396,7 +396,7 @@ impl KubernetesLocalBackend {
 
     fn operation_description_ref(&self, context: &PrincipalContext, operation_ref: &str) -> String {
         let mut hash = Sha256::new();
-        hash.update(serde_json::to_vec(context).expect("owner context serializes"));
+        hash.update(context.stable_authority_seed());
         hash.update(b"\0kubernetes_service_proxy_v1\0");
         hash.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {

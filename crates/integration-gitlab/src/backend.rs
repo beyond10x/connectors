@@ -1146,7 +1146,7 @@ impl GitlabInner {
     fn operation_description_ref(&self, context: &PrincipalContext, operation_ref: &str) -> String {
         let mut digest = Sha256::new();
         digest.update(b"b10x/gitlab-operation-description/v1\0");
-        digest.update(serde_json::to_vec(context).expect("principal context serializes"));
+        digest.update(context.stable_authority_seed());
         digest.update(b"\0");
         digest.update(operation_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
@@ -1531,7 +1531,7 @@ impl GitlabInner {
     ) -> String {
         let mut digest = Sha256::new();
         digest.update(b"b10x/gitlab-datasource-description/v1\0");
-        digest.update(serde_json::to_vec(context).expect("principal context serializes"));
+        digest.update(context.stable_authority_seed());
         digest.update(b"\0");
         digest.update(datasource_ref.as_bytes());
         digest.update(b"\0");

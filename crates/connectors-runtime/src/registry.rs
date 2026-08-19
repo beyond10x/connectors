@@ -552,11 +552,15 @@ fn registry_description_ref(
     local_refs: &mut [String],
 ) -> Result<String, OperationError> {
     local_refs.sort();
-    let encoded = serde_json::to_vec(&(context, operation_ref, local_refs))
-        .map_err(|_| operation_protocol("description lease could not be encoded"))?;
     let mut digest = Sha256::new();
-    digest.update(b"b10x/connectors-runtime-description/v1\0");
-    digest.update(encoded);
+    digest.update(b"b10x/connectors-runtime-description/v2\0");
+    digest.update(context.stable_authority_seed());
+    digest.update(b"\0");
+    digest.update(operation_ref.as_bytes());
+    for local_ref in local_refs.iter() {
+        digest.update(b"\0");
+        digest.update(local_ref.as_bytes());
+    }
     Ok(format!(
         "description:registry:{}",
         hex_digest(digest.finalize())
@@ -909,6 +913,32 @@ mod tests {
             "a".repeat(64),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn the_registry_lease_ignores_request_scoped_provenance() {
+        let provenanced = context()
+            .with_hosted_provenance(
+                "https://identity.example.test".to_owned(),
+                "token-after-rotation".to_owned(),
+                None,
+                "request-2".to_owned(),
+                "trace-2".to_owned(),
+            )
+            .unwrap();
+        // A lease minted while serving describe must admit the invoke on the NEXT
+        // authenticated request: fresh request/trace ids and a rotated access token are
+        // not an authority change.
+        let mut refs_a = ["local-b".to_owned(), "local-a".to_owned()];
+        let mut refs_b = ["local-a".to_owned(), "local-b".to_owned()];
+        assert_eq!(
+            registry_description_ref(&context(), "tickets-list", &mut refs_a).unwrap(),
+            registry_description_ref(&provenanced, "tickets-list", &mut refs_b).unwrap(),
+        );
+        assert_ne!(
+            registry_description_ref(&context(), "tickets-list", &mut refs_a).unwrap(),
+            registry_description_ref(&context(), "tickets-close", &mut refs_a).unwrap(),
+        );
     }
 
     fn operation_connection(connection_ref: &str) -> OperationConnectionSummary {

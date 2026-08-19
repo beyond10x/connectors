@@ -928,7 +928,7 @@ impl MonitoringInner {
         let mut digest = Sha256::new();
         digest.update(document_text(provider_for_operation(operation_ref)).as_bytes());
         digest.update(b"\0");
-        digest.update(serde_json::to_vec(context).expect("owner context serializes"));
+        digest.update(context.stable_authority_seed());
         digest.update(b"\0");
         digest.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {
