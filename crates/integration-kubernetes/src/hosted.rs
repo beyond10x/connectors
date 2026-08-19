@@ -76,7 +76,10 @@ struct NamespaceAccess {
 struct CursorState {
     namespace: String,
     principal_subject: String,
-    authority_snapshot_sha256: String,
+    /// Bound to the stable authority, never to the access token: page two of a listing arrives on
+    /// whatever token is current then, and an expired cursor for a rotated token is a refusal a
+    /// caller cannot act on.
+    authority_seed: Vec<u8>,
     provider_cursor: String,
     expires_at: SystemTime,
 }
@@ -1271,13 +1274,23 @@ fn control_connection() -> ControlConnectionSummary {
     }
 }
 
+/// The description lease for one Kubernetes operation.
+///
+/// Seeded from the stable authority, not from the authority snapshot id or sha. Those are the
+/// access-token id and the introspection-envelope hash, and describe and invoke never share a
+/// token: describe travels on `connectors.catalog.read`, invoke on `connectors.invoke`, and the
+/// client caches one token per scope. Deriving the lease from them refused every hosted
+/// invocation of these operations as stale.
 fn description_ref(context: &PrincipalContext, operation_ref: &str) -> String {
-    let digest = Sha256::digest(format!(
-        "{operation_ref}\0{}\0{}\0v2",
-        context.authority_snapshot_id(),
-        context.authority_snapshot_sha256()
-    ));
-    format!("description:kubernetes:{}", hex::encode(&digest[..16]))
+    let mut digest = Sha256::new();
+    digest.update(b"b10x/kubernetes-operation-description/v3\0");
+    digest.update(context.stable_authority_seed());
+    digest.update(b"\0");
+    digest.update(operation_ref.as_bytes());
+    format!(
+        "description:kubernetes:{}",
+        hex::encode(&digest.finalize()[..16])
+    )
 }
 
 fn audit_ref(

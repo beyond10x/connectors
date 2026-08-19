@@ -445,13 +445,16 @@ impl SlackInner {
         context: &PrincipalContext,
         datasource_ref: &str,
     ) -> Result<DatasourceDescription, DatasourceError> {
+        let summary = datasource_summary(datasource_ref).ok_or_else(datasource_not_found)?;
+        // A datasource with no Connection bound is not a missing datasource, and connecting Slack
+        // fixes it — so it must not answer "was not found", which reads as terminal and as
+        // something an operator has to repair.
         if self
             .datasource_connections(context, datasource_ref)
             .is_empty()
         {
-            return Err(datasource_not_found());
+            return Err(datasource_binding_not_granted(datasource_ref));
         }
-        let summary = datasource_summary(datasource_ref).ok_or_else(datasource_not_found)?;
         let (description, key_schema, compact_schema, detail_schema) =
             datasource_declaration(datasource_ref).ok_or_else(datasource_not_found)?;
         Ok(DatasourceDescription {
@@ -522,19 +525,38 @@ impl SlackInner {
         if request.description_ref
             != self.datasource_description_ref(context, &request.datasource_ref)
         {
+            // One describe recovers it, and the caller is told so. A bare "is stale" reads like
+            // something an operator has to repair.
             return Err(datasource_error(
                 DatasourceErrorCode::StaleAuthority,
-                "Slack datasource description lease is stale",
-                false,
+                "the Slack datasource description lease has moved on; describe it again and retry the read",
+                true,
             ));
         }
-        let connection = self
-            .datasource_connections(context, &request.datasource_ref)
+        let admitted = self.datasource_connections(context, &request.datasource_ref);
+        // Two different facts used to share one bare "not granted": nothing is bound for this
+        // principal, and the binding named is not one of the bindings that exist. The first can
+        // clear on its own — the same principal saw one Slack binding and then none minutes
+        // later — so it is reported as retriable; the second is the caller's to correct and says
+        // exactly how.
+        if admitted.is_empty() {
+            return Err(datasource_binding_not_granted(&request.datasource_ref));
+        }
+        let connection = admitted
             .into_iter()
             .find(|connection| {
                 datasource_binding_ref(&request.datasource_ref, connection) == request.binding_ref
             })
-            .ok_or_else(datasource_not_granted)?;
+            .ok_or_else(|| {
+                DatasourceError::new(
+                    DatasourceErrorCode::InvalidInput,
+                    format!(
+                        "`{}` is not a binding of `{}`; list its bindings and read through one of those",
+                        request.binding_ref, request.datasource_ref
+                    ),
+                    false,
+                )
+            })?;
         let credential_name = match connection.profile {
             SlackConnectionProfile::OrgUser | SlackConnectionProfile::Legacy => {
                 USER_TOKEN_CREDENTIAL

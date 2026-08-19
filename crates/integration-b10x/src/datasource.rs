@@ -66,6 +66,18 @@ impl B10xBackend {
             DatasourceRequest::Read(request) if self.workspace_datasource_admitted() => {
                 self.read_workspace_datasource(context, request).await
             }
+            // The three non-search verbs are gated by the same admission, so they cannot disagree
+            // about whether this datasource is available. Say which of the two things is true
+            // rather than "was not found" for both.
+            DatasourceRequest::Describe(DatasourceDescribeRequest { datasource_ref })
+            | DatasourceRequest::Bindings(BindingSearchRequest { datasource_ref, .. })
+                if datasource_ref == WORKSPACES_DATASOURCE =>
+            {
+                Err(workspace_module_unavailable())
+            }
+            DatasourceRequest::Read(request) if request.datasource_ref == WORKSPACES_DATASOURCE => {
+                Err(workspace_module_unavailable())
+            }
             _ => Err(datasource_error(
                 DatasourceErrorCode::NotFound,
                 "workspace datasource was not found",
@@ -79,14 +91,32 @@ impl B10xBackend {
         context: &PrincipalContext,
         request: ReadRequest,
     ) -> Result<DatasourceResult, DatasourceError> {
-        if request.datasource_ref != WORKSPACES_DATASOURCE
-            || request.description_ref != self.workspace_datasource_description_ref(context)
-            || request.binding_ref != self.workspace_datasource_binding_ref()
-        {
+        // Three unrelated facts used to share one `StaleAuthority`, so the one message a person
+        // saw could mean the wrong datasource, a lease that has moved on, or a binding ref the
+        // caller made up. A reviewing agent read it as the last kind of problem it could be and
+        // asked an operator to re-authorize a lease that was current.
+        if request.datasource_ref != WORKSPACES_DATASOURCE {
+            return Err(datasource_error(
+                DatasourceErrorCode::NotFound,
+                "workspace datasource was not found",
+                false,
+            ));
+        }
+        if request.binding_ref != self.workspace_datasource_binding_ref() {
+            return Err(DatasourceError::new(
+                DatasourceErrorCode::InvalidInput,
+                format!(
+                    "`{}` is not a binding of `{WORKSPACES_DATASOURCE}`; list its bindings and read through one of those",
+                    request.binding_ref
+                ),
+                false,
+            ));
+        }
+        if request.description_ref != self.workspace_datasource_description_ref(context) {
             return Err(datasource_error(
                 DatasourceErrorCode::StaleAuthority,
-                "workspace datasource definition or binding is stale",
-                false,
+                "the workspace datasource description lease has moved on; describe it again and retry the read",
+                true,
             ));
         }
         let binding_ref = request.binding_ref.clone();
@@ -192,14 +222,23 @@ impl B10xBackend {
         }
     }
 
+    /// The description lease for the workspace datasource.
+    ///
+    /// Seeded from the stable authority — the same seed the operation lease in this backend
+    /// already uses — and never from the authority snapshot id or sha. The hosted receiver fills
+    /// those from the access token, so they rotate every few minutes; every datasource request
+    /// travels on the cached `connectors.catalog.read` token, and a describe and a read that
+    /// straddle its refresh arrive on different tokens. Seeding the lease from them made the
+    /// deployed read fail with `StaleAuthority` at one minute and succeed at the next.
     fn workspace_datasource_description_ref(&self, context: &PrincipalContext) -> String {
-        let digest = Sha256::digest(format!(
-            "{WORKSPACES_DATASOURCE}\0{}\0{}\0{}\0{}",
-            context.authority_snapshot_id(),
-            context.authority_snapshot_sha256(),
-            workspace_projection_sha256(),
-            self.deployment_sha256,
-        ));
+        let mut digest = Sha256::new();
+        digest.update(b"b10x/workspace-datasource-description/v2\0");
+        digest.update(context.stable_authority_seed());
+        digest.update(b"\0");
+        digest.update(workspace_projection_sha256().as_bytes());
+        digest.update(b"\0");
+        digest.update(self.deployment_sha256.as_bytes());
+        let digest = digest.finalize();
         format!(
             "description:b10x:workspaces:{}",
             hex::encode(&digest[..16])
@@ -259,15 +298,20 @@ impl B10xBackend {
         Ok(offset)
     }
 
+    /// The page cursor is bound to the same stable authority as the lease, for the same reason:
+    /// page two of a listing arrives on whatever access token is current then, and an expired
+    /// cursor for a rotated token is a refusal a caller cannot act on.
     fn workspace_cursor_digest(&self, context: &PrincipalContext, offset: usize) -> String {
-        let digest = Sha256::digest(format!(
-            "{WORKSPACES_DATASOURCE}\0{}\0{}\0{}\0{}\0{offset}",
-            context.subject(),
-            context.authority_snapshot_sha256(),
-            workspace_projection_sha256(),
-            self.deployment_sha256,
-        ));
-        hex::encode(&digest[..16])
+        let mut digest = Sha256::new();
+        digest.update(b"b10x/workspace-datasource-cursor/v2\0");
+        digest.update(context.stable_authority_seed());
+        digest.update(b"\0");
+        digest.update(workspace_projection_sha256().as_bytes());
+        digest.update(b"\0");
+        digest.update(self.deployment_sha256.as_bytes());
+        digest.update(b"\0");
+        digest.update(offset.to_be_bytes());
+        hex::encode(&digest.finalize()[..16])
     }
 }
 
@@ -447,6 +491,19 @@ fn datasource_invalid() -> DatasourceError {
 
 fn datasource_not_granted(message: &'static str) -> DatasourceError {
     datasource_error(DatasourceErrorCode::NotGranted, message, false)
+}
+
+/// The workspaces module is not admitted or not configured for this principal.
+///
+/// Retriable: a module that is starting, or a tenant module list that has not landed, clears
+/// without any change a caller can make. Terminal-sounding wording here sent a reviewing agent to
+/// an operator for a datasource that simply was not up yet.
+fn workspace_module_unavailable() -> DatasourceError {
+    datasource_error(
+        DatasourceErrorCode::Unavailable,
+        "the workspaces module is not admitted or not answering for this principal, so the workspace datasource cannot be served right now; retry, and if it persists ask an operator whether the workspaces module is enabled for this tenant",
+        true,
+    )
 }
 
 fn datasource_cursor_expired() -> DatasourceError {

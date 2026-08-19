@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hosted::datasource::datasource_description_ref;
 
     struct Reader;
 
@@ -274,6 +275,213 @@ mod tests {
         ] {
             assert!(!encoded.contains(forbidden));
         }
+    }
+
+    fn owner_on_token<const N: usize>(
+        groups: [&str; N],
+        token_id: &str,
+        envelope_sha: char,
+    ) -> PrincipalContext {
+        // The hosted receiver fills the snapshot id from the access-token id and the snapshot sha
+        // from the introspection envelope, so both differ on the next token while the admitted
+        // authority is identical.
+        PrincipalContext::hosted_with_groups(
+            "tenant-dev".to_owned(),
+            "person:owner".to_owned(),
+            "person:owner".to_owned(),
+            None,
+            token_id.to_owned(),
+            envelope_sha.to_string().repeat(64),
+            groups.into_iter().map(ToOwned::to_owned).collect(),
+        )
+        .unwrap()
+    }
+
+    /// Datasource requests all travel on the cached `connectors.catalog.read` token, which lives
+    /// at most five minutes. A describe and the read that follows can therefore arrive on two
+    /// different tokens, and the description lease must not treat that as an authority change.
+    #[tokio::test]
+    async fn a_workload_read_survives_the_access_token_rotation_between_describe_and_read() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let describing = owner_on_token(["dev"], "token-catalog-1", 'c');
+        let DatasourceResult::Describe(description) = backend
+            .handle_datasource(
+                &describing,
+                DatasourceRequest::Describe(DatasourceDescribeRequest {
+                    datasource_ref: DATASOURCE.to_owned(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("datasource description expected");
+        };
+        let reading = owner_on_token(["dev"], "token-catalog-2", 'd');
+        let DatasourceResult::Read(page) = backend
+            .handle_datasource(
+                &reading,
+                DatasourceRequest::Read(ReadRequest {
+                    datasource_ref: DATASOURCE.to_owned(),
+                    binding_ref: namespace_binding("b10x").binding_ref,
+                    description_ref: description.description_ref,
+                    read: DatasourceRead::List {
+                        limit: 5,
+                        cursor: None,
+                    },
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("a read on the next access token must not be refused as stale");
+        };
+        assert_eq!(page.records.len(), 1);
+    }
+
+    /// Describe travels on `connectors.catalog.read` and invoke on `connectors.invoke`, and the
+    /// client holds one cached access token per scope, so these two calls never share a token.
+    /// A lease that noticed would refuse every hosted invocation of these operations.
+    #[tokio::test]
+    async fn a_status_invocation_survives_the_scope_change_between_describe_and_invoke() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let describing = owner_on_token(["dev"], "token-catalog-1", 'c');
+        let OperationResult::Describe(description) = backend
+            .handle(
+                &describing,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: STATUS_OPERATION.to_owned(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("operation description expected");
+        };
+        let invoking = owner_on_token(["dev"], "token-invoke-2", 'd');
+        backend
+            .handle(
+                &invoking,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: STATUS_OPERATION.to_owned(),
+                    connection_ref: CONNECTION.to_owned(),
+                    description_ref: description.description_ref,
+                    input: json!({"namespace": "b10x", "name": "backend"}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .expect("an invoke on the invoke-scoped token must not be refused as stale");
+    }
+
+    /// The deployed build answered a read whose binding ref was the datasource ref with
+    /// `NotGranted: Kubernetes datasource binding is not granted`, and a reviewing agent took
+    /// that to an operator as a missing grant. Describe had just succeeded, which this
+    /// Integration only allows when at least one namespace is readable, so no grant was missing.
+    #[tokio::test]
+    async fn an_unknown_binding_is_named_rather_than_reported_as_an_ungranted_one() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let refused = backend
+            .handle_datasource(
+                &context,
+                DatasourceRequest::Read(ReadRequest {
+                    datasource_ref: DATASOURCE.to_owned(),
+                    binding_ref: DATASOURCE.to_owned(),
+                    description_ref: datasource_description_ref(&context),
+                    read: DatasourceRead::List {
+                        limit: 5,
+                        cursor: None,
+                    },
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, DatasourceErrorCode::InvalidInput);
+        assert!(refused.message.contains(DATASOURCE), "{refused:?}");
+        assert!(!refused.message.contains("not granted"), "{refused:?}");
+    }
+
+    /// Describing with no readable namespace fell through to "Kubernetes datasource was not
+    /// found", which is the same lie in a different place: the datasource exists, the grant does
+    /// not. The second deployed turn saw exactly this state — zero bindings, minutes after the
+    /// first turn's describe succeeded — so it also has to read as recoverable.
+    #[tokio::test]
+    async fn describing_without_a_read_grant_names_the_grant_rather_than_a_missing_datasource() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let context = owner_with_groups("tenant-dev", ["unrelated"]);
+        let refused = backend
+            .handle_datasource(
+                &context,
+                DatasourceRequest::Describe(DatasourceDescribeRequest {
+                    datasource_ref: DATASOURCE.to_owned(),
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, DatasourceErrorCode::NotGranted);
+        assert!(refused.message.contains("b10x"), "{refused:?}");
+        assert!(refused.message.contains("dev"), "{refused:?}");
+        assert!(refused.retriable, "{refused:?}");
+        assert!(!refused.message.contains("not found"), "{refused:?}");
+    }
+
+    /// A grant that really is missing must name the namespace and the group that carries it, so a
+    /// person knows what to ask for. The group facts behind it moved between two turns minutes
+    /// apart against the same deployment, so the refusal is also retriable.
+    #[tokio::test]
+    async fn a_missing_namespace_grant_names_the_namespace_and_the_group_that_carries_it() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let context = owner_with_groups("tenant-dev", ["unrelated"]);
+        let refused = backend
+            .handle_datasource(
+                &context,
+                DatasourceRequest::Read(ReadRequest {
+                    datasource_ref: DATASOURCE.to_owned(),
+                    binding_ref: namespace_binding("b10x").binding_ref,
+                    description_ref: datasource_description_ref(&context),
+                    read: DatasourceRead::List {
+                        limit: 5,
+                        cursor: None,
+                    },
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, DatasourceErrorCode::NotGranted);
+        assert!(refused.message.contains("b10x"), "{refused:?}");
+        assert!(refused.message.contains("dev"), "{refused:?}");
+        assert!(refused.message.contains("sre"), "{refused:?}");
+        assert!(refused.retriable, "{refused:?}");
     }
 
     #[tokio::test]

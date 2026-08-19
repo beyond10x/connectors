@@ -358,10 +358,19 @@ impl ConnectorBackend for BackendRegistry {
         let claims = self.datasource_claims(&request);
         let backend = match claims.as_slice() {
             [backend] => backend,
+            // The backend set is closed at composition (`BackendRegistry::new`), so this can only
+            // mean the deployment configures no Integration for this datasource — never that one
+            // has not registered yet. It used to read as "no Integration owns this datasource"
+            // with no reference attached, which a reviewing agent took to mean a datasource it
+            // had just described had lost its owner. Name the reference so the two cannot be
+            // confused.
             [] => {
                 return Err(DatasourceError::new(
                     DatasourceErrorCode::NotFound,
-                    "no Integration owns this datasource",
+                    format!(
+                        "no Integration in this deployment is configured for datasource `{}`",
+                        datasource_reference(&request)
+                    ),
                     false,
                 ))
             }
@@ -466,6 +475,16 @@ impl ConnectorBackend for BackendRegistry {
     async fn shutdown(&self) {
         futures_util::future::join_all(self.backends.iter().map(|backend| backend.shutdown()))
             .await;
+    }
+}
+
+/// The datasource reference one non-search request names.
+fn datasource_reference(request: &DatasourceRequest) -> &str {
+    match request {
+        DatasourceRequest::Search(_) => "",
+        DatasourceRequest::Describe(request) => &request.datasource_ref,
+        DatasourceRequest::Bindings(request) => &request.datasource_ref,
+        DatasourceRequest::Read(request) => &request.datasource_ref,
     }
 }
 

@@ -811,6 +811,99 @@ mod tests {
         backend.shutdown().await;
     }
 
+    /// Describe and read must agree about who owns a datasource. They did not: read ownership
+    /// additionally required the binding ref to carry a Slack prefix, so a read whose binding ref
+    /// was anything else fell out of every backend's claim and the registry answered
+    /// `NotFound: no Integration owns this datasource` — for a datasource the same session had
+    /// just described. That is what the deployed build reported for `slack.conversations` and
+    /// `slack.users`. Ownership is about the datasource; the binding is the Integration's own
+    /// refusal to make, in words that name the binding.
+    #[tokio::test]
+    async fn read_ownership_matches_describe_ownership_for_every_slack_datasource() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let read_of = |datasource_ref: &str, binding_ref: &str| {
+            DatasourceRequest::Read(protocol::datasource::ReadRequest {
+                datasource_ref: datasource_ref.to_owned(),
+                binding_ref: binding_ref.to_owned(),
+                description_ref: "datasource-description:slack:whatever".to_owned(),
+                read: protocol::datasource::DatasourceRead::List {
+                    limit: 20,
+                    cursor: None,
+                },
+            })
+        };
+        for datasource_ref in SLACK_DATASOURCES {
+            let describe = DatasourceRequest::Describe(protocol::datasource::DescribeRequest {
+                datasource_ref: datasource_ref.to_owned(),
+            });
+            for binding_ref in [
+                datasource_ref,
+                "datasource-binding:slack:whatever",
+                "binding:some-other-owner:1",
+            ] {
+                assert_eq!(
+                    backend.owns_datasource(&describe),
+                    backend.owns_datasource(&read_of(datasource_ref, binding_ref)),
+                    "`{datasource_ref}` must be claimed for read exactly as for describe, \
+                     whatever binding ref arrives (`{binding_ref}`)"
+                );
+            }
+        }
+        assert!(!backend.owns_datasource(&read_of(
+            "kubernetes.workloads",
+            "datasource-binding:slack:whatever"
+        )));
+        backend.shutdown().await;
+    }
+
+    /// Describing a Slack datasource with no Connection bound answered "was not found" — the
+    /// datasource exists, the Connection does not, and only one of those is something a person
+    /// can act on. It is also recoverable, so it must not read as terminal.
+    #[tokio::test]
+    async fn describing_without_a_bound_connection_names_the_connection_not_a_missing_datasource() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let refused = backend
+            .handle_datasource(
+                &owner(),
+                DatasourceRequest::Describe(protocol::datasource::DescribeRequest {
+                    datasource_ref: "slack.conversations".to_owned(),
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, DatasourceErrorCode::NotGranted);
+        assert!(refused.message.contains("slack.conversations"), "{refused:?}");
+        assert!(refused.retriable, "{refused:?}");
+        assert!(!refused.message.contains("not found"), "{refused:?}");
+        // A datasource this Integration has never heard of is still genuinely absent.
+        let unknown = backend
+            .inner
+            .describe_datasource(&owner(), "slack.nonexistent")
+            .unwrap_err();
+        assert_eq!(unknown.code, DatasourceErrorCode::NotFound);
+        backend.shutdown().await;
+    }
+
     #[tokio::test]
     async fn datasource_description_lease_ignores_request_scoped_provenance() {
         let root = tempfile::tempdir().unwrap();
