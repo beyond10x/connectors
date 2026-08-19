@@ -261,6 +261,118 @@ async fn search_projects_only_configured_capabilities() {
     assert_eq!(connections[0].route, ConnectionRoute::Direct);
 }
 
+/// Configure every module origin so search projects the whole module surface at once.
+fn every_module_config(root: &Path) -> B10xIntegrationConfig {
+    let mut configured = config(root);
+    configured.ontology_origin = Some("http://127.0.0.1:4181".to_owned());
+    configured.planner_origin = Some("http://127.0.0.1:4182".to_owned());
+    configured.workspaces_origin = Some("http://127.0.0.1:4183".to_owned());
+    configured.colab_origin = Some("http://127.0.0.1:4184".to_owned());
+    configured
+}
+
+#[tokio::test]
+async fn search_names_each_operation_once_and_never_by_its_second_name() {
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let backend = B10xBackend::personal(
+        every_module_config(temporary.path()),
+        principal(),
+        temporary.path(),
+    )
+    .unwrap();
+    let OperationResult::Search { operations } = backend
+        .handle(
+            &principal(),
+            OperationRequest::Search(SearchRequest {
+                query: String::new(),
+                limit: 256,
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("search result expected")
+    };
+    assert!(operations.len() > 60, "the module surface is projected");
+
+    // Two results are aliases of one operation exactly when they resolve to the same catalog id.
+    let mut seen: BTreeMap<&'static str, String> = BTreeMap::new();
+    for summary in &operations {
+        let (canonical, published_ref, _) = operation_row(&summary.operation_ref)
+            .unwrap_or_else(|| panic!("{} resolves", summary.operation_ref));
+        assert_eq!(
+            summary.operation_ref, published_ref,
+            "search published the catalog id instead of the published name"
+        );
+        if let Some(first) = seen.insert(canonical, summary.operation_ref.clone()) {
+            panic!(
+                "{canonical} is published twice: {first} and {}",
+                summary.operation_ref
+            );
+        }
+    }
+    assert_eq!(seen.len(), operations.len());
+
+    // The catalog id is not a second published name, but it must stay findable and resolvable.
+    let OperationResult::Search { operations: found } = backend
+        .handle(
+            &principal(),
+            OperationRequest::Search(SearchRequest {
+                query: "colab-workspace-list".to_owned(),
+                limit: 8,
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("search result expected")
+    };
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].operation_ref, "colab.workspaces.list");
+}
+
+#[tokio::test]
+async fn every_name_of_an_operation_describes_one_operation() {
+    let temporary = tempfile::tempdir().unwrap();
+    fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let backend = B10xBackend::personal(
+        every_module_config(temporary.path()),
+        principal(),
+        temporary.path(),
+    )
+    .unwrap();
+    let mut leases = Vec::new();
+    // Describe answers under the name it was asked about, because the Agent's Connector client
+    // refuses any other answer. What must hold is that the names are not two capabilities: one
+    // title, one contract, one description lease.
+    for asked in [
+        "ontology-branch-list",
+        "ontology.branches.list",
+        "ontology/branch.list",
+    ] {
+        let OperationResult::Describe(description) = backend
+            .handle(
+                &principal(),
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: asked.to_owned(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("description expected")
+        };
+        assert_eq!(description.operation_ref, asked);
+        assert_eq!(description.title, "List Ontology branches");
+        leases.push(description.description_ref);
+    }
+    assert!(
+        leases.windows(2).all(|pair| pair[0] == pair[1]),
+        "one operation must hold one description lease however it is named"
+    );
+}
+
 #[tokio::test]
 async fn workspace_datasource_projects_only_the_logical_read_model() {
     let (origin, server) = fake_http(

@@ -152,9 +152,10 @@ impl B10xBackend {
         operation_ref: &str,
         input: Value,
     ) -> Result<(Value, String), DatasourceError> {
-        let (_, canonical, _) = self.operation(operation_ref).ok_or_else(|| {
-            datasource_not_granted("workspace datasource operation is unavailable")
-        })?;
+        let canonical = self
+            .operation(operation_ref)
+            .ok_or_else(|| datasource_not_granted("workspace datasource operation is unavailable"))?
+            .canonical;
         let result = self
             .invoke(
                 context,

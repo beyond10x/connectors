@@ -39,8 +39,8 @@ use protocol::event::{
     EventResult,
 };
 use protocol::operation::{
-    ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest, OperationDescription,
-    OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
+    ConnectionSummary, InvocationResult, InvokeRequest, OperationError, OperationErrorCode,
+    OperationRequest, OperationResult,
 };
 use serde_json::Value;
 use service::{
@@ -71,7 +71,7 @@ const PROVIDER: &str = "b10x";
 const WORKSPACES_DATASOURCE: &str = "b10x.workspaces";
 const DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
 use surface::{
-    WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, OPERATIONS,
+    ResolvedOperation, WorkOwnerEventPage, HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT, OPERATIONS,
     PLANNER_EVENT_BINDING, PLANNER_EVENT_CHANNEL, WORK_EVENT_BINDING, WORK_EVENT_CHANNEL,
 };
 
@@ -175,21 +175,6 @@ impl B10xBackend {
             || self.config.tenant_member_module_enabled(module)
     }
 
-    fn operation(
-        &self,
-        operation_ref: &str,
-    ) -> Option<(
-        &connector_resolve::document::Operation,
-        &'static str,
-        &'static str,
-    )> {
-        let (canonical, _, title) = operation_row(operation_ref)?;
-        self.configured(canonical)
-            .then(|| self.document.operation(canonical))
-            .flatten()
-            .map(|operation| (operation, canonical, title))
-    }
-
     fn connection(&self) -> ConnectionSummary {
         ConnectionSummary {
             connection_ref: self.config.connection.connection_ref.clone(),
@@ -231,30 +216,6 @@ impl B10xBackend {
         }
     }
 
-    fn search(&self, query: &str) -> Vec<OperationSummary> {
-        let needle = query.to_ascii_lowercase();
-        all_operation_rows()
-            .filter_map(|(canonical, operation_ref, title)| {
-                let operation = self
-                    .configured(canonical)
-                    .then(|| self.document.operation(canonical))
-                    .flatten()?;
-                let haystack = format!(
-                    "{operation_ref} {title} {}",
-                    operation.contract_description()
-                )
-                .to_ascii_lowercase();
-                (needle.is_empty() || haystack.contains(&needle)).then(|| OperationSummary {
-                    operation_ref: operation_ref.to_owned(),
-                    title: title.to_owned(),
-                    effect: effect(operation.effects()),
-                    approval: approval(canonical, operation.effects()),
-                    connections: vec![self.connection()],
-                })
-            })
-            .collect()
-    }
-
     fn description_ref(&self, context: &PrincipalContext, canonical: &str) -> String {
         let mut digest = Sha256::new();
         digest.update(self.catalog_sha256.as_bytes());
@@ -269,33 +230,16 @@ impl B10xBackend {
         format!("description-sha256-{:x}", digest.finalize())
     }
 
-    fn describe(
-        &self,
-        context: &PrincipalContext,
-        request: DescribeRequest,
-    ) -> Result<OperationResult, OperationError> {
-        let (operation, canonical, title) = self
-            .operation(&request.operation_ref)
-            .ok_or_else(not_found)?;
-        Ok(OperationResult::Describe(OperationDescription {
-            operation_ref: request.operation_ref,
-            title: title.to_owned(),
-            description: operation.contract_description().to_owned(),
-            input_schema: operation.input_schema().clone(),
-            output_schema: response_schema(&self.catalog, canonical)?,
-            effect: effect(operation.effects()),
-            approval: approval(canonical, operation.effects()),
-            connections: vec![self.connection()],
-            description_ref: self.description_ref(context, canonical),
-        }))
-    }
-
     async fn invoke(
         &self,
         context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
-        let (operation, canonical, _) = self
+        let ResolvedOperation {
+            contract: operation,
+            canonical,
+            ..
+        } = self
             .operation(&request.operation_ref)
             .ok_or_else(not_found)?;
         if canonical == BROWSER_GOTO_OPERATION
