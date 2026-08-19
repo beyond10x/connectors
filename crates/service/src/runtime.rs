@@ -260,11 +260,14 @@ impl PrincipalContext {
     ///
     /// Serializing the whole context into a lease digest made every lease stale by
     /// construction: `request_id`, `trace_id`, and `token_id` differ on the next
-    /// authenticated request, and access tokens rotate every few minutes. A lease minted
-    /// while serving `describe` must admit the `read` or `invoke` that follows it, so only
-    /// the facts that constitute the admitted authority participate: tenant, principal,
-    /// authority snapshot, and verified groups. Fields are length-framed so adjacent values
-    /// cannot alias.
+    /// authenticated request, and access tokens rotate every few minutes. The authority
+    /// snapshot fields are deliberately excluded too: the hosted receiver derives both from
+    /// the verified token (the id IS the token id, the sha hashes the introspection
+    /// envelope), so they rotate with every token and even differ between the
+    /// catalog-scoped describe and the invoke-scoped call that follows it. What remains is
+    /// the authority that actually gates behavior: tenant, principal identity, and verified
+    /// groups — a lease therefore survives token rotation and dies on a real authority
+    /// change. Fields are length-framed so adjacent values cannot alias.
     #[must_use]
     pub fn stable_authority_seed(&self) -> Vec<u8> {
         let mut seed = Vec::new();
@@ -283,8 +286,6 @@ impl PrincipalContext {
                 .map(|revision| revision.to_string())
                 .unwrap_or_default(),
         );
-        push(&self.authority_snapshot_id);
-        push(&self.authority_snapshot_sha256);
         for group in &self.verified_groups {
             push(group);
         }
@@ -568,6 +569,35 @@ mod tests {
         assert_ne!(
             plain.stable_authority_seed(),
             other_principal.stable_authority_seed()
+        );
+    }
+
+    #[test]
+    fn the_stable_authority_seed_survives_token_scoped_snapshot_fields() {
+        // The hosted receiver fills the snapshot id with the token id and the snapshot
+        // sha with a hash of the introspection envelope, so both rotate with every access
+        // token. The same admitted principal must keep the same seed across them.
+        let first = PrincipalContext::hosted(
+            "tenant-test".to_owned(),
+            "person:owner".to_owned(),
+            "person:owner".to_owned(),
+            None,
+            "token-catalog-scope".to_owned(),
+            "c".repeat(64),
+        )
+        .unwrap();
+        let second = PrincipalContext::hosted(
+            "tenant-test".to_owned(),
+            "person:owner".to_owned(),
+            "person:owner".to_owned(),
+            None,
+            "token-invoke-scope".to_owned(),
+            "d".repeat(64),
+        )
+        .unwrap();
+        assert_eq!(
+            first.stable_authority_seed(),
+            second.stable_authority_seed()
         );
     }
 
