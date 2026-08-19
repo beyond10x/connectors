@@ -644,14 +644,20 @@ impl B10xBackend {
         operation: &connector_resolve::document::Operation,
         input: Value,
     ) -> Result<Value, OperationError> {
-        let origin = self.origin(canonical).ok_or_else(unavailable)?;
+        let origin = self.origin(canonical).ok_or_else(|| {
+            tracing::warn!(operation = canonical, "no module origin is configured");
+            module_unavailable(canonical, "no module origin is configured for this operation")
+        })?;
         let credentials = Vec::new();
         let plan =
             connector_resolve::resolve(operation, &origin, &input, &BTreeMap::new(), &credentials)
                 .map_err(|_| invalid())?;
-        let method = reqwest::Method::from_bytes(plan.request.method.as_bytes())
-            .map_err(|_| unavailable())?;
-        let target = url::Url::parse(&plan.request.url).map_err(|_| unavailable())?;
+        let method = reqwest::Method::from_bytes(plan.request.method.as_bytes()).map_err(|_| {
+            module_unavailable(canonical, "the operation declares an unusable HTTP method")
+        })?;
+        let target = url::Url::parse(&plan.request.url).map_err(|_| {
+            module_unavailable(canonical, "the operation resolved an unusable request URL")
+        })?;
         same_origin(&origin, &target)
             .then_some(())
             .ok_or_else(not_granted)?;
@@ -681,7 +687,9 @@ impl B10xBackend {
                 "urn:b10x:module:ontology"
             };
         let module = module_id(canonical).ok_or_else(not_granted)?;
-        let client = self.module_client(module).map_err(|_| unavailable())?;
+        let client = self.module_client(module).map_err(|_| {
+            module_unavailable(canonical, "the module transport could not be opened")
+        })?;
         let mut outbound = client.request(method, target);
         if self.config.module_socket(module).is_none() {
             let authorization = self
@@ -705,7 +713,13 @@ impl B10xBackend {
         if !body.is_empty() {
             outbound = outbound.body(body);
         }
-        let mut response = outbound.send().await.map_err(|_| unavailable())?;
+        let mut response = outbound.send().await.map_err(|error| {
+            tracing::warn!(operation = canonical, module, %origin, %error, "module request failed");
+            module_unavailable(
+                canonical,
+                "the module did not answer; it may be unreachable or still starting",
+            )
+        })?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(not_found());
         }
@@ -717,7 +731,12 @@ impl B10xBackend {
                 .content_length()
                 .is_some_and(|size| size > protocol::operation::MAX_RESULT_BYTES as u64)
         {
-            return Err(unavailable());
+            let status = response.status();
+            tracing::warn!(operation = canonical, module, %status, "module refused the request");
+            return Err(module_unavailable(
+                canonical,
+                "the module answered with a failure status",
+            ));
         }
         let mut bytes = Vec::new();
         while let Some(chunk) = response.chunk().await.map_err(|_| unavailable())? {
@@ -1414,6 +1433,17 @@ fn opaque_ref(prefix: &str) -> Result<String, OperationError> {
     let mut bytes = [0_u8; 16];
     getrandom::fill(&mut bytes).map_err(|_| unavailable())?;
     Ok(format!("{prefix}-{}", hex::encode(bytes)))
+}
+
+/// A refusal that names the operation and what actually failed. A single opaque
+/// "connector runtime is unavailable" for every branch of module dispatch left both people and
+/// models guessing between "not configured", "unreachable", and "the module said no".
+fn module_unavailable(canonical: &str, reason: &str) -> OperationError {
+    OperationError::new(
+        OperationErrorCode::Unavailable,
+        format!("{canonical}: {reason}"),
+        true,
+    )
 }
 
 fn unavailable() -> OperationError {
