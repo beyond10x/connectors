@@ -85,6 +85,33 @@ pub struct ProviderSummary {
     pub operation_count: u32,
     /// Whether this runtime publishes a Connector-owned setup flow for the provider.
     pub configurable: bool,
+    /// The credential-acquisition flows this deployment can actually complete for a person who
+    /// is not its operator, in catalog order.
+    ///
+    /// Empty means a product must offer that person no setup control at all: either the provider
+    /// has no self-service flow, or this deployment is missing the configuration one would need.
+    /// It carries no credential and no client identifier — only the fact that a flow exists.
+    pub setup_profiles: Vec<SetupProfileSummary>,
+}
+
+/// One credential-acquisition flow a person may start for themselves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetupProfileSummary {
+    /// Stable auth-profile id, exactly as `ConnectSessionCreateRequest.auth_profile` accepts it.
+    pub auth_profile: String,
+    /// Whose access the resulting Connection exercises.
+    pub actor: SetupProfileActor,
+}
+
+/// Whose access a completed setup flow yields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SetupProfileActor {
+    /// The signed-in person themselves. Reads are bounded by what they can already see.
+    Person,
+    /// A bot or application the person supplies. Reads are bounded by that bot's own access.
+    Application,
 }
 
 /// One operation in a provider's descriptive catalog index.
@@ -297,6 +324,12 @@ fn validate_provider(provider: &ProviderSummary) -> Result<(), CatalogError> {
             .iter()
             .any(|value| !valid_ref(value, 128))
         || provider.services.iter().any(|value| !valid_ref(value, 128))
+        || provider.setup_profiles.len() > 16
+        || provider
+            .setup_profiles
+            .iter()
+            .any(|profile| !valid_ref(&profile.auth_profile, 128))
+        || !provider.configurable && !provider.setup_profiles.is_empty()
     {
         return Err(protocol_error());
     }
@@ -345,10 +378,42 @@ mod tests {
             services: vec!["default".to_owned()],
             operation_count: 4,
             configurable: true,
+            setup_profiles: vec![SetupProfileSummary {
+                auth_profile: "slack.org_user".to_owned(),
+                actor: SetupProfileActor::Person,
+            }],
         };
         let encoded = serde_json::to_string(&provider).unwrap();
         assert!(!encoded.contains("callable"));
         assert!(!encoded.contains("token"));
         assert!(!encoded.contains("credential"));
+        assert!(!encoded.contains("client_id"));
+        assert!(!encoded.contains("secret"));
+    }
+
+    #[test]
+    fn a_setup_profile_cannot_exist_without_a_setup_form() {
+        let mut provider = ProviderSummary {
+            provider_ref: "slack".to_owned(),
+            authority: Some("com.slack.api".to_owned()),
+            vendor: "Slack".to_owned(),
+            description: "Collaboration".to_owned(),
+            audiences: vec!["developer".to_owned()],
+            services: vec!["default".to_owned()],
+            operation_count: 4,
+            configurable: false,
+            setup_profiles: vec![SetupProfileSummary {
+                auth_profile: "slack.org_user".to_owned(),
+                actor: SetupProfileActor::Person,
+            }],
+        };
+        assert!(validate_provider(&provider).is_err());
+        provider.configurable = true;
+        assert!(validate_provider(&provider).is_ok());
+        provider.setup_profiles.push(SetupProfileSummary {
+            auth_profile: String::new(),
+            actor: SetupProfileActor::Application,
+        });
+        assert!(validate_provider(&provider).is_err());
     }
 }

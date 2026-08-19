@@ -415,6 +415,25 @@ impl ConnectorBackend for BackendRegistry {
         }
     }
 
+    /// Union the registered backends' self-service flows for one provider.
+    ///
+    /// Two backends claiming the same auth profile for one provider is a composition fault, not a
+    /// choice to make here: the ambiguous profile is dropped so no product can offer a flow whose
+    /// owner is undetermined.
+    fn setup_profiles(&self, provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
+        let mut published =
+            BTreeMap::<String, Option<protocol::catalog::SetupProfileSummary>>::new();
+        for backend in &self.backends {
+            for profile in backend.setup_profiles(provider_ref) {
+                published
+                    .entry(profile.auth_profile.clone())
+                    .and_modify(|existing| *existing = None)
+                    .or_insert(Some(profile));
+            }
+        }
+        published.into_values().flatten().collect()
+    }
+
     fn owns_event(&self, request: &EventRequest) -> bool {
         matches!(request, EventRequest::Search(_)) || !self.event_claims(request).is_empty()
     }
