@@ -60,10 +60,7 @@ impl B10xBackend {
                 // permission boundary. A topical query ("list") used to hide the only binding
                 // that exists and read as "this datasource is not bound".
                 let _ = &query;
-                let bindings = Some(binding)
-                    .into_iter()
-                    .take(usize::from(limit))
-                    .collect();
+                let bindings = Some(binding).into_iter().take(usize::from(limit)).collect();
                 Ok(DatasourceResult::Bindings { bindings })
             }
             DatasourceRequest::Read(request) if self.workspace_datasource_admitted() => {
