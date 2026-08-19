@@ -631,6 +631,35 @@ impl ConnectorBackend for SlackBackend {
         }
     }
 
+    /// Publish only the flows this deployment can finish.
+    ///
+    /// `slack.org_user` needs an OAuth client, a redirect URI and an expected workspace before it
+    /// can send anyone to Slack — the same three values `oauth_authorize_url` requires — so
+    /// without them it is not offered rather than offered and refused. Both flows also need the
+    /// hosted completion mode: a local placement's operator configures Slack directly.
+    fn setup_profiles(&self, provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
+        if provider_ref != INTEGRATION_REF
+            || !matches!(self.inner.completion_mode, CompletionMode::Hosted { .. })
+        {
+            return Vec::new();
+        }
+        let mut profiles = Vec::new();
+        if self.inner.policy.oauth_client_id.is_some()
+            && self.inner.policy.oauth_redirect_uri.is_some()
+            && self.inner.policy.expected_team_id.is_some()
+        {
+            profiles.push(protocol::catalog::SetupProfileSummary {
+                auth_profile: PROFILE_ORG_USER.to_owned(),
+                actor: protocol::catalog::SetupProfileActor::Person,
+            });
+        }
+        profiles.push(protocol::catalog::SetupProfileSummary {
+            auth_profile: PROFILE_COMPANION_BOT.to_owned(),
+            actor: protocol::catalog::SetupProfileActor::Application,
+        });
+        profiles
+    }
+
     fn owns_event(&self, request: &EventRequest) -> bool {
         match request {
             EventRequest::Receive(request) => self.inner.has_channel(&request.channel_ref),
