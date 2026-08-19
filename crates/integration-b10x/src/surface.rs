@@ -1,3 +1,9 @@
+//! What this Connector publishes, and under which name.
+//!
+//! The operation table below is the one place that decides how an operation is called on the
+//! wire, so the projections that hand a name to a caller — search and describe — live here with
+//! it rather than beside dispatch.
+
 use protocol::audio::{
     SPEECH_SPEAK_OPERATION, SPEECH_SPEAK_TOOL_REF, SPEECH_STATUS_OPERATION, SPEECH_STATUS_TOOL_REF,
 };
@@ -5,6 +11,9 @@ use protocol::browser::{
     BROWSER_CLOSE_OPERATION, BROWSER_CLOSE_TOOL_REF, BROWSER_GOTO_OPERATION, BROWSER_GOTO_TOOL_REF,
     BROWSER_OPEN_OPERATION, BROWSER_OPEN_TOOL_REF, BROWSER_SCREENSHOT_OPERATION,
     BROWSER_SCREENSHOT_TOOL_REF, BROWSER_SNAPSHOT_OPERATION, BROWSER_SNAPSHOT_TOOL_REF,
+};
+use protocol::operation::{
+    DescribeRequest, OperationDescription, OperationError, OperationResult, OperationSummary,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -42,6 +51,21 @@ pub(super) struct WorkOwnerEvent {
     pub(super) data: Value,
 }
 
+/// One resolved operation: its catalog contract, the name this Connector dispatches and audits
+/// under, and its title.
+pub(super) struct ResolvedOperation<'a> {
+    pub(super) contract: &'a connector_resolve::document::Operation,
+    pub(super) canonical: &'static str,
+    pub(super) title: &'static str,
+}
+
+/// Each row is `(catalog id, published operation reference, title)`.
+///
+/// Every operation is addressable under two names — the catalog id (`colab-workspace-list`) and
+/// the dotted operation reference (`colab.workspaces.list`) — and `policy.rs` adds a third for
+/// the module-global ids. All of them keep resolving, so existing callers are unaffected. Only
+/// the second column is ever published, so someone reading the surface meets each operation once,
+/// under one name, instead of believing there are two operations that behave identically.
 #[rustfmt::skip]
 pub(super) const OPERATIONS: [(&str, &str, &str); 72] = [
     (SPEECH_SPEAK_OPERATION, SPEECH_SPEAK_TOOL_REF, "Speak on local audio"),
@@ -117,3 +141,78 @@ pub(super) const OPERATIONS: [(&str, &str, &str); 72] = [
     ("colab-workspace-current-set", "colab.workspaces.current.set", "Select the current conversation checkout"),
     ("colab-workspace-detach", "colab.workspaces.detach", "Detach a checkout from a conversation"),
 ];
+
+impl super::B10xBackend {
+    /// Resolve one operation by any of its names.
+    pub(super) fn operation(&self, operation_ref: &str) -> Option<ResolvedOperation<'_>> {
+        let (canonical, _, title) = super::operation_row(operation_ref)?;
+        self.configured(canonical)
+            .then(|| self.document.operation(canonical))
+            .flatten()
+            .map(|contract| ResolvedOperation {
+                contract,
+                canonical,
+                title,
+            })
+    }
+
+    /// One row per operation, never one row per name: the rows are keyed by catalog id, and every
+    /// summary is named by `published_ref`. Searching the catalog id still finds the operation.
+    pub(super) fn search(&self, query: &str) -> Vec<OperationSummary> {
+        let needle = query.to_ascii_lowercase();
+        super::all_operation_rows()
+            .filter_map(|(canonical, published_ref, title)| {
+                let operation = self
+                    .configured(canonical)
+                    .then(|| self.document.operation(canonical))
+                    .flatten()?;
+                let haystack = format!(
+                    "{canonical} {published_ref} {title} {}",
+                    operation.contract_description()
+                )
+                .to_ascii_lowercase();
+                (needle.is_empty() || haystack.contains(&needle)).then(|| OperationSummary {
+                    operation_ref: published_ref.to_owned(),
+                    title: title.to_owned(),
+                    effect: super::effect(operation.effects()),
+                    approval: super::approval(canonical, operation.effects()),
+                    connections: vec![self.connection()],
+                })
+            })
+            .collect()
+    }
+
+    /// Describe is a lookup by a name the caller already holds, so it answers under that name.
+    ///
+    /// This is deliberately not the published name. The Agent's Connector client refuses a
+    /// description whose `operation_ref` differs from the one it asked about
+    /// (`runtime/agent/crates/agent-connectors-client/src/lib.rs:2027`), and Zwirn asks for the
+    /// catalog ids directly (`products/zwirn/crates/agent-app/src/remote_workspaces.rs:23-33`).
+    /// Renaming the answer here would fail every one of those describes as a protocol error and
+    /// take the workspace and module-widget surfaces with it. The single-name rule therefore
+    /// belongs to `search`, which is where a name is discovered rather than presented.
+    pub(super) fn describe(
+        &self,
+        context: &service::PrincipalContext,
+        request: DescribeRequest,
+    ) -> Result<OperationResult, OperationError> {
+        let ResolvedOperation {
+            contract: operation,
+            canonical,
+            title,
+        } = self
+            .operation(&request.operation_ref)
+            .ok_or_else(super::not_found)?;
+        Ok(OperationResult::Describe(OperationDescription {
+            operation_ref: request.operation_ref,
+            title: title.to_owned(),
+            description: operation.contract_description().to_owned(),
+            input_schema: operation.input_schema().clone(),
+            output_schema: super::response_schema(&self.catalog, canonical)?,
+            effect: super::effect(operation.effects()),
+            approval: super::approval(canonical, operation.effects()),
+            connections: vec![self.connection()],
+            description_ref: self.description_ref(context, canonical),
+        }))
+    }
+}
