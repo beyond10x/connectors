@@ -20,7 +20,9 @@
 //! - [`init`] — write a configuration nobody should have had to author by hand.
 //! - [`doctor`] — report what is configured, what is running, and what cannot work.
 //! - [`providers`] — what the embedded catalogue can reach, as a measured fact.
+//! - [`auth`] — which providers are connected, answered without reading a credential.
 //! - [`connect`] — the guided provider flows, returning their outcome as data so `-o json` works.
+//! - [`envelope`] — reducing a transport envelope to its payload, or to a refusal that exits non-zero.
 //! - [`input`] — where one operation's caller input comes from.
 //! - [`output`] — how any of those reach a terminal, a pipe, or a parser.
 //!
@@ -29,7 +31,9 @@
 //! guided flow is a conversation with the local Connector and the conversation is the behaviour
 //! being packaged.
 
+pub mod auth;
 pub mod connect;
+pub mod envelope;
 pub mod doctor;
 pub mod init;
 pub mod input;

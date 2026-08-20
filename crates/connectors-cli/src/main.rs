@@ -21,7 +21,7 @@ use protocol::operation::{
     OperationRequest, SearchRequest as OperationSearchRequest,
 };
 
-use connectors_console::{connect, doctor, init, input, output, Format};
+use connectors_console::{auth, connect, doctor, init, input, output, reduce_envelope, Format};
 
 #[derive(Debug, Parser)]
 #[command(name = "connectors", version, about = "B10x Connectors service")]
@@ -54,6 +54,14 @@ enum Command {
         /// Replace an existing configuration.
         #[arg(long)]
         force: bool,
+    },
+    /// Report which configured providers have their credential stored.
+    ///
+    /// Never reads a credential. Use this rather than `secret-tool search`, which prints every
+    /// matching secret alongside its attributes and has no attribute-only mode.
+    Auth {
+        #[command(subcommand)]
+        command: AuthCommand,
     },
     /// Report what every catalogued provider needs before it can be connected.
     Providers {
@@ -118,6 +126,17 @@ enum Command {
     Operation {
         #[command(subcommand)]
         command: OperationCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum AuthCommand {
+    /// Which configured providers are connected, and which are not.
+    Status {
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        state_root: Option<PathBuf>,
     },
 }
 
@@ -294,6 +313,10 @@ enum MainError {
     #[error(transparent)]
     Input(#[from] input::InputError),
     #[error(transparent)]
+    Auth(#[from] auth::AuthError),
+    #[error(transparent)]
+    Refused(#[from] connectors_console::envelope::ReducedError),
+    #[error(transparent)]
     Init(#[from] init::InitError),
     #[error(transparent)]
     Output(#[from] output::OutputError),
@@ -301,18 +324,6 @@ enum MainError {
     #[error("this installation has a problem `connectors doctor` named above")]
     Unhealthy,
 
-    /// The Connector answered, and its answer was a refusal.
-    ///
-    /// Distinct from [`Self::Client`], which means the Connector could not be reached at all. Both
-    /// used to be invisible: the envelope was printed as though it were a result and the process
-    /// exited `0`, so `connectors connection list | jq` reported success for a request the daemon
-    /// had refused by name.
-    #[error("{message}")]
-    Refused {
-        code: String,
-        message: String,
-        retriable: bool,
-    },
 }
 
 impl MainError {
@@ -332,40 +343,12 @@ impl MainError {
             Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
             Self::Connect(_) => "connect",
             Self::Output(_) => "output",
-            Self::Refused { code, .. } => code,
+            Self::Refused(refusal) => &refusal.code,
             Self::Unhealthy => "unhealthy",
             Self::Input(_) => "invalid-argument",
+            Self::Auth(_) => "credential-store",
         }
     }
-}
-
-/// Reduce one transport envelope to the payload a caller asked for, or to a refusal.
-///
-/// **Two defects at once.** The envelope carried `protocol`, `request_id` and `status` around every
-/// result, so `-o compact` rendered transport metadata instead of records and `-o text` buried the
-/// answer three levels down. And a `status: error` envelope was printed as though it were a result,
-/// with exit code `0` — the failure a pipe cannot see. Unwrapping here fixes both, because the
-/// same step that drops the metadata is the one that notices the refusal.
-///
-/// The macro exists because the three protocols carry structurally identical envelopes with
-/// distinct types: matching them generically over `serde_json::Value` would work today and stop
-/// compiling nothing on the day a contract changes shape.
-macro_rules! unwrap_envelope {
-    ($envelope:expr) => {{
-        let envelope = $envelope;
-        match (envelope.status, envelope.response, envelope.error) {
-            (_, _, Some(error)) => Err(MainError::Refused {
-                code: serde_json::to_value(error.code)?
-                    .as_str()
-                    .unwrap_or("refused")
-                    .to_owned(),
-                message: error.message,
-                retriable: error.retriable,
-            }),
-            (_, Some(result), None) => Ok(connectors_console::payload(serde_json::to_value(result)?)),
-            (_, None, None) => Err(MainError::InvalidConnectionResponse),
-        }
-    }};
 }
 
 #[tokio::main]
@@ -394,6 +377,13 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             allow_exec_auth,
             force,
         } => initialize(format, config, state_root, &integrations, allow_exec_auth, force),
+        Command::Auth { command } => {
+            let AuthCommand::Status { config, state_root } = command;
+            let config = read_config(config)?;
+            let state_root = state_root.map_or_else(default_state_root, Ok)?;
+            output::emit(format, &auth::status(&config, &state_root).await?)?;
+            Ok(())
+        }
         Command::Providers { query } => {
             output::emit(format, &connectors_console::providers::run(&query))?;
             Ok(())
@@ -588,7 +578,7 @@ async fn connection(format: Format, command: ConnectionCommand) -> Result<(), Ma
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .connection(&config.owner_context(), request)
         .await?;
-    output::emit(format, &unwrap_envelope!(response)?)?;
+    output::emit(format, &reduce_envelope!(response)?)?;
     Ok(())
 }
 
@@ -637,7 +627,7 @@ async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
         .await?;
-    output::emit(format, &unwrap_envelope!(response)?)?;
+    output::emit(format, &reduce_envelope!(response)?)?;
     Ok(())
 }
 
@@ -695,7 +685,7 @@ async fn operation(format: Format, command: OperationCommand) -> Result<(), Main
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .operation(&config.owner_context(), request)
         .await?;
-    output::emit(format, &unwrap_envelope!(response)?)?;
+    output::emit(format, &reduce_envelope!(response)?)?;
     Ok(())
 }
 

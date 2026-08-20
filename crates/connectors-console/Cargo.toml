@@ -25,6 +25,9 @@ catalog = { version = "0.1.0", path = "../catalog" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
 # The guided flows talk to the local Connector through the reusable client; they neither frame a
 # request nor compose an adapter.
+connector-address = { version = "0.1.0", path = "../connector-address" }
+# `auth status` asks the store whether a credential is present. It never reads one.
+connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
 connectors-client = { version = "0.1.0", path = "../connectors-client" }
 protocol = { version = "0.1.0", path = "../protocol" }
 clap = { version = "4", features = ["derive"] }

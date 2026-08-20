@@ -6,7 +6,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use connector_secrets::{FileStore, MemoryStore, PreparedSecretStore, SecretStore};
+use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
@@ -140,6 +140,7 @@ impl PersonalRuntime {
         let mut kubernetes_connections = None;
         let mut b10x_configured = false;
         let mut catalog_connections = None;
+        let mut credential_backend = None;
 
         if let Some(config_path) = config_path {
             let config = PersonalConfig::read(config_path)?;
@@ -150,12 +151,21 @@ impl PersonalRuntime {
                 || config.grafana.is_some()
                 || !config.catalog.is_empty()
             {
-                // **One store, opened once.** `FileStore` takes an exclusive lock on its file, so
-                // opening `credentials.store` twice — once for the prepared consumer and once for
-                // the value consumer — fails the second open and the whole daemon reports only
-                // "the personal credential store could not be opened". Both handles are the same
-                // store because they are the same file.
-                let durable = if config.slack.is_some() || !config.catalog.is_empty() {
+                // **One durable store, opened once.**
+                //
+                // The OS keyring first: a credential on a workstation should be sealed by the
+                // desktop session, not by file permissions alone. `FileStore` protects a value with
+                // owner + `0600`, which is a real guarantee against another user and none at all
+                // against a copied backup or a synced home directory.
+                //
+                // The fallback is deliberate rather than silent. A server, a container or a CI
+                // runner has no Secret Service, and refusing to start there would make the keyring
+                // a deployment requirement instead of an improvement. Which one was bound is
+                // published in readiness so `connectors doctor` can name an unencrypted store
+                // rather than leaving an operator to assume the better one.
+                let keyring: Option<Arc<KeyringStore>> = KeyringStore::open().ok().map(Arc::new);
+                let file = if keyring.is_none() && (config.slack.is_some() || !config.catalog.is_empty())
+                {
                     Some(Arc::new(
                         FileStore::open(state_root.join("credentials.store"))
                             .map_err(|_| RuntimeError::CredentialStore)?,
@@ -163,15 +173,24 @@ impl PersonalRuntime {
                 } else {
                     None
                 };
-                let prepared: Arc<dyn PreparedSecretStore> = match durable.clone() {
-                    Some(store) => store,
-                    None => Arc::new(MemoryStore::new()),
+                credential_backend = Some(if keyring.is_some() { "keyring" } else { "file" });
+                // The prepared (two-phase) store has no keyring implementation yet, so Slack keeps
+                // the file-backed one. Named here rather than hidden: it is the remaining
+                // unencrypted credential surface on a workstation.
+                let prepared: Arc<dyn PreparedSecretStore> = if config.slack.is_some() {
+                    Arc::new(
+                        FileStore::open(state_root.join("credentials.store"))
+                            .map_err(|_| RuntimeError::CredentialStore)?,
+                    )
+                } else {
+                    Arc::new(MemoryStore::new())
                 };
                 // Catalogued providers keep their credential across a restart, so the operator can
                 // delete the file it was imported from. Grafana's own store stays in memory because
                 // its credential is re-entered through a Connect Session each time.
-                let monitoring: Arc<dyn SecretStore> = match durable {
-                    Some(store) if !config.catalog.is_empty() => store,
+                let monitoring: Arc<dyn SecretStore> = match (keyring, file) {
+                    (Some(store), _) if !config.catalog.is_empty() => store,
+                    (_, Some(store)) if !config.catalog.is_empty() => store,
                     _ => Arc::new(MemoryStore::new()),
                 };
                 Some(PersonalCredentialStores::new(prepared, monitoring))
@@ -303,6 +322,7 @@ impl PersonalRuntime {
             "b10x_configured": b10x_configured,
             "catalog_configured": catalog_connections.is_some(),
             "catalog_connections": catalog_connections,
+            "credential_store": credential_backend,
         });
         Ok(Self { daemon, readiness })
     }
