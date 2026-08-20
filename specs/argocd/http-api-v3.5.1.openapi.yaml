@@ -1,0 +1,850 @@
+openapi: 3.1.0
+info:
+  title: Argo CD API v1 curated projection
+  version: "3.5.1"
+  description: >-
+    Deterministic OpenAPI 3 projection of the eleven Argo CD operations B10x ships, reviewed
+    against the pinned official Swagger 2 source at specs/argocd/swagger-v3.5.1.json. The upstream
+    document describes 82 paths and 106 operations; this document intentionally contains only the
+    reviewed surface, and every operation here is the vendor's own path, method and operationId.
+x-b10x-origin: vendor-derived
+x-b10x-upstream: https://github.com/argoproj/argo-cd/blob/v3.5.1/assets/swagger.json
+x-b10x-coverage: eleven reviewed Application, Project and Session operations
+# The upstream document declares no `securityDefinitions` and no `security` at all — it is generated
+# from Argo CD's protobuf service definitions, which carry no auth vocabulary. The bearer scheme
+# below is therefore stated from Argo CD's own API documentation rather than derived from the source
+# bytes, and this is the one fact in this file that the pinned Swagger cannot corroborate.
+x-b10x-auth-reference: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+servers:
+  - url: https://argocd.example.com/api/v1
+security:
+  - apiToken: []
+components:
+  securitySchemes:
+    apiToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Argo CD account or project-role JWT, sent as `Authorization: Bearer <token>`.
+  schemas:
+    HealthStatus:
+      type: object
+      description: Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.
+      properties:
+        status:
+          type: string
+          description: Healthy, Progressing, Degraded, Suspended, Missing or Unknown.
+        message:
+          type: string
+          description: Human-readable explanation of the health status.
+        lastTransitionTime:
+          type: string
+          description: RFC 3339 timestamp at which the health status last changed.
+    ApplicationSource:
+      type: object
+      description: Where an Application's desired state comes from. Projected from v1alpha1ApplicationSource.
+      properties:
+        repoURL:
+          type: string
+          description: Git or Helm/OCI repository URL the manifests are read from.
+        path:
+          type: string
+          description: Directory within the repository, for a directory, Kustomize or Jsonnet source.
+        chart:
+          type: string
+          description: Helm chart name, for a Helm repository source.
+        targetRevision:
+          type: string
+          description: Branch, tag, commit or chart version this Application tracks.
+    ApplicationDestination:
+      type: object
+      description: Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.
+      properties:
+        server:
+          type: string
+          description: API server URL of the destination cluster.
+        name:
+          type: string
+          description: Registered cluster name, used instead of `server` when the destination names a cluster.
+        namespace:
+          type: string
+          description: Default destination namespace for resources that do not set one.
+    Application:
+      type: object
+      description: >-
+        One Argo CD Application. The upstream v1alpha1Application definition carries the entire
+        custom resource, including full Helm, Kustomize, plugin and ignore-difference configuration.
+        This projection declares the identity, source, destination and status fields B10x
+        promises and stops there; unlisted fields are still returned by the server.
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+              description: Application name.
+            namespace:
+              type: string
+              description: Namespace the Application resource lives in, which is the Argo CD namespace rather than the destination.
+            resourceVersion:
+              type: string
+              description: Opaque Kubernetes resource version.
+        spec:
+          type: object
+          properties:
+            project:
+              type: string
+              description: AppProject this Application belongs to.
+            source:
+              $ref: '#/components/schemas/ApplicationSource'
+            destination:
+              $ref: '#/components/schemas/ApplicationDestination'
+        status:
+          type: object
+          properties:
+            sync:
+              type: object
+              description: Projected from v1alpha1SyncStatus.
+              properties:
+                status:
+                  type: string
+                  description: Synced, OutOfSync or Unknown.
+                revision:
+                  type: string
+                  description: Revision the live state was last compared against.
+            health:
+              $ref: '#/components/schemas/HealthStatus'
+            operationState:
+              type: object
+              description: Outcome of the most recent sync, rollback or terminate. Projected from v1alpha1OperationState.
+              properties:
+                phase:
+                  type: string
+                  description: Running, Succeeded, Failed, Error or Terminating.
+                message:
+                  type: string
+                  description: Human-readable outcome of the operation.
+                startedAt:
+                  type: string
+                  description: RFC 3339 timestamp at which the operation started.
+                finishedAt:
+                  type: string
+                  description: RFC 3339 timestamp at which the operation finished, absent while it runs.
+                retryCount:
+                  type: integer
+                  description: Number of times the operation has been retried.
+            reconciledAt:
+              type: string
+              description: RFC 3339 timestamp of the last reconciliation.
+paths:
+  /applications:
+    get:
+      operationId: ApplicationService_List
+      summary: List the Argo CD Applications this token may see, with their sync and health status
+      description: >-
+        The upstream operation also accepts `refresh`, which makes the server reconcile against the
+        repository before answering, and `resourceVersion`. `refresh` is withheld because it turns a
+        read into a request that changes server-side state, and `resourceVersion` is withheld
+        because a caller has no honest way to obtain one here. The `projects` and `project`
+        parameters are repeated (`collectionFormat: multi`) query keys, which the request contract
+        cannot express, so project scoping is not offered on this operation.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Return only the Application with this exact name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: selector
+          in: query
+          required: false
+          description: Kubernetes label selector, such as `env=prod,team=payments`.
+          schema:
+            type: string
+            maxLength: 1024
+        - name: repo
+          in: query
+          required: false
+          description: Return only Applications whose source repository URL matches this value exactly.
+          schema:
+            type: string
+            maxLength: 2048
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resources, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+      responses:
+        "200":
+          description: Application list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metadata:
+                    type: object
+                    properties:
+                      resourceVersion:
+                        type: string
+                        description: Opaque Kubernetes list resource version.
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Application'
+  /applications/{name}:
+    get:
+      operationId: ApplicationService_Get
+      summary: Get one Argo CD Application, with its sync status, health and last operation
+      description: >-
+        `refresh` and `resourceVersion` are withheld for the same reasons as on the list operation,
+        and the repeated `project`/`projects` keys cannot be expressed by the request contract.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+      responses:
+        "200":
+          description: One Application.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+  /applications/{applicationName}/resource-tree:
+    get:
+      operationId: ApplicationService_ResourceTree
+      summary: Get the live Kubernetes resources an Application owns, and their health
+      description: >-
+        The upstream operation also accepts `namespace`, `name`, `group`, `kind` and `version` to
+        narrow the tree to one resource. They are withheld here because the tree is already scoped
+        to one Application and a partially filtered tree is not a tree; use the managed-resources
+        operation when a single resource is wanted.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: applicationName
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: project
+          in: query
+          required: false
+          description: >-
+            AppProject the Application is expected to belong to. Argo CD answers 403 rather than 404
+            when it does not, which is how it avoids leaking the existence of Applications a caller
+            may not see.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: >-
+            Resource tree. Projected from v1alpha1ApplicationTree; each node flattens the
+            v1alpha1ResourceRef the upstream definition composes in through `allOf`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        group:
+                          type: string
+                        version:
+                          type: string
+                        kind:
+                          type: string
+                        namespace:
+                          type: string
+                        name:
+                          type: string
+                        uid:
+                          type: string
+                        resourceVersion:
+                          type: string
+                        createdAt:
+                          type: string
+                        images:
+                          type: array
+                          items:
+                            type: string
+                        health:
+                          $ref: '#/components/schemas/HealthStatus'
+                        parentRefs:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              group:
+                                type: string
+                              kind:
+                                type: string
+                              namespace:
+                                type: string
+                              name:
+                                type: string
+                              uid:
+                                type: string
+                  orphanedNodes:
+                    type: array
+                    description: Resources in the destination namespace that no Application manages.
+                    items:
+                      type: object
+                      properties:
+                        group:
+                          type: string
+                        kind:
+                          type: string
+                        namespace:
+                          type: string
+                        name:
+                          type: string
+  /applications/{applicationName}/managed-resources:
+    get:
+      operationId: ApplicationService_ManagedResources
+      summary: Get the live-versus-target difference for the resources an Application manages
+      description: >-
+        The five resource selectors are kept here precisely because they are the only way to bound
+        this response: unfiltered, it carries the full live and target manifest of every managed
+        resource.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: applicationName
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: namespace
+          in: query
+          required: false
+          description: Narrow the diff to resources in this destination namespace.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: name
+          in: query
+          required: false
+          description: Narrow the diff to the resource with this name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: group
+          in: query
+          required: false
+          description: Narrow the diff to this Kubernetes API group, such as `apps`.
+          schema:
+            type: string
+            maxLength: 253
+        - name: version
+          in: query
+          required: false
+          description: Narrow the diff to this Kubernetes API version, such as `v1`.
+          schema:
+            type: string
+            maxLength: 63
+        - name: kind
+          in: query
+          required: false
+          description: Narrow the diff to this Kubernetes kind, such as `Deployment`.
+          schema:
+            type: string
+            maxLength: 253
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: project
+          in: query
+          required: false
+          description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: >-
+            Per-resource differences. Projected from v1alpha1ResourceDiff. `liveState`,
+            `targetState`, `normalizedLiveState` and `predictedLiveState` are whole serialized
+            manifests: for a managed Secret they contain its data, which is why this operation is
+            catalogued at medium risk and is not exposed to a model.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        group:
+                          type: string
+                        kind:
+                          type: string
+                        namespace:
+                          type: string
+                        name:
+                          type: string
+                        resourceVersion:
+                          type: string
+                        modified:
+                          type: boolean
+                          description: Whether live and target state differ.
+                        hook:
+                          type: boolean
+                          description: Whether this resource is a sync hook rather than managed state.
+                        liveState:
+                          type: string
+                          description: Serialized manifest of the resource as it exists in the cluster.
+                        targetState:
+                          type: string
+                          description: Serialized manifest of the resource as the repository declares it.
+                        normalizedLiveState:
+                          type: string
+                          description: Live state after Argo CD's configured normalizations.
+                        predictedLiveState:
+                          type: string
+                          description: Live state Argo CD predicts after applying the target state.
+  /applications/{name}/events:
+    get:
+      operationId: ApplicationService_ListResourceEvents
+      summary: List the Kubernetes events Argo CD recorded for an Application or one of its resources
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: resourceNamespace
+          in: query
+          required: false
+          description: Narrow to events about resources in this namespace.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: resourceName
+          in: query
+          required: false
+          description: Narrow to events about the resource with this name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: resourceUID
+          in: query
+          required: false
+          description: Narrow to events about the resource with this UID.
+          schema:
+            type: string
+            maxLength: 63
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: project
+          in: query
+          required: false
+          description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: Event list. Projected from eventsEventList.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: Normal or Warning.
+                        reason:
+                          type: string
+                        message:
+                          type: string
+                        action:
+                          type: string
+                        count:
+                          type: integer
+                        firstTimestamp:
+                          type: string
+                        lastTimestamp:
+                          type: string
+                        involvedObject:
+                          type: object
+                          properties:
+                            apiVersion:
+                              type: string
+                            kind:
+                              type: string
+                            namespace:
+                              type: string
+                            name:
+                              type: string
+                            uid:
+                              type: string
+  /applications/{name}/syncwindows:
+    get:
+      operationId: ApplicationService_GetApplicationSyncWindows
+      summary: Report whether an Application may sync now, and which sync windows apply to it
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: project
+          in: query
+          required: false
+          description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: Sync window state. Projected from applicationApplicationSyncWindowsResponse.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canSync:
+                    type: boolean
+                    description: Whether a sync is permitted at this moment.
+                  activeWindows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind:
+                          type: string
+                          description: allow or deny.
+                        schedule:
+                          type: string
+                          description: Cron expression at which the window opens.
+                        duration:
+                          type: string
+                          description: How long the window stays open, such as `1h`.
+                        manualSync:
+                          type: boolean
+                          description: Whether a manual sync is permitted during a deny window.
+                  assignedWindows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind:
+                          type: string
+                        schedule:
+                          type: string
+                        duration:
+                          type: string
+                        manualSync:
+                          type: boolean
+  /applications/{name}/sync:
+    post:
+      operationId: ApplicationService_Sync
+      summary: Sync an Application to the state its repository declares
+      description: >-
+        The upstream applicationApplicationSyncRequest also carries `manifests`, `resources`,
+        `infos`, `retryStrategy`, `strategy`, `syncOptions`, `revisions` and `sourcePositions`.
+        `manifests` is an array of raw manifest strings the server applies in place of the
+        repository's, so admitting it would let any caller of this operation apply arbitrary
+        Kubernetes objects to the destination cluster; the rest are withheld because a bounded sync
+        of what git already says needs none of them.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revision:
+                  type: string
+                  description: Branch, tag or commit to sync to. Absent means the Application's own targetRevision.
+                  maxLength: 253
+                prune:
+                  type: boolean
+                  description: Delete live resources that the repository no longer declares.
+                dryRun:
+                  type: boolean
+                  description: Report what the sync would do without applying anything.
+                project:
+                  type: string
+                  description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+                  maxLength: 253
+                appNamespace:
+                  type: string
+                  description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+                  maxLength: 63
+      responses:
+        "200":
+          description: The Application, with `status.operationState` describing the sync that was started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+  /applications/{name}/rollback:
+    post:
+      operationId: ApplicationService_Rollback
+      summary: Redeploy a previous revision of an Application over its live state
+      description: >-
+        `id` names an entry of `status.history` and is declared required here although the upstream
+        body marks nothing required: a rollback without a history id is not a rollback, and letting
+        it default to zero would silently redeploy the oldest retained revision.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                  description: History id of the deployment to roll back to, from `status.history[].id`.
+                prune:
+                  type: boolean
+                  description: Delete live resources the rolled-back revision does not declare.
+                dryRun:
+                  type: boolean
+                  description: Report what the rollback would do without applying anything.
+                project:
+                  type: string
+                  description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+                  maxLength: 253
+                appNamespace:
+                  type: string
+                  description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+                  maxLength: 63
+      responses:
+        "200":
+          description: The Application, with `status.operationState` describing the rollback that was started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+  /applications/{name}/operation:
+    delete:
+      operationId: ApplicationService_TerminateOperation
+      summary: Terminate the sync or rollback an Application is currently running
+      description: >-
+        Argo CD declares this operation's success body as an empty object with no members, so this
+        projection declares no response schema rather than a placeholder that would constrain
+        nothing. Read the outcome from `status.operationState` on a subsequent get.
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Application name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+        - name: appNamespace
+          in: query
+          required: false
+          description: Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 63
+        - name: project
+          in: query
+          required: false
+          description: AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: The operation was terminated. Argo CD returns an empty object.
+  /projects:
+    get:
+      operationId: ProjectService_List
+      summary: List the Argo CD AppProjects this token may see
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Return only the AppProject with this exact name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 253
+      responses:
+        "200":
+          description: >-
+            AppProject list. The upstream v1alpha1AppProject carries the project's full RBAC
+            policies, role JWT records and cluster/repository allowlists; this projection declares
+            identity, description and the destination and source allowlists only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metadata:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                        spec:
+                          type: object
+                          properties:
+                            description:
+                              type: string
+                            sourceRepos:
+                              type: array
+                              items:
+                                type: string
+                              description: Repository URLs Applications in this project may deploy from.
+                            destinations:
+                              type: array
+                              items:
+                                $ref: '#/components/schemas/ApplicationDestination'
+  /session/userinfo:
+    get:
+      operationId: SessionService_GetUserInfo
+      summary: Report which Argo CD identity the configured token authenticates as
+      externalDocs:
+        url: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+      responses:
+        "200":
+          description: Identity of the caller. Projected from sessionGetUserInfoResponse.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loggedIn:
+                    type: boolean
+                    description: >-
+                      Whether the request carried a token Argo CD accepted. Argo CD answers 200 with
+                      `false` for an anonymous request, so this is an identity report and not a
+                      credential check.
+                  username:
+                    type: string
+                  iss:
+                    type: string
+                    description: Issuer that minted the token, `argocd` for a local account or project-role token.
+                  groups:
+                    type: array
+                    items:
+                      type: string

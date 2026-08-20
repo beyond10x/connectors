@@ -91,7 +91,9 @@ use crate::shipped_provider;
 // schema for 44 of the connector's 51 operations, and the accumulated spec-backed catalogue now
 // measures 825 of 978. Recording the measured figure less one keeps the upward ratchet honest and
 // preserves the single-absence allowance.
-const COVERED_FLOOR: usize = 824;
+// Raised 824 -> 835 by the Argo CD admission. Argo CD declares a response body for ten of its
+// eleven shipped operations; the eleventh is the one honest absence below.
+const COVERED_FLOOR: usize = 835;
 
 /// The other half of the same measurement: operations that ship **without** a response shape. This
 /// is the half that notices a connector arriving with no response shapes at all.
@@ -162,7 +164,14 @@ const COVERED_FLOOR: usize = 824;
 // absent: the other 44 operations carry the schemas its document publishes. The measured absence is
 // 153, so 154 preserves the single-operation allowance and still refuses the smallest
 // two-operation unschematized arrival.
-const ABSENCE_CEILING: usize = 154;
+// Raised 154 -> 155 with the Argo CD admission, and this is the single-honest-absence case rather
+// than the "three or more" one. Argo CD declares `applicationOperationTerminateResponse` as an
+// object with no members, which is exactly the shape `constrains_nothing` refuses, so
+// `argocd-application-terminate-operation` ships declaring nothing rather than a placeholder that
+// would pass this count while carrying none. Its other ten operations all carry schemas. The
+// measured absence is 154, so 155 preserves the single-operation allowance and still refuses the
+// smallest two-operation unschematized arrival.
+const ABSENCE_CEILING: usize = 155;
 
 /// How far [`ABSENCE_CEILING`] may sit above the measured absence. This is the guard's resolution,
 /// and the only number in this file that was chosen rather than read off the catalogue, so it is the

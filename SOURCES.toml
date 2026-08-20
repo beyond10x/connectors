@@ -164,6 +164,16 @@ consumers = ["providers/b10x.toml", "catalog/b10x.catalog.json", "specs/b10x/ont
 note = "The reviewed B10x Provider contract owns the native SIP, audio, and browser driver members plus explicitly selected operations and events from exact Work, Ontology, Planner, Workspaces, and Colab module contracts. The modules retain durable domain-owner identities while implementation source lives in the B10x monorepo or an explicitly retained release pin. Deployment Connections resolve all peers and private HTTP origins, while persistence remains behind each module runtime. The v0alpha1 bytes remain temporarily as migration evidence and are not active Provider inputs. Browser interaction remains outside this surface."
 
 [[source]]
+id = "argocd-openapi"
+kind = "openapi-spec"
+origin = "vendor"
+upstream = "https://github.com/argoproj/argo-cd/blob/v3.5.1/assets/swagger.json"
+refresh = "scripts/vendor-argocd-spec.py"
+pins = "specs/argocd.provenance.toml"
+consumers = ["providers/argocd.toml", "catalog/argocd.catalog.json"]
+note = "Argo CD generates its Swagger from its protobuf services and ships it in the release tag, so the pin is a tag plus a hash and the committed bytes are byte-identical to upstream — the document carries no `example` keyword, which the refresh script asserts rather than assumes. It is Swagger 2.0 and cannot be ingested directly, so providers/argocd.toml reads a reviewed OpenAPI 3 projection of the exact eleven shipped operations, pinned in the same provenance file. The source declares no securityDefinitions at all; the bearer requirement is stated from Argo CD's official API documentation and the script refuses if upstream ever starts declaring its own."
+
+[[source]]
 id = "babelforce-openapi"
 kind = "openapi-spec"
 upstream = "recorded in pins"

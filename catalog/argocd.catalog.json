@@ -1,0 +1,2428 @@
+{
+  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "auth": [
+    {
+      "description": "Argo CD JWT, from `argocd account generate-token` for a local account or from an AppProject role token. Its Argo CD RBAC policy is what bounds this Connection: a token with only `applications, get` cannot sync whatever this catalogue declares. Entered or resolved at the Connector placement and never returned to the caller",
+      "entry": "connect_session",
+      "name": "argocd.api_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "app"
+    }
+  ],
+  "authority": "io.argoproj.argocd.api",
+  "config": [
+    {
+      "approval": "operator",
+      "binds": "endpoint.origin",
+      "docs_url": "https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/",
+      "example": "https://argocd.internal.example",
+      "format": "origin",
+      "help": "The operator-approved HTTPS origin of this Argo CD API server, without an API path. In private deployments this resolves only at the selected local or federated Connector placement",
+      "label": "Argo CD origin",
+      "level": "connection",
+      "name": "origin",
+      "required": true,
+      "secret": false,
+      "service": "default"
+    },
+    {
+      "approval": "none",
+      "binds": "credential.argocd.api_token",
+      "docs_url": "https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/",
+      "format": "token",
+      "help": "Supply this through the selected Connection's custody: local OS keychain, a wired secret provider, or satellite-local storage. The harness can write it but cannot read it back. Scope it in Argo CD's own RBAC to the projects and verbs this Connection should have",
+      "label": "Argo CD API token",
+      "level": "connection",
+      "name": "api_token",
+      "required": true,
+      "secret": true,
+      "service": "default"
+    }
+  ],
+  "connector": "argocd",
+  "default_auth": [
+    [
+      "argocd.api_token"
+    ]
+  ],
+  "description": "Argo CD: inspect Applications, their live resources, drift and sync windows, and sync, roll back or terminate a deployment",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List the Argo CD Applications this token may see, with their sync and health status. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "selector": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "selector",
+            "repo",
+            "appNamespace"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List the Argo CD Applications this token may see, with their sync and health status",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-applications-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Return only the Application with this exact name.",
+          "name": "name",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Kubernetes label selector, such as `env=prod,team=payments`.",
+          "name": "selector",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "symbol": "selector"
+        },
+        {
+          "description": "Return only Applications whose source repository URL matches this value exactly.",
+          "name": "repo",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "symbol": "repo"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resources, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "name",
+            "value": {
+              "$param": "name"
+            }
+          },
+          {
+            "name": "repo",
+            "value": {
+              "$param": "repo"
+            }
+          },
+          {
+            "name": "selector",
+            "value": {
+              "$param": "selector"
+            }
+          }
+        ],
+        "url": "{base}/applications"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "items": {
+            "items": {
+              "description": "One Argo CD Application. The upstream v1alpha1Application definition carries the entire custom resource, including full Helm, Kustomize, plugin and ignore-difference configuration. This projection declares the identity, source, destination and status fields B10x promises and stops there; unlisted fields are still returned by the server.",
+              "properties": {
+                "metadata": {
+                  "properties": {
+                    "name": {
+                      "description": "Application name.",
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "Namespace the Application resource lives in, which is the Argo CD namespace rather than the destination.",
+                      "type": "string"
+                    },
+                    "resourceVersion": {
+                      "description": "Opaque Kubernetes resource version.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "spec": {
+                  "properties": {
+                    "destination": {
+                      "description": "Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.",
+                      "properties": {
+                        "name": {
+                          "description": "Registered cluster name, used instead of `server` when the destination names a cluster.",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Default destination namespace for resources that do not set one.",
+                          "type": "string"
+                        },
+                        "server": {
+                          "description": "API server URL of the destination cluster.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "project": {
+                      "description": "AppProject this Application belongs to.",
+                      "type": "string"
+                    },
+                    "source": {
+                      "description": "Where an Application's desired state comes from. Projected from v1alpha1ApplicationSource.",
+                      "properties": {
+                        "chart": {
+                          "description": "Helm chart name, for a Helm repository source.",
+                          "type": "string"
+                        },
+                        "path": {
+                          "description": "Directory within the repository, for a directory, Kustomize or Jsonnet source.",
+                          "type": "string"
+                        },
+                        "repoURL": {
+                          "description": "Git or Helm/OCI repository URL the manifests are read from.",
+                          "type": "string"
+                        },
+                        "targetRevision": {
+                          "description": "Branch, tag, commit or chart version this Application tracks.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "status": {
+                  "properties": {
+                    "health": {
+                      "description": "Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.",
+                      "properties": {
+                        "lastTransitionTime": {
+                          "description": "RFC 3339 timestamp at which the health status last changed.",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Human-readable explanation of the health status.",
+                          "type": "string"
+                        },
+                        "status": {
+                          "description": "Healthy, Progressing, Degraded, Suspended, Missing or Unknown.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "operationState": {
+                      "description": "Outcome of the most recent sync, rollback or terminate. Projected from v1alpha1OperationState.",
+                      "properties": {
+                        "finishedAt": {
+                          "description": "RFC 3339 timestamp at which the operation finished, absent while it runs.",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Human-readable outcome of the operation.",
+                          "type": "string"
+                        },
+                        "phase": {
+                          "description": "Running, Succeeded, Failed, Error or Terminating.",
+                          "type": "string"
+                        },
+                        "retryCount": {
+                          "description": "Number of times the operation has been retried.",
+                          "type": "integer"
+                        },
+                        "startedAt": {
+                          "description": "RFC 3339 timestamp at which the operation started.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "reconciledAt": {
+                      "description": "RFC 3339 timestamp of the last reconciliation.",
+                      "type": "string"
+                    },
+                    "sync": {
+                      "description": "Projected from v1alpha1SyncStatus.",
+                      "properties": {
+                        "revision": {
+                          "description": "Revision the live state was last compared against.",
+                          "type": "string"
+                        },
+                        "status": {
+                          "description": "Synced, OutOfSync or Unknown.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "properties": {
+              "resourceVersion": {
+                "description": "Opaque Kubernetes list resource version.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Get one Argo CD Application, with its sync status, health and last operation. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "appNamespace"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get one Argo CD Application, with its sync status, health and last operation",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-application-get",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          }
+        ],
+        "url": "{base}/applications/{name}"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "description": "One Argo CD Application. The upstream v1alpha1Application definition carries the entire custom resource, including full Helm, Kustomize, plugin and ignore-difference configuration. This projection declares the identity, source, destination and status fields B10x promises and stops there; unlisted fields are still returned by the server.",
+        "properties": {
+          "metadata": {
+            "properties": {
+              "name": {
+                "description": "Application name.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace the Application resource lives in, which is the Argo CD namespace rather than the destination.",
+                "type": "string"
+              },
+              "resourceVersion": {
+                "description": "Opaque Kubernetes resource version.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "spec": {
+            "properties": {
+              "destination": {
+                "description": "Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.",
+                "properties": {
+                  "name": {
+                    "description": "Registered cluster name, used instead of `server` when the destination names a cluster.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Default destination namespace for resources that do not set one.",
+                    "type": "string"
+                  },
+                  "server": {
+                    "description": "API server URL of the destination cluster.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "project": {
+                "description": "AppProject this Application belongs to.",
+                "type": "string"
+              },
+              "source": {
+                "description": "Where an Application's desired state comes from. Projected from v1alpha1ApplicationSource.",
+                "properties": {
+                  "chart": {
+                    "description": "Helm chart name, for a Helm repository source.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Directory within the repository, for a directory, Kustomize or Jsonnet source.",
+                    "type": "string"
+                  },
+                  "repoURL": {
+                    "description": "Git or Helm/OCI repository URL the manifests are read from.",
+                    "type": "string"
+                  },
+                  "targetRevision": {
+                    "description": "Branch, tag, commit or chart version this Application tracks.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "status": {
+            "properties": {
+              "health": {
+                "description": "Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.",
+                "properties": {
+                  "lastTransitionTime": {
+                    "description": "RFC 3339 timestamp at which the health status last changed.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable explanation of the health status.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Healthy, Progressing, Degraded, Suspended, Missing or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "operationState": {
+                "description": "Outcome of the most recent sync, rollback or terminate. Projected from v1alpha1OperationState.",
+                "properties": {
+                  "finishedAt": {
+                    "description": "RFC 3339 timestamp at which the operation finished, absent while it runs.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable outcome of the operation.",
+                    "type": "string"
+                  },
+                  "phase": {
+                    "description": "Running, Succeeded, Failed, Error or Terminating.",
+                    "type": "string"
+                  },
+                  "retryCount": {
+                    "description": "Number of times the operation has been retried.",
+                    "type": "integer"
+                  },
+                  "startedAt": {
+                    "description": "RFC 3339 timestamp at which the operation started.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "reconciledAt": {
+                "description": "RFC 3339 timestamp of the last reconciliation.",
+                "type": "string"
+              },
+              "sync": {
+                "description": "Projected from v1alpha1SyncStatus.",
+                "properties": {
+                  "revision": {
+                    "description": "Revision the live state was last compared against.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Synced, OutOfSync or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Get the live Kubernetes resources an Application owns, and their health. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "applicationName": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "applicationName",
+            "appNamespace",
+            "project"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get the live Kubernetes resources an Application owns, and their health",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-application-resource-tree",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "applicationName",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "applicationName"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to. Argo CD answers 403 rather than 404 when it does not, which is how it avoids leaking the existence of Applications a caller may not see.",
+          "name": "project",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "project"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "project",
+            "value": {
+              "$param": "project"
+            }
+          }
+        ],
+        "url": "{base}/applications/{applicationName}/resource-tree"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "createdAt": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string"
+                },
+                "health": {
+                  "description": "Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "description": "RFC 3339 timestamp at which the health status last changed.",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "Human-readable explanation of the health status.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "Healthy, Progressing, Degraded, Suspended, Missing or Unknown.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "images": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "parentRefs": {
+                  "items": {
+                    "properties": {
+                      "group": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "uid": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "resourceVersion": {
+                  "type": "string"
+                },
+                "uid": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "orphanedNodes": {
+            "description": "Resources in the destination namespace that no Application manages.",
+            "items": {
+              "properties": {
+                "group": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List the Kubernetes events Argo CD recorded for an Application or one of its resources. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "resourceName": {
+              "type": "string"
+            },
+            "resourceNamespace": {
+              "type": "string"
+            },
+            "resourceUID": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "resourceNamespace",
+            "resourceName",
+            "resourceUID",
+            "appNamespace",
+            "project"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List the Kubernetes events Argo CD recorded for an Application or one of its resources",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-application-events",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Narrow to events about resources in this namespace.",
+          "name": "resourceNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "resourceNamespace"
+        },
+        {
+          "description": "Narrow to events about the resource with this name.",
+          "name": "resourceName",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "resourceName"
+        },
+        {
+          "description": "Narrow to events about the resource with this UID.",
+          "name": "resourceUID",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "type": "string"
+          },
+          "symbol": "resourceUID"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "project"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "project",
+            "value": {
+              "$param": "project"
+            }
+          },
+          {
+            "name": "resourceName",
+            "value": {
+              "$param": "resourceName"
+            }
+          },
+          {
+            "name": "resourceNamespace",
+            "value": {
+              "$param": "resourceNamespace"
+            }
+          },
+          {
+            "name": "resourceUID",
+            "value": {
+              "$param": "resourceUID"
+            }
+          }
+        ],
+        "url": "{base}/applications/{name}/events"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "firstTimestamp": {
+                  "type": "string"
+                },
+                "involvedObject": {
+                  "properties": {
+                    "apiVersion": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "uid": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "lastTimestamp": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "Normal or Warning.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Report whether an Application may sync now, and which sync windows apply to it. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "appNamespace",
+            "project"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Report whether an Application may sync now, and which sync windows apply to it",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-application-syncwindows",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "project"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "project",
+            "value": {
+              "$param": "project"
+            }
+          }
+        ],
+        "url": "{base}/applications/{name}/syncwindows"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "activeWindows": {
+            "items": {
+              "properties": {
+                "duration": {
+                  "description": "How long the window stays open, such as `1h`.",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "allow or deny.",
+                  "type": "string"
+                },
+                "manualSync": {
+                  "description": "Whether a manual sync is permitted during a deny window.",
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "description": "Cron expression at which the window opens.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "assignedWindows": {
+            "items": {
+              "properties": {
+                "duration": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "manualSync": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "canSync": {
+            "description": "Whether a sync is permitted at this moment.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Get the live-versus-target difference for the resources an Application manages. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "applicationName": {
+              "type": "string"
+            },
+            "group": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "applicationName",
+            "namespace",
+            "name",
+            "group",
+            "version",
+            "kind",
+            "appNamespace",
+            "project"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Get the live-versus-target difference for the resources an Application manages",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": false,
+      "id": "argocd-application-managed-resources",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "applicationName",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "applicationName"
+        },
+        {
+          "description": "Narrow the diff to resources in this destination namespace.",
+          "name": "namespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "namespace"
+        },
+        {
+          "description": "Narrow the diff to the resource with this name.",
+          "name": "name",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Narrow the diff to this Kubernetes API group, such as `apps`.",
+          "name": "group",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "type": "string"
+          },
+          "symbol": "group"
+        },
+        {
+          "description": "Narrow the diff to this Kubernetes API version, such as `v1`.",
+          "name": "version",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "type": "string"
+          },
+          "symbol": "version"
+        },
+        {
+          "description": "Narrow the diff to this Kubernetes kind, such as `Deployment`.",
+          "name": "kind",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "type": "string"
+          },
+          "symbol": "kind"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "project"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "group",
+            "value": {
+              "$param": "group"
+            }
+          },
+          {
+            "name": "kind",
+            "value": {
+              "$param": "kind"
+            }
+          },
+          {
+            "name": "name",
+            "value": {
+              "$param": "name"
+            }
+          },
+          {
+            "name": "namespace",
+            "value": {
+              "$param": "namespace"
+            }
+          },
+          {
+            "name": "project",
+            "value": {
+              "$param": "project"
+            }
+          },
+          {
+            "name": "version",
+            "value": {
+              "$param": "version"
+            }
+          }
+        ],
+        "url": "{base}/applications/{applicationName}/managed-resources"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "group": {
+                  "type": "string"
+                },
+                "hook": {
+                  "description": "Whether this resource is a sync hook rather than managed state.",
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "liveState": {
+                  "description": "Serialized manifest of the resource as it exists in the cluster.",
+                  "type": "string"
+                },
+                "modified": {
+                  "description": "Whether live and target state differ.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "normalizedLiveState": {
+                  "description": "Live state after Argo CD's configured normalizations.",
+                  "type": "string"
+                },
+                "predictedLiveState": {
+                  "description": "Live state Argo CD predicts after applying the target state.",
+                  "type": "string"
+                },
+                "resourceVersion": {
+                  "type": "string"
+                },
+                "targetState": {
+                  "description": "Serialized manifest of the resource as the repository declares it.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "List the Argo CD AppProjects this token may see. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List the Argo CD AppProjects this token may see",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": false,
+      "id": "argocd-projects-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Return only the AppProject with this exact name.",
+          "name": "name",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "name",
+            "value": {
+              "$param": "name"
+            }
+          }
+        ],
+        "url": "{base}/projects"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "metadata": {
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "spec": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "destinations": {
+                      "items": {
+                        "description": "Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.",
+                        "properties": {
+                          "name": {
+                            "description": "Registered cluster name, used instead of `server` when the destination names a cluster.",
+                            "type": "string"
+                          },
+                          "namespace": {
+                            "description": "Default destination namespace for resources that do not set one.",
+                            "type": "string"
+                          },
+                          "server": {
+                            "description": "API server URL of the destination cluster.",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "sourceRepos": {
+                      "description": "Repository URLs Applications in this project may deploy from.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Report which Argo CD identity the configured token authenticates as. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Report which Argo CD identity the configured token authenticates as",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": false,
+      "id": "argocd-session-userinfo",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "url": "{base}/session/userinfo"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "iss": {
+            "description": "Issuer that minted the token, `argocd` for a local account or project-role token.",
+            "type": "string"
+          },
+          "loggedIn": {
+            "description": "Whether the request carried a token Argo CD accepted. Argo CD answers 200 with `false` for an anonymous request, so this is an identity report and not a credential check.",
+            "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Sync an Application to the state its repository declares. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "prune": {
+              "type": "boolean"
+            },
+            "revision": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "appNamespace",
+            "dryRun",
+            "project",
+            "prune",
+            "revision"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Sync an Application to the state its repository declares",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": true,
+      "id": "argocd-application-sync",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+            "maxLength": 63,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "Report what the sync would do without applying anything.",
+          "name": "dryRun",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Report what the sync would do without applying anything.",
+            "type": "boolean"
+          },
+          "symbol": "dryRun"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "symbol": "project"
+        },
+        {
+          "description": "Delete live resources that the repository no longer declares.",
+          "name": "prune",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Delete live resources that the repository no longer declares.",
+            "type": "boolean"
+          },
+          "symbol": "prune"
+        },
+        {
+          "description": "Branch, tag or commit to sync to. Absent means the Application's own targetRevision.",
+          "name": "revision",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Branch, tag or commit to sync to. Absent means the Application's own targetRevision.",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "symbol": "revision"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "appNamespace": {
+              "$param": "appNamespace"
+            },
+            "dryRun": {
+              "$param": "dryRun"
+            },
+            "project": {
+              "$param": "project"
+            },
+            "prune": {
+              "$param": "prune"
+            },
+            "revision": {
+              "$param": "revision"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/applications/{name}/sync"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "description": "One Argo CD Application. The upstream v1alpha1Application definition carries the entire custom resource, including full Helm, Kustomize, plugin and ignore-difference configuration. This projection declares the identity, source, destination and status fields B10x promises and stops there; unlisted fields are still returned by the server.",
+        "properties": {
+          "metadata": {
+            "properties": {
+              "name": {
+                "description": "Application name.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace the Application resource lives in, which is the Argo CD namespace rather than the destination.",
+                "type": "string"
+              },
+              "resourceVersion": {
+                "description": "Opaque Kubernetes resource version.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "spec": {
+            "properties": {
+              "destination": {
+                "description": "Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.",
+                "properties": {
+                  "name": {
+                    "description": "Registered cluster name, used instead of `server` when the destination names a cluster.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Default destination namespace for resources that do not set one.",
+                    "type": "string"
+                  },
+                  "server": {
+                    "description": "API server URL of the destination cluster.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "project": {
+                "description": "AppProject this Application belongs to.",
+                "type": "string"
+              },
+              "source": {
+                "description": "Where an Application's desired state comes from. Projected from v1alpha1ApplicationSource.",
+                "properties": {
+                  "chart": {
+                    "description": "Helm chart name, for a Helm repository source.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Directory within the repository, for a directory, Kustomize or Jsonnet source.",
+                    "type": "string"
+                  },
+                  "repoURL": {
+                    "description": "Git or Helm/OCI repository URL the manifests are read from.",
+                    "type": "string"
+                  },
+                  "targetRevision": {
+                    "description": "Branch, tag, commit or chart version this Application tracks.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "status": {
+            "properties": {
+              "health": {
+                "description": "Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.",
+                "properties": {
+                  "lastTransitionTime": {
+                    "description": "RFC 3339 timestamp at which the health status last changed.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable explanation of the health status.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Healthy, Progressing, Degraded, Suspended, Missing or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "operationState": {
+                "description": "Outcome of the most recent sync, rollback or terminate. Projected from v1alpha1OperationState.",
+                "properties": {
+                  "finishedAt": {
+                    "description": "RFC 3339 timestamp at which the operation finished, absent while it runs.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable outcome of the operation.",
+                    "type": "string"
+                  },
+                  "phase": {
+                    "description": "Running, Succeeded, Failed, Error or Terminating.",
+                    "type": "string"
+                  },
+                  "retryCount": {
+                    "description": "Number of times the operation has been retried.",
+                    "type": "integer"
+                  },
+                  "startedAt": {
+                    "description": "RFC 3339 timestamp at which the operation started.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "reconciledAt": {
+                "description": "RFC 3339 timestamp of the last reconciliation.",
+                "type": "string"
+              },
+              "sync": {
+                "description": "Projected from v1alpha1SyncStatus.",
+                "properties": {
+                  "revision": {
+                    "description": "Revision the live state was last compared against.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Synced, OutOfSync or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Terminate the sync or rollback an Application is currently running. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "appNamespace",
+            "project"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Terminate the sync or rollback an Application is currently running",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": false,
+      "id": "argocd-application-terminate-operation",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "project"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "DELETE",
+        "query": [
+          {
+            "name": "appNamespace",
+            "value": {
+              "$param": "appNamespace"
+            }
+          },
+          {
+            "name": "project",
+            "value": {
+              "$param": "project"
+            }
+          }
+        ],
+        "url": "{base}/applications/{name}/operation"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "risk": "medium",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "argocd.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Redeploy a previous revision of an Application over its live state. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/message`, its error code at `/code` in the response body.",
+        "input_schema": {
+          "properties": {
+            "appNamespace": {
+              "type": "string"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "prune": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "appNamespace",
+            "dryRun",
+            "id",
+            "project",
+            "prune"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Redeploy a previous revision of an Application over its live state",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "error_envelope": {
+        "code_pointer": "/code",
+        "message_pointer": "/message"
+      },
+      "expose": false,
+      "id": "argocd-application-rollback",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Application name.",
+          "name": "name",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "name"
+        },
+        {
+          "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+          "name": "appNamespace",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Argo CD namespace holding the Application resource, when apps-in-any-namespace is enabled.",
+            "maxLength": 63,
+            "type": "string"
+          },
+          "symbol": "appNamespace"
+        },
+        {
+          "description": "Report what the rollback would do without applying anything.",
+          "name": "dryRun",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Report what the rollback would do without applying anything.",
+            "type": "boolean"
+          },
+          "symbol": "dryRun"
+        },
+        {
+          "description": "History id of the deployment to roll back to, from `status.history[].id`.",
+          "name": "id",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "description": "History id of the deployment to roll back to, from `status.history[].id`.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "id"
+        },
+        {
+          "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+          "name": "project",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "AppProject the Application is expected to belong to; a mismatch answers 403 rather than 404.",
+            "maxLength": 253,
+            "type": "string"
+          },
+          "symbol": "project"
+        },
+        {
+          "description": "Delete live resources the rolled-back revision does not declare.",
+          "name": "prune",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "description": "Delete live resources the rolled-back revision does not declare.",
+            "type": "boolean"
+          },
+          "symbol": "prune"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "appNamespace": {
+              "$param": "appNamespace"
+            },
+            "dryRun": {
+              "$param": "dryRun"
+            },
+            "id": {
+              "$param": "id"
+            },
+            "project": {
+              "$param": "project"
+            },
+            "prune": {
+              "$param": "prune"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/applications/{name}/rollback"
+      },
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "description": "One Argo CD Application. The upstream v1alpha1Application definition carries the entire custom resource, including full Helm, Kustomize, plugin and ignore-difference configuration. This projection declares the identity, source, destination and status fields B10x promises and stops there; unlisted fields are still returned by the server.",
+        "properties": {
+          "metadata": {
+            "properties": {
+              "name": {
+                "description": "Application name.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace the Application resource lives in, which is the Argo CD namespace rather than the destination.",
+                "type": "string"
+              },
+              "resourceVersion": {
+                "description": "Opaque Kubernetes resource version.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "spec": {
+            "properties": {
+              "destination": {
+                "description": "Cluster and namespace an Application deploys into. Projected from v1alpha1ApplicationDestination.",
+                "properties": {
+                  "name": {
+                    "description": "Registered cluster name, used instead of `server` when the destination names a cluster.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Default destination namespace for resources that do not set one.",
+                    "type": "string"
+                  },
+                  "server": {
+                    "description": "API server URL of the destination cluster.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "project": {
+                "description": "AppProject this Application belongs to.",
+                "type": "string"
+              },
+              "source": {
+                "description": "Where an Application's desired state comes from. Projected from v1alpha1ApplicationSource.",
+                "properties": {
+                  "chart": {
+                    "description": "Helm chart name, for a Helm repository source.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Directory within the repository, for a directory, Kustomize or Jsonnet source.",
+                    "type": "string"
+                  },
+                  "repoURL": {
+                    "description": "Git or Helm/OCI repository URL the manifests are read from.",
+                    "type": "string"
+                  },
+                  "targetRevision": {
+                    "description": "Branch, tag, commit or chart version this Application tracks.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "status": {
+            "properties": {
+              "health": {
+                "description": "Argo CD health assessment. Projected from v1alpha1HealthStatus / v1alpha1AppHealthStatus.",
+                "properties": {
+                  "lastTransitionTime": {
+                    "description": "RFC 3339 timestamp at which the health status last changed.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable explanation of the health status.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Healthy, Progressing, Degraded, Suspended, Missing or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "operationState": {
+                "description": "Outcome of the most recent sync, rollback or terminate. Projected from v1alpha1OperationState.",
+                "properties": {
+                  "finishedAt": {
+                    "description": "RFC 3339 timestamp at which the operation finished, absent while it runs.",
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Human-readable outcome of the operation.",
+                    "type": "string"
+                  },
+                  "phase": {
+                    "description": "Running, Succeeded, Failed, Error or Terminating.",
+                    "type": "string"
+                  },
+                  "retryCount": {
+                    "description": "Number of times the operation has been retried.",
+                    "type": "integer"
+                  },
+                  "startedAt": {
+                    "description": "RFC 3339 timestamp at which the operation started.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "reconciledAt": {
+                "description": "RFC 3339 timestamp of the last reconciliation.",
+                "type": "string"
+              },
+              "sync": {
+                "description": "Projected from v1alpha1SyncStatus.",
+                "properties": {
+                  "revision": {
+                    "description": "Revision the live state was last compared against.",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Synced, OutOfSync or Unknown.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "destructive",
+      "semantic_effects": [],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "sre",
+        "developer"
+      ],
+      "base_url": "{origin}/api/v1",
+      "name": "default",
+      "tags": [
+        "infrastructure",
+        "developer-tools"
+      ]
+    }
+  ],
+  "vendor": "Argo CD",
+  "verify": "argocd-applications-list"
+}
