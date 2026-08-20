@@ -14,9 +14,11 @@ pub use hosted::{
     KubernetesNamespaceAccessConfig,
 };
 pub use personal::{
-    AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,
+    AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, CatalogIntegrationConfig,
+    ConfigError,
     ConnectionConfig, B10xConnectionConfig, B10xIntegrationConfig,
-    GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, OwnerConfig,
+    GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, NetworkScopeConfig,
+    OwnerConfig,
     PersonalConfig, PersonalVoiceConfig, SlackInstanceConfig, SlackInstanceProfile,
     SlackIntegrationConfig,
 };

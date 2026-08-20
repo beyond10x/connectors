@@ -553,6 +553,7 @@ dependencies = [
  "hosted-state",
  "hosted-vault",
  "identity-http",
+ "integration-catalog",
  "integration-b10x",
  "integration-gitlab",
  "integration-jira",
@@ -1785,6 +1786,29 @@ checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
  "block-padding",
  "generic-array",
+]
+
+[[package]]
+name = "integration-catalog"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "catalog",
+ "connector-address",
+ "connector-resolve",
+ "connector-secrets",
+ "connectors-config",
+ "domain",
+ "hex",
+ "protocol",
+ "rustix",
+ "serde_json",
+ "service",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]

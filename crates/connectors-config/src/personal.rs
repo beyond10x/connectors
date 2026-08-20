@@ -43,6 +43,107 @@ pub struct PersonalConfig {
     pub kubernetes: Option<KubernetesIntegrationConfig>,
     #[serde(default)]
     pub b10x: Option<B10xIntegrationConfig>,
+    /// Providers served generically from the catalogue, with no per-provider Rust.
+    #[serde(default)]
+    pub catalog: Vec<CatalogIntegrationConfig>,
+}
+
+/// Which addresses a Connection's destinations may resolve to.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkScopeConfig {
+    /// Public destinations only. The safe default.
+    #[default]
+    Public,
+    /// Operator-selected public or private destinations. Local, link-local, multicast and
+    /// otherwise non-routable answers still refuse.
+    Operator,
+}
+
+/// One catalogued provider this placement offers, and the configuration the catalogue says it needs.
+///
+/// There is deliberately no provider-specific shape here. The catalogue already declares each
+/// provider's credentials, its configuration variables and their approval posture; this carries the
+/// operator's answers and nothing else. A new provider needs a row, not a crate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogIntegrationConfig {
+    /// The catalogue provider id — `gitlab`, `sentry`, `datadog`.
+    pub provider: String,
+    /// A stable name when one placement holds the same provider more than once. Defaults to the
+    /// provider id, which is right for the common case of holding it once.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Human label for the resulting Connection.
+    #[serde(default)]
+    pub label: Option<String>,
+    pub grant_ref: String,
+    pub initiation: InitiationConfig,
+    /// The grant ceiling. Absent or false admits declared reads with no host effect and nothing
+    /// else — writes are refused by name until this is raised deliberately.
+    #[serde(default)]
+    pub allow_writes: bool,
+    /// Values for the `{variable}` slots a provider's declared base URL carries — for a
+    /// self-managed GitLab, `origin`.
+    #[serde(default)]
+    pub endpoints: BTreeMap<String, String>,
+    /// Whether the operator has approved these configuration values.
+    ///
+    /// The catalogue marks some fields as needing deployment approval before they can influence a
+    /// request — a self-managed origin is the shipped case, because pointing a credential at a
+    /// different host than the one that issued it is how a token leaves its network. In the
+    /// personal posture the operator is the deployment, so this is expressible; it is still
+    /// expressed rather than assumed.
+    #[serde(default)]
+    pub operator_approved: bool,
+    /// Which declared credential this Connection supplies. Defaults to the provider's first, which
+    /// is the one a reviewer put first rather than an arbitrary pick.
+    #[serde(default)]
+    pub credential: Option<String>,
+    /// Which network this provider's declared hosts live on.
+    ///
+    /// `public` — the default — admits only public destinations and refuses a private, local or
+    /// reserved answer, which is right for SaaS. A self-managed instance on the operator's own
+    /// network needs `operator`, and that is a deliberate widening: it is the difference between
+    /// "this credential may reach the internet" and "this credential may reach inside my network".
+    /// A self-hosted GitLab resolving to `172.31.x.x` is refused under `public` — correctly, until
+    /// someone says otherwise here.
+    #[serde(default)]
+    pub network: NetworkScopeConfig,
+    /// Owner-only file holding the credential, by path — never a value.
+    ///
+    /// A bootstrap, not the custody: the value is sealed in the SecretStore on first open and the
+    /// file is never read again, so it can be deleted afterwards.
+    #[serde(default)]
+    pub credential_file: Option<PathBuf>,
+}
+
+impl CatalogIntegrationConfig {
+    /// The stable instance name, defaulting to the provider id.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        self.name.as_deref().unwrap_or(&self.provider)
+    }
+
+    /// The human label, defaulting to the instance name.
+    #[must_use]
+    pub fn label(&self) -> String {
+        self.label.clone().unwrap_or_else(|| self.name().to_owned())
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), ConfigError> {
+        if self.provider.is_empty()
+            || !config_ref(&self.grant_ref, 512)
+            || matches!(self.initiation, InitiationConfig::Provider)
+            || self
+                .credential_file
+                .as_deref()
+                .is_some_and(|path| !path.is_absolute())
+        {
+            return Err(ConfigError::Invalid);
+        }
+        Ok(())
+    }
 }
 
 /// Complete deployment selection needed to make the development `sip.dial` member callable.
@@ -460,11 +561,15 @@ impl PersonalConfig {
         if let Some(b10x) = &self.b10x {
             b10x.validate()?;
         }
+        for provider in &self.catalog {
+            provider.validate()?;
+        }
         if voice.is_none()
             && self.slack.is_none()
             && self.grafana.is_none()
             && self.kubernetes.is_none()
             && self.b10x.is_none()
+            && self.catalog.is_empty()
         {
             return Err(ConfigError::Invalid);
         }
