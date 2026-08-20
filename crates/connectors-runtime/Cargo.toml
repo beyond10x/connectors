@@ -27,6 +27,7 @@ members = [
     "../integration-sip",
     "../integration-slack",
     "../monitoring-model",
+    "../state-sqlite",
 ]
 
 [features]

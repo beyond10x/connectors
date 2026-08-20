@@ -1,0 +1,22 @@
+[package]
+name = "state-sqlite"
+description = "SQLite-backed Connector state cells: in-memory for tests, a file for a workstation."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/b10x"
+homepage = "https://github.com/b10x/b10x"
+rust-version = "1.88"
+publish = false
+# Outside the deterministic compiler workspace because it links a bundled C library, and pointed at
+# the composition root that owns every backend.
+workspace = "../connectors-runtime"
+
+[dependencies]
+connector-state = { version = "0.1.0", path = "../connector-state" }
+# `bundled` so the build carries its own SQLite: the connectors image is distroless and has no
+# system libsqlite3. Same crate and version as `substrate` and `identity`.
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"

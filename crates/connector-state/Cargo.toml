@@ -1,0 +1,15 @@
+[package]
+name = "connector-state"
+description = "Where an Integration's durable state lives, as a port: bounded keyed byte cells over memory, SQLite, or PostgreSQL."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Nothing else. This crate is the port and its in-memory backend: no transport, no database driver,
+# no filesystem. That is what lets every consumer depend on it without inheriting a backend.
+thiserror.workspace = true

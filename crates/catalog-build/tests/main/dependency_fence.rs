@@ -98,6 +98,11 @@ const HOST_LIBRARIES: &[&str] = &[
     // will carry one lives in the platform family. It is not in `COMPILER_CRATES` because nothing
     // in the build path depends on it, and it is not in `NETWORK_CRATES` because it may not dial.
     "connector-resolve",
+    // Where durable state lives, as a port, plus its in-memory backend. It has one dependency
+    // (`thiserror`) and no transport at all — the SQLite and PostgreSQL backends are separate
+    // crates outside this workspace, which is the whole point of the port being here and them
+    // not being.
+    "connector-state",
     // Protocol-neutral proof types and their wire projection. They are shared by runtime
     // composition, but neither belongs to the catalogue compiler nor owns I/O.
     "domain",

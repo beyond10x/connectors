@@ -21,6 +21,7 @@ members = [
     "crates/catalog",
     "crates/connector-resolve",
     "crates/connector-secrets",
+    "crates/connector-state",
     "crates/connectors-client",
     "crates/catalog-build",
     # The repository-maintenance CLI. Workspace-internal: it is how the catalogue is rebuilt and
@@ -43,6 +44,7 @@ exclude = [
     "crates/driver-cdp",
     "crates/driver-sip",
     "crates/rtvbp-voice-endpoint",
+    "crates/state-sqlite",
     "crates/voice-runtime",
     "crates/hosted-state",
     "crates/connectors-config",

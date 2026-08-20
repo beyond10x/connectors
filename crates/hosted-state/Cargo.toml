@@ -11,5 +11,6 @@ publish = false
 workspace = "../connectors-runtime"
 
 [dependencies]
+connector-state = { version = "0.1.0", path = "../connector-state" }
 postgres = "0.19"
 thiserror = "2"
