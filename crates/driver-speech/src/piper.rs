@@ -1,7 +1,9 @@
 //! The one shipped [`SpeechEngine`]: a local neural synthesizer driven as a subprocess.
 //!
-//! This is the *speech* implementation. It produces PCM and hands it to [`crate::device`], which is
-//! the only code here that knows a sound stack exists.
+//! This is the *speech* implementation. It produces PCM and hands it to a
+//! [`domain::audio::AudioDevice`] it was given. It resolves no sink and spawns no playback command:
+//! `driver-audio` is the only code that knows a sound stack exists, and this crate cannot tell
+//! whether the device it writes to has a speaker behind it.
 //!
 //! The synthesizer product is named here, in its configuration values, and in the recorded engine
 //! identity. It is named in no `domain`, `protocol`, or `service` type. A network-backed engine, if
@@ -17,12 +19,13 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use domain::audio::AudioSink;
+use domain::audio::{AudioDevice, AudioPlayback, PcmFormat};
+use driver_audio::{discover_executable, executable_at};
 use sha2::{Digest, Sha256};
 
-use crate::device::{discover_executable, executable_at, resolve_sink, sink_arguments};
 use crate::speech::{
     SpeechAttestation, SpeechCancellation, SpeechEngine, SpeechEngineError, SpeechOutcome,
     Utterance,
@@ -58,24 +61,29 @@ pub struct PiperConfig {
     /// An optional digest pin. The digest is always computed and recorded; a pin additionally
     /// refuses on mismatch.
     pub voice_sha256: Option<String>,
-    /// An explicit sink. When absent, the candidates are probed in order, once.
-    pub sink: Option<AudioSink>,
     /// The wall-clock bound on one utterance.
     pub maximum_utterance: Duration,
 }
 
 /// A local neural speech synthesizer driven over stdin/stdout.
+///
+/// It produces PCM and hands it to a device it was given. It resolves no sink, spawns no playback
+/// command, and cannot tell whether the device it writes to has a speaker behind it.
 pub struct PiperSpeechEngine {
     config: PiperConfig,
+    device: Arc<dyn AudioDevice>,
     attestation: Option<SpeechAttestation>,
 }
 
 impl PiperSpeechEngine {
-    /// Bind one deployment-selected configuration. Nothing is resolved until `probe`.
+    /// Bind one deployment-selected configuration to the device it will play through.
+    ///
+    /// Nothing is resolved until `probe`.
     #[must_use]
-    pub const fn new(config: PiperConfig) -> Self {
+    pub fn new(config: PiperConfig, device: Arc<dyn AudioDevice>) -> Self {
         Self {
             config,
+            device,
             attestation: None,
         }
     }
@@ -100,15 +108,6 @@ impl PiperSpeechEngine {
                 path: SYNTHESIZER_EXECUTABLE.to_owned(),
                 reason: "not found in any absolute PATH directory".to_owned(),
             }
-        })
-    }
-
-    fn resolve_sink(&self) -> Result<(AudioSink, PathBuf), SpeechEngineError> {
-        resolve_sink(self.config.sink).ok_or_else(|| SpeechEngineError::SinkUnavailable {
-            reason: self.config.sink.map_or_else(
-                || "none of `pw-play`, `paplay`, or `aplay` is on PATH".to_owned(),
-                |sink| format!("`{}` is not on PATH", crate::device::sink_executable(sink)),
-            ),
         })
     }
 
@@ -156,7 +155,10 @@ impl SpeechEngine for PiperSpeechEngine {
                 reason,
             }
         })?;
-        let (sink, sink_path) = self.resolve_sink()?;
+        // The device is asked what it is rather than probed for: on a host with no sound stack this
+        // records an absent one and synthesis still runs, which is the headless case working rather
+        // than a refusal.
+        let device = self.device.description();
         let attestation = SpeechAttestation {
             engine: ENGINE_ID.to_owned(),
             synthesizer_path: synthesizer.display().to_string(),
@@ -167,8 +169,8 @@ impl SpeechEngine for PiperSpeechEngine {
             voice_config_path: voice_config.display().to_string(),
             sample_rate_hz,
             channels: 1,
-            sink,
-            sink_path: sink_path.display().to_string(),
+            sink: device.stack,
+            sink_path: device.path,
         };
         self.attestation = Some(attestation.clone());
         Ok(attestation)
@@ -199,18 +201,19 @@ impl SpeechEngine for PiperSpeechEngine {
                 reason: error.to_string(),
             })?;
 
-        let mut sink = Command::new(&attestation.sink_path)
-            .args(sink_arguments(attestation.sink, attestation.sample_rate_hz))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|error| {
+        // The voice's own rate, never a constant — see `read_voice_configuration`.
+        let mut playback = match self
+            .device
+            .open_playback(PcmFormat::mono(attestation.sample_rate_hz))
+        {
+            Ok(playback) => playback,
+            Err(error) => {
                 terminate(&mut synthesizer);
-                SpeechEngineError::SinkUnavailable {
-                    reason: format!("`{}`: {error}", attestation.sink_path),
-                }
-            })?;
+                return Err(SpeechEngineError::SinkUnavailable {
+                    reason: error.to_string(),
+                });
+            }
+        };
 
         let write_result = synthesizer.stdin.take().map_or_else(
             || Err("synthesizer stdin was not captured".to_owned()),
@@ -225,13 +228,14 @@ impl SpeechEngine for PiperSpeechEngine {
         );
         if let Err(reason) = write_result {
             terminate(&mut synthesizer);
-            terminate(&mut sink);
+            // Dropped rather than drained: the tail must not play after a refusal.
+            drop(playback);
             return Err(SpeechEngineError::Refused { reason });
         }
 
         let outcome = pump(
             &mut synthesizer,
-            &mut sink,
+            playback.as_mut(),
             cancellation,
             started,
             self.config.maximum_utterance,
@@ -240,24 +244,22 @@ impl SpeechEngine for PiperSpeechEngine {
             Ok(bytes) => bytes,
             Err(error) => {
                 terminate(&mut synthesizer);
-                terminate(&mut sink);
+                drop(playback);
                 return Err(error);
             }
         };
 
         // Draining first lets the device finish the tail; the synthesizer is already done.
         let synthesizer_status = synthesizer.wait().ok();
-        let sink_status = sink.wait().ok();
+        let drained = playback.finish();
         if synthesizer_status.is_some_and(|status| !status.success()) {
             return Err(SpeechEngineError::Refused {
                 reason: "synthesizer exited with a failure status".to_owned(),
             });
         }
-        if sink_status.is_some_and(|status| !status.success()) {
-            return Err(SpeechEngineError::Refused {
-                reason: "audio sink exited with a failure status".to_owned(),
-            });
-        }
+        drained.map_err(|error| SpeechEngineError::SinkUnavailable {
+            reason: error.to_string(),
+        })?;
 
         Ok(SpeechOutcome {
             engine: ENGINE_ID.to_owned(),
@@ -270,17 +272,17 @@ impl SpeechEngine for PiperSpeechEngine {
     }
 }
 
-/// Moves audio from the synthesizer into the sink while remaining cancellable.
+/// Moves audio from the synthesizer into the device while remaining cancellable.
 ///
-/// Letting the two children share a pipe directly would be simpler, but then neither the byte
-/// count nor a cancellation could be observed until the utterance had already been played.
+/// Letting the synthesizer write to a device pipe directly would be simpler, but then neither the
+/// byte count nor a cancellation could be observed until the utterance had already been played.
 ///
 /// Cancellation and the wall-clock bound are observed between chunks, so the worst-case latency is
 /// one blocking read: sub-second once audio is flowing, and about as long as model loading takes
 /// before the first chunk arrives.
 fn pump(
     synthesizer: &mut Child,
-    sink: &mut Child,
+    destination: &mut dyn AudioPlayback,
     cancellation: &SpeechCancellation,
     started: Instant,
     maximum: Duration,
@@ -290,12 +292,6 @@ fn pump(
         .take()
         .ok_or_else(|| SpeechEngineError::Refused {
             reason: "synthesizer stdout was not captured".to_owned(),
-        })?;
-    let mut destination = sink
-        .stdin
-        .take()
-        .ok_or_else(|| SpeechEngineError::Refused {
-            reason: "audio sink stdin was not captured".to_owned(),
         })?;
     let mut buffer = vec![0_u8; PUMP_CHUNK_BYTES];
     let mut audio_bytes = 0_u64;
@@ -318,13 +314,12 @@ fn pump(
             break;
         }
         destination
-            .write_all(&buffer[..read])
+            .write(&buffer[..read])
             .map_err(|error| SpeechEngineError::Refused {
-                reason: format!("writing to the audio sink failed: {error}"),
+                reason: format!("writing to the audio device failed: {error}"),
             })?;
         audio_bytes = audio_bytes.saturating_add(read as u64);
     }
-    drop(destination);
     Ok(audio_bytes)
 }
 
@@ -394,9 +389,15 @@ fn readable_file(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write as _;
-
     use super::*;
+
+    /// The device every test here runs against: no sound stack, no subprocess, no sound.
+    ///
+    /// Before the split this was impossible — the engine resolved `pw-play` itself, so synthesis on
+    /// a host without one exercised a different path than the one that ships.
+    fn headless() -> Arc<dyn AudioDevice> {
+        Arc::new(driver_audio::NullAudioDevice::new())
+    }
 
     fn write(directory: &Path, name: &str, body: &str) -> PathBuf {
         let path = directory.join(name);
@@ -473,9 +474,8 @@ mod tests {
             voice: PathBuf::from("/nonexistent/voice.onnx"),
             voice_config: None,
             voice_sha256: None,
-            sink: None,
             maximum_utterance: Duration::from_secs(1),
-        });
+        }, headless());
         let error = engine
             .resolve_synthesizer()
             .expect_err("absent synthesizer");
@@ -497,9 +497,8 @@ mod tests {
             voice: PathBuf::from("/voices/en_US-ryan-high.onnx"),
             voice_config: None,
             voice_sha256: None,
-            sink: None,
             maximum_utterance: Duration::from_secs(1),
-        });
+        }, headless());
         assert_eq!(
             engine.voice_config_path(),
             PathBuf::from("/voices/en_US-ryan-high.onnx.json")
@@ -524,11 +523,16 @@ mod tests {
 ///
 /// ```text
 /// B10X_AUDIO_VOICE=/absolute/path/voice.onnx \
-///   cargo test --manifest-path crates/driver-audio/Cargo.toml -- --ignored --nocapture
+///   cargo test --manifest-path crates/driver-speech/Cargo.toml -- --ignored --nocapture
 /// ```
 #[cfg(test)]
 mod live {
     use super::*;
+
+    /// The real stack, because being audible is the whole point of this suite.
+    fn speaker() -> Arc<dyn AudioDevice> {
+        driver_audio::local_device(None)
+    }
 
     fn configured() -> Option<PiperConfig> {
         let voice = std::env::var_os("B10X_AUDIO_VOICE").map(PathBuf::from)?;
@@ -537,7 +541,6 @@ mod live {
             voice,
             voice_config: None,
             voice_sha256: None,
-            sink: None,
             maximum_utterance: Duration::from_secs(60),
         })
     }
@@ -548,7 +551,7 @@ mod live {
         let Some(config) = configured() else {
             panic!("set B10X_AUDIO_VOICE to an absolute voice path");
         };
-        let mut engine = PiperSpeechEngine::new(config);
+        let mut engine = PiperSpeechEngine::new(config, speaker());
         let attestation = engine.probe().expect("probe");
         assert_eq!(attestation.engine, ENGINE_ID);
         assert_eq!(attestation.channels, 1);
@@ -571,7 +574,7 @@ mod live {
         let Some(config) = configured() else {
             panic!("set B10X_AUDIO_VOICE to an absolute voice path");
         };
-        let mut engine = PiperSpeechEngine::new(config);
+        let mut engine = PiperSpeechEngine::new(config, speaker());
         engine.probe().expect("probe");
         let utterance = Utterance::new("B10x speech is online.", 1_000).expect("utterance");
         let outcome = engine

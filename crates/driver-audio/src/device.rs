@@ -57,6 +57,70 @@ pub fn sink_arguments(sink: AudioSink, sample_rate_hz: u32) -> Vec<String> {
     }
 }
 
+/// The executable a stack family is **captured** through.
+///
+/// The read direction of the same three stacks. Each family ships its recorder under its own name,
+/// so this is a lookup rather than a mode flag on [`sink_executable`].
+#[must_use]
+pub const fn capture_executable(sink: AudioSink) -> &'static str {
+    match sink {
+        AudioSink::PipeWire => "pw-record",
+        AudioSink::PulseAudio => "parecord",
+        AudioSink::Alsa => "arecord",
+    }
+}
+
+/// The arguments that capture signed 16-bit little-endian mono audio at `sample_rate_hz` to stdout.
+///
+/// Every recorder is told the rate explicitly, for the same reason playback is: the rate belongs to
+/// whatever will consume the audio, not to the device. `--raw` / `-t raw` is load-bearing on all
+/// three — `parecord` and `arecord` both default to writing a **WAV header**, and a 44-byte header
+/// interpreted as samples is a click followed by permanently offset frame boundaries.
+#[must_use]
+pub fn capture_arguments(sink: AudioSink, sample_rate_hz: u32) -> Vec<String> {
+    match sink {
+        AudioSink::PipeWire => vec![
+            "--raw".to_owned(),
+            format!("--rate={sample_rate_hz}"),
+            "--channels=1".to_owned(),
+            "--format=s16".to_owned(),
+            "-".to_owned(),
+        ],
+        AudioSink::PulseAudio => vec![
+            "--raw".to_owned(),
+            "--format=s16le".to_owned(),
+            format!("--rate={sample_rate_hz}"),
+            "--channels=1".to_owned(),
+        ],
+        AudioSink::Alsa => vec![
+            "-q".to_owned(),
+            "-t".to_owned(),
+            "raw".to_owned(),
+            "-f".to_owned(),
+            "S16_LE".to_owned(),
+            "-r".to_owned(),
+            sample_rate_hz.to_string(),
+            "-c".to_owned(),
+            "1".to_owned(),
+            "-".to_owned(),
+        ],
+    }
+}
+
+/// Resolve the first capture family present on this machine, in the fixed candidate order.
+///
+/// Separate from [`resolve_sink`] rather than derived from it: a machine can have a working speaker
+/// and no microphone, and resolving one direction must not claim the other.
+#[must_use]
+pub fn resolve_capture(explicit: Option<AudioSink>) -> Option<(AudioSink, PathBuf)> {
+    if let Some(sink) = explicit {
+        return discover_executable(capture_executable(sink)).map(|path| (sink, path));
+    }
+    AudioSink::candidates()
+        .into_iter()
+        .find_map(|sink| discover_executable(capture_executable(sink)).map(|path| (sink, path)))
+}
+
 /// Resolve the first sink family present on this machine, in the fixed candidate order.
 ///
 /// Returns the family **and the exact path it was found at**. A caller must execute that path
@@ -111,6 +175,41 @@ mod tests {
                 arguments.contains("16000"),
                 "{sink:?} dropped the sample rate: {arguments}"
             );
+        }
+    }
+
+    #[test]
+    fn every_recorder_is_told_the_rate_explicitly() {
+        for sink in AudioSink::candidates() {
+            let arguments = capture_arguments(sink, 8_000).join(" ");
+            assert!(
+                arguments.contains("8000"),
+                "{sink:?} dropped the capture rate: {arguments}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_recorder_is_forced_out_of_its_container_format() {
+        // `parecord` and `arecord` both default to a WAV header. Forty-four bytes of header read as
+        // samples is a click, and then every frame boundary after it is wrong — audible as noise,
+        // never as a failure.
+        for sink in AudioSink::candidates() {
+            let arguments = capture_arguments(sink, 8_000);
+            assert!(
+                arguments.iter().any(|argument| argument == "--raw")
+                    || arguments.windows(2).any(|pair| pair == ["-t", "raw"]),
+                "{sink:?} would emit a container header: {arguments:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn capture_and_playback_are_different_executables_per_stack() {
+        // The read direction is a separate binary per family, not a flag: resolving one and
+        // assuming the other is what would make a machine with a speaker claim a microphone.
+        for sink in AudioSink::candidates() {
+            assert_ne!(capture_executable(sink), sink_executable(sink));
         }
     }
 

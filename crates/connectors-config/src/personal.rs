@@ -1099,9 +1099,9 @@ impl PersonalVoiceConfig {
             .map_err(|_| ConfigError::Invalid)
     }
 
-    /// Build the admitted application route; the TCP/TLS target remains in the connector object.
-    #[must_use]
     /// The application-channel route, when this Connection carries a call onward to one.
+    ///
+    /// The TCP/TLS target stays in the connector object; only the route is built here.
     ///
     /// `None` is a raw SIP Connection: the call is established and terminated at the edge, and no
     /// application channel is involved.

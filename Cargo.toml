@@ -41,10 +41,12 @@ members = [
 # workspace directly.
 exclude = [
     "crates/driver-audio",
+    "crates/driver-speech",
     "crates/driver-cdp",
     "crates/driver-sip",
     "crates/rtvbp-voice-endpoint",
     "crates/state-sqlite",
+    "crates/voice-local-audio",
     "crates/voice-runtime",
     "crates/hosted-state",
     "crates/connectors-config",

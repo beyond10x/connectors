@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use connector_resolve::document::{Document, ProtocolDriver};
 use connectors_config::B10xIntegrationConfig;
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
-use driver_audio::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
+use driver_speech::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use driver_cdp::LocalBrowserDriver;
 use protocol::audio::{SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION};
 use protocol::browser::{
@@ -460,7 +460,7 @@ impl B10xBackend {
             };
             let mut driver = lock(&state);
             if driver.is_none() {
-                let mut engine = driver_audio::engine_for(&admitted);
+                let mut engine = driver_speech::engine_for(&admitted);
                 let attestation = engine.probe().map_err(|_| unavailable())?;
                 *driver = Some(
                     LocalSpeechDriver::new(

@@ -11,19 +11,26 @@
 //! This launcher is the missing arm — the one that stops after establishing, because there is
 //! nowhere the call is being carried onward to.
 //!
-//! # What it deliberately does not do yet
+//! # The call is audible on the machine that placed it
 //!
-//! **Nothing consumes the media.** The call connects, SDP is negotiated and RTP flows, and the
-//! frames arrive at a session nobody reads. That is honest for this slice and it is not the end
-//! state: hearing a call on the machine that placed it needs a duplex binding between
-//! [`TelephonySession::read_input`] / [`TelephonySession::write_output`] and the local audio device,
-//! and **no capture path exists anywhere in the tree** — `driver-audio` is text-to-speech, output
-//! only, through `pw-play`. That binding is its own piece of work, and it is named here rather than
-//! faked.
+//! Establishing alone left the media going nowhere: RTP flowed to a session nobody read. So the
+//! launcher binds the session to this host's speaker and microphone through `voice-local-audio`,
+//! which names no protocol — it carries a [`TelephonySession`], and RTVBP produces one of those
+//! too.
+//!
+//! A host with no sound stack binds `driver_audio::NullAudioDevice` instead, which is chosen by
+//! `driver_audio::local_device` rather than branched on here. The call still connects; nobody hears
+//! it, and the deployment said so by not having a device.
+//!
+//! **The binding is not allowed to take the call down.** If the device refuses — no microphone, a
+//! stack that disappeared between probe and use — the call stays up and unbound. Refusing to
+//! establish a working call because the local speaker is busy would be the wrong trade for a
+//! telephony operation whose contract is the call, not the audio.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use domain::audio::AudioDevice;
 use domain::voice::{TelephonySession, TerminationReason};
 use service::{AdmittedSipPlan, AdmittedVoicePlan, CredentialSet};
 use tokio::sync::watch;
@@ -32,16 +39,32 @@ use voice_runtime::VoiceSessionControl;
 
 use crate::backend::{LaunchError, LaunchedSession, SessionLauncher};
 
-/// Establishes SIP calls that terminate at the edge.
+/// Establishes SIP calls that terminate at the edge, audible on this machine.
 pub struct SipLauncher {
     /// Credentials the trunk may require. Empty for a peer that does not authenticate.
     credentials: CredentialSet,
+    /// The speaker and microphone a call is carried to. Real where this host has a sound stack,
+    /// silent where it does not — the launcher does not know which, by construction.
+    device: Arc<dyn AudioDevice>,
 }
 
 impl SipLauncher {
+    /// Bind the trunk credentials and this host's own audio device.
     #[must_use]
     pub fn new(credentials: CredentialSet) -> Self {
-        Self { credentials }
+        Self::with_device(credentials, driver_audio::local_device(None))
+    }
+
+    /// Bind a device the caller chose.
+    ///
+    /// The seam a headless deployment and every test use: pass
+    /// `driver_audio::NullAudioDevice` and a call runs end to end with no sound stack present.
+    #[must_use]
+    pub fn with_device(credentials: CredentialSet, device: Arc<dyn AudioDevice>) -> Self {
+        Self {
+            credentials,
+            device,
+        }
     }
 }
 
@@ -83,6 +106,11 @@ impl SessionLauncher for SipLauncher {
             state: protocol::sip::SipDialState::Established,
         };
 
+        // Carry the media to this machine. A device refusal leaves the call up and unbound rather
+        // than tearing down a working call over a busy speaker — the operation's contract is the
+        // call, and the binding is what makes it audible, not what makes it succeed.
+        let binding = voice_local_audio::bind(Arc::clone(&session), self.device.as_ref()).ok();
+
         // The call outlives this call, so its terminal fact is published by a task that waits for
         // the driver's own answer rather than inferring one from media or signal EOF.
         let supervised = Arc::clone(&session);
@@ -91,6 +119,11 @@ impl SessionLauncher for SipLauncher {
                 .wait_terminated()
                 .await
                 .unwrap_or(TerminationReason::TransportLost);
+            // Released on the driver's terminal fact, so the recorder never outlives the call it
+            // was opened for.
+            if let Some(binding) = binding {
+                binding.stop();
+            }
             completion_sender.send_replace(Some(crate::runtime::termination(reason)));
         });
 
@@ -105,6 +138,34 @@ impl SessionLauncher for SipLauncher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn a_host_with_no_sound_stack_still_composes_a_launcher() {
+        // The deployment seam: `local_device` answers with silence rather than failing, so a server
+        // with no sound card composes the same launcher a workstation does. If this ever became a
+        // refusal, every headless deployment would lose `sip.dial` entirely.
+        let launcher = SipLauncher::new(CredentialSet::default());
+        launcher
+            .ready()
+            .await
+            .expect("composition never depends on a sound card");
+        assert!(
+            launcher.device.description().stack.is_none()
+                || !launcher.device.description().path.is_empty(),
+            "the bound device always describes itself"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_chosen_device_is_the_one_bound() {
+        // The seam a headless deployment and every test use, asserted rather than assumed.
+        let launcher = SipLauncher::with_device(
+            CredentialSet::default(),
+            Arc::new(driver_audio::NullAudioDevice::new()),
+        );
+        assert_eq!(launcher.device.description().path, "null");
+        assert_eq!(launcher.device.description().stack, None);
+    }
 
     #[tokio::test]
     async fn readiness_contacts_nothing() {
