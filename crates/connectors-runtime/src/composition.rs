@@ -11,6 +11,7 @@ use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
+use integration_catalog::{CatalogBackend, CatalogIntegrationError};
 use integration_b10x::{B10xBackend, B10xIntegrationError};
 use integration_gitlab::GitlabBackend;
 use integration_jira::JiraBackend;
@@ -58,6 +59,8 @@ pub enum RuntimeError {
     KubernetesLocal(#[from] integration_kubernetes::KubernetesLocalError),
     #[error(transparent)]
     B10x(#[from] B10xIntegrationError),
+    #[error(transparent)]
+    CatalogIntegration(#[from] CatalogIntegrationError),
     #[error(transparent)]
     Identity(#[from] identity_http::IdentityVerifierConfigError),
     #[error(transparent)]
@@ -136,22 +139,41 @@ impl PersonalRuntime {
         let mut kubernetes_candidates = None;
         let mut kubernetes_connections = None;
         let mut b10x_configured = false;
+        let mut catalog_connections = None;
 
         if let Some(config_path) = config_path {
             let config = PersonalConfig::read(config_path)?;
             let owner = config.principal_context()?;
             let stores = if let Some(stores) = supplied_stores {
                 Some(stores)
-            } else if config.slack.is_some() || config.grafana.is_some() {
-                let prepared: Arc<dyn PreparedSecretStore> = if config.slack.is_some() {
-                    Arc::new(
+            } else if config.slack.is_some()
+                || config.grafana.is_some()
+                || !config.catalog.is_empty()
+            {
+                // **One store, opened once.** `FileStore` takes an exclusive lock on its file, so
+                // opening `credentials.store` twice — once for the prepared consumer and once for
+                // the value consumer — fails the second open and the whole daemon reports only
+                // "the personal credential store could not be opened". Both handles are the same
+                // store because they are the same file.
+                let durable = if config.slack.is_some() || !config.catalog.is_empty() {
+                    Some(Arc::new(
                         FileStore::open(state_root.join("credentials.store"))
                             .map_err(|_| RuntimeError::CredentialStore)?,
-                    )
+                    ))
                 } else {
-                    Arc::new(MemoryStore::new())
+                    None
                 };
-                let monitoring: Arc<dyn SecretStore> = Arc::new(MemoryStore::new());
+                let prepared: Arc<dyn PreparedSecretStore> = match durable.clone() {
+                    Some(store) => store,
+                    None => Arc::new(MemoryStore::new()),
+                };
+                // Catalogued providers keep their credential across a restart, so the operator can
+                // delete the file it was imported from. Grafana's own store stays in memory because
+                // its credential is re-entered through a Connect Session each time.
+                let monitoring: Arc<dyn SecretStore> = match durable {
+                    Some(store) if !config.catalog.is_empty() => store,
+                    _ => Arc::new(MemoryStore::new()),
+                };
                 Some(PersonalCredentialStores::new(prepared, monitoring))
             } else {
                 None
@@ -198,6 +220,42 @@ impl PersonalRuntime {
                 )?));
                 b10x_configured = true;
             }
+            // Every provider the catalogue declares, served by one adapter. Composed before Slack
+            // for the same reason everything else is: it can still fail, and a failed composition
+            // must not leave Slack's supervision tasks running.
+            if !config.catalog.is_empty() {
+                let store = stores
+                    .as_ref()
+                    .expect("credential consumer selected the shared store")
+                    .monitoring
+                    .clone();
+                let mut rules = Vec::new();
+                for entry in &config.catalog {
+                    // The scope is the provider's, not the deployment's: one placement may hold a
+                    // public SaaS and a self-hosted instance at once, and widening the aperture for
+                    // the second must not widen it for the first.
+                    let scope = match entry.network {
+                        connectors_config::NetworkScopeConfig::Public => AddressScope::Public,
+                        connectors_config::NetworkScopeConfig::Operator => {
+                            AddressScope::OperatorNetwork
+                        }
+                    };
+                    for origin in integration_catalog::admitted_origins(entry)? {
+                        rules.push(DestinationRule::exact_origin(&origin, scope)?);
+                    }
+                }
+                let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+                let backend = CatalogBackend::open(
+                    owner.clone(),
+                    &config.catalog,
+                    &state_root,
+                    store,
+                    egress,
+                )
+                .await?;
+                catalog_connections = Some(backend.connection_count());
+                backends.push(Arc::new(backend));
+            }
             // Slack starts background supervision, so construct it only after every adapter whose
             // constructor can still fail. This keeps failed composition from leaking live tasks.
             if let Some(slack) = config.slack {
@@ -243,6 +301,8 @@ impl PersonalRuntime {
             "kubernetes_candidates": kubernetes_candidates,
             "kubernetes_connections": kubernetes_connections,
             "b10x_configured": b10x_configured,
+            "catalog_configured": catalog_connections.is_some(),
+            "catalog_connections": catalog_connections,
         });
         Ok(Self { daemon, readiness })
     }

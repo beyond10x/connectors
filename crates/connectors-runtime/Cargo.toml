@@ -21,6 +21,7 @@ members = [
     "../integration-kubernetes",
     "../integration-gitlab",
     "../integration-jira",
+    "../integration-catalog",
     "../integration-b10x",
     "../integration-monitoring",
     "../integration-sip",
@@ -46,6 +47,7 @@ identity-http = { version = "0.1.0", path = "../identity-http" }
 integration-kubernetes = { version = "0.1.0", path = "../integration-kubernetes" }
 integration-gitlab = { version = "0.1.0", path = "../integration-gitlab" }
 integration-jira = { version = "0.1.0", path = "../integration-jira" }
+integration-catalog = { version = "0.1.0", path = "../integration-catalog" }
 integration-b10x = { version = "0.1.0", path = "../integration-b10x" }
 integration-monitoring = { version = "0.1.0", path = "../integration-monitoring" }
 integration-sip = { version = "0.1.0", path = "../integration-sip" }
