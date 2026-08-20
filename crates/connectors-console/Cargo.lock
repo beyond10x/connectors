@@ -269,6 +269,8 @@ version = "0.1.0"
 dependencies = [
  "catalog",
  "clap",
+ "connector-address",
+ "connector-secrets",
  "connectors-client",
  "connectors-config",
  "hex",

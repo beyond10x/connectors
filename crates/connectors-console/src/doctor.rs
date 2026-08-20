@@ -284,22 +284,50 @@ fn check_daemon(state_root: &Path) -> Check {
 /// is a real guarantee against another user and no guarantee at all against a copied backup, so it
 /// is reported as a warning rather than passed over in silence.
 fn check_credential_store(state_root: &Path) -> Check {
-    let store = state_root.join("credentials.store");
-    if store.exists() {
-        return Check::new(
+    let file = state_root.join("credentials.store");
+    let keyring = which("secret-tool").is_some();
+    match (keyring, file.exists()) {
+        // Both: the keyring is what new credentials go to, and the file is the two-phase store
+        // Slack still uses. Saying so beats reporting only the better one.
+        (true, true) => Check::new(
             "credential-store",
             Status::Warn,
             format!(
-                "{} holds credentials protected by file ownership only — not encrypted at rest",
-                store.display()
+                "OS keyring for values; {} still holds Slack's two-phase store, protected by file \
+                 ownership only and not encrypted at rest",
+                file.display()
             ),
-        );
+        ),
+        (true, false) => Check::new(
+            "credential-store",
+            Status::Ok,
+            "OS keyring (freedesktop Secret Service)",
+        ),
+        (false, true) => Check::new(
+            "credential-store",
+            Status::Warn,
+            format!(
+                "{} holds credentials protected by file ownership only — not encrypted at rest. \
+                 Install `secret-tool` (libsecret) to use the OS keyring instead",
+                file.display()
+            ),
+        ),
+        (false, false) => Check::new(
+            "credential-store",
+            Status::Warn,
+            "no OS keyring: `secret-tool` (libsecret) is not installed, so credentials would be \
+             stored in an unencrypted owner-only file",
+        ),
     }
-    Check::new(
-        "credential-store",
-        Status::Ok,
-        "no credentials stored locally yet",
-    )
+}
+
+/// Whether a program is on `PATH`. Presence only — the store itself decides whether the service
+/// behind it answers.
+fn which(program: &str) -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|directory| directory.join(program))
+        .find(|candidate| candidate.is_file())
 }
 
 #[cfg(test)]

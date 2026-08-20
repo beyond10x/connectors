@@ -614,6 +614,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "connector-state"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "connectors-cli"
 version = "0.1.0"
 dependencies = [
@@ -663,6 +670,8 @@ version = "0.1.0"
 dependencies = [
  "catalog",
  "clap",
+ "connector-address",
+ "connector-secrets",
  "connectors-client",
  "connectors-config",
  "hex",
@@ -1625,6 +1634,7 @@ dependencies = [
 name = "hosted-state"
 version = "0.1.0"
 dependencies = [
+ "connector-state",
  "postgres",
  "thiserror 2.0.20",
 ]

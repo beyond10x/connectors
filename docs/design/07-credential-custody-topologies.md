@@ -22,6 +22,30 @@ reusable secret across personal, central, and satellite deployments. The result 
 Connection contract. A provider such as Grafana does not choose the topology, and a caller cannot
 choose it at invocation time.
 
+**2026-08-20 amendment: personal-local OS-keychain custody is accepted for Linux.** The
+`managed_store` binding for the personal posture may now be the freedesktop Secret Service, and
+`connectors-runtime` composes it in preference to the owner-only file store, falling back and saying
+so when no keyring is present. §4's "personal-local, pasted once" flow is unchanged: the value still
+arrives through the one-use completion socket or a declared credential file, and the keyring is where
+it is sealed afterwards.
+
+Scope of the acceptance, precisely: **Linux Secret Service only**, values only. macOS Keychain and
+Windows Credential Manager remain unimplemented behind the same port. The prepared two-phase store
+has no keyring implementation, so Slack's staged credentials stay in the owner-only file — the
+remaining unencrypted credential surface on a workstation, which `connectors doctor` names rather
+than leaving to be assumed.
+
+The implementation drives `secret-tool` rather than linking a keyring crate: the crate resolves 48
+packages that this component's lockfile does not already carry, including a second async executor.
+The credential reaches it on **stdin**, never `argv`.
+
+One consequence for §3's "no retrieval surface". `secret-tool search` prints a `secret = …` line for
+every match and offers no attribute-only mode, so the store implements no `references` enumeration —
+listing addresses through it would mean reading every value in scope. `connectors auth status`
+answers "is this provider connected?" from the declared configuration plus a presence probe instead,
+which is value-free by construction. This was learned the hard way: running that command during
+implementation put a live token into a session transcript, and it was rotated.
+
 ## 1. Placement and custody are separate decisions
 
 A Connection answers which authorized provider instance exists. Its execution placement answers

@@ -104,6 +104,7 @@
 
 mod batch;
 pub mod file;
+pub mod keyring;
 mod memory;
 mod secret;
 mod transaction;
@@ -112,6 +113,7 @@ pub mod vault;
 
 pub use batch::SecretBatch;
 pub use file::FileStore;
+pub use keyring::KeyringStore;
 pub use memory::MemoryStore;
 pub use secret::Secret;
 pub use transaction::{
@@ -191,6 +193,23 @@ pub trait SecretStore: Send + Sync {
     ///
     /// Stores without a proven listing policy refuse explicitly; a caller must not infer an empty
     /// inventory from that refusal.
+    /// Whether a credential is stored at this address.
+    ///
+    /// Defaulted in terms of [`get`](Self::get) so every backend has it, and overridable by one
+    /// that can answer more cheaply. It exists so that "is this connected?" is a question a caller
+    /// can ask **without writing `get(…)` and dropping the result** — an idiom that reads as
+    /// carelessness at every call site and puts a credential in a local variable for no reason.
+    ///
+    /// An unreachable backend is still an error rather than `false`: "we cannot say" must never be
+    /// presented as "not configured".
+    async fn exists(&self, reference: &CredentialRef) -> Result<bool, StoreError> {
+        match self.get(reference).await {
+            Ok(_) => Ok(true),
+            Err(StoreError::NotFound { .. }) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
     async fn references(&self, _scope: &CredentialScope) -> Result<Vec<CredentialRef>, StoreError> {
         Err(StoreError::Unsupported {
             operation: "references".to_owned(),

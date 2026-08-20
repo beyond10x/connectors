@@ -71,6 +71,7 @@ will spawn children as each milestone is designed.
 | [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint, voice-runtime |
 | [S-034](S-034-production-credential-custody-closes.md) | Production credential custody closes with owner evidence | backlog | Platform | connector-secrets, service, protocol, ci, docs |
 | [S-035](S-035-the-cli-runs-without-being-configured-by-hand.md) | The CLI runs without being configured by hand | in-progress | Platform | cli, console, config, protocol |
+| [S-036](S-036-the-os-keyring-becomes-the-local-store.md) | The OS keyring becomes the local credential store | in-progress | Platform | connector-secrets, runtime, cli |
 | [S-041](S-041-state-becomes-a-port.md) | State becomes a port, with a SQLite backend | in-progress | Platform | service, state, testing |
 | [S-042](S-042-one-composed-local-placement.md) | One composed local placement, called by both the CLI and Zwirn | backlog | Platform | runtime, cli, zwirn |
 
@@ -88,7 +89,7 @@ will spawn children as each milestone is designed.
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-component conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
-| `local-product` | S-035, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
+| `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 
 ## Known gaps in this backlog
