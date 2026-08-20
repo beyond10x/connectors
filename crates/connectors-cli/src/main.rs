@@ -122,9 +122,9 @@ enum Command {
         /// Read the credential from an owner-only file rather than prompting.
         #[arg(long)]
         credential_file: Option<PathBuf>,
-        /// A stable name, when this placement holds one provider more than once.
+        /// Which instance, when this placement holds one provider more than once.
         #[arg(long)]
-        name: Option<String>,
+        instance: Option<String>,
     },
     /// Manage durable Connections through the credential-free control socket.
     Connection {
@@ -413,7 +413,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             allow,
             operator_network,
             credential_file,
-            name,
+            instance,
         } => {
             let config_path = config.map_or_else(default_config_path, Ok)?;
             let state_root = state_root.map_or_else(default_state_root, Ok)?;
@@ -426,7 +426,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 operator_network,
                 force: false,
                 credential_file,
-                name,
+                instance,
             };
             let outcome = connect::dispatch(
                 &provider,
@@ -753,6 +753,7 @@ mod tests {
             label,
             context,
             state_root,
+            ..
         } = cli.command
         else {
             panic!("guided connect command was not parsed");
