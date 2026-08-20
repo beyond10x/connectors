@@ -342,6 +342,7 @@ mod tests {
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["channels:history".to_owned(), "users:read".to_owned()],
             purpose: String::new(),
+            carries_operations: true,
         };
 
         assert!(backend.inner.connection_is_admitted(&connection));
@@ -631,6 +632,7 @@ mod tests {
             external_subject_id: String::new(),
             scopes: Vec::new(),
             purpose: String::new(),
+            carries_operations: true,
         };
         let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
         store
@@ -681,6 +683,7 @@ mod tests {
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["app_mentions:read".to_owned(), "chat:write".to_owned()],
             purpose: String::new(),
+            carries_operations: true,
         };
         backend
             .inner
@@ -772,6 +775,7 @@ mod tests {
             external_subject_id: String::new(),
             scopes: Vec::new(),
             purpose: String::new(),
+            carries_operations: true,
         };
         lock(&backend.inner.metadata)
             .connections
@@ -995,6 +999,7 @@ mod tests {
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["channels:read".to_owned(), "users:read".to_owned()],
             purpose: String::new(),
+            carries_operations: true,
         };
 
         assert!(backend.inner.connection_is_admitted(&companion(Vec::new())));

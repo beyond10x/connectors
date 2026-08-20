@@ -31,7 +31,10 @@ use protocol::datasource::{
     DatasourceErrorCode, DatasourcePage, DatasourceProvenance, DatasourceRead, DatasourceRecord,
     DatasourceResult, DatasourceSummary, ReadRequest, ReadVerb, RecordView,
 };
-use protocol::operation::{OperationError, OperationErrorCode};
+use protocol::operation::{
+    ApprovalPosture, ConnectionSummary, EffectClass, OperationDescription, OperationError,
+    OperationErrorCode,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
@@ -912,4 +915,82 @@ pub(crate) async fn read_workloads(
             connector_audit_ref,
         },
     }))
+}
+
+/// The two workload operations, as every host mode publishes them.
+///
+/// Shared for the same reason the datasource projection is: a Deployment read through a
+/// workstation kubeconfig and one read through an in-cluster ServiceAccount are the same object,
+/// so the contract a caller is handed must not depend on which placement answered. Only the
+/// Connections and the description lease belong to the placement.
+pub(crate) fn status_operation(
+    connections: Vec<ConnectionSummary>,
+    description_ref: String,
+) -> OperationDescription {
+    OperationDescription {
+        operation_ref: STATUS_OPERATION.to_owned(),
+        title: "Read Kubernetes deployment status".to_owned(),
+        description: "Reads the observed replica and Available condition of one admitted Kubernetes Deployment. It cannot read Secrets or mutate cluster state.".to_owned(),
+        input_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "name"],
+            "properties": {
+                "namespace": {"type": "string", "minLength": 1, "maxLength": 63},
+                "name": {"type": "string", "minLength": 1, "maxLength": 253}
+            }
+        }),
+        output_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "name", "generation", "observed_generation", "desired_replicas", "ready_replicas", "available_replicas", "updated_replicas", "running", "available_condition"],
+            "properties": {
+                "namespace": {"type": "string"}, "name": {"type": "string"},
+                "generation": {"type": "integer"}, "observed_generation": {"type": "integer"},
+                "desired_replicas": {"type": "integer"}, "ready_replicas": {"type": "integer"},
+                "available_replicas": {"type": "integer"}, "updated_replicas": {"type": "integer"},
+                "running": {"type": "boolean"}, "available_condition": {"type": "boolean"}
+            }
+        }),
+        effect: EffectClass::ReadOnly,
+        approval: ApprovalPosture::NotRequired,
+        connections,
+        description_ref,
+    }
+}
+
+pub(crate) fn restart_operation(
+    connections: Vec<ConnectionSummary>,
+    description_ref: String,
+) -> OperationDescription {
+    OperationDescription {
+        operation_ref: RESTART_OPERATION.to_owned(),
+        title: "Restart a Kubernetes Deployment rollout".to_owned(),
+        description: "Patches the admitted Deployment pod-template restart annotation after exact human approval. It never deletes Pods and reports success when Kubernetes accepts the patch.".to_owned(),
+        input_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "name", "uid", "resource_version"],
+            "properties": {
+                "namespace": {"type": "string", "minLength": 1, "maxLength": 63},
+                "name": {"type": "string", "minLength": 1, "maxLength": 253},
+                "uid": {"type": "string", "minLength": 1, "maxLength": 128},
+                "resource_version": {"type": "string", "minLength": 1, "maxLength": 128}
+            }
+        }),
+        output_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "name", "uid", "resource_version", "patch_accepted"],
+            "properties": {
+                "namespace": {"type": "string"}, "name": {"type": "string"},
+                "uid": {"type": "string"}, "resource_version": {"type": "string"},
+                "patch_accepted": {"const": true}
+            }
+        }),
+        effect: EffectClass::Mutating,
+        approval: ApprovalPosture::Required,
+        connections,
+        description_ref,
+    }
 }

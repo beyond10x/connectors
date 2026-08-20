@@ -287,6 +287,19 @@ struct StoredConnection {
     /// name. Empty for every Connection acquired through a Connect Session, which nobody named.
     #[serde(default)]
     purpose: String,
+    /// Whether this Connection publishes operations, as opposed to datasources alone.
+    ///
+    /// Defaults true — every Connection that predates named instances, and every one a Connect
+    /// Session creates. A placement holding several identities marks exactly one, because the
+    /// agent's capability projection admits one Connection per operation reference and two
+    /// identities publishing `slack-conversations-history` refuse the whole session. Datasources
+    /// are unaffected: a binding names its Connection, so every identity stays readable.
+    #[serde(default = "default_carries_operations")]
+    carries_operations: bool,
+}
+
+const fn default_carries_operations() -> bool {
+    true
 }
 
 struct SlackCredentials {

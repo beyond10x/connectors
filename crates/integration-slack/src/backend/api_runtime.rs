@@ -273,6 +273,7 @@ impl SlackInner {
             external_subject_id: evidence.subject_id,
             scopes: evidence.scopes,
             purpose: String::new(),
+            carries_operations: true,
         };
         let mut state = lock(&self.metadata);
         state
@@ -727,6 +728,7 @@ impl SlackInner {
             .iter()
             .filter(|connection| self.connection_is_admitted(connection))
             .filter(|connection| self.connection_owned_by(connection, context))
+            .filter(|connection| connection.carries_operations)
             .filter(|connection| connection_supports_operation(connection, operation_ref))
             .map(|connection| OperationConnectionSummary {
                 connection_ref: connection.connection_ref.clone(),

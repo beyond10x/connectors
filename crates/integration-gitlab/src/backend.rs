@@ -13,6 +13,8 @@ use connector_secrets::{
 };
 use connectors_config::{HostedGitlabConfig, InitiationConfig};
 use hosted_state::PostgresState;
+
+use crate::state::GitlabState;
 use protocol::connection::{
     ConnectSessionStatus, ConnectionActor, ConnectionDescription, ConnectionError,
     ConnectionErrorCode, ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionScope,
@@ -86,7 +88,7 @@ pub struct GitlabError {
 }
 
 impl GitlabError {
-    const fn new(code: &'static str) -> Self {
+    pub(crate) const fn new(code: &'static str) -> Self {
         Self { code }
     }
 }
@@ -101,7 +103,7 @@ struct GitlabInner {
     policy: HostedGitlabConfig,
     origin: url::Url,
     public_origin: url::Url,
-    state_store: PostgresState,
+    state_store: GitlabState,
     credential_store: Arc<dyn PreparedSecretStore>,
     metadata: Mutex<StateFile>,
     sessions: Mutex<ConnectSessionLifecycle>,
@@ -254,18 +256,59 @@ struct PersonalTokenInfo {
 
 impl GitlabBackend {
     /// Open a hosted adapter with policy-only configuration and injected secret custody.
+    ///
+    /// The bookkeeping lives in Postgres because a hosted Connector runs as several replicas and
+    /// they must agree on which Connections exist.
     pub async fn open_hosted(
         tenant_id: String,
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
         state_store: PostgresState,
     ) -> Result<Self, GitlabError> {
+        Self::open_inner(
+            tenant_id,
+            policy,
+            credential_store,
+            GitlabState::Hosted(state_store),
+        )
+        .await
+    }
+
+    /// Open the same adapter for one personal-local placement.
+    ///
+    /// Identical in everything a caller can observe. The only difference is where this Integration
+    /// keeps its own list of Connections: one process on one machine writes owner-only files beside
+    /// its socket, and needs no database to do it. Without this constructor GitLab could not be
+    /// composed anywhere without Postgres, which is why a workstation could not reach GitLab at
+    /// all — a fact about replica bookkeeping that read as "GitLab needs a database".
+    pub async fn open(
+        tenant_id: String,
+        policy: HostedGitlabConfig,
+        credential_store: Arc<dyn PreparedSecretStore>,
+        state_root: &std::path::Path,
+    ) -> Result<Self, GitlabError> {
+        Self::open_inner(
+            tenant_id,
+            policy,
+            credential_store,
+            GitlabState::Local {
+                root: state_root.to_path_buf(),
+            },
+        )
+        .await
+    }
+
+    async fn open_inner(
+        tenant_id: String,
+        policy: HostedGitlabConfig,
+        credential_store: Arc<dyn PreparedSecretStore>,
+        state_store: GitlabState,
+    ) -> Result<Self, GitlabError> {
         let origin = parse_origin(&policy.origin)?;
         let public_origin = url::Url::parse(&policy.public_origin)
             .map_err(|_| GitlabError::new("public-origin"))?;
         let metadata = state_store
-            .read(STATE_KEY, MAX_STATE_BYTES)
-            .map_err(|_| GitlabError::new("connection-state"))?
+            .read(STATE_KEY, MAX_STATE_BYTES)?
             .map_or_else(
                 || Ok(StateFile::default()),
                 |bytes| {
@@ -619,9 +662,7 @@ impl ConnectorBackend for GitlabBackend {
 impl GitlabInner {
     fn persist(&self, state: &StateFile) -> Result<(), GitlabError> {
         let body = serde_json::to_vec(state).map_err(|_| GitlabError::new("connection-state"))?;
-        self.state_store
-            .replace(STATE_KEY, &body, MAX_STATE_BYTES)
-            .map_err(|_| GitlabError::new("connection-state"))
+        self.state_store.replace(STATE_KEY, &body, MAX_STATE_BYTES)
     }
 
     fn check_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
@@ -1468,10 +1509,7 @@ impl GitlabInner {
         }))
         .map_err(|_| GitlabError::new("audit-store"))?;
         line.push(b'\n');
-        self.state_store
-            .append(AUDIT_KEY, &line, MAX_AUDIT_BYTES)
-            .map(|_| ())
-            .map_err(|_| GitlabError::new("audit-store"))
+        self.state_store.append(AUDIT_KEY, &line, MAX_AUDIT_BYTES)
     }
 
     async fn provider_json<T: for<'de> Deserialize<'de>>(

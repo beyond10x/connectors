@@ -23,6 +23,7 @@ hosted-state = { version = "0.1.0", path = "../hosted-state" }
 jsonschema = { version = "0.33", default-features = false }
 protocol = { version = "0.1.0", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 service = { version = "0.1.0", path = "../service" }
