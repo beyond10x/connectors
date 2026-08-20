@@ -274,6 +274,7 @@ dependencies = [
  "connectors-client",
  "connectors-config",
  "hex",
+ "integration-catalog",
  "protocol",
  "rpassword",
  "rustix",
@@ -763,6 +764,28 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "integration-catalog"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "catalog",
+ "connector-address",
+ "connector-resolve",
+ "connector-secrets",
+ "connectors-config",
+ "domain",
+ "hex",
+ "protocol",
+ "rustix",
+ "serde_json",
+ "service",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]
