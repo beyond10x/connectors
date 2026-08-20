@@ -108,17 +108,13 @@ pub async fn run(
         .ok_or_else(|| EnrolError::NoAuthority(provider_id.to_owned()))?;
 
     let existing = PersonalConfig::read(config_path)?;
-    // Named entries are distinct Connections of one provider, so the clash is on the *name*, not
-    // on the provider. Connecting a second Slack identity must not read as connecting Slack twice.
+    // Named entries are distinct Connections of one provider, so a clash is on the *name*, not on
+    // the provider: connecting a second Slack identity must not read as connecting Slack twice.
     let identity = options.name.as_deref().unwrap_or(provider_id);
-    if !options.force
-        && existing
-            .catalog
-            .iter()
-            .any(|entry| entry.provider == provider_id && entry.name() == identity)
-    {
-        return Err(EnrolError::AlreadyConfigured(identity.to_owned()));
-    }
+    let already = existing
+        .catalog
+        .iter()
+        .any(|entry| entry.provider == provider_id && entry.name() == identity);
 
     let credential = match options.credential.as_deref() {
         Some(name) => provider
@@ -216,6 +212,25 @@ pub async fn run(
     let (store, backend) = crate::auth::open_store(state_root)?;
     store.put(&reference, &Secret::new(value.trim())).await?;
     drop(value);
+
+    // **One identity, several credentials.** A companion bot holds a bot token *and* a user token:
+    // same provider, same instance, different leaf, so they are already distinct addresses. Adding
+    // the second is storing a value against an identity that exists, not declaring a second
+    // Connection — and `assemble_credentials` then picks whichever declared mechanism resolves,
+    // so a user-token operation starts working the moment its credential is there.
+    //
+    // The first cut refused this as "already configured", which pushed an operator into inventing
+    // a second identity (`timo-ai-user`) for what is one actor holding two tokens.
+    if already {
+        return Ok(json!({
+            "provider": provider_id,
+            "name": identity,
+            "credential": credential.name,
+            "store": backend,
+            "added_to_existing_identity": true,
+            "verify": provider.verify,
+        }));
+    }
 
     append_entry(config_path, provider_id, credential.name, &endpoints, options)?;
 
@@ -345,21 +360,6 @@ fn append_entry(
     }
 
     let mut next = previous.clone();
-    if options.force {
-        // Replacing means removing the old block first, and doing that textually would need a TOML
-        // parser to find its bounds. Refusing is honest until that is written; the operator can
-        // delete the block and re-run.
-        if PersonalConfig::read(config_path)?
-            .catalog
-            .iter()
-            .any(|entry| entry.provider == provider)
-        {
-            return Err(EnrolError::AlreadyConfigured(format!(
-                "{provider}; remove its [[catalog]] block from {} and re-run",
-                config_path.display()
-            )));
-        }
-    }
     next.push_str(&block);
     std::fs::write(config_path, &next)?;
 
@@ -375,6 +375,26 @@ fn append_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slack_declares_a_bot_and_a_user_credential_which_one_identity_may_both_hold() {
+        // The shape Timo's companion bot needs: `timo-ai` is one actor with two tokens, not two
+        // actors. They differ only by leaf, so one instance addresses both without collision.
+        let slack = catalog::provider(catalog::ProviderKey::id("slack")).expect("slack");
+        let bot = slack
+            .auth
+            .iter()
+            .find(|c| c.name == "slack.bot_token")
+            .expect("a bot credential");
+        let user = slack
+            .auth
+            .iter()
+            .find(|c| c.name == "slack.user_token")
+            .expect("a user credential");
+        assert_ne!(bot.leaf, user.leaf, "different leaves, so one instance holds both");
+        assert!(matches!(bot.subject, catalog::Subject::App));
+        assert!(matches!(user.subject, catalog::Subject::User));
+    }
 
     #[test]
     fn a_provider_outside_the_catalogue_is_named_rather_than_guessed_at() {
