@@ -102,7 +102,7 @@ foundation/connectors/
 | The cluster | the **same binary**, `serve-hosted` |
 
 `products ──▶ connectors` is the permitted dependency direction
-([`dependency-rules.md`](../../../../architecture/dependency-rules.md)). The link is made from
+([`dependency-rules.md`](../../../../architecture/architecture/dependency-rules.md)). The link is made from
 Zwirn's own crates; **agent** must never compile connectors implementation, and does not.
 
 ## What this removes

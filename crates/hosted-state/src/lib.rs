@@ -159,6 +159,55 @@ impl PostgresState {
     }
 }
 
+/// The hosted backend behind the shared port.
+///
+/// Additive: `PostgresState`'s inherent methods stay, because existing Integrations call them
+/// directly and will move to the port one at a time. What this gains is that a deployment can hold
+/// `Arc<dyn StateStore>` without knowing which backend it bound — the property that collapses two
+/// composition ladders into one.
+///
+/// The errors are re-mapped rather than shared because this crate's `StateError` predates the port
+/// and is part of its published surface. The variants correspond one to one.
+impl connector_state::StateStore for PostgresState {
+    fn read(
+        &self,
+        key: &str,
+        maximum: usize,
+    ) -> Result<Option<Vec<u8>>, connector_state::StateError> {
+        Self::read(self, key, maximum).map_err(port_error)
+    }
+
+    fn replace(
+        &self,
+        key: &str,
+        body: &[u8],
+        maximum: usize,
+    ) -> Result<(), connector_state::StateError> {
+        Self::replace(self, key, body, maximum).map_err(port_error)
+    }
+
+    fn append(
+        &self,
+        key: &str,
+        suffix: &[u8],
+        maximum: usize,
+    ) -> Result<usize, connector_state::StateError> {
+        Self::append(self, key, suffix, maximum).map_err(port_error)
+    }
+
+    fn delete(&self, key: &str) -> Result<(), connector_state::StateError> {
+        Self::delete(self, key).map_err(port_error)
+    }
+}
+
+const fn port_error(error: StateError) -> connector_state::StateError {
+    match error {
+        StateError::Invalid => connector_state::StateError::Invalid,
+        StateError::Unavailable => connector_state::StateError::Unavailable,
+        StateError::Capacity => connector_state::StateError::Capacity,
+    }
+}
+
 fn bootstrap_schema(client: &mut Client) -> Result<(), postgres::Error> {
     client.batch_execute(
         "CREATE TABLE IF NOT EXISTS connector_state_cells (
@@ -322,5 +371,29 @@ mod tests {
         assert_eq!(first.append(&key, b"efghi", 8), Err(StateError::Capacity));
         assert_eq!(second.read(&key, 8).unwrap(), Some(b"abcd".to_vec()));
         first.delete(&key).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod port_tests {
+    use super::*;
+
+    /// The conformance suite against a live PostgreSQL, when one is offered.
+    ///
+    /// `#[ignore]`d by default and pointed at `CONNECTORS_DATABASE_URL`, mirroring
+    /// `connector-secrets`'s `vault_live.rs`: a suite that silently passes because no database was
+    /// present would be worse than one that is visibly skipped. The other two backends run the
+    /// same suite unconditionally, so a divergence is caught the moment anyone runs this one.
+    ///
+    /// ```text
+    /// CONNECTORS_DATABASE_URL=postgres://… cargo test -p hosted-state -- --ignored
+    /// ```
+    #[test]
+    #[ignore = "requires a PostgreSQL named by CONNECTORS_DATABASE_URL"]
+    fn the_postgres_backend_conforms() {
+        let url = std::env::var("CONNECTORS_DATABASE_URL")
+            .expect("CONNECTORS_DATABASE_URL names the database to test against");
+        let store = PostgresState::connect(&url).expect("the database is reachable");
+        connector_state::conformance::run(&store);
     }
 }
