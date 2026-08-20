@@ -4,7 +4,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use connectors_client::{CandidateActivationOutcome, CompletionEndpoint, LocalClient};
+use connectors_client::LocalClient;
 use connectors_runtime::{
     default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
     PersonalRuntime, RuntimeError,
@@ -20,17 +20,54 @@ use protocol::operation::{
     DescribeRequest as OperationDescribeRequest, InvokeRequest as OperationInvokeRequest,
     OperationRequest, SearchRequest as OperationSearchRequest,
 };
-use zeroize::Zeroizing;
+
+use connectors_console::{connect, doctor, init, input, output, Format};
 
 #[derive(Debug, Parser)]
 #[command(name = "connectors", version, about = "B10x Connectors service")]
 struct Cli {
+    /// How results are rendered. `json` and `yaml` also carry failures on stdout, so a pipe reads
+    /// the refusal instead of an empty stream.
+    #[arg(long, short = 'o', value_enum, default_value_t = Format::Text, global = true)]
+    output: Format,
     #[command(subcommand)]
     command: Command,
 }
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Write a usable configuration for this machine, so nothing has to be authored by hand.
+    Init {
+        /// Where to write. Defaults below XDG_CONFIG_HOME (or ~/.config).
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Owner-only state root the configuration will be served with.
+        #[arg(long)]
+        state_root: Option<PathBuf>,
+        /// Integration to declare. Repeatable. Omit to admit whatever this machine supports.
+        #[arg(long = "integration", value_enum)]
+        integrations: Vec<init::Integration>,
+        /// Admit kubeconfig contexts authenticated by a credential plugin. Activating one runs that
+        /// plugin — the same helper your `kubectl` already runs. Every EKS context needs this.
+        #[arg(long)]
+        allow_exec_auth: bool,
+        /// Replace an existing configuration.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Report what every catalogued provider needs before it can be connected.
+    Providers {
+        /// Narrow to providers whose id or vendor contains this text.
+        #[arg(long, default_value = "")]
+        query: String,
+    },
+    /// Report what is configured, what is running, and what cannot work.
+    Doctor {
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        state_root: Option<PathBuf>,
+    },
     /// Serve the owner-permissioned personal-local Connector protocols.
     Serve {
         /// Strict value-free deployment configuration.
@@ -43,6 +80,10 @@ enum Command {
     /// Serve the Identity-authenticated hosted Operation and Connection APIs.
     ServeHosted {
         /// Strict value-free server and Integration configuration.
+        ///
+        /// Required, unlike every personal-local command: a hosted deployment's configuration is
+        /// installed by whoever operates it, and defaulting to a path in the invoking user's home
+        /// directory would be the wrong file every time.
         #[arg(long)]
         config: PathBuf,
     },
@@ -85,7 +126,7 @@ enum ConnectionCommand {
     /// Passively list potential direct Connections without contacting their providers.
     Candidates {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         integration: String,
         #[arg(long, default_value = "")]
@@ -98,7 +139,7 @@ enum ConnectionCommand {
     /// Explicitly contact and activate one opaque direct-Connection candidate.
     Activate {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         candidate: String,
         #[arg(long)]
@@ -109,7 +150,7 @@ enum ConnectionCommand {
     /// List non-secret Connection summaries.
     List {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
         #[arg(long, default_value_t = 64)]
@@ -120,7 +161,7 @@ enum ConnectionCommand {
     /// List the latest stored discovery observations for a source Connection.
     Observations {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         source: String,
         #[arg(long, default_value = "")]
@@ -133,7 +174,7 @@ enum ConnectionCommand {
     /// Materialize one recognized observation as a callable mediated Connection.
     Materialize {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         observation: String,
         #[arg(long)]
@@ -146,7 +187,7 @@ enum OperationCommand {
     /// List currently callable operations and their admitted Connections.
     Search {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
         #[arg(long, default_value_t = 25)]
@@ -157,7 +198,7 @@ enum OperationCommand {
     /// Read a fresh operation description and its opaque lease.
     Describe {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
         #[arg(long)]
@@ -166,7 +207,7 @@ enum OperationCommand {
     /// Invoke an operation using a fresh description lease.
     Invoke {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
         #[arg(long)]
@@ -174,8 +215,20 @@ enum OperationCommand {
         #[arg(long)]
         description_ref: String,
         /// Strict JSON object containing only catalog-declared caller input.
-        #[arg(long)]
-        input_json: String,
+        ///
+        /// Three ways in, because one of them stops working at scale: `--input-json` inlines the
+        /// object, `--input-file` reads it from a path, and `--input -` reads stdin. A real
+        /// payload exceeds the operating system's argv limit, at which point an inline argument
+        /// fails in the shell rather than in this program, with a message about the argument list
+        /// rather than about the request.
+        #[arg(long, group = "caller-input")]
+        input_json: Option<String>,
+        /// Read the input object from a file.
+        #[arg(long, group = "caller-input")]
+        input_file: Option<PathBuf>,
+        /// Read the input object from stdin. The only accepted value is `-`.
+        #[arg(long, group = "caller-input")]
+        input: Option<String>,
         #[arg(long)]
         approval_evidence_ref: Option<String>,
         #[arg(long)]
@@ -188,7 +241,7 @@ enum EventCommand {
     /// List admitted Connector channels.
     Search {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
         #[arg(long, default_value_t = 64)]
@@ -199,7 +252,7 @@ enum EventCommand {
     /// Pull durable events, optionally waiting for the next one.
     Receive {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         channel: String,
         #[arg(long)]
@@ -214,7 +267,7 @@ enum EventCommand {
     /// Replay one stored event by its opaque Connector event reference.
     Replay {
         #[arg(long)]
-        config: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
         event: String,
         #[arg(long)]
@@ -234,16 +287,118 @@ enum MainError {
     Io(#[from] io::Error),
     #[error("local Connector response was malformed: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("the guided connection flow does not support provider `{0}` yet")]
-    UnsupportedProvider(String),
     #[error("the Connector returned an invalid connection response")]
     InvalidConnectionResponse,
+    #[error(transparent)]
+    Connect(#[from] connect::ConnectError),
+    #[error(transparent)]
+    Input(#[from] input::InputError),
+    #[error(transparent)]
+    Init(#[from] init::InitError),
+    #[error(transparent)]
+    Output(#[from] output::OutputError),
+    /// `doctor` found something that cannot work. The detail is in the report it already printed.
+    #[error("this installation has a problem `connectors doctor` named above")]
+    Unhealthy,
+
+    /// The Connector answered, and its answer was a refusal.
+    ///
+    /// Distinct from [`Self::Client`], which means the Connector could not be reached at all. Both
+    /// used to be invisible: the envelope was printed as though it were a result and the process
+    /// exited `0`, so `connectors connection list | jq` reported success for a request the daemon
+    /// had refused by name.
+    #[error("{message}")]
+    Refused {
+        code: String,
+        message: String,
+        retriable: bool,
+    },
+}
+
+impl MainError {
+    /// A stable token naming the *class* of fault, for a caller that branches on failures.
+    ///
+    /// Deliberately coarse and deliberately not the message: a script should be able to match on
+    /// `configuration` without depending on the sentence a human reads, and the sentence is free to
+    /// improve. A refusal forwards the Connector's own code, which is the contract's vocabulary and
+    /// more precise than anything this layer could invent. No arm can carry a credential.
+    fn code(&self) -> &str {
+        match self {
+            Self::Runtime(_) => "runtime",
+            Self::Config(_) | Self::Init(_) => "configuration",
+            Self::Client(_) => "connector-unreachable",
+            Self::Io(_) => "io",
+            Self::Json(_) | Self::InvalidConnectionResponse => "malformed-response",
+            Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
+            Self::Connect(_) => "connect",
+            Self::Output(_) => "output",
+            Self::Refused { code, .. } => code,
+            Self::Unhealthy => "unhealthy",
+            Self::Input(_) => "invalid-argument",
+        }
+    }
+}
+
+/// Reduce one transport envelope to the payload a caller asked for, or to a refusal.
+///
+/// **Two defects at once.** The envelope carried `protocol`, `request_id` and `status` around every
+/// result, so `-o compact` rendered transport metadata instead of records and `-o text` buried the
+/// answer three levels down. And a `status: error` envelope was printed as though it were a result,
+/// with exit code `0` — the failure a pipe cannot see. Unwrapping here fixes both, because the
+/// same step that drops the metadata is the one that notices the refusal.
+///
+/// The macro exists because the three protocols carry structurally identical envelopes with
+/// distinct types: matching them generically over `serde_json::Value` would work today and stop
+/// compiling nothing on the day a contract changes shape.
+macro_rules! unwrap_envelope {
+    ($envelope:expr) => {{
+        let envelope = $envelope;
+        match (envelope.status, envelope.response, envelope.error) {
+            (_, _, Some(error)) => Err(MainError::Refused {
+                code: serde_json::to_value(error.code)?
+                    .as_str()
+                    .unwrap_or("refused")
+                    .to_owned(),
+                message: error.message,
+                retriable: error.retriable,
+            }),
+            (_, Some(result), None) => Ok(connectors_console::payload(serde_json::to_value(result)?)),
+            (_, None, None) => Err(MainError::InvalidConnectionResponse),
+        }
+    }};
 }
 
 #[tokio::main]
-async fn main() -> Result<(), MainError> {
+async fn main() -> std::process::ExitCode {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-    match Cli::parse().command {
+    let cli = Cli::parse();
+    // Captured before dispatch: a failure must be rendered in the format the caller asked for, and
+    // the command that failed is no longer available to ask.
+    let format = cli.output;
+    match run(cli).await {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            output::emit_error(format, error.code(), &error.to_string());
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+async fn run(cli: Cli) -> Result<(), MainError> {
+    let format = cli.output;
+    match cli.command {
+        Command::Init {
+            config,
+            state_root,
+            integrations,
+            allow_exec_auth,
+            force,
+        } => initialize(format, config, state_root, &integrations, allow_exec_auth, force),
+        Command::Providers { query } => {
+            output::emit(format, &connectors_console::providers::run(&query))?;
+            Ok(())
+        }
+        Command::Doctor { config, state_root } => diagnose(format, config, state_root),
         Command::Serve { config, state_root } => serve(config, state_root).await,
         Command::ServeHosted { config } => serve_hosted(&config).await,
         Command::Connect {
@@ -252,11 +407,77 @@ async fn main() -> Result<(), MainError> {
             label,
             context,
             state_root,
-        } => connect(provider, config, label, context, state_root).await,
-        Command::Connection { command } => connection(command).await,
-        Command::Event { command } => event(command).await,
-        Command::Operation { command } => operation(command).await,
+        } => guided_connect(format, &provider, config, label, context, state_root).await,
+        Command::Connection { command } => connection(format, command).await,
+        Command::Event { command } => event(format, command).await,
+        Command::Operation { command } => operation(format, command).await,
     }
+}
+
+/// Report on this installation, and exit non-zero when something in it cannot work.
+fn diagnose(
+    format: Format,
+    config: Option<PathBuf>,
+    state_root: Option<PathBuf>,
+) -> Result<(), MainError> {
+    let config_path = config.map_or_else(default_config_path, Ok)?;
+    let state_root = state_root.map_or_else(default_state_root, Ok)?;
+    let report = doctor::run(&config_path, &state_root);
+    output::emit(format, &report.to_value())?;
+    if report.healthy() {
+        Ok(())
+    } else {
+        // The report was already rendered; this only sets the exit code, so a script can branch on
+        // `connectors doctor` without parsing it.
+        Err(MainError::Unhealthy)
+    }
+}
+
+/// Resolve this machine's paths, run one guided flow, and render whatever it reports.
+async fn guided_connect(
+    format: Format,
+    provider: &str,
+    config: Option<PathBuf>,
+    label: Option<String>,
+    context: Option<String>,
+    state_root: Option<PathBuf>,
+) -> Result<(), MainError> {
+    let config = read_config(config)?;
+    let state_root = state_root.map_or_else(default_state_root, Ok)?;
+    validate_state_root(&state_root)?;
+    let outcome = connect::run(provider, &config, &state_root, label, context).await?;
+    output::emit(format, &outcome)?;
+    Ok(())
+}
+
+fn initialize(
+    format: Format,
+    config: Option<PathBuf>,
+    state_root: Option<PathBuf>,
+    integrations: &[init::Integration],
+    allow_exec_auth: bool,
+    force: bool,
+) -> Result<(), MainError> {
+    let config_path = config.map_or_else(default_config_path, Ok)?;
+    let state_root = state_root.map_or_else(default_state_root, Ok)?;
+    let written = init::run(
+        &config_path,
+        &state_root,
+        integrations,
+        allow_exec_auth,
+        force,
+    )?;
+    output::emit(
+        format,
+        &serde_json::json!({
+            "config": written.config_path.display().to_string(),
+            "state_root": written.state_root.display().to_string(),
+            "authority_snapshot_id": written.snapshot_id,
+            "integrations": written.integrations,
+            "notes": written.notes,
+        }),
+    )?;
+    Ok(())
 }
 
 async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
@@ -270,132 +491,20 @@ async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
     Ok(())
 }
 
-async fn connect(
-    provider: String,
-    config_path: Option<PathBuf>,
-    label: Option<String>,
-    context: Option<String>,
-    state_root: Option<PathBuf>,
-) -> Result<(), MainError> {
-    if !matches!(provider.as_str(), "slack" | "grafana" | "kubernetes") {
-        return Err(MainError::UnsupportedProvider(provider));
-    }
-    let config_path = config_path.map_or_else(default_config_path, Ok)?;
-    let config = PersonalConfig::read(&config_path)?;
-    let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    validate_state_root(&state_root)?;
-    let client = LocalClient::new(state_root.join("connectors.sock"));
-    let owner = config.owner_context();
-
-    if provider == "kubernetes" {
-        return connect_kubernetes(&client, &owner, label, context).await;
-    }
-
-    let display_name = match provider.as_str() {
-        "slack" => "Slack",
-        "grafana" => "Grafana",
-        _ => unreachable!("provider was validated"),
-    };
-    let label = label.unwrap_or_else(|| display_name.to_owned());
-    println!("Connect {display_name}");
-    println!("Input is hidden and sent only to the local Connector.");
-    let pending = client
-        .begin_connect_session(&owner, provider.clone(), label)
-        .await?;
-    let credential_prompt = match provider.as_str() {
-        "slack" => "Slack app token: ",
-        "grafana" => "Grafana service account token: ",
-        _ => unreachable!("provider was validated"),
-    };
-    prompt_and_submit_completion(&state_root, &pending.completion_endpoint, credential_prompt)
-        .await?;
-    let description = client
-        .finish_connect_session(&owner, pending.session_ref)
-        .await?;
-    println!();
-    if provider == "slack" {
-        let channel = description
-            .channels
-            .first()
-            .ok_or(MainError::InvalidConnectionResponse)?;
-        println!("Slack is connected and ready to receive messages.");
-        println!("Connection: {}", description.summary.label);
-        println!("Events: {}", channel.events.join(", "));
-    } else {
-        let observations = client
-            .observations(&owner, description.summary.connection_ref.clone())
-            .await?;
-        let materialized = client.materialize_admitted(&owner, observations).await?;
-        println!("Grafana is connected and its data sources are ready.");
-        println!("Connection: {}", description.summary.label);
-        for target in &materialized.connections {
-            println!(
-                "Target: {} ({}) -> {}",
-                target.label, target.integration_ref, target.connection_ref
-            );
-        }
-        if materialized.unsupported > 0 {
-            println!(
-                "Observed but unsupported data sources: {}",
-                materialized.unsupported
-            );
-        }
-        if materialized.not_granted > 0 {
-            println!(
-                "Recognized data sources without a configured target Grant: {}",
-                materialized.not_granted
-            );
-        }
-    }
-    Ok(())
-}
-
-async fn connect_kubernetes(
-    client: &LocalClient,
-    owner: &protocol::operation::OwnerContext,
-    label: Option<String>,
-    context: Option<String>,
-) -> Result<(), MainError> {
-    let outcome = client
-        .activate_candidate(owner, "kubernetes".to_owned(), label, context)
-        .await?;
-    let CandidateActivationOutcome::Connected {
-        connection,
-        observations,
-    } = outcome
-    else {
-        let CandidateActivationOutcome::SelectionRequired(candidates) = outcome else {
-            unreachable!()
-        };
-        if candidates.is_empty() {
-            println!("No kubeconfig contexts were detected.");
-        } else {
-            println!("Detected kubeconfig contexts:");
-            for candidate in candidates {
-                println!("  {}", candidate.title);
-            }
-            println!();
-            println!("Choose one with: connectors connect kubernetes --context <name>");
-        }
-        return Ok(());
-    };
-    println!(
-        "Kubernetes is connected: {}",
-        connection.summary.connection_ref
-    );
-    if observations.is_empty() {
-        println!("No supported monitoring Services were visible in the admitted namespace scope.");
-    } else {
-        println!("Discovered monitoring Services:");
-        for observation in observations {
-            println!("  {} -> {}", observation.title, observation.observation_ref);
-        }
-    }
-    Ok(())
-}
-
 async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Result<(), MainError> {
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
+    // **An omitted `--config` means the well-known path, not "no configuration".** Passing `None`
+    // straight through composed a daemon with an empty registry: `connectors init` followed by
+    // `connectors serve` published a readiness document reporting every integration as absent, and
+    // the operator's next command found nothing callable with no error anywhere to explain it.
+    //
+    // A genuinely absent file still composes the refusing protocol skeleton, which is what a
+    // machine that has never run `init` should get — so the fallback is "the default path if it
+    // exists", not "the default path, and fail if it does not".
+    let config_path = match config_path {
+        Some(explicit) => Some(explicit),
+        None => default_config_path().ok().filter(|path| path.exists()),
+    };
     let runtime = PersonalRuntime::bind(config_path.as_deref(), state_root).await?;
     println!("{}", runtime.readiness());
     runtime
@@ -406,7 +515,7 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
     Ok(())
 }
 
-async fn connection(command: ConnectionCommand) -> Result<(), MainError> {
+async fn connection(format: Format, command: ConnectionCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         ConnectionCommand::Candidates {
             config,
@@ -473,17 +582,17 @@ async fn connection(command: ConnectionCommand) -> Result<(), MainError> {
             }),
         ),
     };
-    let config = PersonalConfig::read(&config_path)?;
+    let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .connection(&config.owner_context(), request)
         .await?;
-    print_response(serde_json::to_value(response)?)?;
+    output::emit(format, &unwrap_envelope!(response)?)?;
     Ok(())
 }
 
-async fn event(command: EventCommand) -> Result<(), MainError> {
+async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         EventCommand::Search {
             config,
@@ -522,17 +631,17 @@ async fn event(command: EventCommand) -> Result<(), MainError> {
             EventRequest::Replay(ReplayRequest { event_ref: event }),
         ),
     };
-    let config = PersonalConfig::read(&config_path)?;
+    let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
         .await?;
-    print_response(serde_json::to_value(response)?)?;
+    output::emit(format, &unwrap_envelope!(response)?)?;
     Ok(())
 }
 
-async fn operation(command: OperationCommand) -> Result<(), MainError> {
+async fn operation(format: Format, command: OperationCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         OperationCommand::Search {
             config,
@@ -561,10 +670,12 @@ async fn operation(command: OperationCommand) -> Result<(), MainError> {
             connection,
             description_ref,
             input_json,
+            input_file,
+            input,
             approval_evidence_ref,
             state_root,
         } => {
-            let input = serde_json::from_str(&input_json)?;
+            let input = input::read(input_json, input_file, input)?;
             (
                 config,
                 state_root,
@@ -578,30 +689,24 @@ async fn operation(command: OperationCommand) -> Result<(), MainError> {
             )
         }
     };
-    let config = PersonalConfig::read(&config_path)?;
+    let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .operation(&config.owner_context(), request)
         .await?;
-    print_response(serde_json::to_value(response)?)?;
+    output::emit(format, &unwrap_envelope!(response)?)?;
     Ok(())
 }
 
-async fn prompt_and_submit_completion(
-    state_root: &Path,
-    completion_endpoint: &Path,
-    prompt: &str,
-) -> Result<(), MainError> {
-    let endpoint = CompletionEndpoint::validate(state_root, completion_endpoint)?;
-    let token = Zeroizing::new(rpassword::prompt_password(prompt).map_err(MainError::Io)?);
-    endpoint.submit(token.as_bytes()).await?;
-    Ok(())
-}
-
-fn print_response(response: serde_json::Value) -> Result<(), MainError> {
-    println!("{}", serde_json::to_string_pretty(&response)?);
-    Ok(())
+/// Read the personal configuration, defaulting to the well-known path.
+///
+/// Every personal-local command takes `--config` as an option rather than a requirement. Before
+/// this, each one demanded an explicit path, so the shortest working invocation of the product
+/// carried a path the person had to know and retype.
+fn read_config(path: Option<PathBuf>) -> Result<PersonalConfig, MainError> {
+    let path = path.map_or_else(default_config_path, Ok)?;
+    Ok(PersonalConfig::read(&path)?)
 }
 
 #[cfg(test)]

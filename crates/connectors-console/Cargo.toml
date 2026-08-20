@@ -1,0 +1,52 @@
+[package]
+name = "connectors-console"
+description = "Operator-facing surface below the command line: writing a configuration, diagnosing an installation, reading the catalogue, and rendering a result."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/b10x"
+homepage = "https://github.com/b10x/b10x"
+rust-version = "1.88"
+publish = false
+
+# An isolated nested workspace for the same reason `connectors-cli` and `connectors-runtime` are:
+# this package links the compiled catalogue and the configuration vocabulary, and feature-unifying
+# those into the deterministic compiler workspace is exactly what
+# `catalog-build/tests/main/architecture_fence.rs` exists to prevent.
+[workspace]
+resolver = "3"
+members = ["."]
+
+[dependencies]
+# The compiled catalogue, embedded. `providers` reports what this binary can actually reach rather
+# than what a document last claimed, which is only true if the answer comes from the build.
+catalog = { version = "0.1.0", path = "../catalog" }
+# The configuration vocabulary `init` writes and `doctor` reads back.
+connectors-config = { version = "0.1.0", path = "../connectors-config" }
+# The guided flows talk to the local Connector through the reusable client; they neither frame a
+# request nor compose an adapter.
+connectors-client = { version = "0.1.0", path = "../connectors-client" }
+protocol = { version = "0.1.0", path = "../protocol" }
+clap = { version = "4", features = ["derive"] }
+# A credential is typed with echo disabled and held in a zeroizing buffer until the one-use socket
+# takes it.
+rpassword = "7"
+zeroize = "1"
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+serde_json = "1"
+# YAML for `-o yaml`. `serde_norway` rather than `serde_yaml`, which is unmaintained — the same
+# choice the root workspace documents for OpenAPI ingest.
+serde_norway = "0.9"
+# The derived authority-snapshot digest in `init`. See `src/init.rs` for why it is derived.
+sha2 = "0.10"
+hex = "0.4"
+toml = "0.8"
+# `system` for the hostname half of a stable local agent id; `process` for the effective uid, which
+# `doctor` compares against the state root's owner.
+rustix = { version = "1.1.4", features = ["process", "system"] }
+thiserror = "2"
+
+[dev-dependencies]
+# `init` proves its output by reading it back through the daemon's own reader, which enforces file
+# ownership and mode — so the tests need a real directory rather than an in-memory buffer.
+tempfile = "3"

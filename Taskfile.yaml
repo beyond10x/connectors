@@ -1,0 +1,80 @@
+version: '3'
+
+tasks:
+  install:
+    desc: Install the release Connectors CLI
+    summary: |
+      Builds `connectors` with Cargo's release profile in an isolated staging root and
+      installs it, replacing any existing binary atomically.
+
+      The destination is CONNECTORS_INSTALL_DIR when set, otherwise CARGO_INSTALL_ROOT/bin,
+      CARGO_HOME/bin, or $HOME/.cargo/bin in that order.
+
+      Default features only. The `local-identity` feature is the loopback Identity exception
+      and a release build that enables it does not start — it fails to compile
+      (see crates/identity-http/src/local_identity.rs).
+
+      This task does not run the component gate. Run `cargo test` here first if you are
+      installing something you have just changed.
+
+      After installing, `connectors init` writes a configuration for this machine and
+      `connectors doctor` reports whether it can work.
+    preconditions:
+      - sh: command -v cargo >/dev/null 2>&1
+        msg: Rust and Cargo are required to install the Connectors CLI.
+      - sh: command -v install >/dev/null 2>&1
+        msg: The POSIX install utility is required to install the Connectors CLI.
+    cmds:
+      - |
+        set -eu
+
+        if [ -n "${CONNECTORS_INSTALL_DIR:-}" ]; then
+          install_dir=${CONNECTORS_INSTALL_DIR}
+        elif [ -n "${CARGO_INSTALL_ROOT:-}" ]; then
+          install_dir=${CARGO_INSTALL_ROOT}/bin
+        elif [ -n "${CARGO_HOME:-}" ]; then
+          install_dir=${CARGO_HOME}/bin
+        else
+          install_dir=${HOME:?HOME is required when no install directory is configured}/.cargo/bin
+        fi
+
+        # Staged outside the destination, then moved into place: a build that fails partway
+        # must not leave a half-written `connectors` where a working one used to be, and a
+        # daemon running from the old binary must not have its file truncated underneath it.
+        stage_root=$(mktemp -d "${TMPDIR:-/tmp}/b10x-connectors-install.XXXXXXXX")
+        staged_binary=
+        cleanup() {
+          if [ -n "${staged_binary}" ]; then
+            rm -f -- "${staged_binary}"
+          fi
+          rm -rf -- "${stage_root}"
+        }
+        trap cleanup EXIT
+
+        cargo install \
+          --path ./crates/connectors-cli \
+          --bin connectors \
+          --locked \
+          --force \
+          --no-track \
+          --profile release \
+          --root "${stage_root}"
+
+        install -d -m 0755 "${install_dir}"
+        staged_binary=${install_dir}/.connectors-install.$$
+        install -m 0755 "${stage_root}/bin/connectors" "${staged_binary}"
+        # `mv` within one directory is atomic, so a concurrent `connectors` either runs the old
+        # inode to completion or starts on the new one. There is no moment with neither.
+        mv -f -- "${staged_binary}" "${install_dir}/connectors"
+        staged_binary=
+
+        printf 'Installed Connectors: %s\n' "${install_dir}/connectors"
+        "${install_dir}/connectors" --version
+        case ":${PATH:-}:" in
+          *:"${install_dir}":*)
+            printf 'Next: connectors init && connectors doctor\n'
+            ;;
+          *)
+            printf 'Add %s to PATH, then run: connectors init && connectors doctor\n' "${install_dir}"
+            ;;
+        esac
