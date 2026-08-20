@@ -206,10 +206,7 @@
           },
           "required": [
             "index_name",
-            "query",
-            "hits_per_page",
-            "page",
-            "filters"
+            "query"
           ],
           "type": "object"
         }

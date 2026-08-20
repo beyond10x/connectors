@@ -494,10 +494,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "per_page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -903,12 +900,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "search",
-            "min_access_level",
-            "page",
-            "per_page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1363,14 +1355,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "search",
-            "membership",
-            "owned",
-            "min_access_level",
-            "page",
-            "per_page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1869,10 +1854,7 @@
             }
           },
           "required": [
-            "project_id",
-            "state",
-            "page",
-            "per_page"
+            "project_id"
           ],
           "type": "object"
         }
@@ -2415,9 +2397,7 @@
           },
           "required": [
             "project_id",
-            "title",
-            "description",
-            "labels"
+            "title"
           ],
           "type": "object"
         }
@@ -2679,10 +2659,7 @@
             }
           },
           "required": [
-            "project_id",
-            "state",
-            "page",
-            "per_page"
+            "project_id"
           ],
           "type": "object"
         }
@@ -3457,9 +3434,7 @@
             }
           },
           "required": [
-            "project_id",
-            "page",
-            "per_page"
+            "project_id"
           ],
           "type": "object"
         }

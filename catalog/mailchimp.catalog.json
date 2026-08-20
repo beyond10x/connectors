@@ -746,8 +746,7 @@
             "list_id",
             "subscriber_hash",
             "email_address",
-            "status_if_new",
-            "status"
+            "status_if_new"
           ],
           "type": "object"
         }

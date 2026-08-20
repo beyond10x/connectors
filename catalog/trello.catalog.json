@@ -537,9 +537,7 @@
             }
           },
           "required": [
-            "list_id",
-            "name",
-            "description"
+            "list_id"
           ],
           "type": "object"
         }

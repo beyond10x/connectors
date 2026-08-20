@@ -740,7 +740,7 @@ group = "Planner"
 service = "default"
 id = "sip-dial"
 direction = "write"
-description = "Start one native SIP voice session to a destination configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, phone number, host, port, or PBX type. Establishing a call is externally visible and may ring or answer a real endpoint"
+description = "Start one native SIP voice session through a trunk configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, host, port, or PBX type, and may be omitted to use this Connection's default trunk. `number` is the party to dial through that trunk, digits only; the trunk decides where the call goes and whether a number may be dialled at all. Establishing a call is externally visible and may ring or answer a real endpoint"
 risk = "high"
 idempotency = "non_idempotent"
 effects = ["write", "network"]
@@ -755,14 +755,20 @@ expose = true
 
 [[operations.params.body]]
 name = "target"
-description = "Opaque destination alias configured by an operator on this Connection, for example `staging-pbx`; the alias cannot contain a SIP URI or network address"
-required = true
+description = "Opaque trunk alias configured by an operator on this Connection, for example `staging-pbx`; the alias cannot contain a SIP URI or network address. Omit it to use this Connection's default trunk"
+required = false
 schema = { type = "string", pattern = "^[A-Za-z][A-Za-z0-9_-]{0,63}$", minLength = 1, maxLength = 64 }
+
+[[operations.params.body]]
+name = "number"
+description = "The party to dial through the selected trunk, digits only, for example `12341234`. It becomes the dialled user on the trunk's own destination and cannot change which host, port, or network the call reaches. Omit it to reach the trunk's own configured endpoint. A trunk that does not admit dialled numbers refuses this"
+required = false
+schema = { type = "string", pattern = "^[0-9]{1,32}$", minLength = 1, maxLength = 32 }
 
 [operations.response_schema]
 type = "object"
-required = ["call", "session", "channel", "state"]
-properties = { call = { type = "string", description = "Opaque call reference" }, session = { type = "string", description = "Opaque voice-session reference" }, channel = { type = "string", description = "Opaque application-channel reference" }, state = { type = "string", enum = ["established"], description = "The SIP dialog and voice application binding are established" } }
+required = ["call", "session", "state"]
+properties = { call = { type = "string", description = "Opaque call reference" }, session = { type = "string", description = "Opaque voice-session reference" }, channel = { type = "string", description = "Opaque application-channel reference, absent when the call terminates at the SIP edge with no application channel" }, state = { type = "string", enum = ["established"], description = "The SIP dialog is established, together with the voice application binding when this Connection carries one" } }
 
 # Local speech output, implemented by the closed built-in `audio_v1` driver. Accepted by
 # architecture ADR 0035: a capability that reaches a system outside the process is a protocol driver

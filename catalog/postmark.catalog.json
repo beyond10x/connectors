@@ -79,14 +79,7 @@
           },
           "required": [
             "from",
-            "to",
-            "cc",
-            "bcc",
-            "subject",
-            "text_body",
-            "html_body",
-            "reply_to",
-            "tag"
+            "to"
           ],
           "type": "object"
         }

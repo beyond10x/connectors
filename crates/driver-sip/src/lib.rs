@@ -108,7 +108,14 @@ pub async fn establish_outbound(
         SipSignalingTransport::Udp => TransportKind::Udp,
         SipSignalingTransport::Tcp => TransportKind::Tcp,
     };
-    let target = Target::new(route.target, transport);
+    // Always already resolved: `admit_sip_dial` turns a named trunk into an address *before*
+    // admission, so that address could be aperture-checked. An unresolved target reaching here
+    // would mean admission was bypassed, which is a refusal rather than a lookup to perform.
+    let Some(signaling_target) = route.target.address() else {
+        endpoint.shutdown().await;
+        return Err(DriverError::InvalidUri);
+    };
+    let target = Target::new(signaling_target, transport);
     if cancelled.is_cancelled() {
         endpoint.shutdown().await;
         return Err(DriverError::Cancelled);
@@ -449,7 +456,7 @@ mod tests {
     use rtvbp::{ControlFrame, Envelope as _, Transport as _};
     use rtvbp_voice_endpoint::{VoiceEndpoint, INITIALIZE_METHOD, PROFILE};
     use service::authority::{AuthorityIssuer, IssueRequest, ProofKey};
-    use service::{admit_sip_plan, SipDeploymentRoute, SocketAperture};
+    use service::{admit_sip_plan, SipDeploymentRoute, SipSignalingTarget, SocketAperture};
     use tokio::sync::oneshot;
 
     use super::*;
@@ -498,7 +505,7 @@ mod tests {
                 connection: "connection-1".to_owned(),
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
-                target: callee.local_addr(),
+                target: SipSignalingTarget::Address(callee.local_addr()),
                 signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -508,6 +515,7 @@ mod tests {
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
                 network_mode: service::SipNetworkMode::Loopback,
+                accepts_dialed_number: false,
             },
         )
         .unwrap();
@@ -666,7 +674,7 @@ mod tests {
                 connection: "connection-1".to_owned(),
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
-                target: callee.local_addr(),
+                target: SipSignalingTarget::Address(callee.local_addr()),
                 signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -676,6 +684,7 @@ mod tests {
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
                 network_mode: service::SipNetworkMode::Loopback,
+                accepts_dialed_number: false,
             },
         )
         .unwrap();
