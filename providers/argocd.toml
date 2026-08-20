@@ -1,0 +1,298 @@
+# Argo CD's first B10x surface: see what a cluster is running against what git declares, and
+# act on the difference.
+#
+# The source is Argo CD's own generated `assets/swagger.json`, pinned at the v3.5.1 release tag and
+# committed unmodified (`specs/argocd/swagger-v3.5.1.json`). That document is Swagger 2.0, which the
+# ingest cannot read, so `[spec]` below points at the reviewed OpenAPI 3 projection of the exact
+# eleven operations shipped here. Both are pinned in `specs/argocd.provenance.toml`.
+#
+# One fact in this connector does not come from the vendor document: Argo CD's generated Swagger
+# declares no `securityDefinitions` and no `security` at all. The bearer requirement is taken from
+# Argo CD's official API documentation, and `scripts/vendor-argocd-spec.py` refuses if the source
+# ever starts declaring security of its own, so that this stays a stated fact rather than a stale one.
+#
+# `POST /api/v1/session` and `DELETE /api/v1/session` are absent by rule, not by oversight. They are
+# Argo CD's authentication flow; the platform performs authentication and a connector never
+# catalogues the endpoints that mint or destroy a credential. The token this connector uses is
+# supplied to it, never obtained by it.
+#
+# This connector never embeds an instance address or credential. A Connection binds one
+# operator-approved HTTPS origin and resolves the token through Connector custody. `private_network`
+# is the reachability requirement: an Argo CD API server is normally reachable only from inside the
+# cluster or through an operator-controlled ingress, and deployment policy may fulfil that with a
+# developer-local placement or a federated satellite. The operation contract is identical either way.
+
+id = "argocd"
+vendor = "Argo CD"
+authority = "io.argoproj.argocd.api"
+base_url = "{origin}/api/v1"
+description = "Argo CD: inspect Applications, their live resources, drift and sync windows, and sync, roll back or terminate a deployment"
+default_auth = [{ credentials = ["argocd.api_token"] }]
+verify = "argocd-applications-list"
+
+[spec]
+path = "specs/argocd/http-api-v3.5.1.openapi.yaml"
+source_url = "https://github.com/argoproj/argo-cd/blob/v3.5.1/assets/swagger.json"
+upstream_version = "v3.5.1"
+fetched_at = "2026-08-20T00:00:00Z"
+sha256 = "48dd67c27f3ba022e8cc8da1c4893f1b4f29b0596c8c412df34bf70701eb2487"
+
+[[auth]]
+name = "argocd.api_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "app"
+description = "Argo CD JWT, from `argocd account generate-token` for a local account or from an AppProject role token. Its Argo CD RBAC policy is what bounds this Connection: a token with only `applications, get` cannot sync whatever this catalogue declares. Entered or resolved at the Connector placement and never returned to the caller"
+
+[[services]]
+name = "default"
+tags = ["infrastructure", "developer-tools"]
+audiences = ["sre", "developer"]
+
+# ---------------------------------------------------------------------------------------------
+# Reads. Every one of them is `low` except managed-resources, which is the only read here that can
+# hand back the contents of a Secret.
+# ---------------------------------------------------------------------------------------------
+
+[[patch.operations]]
+select = "ApplicationService_List"
+rename = "argocd-applications-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+[[patch.operations]]
+select = "ApplicationService_Get"
+rename = "argocd-application-get"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+[[patch.operations]]
+select = "ApplicationService_ResourceTree"
+rename = "argocd-application-resource-tree"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+[[patch.operations]]
+select = "ApplicationService_ListResourceEvents"
+rename = "argocd-application-events"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+[[patch.operations]]
+select = "ApplicationService_GetApplicationSyncWindows"
+rename = "argocd-application-syncwindows"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# `medium`, not `low`, and not exposed. `liveState`, `targetState`, `normalizedLiveState` and
+# `predictedLiveState` are whole serialized manifests of resources the Application manages, so for a
+# managed Secret this read returns its data. The five resource selectors are kept precisely because
+# they are the only way a caller can bound what comes back.
+[[patch.operations]]
+select = "ApplicationService_ManagedResources"
+rename = "argocd-application-managed-resources"
+direction = "read"
+risk = "medium"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# Catalogued but not exposed: projects and identity are context a flow or an operator reads, not a
+# tool a model needs among the handful it can hold.
+[[patch.operations]]
+select = "ProjectService_List"
+rename = "argocd-projects-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# Not the verify probe, despite the name: Argo CD answers this 200 with `loggedIn: false` for an
+# anonymous request, so it reports an identity rather than proving a credential. The list operation
+# is the probe, because it answers 401 when the token is wrong.
+[[patch.operations]]
+select = "SessionService_GetUserInfo"
+rename = "argocd-session-userinfo"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# ---------------------------------------------------------------------------------------------
+# Writes. Three, each with a different damage claim, so each is its own statement.
+# ---------------------------------------------------------------------------------------------
+
+# `non_idempotent`, not `conditional`. A sync converges the cluster on what git declares, which
+# sounds repeatable, but Argo CD runs PreSync, Sync and PostSync hooks on every sync — a migration
+# Job configured as a PreSync hook runs again each time. Repeating the call repeats that effect, so
+# the honest claim is the higher one, and a stored result must never be served in its place.
+#
+# Exposed to a model deliberately. The narrowing that makes that defensible is in the projection:
+# the vendor's `manifests` field, an array of raw manifests the server applies instead of the
+# repository's, is not admitted here. Without it this operation can only deploy what git already
+# says; with it, it would be arbitrary cluster write access wearing a sync's name.
+[[patch.operations]]
+select = "ApplicationService_Sync"
+rename = "argocd-application-sync"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# `medium`: terminating a running sync stops work rather than changing declared state, but it leaves
+# the cluster partly applied, which is a real consequence someone has to reconcile.
+[[patch.operations]]
+select = "ApplicationService_TerminateOperation"
+rename = "argocd-application-terminate-operation"
+direction = "write"
+risk = "medium"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+# `destructive`, and the claim is about the live cluster rather than the Argo CD record: a rollback
+# redeploys an older revision over what is running, and with `prune` it deletes resources the older
+# revision does not declare. Nothing undoes that but another deployment. Being `destructive` also
+# puts it above the default grant ceiling, so a Connection admits it only by saying so.
+[[patch.operations]]
+select = "ApplicationService_Rollback"
+rename = "argocd-application-rollback"
+direction = "write"
+risk = "destructive"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+expose = false
+
+[patch.operations.error_envelope]
+message_pointer = "/message"
+code_pointer = "/code"
+
+[[config]]
+name = "origin"
+service = "default"
+label = "Argo CD origin"
+help = "The operator-approved HTTPS origin of this Argo CD API server, without an API path. In private deployments this resolves only at the selected local or federated Connector placement"
+example = "https://argocd.internal.example"
+format = "origin"
+required = true
+approval = "operator"
+docs_url = "https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/"
+binds = "endpoint.origin"
+
+[[config]]
+name = "api_token"
+service = "default"
+label = "Argo CD API token"
+help = "Supply this through the selected Connection's custody: local OS keychain, a wired secret provider, or satellite-local storage. The harness can write it but cannot read it back. Scope it in Argo CD's own RBAC to the projects and verbs this Connection should have"
+format = "token"
+required = true
+secret = true
+docs_url = "https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/"
+binds = "credential.argocd.api_token"

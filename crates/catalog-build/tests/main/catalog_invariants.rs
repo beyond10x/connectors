@@ -451,11 +451,11 @@ fn promoted_operation_traits_equal_the_pre_migration_inventory() {
             fact["id"].as_str().unwrap()
         )
     });
-    assert_eq!(facts.len(), 161);
+    assert_eq!(facts.len(), 172);
     let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
     assert_eq!(
         digest,
-        "f52010fd9050920b04a75c735d35f38800978bd68c5c3792ce3645f103bfae53"
+        "dff0fc0fdcc743b4fe50241d0b7a6d93f1c1fff751a03c8d6a1780a657888d35"
     );
 }
 

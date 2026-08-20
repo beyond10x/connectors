@@ -154,6 +154,10 @@ path = "web/public/catalog.json"
 schema = "web/catalog.schema.json"
 
 [[syntax]]
+path = "specs/argocd/swagger-v3.5.1.json"
+origin = "vendored-source"
+
+[[syntax]]
 path = "specs/asterisk/api-docs/applications.json"
 origin = "vendored-source"
 
