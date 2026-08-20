@@ -2094,6 +2094,7 @@ dependencies = [
  "connector-secrets",
  "connectors-config",
  "domain",
+ "driver-sip",
  "ed25519-dalek",
  "getrandom 0.3.4",
  "hex",
@@ -2108,6 +2109,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "voice-runtime",
  "webpki-roots 1.0.9",
 ]
