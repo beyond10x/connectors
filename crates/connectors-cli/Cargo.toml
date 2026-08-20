@@ -27,11 +27,13 @@ local-identity = ["connectors-runtime/local-identity"]
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 connectors-client = { version = "0.1.0", path = "../connectors-client" }
+# The operator-facing behaviour this frontend delegates to: writing a configuration, diagnosing an
+# installation, reading the catalogue, rendering a result. Kept out of the binary because the
+# architecture fence caps what a thin frontend may contain, and it is right to.
+connectors-console = { version = "0.1.0", path = "../connectors-console" }
 connectors-runtime = { version = "0.1.0", path = "../connectors-runtime" }
 protocol = { version = "0.1.0", path = "../protocol" }
-rpassword = "7"
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "time"] }
-zeroize = "1"

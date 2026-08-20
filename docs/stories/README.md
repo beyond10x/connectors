@@ -70,6 +70,7 @@ will spawn children as each milestone is designed.
 | [S-032](S-032-sip-driver-terminates-one-governed-call.md) | The SIP driver terminates one governed call | in-progress | Platform | catalog, domain, service, server, driver-sip |
 | [S-033](S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md) | Neutral RTVBP bridges the call to an application channel | in-progress | Platform | domain, protocol, service, server, rtvbp-voice-endpoint, voice-runtime |
 | [S-034](S-034-production-credential-custody-closes.md) | Production credential custody closes with owner evidence | backlog | Platform | connector-secrets, service, protocol, ci, docs |
+| [S-035](S-035-the-cli-runs-without-being-configured-by-hand.md) | The CLI runs without being configured by hand | in-progress | Platform | cli, console, config, protocol |
 
 ## Epics in this seed
 
@@ -85,6 +86,7 @@ will spawn children as each milestone is designed.
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-component conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
+| `local-product` | S-035 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 
 ## Known gaps in this backlog
