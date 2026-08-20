@@ -427,6 +427,8 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 force: false,
                 credential_file,
                 instance,
+                acquire: enrol::acquires(&provider)
+                    .then(|| connectors_runtime::argocd_acquisition(operator_network)),
             };
             let outcome = connect::dispatch(
                 &provider,

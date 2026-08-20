@@ -72,7 +72,7 @@ pub async fn dispatch(
     if is_guided(provider, config) {
         return run(provider, config, state_root, label, context).await;
     }
-    Ok(crate::enrol::run(provider, config_path, state_root, &options).await?)
+    Ok(crate::enrol::run(provider, config_path, state_root, options).await?)
 }
 
 #[derive(Debug, thiserror::Error)]

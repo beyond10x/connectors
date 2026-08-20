@@ -37,7 +37,7 @@ use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 /// What the caller fixed on the command line, so nothing already answered is asked again.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Options {
     /// Which declared credential to supply. Defaults to the provider's first.
     pub credential: Option<String>,
@@ -62,6 +62,15 @@ pub struct Options {
     /// in `ps` output and shell history. The file is read once, its bytes go to the store, and it
     /// can be deleted afterwards — the same import the runtime performs for a declared instance.
     pub credential_file: Option<std::path::PathBuf>,
+    /// How to obtain a credential the provider will issue us, rather than one a person pastes.
+    ///
+    /// Supplied by the composition root, because acquiring is a network act and this package links
+    /// no transport. What comes back is the value alone: **this module still decides where it is
+    /// stored**, through the one addressing function the backend also uses. A closure that stored
+    /// its own result would be the second copy of that rule, and the second copy is the one that
+    /// drifts — `auth status` reported every named instance as `not-connected` for exactly that
+    /// reason.
+    pub acquire: Option<integration_catalog::argocd::Acquire>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -71,7 +80,10 @@ pub enum EnrolError {
     #[error("`{0}` declares no authority, so its credential has no address")]
     NoAuthority(String),
     #[error("`{provider}` declares no credential named `{credential}`")]
-    UnknownCredential { provider: String, credential: String },
+    UnknownCredential {
+        provider: String,
+        credential: String,
+    },
     #[error("`{0}` declares no credential to supply")]
     NoCredential(String),
     #[error("`{0}` is already configured; pass --force to replace it")]
@@ -80,6 +92,8 @@ pub enum EnrolError {
     MissingValue(String),
     #[error("the credential could not be read from the terminal: {0}")]
     Prompt(#[from] std::io::Error),
+    #[error("{0}")]
+    Acquisition(String),
     #[error("{0} is not an owner-only regular file")]
     UnsafeCredentialFile(String),
     #[error("the credential could not be stored: {0}")]
@@ -99,7 +113,7 @@ pub async fn run(
     provider_id: &str,
     config_path: &Path,
     state_root: &Path,
-    options: &Options,
+    mut options: Options,
 ) -> Result<Value, EnrolError> {
     let provider = catalog::provider(catalog::ProviderKey::id(provider_id))
         .ok_or_else(|| EnrolError::UnknownProvider(provider_id.to_owned()))?;
@@ -110,7 +124,10 @@ pub async fn run(
     let existing = PersonalConfig::read(config_path)?;
     // Named entries are distinct Connections of one provider, so a clash is on the *name*, not on
     // the provider: connecting a second Slack identity must not read as connecting Slack twice.
-    let identity = options.instance.as_deref().unwrap_or(provider_id);
+    let identity = options
+        .instance
+        .clone()
+        .unwrap_or_else(|| provider_id.to_owned());
     let already = existing
         .catalog
         .iter()
@@ -151,7 +168,8 @@ pub async fn run(
         };
         // A value differing from the catalogue's default is the operator pointing this credential
         // at an instance the catalogue did not name. That is the case the approval flag exists for.
-        if matches!(field.approval, catalog::Approval::Operator) && Some(value.as_str()) != field.default
+        if matches!(field.approval, catalog::Approval::Operator)
+            && Some(value.as_str()) != field.default
         {
             approval_needed.push(field.name.to_owned());
         }
@@ -179,9 +197,27 @@ pub async fn run(
     }
     eprintln!("Input is hidden and goes straight to the credential store.");
 
-    let value = match options.credential_file.as_deref() {
-        Some(path) => read_credential_file(path)?,
-        None => Zeroizing::new(rpassword::prompt_password(format!("{}: ", credential.name))?),
+    let mut acquired = None;
+    let value = match options.credential_file.take() {
+        Some(path) => read_credential_file(&path)?,
+        // A provider that issues its own credential is asked for one rather than asking a person to
+        // go and fetch it. The password this collects buys exactly one thing and is dropped inside
+        // the acquisition; only what comes back is stored, by the same path a pasted value takes.
+        None if acquires(provider_id) && options.acquire.is_some() => {
+            let acquire = options.acquire.take().expect("checked above");
+            let origin = endpoints
+                .get("origin")
+                .ok_or_else(|| EnrolError::MissingValue("origin".to_owned()))?
+                .clone();
+            let request = argocd_request(origin, options.allow_writes)?;
+            let (token, report) = acquire(request).await.map_err(EnrolError::Acquisition)?;
+            acquired = Some(report);
+            token
+        }
+        None => Zeroizing::new(rpassword::prompt_password(format!(
+            "{}: ",
+            credential.name
+        ))?),
     };
     if value.trim().is_empty() {
         return Err(EnrolError::MissingValue(credential.name.to_owned()));
@@ -232,7 +268,13 @@ pub async fn run(
         }));
     }
 
-    append_entry(config_path, provider_id, credential.name, &endpoints, options)?;
+    append_entry(
+        config_path,
+        provider_id,
+        credential.name,
+        &endpoints,
+        &options,
+    )?;
 
     Ok(json!({
         "provider": provider_id,
@@ -244,6 +286,21 @@ pub async fn run(
         "verify": provider.verify,
         "operations": provider.operations.len(),
         "next": "connectors serve, then connectors operation search",
+        // Present only when the provider issued the credential rather than a person pasting one.
+        // It is the whole record of what was created on the operator's side, and every field is
+        // safe to print — the token itself is not here and never was.
+        "acquired": acquired.map(|report| json!({
+            "project": report.project,
+            "role": report.role,
+            "role_created": report.role_created,
+            "token_id": report.token_id,
+            "policies": report.policies,
+            "expires_in_days": report.expires_in_seconds / 86_400,
+            "revoke": format!(
+                "argocd proj role delete-token {} {} <issued-at>, or delete the role",
+                report.project, report.role
+            ),
+        })),
     }))
 }
 
@@ -391,7 +448,10 @@ mod tests {
             .iter()
             .find(|c| c.name == "slack.user_token")
             .expect("a user credential");
-        assert_ne!(bot.leaf, user.leaf, "different leaves, so one instance holds both");
+        assert_ne!(
+            bot.leaf, user.leaf,
+            "different leaves, so one instance holds both"
+        );
         assert!(matches!(bot.subject, catalog::Subject::App));
         assert!(matches!(user.subject, catalog::Subject::User));
     }
@@ -455,4 +515,76 @@ mod tests {
             "only {askless} providers can be connected without answering an endpoint question"
         );
     }
+}
+
+/// Whether this provider issues its own credential rather than expecting a pasted one.
+///
+/// One name today, and deliberately a function rather than a catalogue lookup: acquiring is
+/// hand-written per provider, so a provider is on this list exactly when code exists to do it.
+/// The catalogue cannot answer "is there an implementation", and a declaration that claimed one
+/// without it would fail at the moment a person is holding a password.
+#[must_use]
+pub fn acquires(provider: &str) -> bool {
+    provider == "argocd"
+}
+
+/// Ask for the parts of an Argo CD acquisition the catalogue cannot supply.
+///
+/// The project and role are the operator's own nouns, and the password is the one value here that
+/// must not outlive its use — it goes into the request as a `Zeroizing` and the acquisition drops
+/// it after the single sign-in it pays for.
+fn argocd_request(
+    origin: String,
+    allow_sync: bool,
+) -> Result<integration_catalog::argocd::AcquireRequest, EnrolError> {
+    eprintln!();
+    eprintln!("Argo CD issues its own tokens, so there is nothing for you to fetch first.");
+    eprintln!(
+        "Sign in once and a scoped, expiring token is minted and stored; the password is not."
+    );
+    let project = ask("Argo CD project whose applications this connection reads")?;
+    let role = ask_with_default("Role to create in that project", "b10x")?;
+    let username = ask("Argo CD username with `projects, update` on it (often `admin`)")?;
+    let password = Zeroizing::new(rpassword::prompt_password("Argo CD password: ")?);
+    if password.trim().is_empty() {
+        return Err(EnrolError::MissingValue("password".to_owned()));
+    }
+    Ok(integration_catalog::argocd::AcquireRequest {
+        origin,
+        username,
+        password,
+        project,
+        role,
+        allow_sync,
+        expires_in_seconds: integration_catalog::argocd::DEFAULT_EXPIRES_IN_SECONDS,
+    })
+}
+
+fn ask(prompt: &str) -> Result<String, EnrolError> {
+    use std::io::{BufRead as _, Write as _};
+
+    eprint!("{prompt}: ");
+    std::io::stderr().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().lock().read_line(&mut answer)?;
+    let answer = answer.trim().to_owned();
+    if answer.is_empty() {
+        return Err(EnrolError::MissingValue(prompt.to_owned()));
+    }
+    Ok(answer)
+}
+
+fn ask_with_default(prompt: &str, default: &str) -> Result<String, EnrolError> {
+    use std::io::{BufRead as _, Write as _};
+
+    eprint!("{prompt} [{default}]: ");
+    std::io::stderr().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().lock().read_line(&mut answer)?;
+    let answer = answer.trim();
+    Ok(if answer.is_empty() {
+        default.to_owned()
+    } else {
+        answer.to_owned()
+    })
 }

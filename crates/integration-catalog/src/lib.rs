@@ -59,6 +59,14 @@ use sha2::{Digest as _, Sha256};
 mod config;
 pub use config::DeclaredConfig;
 
+/// Minting an Argo CD API token from an operator's password, so the `argocd` CLI is not a
+/// prerequisite for connecting Argo CD.
+///
+/// It lives beside invocation rather than in the operator console because acquisition is a network
+/// act, and the console is fenced against transports. The runtime-owned [`service::EgressTransport`]
+/// port arrives here exactly as invocation's does — this crate composes no adapter either.
+pub mod argocd;
+
 /// The most caller input one operation may carry. A declared operation's input is a small JSON
 /// object of catalogue-declared fields; anything larger is a caller mistake, not a payload.
 const MAX_INPUT_BYTES: usize = 64 * 1024;
