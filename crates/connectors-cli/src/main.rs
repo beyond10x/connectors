@@ -21,7 +21,7 @@ use protocol::operation::{
     OperationRequest, SearchRequest as OperationSearchRequest,
 };
 
-use connectors_console::{auth, connect, doctor, init, input, output, reduce_envelope, Format};
+use connectors_console::{auth, connect, doctor, enrol, init, input, output, reduce_envelope, Format};
 
 #[derive(Debug, Parser)]
 #[command(name = "connectors", version, about = "B10x Connectors service")]
@@ -47,29 +47,25 @@ enum Command {
         /// Integration to declare. Repeatable. Omit to admit whatever this machine supports.
         #[arg(long = "integration", value_enum)]
         integrations: Vec<init::Integration>,
-        /// Admit kubeconfig contexts authenticated by a credential plugin. Activating one runs that
-        /// plugin — the same helper your `kubectl` already runs. Every EKS context needs this.
+        /// Admit kubeconfig contexts authenticated by a credential plugin. Every EKS context is one.
         #[arg(long)]
         allow_exec_auth: bool,
         /// Replace an existing configuration.
         #[arg(long)]
         force: bool,
     },
-    /// Report which configured providers have their credential stored.
-    ///
-    /// Never reads a credential. Use this rather than `secret-tool search`, which prints every
-    /// matching secret alongside its attributes and has no attribute-only mode.
+    /// Which configured providers have their credential stored. Never reads one.
     Auth {
         #[command(subcommand)]
         command: AuthCommand,
     },
-    /// Report what every catalogued provider needs before it can be connected.
+    /// What every catalogued provider needs before it can be connected.
     Providers {
         /// Narrow to providers whose id or vendor contains this text.
         #[arg(long, default_value = "")]
         query: String,
     },
-    /// Report what is configured, what is running, and what cannot work.
+    /// What is configured, what is running, and what cannot work.
     Doctor {
         #[arg(long)]
         config: Option<PathBuf>,
@@ -97,7 +93,7 @@ enum Command {
     },
     /// Add a provider through one guided, secret-safe flow.
     Connect {
-        /// Provider to add. The personal-local alpha supports `slack`, `grafana`, and `kubernetes`.
+        /// Provider to add. `connectors providers` lists every one the catalogue declares.
         provider: String,
         /// Strict value-free deployment configuration.
         #[arg(long)]
@@ -111,6 +107,21 @@ enum Command {
         /// Owner-only state root used by the running Connector.
         #[arg(long)]
         state_root: Option<PathBuf>,
+        /// Which declared credential to supply.
+        #[arg(long = "as")]
+        credential: Option<String>,
+        /// A declared configuration value, as `field=value`. Repeatable.
+        #[arg(long = "set", value_parser = enrol::parse_setting)]
+        settings: Vec<(String, String)>,
+        /// Admit write operations. Reads only without it.
+        #[arg(long = "allow", value_parser = ["writes"])]
+        allow: Option<String>,
+        /// Admit private destinations, for a self-hosted instance on your own network.
+        #[arg(long)]
+        operator_network: bool,
+        /// Read the credential from an owner-only file rather than prompting.
+        #[arg(long)]
+        credential_file: Option<PathBuf>,
     },
     /// Manage durable Connections through the credential-free control socket.
     Connection {
@@ -315,6 +326,8 @@ enum MainError {
     #[error(transparent)]
     Auth(#[from] auth::AuthError),
     #[error(transparent)]
+    Enrol(#[from] enrol::EnrolError),
+    #[error(transparent)]
     Refused(#[from] connectors_console::envelope::ReducedError),
     #[error(transparent)]
     Init(#[from] init::InitError),
@@ -347,6 +360,7 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",
+            Self::Enrol(_) => "connect",
         }
     }
 }
@@ -397,7 +411,37 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             label,
             context,
             state_root,
-        } => guided_connect(format, &provider, config, label, context, state_root).await,
+            credential,
+            settings,
+            allow,
+            operator_network,
+            credential_file,
+        } => {
+            let config_path = config.map_or_else(default_config_path, Ok)?;
+            let state_root = state_root.map_or_else(default_state_root, Ok)?;
+            validate_state_root(&state_root)?;
+            let personal = PersonalConfig::read(&config_path)?;
+            let options = enrol::Options {
+                credential,
+                values: settings.into_iter().collect(),
+                allow_writes: allow.as_deref() == Some("writes"),
+                operator_network,
+                force: false,
+                credential_file,
+            };
+            let outcome = connect::dispatch(
+                &provider,
+                &personal,
+                &config_path,
+                &state_root,
+                label,
+                context,
+                options,
+            )
+            .await?;
+            output::emit(format, &outcome)?;
+            Ok(())
+        }
         Command::Connection { command } => connection(format, command).await,
         Command::Event { command } => event(format, command).await,
         Command::Operation { command } => operation(format, command).await,
@@ -421,23 +465,6 @@ fn diagnose(
         // `connectors doctor` without parsing it.
         Err(MainError::Unhealthy)
     }
-}
-
-/// Resolve this machine's paths, run one guided flow, and render whatever it reports.
-async fn guided_connect(
-    format: Format,
-    provider: &str,
-    config: Option<PathBuf>,
-    label: Option<String>,
-    context: Option<String>,
-    state_root: Option<PathBuf>,
-) -> Result<(), MainError> {
-    let config = read_config(config)?;
-    let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    validate_state_root(&state_root)?;
-    let outcome = connect::run(provider, &config, &state_root, label, context).await?;
-    output::emit(format, &outcome)?;
-    Ok(())
 }
 
 fn initialize(

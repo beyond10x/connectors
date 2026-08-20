@@ -30,8 +30,43 @@ use zeroize::Zeroizing;
 /// configuration fields already describe what to ask for.
 const GUIDED: [&str; 3] = ["slack", "grafana", "kubernetes"];
 
+/// Which flow a provider uses, and why.
+///
+/// The three guided providers complete a **Connect Session** against a running Connector: that is
+/// how a credential which the provider itself issues — a Socket Mode app token, an OAuth grant —
+/// arrives without passing through a caller. Everything else the catalogue declares is a value the
+/// operator already holds, so it needs no session and no daemon.
+///
+/// Deciding this here rather than in the frontend keeps the rule in one place: a fourth provider
+/// gaining a guided flow should not require the CLI to learn about it.
+pub fn is_guided(provider: &str) -> bool {
+    GUIDED.contains(&provider)
+}
+
+/// Run whichever flow this provider uses.
+///
+/// # Errors
+///
+/// Whatever the selected flow refuses with.
+pub async fn dispatch(
+    provider: &str,
+    config: &PersonalConfig,
+    config_path: &Path,
+    state_root: &Path,
+    label: Option<String>,
+    context: Option<String>,
+    options: crate::enrol::Options,
+) -> Result<Value, ConnectError> {
+    if is_guided(provider) {
+        return run(provider, config, state_root, label, context).await;
+    }
+    Ok(crate::enrol::run(provider, config_path, state_root, &options).await?)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
+    #[error(transparent)]
+    Enrol(#[from] crate::enrol::EnrolError),
     #[error("the guided connection flow does not support provider `{0}` yet")]
     Unsupported(String),
     #[error(transparent)]

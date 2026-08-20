@@ -19,6 +19,7 @@
 //!
 //! - [`init`] — write a configuration nobody should have had to author by hand.
 //! - [`doctor`] — report what is configured, what is running, and what cannot work.
+//! - [`enrol`] — connect any catalogued provider: prompt for what the catalogue cannot answer.
 //! - [`providers`] — what the embedded catalogue can reach, as a measured fact.
 //! - [`auth`] — which providers are connected, answered without reading a credential.
 //! - [`connect`] — the guided provider flows, returning their outcome as data so `-o json` works.
@@ -35,6 +36,7 @@ pub mod auth;
 pub mod connect;
 pub mod envelope;
 pub mod doctor;
+pub mod enrol;
 pub mod init;
 pub mod input;
 pub mod output;

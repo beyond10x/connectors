@@ -119,7 +119,7 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
 ///
 /// The same preference order the runtime composes with, so `auth status` reports the store the
 /// daemon actually reads rather than a different one that happens to be openable.
-fn open_store(state_root: &Path) -> Result<(Arc<dyn SecretStore>, &'static str), StoreError> {
+pub(crate) fn open_store(state_root: &Path) -> Result<(Arc<dyn SecretStore>, &'static str), StoreError> {
     if let Ok(keyring) = KeyringStore::open() {
         return Ok((Arc::new(keyring), "keyring"));
     }
