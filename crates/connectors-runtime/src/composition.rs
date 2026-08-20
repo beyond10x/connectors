@@ -166,35 +166,54 @@ impl PersonalRuntime {
                 // published in readiness so `connectors doctor` can name an unencrypted store
                 // rather than leaving an operator to assume the better one.
                 let keyring: Option<Arc<KeyringStore>> = KeyringStore::open().ok().map(Arc::new);
-                let file = if keyring.is_none() && (config.slack.is_some() || !config.catalog.is_empty())
-                {
-                    Some(Arc::new(
-                        FileStore::open(state_root.join("credentials.store"))
-                            .map_err(|_| RuntimeError::CredentialStore)?,
-                    ))
-                } else {
-                    None
-                };
-                credential_backend = Some(if keyring.is_some() { "keyring" } else { "file" });
+                // **One `FileStore` per state root, opened once and shared.**
+                //
+                // The store takes an exclusive lease on its own file, so opening it twice in one
+                // process is a self-inflicted `Conflict` — not a contended one, and no amount of
+                // retrying clears it. It used to be opened once here for catalogued providers and
+                // again below for Slack's prepared store, which worked on a workstation, where the
+                // keyring is reachable and the first open is skipped, and refused to start
+                // anywhere without a Secret Service: a server, a container, and any placement
+                // spawned with a different `HOME` than the session that has the bus.
+                let file: Option<Arc<FileStore>> =
+                    if config.slack.is_some() || (keyring.is_none() && !config.catalog.is_empty()) {
+                        Some(Arc::new(
+                            FileStore::open(state_root.join("credentials.store"))
+                                .map_err(|_| RuntimeError::CredentialStore)?,
+                        ))
+                    } else {
+                        None
+                    };
                 // The prepared (two-phase) store has no keyring implementation yet, so Slack keeps
                 // the file-backed one. Named here rather than hidden: it is the remaining
-                // unencrypted credential surface on a workstation.
-                let prepared: Arc<dyn PreparedSecretStore> = if config.slack.is_some() {
-                    Arc::new(
-                        FileStore::open(state_root.join("credentials.store"))
-                            .map_err(|_| RuntimeError::CredentialStore)?,
-                    )
-                } else {
-                    Arc::new(MemoryStore::new())
+                // unencrypted credential surface on a workstation, and it is why the reported
+                // backend can be both at once.
+                let prepared: Arc<dyn PreparedSecretStore> = match (&file, config.slack.is_some()) {
+                    (Some(store), true) => Arc::clone(store) as Arc<dyn PreparedSecretStore>,
+                    _ => Arc::new(MemoryStore::new()),
                 };
                 // Catalogued providers keep their credential across a restart, so the operator can
                 // delete the file it was imported from. Grafana's own store stays in memory because
                 // its credential is re-entered through a Connect Session each time.
-                let monitoring: Arc<dyn SecretStore> = match (keyring, file) {
-                    (Some(store), _) if !config.catalog.is_empty() => store,
-                    (_, Some(store)) if !config.catalog.is_empty() => store,
-                    _ => Arc::new(MemoryStore::new()),
+                let monitoring: Arc<dyn SecretStore> = if config.catalog.is_empty() {
+                    Arc::new(MemoryStore::new())
+                } else if let Some(store) = &keyring {
+                    Arc::clone(store) as Arc<dyn SecretStore>
+                } else if let Some(store) = &file {
+                    Arc::clone(store) as Arc<dyn SecretStore>
+                } else {
+                    Arc::new(MemoryStore::new())
                 };
+                // Reported as what was actually bound, not as the best one available. `doctor`
+                // exists to tell an operator that a credential is sitting in an unencrypted file,
+                // and a lone `keyring` on a Slack deployment — where the prepared store is still a
+                // file — would say the opposite of the truth.
+                credential_backend = Some(match (keyring.is_some(), file.is_some()) {
+                    (true, true) => "keyring+file",
+                    (true, false) => "keyring",
+                    (false, true) => "file",
+                    (false, false) => "memory",
+                });
                 Some(PersonalCredentialStores::new(prepared, monitoring))
             } else {
                 None

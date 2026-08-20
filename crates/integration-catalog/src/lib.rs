@@ -443,7 +443,7 @@ impl Inner {
         })?;
 
         let base_url = document
-            .base_url(&operation.service)
+            .base_url(operation.service)
             .ok_or_else(|| refusal(OperationErrorCode::Unavailable, "the service has no base URL"))?;
 
         let plan = connector_resolve::resolve(declared, base_url, &input, &endpoints, &assembly.credentials)
