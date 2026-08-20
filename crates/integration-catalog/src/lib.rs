@@ -197,7 +197,7 @@ impl CatalogBackend {
 
             bindings.push(Binding {
                 provider,
-                connection_ref: connection_ref(&entry.provider, entry.name()),
+                connection_ref: connection_ref(&entry.provider, entry.instance()),
                 label: entry.label(),
                 grant_ref: entry.grant_ref.clone(),
                 initiation: match entry.initiation {
@@ -207,7 +207,7 @@ impl CatalogBackend {
                 },
                 config: DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
                 allow_writes: entry.allow_writes,
-                instance: match entry.name.as_deref() {
+                instance: match entry.instance.as_deref() {
                     Some(name) => Some(instance_for(&entry.provider, name)?),
                     None => None,
                 },
@@ -754,7 +754,7 @@ pub fn credential_address(
     entry: &CatalogIntegrationConfig,
     leaf: &str,
 ) -> Result<CredentialRef, CatalogIntegrationError> {
-    match entry.name.as_deref() {
+    match entry.instance.as_deref() {
         Some(name) => {
             let instance = instance_for(&entry.provider, name)?;
             CredentialRef::for_instance(
@@ -934,7 +934,7 @@ mod tests {
     fn entry(provider: &str, endpoints: &[(&str, &str)]) -> CatalogIntegrationConfig {
         CatalogIntegrationConfig {
             provider: provider.to_owned(),
-            name: None,
+            instance: None,
             label: None,
             grant_ref: format!("grant:{provider}:test"),
             initiation: InitiationConfig::B10x,
@@ -1013,9 +1013,9 @@ mod tests {
         // The property Timo's two Slack identities need: babelforce-bot and timo-ai are the same
         // provider, the same tenant and the same credential name, and must not collide.
         let mut first = entry("slack", &[]);
-        first.name = Some("babelforce-bot".to_owned());
+        first.instance = Some("babelforce-bot".to_owned());
         let mut second = entry("slack", &[]);
-        second.name = Some("timo-ai".to_owned());
+        second.instance = Some("timo-ai".to_owned());
         let a = credential_address("local", "com.slack.api", &first, "bot_token").unwrap();
         let b = credential_address("local", "com.slack.api", &second, "bot_token").unwrap();
         assert!(a.instance().is_some() && b.instance().is_some());

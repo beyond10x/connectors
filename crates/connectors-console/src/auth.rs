@@ -46,75 +46,98 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
     for entry in &config.catalog {
         let Some(provider) = catalog::provider(catalog::ProviderKey::id(&entry.provider)) else {
             providers.push(json!({
-                "provider": entry.provider,
-                "status": "unknown-provider",
-                "detail": "not in the catalogue",
+                "provider": entry.provider, "instance": entry.instance(),
+                "status": "unknown-provider", "detail": "not in the catalogue",
             }));
             continue;
         };
         let Some(authority) = provider.authority else {
             providers.push(json!({
-                "provider": entry.provider,
+                "provider": entry.provider, "instance": entry.instance(),
                 "status": "no-authority",
                 "detail": "the provider declares no authority, so its credential has no address",
             }));
             continue;
         };
-        let credential = entry
-            .credential
-            .as_deref()
-            .and_then(|name| provider.auth.iter().find(|item| item.name == name))
-            .or_else(|| provider.auth.first());
-        let Some(credential) = credential else {
-            providers.push(json!({
-                "provider": entry.provider,
-                "status": "no-credential-declared",
-                "detail": "the provider declares no credential to supply",
+
+        // **Every declared credential, each with its role.** There is no primary and no secondary:
+        // a workspace bot token and a personal user token are two roles one identity holds, and
+        // reporting only one of them describes an identity that is not the one configured. The
+        // catalogue names the role — `subject` — so this reads it rather than inventing an order.
+        let mut credentials = Vec::new();
+        let mut stored = std::collections::BTreeSet::new();
+        for declared in provider.auth {
+            let reference = integration_catalog::credential_address(
+                &config.owner.tenant_id,
+                authority,
+                entry,
+                declared.leaf,
+            );
+            let present = match reference {
+                Ok(reference) => store.exists(&reference).await,
+                Err(_) => Ok(false),
+            };
+            let state = match present {
+                Ok(true) => {
+                    stored.insert(declared.name);
+                    "stored"
+                }
+                Ok(false) => "absent",
+                // "We cannot say" is its own answer: reporting a locked keyring as absent would
+                // send an operator to re-enter a credential that is already there.
+                Err(_) => "unavailable",
+            };
+            credentials.push(json!({
+                "credential": declared.name,
+                "subject": subject_of(declared.subject),
+                "state": state,
             }));
-            continue;
-        };
-        // **The backend's own addressing function**, not a second copy of the rule. Reimplementing
-        // it here reported every named instance as `not-connected` while its credential sat in the
-        // keyring at the instance address — a report that is worse than no report, because it sends
-        // an operator to re-enter a credential that is already there.
-        let reference =
-            integration_catalog::credential_address(&config.owner.tenant_id, authority, entry, credential.leaf);
-        let present = match reference {
-            Ok(reference) => store.exists(&reference).await,
-            Err(_) => Ok(false),
-        };
-        providers.push(match present {
-            Ok(true) => json!({
-                "provider": entry.provider,
-                "name": entry.name(),
-                "credential": credential.name,
-                "status": "connected",
-                // The declared probe, so an operator knows whether `auth test` can check this one.
-                "verify": provider.verify,
-            }),
-            Ok(false) => json!({
-                "provider": entry.provider,
-                "name": entry.name(),
-                "credential": credential.name,
-                "status": "not-connected",
-                "detail": "no credential is stored for this provider yet",
-            }),
-            // "We cannot say" is its own answer. Reporting a locked keyring as `not-connected`
-            // would send an operator to re-enter a credential that is already there.
-            Err(error) => json!({
-                "provider": entry.provider,
-                "name": entry.name(),
-                "credential": credential.name,
-                "status": "unavailable",
-                "detail": error.to_string(),
-            }),
-        });
+        }
+
+        // What this identity can actually call. A mechanism is one alternative set of credentials
+        // an operation accepts, so an identity is usable exactly when some mechanism is complete —
+        // a more useful answer than any single credential's state, and the real question behind
+        // "is this connected?".
+        let mechanisms: std::collections::BTreeSet<Vec<&str>> = provider
+            .operations
+            .iter()
+            .flat_map(|operation| operation.credentials.iter())
+            .map(|mechanism| mechanism.to_vec())
+            .collect();
+        let satisfied: Vec<String> = mechanisms
+            .iter()
+            .filter(|mechanism| mechanism.iter().all(|name| stored.contains(name)))
+            .map(|mechanism| mechanism.join(" + "))
+            .collect();
+
+        providers.push(json!({
+            "provider": entry.provider,
+            "instance": entry.instance(),
+            "status": if satisfied.is_empty() { "not-callable" } else { "callable" },
+            "credentials": credentials,
+            // Named rather than counted: an operator whose identity is not callable needs to know
+            // which credential would make it so.
+            "satisfied_mechanisms": satisfied,
+            "verify": provider.verify,
+        }));
     }
 
     Ok(json!({
         "store": backend,
         "providers": providers,
     }))
+}
+
+/// The subject the catalogue declares a credential carries — its own word, not an invented one.
+///
+/// Not a rank and not a role: `app` and `user` are different actors, and one instance may hold
+/// both. Slack makes the distinction look like a role; for another provider it would not.
+const fn subject_of(subject: catalog::Subject) -> &'static str {
+    match subject {
+        catalog::Subject::App => "app",
+        catalog::Subject::User => "user",
+        catalog::Subject::Unstated => "unstated",
+    }
 }
 
 /// The store this machine would use, and its name.
@@ -139,17 +162,20 @@ mod tests {
         // from the catalogue, the configuration, or a boolean outcome. If someone later adds a
         // value-bearing field, this is the test that should stop them.
         let rendered = json!({
-            "provider": "gitlab",
-            "credential": "gitlab.token",
-            "status": "connected",
-            "verify": "gitlab-user-get",
+            "provider": "slack",
+            "instance": "timo-ai",
+            "status": "callable",
+            "credentials": [{"credential": "slack.bot_token", "subject": "app", "state": "stored"}],
+            "satisfied_mechanisms": ["slack.bot_token"],
+            "verify": "slack-users-info",
         });
         let object = rendered.as_object().expect("an object");
         for key in object.keys() {
             assert!(
                 matches!(
                     key.as_str(),
-                    "provider" | "name" | "credential" | "status" | "verify" | "detail"
+                    "provider" | "instance" | "credentials" | "status" | "verify" | "detail"
+                        | "satisfied_mechanisms"
                 ),
                 "`{key}` is not one of the value-free fields this report may carry"
             );

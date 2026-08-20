@@ -54,7 +54,7 @@ pub struct Options {
     /// Two Slack identities — a workspace bot and a personal companion — are the same provider,
     /// tenant and credential name, so only an instance separates their stored credentials. Naming
     /// one here is what puts an instance segment in its address.
-    pub name: Option<String>,
+    pub instance: Option<String>,
     /// Read the credential from an owner-only file instead of prompting.
     ///
     /// The scriptable path, and deliberately a **file rather than an environment variable or an
@@ -110,11 +110,11 @@ pub async fn run(
     let existing = PersonalConfig::read(config_path)?;
     // Named entries are distinct Connections of one provider, so a clash is on the *name*, not on
     // the provider: connecting a second Slack identity must not read as connecting Slack twice.
-    let identity = options.name.as_deref().unwrap_or(provider_id);
+    let identity = options.instance.as_deref().unwrap_or(provider_id);
     let already = existing
         .catalog
         .iter()
-        .any(|entry| entry.provider == provider_id && entry.name() == identity);
+        .any(|entry| entry.provider == provider_id && entry.instance() == identity);
 
     let credential = match options.credential.as_deref() {
         Some(name) => provider
@@ -191,7 +191,7 @@ pub async fn run(
     // command stores cannot land somewhere the backend does not look.
     let entry = connectors_config::CatalogIntegrationConfig {
         provider: provider_id.to_owned(),
-        name: options.name.clone(),
+        instance: options.instance.clone(),
         label: None,
         grant_ref: format!("grant:{provider_id}:local"),
         initiation: connectors_config::InitiationConfig::B10x,
@@ -346,8 +346,8 @@ fn append_entry(
          operator_approved = true\n",
         options.allow_writes
     );
-    if let Some(name) = options.name.as_deref() {
-        let _ = write!(block, "name = \"{name}\"\n");
+    if let Some(name) = options.instance.as_deref() {
+        let _ = write!(block, "instance = \"{name}\"\n");
     }
     if options.operator_network {
         let _ = write!(block, "network = \"operator\"\n");

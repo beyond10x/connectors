@@ -70,10 +70,15 @@ pub enum NetworkScopeConfig {
 pub struct CatalogIntegrationConfig {
     /// The catalogue provider id — `gitlab`, `sentry`, `datadog`.
     pub provider: String,
-    /// A stable name when one placement holds the same provider more than once. Defaults to the
-    /// provider id, which is right for the common case of holding it once.
+    /// Which instance of this provider, when one placement holds it more than once.
+    ///
+    /// The generic noun, deliberately. A workspace bot and a personal companion are two Slack
+    /// *instances*; what distinguishes them reads as a role only because Slack happens to have
+    /// bots and users. Another provider holds two instances for two tenants, or two regions, and
+    /// no word about roles would fit. Defaults to the provider id, which is right for the common
+    /// case of holding it once.
     #[serde(default)]
-    pub name: Option<String>,
+    pub instance: Option<String>,
     /// Human label for the resulting Connection.
     #[serde(default)]
     pub label: Option<String>,
@@ -119,16 +124,16 @@ pub struct CatalogIntegrationConfig {
 }
 
 impl CatalogIntegrationConfig {
-    /// The stable instance name, defaulting to the provider id.
+    /// The instance, defaulting to the provider id.
     #[must_use]
-    pub fn name(&self) -> &str {
-        self.name.as_deref().unwrap_or(&self.provider)
+    pub fn instance(&self) -> &str {
+        self.instance.as_deref().unwrap_or(&self.provider)
     }
 
-    /// The human label, defaulting to the instance name.
+    /// The human label, defaulting to the instance.
     #[must_use]
     pub fn label(&self) -> String {
-        self.label.clone().unwrap_or_else(|| self.name().to_owned())
+        self.label.clone().unwrap_or_else(|| self.instance().to_owned())
     }
 
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
