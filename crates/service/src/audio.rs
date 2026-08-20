@@ -185,7 +185,8 @@ pub fn admit_speech_speak(
     Ok((admitted, characters))
 }
 
-/// Non-serializable evidence handed only to the device-capable `driver-audio` crate.
+/// Non-serializable evidence handed only to the `driver-speech` crate, which turns it into an
+/// engine bound to whichever `driver-audio` device the deployment provided.
 pub struct AdmittedAudioPlan {
     provider: String,
     operation: String,

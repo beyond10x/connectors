@@ -41,9 +41,13 @@ pub struct SpeechAttestation {
     pub sample_rate_hz: u32,
     /// Channel count. The first profile is mono.
     pub channels: u8,
-    /// The resolved sink family.
-    pub sink: AudioSink,
-    /// The exact executable the sink was found as — deliberately not canonicalized.
+    /// The device's stack family, absent on a host that has no sound stack at all.
+    ///
+    /// A headless deployment records `None` here rather than a fabricated family: synthesis still
+    /// ran and still produced the byte count below, and the evidence says where it went.
+    pub sink: Option<AudioSink>,
+    /// The exact executable the device was found as — deliberately not canonicalized — or the
+    /// device's own name where there is no executable.
     pub sink_path: String,
 }
 

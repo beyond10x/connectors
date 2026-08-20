@@ -896,12 +896,6 @@ name = "driver-audio"
 version = "0.1.0"
 dependencies = [
  "domain",
- "protocol",
- "serde",
- "serde_json",
- "service",
- "sha2 0.10.9",
- "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -935,6 +929,20 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "driver-speech"
+version = "0.1.0"
+dependencies = [
+ "domain",
+ "driver-audio",
+ "protocol",
+ "serde",
+ "serde_json",
+ "service",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -1865,8 +1873,8 @@ dependencies = [
  "connector-resolve",
  "connectors-config",
  "domain",
- "driver-audio",
  "driver-cdp",
+ "driver-speech",
  "ed25519-dalek",
  "getrandom 0.3.4",
  "hex",
@@ -2002,6 +2010,7 @@ dependencies = [
  "connector-secrets",
  "connectors-config",
  "domain",
+ "driver-audio",
  "driver-sip",
  "ed25519-dalek",
  "getrandom 0.3.4",
@@ -2020,6 +2029,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "toml",
+ "voice-local-audio",
  "voice-runtime",
  "webpki-roots 1.0.9",
 ]
@@ -4707,6 +4717,15 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "voice-local-audio"
+version = "0.1.0"
+dependencies = [
+ "domain",
+ "thiserror 2.0.20",
+ "tokio",
+]
 
 [[package]]
 name = "voice-runtime"

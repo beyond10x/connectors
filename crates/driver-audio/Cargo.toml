@@ -1,6 +1,6 @@
 [package]
 name = "driver-audio"
-description = "Closed built-in audio_v1 driver: bounded local speech synthesis on a local sound device."
+description = "Closed built-in audio_v1 driver: this machine's sound device, in both directions."
 edition = "2021"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
@@ -15,12 +15,6 @@ members = ["."]
 
 [dependencies]
 domain = { version = "0.1.0", path = "../domain" }
-protocol = { version = "0.1.0", path = "../protocol" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-service = { version = "0.1.0", path = "../service" }
-sha2 = "0.10"
-thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"

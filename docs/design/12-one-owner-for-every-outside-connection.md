@@ -75,7 +75,8 @@ foundation/connectors/
     ── execution ───────────────────────────────────────────────────────
     integration-catalog        every declared HTTP provider. One adapter, 61 providers.
     driver-sip driver-audio    the non-HTTP drivers, closed set
-    driver-cdp
+    driver-cdp                 driver-audio is the sound device in both
+    driver-speech              directions; driver-speech is TTS/STT over it
     integration-sip            voice sessions
     integration-kubernetes     only what kubeconfig exec auth adds beyond HTTP
     integration-b10x     module sockets and signed module requests
