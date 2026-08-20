@@ -12,8 +12,6 @@ use connector_secrets::{
     TenantLayout,
 };
 use connectors_config::{HostedGitlabConfig, InitiationConfig};
-use hosted_state::PostgresState;
-
 use crate::state::GitlabState;
 use protocol::connection::{
     ConnectSessionStatus, ConnectionActor, ConnectionDescription, ConnectionError,
@@ -43,7 +41,7 @@ use service::{
 use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
 
-const INTEGRATION_REF: &str = "gitlab";
+pub(crate) const INTEGRATION_REF: &str = "gitlab";
 const AUTHORITY: &str = "com.gitlab.api";
 const SERVICE: &str = "default";
 const LOGIN_SERVICE: &str = "login";
@@ -52,12 +50,12 @@ const PROFILE_PAT: &str = "gitlab.personal_token";
 const ACCESS_TOKEN_CREDENTIAL: &str = "access_token";
 const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
 const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
-const STATE_KEY: &str = "gitlab.connections";
+pub(crate) const STATE_KEY: &str = "gitlab.connections";
 const AUDIT_KEY: &str = "gitlab.audit";
-const STATE_VERSION: u8 = 1;
-const MAX_STATE_BYTES: usize = 4 * 1024 * 1024;
+pub(crate) const STATE_VERSION: u8 = 1;
+pub(crate) const MAX_STATE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_AUDIT_BYTES: usize = 16 * 1024 * 1024;
-const MAX_CONNECT_SESSIONS: usize = 32;
+pub(crate) const MAX_CONNECT_SESSIONS: usize = 32;
 const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
 const VALUE_PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
 const GITLAB_OPERATIONS: [&str; 9] = [
@@ -98,7 +96,7 @@ pub struct GitlabBackend {
     inner: Arc<GitlabInner>,
 }
 
-struct GitlabInner {
+pub(crate) struct GitlabInner {
     tenant_id: String,
     policy: HostedGitlabConfig,
     origin: url::Url,
@@ -162,7 +160,7 @@ struct OAuthPending {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StateFile {
+pub(crate) struct StateFile {
     version: u8,
     next_transaction_generation: u64,
     connections: Vec<StoredConnection>,
@@ -255,50 +253,7 @@ struct PersonalTokenInfo {
 }
 
 impl GitlabBackend {
-    /// Open a hosted adapter with policy-only configuration and injected secret custody.
-    ///
-    /// The bookkeeping lives in Postgres because a hosted Connector runs as several replicas and
-    /// they must agree on which Connections exist.
-    pub async fn open_hosted(
-        tenant_id: String,
-        policy: HostedGitlabConfig,
-        credential_store: Arc<dyn PreparedSecretStore>,
-        state_store: PostgresState,
-    ) -> Result<Self, GitlabError> {
-        Self::open_inner(
-            tenant_id,
-            policy,
-            credential_store,
-            GitlabState::Hosted(state_store),
-        )
-        .await
-    }
-
-    /// Open the same adapter for one personal-local placement.
-    ///
-    /// Identical in everything a caller can observe. The only difference is where this Integration
-    /// keeps its own list of Connections: one process on one machine writes owner-only files beside
-    /// its socket, and needs no database to do it. Without this constructor GitLab could not be
-    /// composed anywhere without Postgres, which is why a workstation could not reach GitLab at
-    /// all — a fact about replica bookkeeping that read as "GitLab needs a database".
-    pub async fn open(
-        tenant_id: String,
-        policy: HostedGitlabConfig,
-        credential_store: Arc<dyn PreparedSecretStore>,
-        state_root: &std::path::Path,
-    ) -> Result<Self, GitlabError> {
-        Self::open_inner(
-            tenant_id,
-            policy,
-            credential_store,
-            GitlabState::Local {
-                root: state_root.to_path_buf(),
-            },
-        )
-        .await
-    }
-
-    async fn open_inner(
+    pub(crate) async fn open_inner(
         tenant_id: String,
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
@@ -353,6 +308,7 @@ impl GitlabBackend {
         inner.recover_pending().await?;
         Ok(Self { inner })
     }
+
 
     #[must_use]
     pub fn connection_count(&self) -> usize {
@@ -2613,7 +2569,7 @@ fn decode_transaction(encoded: &str) -> Result<SecretTransactionId, GitlabError>
         .ok_or_else(|| GitlabError::new("transaction-state"))
 }
 
-fn parse_origin(value: &str) -> Result<url::Url, GitlabError> {
+pub(crate) fn parse_origin(value: &str) -> Result<url::Url, GitlabError> {
     let origin = url::Url::parse(value).map_err(|_| GitlabError::new("origin"))?;
     if origin.scheme() != "https"
         || origin.host_str().is_none()
