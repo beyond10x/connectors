@@ -55,8 +55,13 @@ pub struct SipDialEstablished {
     pub call: String,
     /// Opaque voice-session reference.
     pub session: String,
-    /// Opaque application-channel reference.
-    pub channel: String,
+    /// Opaque application-channel reference, when the call was carried onward to one.
+    ///
+    /// **Absent for a raw SIP call.** SIP terminates a call at the edge; carrying it onward to an
+    /// application channel is a separate binding of the same neutral session contract. A receipt
+    /// that always claimed a channel would name one that does not exist.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
     /// Closed state token; always `established` in this response version.
     pub state: SipDialState,
 }

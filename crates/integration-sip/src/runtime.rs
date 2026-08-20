@@ -345,7 +345,11 @@ pub fn load_authority_issuer(config: &AuthorityConfig) -> Result<AuthorityIssuer
     ))
 }
 
-fn termination(
+/// Map a driver's terminal reason onto the protocol's session termination.
+///
+/// Shared with the raw SIP launcher: both bindings publish the same terminal vocabulary, which is
+/// the point of the neutral session contract.
+pub(crate) fn termination(
     reason: domain::voice::TerminationReason,
 ) -> protocol::operation::SessionTermination {
     use domain::voice::TerminationReason;

@@ -197,7 +197,7 @@ impl VoiceObserver for DialEstablishmentObserver {
             VoiceObservation::Established { descriptor } => Ok(SipDialEstablished {
                 call: descriptor.call.as_str().to_owned(),
                 session: descriptor.session.as_str().to_owned(),
-                channel: descriptor.channel.as_str().to_owned(),
+                channel: Some(descriptor.channel.as_str().to_owned()),
                 state: SipDialState::Established,
             }),
             VoiceObservation::Terminated { .. } => Err(DialEstablishmentError),

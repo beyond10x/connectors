@@ -350,7 +350,15 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
     assert_eq!(established.state, protocol::sip::SipDialState::Established);
     assert!(established.call.starts_with("sip-call-"));
     assert!(established.session.starts_with("sip-session-"));
-    assert!(established.channel.starts_with("sip-channel-"));
+    // The composed binding carries the call onward, so this receipt names a channel. A raw SIP
+    // call's receipt has none — that is the distinction the field became optional to express.
+    assert!(
+        established
+            .channel
+            .as_deref()
+            .expect("the composed binding carries the call to an application channel")
+            .starts_with("sip-channel-")
+    );
     let result = result.unwrap();
     assert_eq!(result.reason, domain::voice::TerminationReason::Completed);
     assert_eq!(result.source, TerminalSource::Application);

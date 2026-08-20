@@ -160,9 +160,18 @@ pub struct PersonalVoiceConfig {
     /// Connection, Grant and approval facts selected outside caller input.
     pub connection: ConnectionConfig,
     /// Session-authority issuer identity and private-key location.
-    pub authority: AuthorityConfig,
-    /// Exact RTVBP application endpoint and its transport destination.
-    pub application: ApplicationConfig,
+    ///
+    /// Absent for a raw SIP Connection. A session authority exists to let an application channel
+    /// prove it may join a call; with no application channel there is nothing to prove to.
+    pub authority: Option<AuthorityConfig>,
+    /// The application-channel endpoint a call's control and media are carried to.
+    ///
+    /// **Absent for a raw SIP Connection**, and that is the point. SIP is the trunk at the edge and
+    /// terminates a call on its own; carrying that call onward to an application channel is a
+    /// separate binding of the same neutral `VoiceSession` contract, not a stage SIP depends on.
+    /// Requiring this made a SIP Connection inexpressible without one, which is a statement about
+    /// the configuration rather than about either protocol.
+    pub application: Option<ApplicationConfig>,
     /// Connection-owned SIP destination aliases and admitted apertures.
     pub sip: SipConfig,
 }
@@ -529,19 +538,35 @@ impl PersonalConfig {
 
     /// Return voice configuration only when the complete group is present.
     pub fn voice(&self) -> Result<Option<PersonalVoiceConfig>, ConfigError> {
-        match (
-            &self.connection,
-            &self.authority,
-            &self.application,
-            &self.sip,
-        ) {
-            (None, None, None, None) => Ok(None),
-            (Some(connection), Some(authority), Some(application), Some(sip)) => {
+        match (&self.connection, &self.sip) {
+            (None, None) => {
+                // An authority or an application with no Connection and no SIP targets configures
+                // nothing and is a mistake worth naming rather than ignoring.
+                if self.authority.is_some() || self.application.is_some() {
+                    return Err(ConfigError::Invalid);
+                }
+                Ok(None)
+            }
+            // **A Connection plus SIP targets is a complete voice configuration.** The authority and
+            // the application channel are additions to it, not prerequisites: SIP terminates a call
+            // at the edge on its own, and carrying that call onward to an application is a separate
+            // binding of the same neutral session contract. Demanding all four made a raw SIP
+            // Connection inexpressible, which said something about this file rather than about
+            // either protocol.
+            //
+            // The pair is still required together: SIP targets with no Connection have no Grant to
+            // be admitted under, and a Connection with no targets can dial nothing.
+            (Some(connection), Some(sip)) => {
+                // An application channel needs an authority to issue its join credential, so one
+                // without the other is incomplete rather than raw.
+                if self.application.is_some() != self.authority.is_some() {
+                    return Err(ConfigError::Invalid);
+                }
                 let voice = PersonalVoiceConfig {
                     owner: self.owner.clone(),
                     connection: connection.clone(),
-                    authority: authority.clone(),
-                    application: application.clone(),
+                    authority: self.authority.clone(),
+                    application: self.application.clone(),
                     sip: sip.clone(),
                 };
                 voice.validate()?;
@@ -1076,16 +1101,22 @@ impl PersonalVoiceConfig {
 
     /// Build the admitted application route; the TCP/TLS target remains in the connector object.
     #[must_use]
-    pub fn application_route(&self) -> VoiceApplicationRoute {
-        VoiceApplicationRoute {
-            actor: self.application.actor.clone(),
-            audience: self.application.audience.clone(),
-            deployment: self.application.deployment.clone(),
-            resource: self.application.resource.clone(),
-            endpoint: self.application.endpoint.clone(),
-            authority_lifetime: Duration::from_secs(self.application.authority_lifetime_seconds),
-            session_lease: Duration::from_secs(self.application.session_lease_seconds),
-        }
+    /// The application-channel route, when this Connection carries a call onward to one.
+    ///
+    /// `None` is a raw SIP Connection: the call is established and terminated at the edge, and no
+    /// application channel is involved.
+    #[must_use]
+    pub fn application_route(&self) -> Option<VoiceApplicationRoute> {
+        let application = self.application.as_ref()?;
+        Some(VoiceApplicationRoute {
+            actor: application.actor.clone(),
+            audience: application.audience.clone(),
+            deployment: application.deployment.clone(),
+            resource: application.resource.clone(),
+            endpoint: application.endpoint.clone(),
+            authority_lifetime: Duration::from_secs(application.authority_lifetime_seconds),
+            session_lease: Duration::from_secs(application.session_lease_seconds),
+        })
     }
 
     /// Return the reviewed permission subject for one exact configured alias.
@@ -1102,14 +1133,12 @@ impl PersonalVoiceConfig {
     fn validate(&self) -> Result<(), ConfigError> {
         let owner = self.owner_context();
         owner.validate_for_config()?;
+        // The Connection and its SIP targets: everything a raw SIP call needs and nothing more.
         if !config_ref(&self.connection.connection_ref, 512)
             || self.connection.label.is_empty()
             || self.connection.label.len() > 1024
             || !config_ref(&self.connection.grant_ref, 512)
             || !config_ref(&self.connection.approval_evidence_ref, 512)
-            || !config_ref(&self.authority.key_id, 128)
-            || self.authority.signing_key_file.is_empty()
-            || self.application.tls_server_name.is_empty()
             || self.sip.targets.is_empty()
             || self
                 .sip
@@ -1119,7 +1148,25 @@ impl PersonalVoiceConfig {
         {
             return Err(ConfigError::Invalid);
         }
-        let issuer = url::Url::parse(&self.authority.issuer).map_err(|_| ConfigError::Invalid)?;
+        self.sip_routes()?;
+        // Everything below belongs to carrying a call onward to an application channel. A raw SIP
+        // Connection configures none of it, so none of it is checked — validating an absent
+        // application would be the same coupling this split exists to remove, moved one layer down.
+        self.validate_application_channel()
+    }
+
+    /// The application channel's own validation, when this Connection has one.
+    fn validate_application_channel(&self) -> Result<(), ConfigError> {
+        let (Some(authority), Some(application)) = (&self.authority, &self.application) else {
+            return Ok(());
+        };
+        if !config_ref(&authority.key_id, 128)
+            || authority.signing_key_file.is_empty()
+            || application.tls_server_name.is_empty()
+        {
+            return Err(ConfigError::Invalid);
+        }
+        let issuer = url::Url::parse(&authority.issuer).map_err(|_| ConfigError::Invalid)?;
         if issuer.scheme() != "https"
             || issuer.host_str().is_none()
             || !issuer.username().is_empty()
@@ -1129,14 +1176,14 @@ impl PersonalVoiceConfig {
         {
             return Err(ConfigError::Invalid);
         }
-        let endpoint =
-            url::Url::parse(&self.application.endpoint).map_err(|_| ConfigError::Invalid)?;
-        if endpoint.host_str() != Some(self.application.tls_server_name.as_str()) {
+        let endpoint = url::Url::parse(&application.endpoint).map_err(|_| ConfigError::Invalid)?;
+        if endpoint.host_str() != Some(application.tls_server_name.as_str()) {
             return Err(ConfigError::Invalid);
         }
-        self.sip_routes()?;
-        service::validate_voice_application_route(&self.application_route())
-            .map_err(|_| ConfigError::Invalid)?;
+        let route = self
+            .application_route()
+            .ok_or(ConfigError::Invalid)?;
+        service::validate_voice_application_route(&route).map_err(|_| ConfigError::Invalid)?;
         Ok(())
     }
 }

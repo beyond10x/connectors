@@ -18,13 +18,13 @@ use integration_jira::JiraBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
 use integration_sip::{
-    load_authority_issuer, RuntimeLauncher, SipOperationBackend, StoredSipCredentials,
+    load_authority_issuer, RuntimeLauncher, SipLauncher, SipOperationBackend, StoredSipCredentials,
 };
 use integration_slack::SlackBackend;
 use serde_json::{json, Value};
 use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
-use service::{ConnectorBackend, EgressTransport};
+use service::{ConnectorBackend, CredentialSet, EgressTransport};
 
 use crate::BackendRegistry;
 
@@ -55,6 +55,8 @@ pub enum RuntimeError {
     Monitoring(#[from] integration_monitoring::MonitoringError),
     #[error(transparent)]
     Kubernetes(#[from] integration_kubernetes::KubernetesBackendError),
+    #[error(transparent)]
+    ArgoCdAcquisition(integration_catalog::argocd::AcquireError),
     #[error(transparent)]
     KubernetesLocal(#[from] integration_kubernetes::KubernetesLocalError),
     #[error(transparent)]
@@ -199,19 +201,36 @@ impl PersonalRuntime {
             };
 
             if let Some(voice) = config.voice()? {
-                let issuer = Arc::new(load_authority_issuer(&voice.authority)?);
-                verifying_key = Some(hex::encode(issuer.verifying_key().to_bytes()));
-                let launcher = Arc::new(RuntimeLauncher::new(
-                    Arc::clone(&issuer),
-                    voice.application.endpoint.clone(),
-                    voice.application.connect_address,
-                    voice.application.tls_server_name.clone(),
-                ));
-                backends.push(Arc::new(SipOperationBackend::new(
-                    voice,
-                    launcher,
-                    &state_root,
-                )?));
+                // **Which launcher, decided by what was configured.** An application channel means
+                // the call is carried onward and needs a session authority to issue its join
+                // credential; without one the call terminates at the edge and neither exists. The
+                // two are separate bindings of one neutral session contract, and composing the
+                // composed launcher unconditionally is what made a raw SIP Connection impossible
+                // to express.
+                // Each arm yields the trait object: the two launchers are different types, and the
+                // registry holds backends by capability rather than by which binding built them.
+                let backend: Arc<dyn ConnectorBackend> = match (&voice.authority, &voice.application)
+                {
+                    (Some(authority), Some(application)) => {
+                        let issuer = Arc::new(load_authority_issuer(authority)?);
+                        verifying_key = Some(hex::encode(issuer.verifying_key().to_bytes()));
+                        let launcher = Arc::new(RuntimeLauncher::new(
+                            Arc::clone(&issuer),
+                            application.endpoint.clone(),
+                            application.connect_address,
+                            application.tls_server_name.clone(),
+                        ));
+                        Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
+                    }
+                    _ => {
+                        // Raw SIP: no signing key to load, no application endpoint to reach. The
+                        // trunk's own credentials, when the peer authenticates, still arrive
+                        // through the plan.
+                        let launcher = Arc::new(SipLauncher::new(CredentialSet::default()));
+                        Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
+                    }
+                };
+                backends.push(backend);
             }
             if let Some(grafana) = config.grafana {
                 let store = stores
@@ -445,7 +464,17 @@ impl HostedRuntime {
             {
                 return Err(connectors_config::HostedServerConfigError::Invalid.into());
             }
-            let issuer = Arc::new(load_authority_issuer(&voice.authority)?);
+            // A hosted SIP deployment always carries calls onward to an application channel — that
+            // is what it is for — so a configuration without one is incomplete rather than raw.
+            let authority = voice
+                .authority
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
+            let application = voice
+                .application
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
+            let issuer = Arc::new(load_authority_issuer(authority)?);
             let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
                 let store = credential_stores
                     .values
@@ -459,17 +488,17 @@ impl HostedRuntime {
                 )?);
                 Arc::new(RuntimeLauncher::with_credential_source(
                     issuer,
-                    voice.application.endpoint.clone(),
-                    voice.application.connect_address,
-                    voice.application.tls_server_name.clone(),
+                    application.endpoint.clone(),
+                    application.connect_address,
+                    application.tls_server_name.clone(),
                     source,
                 ))
             } else {
                 Arc::new(RuntimeLauncher::new(
                     issuer,
-                    voice.application.endpoint.clone(),
-                    voice.application.connect_address,
-                    voice.application.tls_server_name.clone(),
+                    application.endpoint.clone(),
+                    application.connect_address,
+                    application.tls_server_name.clone(),
                 ))
             };
             backends.push(Arc::new(SipOperationBackend::new_postgres(
@@ -628,6 +657,62 @@ impl HostedRuntime {
 fn monitoring_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
     let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
     Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
+}
+
+/// The Argo CD acquisition, packaged so a frontend can hand it to the console without unpacking it.
+///
+/// The composition root's whole job, in one function: it is the only place that may build a
+/// transport, so it is the only place that can turn "acquire an Argo CD token" into a value with
+/// the network already inside it. A frontend that assembled this itself would be composing an
+/// adapter, which is the thing `architecture_fence.rs` measures and refuses.
+#[must_use]
+pub fn argocd_acquisition(operator_network: bool) -> integration_catalog::argocd::Acquire {
+    Box::new(move |request| {
+        Box::pin(async move {
+            acquire_argocd_token(request, operator_network)
+                .await
+                .map_err(|error| error.to_string())
+        })
+    })
+}
+
+/// Mint an Argo CD API token, composing the one-origin aperture the acquisition may reach.
+///
+/// **This function exists so that nothing above it has to name a transport.** The product CLI's
+/// reviewed dependency surface is parsing, presentation and these two packages, and
+/// `connectors-console` is fenced against transports as well; both would have to grow an edge to
+/// `service` merely to hold an `Arc<dyn EgressTransport>` on its way through. So the composition
+/// root does what it is for — it builds the aperture, hands it to the acquisition, and returns a
+/// value the caller can hold without linking anything.
+///
+/// The aperture is one origin and nothing else: the operator's own Argo CD, at the address they
+/// approved. `operator_network` is theirs to assert, because an Argo CD reachable only inside their
+/// network is the ordinary case and a public-only scope would refuse it — the same choice a
+/// self-hosted `[[catalog]]` entry makes with `network = "operator"`.
+///
+/// # Errors
+///
+/// An origin no destination rule admits, or whatever the acquisition itself refuses.
+pub async fn acquire_argocd_token(
+    request: integration_catalog::argocd::AcquireRequest,
+    operator_network: bool,
+) -> Result<
+    (
+        integration_catalog::argocd::SecretString<String>,
+        integration_catalog::argocd::AcquiredToken,
+    ),
+    RuntimeError,
+> {
+    let scope = if operator_network {
+        AddressScope::OperatorNetwork
+    } else {
+        AddressScope::Public
+    };
+    let rule = DestinationRule::exact_origin(request.origin.trim_end_matches('/'), scope)?;
+    let egress = ConnectionEgress::new(vec![rule])?;
+    integration_catalog::argocd::acquire(&egress, request)
+        .await
+        .map_err(RuntimeError::ArgoCdAcquisition)
 }
 
 fn slack_egress() -> Result<Arc<dyn EgressTransport>, RuntimeError> {
