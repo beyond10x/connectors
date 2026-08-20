@@ -37,7 +37,11 @@ use protocol::operation::{
     OperationRequest, OperationResult, OperationSummary,
 };
 use serde_json::Value;
-use crate::local_workloads::WorkloadSurface;
+use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
+use crate::workloads::{
+    restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
+    RESTART_OPERATION, STATUS_OPERATION,
+};
 use service::{
     plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
 };
@@ -381,7 +385,38 @@ impl KubernetesLocalBackend {
         lock(&self.state).observations.get(observation_ref).cloned()
     }
 
+    /// The cluster Connection itself, when it is attached.
+    ///
+    /// Distinct from the child Service Connections below it: those are Prometheus and Loki behind
+    /// Kubernetes Services, reached by proxy. This is the cluster, and it is what
+    /// `kubernetes.deployment.*` acts on.
+    fn cluster_connection(&self) -> Option<(String, String)> {
+        let state = lock(&self.state);
+        state.clients.keys().next().and_then(|connection_ref| {
+            state
+                .connections
+                .get(connection_ref)
+                .map(|description| (connection_ref.clone(), description.summary.label.clone()))
+        })
+    }
+
     fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
+        // The two workload operations belong to the cluster, not to a Service behind it. Publishing
+        // them only for child Services is why an activated cluster admitted nothing a person could
+        // call: the Connection was attached, readable as a datasource, and had no operation at all.
+        if matches!(operation_ref, STATUS_OPERATION | RESTART_OPERATION) {
+            return self
+                .cluster_connection()
+                .map(|(connection_ref, label)| OperationConnectionSummary {
+                    connection_ref,
+                    label,
+                    provider: KUBERNETES.to_owned(),
+                    audiences: vec!["operations".to_owned()],
+                    purpose: None,
+                })
+                .into_iter()
+                .collect();
+        }
         let provider = monitoring_model::provider_for_operation(operation_ref);
         if !kubernetes_route_operation(operation_ref) {
             return Vec::new();
@@ -408,11 +443,33 @@ impl KubernetesLocalBackend {
 
     fn operation_summary(&self, operation_ref: &str) -> Option<OperationSummary> {
         let connections = self.connections_for_operation(operation_ref);
-        (!connections.is_empty()).then(|| OperationSummary {
+        if connections.is_empty() {
+            return None;
+        }
+        // A rollout restart changes a running deployment, so it carries the posture that says so.
+        // The monitoring route operations are proxied reads and keep theirs.
+        let (title, effect, approval) = match operation_ref {
+            STATUS_OPERATION => (
+                "Read Kubernetes deployment status",
+                EffectClass::ReadOnly,
+                ApprovalPosture::NotRequired,
+            ),
+            RESTART_OPERATION => (
+                "Restart a Kubernetes Deployment rollout",
+                EffectClass::Mutating,
+                ApprovalPosture::Required,
+            ),
+            _ => (
+                monitoring_model::title(operation_ref),
+                EffectClass::ReadOnly,
+                ApprovalPosture::NotRequired,
+            ),
+        };
+        Some(OperationSummary {
             operation_ref: operation_ref.to_owned(),
-            title: monitoring_model::title(operation_ref).to_owned(),
-            effect: EffectClass::ReadOnly,
-            approval: ApprovalPosture::NotRequired,
+            title: title.to_owned(),
+            effect,
+            approval,
             connections,
         })
     }
@@ -422,12 +479,20 @@ impl KubernetesLocalBackend {
         context: &PrincipalContext,
         operation_ref: &str,
     ) -> Result<OperationDescription, OperationError> {
-        let operation =
-            monitoring_model::operation_document(operation_ref).ok_or_else(operation_not_found)?;
         let connections = self.connections_for_operation(operation_ref);
         if connections.is_empty() {
             return Err(operation_not_found());
         }
+        // The two workload operations carry the contract every host mode publishes; only the
+        // Connections and the lease below are this placement's.
+        let description_ref = self.operation_description_ref(context, operation_ref);
+        match operation_ref {
+            STATUS_OPERATION => return Ok(status_operation(connections, description_ref)),
+            RESTART_OPERATION => return Ok(restart_operation(connections, description_ref)),
+            _ => {}
+        }
+        let operation =
+            monitoring_model::operation_document(operation_ref).ok_or_else(operation_not_found)?;
         Ok(OperationDescription {
             operation_ref: operation_ref.to_owned(),
             title: monitoring_model::title(operation_ref).to_owned(),
@@ -440,7 +505,7 @@ impl KubernetesLocalBackend {
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
             connections,
-            description_ref: self.operation_description_ref(context, operation_ref),
+            description_ref,
         })
     }
 
@@ -547,6 +612,76 @@ impl KubernetesLocalBackend {
             .connections
             .insert(connection_ref, description.clone());
         Ok(description)
+    }
+
+    /// Runs one `kubernetes.deployment.*` operation against the attached cluster.
+    ///
+    /// The description lease is checked first: a restart approved against one description must not
+    /// be dispatched after the surface moved underneath it. That is the whole reason the two
+    /// operations carry a lease rather than being callable from a bare reference.
+    async fn invoke_workload(
+        &self,
+        context: &PrincipalContext,
+        request: InvokeRequest,
+    ) -> Result<OperationResult, OperationError> {
+        let Some((connection_ref, _)) = self.cluster_connection() else {
+            return Err(operation_not_found());
+        };
+        if request.connection_ref != connection_ref {
+            return Err(operation_not_found());
+        }
+        if request.description_ref != self.operation_description_ref(context, &request.operation_ref)
+        {
+            return Err(OperationError::new(
+                OperationErrorCode::StaleAuthority,
+                "the Kubernetes operation description has moved on; describe it again and retry",
+                true,
+            ));
+        }
+        let client = {
+            let state = lock(&self.state);
+            state.clients.get(&connection_ref).cloned()
+        }
+        .ok_or_else(operation_unavailable)?;
+        let reader = KubeconfigReader::new(client);
+        let output = match request.operation_ref.as_str() {
+            STATUS_OPERATION => {
+                let input: DeploymentInput = serde_json::from_value(request.input)
+                    .map_err(|_| operation_invalid())?;
+                serde_json::to_value(reader.read(&input.namespace, &input.name).await?)
+                    .map_err(|_| operation_unavailable())?
+            }
+            RESTART_OPERATION => {
+                let input: RestartInput = serde_json::from_value(request.input)
+                    .map_err(|_| operation_invalid())?;
+                serde_json::to_value(
+                    reader
+                        .restart(
+                            &input.namespace,
+                            &input.name,
+                            &input.uid,
+                            &input.resource_version,
+                        )
+                        .await?,
+                )
+                .map_err(|_| operation_unavailable())?
+            }
+            _ => return Err(operation_not_found()),
+        };
+        Ok(OperationResult::Invoke(InvocationResult {
+            operation_ref: request.operation_ref.clone(),
+            output,
+            connector_audit_ref: opaque_ref(
+                "audit:kubernetes-workload:",
+                &format!(
+                    "{}\0{}\0{}",
+                    context.authority_snapshot_sha256(),
+                    request.operation_ref,
+                    connection_ref
+                ),
+            ),
+            execution_ref: None,
+        }))
     }
 
     async fn invoke_service(
@@ -688,15 +823,18 @@ impl ConnectorBackend for KubernetesLocalBackend {
 
     fn owns_operation(&self, request: &OperationRequest) -> bool {
         match request {
-            OperationRequest::Describe(request) => {
-                kubernetes_route_operation(&request.operation_ref)
-                    && !self
-                        .connections_for_operation(&request.operation_ref)
-                        .is_empty()
+            OperationRequest::Describe(request) => !self
+                .connections_for_operation(&request.operation_ref)
+                .is_empty(),
+            OperationRequest::Invoke(request) => {
+                lock(&self.state).children.contains_key(&request.connection_ref)
+                    || (matches!(
+                        request.operation_ref.as_str(),
+                        STATUS_OPERATION | RESTART_OPERATION
+                    ) && self
+                        .cluster_connection()
+                        .is_some_and(|(reference, _)| reference == request.connection_ref))
             }
-            OperationRequest::Invoke(request) => lock(&self.state)
-                .children
-                .contains_key(&request.connection_ref),
             OperationRequest::Search(_) => false,
             _ => false,
         }
@@ -733,7 +871,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
         match request {
             OperationRequest::Search(search) => {
                 let query = search.query.to_ascii_lowercase();
-                let mut operations = kubernetes_route_operations()
+                let mut operations = local_operations()
                     .into_iter()
                     .filter(|operation_ref| {
                         query.is_empty()
@@ -747,11 +885,18 @@ impl ConnectorBackend for KubernetesLocalBackend {
                 Ok(OperationResult::Search { operations })
             }
             OperationRequest::Describe(DescribeRequest { operation_ref })
-                if kubernetes_route_operation(&operation_ref)
-                    && !self.connections_for_operation(&operation_ref).is_empty() =>
+                if !self.connections_for_operation(&operation_ref).is_empty() =>
             {
                 self.operation_description(context, &operation_ref)
                     .map(OperationResult::Describe)
+            }
+            OperationRequest::Invoke(request)
+                if matches!(
+                    request.operation_ref.as_str(),
+                    STATUS_OPERATION | RESTART_OPERATION
+                ) =>
+            {
+                self.invoke_workload(context, request).await
             }
             OperationRequest::Invoke(request)
                 if lock(&self.state)
@@ -1325,6 +1470,14 @@ fn recognize_service(service: &Service) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+/// Every operation this placement can publish: the two cluster workload operations, then the
+/// proxied monitoring routes.
+fn local_operations() -> Vec<&'static str> {
+    let mut operations = vec![STATUS_OPERATION, RESTART_OPERATION];
+    operations.extend(kubernetes_route_operations());
+    operations
 }
 
 fn kubernetes_route_operations() -> [&'static str; 3] {

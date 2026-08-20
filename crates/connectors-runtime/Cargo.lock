@@ -1833,6 +1833,7 @@ dependencies = [
  "jsonschema 0.33.0",
  "protocol",
  "reqwest",
+ "rustix",
  "serde",
  "serde_json",
  "service",

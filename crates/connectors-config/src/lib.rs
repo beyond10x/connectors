@@ -16,7 +16,7 @@ pub use hosted::{
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,
     ConnectionConfig, B10xConnectionConfig, B10xIntegrationConfig,
-    GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, PersonalConfig,
-    PersonalVoiceConfig, SlackInstanceConfig, SlackInstanceProfile,
+    GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, OwnerConfig,
+    PersonalConfig, PersonalVoiceConfig, SlackInstanceConfig, SlackInstanceProfile,
     SlackIntegrationConfig,
 };

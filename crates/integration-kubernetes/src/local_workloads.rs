@@ -23,8 +23,8 @@ use crate::workloads::{
     namespace_binding, namespace_binding_ref, project_compact, project_pod, read_workloads,
     safe_event_reason, unavailable, valid_dns_label, CursorStore, DeploymentReader,
     DeploymentStatus, KubernetesDeployment, KubernetesEvent, KubernetesList, KubernetesPod,
-    RestartAccepted, WarningSummary, WorkloadDetail, WorkloadList, DATASOURCE,
-    MAX_KUBERNETES_RESPONSE_BYTES, MAX_RELATED_RECORDS,
+    now_unix_ms, outcome_unknown, project, stale, RestartAccepted, WarningSummary, WorkloadDetail,
+    WorkloadList, DATASOURCE, MAX_KUBERNETES_RESPONSE_BYTES, MAX_RELATED_RECORDS,
 };
 
 /// Reads the Kubernetes API through a `kube::Client` bound to one kubeconfig context.
@@ -87,6 +87,43 @@ fn datasource_error(error: kube::Error) -> DatasourceError {
     }
 }
 
+/// The same fault, said as an operation rather than as a read.
+fn operation_from_datasource(error: DatasourceError) -> OperationError {
+    let code = match error.code {
+        DatasourceErrorCode::NotFound => OperationErrorCode::NotFound,
+        DatasourceErrorCode::NotGranted => OperationErrorCode::NotGranted,
+        DatasourceErrorCode::InvalidInput => OperationErrorCode::InvalidInput,
+        _ => OperationErrorCode::Unavailable,
+    };
+    OperationError::new(code, error.message, error.retriable)
+}
+
+/// A refused restart, classified by what the cluster said.
+///
+/// A conflict means the Deployment moved between the read and the patch, which is a stale-authority
+/// refusal a caller fixes by reading again — not an unknown outcome. Anything the transport could
+/// not classify stays `OutcomeUnknown`, because a patch that may have been applied must never be
+/// reported as one that was not.
+fn restart_error(error: kube::Error) -> OperationError {
+    match error {
+        kube::Error::Api(status) => match status.code {
+            404 => OperationError::new(
+                OperationErrorCode::NotFound,
+                "Kubernetes Deployment was not found",
+                false,
+            ),
+            401 | 403 => OperationError::new(
+                OperationErrorCode::NotGranted,
+                "the active kubeconfig identity may not restart this Deployment",
+                false,
+            ),
+            409 | 422 => stale("Kubernetes Deployment changed before the restart patch"),
+            _ => outcome_unknown("Kubernetes rollout restart outcome is unknown after dispatch"),
+        },
+        _ => outcome_unknown("Kubernetes rollout restart outcome is unknown after dispatch"),
+    }
+}
+
 fn query(pairs: &[(&str, &str)]) -> String {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     for (key, value) in pairs {
@@ -114,14 +151,19 @@ fn path_segment(value: &str) -> Result<&str, DatasourceError> {
 
 #[async_trait]
 impl DeploymentReader for KubeconfigReader {
-    /// The `kubernetes.deployment.status` operation is not published by this placement, so nothing
-    /// calls this. The datasource carries the same fields and more.
-    async fn read(&self, _namespace: &str, _name: &str) -> Result<DeploymentStatus, OperationError> {
-        Err(OperationError::new(
-            OperationErrorCode::NotFound,
-            "the personal-local placement publishes Kubernetes workloads as a datasource",
-            false,
-        ))
+    async fn read(&self, namespace: &str, name: &str) -> Result<DeploymentStatus, OperationError> {
+        let namespace = path_segment(namespace).map_err(operation_from_datasource)?;
+        let name = path_segment(name).map_err(operation_from_datasource)?;
+        let deployment: KubernetesDeployment = self
+            .get_json(&format!(
+                "/apis/apps/v1/namespaces/{namespace}/deployments/{name}"
+            ))
+            .await
+            .map_err(operation_from_datasource)?;
+        if deployment.metadata.namespace != namespace || deployment.metadata.name != name {
+            return Err(unavailable("Kubernetes returned a different Deployment"));
+        }
+        Ok(project(deployment))
     }
 
     async fn list_workloads(
@@ -233,16 +275,60 @@ impl DeploymentReader for KubeconfigReader {
         })
     }
 
+    /// Restarts one rollout, and only the exact object the caller named.
+    ///
+    /// The uid and resourceVersion travel in the patch, so the API server refuses it outright if
+    /// the Deployment changed since the caller read it. That is what makes a restart safe to
+    /// approve against a cluster somebody else is also changing: the thing approved and the thing
+    /// patched are provably the same object.
     async fn restart(
         &self,
-        _namespace: &str,
-        _name: &str,
-        _uid: &str,
-        _resource_version: &str,
+        namespace: &str,
+        name: &str,
+        uid: &str,
+        resource_version: &str,
     ) -> Result<RestartAccepted, OperationError> {
-        Err(unavailable(
-            "the personal-local placement does not publish a Kubernetes rollout restart",
+        let namespace = path_segment(namespace).map_err(operation_from_datasource)?;
+        let name = path_segment(name).map_err(operation_from_datasource)?;
+        let body = serde_json::to_vec(&serde_json::json!({
+            "metadata": {"uid": uid, "resourceVersion": resource_version},
+            "spec": {"template": {"metadata": {"annotations": {
+                "kubectl.kubernetes.io/restartedAt": now_unix_ms().to_string()
+            }}}}
+        }))
+        .map_err(|_| outcome_unknown("Kubernetes restart patch could not be encoded"))?;
+        let request = http::Request::patch(format!(
+            "/apis/apps/v1/namespaces/{namespace}/deployments/{name}"
         ))
+        .header("content-type", "application/strategic-merge-patch+json")
+        .body(body)
+        .map_err(|_| unavailable("Kubernetes API endpoint is invalid"))?;
+        let response = self
+            .client
+            .request_text(request)
+            .await
+            .map_err(restart_error)?;
+        let deployment: KubernetesDeployment = serde_json::from_str(&response).map_err(|_| {
+            outcome_unknown("Kubernetes restart response is malformed after dispatch")
+        })?;
+        if deployment.metadata.namespace != namespace
+            || deployment.metadata.name != name
+            || deployment.metadata.uid != uid
+            || deployment.metadata.resource_version.is_empty()
+        {
+            return Err(OperationError::new(
+                OperationErrorCode::OutcomeUnknown,
+                "Kubernetes accepted a restart but returned unexpected authority",
+                false,
+            ));
+        }
+        Ok(RestartAccepted {
+            namespace: namespace.to_owned(),
+            name: name.to_owned(),
+            uid: uid.to_owned(),
+            resource_version: deployment.metadata.resource_version,
+            patch_accepted: true,
+        })
     }
 }
 

@@ -186,6 +186,15 @@ pub struct SlackInstanceConfig {
     pub purpose: Option<String>,
     /// Owner-only file holding the `xoxb-`/`xoxp-` token, by path.
     pub token_file: PathBuf,
+    /// Whether this identity is the one the agent *calls operations through*.
+    ///
+    /// Datasources are bound per identity and every one of them stays readable, because a binding
+    /// names its Connection. An operation does not: the agent's capability projection admits one
+    /// Connection per operation reference, so two identities that both publish
+    /// `slack-conversations-history` make it ambiguous and the session refuses to compose. At most
+    /// one instance may carry this, and it is the one whose Connection is selected.
+    #[serde(default)]
+    pub operations: bool,
 }
 
 /// The actor one declared Slack instance speaks as.
@@ -746,6 +755,15 @@ impl SlackIntegrationConfig {
             if !names.insert(instance.name.as_str()) {
                 return Err(ConfigError::Invalid);
             }
+        }
+        if self
+            .instances
+            .iter()
+            .filter(|instance| instance.operations)
+            .count()
+            > 1
+        {
+            return Err(ConfigError::Invalid);
         }
         Ok(())
     }

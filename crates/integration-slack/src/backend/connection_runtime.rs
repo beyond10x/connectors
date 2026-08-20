@@ -407,6 +407,33 @@ impl SlackInner {
         scopes: Vec<String>,
         credentials: SlackCredentials,
     ) -> Result<String, SlackError> {
+        self.register_connection_with(
+            instance_id,
+            label,
+            purpose,
+            true,
+            owner,
+            team_id,
+            external_subject_id,
+            scopes,
+            credentials,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn register_connection_with(
+        self: &Arc<Self>,
+        instance_id: String,
+        label: String,
+        purpose: String,
+        carries_operations: bool,
+        owner: SessionOwner,
+        team_id: String,
+        external_subject_id: String,
+        scopes: Vec<String>,
+        credentials: SlackCredentials,
+    ) -> Result<String, SlackError> {
         let connection_ref = format!("connection:slack:{instance_id}");
         let connection = StoredConnection {
             connection_ref: connection_ref.clone(),
@@ -431,6 +458,7 @@ impl SlackInner {
             external_subject_id,
             scopes,
             purpose,
+            carries_operations,
         };
         let app_credential_ref = self.app_credential_ref_for(&connection)?;
         if connection.profile == SlackConnectionProfile::Legacy
@@ -1015,10 +1043,16 @@ impl SlackInner {
             email: None,
             profile,
         };
-        self.register_connection(
+        // An identity that is not the operations identity still publishes its datasources — a
+        // binding names its Connection, so reading as each of them stays unambiguous — but it must
+        // not publish operations, because the agent's capability projection admits one Connection
+        // per operation reference and two identities publishing the same one refuse the session.
+        let carries_operations = instance.operations;
+        self.register_connection_with(
             instance_id,
             instance.name.clone(),
             instance.purpose.clone().unwrap_or_default(),
+            carries_operations,
             owner,
             evidence.team_id,
             evidence.subject_id,
