@@ -699,10 +699,14 @@ async fn planner_owner_events_are_checkpointed_into_connector_sequence_space() {
 fn browser_catalog_symbol_is_translated_into_the_closed_driver_input() {
     let document = Document::parse(DOCUMENT).unwrap();
     let operation = document.operation(BROWSER_OPEN_OPERATION).unwrap();
-    assert_eq!(
-        operation.input_schema()["required"],
-        serde_json::json!(["url_2"])
-    );
+    // **`url` is declared optional, and `browser.open` means it.** Opening with no URL is a
+    // blank browser, which is why `browser_open_input` returns an `Option`. This asserted the
+    // opposite because the contract projection marked every parameter required regardless of what
+    // the provider declared -- so a model was told it had to supply a URL it may not have.
+    assert_eq!(operation.input_schema()["required"], serde_json::json!([]));
+    assert!(operation.input_schema()["properties"]
+        .as_object()
+        .is_some_and(|properties| properties.contains_key("url_2")));
     assert_eq!(
         browser_open_input(serde_json::json!({"url_2":"https://example.com"}))
             .unwrap()

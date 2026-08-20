@@ -1,6 +1,7 @@
 //! Catalog-backed generic operation projection for the admitted SIP voice runtime.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::ToSocketAddrs as _;
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
@@ -23,7 +24,9 @@ use protocol::operation::{
 use protocol::sip::{
     SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF,
 };
-use service::{admit_sip_dial, admit_voice_dial, AdmittedSipPlan, AdmittedVoicePlan};
+use service::{
+    admit_sip_dial, admit_voice_dial, AdmittedSipPlan, AdmittedVoicePlan, FixedHostResolution,
+};
 use service::{
     plan_operation, BackendCapabilities, BackendReadinessError, ConnectorBackend,
     PlanningEnvironment, PrincipalContext,
@@ -373,9 +376,15 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         }
         let input: SipDialInput = serde_json::from_value(request.input).map_err(|_| invalid())?;
         input.validate().map_err(|_| invalid())?;
+        // The trunk actually selected, which is the default when the caller named none. Looking it
+        // up from the caller's field would leave an untargeted dial authorized against nothing.
+        let selected = self
+            .routes
+            .selected_alias(&input)
+            .map_err(|_| not_granted())?;
         let permission_subject = self
             .config
-            .permission_subject(&input.target)
+            .permission_subject(&selected)
             .ok_or_else(not_granted)?;
         let operation = self
             .document
@@ -406,12 +415,6 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             },
         )
         .map_err(|_| not_granted())?;
-        // **Raw SIP and SIP-plus-application-channel are two admissions, and both already exist.**
-        // `admit_sip_dial` produces socket-opening evidence for the call itself; `admit_voice_dial`
-        // additionally admits the application channel the call is carried onward to. Calling the
-        // second unconditionally meant a Connection could not be admitted without an application
-        // route, so raw SIP was unreachable — not because either protocol required the other, but
-        // because this line only knew one of them.
         // **Raw SIP and SIP-plus-application-channel are two admissions, and both already existed.**
         // `admit_sip_dial` produces socket-opening evidence for the call itself; `admit_voice_dial`
         // additionally admits the application channel a call is carried onward to. Calling the
@@ -422,9 +425,18 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         // The launch is dispatched here rather than behind one plan type because the two carry
         // different evidence, and a type that could hold either would let a launcher receive
         // application evidence it must not act on.
+        // **Resolve a named trunk here, off the reactor, before admission.**
+        //
+        // Two properties are being held at once. `getaddrinfo` blocks, and a telephony path that
+        // blocks the runtime thread stalls every other call sharing it — so the lookup runs on a
+        // blocking task. And the answer is handed *into* admission rather than used after it, so
+        // the address DNS chose is aperture-checked like any other; resolving afterwards would let
+        // anyone able to answer for the name redirect the call.
+        let resolver = self.resolve_pending_host(&input).await?;
+
         let launched = match self.config.application_route() {
             Some(route) => {
-                let admitted = admit_voice_dial(&plan, &input, &self.routes, route)
+                let admitted = admit_voice_dial(&plan, &input, &self.routes, route, &resolver)
                     .map_err(|_| not_granted())?;
                 let live_permit = Arc::clone(&self.live_capacity)
                     .try_acquire_owned()
@@ -433,8 +445,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                 (self.launcher.launch(admitted).await, live_permit)
             }
             None => {
-                let admitted =
-                    admit_sip_dial(&plan, &input, &self.routes).map_err(|_| not_granted())?;
+                let admitted = admit_sip_dial(&plan, &input, &self.routes, &resolver)
+                    .map_err(|_| not_granted())?;
                 let live_permit = Arc::clone(&self.live_capacity)
                     .try_acquire_owned()
                     .map_err(|_| unavailable())?;
@@ -519,6 +531,33 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             connector_audit_ref: audit_ref,
             execution_ref: Some(execution_ref),
         }))
+    }
+
+    /// Resolve this dial's trunk name, if it has one, without blocking the runtime thread.
+    ///
+    /// A trunk configured as a literal address resolves nothing and never leaves this function.
+    async fn resolve_pending_host(
+        &self,
+        input: &SipDialInput,
+    ) -> Result<FixedHostResolution, OperationError> {
+        let Some((host, port)) = self
+            .routes
+            .pending_host(input)
+            .map_err(|_| not_granted())?
+        else {
+            return Ok(FixedHostResolution(Vec::new()));
+        };
+        let resolved = tokio::task::spawn_blocking(move || {
+            // The system resolver, in the order it answered. A DNS load balancer's ordering is
+            // its own decision and is honoured rather than sorted or shuffled here.
+            (host.as_str(), port)
+                .to_socket_addrs()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default()
+        })
+        .await
+        .map_err(|_| unavailable())?;
+        Ok(FixedHostResolution(resolved))
     }
 
     fn prune_terminal_records(&self) -> Result<(), OperationError> {
@@ -949,7 +988,23 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
             OperationResult::Describe(description) => {
                 assert_eq!(description.effect, EffectClass::Mutating);
                 assert_eq!(description.approval, ApprovalPosture::Required);
-                assert_eq!(description.input_schema["required"][0], "target");
+                // **Neither input is required, and that is the contract.** The Connection names
+                // the trunk (or declares a default), and the trunk names its own endpoint, so a
+                // caller that supplies nothing still dials something admitted. This asserted
+                // `required[0] == "target"` while the projection marked every parameter mandatory
+                // regardless of what the provider declared.
+                assert_eq!(
+                    description.input_schema["required"].as_array().map(Vec::len),
+                    Some(0)
+                );
+                let properties = description.input_schema["properties"]
+                    .as_object()
+                    .expect("the input schema declares properties");
+                assert!(properties.contains_key("target"));
+                assert!(
+                    properties.contains_key("number"),
+                    "the dialled number must reach the model-facing surface"
+                );
                 assert_eq!(description.output_schema["required"][0], "call");
                 description.description_ref
             }

@@ -9554,12 +9554,7 @@
             },
             "variables": {}
           },
-          "required": [
-            "type",
-            "bridgeId",
-            "name",
-            "variables"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -10033,20 +10028,7 @@
             "variables": {}
           },
           "required": [
-            "endpoint",
-            "extension",
-            "context",
-            "priority",
-            "label",
-            "app",
-            "appArgs",
-            "callerId",
-            "timeout",
-            "channelId",
-            "otherChannelId",
-            "originator",
-            "formats",
-            "variables"
+            "endpoint"
           ],
           "type": "object"
         }
@@ -10475,9 +10457,7 @@
             }
           },
           "required": [
-            "channelId",
-            "reason_code",
-            "reason"
+            "channelId"
           ],
           "type": "object"
         }
@@ -11050,10 +11030,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "lang",
-            "format"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -11570,8 +11547,7 @@
           "required": [
             "configClass",
             "objectType",
-            "id",
-            "fields"
+            "id"
           ],
           "type": "object"
         }
@@ -12517,8 +12493,7 @@
             }
           },
           "required": [
-            "variable",
-            "value"
+            "variable"
           ],
           "type": "object"
         }
@@ -12742,10 +12717,7 @@
             "variables": {}
           },
           "required": [
-            "bridgeId",
-            "type",
-            "name",
-            "variables"
+            "bridgeId"
           ],
           "type": "object"
         }
@@ -12934,8 +12906,7 @@
             }
           },
           "required": [
-            "bridgeId",
-            "mohClass"
+            "bridgeId"
           ],
           "type": "object"
         }
@@ -13103,13 +13074,7 @@
           "required": [
             "bridgeId",
             "name",
-            "format",
-            "recorder_format",
-            "maxDurationSeconds",
-            "maxSilenceSeconds",
-            "ifExists",
-            "beep",
-            "terminateOn"
+            "format"
           ],
           "type": "object"
         }
@@ -13482,9 +13447,7 @@
           },
           "required": [
             "bridgeId",
-            "variable",
-            "value",
-            "report_events"
+            "variable"
           ],
           "type": "object"
         }
@@ -13840,13 +13803,7 @@
           },
           "required": [
             "endpoint",
-            "app",
-            "appArgs",
-            "channelId",
-            "otherChannelId",
-            "originator",
-            "formats",
-            "variables"
+            "app"
           ],
           "type": "object"
         }
@@ -14198,17 +14155,8 @@
             "variables": {}
           },
           "required": [
-            "channelId",
             "app",
-            "external_host",
-            "encapsulation",
-            "transport",
-            "connection_type",
-            "format",
-            "direction",
-            "data",
-            "transport_data",
-            "variables"
+            "format"
           ],
           "type": "object"
         }
@@ -14838,19 +14786,7 @@
           },
           "required": [
             "channelId",
-            "endpoint",
-            "extension",
-            "context",
-            "priority",
-            "label",
-            "app",
-            "appArgs",
-            "callerId",
-            "timeout",
-            "otherChannelId",
-            "originator",
-            "formats",
-            "variables"
+            "endpoint"
           ],
           "type": "object"
         }
@@ -15341,11 +15277,7 @@
             }
           },
           "required": [
-            "channelId",
-            "context",
-            "extension",
-            "priority",
-            "label"
+            "channelId"
           ],
           "type": "object"
         }
@@ -15480,9 +15412,7 @@
             }
           },
           "required": [
-            "channelId",
-            "caller",
-            "timeout"
+            "channelId"
           ],
           "type": "object"
         }
@@ -15596,12 +15526,7 @@
             }
           },
           "required": [
-            "channelId",
-            "dtmf",
-            "before",
-            "between",
-            "duration",
-            "after"
+            "channelId"
           ],
           "type": "object"
         }
@@ -15880,8 +15805,7 @@
             }
           },
           "required": [
-            "channelId",
-            "mohClass"
+            "channelId"
           ],
           "type": "object"
         }
@@ -16030,8 +15954,7 @@
           },
           "required": [
             "channelId",
-            "app",
-            "appArgs"
+            "app"
           ],
           "type": "object"
         }
@@ -16130,8 +16053,7 @@
             }
           },
           "required": [
-            "channelId",
-            "direction"
+            "channelId"
           ],
           "type": "object"
         }
@@ -16220,8 +16142,7 @@
             }
           },
           "required": [
-            "channelId",
-            "direction"
+            "channelId"
           ],
           "type": "object"
         }
@@ -16392,12 +16313,7 @@
           "required": [
             "channelId",
             "name",
-            "format",
-            "maxDurationSeconds",
-            "maxSilenceSeconds",
-            "ifExists",
-            "beep",
-            "terminateOn"
+            "format"
           ],
           "type": "object"
         }
@@ -17233,11 +17149,7 @@
           },
           "required": [
             "channelId",
-            "spy",
-            "whisper",
-            "app",
-            "appArgs",
-            "snoopId"
+            "app"
           ],
           "type": "object"
         }
@@ -17549,10 +17461,7 @@
           "required": [
             "channelId",
             "snoopId",
-            "spy",
-            "whisper",
-            "app",
-            "appArgs"
+            "app"
           ],
           "type": "object"
         }
@@ -18032,9 +17941,7 @@
           },
           "required": [
             "channelId",
-            "variable",
-            "value",
-            "report_events"
+            "variable"
           ],
           "type": "object"
         }
@@ -18491,9 +18398,7 @@
           "required": [
             "to",
             "from",
-            "refer_to",
-            "to_self",
-            "variables"
+            "refer_to"
           ],
           "type": "object"
         }
@@ -18641,9 +18546,7 @@
           },
           "required": [
             "to",
-            "from",
-            "body",
-            "variables"
+            "from"
           ],
           "type": "object"
         }
@@ -18993,9 +18896,7 @@
             "tech",
             "resource",
             "from",
-            "refer_to",
-            "to_self",
-            "variables"
+            "refer_to"
           ],
           "type": "object"
         }
@@ -19151,9 +19052,7 @@
           "required": [
             "tech",
             "resource",
-            "from",
-            "body",
-            "variables"
+            "from"
           ],
           "type": "object"
         }

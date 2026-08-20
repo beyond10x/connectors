@@ -1024,21 +1024,22 @@
     {
       "auth": [],
       "contract": {
-        "description": "Start one native SIP voice session to a destination configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, phone number, host, port, or PBX type. Establishing a call is externally visible and may ring or answer a real endpoint",
+        "description": "Start one native SIP voice session through a trunk configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, host, port, or PBX type, and may be omitted to use this Connection's default trunk. `number` is the party to dial through that trunk, digits only; the trunk decides where the call goes and whether a number may be dialled at all. Establishing a call is externally visible and may ring or answer a real endpoint",
         "input_schema": {
           "properties": {
+            "number": {
+              "type": "string"
+            },
             "target": {
               "type": "string"
             }
           },
-          "required": [
-            "target"
-          ],
+          "required": [],
           "type": "object"
         }
       },
       "credential_requirement": "no-credential-required",
-      "description": "Start one native SIP voice session to a destination configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, phone number, host, port, or PBX type. Establishing a call is externally visible and may ring or answer a real endpoint",
+      "description": "Start one native SIP voice session through a trunk configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, host, port, or PBX type, and may be omitted to use this Connection's default trunk. `number` is the party to dial through that trunk, digits only; the trunk decides where the call goes and whether a number may be dialled at all. Establishing a call is externally visible and may ring or answer a real endpoint",
       "direction": "write",
       "effects": [
         "write",
@@ -1051,10 +1052,10 @@
       "interaction_shape": "session_establishment",
       "params": [
         {
-          "description": "Opaque destination alias configured by an operator on this Connection, for example `staging-pbx`; the alias cannot contain a SIP URI or network address",
+          "description": "Opaque trunk alias configured by an operator on this Connection, for example `staging-pbx`; the alias cannot contain a SIP URI or network address. Omit it to use this Connection's default trunk",
           "name": "target",
           "position": "body",
-          "required": true,
+          "required": false,
           "schema": {
             "maxLength": 64,
             "minLength": 1,
@@ -1062,6 +1063,19 @@
             "type": "string"
           },
           "symbol": "target"
+        },
+        {
+          "description": "The party to dial through the selected trunk, digits only, for example `12341234`. It becomes the dialled user on the trunk's own destination and cannot change which host, port, or network the call reaches. Omit it to reach the trunk's own configured endpoint. A trunk that does not admit dialled numbers refuses this",
+          "name": "number",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[0-9]{1,32}$",
+            "type": "string"
+          },
+          "symbol": "number"
         }
       ],
       "placement_requirement": "connectors_deployment",
@@ -1077,7 +1091,7 @@
             "type": "string"
           },
           "channel": {
-            "description": "Opaque application-channel reference",
+            "description": "Opaque application-channel reference, absent when the call terminates at the SIP edge with no application channel",
             "type": "string"
           },
           "session": {
@@ -1085,7 +1099,7 @@
             "type": "string"
           },
           "state": {
-            "description": "The SIP dialog and voice application binding are established",
+            "description": "The SIP dialog is established, together with the voice application binding when this Connection carries one",
             "enum": [
               "established"
             ],
@@ -1095,7 +1109,6 @@
         "required": [
           "call",
           "session",
-          "channel",
           "state"
         ],
         "type": "object"
@@ -1270,9 +1283,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "url_2"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1760,9 +1771,7 @@
           },
           "required": [
             "branches",
-            "limit",
-            "predicate",
-            "subject"
+            "limit"
           ],
           "type": "object"
         }
@@ -2572,9 +2581,7 @@
           },
           "required": [
             "branches",
-            "limit",
-            "predicate",
-            "subject"
+            "limit"
           ],
           "type": "object"
         }
@@ -5686,8 +5693,6 @@
           "required": [
             "author",
             "claim_ids",
-            "evaluation",
-            "human_approval",
             "id",
             "risk",
             "source_branch",
@@ -6604,7 +6609,6 @@
             "digest",
             "id",
             "predicates",
-            "previous",
             "shapes"
           ],
           "type": "object"
@@ -6817,8 +6821,6 @@
           },
           "required": [
             "Idempotency_Key",
-            "description",
-            "references",
             "title"
           ],
           "type": "object"
@@ -7232,10 +7234,7 @@
             "cursor": {},
             "limit": {}
           },
-          "required": [
-            "cursor",
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -7564,9 +7563,6 @@
           "required": [
             "id",
             "Idempotency_Key",
-            "depends_on",
-            "description",
-            "references",
             "title"
           ],
           "type": "object"
@@ -8035,10 +8031,7 @@
             "cursor": {},
             "limit": {}
           },
-          "required": [
-            "cursor",
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -8631,10 +8624,7 @@
             "cursor": {},
             "limit": {}
           },
-          "required": [
-            "cursor",
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -14407,16 +14397,7 @@
             }
           },
           "required": [
-            "project",
-            "epic",
-            "include_deleted",
-            "kinds",
-            "milestone",
-            "projects",
-            "related_to",
-            "statuses",
-            "term",
-            "text"
+            "project"
           ],
           "type": "object"
         }
@@ -19100,11 +19081,7 @@
             }
           },
           "required": [
-            "project",
-            "cursor",
-            "include_deleted",
-            "kind",
-            "limit"
+            "project"
           ],
           "type": "object"
         }
@@ -25021,8 +24998,7 @@
             "state": {}
           },
           "required": [
-            "project",
-            "state"
+            "project"
           ],
           "type": "object"
         }
@@ -34929,17 +34905,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "epic",
-            "include_deleted",
-            "kinds",
-            "milestone",
-            "projects",
-            "related_to",
-            "statuses",
-            "term",
-            "text"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -35376,7 +35342,6 @@
           },
           "required": [
             "documents",
-            "git_revision",
             "inventory",
             "issues",
             "project"
@@ -57713,10 +57678,8 @@
           },
           "required": [
             "Idempotency_Key",
-            "expires_at_ms",
             "name",
-            "retention",
-            "source"
+            "retention"
           ],
           "type": "object"
         }
@@ -58072,9 +58035,7 @@
           },
           "required": [
             "workspace",
-            "Idempotency_Key",
-            "branch",
-            "source_ticket"
+            "Idempotency_Key"
           ],
           "type": "object"
         }
@@ -58285,9 +58246,7 @@
           "required": [
             "workspace",
             "checkout",
-            "path",
-            "offset",
-            "limit"
+            "path"
           ],
           "type": "object"
         }
@@ -58414,9 +58373,7 @@
           },
           "required": [
             "workspace",
-            "checkout",
-            "limit_items",
-            "include_hidden"
+            "checkout"
           ],
           "type": "object"
         }
@@ -58539,7 +58496,6 @@
             "path",
             "Idempotency_Key",
             "content_base64",
-            "create_parents",
             "expected"
           ],
           "type": "object"
@@ -59174,12 +59130,7 @@
             "workspace",
             "checkout",
             "Idempotency_Key",
-            "argv",
-            "cpu_millis",
-            "memory_bytes",
-            "output_bytes",
-            "processes",
-            "timeout_ms"
+            "argv"
           ],
           "type": "object"
         }
@@ -59373,9 +59324,7 @@
           },
           "required": [
             "Idempotency_Key",
-            "access",
-            "project",
-            "title"
+            "access"
           ],
           "type": "object"
         }
@@ -59555,7 +59504,6 @@
             "room",
             "Idempotency_Key",
             "checkout",
-            "make_current",
             "workspace"
           ],
           "type": "object"
@@ -59897,8 +59845,6 @@
           },
           "required": [
             "Idempotency_Key",
-            "canonical_remote",
-            "default_ref",
             "display_name",
             "id"
           ],
@@ -83785,8 +83731,7 @@
             "id",
             "Idempotency_Key",
             "expected_revision",
-            "gate",
-            "note"
+            "gate"
           ],
           "type": "object"
         }
@@ -110033,7 +109978,6 @@
           "required": [
             "Idempotency_Key",
             "documents",
-            "git_revision",
             "inventory",
             "issues",
             "project"
@@ -117863,9 +117807,6 @@
           },
           "required": [
             "Idempotency_Key",
-            "git_revision",
-            "inventory",
-            "issues",
             "project"
           ],
           "type": "object"

@@ -616,10 +616,7 @@
           },
           "required": [
             "application_id",
-            "revision",
-            "changelog",
-            "description",
-            "user"
+            "revision"
           ],
           "type": "object"
         }

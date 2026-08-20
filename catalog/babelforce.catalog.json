@@ -113,20 +113,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "q",
-            "enabled",
-            "name",
-            "number",
-            "sourceId",
-            "state",
-            "source",
-            "groupIds",
-            "groups",
-            "tags"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1262,9 +1249,7 @@
             "presence": {}
           },
           "required": [
-            "id",
-            "enabled",
-            "presence"
+            "id"
           ],
           "type": "object"
         }
@@ -1486,22 +1471,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "sessionId",
-            "conversationId",
-            "id",
-            "type",
-            "fromNumber",
-            "toNumber",
-            "time_start",
-            "time_end",
-            "agentId",
-            "q",
-            "state",
-            "finishReason"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -3489,8 +3459,7 @@
             "variables": {}
           },
           "required": [
-            "id",
-            "variables"
+            "id"
           ],
           "type": "object"
         }
@@ -3925,41 +3894,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "sessionId",
-            "conversationId",
-            "id",
-            "parentId",
-            "type",
-            "from",
-            "fromNumber",
-            "to",
-            "toNumber",
-            "time_start",
-            "time_end",
-            "agentId",
-            "queueName",
-            "agentName",
-            "bridged",
-            "duration_start",
-            "duration_end",
-            "waitTime_start",
-            "waitTime_end",
-            "queueWaitTime_start",
-            "queueWaitTime_end",
-            "bridgeTime_start",
-            "bridgeTime_end",
-            "talkTime_start",
-            "talkTime_end",
-            "holdTime_start",
-            "holdTime_end",
-            "wrapupTime_start",
-            "wrapupTime_end",
-            "handleTime_start",
-            "handleTime_end"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4779,14 +4714,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "q",
-            "uuid",
-            "sort",
-            "order"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5035,9 +4963,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "filters_level"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5227,9 +5153,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "email"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5622,10 +5546,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "id",
-            "all"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5722,9 +5643,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "type"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -7498,10 +7417,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -7935,9 +7851,7 @@
             }
           },
           "required": [
-            "groupId",
-            "page",
-            "max"
+            "groupId"
           ],
           "type": "object"
         }
@@ -9450,10 +9364,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -12985,11 +12896,7 @@
             }
           },
           "required": [
-            "id",
-            "page",
-            "max",
-            "filters_from",
-            "filters_to"
+            "id"
           ],
           "type": "object"
         }
@@ -14064,10 +13971,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -24208,10 +24112,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -24658,9 +24559,7 @@
             }
           },
           "required": [
-            "applicationId",
-            "page",
-            "max"
+            "applicationId"
           ],
           "type": "object"
         }
@@ -45615,16 +45514,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "filters_dateCreated_start",
-            "filters_dateCreated_end",
-            "max",
-            "page",
-            "sort",
-            "order",
-            "filters_operation",
-            "filters_resource"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -46003,10 +45893,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -46290,10 +46177,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -47526,10 +47410,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -48838,10 +48719,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -51912,10 +51790,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -52629,9 +52504,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "date"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -53865,10 +53738,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -54159,10 +54029,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -54453,10 +54320,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -55903,10 +55767,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -59032,12 +58893,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "phone",
-            "state"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -59395,10 +59251,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -64606,10 +64459,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "q",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -64831,9 +64681,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "type"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -65211,10 +65059,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -66146,8 +65991,6 @@
           },
           "required": [
             "eventTriggerId",
-            "timeout",
-            "simulateCall",
             "body"
           ],
           "type": "object"
@@ -67488,16 +67331,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "sort",
-            "order",
-            "type",
-            "state",
-            "filename",
-            "q"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -69279,10 +69113,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -72362,9 +72193,7 @@
           },
           "required": [
             "integrationId",
-            "action",
-            "callId",
-            "sessionId"
+            "action"
           ],
           "type": "object"
         }
@@ -72551,8 +72380,6 @@
           "required": [
             "integrationId",
             "action",
-            "callId",
-            "sessionId",
             "body"
           ],
           "type": "object"
@@ -73393,14 +73220,7 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "category",
-            "level",
-            "message",
-            "seq",
-            "timestamp",
-            "visible"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -74854,10 +74674,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -75511,14 +75328,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "campaignId",
-            "listId",
-            "leadId",
-            "number"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -76141,7 +75951,6 @@
           },
           "required": [
             "active",
-            "callRatio",
             "displayNumber",
             "listOrder",
             "name",
@@ -76593,13 +76402,7 @@
             }
           },
           "required": [
-            "id",
-            "active",
-            "callRatio",
-            "displayNumber",
-            "listOrder",
-            "name",
-            "testMode"
+            "id"
           ],
           "type": "object"
         }
@@ -77042,8 +76845,7 @@
             }
           },
           "required": [
-            "id",
-            "number"
+            "id"
           ],
           "type": "object"
         }
@@ -78892,9 +78694,7 @@
             }
           },
           "required": [
-            "id",
-            "from",
-            "to"
+            "id"
           ],
           "type": "object"
         }
@@ -79205,10 +79005,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -79900,12 +79697,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "max",
-            "status",
-            "listId"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -80291,10 +80083,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -81225,9 +81014,7 @@
             }
           },
           "required": [
-            "id",
-            "status",
-            "format"
+            "id"
           ],
           "type": "object"
         }
@@ -82759,10 +82546,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -83671,10 +83455,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -84771,10 +84552,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -85454,13 +85232,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "sort",
-            "order",
-            "includeMembers",
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -86409,9 +86181,7 @@
             }
           },
           "required": [
-            "queueId",
-            "page",
-            "max"
+            "queueId"
           ],
           "type": "object"
         }
@@ -86832,8 +86602,7 @@
             }
           },
           "required": [
-            "queueId",
-            "callId"
+            "queueId"
           ],
           "type": "object"
         }
@@ -86967,9 +86736,7 @@
             }
           },
           "required": [
-            "queueId",
-            "page",
-            "max"
+            "queueId"
           ],
           "type": "object"
         }
@@ -96101,10 +95868,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -99057,10 +98821,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -104238,10 +103999,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -104716,10 +104474,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -105825,10 +105580,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "max"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -110774,11 +110526,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "filter",
-            "page",
-            "page_size"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -111467,16 +111215,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "actions",
-            "body",
-            "id",
-            "queue_id",
-            "scheduled_at",
-            "selection_settings",
-            "task_completion",
-            "type"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -112642,10 +112381,7 @@
             "actions": {},
             "input": {}
           },
-          "required": [
-            "actions",
-            "input"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -113351,13 +113087,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "accept_timeout",
-            "complete_timeout",
-            "expire_in",
-            "reschedule_delay",
-            "selection_engine"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -113547,13 +113277,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "accept_timeout",
-            "complete_timeout",
-            "expire_in",
-            "reschedule_delay",
-            "selection_engine"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -113785,14 +113509,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "filter",
-            "type",
-            "details",
-            "page_size",
-            "page",
-            "context"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -114340,10 +114057,7 @@
             }
           },
           "required": [
-            "type",
-            "filter",
-            "page",
-            "page_size"
+            "type"
           ],
           "type": "object"
         }
@@ -114516,8 +114230,7 @@
           },
           "required": [
             "type",
-            "file",
-            "metadata"
+            "file"
           ],
           "type": "object"
         }
@@ -114688,8 +114401,7 @@
           },
           "required": [
             "codeId",
-            "type",
-            "response_2"
+            "type"
           ],
           "type": "object"
         }
@@ -114842,8 +114554,7 @@
           "required": [
             "codeId",
             "type",
-            "file",
-            "metadata"
+            "file"
           ],
           "type": "object"
         }
@@ -115100,7 +114811,6 @@
           },
           "required": [
             "template",
-            "style",
             "body"
           ],
           "type": "object"
@@ -115915,12 +115625,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "type",
-            "start",
-            "end",
-            "rate"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -116091,10 +115796,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "start",
-            "end"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -118163,10 +117865,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "page",
-            "page_size"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -118326,10 +118025,7 @@
           "required": [
             "cron",
             "name",
-            "task",
-            "template_id",
-            "template_style",
-            "timezone"
+            "task"
           ],
           "type": "object"
         }

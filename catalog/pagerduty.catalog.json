@@ -57,10 +57,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit",
-            "offset"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -472,10 +469,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit",
-            "offset"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -666,10 +660,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit",
-            "offset"
-          ],
+          "required": [],
           "type": "object"
         }
       },

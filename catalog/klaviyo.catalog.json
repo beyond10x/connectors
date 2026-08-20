@@ -497,15 +497,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "email",
-            "phone_number",
-            "external_id",
-            "first_name",
-            "last_name",
-            "organization",
-            "title"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -876,10 +868,7 @@
           "required": [
             "metric_name",
             "profile_email",
-            "properties",
-            "value",
-            "value_currency",
-            "unique_id"
+            "properties"
           ],
           "type": "object"
         }

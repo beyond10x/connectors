@@ -10,8 +10,8 @@ use domain::voice::{AudioFrame, TerminationReason};
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy};
 use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF};
 use service::{
-    admit_sip_dial, CredentialSet, SipDeploymentRoute, SipDialRouteTable, SipNetworkMode,
-    SipSignalingTransport, SocketAperture,
+    admit_sip_dial, CredentialSet, NoHostResolution, SipDeploymentRoute, SipDialRouteTable,
+    SipNetworkMode, SipSignalingTarget, SipSignalingTransport, SocketAperture,
 };
 use service::{plan_operation, PlanningEnvironment};
 use tokio_util::sync::CancellationToken;
@@ -84,7 +84,7 @@ async fn main() {
                 connection: connection.to_owned(),
                 signaling_bind: signal_bind,
                 sent_by: required("B10X_SIP_SENT_BY"),
-                target: signal_target,
+                target: SipSignalingTarget::Address(signal_target),
                 signaling_transport: SipSignalingTransport::Tcp,
                 to_uri: required("B10X_SIP_TO_URI"),
                 from_uri: required("B10X_SIP_FROM_URI"),
@@ -106,6 +106,7 @@ async fn main() {
                 ],
                 dial_timeout: Duration::from_secs(10),
                 network_mode: SipNetworkMode::OperatorAuthorizedDevelopment,
+                accepts_dialed_number: false,
             },
         )],
     )
@@ -113,9 +114,11 @@ async fn main() {
     let admitted = admit_sip_dial(
         &plan,
         &SipDialInput {
-            target: alias.to_owned(),
+            target: Some(alias.to_owned()),
+            number: None,
         },
         &routes,
+        &NoHostResolution,
     )
     .expect("exact characterization route is admitted");
     let session = driver_sip::establish_outbound(
