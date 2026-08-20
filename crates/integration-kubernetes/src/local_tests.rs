@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k8s_openapi::api::core::v1::ServicePort;
 
     #[test]
     fn passive_candidates_expose_only_context_label_and_opaque_evidence() {

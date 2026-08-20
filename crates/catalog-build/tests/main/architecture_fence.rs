@@ -28,11 +28,13 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/integration-gitlab/src/backend.rs",
-        2_875,
+        2_869,
         "the first GitLab slice keeps OAuth/PAT custody, connection reconciliation, operation \
          dispatch, and bounded datasource projections together while their transaction seam \
-         settles; no further growth is admitted before those arms split, +3 for the datasource \
-         binding and operation connection `purpose` at three literal sites",
+         settles; no further growth is admitted before those arms split. Composition was the first \
+         arm to split: `open`/`open_hosted` live in `src/open.rs` and the placement's own \
+         bookkeeping in `src/state.rs`, which is why this number went down rather than up when \
+         GitLab stopped requiring a database",
     ),
     (
         "crates/integration-monitoring/src/backend.rs",

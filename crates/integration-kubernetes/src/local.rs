@@ -11,16 +11,9 @@ use domain::{
     AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
 };
-use futures_util::AsyncReadExt as _;
-use http::{Method, Request as HttpRequest};
-use k8s_openapi::api::authentication::v1::SelfSubjectReview;
-use k8s_openapi::api::authorization::v1::{
-    ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
-};
-use k8s_openapi::api::core::v1::{Service, ServicePort};
-use kube::api::{ListParams, PostParams};
+use k8s_openapi::api::core::v1::Service;
 use kube::config::{KubeConfigOptions, Kubeconfig};
-use kube::{Api, Client, Config};
+use kube::{Client, Config};
 use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectionCandidateState,
     ConnectionCandidateSummary, ConnectionDescription, ConnectionError, ConnectionErrorCode,
@@ -36,7 +29,10 @@ use protocol::operation::{
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
-use serde_json::Value;
+use crate::local_services::{
+    can_get_service, can_proxy_service, discover_services, normalize_services, proxy_json,
+    service_is_current, verify_identity,
+};
 use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
 use crate::workloads::{
     restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
@@ -50,9 +46,9 @@ use sha2::{Digest as _, Sha256};
 use connectors_config::{InitiationConfig, KubernetesIntegrationConfig};
 
 const KUBERNETES: &str = "kubernetes";
-const DISCOVERY_REF: &str = "discovery:kubernetes-service-v1";
+pub(crate) const DISCOVERY_REF: &str = "discovery:kubernetes-service-v1";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
-const MAX_PROXY_RESULT_BYTES: usize = protocol::operation::MAX_RESULT_BYTES;
+pub(crate) const MAX_PROXY_RESULT_BYTES: usize = protocol::operation::MAX_RESULT_BYTES;
 
 /// Setup refusal for the personal-local Kubernetes backend. Details deliberately do not include
 /// kubeconfig contents, credential helpers, endpoints, or paths.
@@ -79,29 +75,29 @@ struct KubernetesState {
 }
 
 #[derive(Debug, Clone)]
-struct StoredServiceObservation {
-    summary: DiscoveryObservationSummary,
-    namespace: String,
-    service: String,
-    resource_uid: String,
-    port: String,
-    provider: String,
-    resource_binding: String,
+pub(crate) struct StoredServiceObservation {
+    pub(crate) summary: DiscoveryObservationSummary,
+    pub(crate) namespace: String,
+    pub(crate) service: String,
+    pub(crate) resource_uid: String,
+    pub(crate) port: String,
+    pub(crate) provider: String,
+    pub(crate) resource_binding: String,
 }
 
 #[derive(Debug, Clone)]
-struct KubernetesServiceConnection {
-    connection_ref: String,
-    label: String,
-    provider: String,
-    grant_ref: String,
-    parent_connection_ref: String,
-    observation_ref: String,
-    namespace: String,
-    service: String,
-    resource_uid: String,
-    port: String,
-    resource_binding: String,
+pub(crate) struct KubernetesServiceConnection {
+    pub(crate) connection_ref: String,
+    pub(crate) label: String,
+    pub(crate) provider: String,
+    pub(crate) grant_ref: String,
+    pub(crate) parent_connection_ref: String,
+    pub(crate) observation_ref: String,
+    pub(crate) namespace: String,
+    pub(crate) service: String,
+    pub(crate) resource_uid: String,
+    pub(crate) port: String,
+    pub(crate) resource_binding: String,
 }
 
 /// Personal-local backend which passively detects kubeconfig contexts, then contacts a cluster
@@ -1100,312 +1096,6 @@ fn context_uses_credential_plugin(kubeconfig: &Kubeconfig, context_name: &str) -
     })
 }
 
-async fn verify_identity(client: Client) -> Result<(), ConnectionError> {
-    let reviews: Api<SelfSubjectReview> = Api::all(client);
-    let reviewed = reviews
-        .create(&PostParams::default(), &SelfSubjectReview::default())
-        .await
-        .map_err(|_| connection_unavailable())?;
-    let username = reviewed
-        .status
-        .and_then(|status| status.user_info)
-        .and_then(|identity| identity.username);
-    if username.as_deref().is_none_or(str::is_empty) {
-        return Err(connection_unavailable());
-    }
-    Ok(())
-}
-
-async fn discover_services(
-    client: Client,
-    policy: &KubernetesIntegrationConfig,
-) -> Result<Vec<Service>, ConnectionError> {
-    let limit = u32::from(policy.resource_limit);
-    if policy.namespaces.is_empty() {
-        if !can_list_services(client.clone(), None).await? {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
-                "the selected Kubernetes identity cannot list Services cluster-wide",
-                false,
-            ));
-        }
-        let services: Api<Service> = Api::all(client);
-        let mut items = services
-            .list(&ListParams::default().limit(limit))
-            .await
-            .map(|list| list.items)
-            .map_err(|_| connection_unavailable())?;
-        items.truncate(usize::from(policy.resource_limit));
-        return Ok(items);
-    }
-
-    let mut remaining = usize::from(policy.resource_limit);
-    let mut discovered = Vec::new();
-    for namespace in &policy.namespaces {
-        if remaining == 0 {
-            break;
-        }
-        if !can_list_services(client.clone(), Some(namespace)).await? {
-            continue;
-        }
-        let services: Api<Service> = Api::namespaced(client.clone(), namespace);
-        let mut items = services
-            .list(&ListParams::default().limit(remaining as u32))
-            .await
-            .map_err(|_| connection_unavailable())?
-            .items;
-        items.truncate(remaining);
-        remaining -= items.len();
-        discovered.extend(items);
-    }
-    Ok(discovered)
-}
-
-async fn can_list_services(
-    client: Client,
-    namespace: Option<&str>,
-) -> Result<bool, ConnectionError> {
-    let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
-    let review = SelfSubjectAccessReview {
-        spec: SelfSubjectAccessReviewSpec {
-            resource_attributes: Some(ResourceAttributes {
-                group: Some(String::new()),
-                namespace: namespace.map(str::to_owned),
-                resource: Some("services".to_owned()),
-                verb: Some("list".to_owned()),
-                version: Some("v1".to_owned()),
-                ..ResourceAttributes::default()
-            }),
-            ..SelfSubjectAccessReviewSpec::default()
-        },
-        ..SelfSubjectAccessReview::default()
-    };
-    let reviewed = reviews
-        .create(&PostParams::default(), &review)
-        .await
-        .map_err(|_| connection_unavailable())?;
-    Ok(reviewed.status.is_some_and(|status| status.allowed))
-}
-
-async fn can_proxy_service(
-    client: Client,
-    namespace: &str,
-    service: &str,
-) -> Result<bool, OperationError> {
-    let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
-    let review = SelfSubjectAccessReview {
-        spec: SelfSubjectAccessReviewSpec {
-            resource_attributes: Some(ResourceAttributes {
-                group: Some(String::new()),
-                namespace: Some(namespace.to_owned()),
-                resource: Some("services".to_owned()),
-                subresource: Some("proxy".to_owned()),
-                name: Some(service.to_owned()),
-                verb: Some("get".to_owned()),
-                version: Some("v1".to_owned()),
-                ..ResourceAttributes::default()
-            }),
-            ..SelfSubjectAccessReviewSpec::default()
-        },
-        ..SelfSubjectAccessReview::default()
-    };
-    let reviewed = reviews
-        .create(&PostParams::default(), &review)
-        .await
-        .map_err(|_| operation_unavailable())?;
-    Ok(reviewed.status.is_some_and(|status| status.allowed))
-}
-
-async fn can_get_service(
-    client: Client,
-    namespace: &str,
-    service: &str,
-) -> Result<bool, OperationError> {
-    let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
-    let review = SelfSubjectAccessReview {
-        spec: SelfSubjectAccessReviewSpec {
-            resource_attributes: Some(ResourceAttributes {
-                group: Some(String::new()),
-                namespace: Some(namespace.to_owned()),
-                resource: Some("services".to_owned()),
-                name: Some(service.to_owned()),
-                verb: Some("get".to_owned()),
-                version: Some("v1".to_owned()),
-                ..ResourceAttributes::default()
-            }),
-            ..SelfSubjectAccessReviewSpec::default()
-        },
-        ..SelfSubjectAccessReview::default()
-    };
-    let reviewed = reviews
-        .create(&PostParams::default(), &review)
-        .await
-        .map_err(|_| operation_unavailable())?;
-    Ok(reviewed.status.is_some_and(|status| status.allowed))
-}
-
-async fn service_is_current(
-    client: Client,
-    child: &KubernetesServiceConnection,
-) -> Result<bool, OperationError> {
-    let services: Api<Service> = Api::namespaced(client, &child.namespace);
-    let current = services
-        .get(&child.service)
-        .await
-        .map_err(|_| operation_unavailable())?;
-    let Some(provider) = recognize_service(&current) else {
-        return Ok(false);
-    };
-    let Some(uid) = current.metadata.uid.as_deref() else {
-        return Ok(false);
-    };
-    let Some(port) = current
-        .spec
-        .as_ref()
-        .and_then(|spec| spec.ports.as_deref())
-        .and_then(|ports| select_service_port(provider, ports))
-    else {
-        return Ok(false);
-    };
-    let binding = format!(
-        "{}\0{}\0{}\0{}\0{}\0{}",
-        child.parent_connection_ref, child.namespace, child.service, port, uid, provider
-    );
-    Ok(provider == child.provider
-        && uid == child.resource_uid
-        && port == child.port
-        && opaque_ref("binding:kubernetes-service:", &binding) == child.resource_binding)
-}
-
-async fn proxy_json(
-    client: Client,
-    child: &KubernetesServiceConnection,
-    relative: &str,
-) -> Result<Value, OperationError> {
-    let route = format!(
-        "/api/v1/namespaces/{}/services/{}:{}/proxy{}",
-        child.namespace, child.service, child.port, relative
-    );
-    let request = HttpRequest::builder()
-        .method(Method::GET)
-        .uri(route)
-        .header(http::header::ACCEPT, "application/json")
-        .body(Vec::new())
-        .map_err(|_| operation_invalid())?;
-    let stream = client
-        .request_stream(request)
-        .await
-        .map_err(|_| operation_unavailable())?;
-    let mut bytes = Vec::new();
-    stream
-        .take((MAX_PROXY_RESULT_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .await
-        .map_err(|_| operation_unavailable())?;
-    if bytes.len() > MAX_PROXY_RESULT_BYTES {
-        return Err(OperationError::new(
-            OperationErrorCode::ResultTooLarge,
-            "Kubernetes Service proxy result exceeded the Connector bound",
-            false,
-        ));
-    }
-    serde_json::from_slice(&bytes).map_err(|_| operation_unavailable())
-}
-
-fn normalize_services(
-    source_connection_ref: &str,
-    services: Vec<Service>,
-) -> Vec<StoredServiceObservation> {
-    let mut seen = BTreeSet::new();
-    let mut observations = services
-        .into_iter()
-        .filter_map(|service| {
-            let provider = recognize_service(&service)?;
-            let namespace = service.metadata.namespace.as_deref()?;
-            let name = service.metadata.name.as_deref()?;
-            let uid = service.metadata.uid.as_deref()?;
-            let port = select_service_port(provider, service.spec.as_ref()?.ports.as_deref()?)?;
-            let binding =
-                format!("{source_connection_ref}\0{namespace}\0{name}\0{port}\0{uid}\0{provider}");
-            if !seen.insert(binding.clone()) {
-                return None;
-            }
-            let title = format!("{namespace}/{name} ({provider})");
-            Some(StoredServiceObservation {
-                summary: DiscoveryObservationSummary {
-                    observation_ref: opaque_ref("observation:kubernetes:", &binding),
-                    discovery_ref: DISCOVERY_REF.to_owned(),
-                    source_connection_ref: source_connection_ref.to_owned(),
-                    observed_type: "kubernetes_service".to_owned(),
-                    title,
-                    state: DiscoveryObservationState::Observed,
-                    evidence_generation: 1,
-                    evidence_sha256: digest(&binding),
-                    target_provider_ref: Some(provider.to_owned()),
-                    connection_ref: None,
-                },
-                namespace: namespace.to_owned(),
-                service: name.to_owned(),
-                resource_uid: uid.to_owned(),
-                port,
-                provider: provider.to_owned(),
-                resource_binding: opaque_ref("binding:kubernetes-service:", &binding),
-            })
-        })
-        .collect::<Vec<_>>();
-    observations.sort_by(|left, right| left.summary.title.cmp(&right.summary.title));
-    observations
-}
-
-fn select_service_port(provider: &str, ports: &[ServicePort]) -> Option<String> {
-    let candidates = ports
-        .iter()
-        .filter(|port| {
-            port.protocol
-                .as_deref()
-                .is_none_or(|protocol| protocol == "TCP")
-        })
-        .collect::<Vec<_>>();
-    let known_number = match provider {
-        "grafana" => 3000,
-        "prometheus" => 9090,
-        "loki" => 3100,
-        "alertmanager" => 9093,
-        _ => return None,
-    };
-    let preferred = candidates
-        .iter()
-        .copied()
-        .find(|port| port.port == known_number)
-        .or_else(|| {
-            candidates.iter().copied().find(|port| {
-                port.name.as_deref().is_some_and(|name| {
-                    matches!(
-                        name,
-                        "http"
-                            | "http-web"
-                            | "web"
-                            | "service"
-                            | "grafana"
-                            | "prometheus"
-                            | "loki"
-                            | "alertmanager"
-                    )
-                })
-            })
-        })
-        .or_else(|| (candidates.len() == 1).then_some(candidates[0]))?;
-    preferred
-        .name
-        .as_ref()
-        .filter(|name| valid_dns_label(name, 63))
-        .cloned()
-        .or_else(|| {
-            (1..=65_535)
-                .contains(&preferred.port)
-                .then(|| preferred.port.to_string())
-        })
-}
 
 fn child_is_current(state: &KubernetesState, child: &KubernetesServiceConnection) -> bool {
     state
@@ -1421,7 +1111,7 @@ fn child_is_current(state: &KubernetesState, child: &KubernetesServiceConnection
         })
 }
 
-fn valid_dns_label(value: &str, maximum: usize) -> bool {
+pub(crate) fn valid_dns_label(value: &str, maximum: usize) -> bool {
     !value.is_empty()
         && value.len() <= maximum
         && value
@@ -1437,7 +1127,7 @@ fn valid_dns_label(value: &str, maximum: usize) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
-fn recognize_service(service: &Service) -> Option<&'static str> {
+pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
     let name = service
         .metadata
         .name
@@ -1503,11 +1193,11 @@ fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     }
 }
 
-fn opaque_ref(prefix: &str, value: &str) -> String {
+pub(crate) fn opaque_ref(prefix: &str, value: &str) -> String {
     format!("{prefix}{}", &digest(value)[..32])
 }
 
-fn digest(value: &str) -> String {
+pub(crate) fn digest(value: &str) -> String {
     hex::encode(Sha256::digest(value.as_bytes()))
 }
 
@@ -1525,7 +1215,7 @@ fn connection_not_found() -> ConnectionError {
     )
 }
 
-fn connection_unavailable() -> ConnectionError {
+pub(crate) fn connection_unavailable() -> ConnectionError {
     ConnectionError::new(
         ConnectionErrorCode::Unavailable,
         "the selected Kubernetes context could not be verified",
@@ -1557,7 +1247,7 @@ fn operation_not_granted() -> OperationError {
     )
 }
 
-fn operation_invalid() -> OperationError {
+pub(crate) fn operation_invalid() -> OperationError {
     OperationError::new(
         OperationErrorCode::InvalidInput,
         "operation input is outside the catalog contract",
@@ -1565,7 +1255,7 @@ fn operation_invalid() -> OperationError {
     )
 }
 
-fn operation_unavailable() -> OperationError {
+pub(crate) fn operation_unavailable() -> OperationError {
     OperationError::new(
         OperationErrorCode::Unavailable,
         "Kubernetes Service route is unavailable",

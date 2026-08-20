@@ -4,6 +4,7 @@
 
 mod hosted;
 mod local;
+mod local_services;
 mod local_workloads;
 mod workloads;
 
