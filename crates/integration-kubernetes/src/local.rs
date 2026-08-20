@@ -46,6 +46,7 @@ use sha2::{Digest as _, Sha256};
 use connectors_config::{InitiationConfig, KubernetesIntegrationConfig};
 
 const KUBERNETES: &str = "kubernetes";
+const ARGOCD: &str = "argocd";
 pub(crate) const DISCOVERY_REF: &str = "discovery:kubernetes-service-v1";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
 pub(crate) const MAX_PROXY_RESULT_BYTES: usize = protocol::operation::MAX_RESULT_BYTES;
@@ -524,10 +525,16 @@ impl KubernetesLocalBackend {
         let observation = self
             .observation(&request.observation_ref)
             .ok_or_else(connection_not_found)?;
-        if observation.provider == monitoring_model::GRAFANA {
+        if credential_bearing_provider(&observation.provider) {
+            // The provider kind is already in the observation the caller is holding, so naming it
+            // here costs nothing and is the difference between a refusal someone can act on and one
+            // they have to guess at.
             return Err(ConnectionError::new(
                 ConnectionErrorCode::NotGranted,
-                "the discovered Grafana Service requires an explicit credential source",
+                format!(
+                    "the discovered {} Service requires an explicit credential source",
+                    observation.provider
+                ),
                 false,
             ));
         }
@@ -1127,6 +1134,22 @@ pub(crate) fn valid_dns_label(value: &str, maximum: usize) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
+/// Every Service name or identity label that names **exactly one** component, so a substring test
+/// would recognize its siblings too.
+///
+/// A default Argo CD install ships eight Services whose names contain `argocd`, and only
+/// `argocd-server` is the API. `argocd-repo-server` speaks a private gRPC protocol,
+/// `argocd-server-metrics` serves Prometheus text on a different port, and `argocd-redis` is a
+/// cache holding session state. `haystack.contains("argocd")` would offer all eight as Argo CD
+/// Connection candidates, and `contains("argocd-server")` would still take the metrics Service —
+/// which shares `app.kubernetes.io/component: server` — so this arm matches whole tokens and runs
+/// before the substring arms below.
+///
+/// Whole-token rather than name-only because a Helm release renames the Service: `argo-cd` chart
+/// installs it as `<release>-argocd-server` while keeping `app.kubernetes.io/name: argocd-server`,
+/// so the label is the stable identity and the name is not.
+const EXACT_IDENTITIES: [(&str, &str); 1] = [("argocd-server", "argocd")];
+
 pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
     let name = service
         .metadata
@@ -1145,10 +1168,16 @@ pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
                 .filter_map(|key| labels.get(key))
                 .map(|value| value.to_ascii_lowercase())
         });
-    let haystack = std::iter::once(name)
+    let identities = std::iter::once(name)
         .chain(identity_labels)
-        .collect::<Vec<_>>()
-        .join(" ");
+        .collect::<Vec<_>>();
+    if let Some((_, provider)) = EXACT_IDENTITIES
+        .iter()
+        .find(|(token, _)| identities.iter().any(|identity| identity == token))
+    {
+        return Some(provider);
+    }
+    let haystack = identities.join(" ");
     if haystack.contains("grafana") {
         Some("grafana")
     } else if haystack.contains("alertmanager") {
@@ -1168,6 +1197,30 @@ fn local_operations() -> Vec<&'static str> {
     let mut operations = vec![STATUS_OPERATION, RESTART_OPERATION];
     operations.extend(kubernetes_route_operations());
     operations
+}
+
+/// Whether a recognized provider's own API refuses an unauthenticated request, so this placement
+/// cannot open a Connection to it.
+///
+/// **A mediated call carries no credential.** `invoke_service` resolves the request with an empty
+/// credential slice, because the Kubernetes Service proxy is the whole of the authority it has: the
+/// caller's cluster identity gets the request to the Service, and nothing after that speaks for the
+/// caller to the Service's own API. That is exactly right for Prometheus, Loki and Alertmanager,
+/// which are ordinarily deployed inside a cluster with no authentication of their own.
+///
+/// It is exactly wrong for the two below. Grafana wants a service-account token; Argo CD wants an
+/// account or project-role JWT on every `/api/v1` request and answers 401 without one. Materializing
+/// either as a mediated Connection would publish something that looks callable and returns 401 on
+/// first use, so discovery stops at the observation: it tells the operator that this cluster runs
+/// one, and the Connection is opened directly against `providers/<id>.toml` with a token the
+/// operator supplies.
+///
+/// Giving this placement a credential source is real work rather than an oversight — it needs a
+/// custody surface, a config vocabulary, and a credential threaded into the mediated route for every
+/// provider at once, which would also let the discovered Grafana finally materialize. Design 10's
+/// 2026-08-20 amendment records it as the open follow-up.
+fn credential_bearing_provider(provider: &str) -> bool {
+    matches!(provider, monitoring_model::GRAFANA | ARGOCD)
 }
 
 fn kubernetes_route_operations() -> [&'static str; 3] {
