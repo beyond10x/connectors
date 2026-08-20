@@ -1,9 +1,9 @@
 //! Strict, value-free deployment-owned configuration for personal-local Connectors.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::{IpAddr, SocketAddr};
 use std::ops::RangeInclusive;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use domain::audio::AudioSink;
@@ -159,6 +159,66 @@ pub struct SlackIntegrationConfig {
     pub allowed_events: Vec<String>,
     #[serde(default = "default_connect_session_ttl_seconds")]
     pub connect_session_ttl_seconds: u64,
+    /// Named identities this placement holds at once, each with its own credential file.
+    #[serde(default)]
+    pub instances: Vec<SlackInstanceConfig>,
+}
+
+/// One named Slack identity a placement holds.
+///
+/// A workstation reaches Slack as more than one actor: the workspace bot for looking things up, the
+/// operator themself for what only they can see, an assistant bot for posting. Each is a separate
+/// Connection with its own token and its own authority, and an agent about to read or post has to
+/// be able to tell them apart — which is what `name` and `purpose` are for.
+///
+/// The credential is a **path**, never a value. Nothing that composes this file may open it; the
+/// Connector does, because the Connector is the process admitted to hold credentials. This is the
+/// same shape `HostedKubernetesConfig::token_file` and `AuthorityConfig::signing_key_file` take.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SlackInstanceConfig {
+    /// Stable, human-chosen identity. Fixes this instance's Connection and credential addresses.
+    pub name: String,
+    /// Which actor this instance is, and therefore what it may do. `org_bot` is read-only.
+    pub profile: SlackInstanceProfile,
+    /// When an agent should reach for this instance rather than another. Carried to the workbench.
+    #[serde(default)]
+    pub purpose: Option<String>,
+    /// Owner-only file holding the `xoxb-`/`xoxp-` token, by path.
+    pub token_file: PathBuf,
+}
+
+/// The actor one declared Slack instance speaks as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackInstanceProfile {
+    /// The workspace bot, admitted for reads only.
+    OrgBot,
+    /// The operator themself: everything their own Slack account can see.
+    OrgUser,
+    /// An assistant bot that may post and react.
+    CompanionBot,
+}
+
+impl SlackInstanceProfile {
+    /// The `auth_profile` reference this instance's Connection carries.
+    #[must_use]
+    pub const fn auth_profile(self) -> &'static str {
+        match self {
+            Self::OrgBot => "slack.org_bot",
+            Self::OrgUser => "slack.org_user",
+            Self::CompanionBot => "slack.companion_bot",
+        }
+    }
+
+    /// The token prefix this actor's credential must carry.
+    #[must_use]
+    pub const fn token_prefix(self) -> &'static str {
+        match self {
+            Self::OrgBot | Self::CompanionBot => "xoxb-",
+            Self::OrgUser => "xoxp-",
+        }
+    }
 }
 
 /// Value-free Grafana policy. The service-account token arrives only through a Connect Session.
@@ -678,6 +738,47 @@ impl SlackIntegrationConfig {
                 .any(|event| !matches!(event.as_str(), "app_mention" | "message.channels"))
             || !(30..=900).contains(&self.connect_session_ttl_seconds)
         {
+            return Err(ConfigError::Invalid);
+        }
+        let mut names = BTreeSet::new();
+        for instance in &self.instances {
+            instance.validate()?;
+            if !names.insert(instance.name.as_str()) {
+                return Err(ConfigError::Invalid);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl SlackInstanceConfig {
+    fn validate(&self) -> Result<(), ConfigError> {
+        // The name is an identity, not prose: it addresses a Connection, a credential and a
+        // datasource binding, and it appears in a path. Keeping it to a lowercase label means a
+        // name can never spell a second instance's address or escape its own directory.
+        if self.name.is_empty()
+            || self.name.len() > 64
+            || !self
+                .name
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+            || self.name.starts_with('-')
+            || self.name.ends_with('-')
+        {
+            return Err(ConfigError::Invalid);
+        }
+        if self
+            .purpose
+            .as_deref()
+            .is_some_and(|purpose| purpose.is_empty() || purpose.len() > 512)
+        {
+            return Err(ConfigError::Invalid);
+        }
+        // Absolute, because a relative credential path resolves against whatever directory the
+        // Connector happened to start in. The file's own ownership and mode are checked where it is
+        // read, not here: this type states the reference, and only the reader can state what it
+        // found.
+        if !self.token_file.is_absolute() {
             return Err(ConfigError::Invalid);
         }
         Ok(())

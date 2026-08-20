@@ -284,33 +284,57 @@ impl SlackInner {
             }
         };
         let secret = submission.secret();
-        let valid = secret.expose_secret().starts_with("xapp-");
-        let result = if valid {
-            let owner = lock(&self.session_owners)
-                .get(&session_ref)
-                .cloned()
-                .ok_or_else(|| SlackError::new("connect-session"));
-            match owner {
-                Ok(owner) => {
-                    self.complete_connection(
-                        &session_ref,
-                        owner,
-                        String::new(),
-                        String::new(),
-                        Vec::new(),
-                        SlackCredentials {
-                            app_token: Some(Secret::new(secret.expose_secret())),
-                            bot_token: None,
-                            user_token: None,
-                            refresh_token: None,
-                        },
-                    )
-                    .await
+        let owner = lock(&self.session_owners)
+            .get(&session_ref)
+            .cloned()
+            .ok_or_else(|| SlackError::new("connect-session"));
+        let result = match owner {
+            // A companion-bot session carries both tokens, in the same `xapp-\nxoxb-` form the
+            // hosted receiver accepts, and is verified the same way. Without this a personal
+            // placement acquired only the app token — Socket Mode events and nothing else — so
+            // `slack.conversations` and `slack.users` were published and could never be read: every
+            // read needs the bot credential the local flow had no way to accept. The workspace pin
+            // still holds; `verify_companion_credentials` checks the token's own team against it.
+            Ok(owner) if owner.profile == SlackConnectionProfile::CompanionBot => {
+                match parse_companion_submission(secret.expose_secret()) {
+                    Ok(credentials) => match self
+                        .verify_companion_credentials(&session_ref, &credentials)
+                        .await
+                    {
+                        Ok(evidence) => {
+                            self.complete_connection(
+                                &session_ref,
+                                owner,
+                                evidence.team_id,
+                                evidence.subject_id,
+                                evidence.scopes,
+                                credentials,
+                            )
+                            .await
+                        }
+                        Err(error) => Err(error),
+                    },
+                    Err(error) => Err(error),
                 }
-                Err(error) => Err(error),
             }
-        } else {
-            Err(SlackError::new("credential-shape"))
+            Ok(owner) if secret.expose_secret().starts_with("xapp-") => {
+                self.complete_connection(
+                    &session_ref,
+                    owner,
+                    String::new(),
+                    String::new(),
+                    Vec::new(),
+                    SlackCredentials {
+                        app_token: Some(Secret::new(secret.expose_secret())),
+                        bot_token: None,
+                        user_token: None,
+                        refresh_token: None,
+                    },
+                )
+                .await
+            }
+            Ok(_) => Err(SlackError::new("credential-shape")),
+            Err(error) => Err(error),
         };
         let accepted = match result {
             Ok(connection_ref) => {
@@ -320,7 +344,16 @@ impl SlackInner {
                 );
                 true
             }
-            Err(_) => {
+            Err(error) => {
+                // The session's own state carries no reason — `Failed` is all a caller can see —
+                // so the placement's log is the only place a person can find out whether Slack
+                // rejected the token, the workspace did not match, or the API was unreachable.
+                // The code only: a credential must never reach a log, and these codes name a class
+                // of fault rather than anything submitted.
+                eprintln!(
+                    "slack: connect session {session_ref} failed: {}",
+                    error.code
+                );
                 let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Failed);
                 false
             }
@@ -340,7 +373,40 @@ impl SlackInner {
         let label = lock(&self.sessions)
             .pending_label(session_ref)
             .map_err(|_| SlackError::new("connect-session"))?;
-        let instance_id = random_uuid()?;
+        // A session-acquired Connection has no name a person chose, so its identity is random and
+        // it exists for as long as its state file does. A declared instance takes the other route
+        // through `register_connection`, where the name fixes the identity.
+        self.register_connection(
+            random_uuid()?,
+            label,
+            String::new(),
+            owner,
+            team_id,
+            external_subject_id,
+            scopes,
+            credentials,
+        )
+        .await
+    }
+
+    /// Registers one Connection and commits its credentials in a single prepared transaction.
+    ///
+    /// Shared by both routes into a Slack Connection — a Connect Session somebody completed, and an
+    /// instance declared in configuration — because everything below the point where the credential
+    /// is in hand is identical, and a second copy of the prepare/persist/commit ordering is a
+    /// second place for a half-written connection to appear.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn register_connection(
+        self: &Arc<Self>,
+        instance_id: String,
+        label: String,
+        purpose: String,
+        owner: SessionOwner,
+        team_id: String,
+        external_subject_id: String,
+        scopes: Vec<String>,
+        credentials: SlackCredentials,
+    ) -> Result<String, SlackError> {
         let connection_ref = format!("connection:slack:{instance_id}");
         let connection = StoredConnection {
             connection_ref: connection_ref.clone(),
@@ -351,7 +417,10 @@ impl SlackInner {
                 .grant_for_profile(owner.profile.as_str())
                 .to_owned(),
             initiation: self.policy.initiation,
-            allowed_events: if owner.profile.receives_events() {
+            // Events need the app-level token that opens the socket they arrive on. A connection
+            // that advertised events it has no credential to receive would read to a person as
+            // wired up and then stay silent forever.
+            allowed_events: if owner.profile.receives_events() && credentials.app_token.is_some() {
                 self.policy.allowed_events.clone()
             } else {
                 Vec::new()
@@ -361,6 +430,7 @@ impl SlackInner {
             profile: owner.profile,
             external_subject_id,
             scopes,
+            purpose,
         };
         let app_credential_ref = self.app_credential_ref_for(&connection)?;
         if connection.profile == SlackConnectionProfile::Legacy
@@ -539,10 +609,11 @@ impl SlackInner {
             .bot_token
             .as_ref()
             .ok_or_else(|| SlackError::new("credential-shape"))?;
-        if credentials.app_token.is_none()
-            || credentials.user_token.is_some()
-            || credentials.refresh_token.is_some()
-        {
+        // The bot token is what a companion connection is for; the app-level token is optional
+        // because it only carries Socket Mode. A hosted receiver supplies both, a workstation
+        // usually supplies neither more than one — and a connection without events is a real,
+        // usable connection, where a connection without the bot token can answer nothing.
+        if credentials.user_token.is_some() || credentials.refresh_token.is_some() {
             return Err(SlackError::new("credential-shape"));
         }
         let evidence = self.auth_test(authority_ref, bot).await?;
@@ -632,7 +703,16 @@ impl SlackInner {
         connection: &StoredConnection,
         credential: &str,
     ) -> Result<CredentialRef, SlackError> {
-        if connection.profile == SlackConnectionProfile::OrgBot {
+        // The tenant-wide organisation install is the one Connection whose credential has no
+        // instance in its address, because there is exactly one of it and `ensure_org_connection`
+        // writes it there. Every other Connection — including a declared `org_bot` instance, of
+        // which a placement may hold several — owns its credential at its own instance address.
+        //
+        // Keying this on the profile instead of on that one Connection is what broke a declared
+        // `org_bot`: it stored its token per instance and then looked for it at the org address,
+        // and the read came back "Slack datasource is not granted for this Connection" for a token
+        // that was present and valid.
+        if connection.connection_ref == ORG_BOT_CONNECTION {
             CredentialRef::new(self.tenant_id(), AUTHORITY, SERVICE, credential)
                 .map_err(|_| SlackError::new("credential-address"))
         } else {
@@ -813,4 +893,174 @@ impl SlackInner {
             .await
             .map_err(|_| SlackError::new("socket-ack"))
     }
+}
+
+/// Reads one local companion-bot submission: a bot token, and nothing else.
+///
+/// One secret, because that is what the transport carries. A local completion endpoint reads with
+/// `read_until(b'\n')` and then refuses any submission containing whitespace at all
+/// (`connect-session-transport`, `secret_from_bytes`), so the app-plus-bot pair the hosted
+/// receiver takes as two lines cannot be expressed here under any separator — the hosted path
+/// carries an HTTP body and has no such bound.
+///
+/// A bot token alone is what the reads need: `slack.conversations` and `slack.users` are Web API
+/// calls and every one of them resolves the bot credential. The app-level token exists for Socket
+/// Mode, so a workstation that supplies none simply receives no events, which `complete_connection`
+/// records rather than pretends.
+///
+/// The token is never logged, echoed, or returned in a refusal — a malformed submission says only
+/// that it was malformed.
+pub(super) fn parse_companion_submission(value: &str) -> Result<SlackCredentials, SlackError> {
+    if !valid_slack_token(value, "xoxb-") {
+        return Err(SlackError::new("credential-shape"));
+    }
+    Ok(SlackCredentials {
+        app_token: None,
+        bot_token: Some(Secret::new(value)),
+        user_token: None,
+        refresh_token: None,
+    })
+}
+
+impl SlackInner {
+    /// Materialises every Slack identity this placement's configuration declares.
+    ///
+    /// A workstation reaches Slack as more than one actor at once — the workspace bot for looking
+    /// things up, the operator themself for what only they can see, an assistant bot for posting —
+    /// and each is a separate Connection with its own credential and its own authority. Declaring
+    /// them is what makes that possible without a person completing three Connect Sessions by hand
+    /// on every restart, and what makes each one's identity stable enough to reference.
+    ///
+    /// The credential arrives as a **path**. Nothing above this reads it: the placement is the
+    /// process admitted to hold credentials, so it is the one that opens the file, and the value
+    /// goes straight into the credential store addressed by this instance.
+    ///
+    /// Already-registered instances are skipped rather than re-verified, so a restart against
+    /// surviving state costs no Slack API call. A declared instance that fails is reported and
+    /// skipped: one bad token must not take the other two identities, or the whole placement, down.
+    pub(super) async fn ensure_declared_instances(self: &Arc<Self>) -> Result<(), SlackError> {
+        for instance in self.policy.instances.clone() {
+            let instance_id = instance_id_for_name(&instance.name);
+            let connection_ref = format!("connection:slack:{instance_id}");
+            if lock(&self.metadata)
+                .connections
+                .iter()
+                .any(|stored| stored.connection_ref == connection_ref)
+            {
+                continue;
+            }
+            if let Err(error) = self.register_declared_instance(&instance, instance_id).await {
+                eprintln!(
+                    "slack: instance `{}` was declared and is not connected: {}",
+                    instance.name, error.code
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn register_declared_instance(
+        self: &Arc<Self>,
+        instance: &SlackInstanceConfig,
+        instance_id: String,
+    ) -> Result<(), SlackError> {
+        let token = read_credential_file(&instance.token_file)?;
+        if !valid_slack_token(token.expose_secret(), instance.profile.token_prefix()) {
+            return Err(SlackError::new("instance-credential-shape"));
+        }
+        let profile = match instance.profile {
+            SlackInstanceProfile::OrgBot => SlackConnectionProfile::OrgBot,
+            SlackInstanceProfile::OrgUser => SlackConnectionProfile::OrgUser,
+            SlackInstanceProfile::CompanionBot => SlackConnectionProfile::CompanionBot,
+        };
+        // The Connection this credential is about to become is the authority for verifying it —
+        // the egress boundary admits only a `connection:`/`connect-session:` ref, and a bare
+        // instance name would be refused as an unknown authority.
+        let evidence = self
+            .auth_test(&format!("connection:slack:{instance_id}"), &token)
+            .await?;
+        // The declared actor and the token's own actor have to agree. A user token filed as the
+        // workspace bot would be read-only by policy and act as a person in fact — the exact
+        // confusion naming these instances is meant to remove.
+        let expects_a_bot = !matches!(instance.profile, SlackInstanceProfile::OrgUser);
+        if evidence.is_bot != expects_a_bot {
+            return Err(SlackError::new("instance-credential-subject"));
+        }
+        if self
+            .policy
+            .expected_team_id
+            .as_deref()
+            .is_some_and(|expected| expected != evidence.team_id)
+        {
+            return Err(SlackError::new("credential-workspace"));
+        }
+        let credentials = if matches!(instance.profile, SlackInstanceProfile::OrgUser) {
+            SlackCredentials {
+                app_token: None,
+                bot_token: None,
+                user_token: Some(Secret::new(token.expose_secret())),
+                refresh_token: None,
+            }
+        } else {
+            SlackCredentials {
+                app_token: None,
+                bot_token: Some(Secret::new(token.expose_secret())),
+                user_token: None,
+                refresh_token: None,
+            }
+        };
+        drop(token);
+        let owner = SessionOwner {
+            subject: self.owner_subject(),
+            email: None,
+            profile,
+        };
+        self.register_connection(
+            instance_id,
+            instance.name.clone(),
+            instance.purpose.clone().unwrap_or_default(),
+            owner,
+            evidence.team_id,
+            evidence.subject_id,
+            evidence.scopes,
+            credentials,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The subject a Connection this placement creates for itself belongs to.
+    fn owner_subject(&self) -> String {
+        match &self.admission {
+            PrincipalAdmission::Exact(owner) => owner.subject().to_owned(),
+            PrincipalAdmission::Tenant(_) => String::new(),
+        }
+    }
+}
+
+/// Reads one credential out of an owner-only file.
+///
+/// The mode is checked before the read, not after: a token any other local account can open is a
+/// token that has already leaked, and reporting that as a refusal rather than quietly using it is
+/// the only way a person finds out. Bounded, because a path that turns out to be a log or a device
+/// must not be pulled into memory whole.
+pub(super) fn read_credential_file(path: &Path) -> Result<Secret, SlackError> {
+    const MAX_CREDENTIAL_FILE_BYTES: u64 = 8 * 1024;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| SlackError::new("instance-credential-unreadable"))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != rustix::process::geteuid().as_raw()
+        || metadata.permissions().mode() & 0o077 != 0
+        || metadata.len() > MAX_CREDENTIAL_FILE_BYTES
+    {
+        return Err(SlackError::new("instance-credential-unsafe"));
+    }
+    let value = Zeroizing::new(
+        fs::read_to_string(path).map_err(|_| SlackError::new("instance-credential-unreadable"))?,
+    );
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(SlackError::new("instance-credential-shape"));
+    }
+    Ok(Secret::new(trimmed))
 }

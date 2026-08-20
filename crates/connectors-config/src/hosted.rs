@@ -143,6 +143,9 @@ impl HostedSlackConfig {
             initiation: self.initiation,
             allowed_events: self.allowed_events.clone(),
             connect_session_ttl_seconds: self.connect_session_ttl_seconds,
+            // A hosted receiver acquires every identity through OAuth or an org install; it never
+            // reads a credential off a local path, so it declares no instances.
+            instances: Vec::new(),
         }
     }
 }

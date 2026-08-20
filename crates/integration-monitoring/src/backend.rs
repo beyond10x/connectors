@@ -907,6 +907,7 @@ impl MonitoringInner {
                         label: parent.label.clone(),
                         provider: provider.to_owned(),
                         audiences: audiences_for_operation(operation_ref),
+                        purpose: None,
                     }]
                 })
                 .unwrap_or_default();
@@ -920,6 +921,7 @@ impl MonitoringInner {
                 label: child.label.clone(),
                 provider: provider.to_owned(),
                 audiences: audiences_for_operation(operation_ref),
+                purpose: None,
             })
             .collect()
     }

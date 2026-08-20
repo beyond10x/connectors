@@ -179,6 +179,13 @@ pub struct DatasourceBinding {
     pub connection_ref: String,
     /// Safe scope label, such as one admitted namespace.
     pub label: String,
+    /// When a caller should read through this binding rather than another of the same datasource.
+    ///
+    /// Free text the deployment or the operator wrote. One datasource can be bound to several
+    /// Connections that are genuinely different actors — a workspace bot, a person, an assistant —
+    /// and which one to read through is not answerable from a label alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
     /// Authority generation for stale-binding refusal.
     pub generation: u64,
 }

@@ -189,6 +189,7 @@ impl B10xBackend {
                         .collect()
                 })
                 .unwrap_or_default(),
+            purpose: None,
         }
     }
 

@@ -28,6 +28,7 @@ impl JiraInner {
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
+                purpose: None,
             })
             .collect()
     }

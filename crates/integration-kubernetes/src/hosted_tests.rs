@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hosted::datasource::datasource_description_ref;
+    use protocol::datasource::DatasourceRead;
 
     struct Reader;
 
@@ -245,7 +245,7 @@ mod tests {
         else {
             panic!("datasource description expected");
         };
-        let binding = namespace_binding("b10x");
+        let binding = namespace_binding(CONNECTION, "b10x");
         let DatasourceResult::Read(page) = backend
             .handle_datasource(
                 &context,
@@ -328,7 +328,7 @@ mod tests {
                 &reading,
                 DatasourceRequest::Read(ReadRequest {
                     datasource_ref: DATASOURCE.to_owned(),
-                    binding_ref: namespace_binding("b10x").binding_ref,
+                    binding_ref: namespace_binding(CONNECTION, "b10x").binding_ref,
                     description_ref: description.description_ref,
                     read: DatasourceRead::List {
                         limit: 5,
@@ -467,7 +467,7 @@ mod tests {
                 &context,
                 DatasourceRequest::Read(ReadRequest {
                     datasource_ref: DATASOURCE.to_owned(),
-                    binding_ref: namespace_binding("b10x").binding_ref,
+                    binding_ref: namespace_binding(CONNECTION, "b10x").binding_ref,
                     description_ref: datasource_description_ref(&context),
                     read: DatasourceRead::List {
                         limit: 5,

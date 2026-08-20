@@ -1111,6 +1111,7 @@ impl GitlabInner {
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
+                purpose: None,
             })
             .collect()
     }
@@ -1623,6 +1624,7 @@ impl GitlabInner {
                         connection_ref: connection.connection_ref.clone(),
                         label,
                         generation: connection.credential_generation,
+                        purpose: None,
                     });
                     if bindings.len() >= limit {
                         return Ok(bindings);
@@ -1640,6 +1642,7 @@ impl GitlabInner {
                     connection_ref: connection.connection_ref.clone(),
                     label: connection.label.clone(),
                     generation: connection.credential_generation,
+                    purpose: None,
                 });
                 if bindings.len() >= limit {
                     return Ok(bindings);
