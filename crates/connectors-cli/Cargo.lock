@@ -675,6 +675,7 @@ dependencies = [
  "connectors-client",
  "connectors-config",
  "hex",
+ "integration-catalog",
  "protocol",
  "rpassword",
  "rustix",

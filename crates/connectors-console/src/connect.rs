@@ -32,15 +32,27 @@ const GUIDED: [&str; 3] = ["slack", "grafana", "kubernetes"];
 
 /// Which flow a provider uses, and why.
 ///
-/// The three guided providers complete a **Connect Session** against a running Connector: that is
-/// how a credential which the provider itself issues — a Socket Mode app token, an OAuth grant —
-/// arrives without passing through a caller. Everything else the catalogue declares is a value the
-/// operator already holds, so it needs no session and no daemon.
+/// The guided flow completes a **Connect Session** against a running Connector — how a credential
+/// the provider itself issues (a Socket Mode app token, an OAuth grant) arrives without passing
+/// through a caller. It is only reachable when that curated Integration is actually **composed**,
+/// which for Slack and Grafana means the configuration declares its section.
 ///
-/// Deciding this here rather than in the frontend keeps the rule in one place: a fourth provider
-/// gaining a guided flow should not require the CLI to learn about it.
-pub fn is_guided(provider: &str) -> bool {
-    GUIDED.contains(&provider)
+/// So the test is not "is this one of three names" but "is its curated backend there to answer".
+/// Deciding on the name alone sent `connect slack` into a Connect Session against a daemon with no
+/// Slack backend, which refused with `no Integration owns this Connection request` — a true
+/// statement that tells an operator nothing about what to do. A catalogued provider whose curated
+/// Integration is absent is connected from its declarations instead, which works.
+#[must_use]
+pub fn is_guided(provider: &str, config: &PersonalConfig) -> bool {
+    match provider {
+        "slack" => config.slack.is_some(),
+        "grafana" => config.grafana.is_some(),
+        // Kubernetes has no catalogued surface at all — it is not in the catalogue — so its guided
+        // flow is the only way in, configured or not. Saying so beats falling through to a
+        // catalogue lookup that can only fail.
+        "kubernetes" => true,
+        _ => false,
+    }
 }
 
 /// Run whichever flow this provider uses.
@@ -57,7 +69,7 @@ pub async fn dispatch(
     context: Option<String>,
     options: crate::enrol::Options,
 ) -> Result<Value, ConnectError> {
-    if is_guided(provider) {
+    if is_guided(provider, config) {
         return run(provider, config, state_root, label, context).await;
     }
     Ok(crate::enrol::run(provider, config_path, state_root, &options).await?)
@@ -208,6 +220,25 @@ async fn submit_credential(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A configuration declaring no curated Integration — the ordinary state of a fresh install.
+    fn minimal_config() -> PersonalConfig {
+        let toml = "[owner]\ntenant_id = \"local\"\nagent_id = \"a\"\nagent_revision = 1\n\
+                    authority_snapshot_id = \"s\"\nauthority_snapshot_sha256 = \"00\"\n";
+        toml::from_str(toml).expect("a minimal owner-only configuration parses")
+    }
+
+    #[test]
+    fn a_catalogued_provider_whose_curated_backend_is_absent_takes_the_catalogue_path() {
+        // The case that produced `no Integration owns this Connection request`: Slack is a guided
+        // name, but with no `[slack]` section there is no backend to hold a Connect Session, and
+        // the catalogue declares eight Slack operations that a bot token can serve today.
+        let config = minimal_config();
+        assert!(!is_guided("slack", &config));
+        assert!(!is_guided("grafana", &config));
+        // Kubernetes is not catalogued, so there is no other path to fall through to.
+        assert!(is_guided("kubernetes", &config));
+    }
 
     #[test]
     fn a_provider_outside_the_guided_set_is_refused_by_name() {

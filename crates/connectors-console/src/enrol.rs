@@ -31,7 +31,6 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
-use connector_address::CredentialRef;
 use connector_secrets::Secret;
 use connectors_config::PersonalConfig;
 use serde_json::{json, Value};
@@ -50,6 +49,12 @@ pub struct Options {
     pub operator_network: bool,
     /// Replace an existing entry for this provider.
     pub force: bool,
+    /// A stable name, when this placement holds the same provider more than once.
+    ///
+    /// Two Slack identities — a workspace bot and a personal companion — are the same provider,
+    /// tenant and credential name, so only an instance separates their stored credentials. Naming
+    /// one here is what puts an instance segment in its address.
+    pub name: Option<String>,
     /// Read the credential from an owner-only file instead of prompting.
     ///
     /// The scriptable path, and deliberately a **file rather than an environment variable or an
@@ -103,13 +108,16 @@ pub async fn run(
         .ok_or_else(|| EnrolError::NoAuthority(provider_id.to_owned()))?;
 
     let existing = PersonalConfig::read(config_path)?;
+    // Named entries are distinct Connections of one provider, so the clash is on the *name*, not
+    // on the provider. Connecting a second Slack identity must not read as connecting Slack twice.
+    let identity = options.name.as_deref().unwrap_or(provider_id);
     if !options.force
         && existing
             .catalog
             .iter()
-            .any(|entry| entry.provider == provider_id)
+            .any(|entry| entry.provider == provider_id && entry.name() == identity)
     {
-        return Err(EnrolError::AlreadyConfigured(provider_id.to_owned()));
+        return Err(EnrolError::AlreadyConfigured(identity.to_owned()));
     }
 
     let credential = match options.credential.as_deref() {
@@ -183,10 +191,25 @@ pub async fn run(
         return Err(EnrolError::MissingValue(credential.name.to_owned()));
     }
 
-    let reference = CredentialRef::new(
+    // Addressed exactly as the runtime will read it: the same function, so a credential this
+    // command stores cannot land somewhere the backend does not look.
+    let entry = connectors_config::CatalogIntegrationConfig {
+        provider: provider_id.to_owned(),
+        name: options.name.clone(),
+        label: None,
+        grant_ref: format!("grant:{provider_id}:local"),
+        initiation: connectors_config::InitiationConfig::B10x,
+        allow_writes: options.allow_writes,
+        endpoints: endpoints.clone(),
+        operator_approved: true,
+        network: connectors_config::NetworkScopeConfig::Public,
+        credential: Some(credential.name.to_owned()),
+        credential_file: None,
+    };
+    let reference = integration_catalog::credential_address(
         existing.owner.tenant_id.as_str(),
         authority,
-        connector_address::DEFAULT_SERVICE,
+        &entry,
         credential.leaf,
     )
     .map_err(|_| EnrolError::NoAuthority(provider_id.to_owned()))?;
@@ -198,6 +221,7 @@ pub async fn run(
 
     Ok(json!({
         "provider": provider_id,
+        "name": identity,
         "credential": credential.name,
         "store": backend,
         "endpoints": endpoints,
@@ -307,6 +331,9 @@ fn append_entry(
          operator_approved = true\n",
         options.allow_writes
     );
+    if let Some(name) = options.name.as_deref() {
+        let _ = write!(block, "name = \"{name}\"\n");
+    }
     if options.operator_network {
         let _ = write!(block, "network = \"operator\"\n");
     }

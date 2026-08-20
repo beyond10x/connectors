@@ -22,6 +22,9 @@ members = ["."]
 # than what a document last claimed, which is only true if the answer comes from the build.
 catalog = { version = "0.1.0", path = "../catalog" }
 # The configuration vocabulary `init` writes and `doctor` reads back.
+# The credential address a stored value must land at is the backend's own function, not a second
+# copy of the rule.
+integration-catalog = { version = "0.1.0", path = "../integration-catalog" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
 # The guided flows talk to the local Connector through the reusable client; they neither frame a
 # request nor compose an adapter.

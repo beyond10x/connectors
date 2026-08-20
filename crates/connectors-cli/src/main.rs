@@ -38,10 +38,10 @@ struct Cli {
 enum Command {
     /// Write a usable configuration for this machine, so nothing has to be authored by hand.
     Init {
-        /// Where to write. Defaults below XDG_CONFIG_HOME (or ~/.config).
+        /// Where to write. Defaults below XDG_CONFIG_HOME.
         #[arg(long)]
         config: Option<PathBuf>,
-        /// Owner-only state root the configuration will be served with.
+        /// Owner-only state root it will be served with.
         #[arg(long)]
         state_root: Option<PathBuf>,
         /// Integration to declare. Repeatable. Omit to admit whatever this machine supports.
@@ -122,6 +122,9 @@ enum Command {
         /// Read the credential from an owner-only file rather than prompting.
         #[arg(long)]
         credential_file: Option<PathBuf>,
+        /// A stable name, when this placement holds one provider more than once.
+        #[arg(long)]
+        name: Option<String>,
     },
     /// Manage durable Connections through the credential-free control socket.
     Connection {
@@ -244,13 +247,7 @@ enum OperationCommand {
         connection: String,
         #[arg(long)]
         description_ref: String,
-        /// Strict JSON object containing only catalog-declared caller input.
-        ///
-        /// Three ways in, because one of them stops working at scale: `--input-json` inlines the
-        /// object, `--input-file` reads it from a path, and `--input -` reads stdin. A real
-        /// payload exceeds the operating system's argv limit, at which point an inline argument
-        /// fails in the shell rather than in this program, with a message about the argument list
-        /// rather than about the request.
+        /// Strict JSON object of catalog-declared caller input. See also --input-file and --input.
         #[arg(long, group = "caller-input")]
         input_json: Option<String>,
         /// Read the input object from a file.
@@ -416,6 +413,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             allow,
             operator_network,
             credential_file,
+            name,
         } => {
             let config_path = config.map_or_else(default_config_path, Ok)?;
             let state_root = state_root.map_or_else(default_state_root, Ok)?;
@@ -428,6 +426,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 operator_network,
                 force: false,
                 credential_file,
+                name,
             };
             let outcome = connect::dispatch(
                 &provider,

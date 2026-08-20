@@ -24,7 +24,6 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use connector_address::CredentialRef;
 use connector_secrets::{FileStore, KeyringStore, SecretStore, StoreError};
 
 /// A store that could not be opened at all. A missing credential is a reported row, not this.
@@ -74,12 +73,12 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
             }));
             continue;
         };
-        let reference = CredentialRef::new(
-            config.owner.tenant_id.as_str(),
-            authority,
-            connector_address::DEFAULT_SERVICE,
-            credential.leaf,
-        );
+        // **The backend's own addressing function**, not a second copy of the rule. Reimplementing
+        // it here reported every named instance as `not-connected` while its credential sat in the
+        // keyring at the instance address — a report that is worse than no report, because it sends
+        // an operator to re-enter a credential that is already there.
+        let reference =
+            integration_catalog::credential_address(&config.owner.tenant_id, authority, entry, credential.leaf);
         let present = match reference {
             Ok(reference) => store.exists(&reference).await,
             Err(_) => Ok(false),
@@ -87,6 +86,7 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
         providers.push(match present {
             Ok(true) => json!({
                 "provider": entry.provider,
+                "name": entry.name(),
                 "credential": credential.name,
                 "status": "connected",
                 // The declared probe, so an operator knows whether `auth test` can check this one.
@@ -94,6 +94,7 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
             }),
             Ok(false) => json!({
                 "provider": entry.provider,
+                "name": entry.name(),
                 "credential": credential.name,
                 "status": "not-connected",
                 "detail": "no credential is stored for this provider yet",
@@ -102,6 +103,7 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
             // would send an operator to re-enter a credential that is already there.
             Err(error) => json!({
                 "provider": entry.provider,
+                "name": entry.name(),
                 "credential": credential.name,
                 "status": "unavailable",
                 "detail": error.to_string(),
@@ -145,7 +147,10 @@ mod tests {
         let object = rendered.as_object().expect("an object");
         for key in object.keys() {
             assert!(
-                matches!(key.as_str(), "provider" | "credential" | "status" | "verify" | "detail"),
+                matches!(
+                    key.as_str(),
+                    "provider" | "name" | "credential" | "status" | "verify" | "detail"
+                ),
                 "`{key}` is not one of the value-free fields this report may carry"
             );
         }

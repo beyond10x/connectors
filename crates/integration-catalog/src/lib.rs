@@ -43,7 +43,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use catalog::{HostEffect, OperationDirection, Risk};
-use connector_address::CredentialRef;
+use connector_address::{CredentialRef, InstanceId};
 use connector_secrets::{Secret, SecretStore};
 use connectors_config::{CatalogIntegrationConfig, InitiationConfig};
 use domain::InitiationPolicy;
@@ -100,6 +100,8 @@ struct Binding {
     config: DeclaredConfig,
     /// The grant ceiling. False admits reads with no declared host effect and nothing else.
     allow_writes: bool,
+    /// Which instance this Connection's credential is addressed under, when it names one.
+    instance: Option<InstanceId>,
 }
 
 impl Binding {
@@ -139,12 +141,16 @@ impl Binding {
 /// A description a caller read, which invocation then requires.
 ///
 /// Invocation takes a `description_ref` rather than trusting the caller's memory of an operation:
-/// the lease says *this caller has seen this operation's current shape against this connection*.
-/// Without it a caller could invoke an operation whose input schema or risk had changed since it
-/// last looked.
+/// the lease says *this caller has seen this operation's current shape*. Without it a caller could
+/// invoke an operation whose input schema or risk had changed since it last looked.
+///
+/// **Bound to the operation, not to a Connection.** The shape a caller must have seen is the
+/// catalogue's — the same for every Connection of a provider — so binding the lease to one
+/// Connection only made a person holding two Slack identities describe the operation twice to call
+/// it twice, and refused the second with `stale_authority`, which says something untrue about why.
+/// Which Connection may serve the call is checked at invocation from the grant, where it belongs.
 struct Lease {
     operation_ref: String,
-    connection_ref: String,
 }
 
 /// The generic Integration.
@@ -185,13 +191,7 @@ impl CatalogBackend {
 
             if let Some(path) = entry.credential_file.as_ref() {
                 let leaf = credential_leaf(provider, entry.credential.as_deref())?;
-                let reference = CredentialRef::new(
-                    owner.tenant_id(),
-                    authority,
-                    connector_address::DEFAULT_SERVICE,
-                    leaf,
-                )
-                .map_err(|_| CatalogIntegrationError::NoAuthority(entry.provider.clone()))?;
+                let reference = credential_address(owner.tenant_id(), authority, entry, leaf)?;
                 import_credential(&entry.provider, path, &reference, secrets.as_ref()).await?;
             }
 
@@ -207,6 +207,10 @@ impl CatalogBackend {
                 },
                 config: DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
                 allow_writes: entry.allow_writes,
+                instance: match entry.name.as_deref() {
+                    Some(name) => Some(instance_for(&entry.provider, name)?),
+                    None => None,
+                },
             });
         }
         Ok(Self {
@@ -256,35 +260,54 @@ impl Inner {
     }
 
     /// Every operation this deployment can currently call, filtered by the caller's query.
+    ///
+    /// **Grouped by operation, then limited.** One operation that several Connections can serve is
+    /// one row carrying all of them, not one row per Connection — a person holding two Slack
+    /// identities has one `slack-users-info`, answerable as either. Doing it the other way round
+    /// also truncated wrongly: applying the caller's limit while still walking Connections dropped
+    /// the later identities from an operation instead of dropping later operations, so
+    /// `--limit 1` reported `slack-users-info` as reachable through exactly one identity when three
+    /// could serve it.
     fn search(&self, query: &str, limit: u16) -> Vec<OperationSummary> {
         let needle = query.trim().to_ascii_lowercase();
-        let mut found = Vec::new();
+        // Insertion-ordered so the result is stable across runs: a caller diffing two searches
+        // should see real changes, not map iteration order.
+        let mut grouped: Vec<(&'static catalog::Operation, Vec<ConnectionSummary>)> = Vec::new();
         for binding in &self.bindings {
             for operation in binding.provider.operations {
-                if found.len() >= limit as usize {
-                    return found;
-                }
                 if !binding.admits(operation) {
                     continue;
                 }
                 if !needle.is_empty() && !operation.id.to_ascii_lowercase().contains(&needle) {
                     continue;
                 }
-                found.push(OperationSummary {
-                    operation_ref: operation.id.to_owned(),
-                    title: operation.id.to_owned(),
-                    effect: effect_class(operation),
-                    approval: ApprovalPosture::NotRequired,
-                    connections: vec![self.summary(binding)],
-                });
+                match grouped
+                    .iter_mut()
+                    .find(|(existing, _)| existing.id == operation.id)
+                {
+                    Some((_, connections)) => connections.push(self.summary(binding)),
+                    None => grouped.push((operation, vec![self.summary(binding)])),
+                }
             }
         }
-        found
+        grouped
+            .into_iter()
+            .take(limit as usize)
+            .map(|(operation, connections)| OperationSummary {
+                operation_ref: operation.id.to_owned(),
+                title: operation.id.to_owned(),
+                effect: effect_class(operation),
+                approval: ApprovalPosture::NotRequired,
+                connections,
+            })
+            .collect()
     }
 
     fn describe(&self, operation_ref: &str) -> Result<OperationDescription, OperationError> {
         let operation = catalog::operation(catalog::OperationKey::id(operation_ref))
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no such catalogued operation"))?;
+        // Any admitting Connection proves the operation is describable here; which one serves a
+        // call is the caller's choice at invocation.
         let binding = self
             .binding_for_operation(operation)
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no Connection for its provider"))?;
@@ -294,12 +317,11 @@ impl Inner {
                 "this Connection's grant admits reads only; connect with --allow writes to raise it",
             ));
         }
-        let description_ref = lease_ref(operation_ref, &binding.connection_ref);
+        let description_ref = lease_ref(operation_ref);
         self.leases.lock().expect("the lease map is not poisoned").insert(
             description_ref.clone(),
             Lease {
                 operation_ref: operation_ref.to_owned(),
-                connection_ref: binding.connection_ref.clone(),
             },
         );
         Ok(OperationDescription {
@@ -311,7 +333,13 @@ impl Inner {
             output_schema: serde_json::Value::Null,
             effect: effect_class(operation),
             approval: ApprovalPosture::NotRequired,
-            connections: vec![self.summary(binding)],
+            // Every Connection that could serve it, so a caller reading one description can pick.
+            connections: self
+                .bindings
+                .iter()
+                .filter(|candidate| candidate.provider.id == operation.provider && candidate.admits(operation))
+                .map(|candidate| self.summary(candidate))
+                .collect(),
             description_ref,
         })
     }
@@ -339,10 +367,10 @@ impl Inner {
                     "read a fresh description before invoking",
                 )
             })?;
-            if lease.operation_ref != operation_ref || lease.connection_ref != connection_ref {
+            if lease.operation_ref != operation_ref {
                 return Err(refusal(
                     OperationErrorCode::StaleAuthority,
-                    "the description lease is for a different operation or Connection",
+                    "the description lease is for a different operation",
                 ));
             }
         }
@@ -381,7 +409,7 @@ impl Inner {
             operation,
             binding.provider,
             self.owner.tenant_id(),
-            None,
+            binding.instance.as_ref(),
             self.secrets.as_ref(),
             &binding.config,
         )
@@ -677,8 +705,73 @@ fn connection_ref(provider: &str, name: &str) -> String {
     format!("connection:{provider}:{}", digest(&[provider, name]))
 }
 
-fn lease_ref(operation_ref: &str, connection_ref: &str) -> String {
-    format!("description:{}", digest(&[operation_ref, connection_ref]))
+/// The instance a named Connection's credential is addressed under.
+///
+/// # Why a derived UUID rather than the name
+///
+/// `connector_address::validate_instance` requires the canonical 36-character hyphenated form, so a
+/// human name cannot be the address. Deriving one keeps the address stable across restarts — the
+/// same name always yields the same instance — with no registry mapping names to ids.
+///
+/// **The provider is inside the domain separator**, not only the name. Without it `babelforce-bot`
+/// on Slack and `babelforce-bot` on another provider would derive the same instance, and two
+/// unrelated credentials would collide at one address. This generalises the Slack-only derivation
+/// `integration-slack` arrived at first; the namespace is versioned so a later change to what goes
+/// into the digest cannot silently collide with ids an earlier build derived.
+fn instance_for(provider: &str, name: &str) -> Result<InstanceId, CatalogIntegrationError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"b10x/instance/v1\0");
+    hasher.update(provider.as_bytes());
+    hasher.update([0]);
+    hasher.update(name.as_bytes());
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&hasher.finalize()[..16]);
+    // Version 4 and RFC 4122 variant bits, so the result is a well-formed UUID rather than sixteen
+    // random-looking bytes wearing hyphens.
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex = hex::encode(bytes);
+    let text = format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32]
+    );
+    InstanceId::parse(&text)
+        .map_err(|_| CatalogIntegrationError::UnknownProvider(provider.to_owned()))
+}
+
+/// The credential address for one configured entry.
+///
+/// An entry that names no instance keeps the **elided** address — byte-identical to what a
+/// single-connection deployment already stored — so adding instance support does not orphan a
+/// credential connected before it existed.
+///
+/// # Errors
+///
+/// An address that will not render, which for a catalogued provider means a missing authority.
+pub fn credential_address(
+    tenant: &str,
+    authority: &str,
+    entry: &CatalogIntegrationConfig,
+    leaf: &str,
+) -> Result<CredentialRef, CatalogIntegrationError> {
+    match entry.name.as_deref() {
+        Some(name) => {
+            let instance = instance_for(&entry.provider, name)?;
+            CredentialRef::for_instance(
+                tenant,
+                authority,
+                instance.as_str(),
+                connector_address::DEFAULT_SERVICE,
+                leaf,
+            )
+        }
+        None => CredentialRef::new(tenant, authority, connector_address::DEFAULT_SERVICE, leaf),
+    }
+    .map_err(|_| CatalogIntegrationError::NoAuthority(entry.provider.clone()))
+}
+
+fn lease_ref(operation_ref: &str) -> String {
+    format!("description:{}", digest(&[operation_ref]))
 }
 
 fn audit_ref(operation_ref: &str, connection_ref: &str) -> String {
@@ -706,8 +799,40 @@ mod tests {
         catalog::provider(catalog::ProviderKey::id("gitlab")).expect("gitlab is catalogued")
     }
 
+    /// An egress that refuses everything: `search` and `describe` never dispatch, so the tests
+    /// covering them need a transport that exists and is never used.
+    struct RefusingEgress;
+
+    #[async_trait]
+    impl EgressTransport for RefusingEgress {
+        async fn execute(
+            &self,
+            _authority: &str,
+            _request: EgressHttpRequest,
+        ) -> Result<service::EgressHttpResponse, service::EgressTransportError> {
+            Err(service::EgressTransportError::Refused)
+        }
+
+        async fn connect_websocket(
+            &self,
+            _authority: &str,
+            _url: String,
+            _maximum: usize,
+        ) -> Result<Box<dyn service::EgressWebSocket>, service::EgressTransportError> {
+            Err(service::EgressTransportError::Refused)
+        }
+    }
+
+    fn named(name: &str) -> Binding {
+        let mut binding = binding(false);
+        binding.connection_ref = format!("connection:gitlab:{name}");
+        binding.label = name.to_owned();
+        binding
+    }
+
     fn binding(allow_writes: bool) -> Binding {
         Binding {
+            instance: None,
             provider: gitlab(),
             connection_ref: "connection:gitlab:test".to_owned(),
             label: "GitLab".to_owned(),
@@ -852,6 +977,78 @@ mod tests {
         let origins = admitted_origins(&entry("sentry", &[])).expect("sentry has fixed hosts");
         assert!(!origins.is_empty());
         assert!(origins.iter().all(|origin| origin.starts_with("https://")));
+    }
+
+    #[test]
+    fn the_limit_drops_operations_rather_than_the_identities_that_serve_one() {
+        // The truncation bug this shape fixes: with three Slack identities, `--limit 1` used to
+        // report one operation reachable through one identity. An operation is one row; a caller
+        // choosing between identities needs to see all of them or it cannot choose.
+        let inner = Inner {
+            owner: PrincipalContext::local(&protocol::operation::OwnerContext {
+                tenant_id: "local".to_owned(),
+                agent_id: "a".to_owned(),
+                agent_revision: 1,
+                authority_snapshot_id: "snapshot:test".to_owned(),
+                // A real digest shape: the principal refuses anything that is not 64 hex digits.
+                authority_snapshot_sha256: "0".repeat(64),
+            })
+            .expect("a local principal"),
+            bindings: vec![named("first"), named("second"), named("third")],
+            secrets: std::sync::Arc::new(connector_secrets::MemoryStore::new()),
+            egress: std::sync::Arc::new(RefusingEgress),
+            leases: Mutex::new(BTreeMap::new()),
+        };
+        let rows = inner.search("gitlab-user-get", 1);
+        assert_eq!(rows.len(), 1, "one operation");
+        assert_eq!(
+            rows[0].connections.len(),
+            3,
+            "and every Connection that can serve it, not the first one the limit happened to reach"
+        );
+    }
+
+    #[test]
+    fn two_named_instances_of_one_provider_get_different_addresses() {
+        // The property Timo's two Slack identities need: babelforce-bot and timo-ai are the same
+        // provider, the same tenant and the same credential name, and must not collide.
+        let mut first = entry("slack", &[]);
+        first.name = Some("babelforce-bot".to_owned());
+        let mut second = entry("slack", &[]);
+        second.name = Some("timo-ai".to_owned());
+        let a = credential_address("local", "com.slack.api", &first, "bot_token").unwrap();
+        let b = credential_address("local", "com.slack.api", &second, "bot_token").unwrap();
+        assert!(a.instance().is_some() && b.instance().is_some());
+        assert_ne!(
+            a.instance().map(InstanceId::as_str),
+            b.instance().map(InstanceId::as_str),
+            "same provider, same tenant, same credential name — only the instance separates them"
+        );
+    }
+
+    #[test]
+    fn an_unnamed_entry_keeps_the_address_it_had_before_instances_existed() {
+        // Adding instance support must not orphan a credential someone connected yesterday. The
+        // elided form is what a single-connection deployment already stored.
+        let unnamed = entry("gitlab", &[]);
+        let address = credential_address("local", "com.gitlab.api", &unnamed, "token").unwrap();
+        assert!(address.instance().is_none(), "no instance segment for an unnamed entry");
+        assert_eq!(address.tenant(), "local");
+        assert_eq!(address.authority(), "com.gitlab.api");
+        assert_eq!(address.credential(), "token");
+        assert!(address.is_default_service());
+    }
+
+    #[test]
+    fn the_instance_derivation_puts_the_provider_in_the_namespace() {
+        // Without the provider inside the digest, the same instance name on two providers would
+        // address one credential. Named here because the Slack-only derivation this generalises
+        // had exactly that shape.
+        let slack = instance_for("slack", "shared-name").unwrap();
+        let datadog = instance_for("datadog", "shared-name").unwrap();
+        assert_ne!(slack.as_str(), datadog.as_str());
+        assert_eq!(slack.as_str(), instance_for("slack", "shared-name").unwrap().as_str());
+        assert_eq!(slack.as_str().len(), 36);
     }
 
     #[test]
