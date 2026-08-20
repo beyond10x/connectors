@@ -291,11 +291,16 @@ pub(crate) fn select_service_port(provider: &str, ports: &[ServicePort]) -> Opti
                 .is_none_or(|protocol| protocol == "TCP")
         })
         .collect::<Vec<_>>();
+    // Argo CD's `argocd-server` Service publishes `http` on 80 and `https` on 443, both targeting
+    // the same container port 8080, where the server decides by TLS. 443 is the pin because that is
+    // the listener its own clients use; nothing here dials it, so this is evidence that identifies
+    // the API endpoint rather than a route (see `materialize`, which refuses this provider).
     let known_number = match provider {
         "grafana" => 3000,
         "prometheus" => 9090,
         "loki" => 3100,
         "alertmanager" => 9093,
+        "argocd" => 443,
         _ => return None,
     };
     let preferred = candidates

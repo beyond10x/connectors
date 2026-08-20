@@ -170,3 +170,42 @@ observations. The user then materializes an observation explicitly; only Prometh
 Alertmanager become callable through the Service proxy in this slice. Generic clients can use
 `connection candidates`, `connection activate`, `connection observations`, and `connection
 materialize` over the same credential-free protocol.
+## Amendment, 2026-08-20: Argo CD is recognized, and deliberately stops at the observation
+
+The recognized-Service set gains `argocd-server`, so activating a kubeconfig context now tells an
+operator that this cluster runs Argo CD without anyone typing its address. It does **not** become a
+callable Connection, and the reason is a property of the mediated route rather than caution.
+
+**Recognition is by whole token, not by substring.** The four monitoring providers are matched with
+`contains`, which is safe for them because a cluster runs one Grafana, not eight things named after
+it. A default Argo CD install ships eight Services whose names contain `argocd`, of which exactly
+one — `argocd-server` — is the API; `argocd-repo-server` speaks a private gRPC protocol,
+`argocd-server-metrics` serves Prometheus text, `argocd-redis` is a cache holding session state.
+Even `contains("argocd-server")` takes the metrics Service. So an exact-identity arm runs first, over
+the Service name *and* its `app.kubernetes.io/name` label — the label matters because the `argo-cd`
+Helm chart installs the object as `<release>-argocd-server` while keeping the label stable.
+
+**A mediated call carries no credential.** `invoke_service` resolves every routed request with an
+empty credential slice: the Kubernetes Service proxy is the whole of the authority this placement
+has, and the caller's cluster identity gets the request to the Service but does not speak for the
+caller to the Service's own API. That is right for Prometheus, Loki and Alertmanager, which are
+ordinarily deployed inside a cluster with no authentication of their own. It is wrong for Argo CD,
+which requires an account or project-role JWT on every `/api/v1` request and answers 401 without one.
+
+Materializing it anyway would publish a Connection that looks callable and returns 401 on first use.
+So Argo CD joins Grafana in the set this placement refuses to materialize, for the same stated
+reason, and `providers/argocd.toml` is how an operator connects it: one approved HTTPS origin, one
+token they supply, no cluster involvement. The Kubernetes observation is the pointer, not the route.
+For the same reason the Kubernetes configuration's target-Grant allowlist is unchanged: a grant that
+can never be exercised is a misleading thing to let someone configure.
+
+The selected port is pinned at 443 — `argocd-server` publishes `http` on 80 and `https` on 443, both
+targeting container port 8080, where the server decides by TLS. Nothing here dials it; the port
+identifies the API endpoint in the observation's evidence and staleness check.
+
+**What this leaves open.** Giving this placement a credential source is the named follow-up: it needs
+a custody surface, a configuration vocabulary, and a credential threaded into the mediated route for
+every provider at once, which would also let the discovered Grafana finally materialize. Argo CD's
+writes stay outside it regardless — `invoke_service` refuses anything that is not a GET with no body,
+so sync, rollback and terminate are structurally unroutable through the Service proxy and belong to
+the direct Connection.
