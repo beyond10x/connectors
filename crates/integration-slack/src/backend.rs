@@ -51,7 +51,9 @@ use tokio::sync::{watch, Notify};
 use tokio::task::JoinHandle;
 use zeroize::Zeroizing;
 
-use connectors_config::{InitiationConfig, SlackIntegrationConfig};
+use connectors_config::{
+    InitiationConfig, SlackInstanceConfig, SlackInstanceProfile, SlackIntegrationConfig,
+};
 use service::{
     BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectSessionLifecycle,
     ConnectSessionLifecycleError, ConnectSessionTerminal, ConnectorBackend, EgressHttpRequest,
@@ -72,7 +74,10 @@ const APP_TOKEN_CREDENTIAL: &str = "app_token";
 const BOT_TOKEN_CREDENTIAL: &str = "bot_token";
 const USER_TOKEN_CREDENTIAL: &str = "user_token";
 const SOCKET_BINDING_REF: &str = "com.slack.api:v1#socket";
-const STATE_VERSION: u8 = 3;
+// 4: `StoredConnection.purpose`. The field defaults, so an older state file still reads; the
+// version moves so datasource bindings issued before it are refused rather than served without the
+// hint a caller now expects to be there.
+const STATE_VERSION: u8 = 4;
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_APP_TOKEN_BYTES: usize = 1024;
 const MAX_STATE_BYTES: u64 = 4 * 1024 * 1024;
@@ -96,6 +101,8 @@ const CONVERSATIONS_HISTORY: &str = "https://slack.com/api/conversations.history
 const USER_OAUTH_ACCESS: &str = "https://slack.com/api/oauth.v2.user.access";
 const SLACK_ORIGIN: &str = "https://slack.com";
 const PROFILE_ORG_BOT: &str = "slack.org_bot";
+/// The one tenant-wide organisation bot install, whose credential has no instance in its address.
+const ORG_BOT_CONNECTION: &str = "connection:slack:org-bot";
 const PROFILE_ORG_USER: &str = "slack.org_user";
 const PROFILE_COMPANION_BOT: &str = "slack.companion_bot";
 const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
@@ -272,6 +279,14 @@ struct StoredConnection {
     external_subject_id: String,
     #[serde(default)]
     scopes: Vec<String>,
+    /// When an agent should reach for this Connection rather than another one of the same kind.
+    ///
+    /// Free text a person wrote, carried to the workbench beside the label. It exists because a
+    /// workstation reaches Slack as several actors at once — the workspace bot, the operator, an
+    /// assistant bot — and "which of these three should I post as" is not answerable from a profile
+    /// name. Empty for every Connection acquired through a Connect Session, which nobody named.
+    #[serde(default)]
+    purpose: String,
 }
 
 struct SlackCredentials {
@@ -524,6 +539,7 @@ impl SlackBackend {
         });
         inner.recover_pending().await?;
         inner.ensure_org_connection().await?;
+        inner.ensure_declared_instances().await?;
         for connection in lock(&inner.metadata).connections.clone() {
             if inner.connection_is_admitted(&connection) {
                 inner.start_supervisor(connection);
@@ -2143,20 +2159,42 @@ fn test_egress() -> Arc<dyn EgressTransport> {
     Arc::new(RefusingEgress)
 }
 
-fn random_uuid() -> Result<String, SlackError> {
+/// The stable machine identity of one declared instance, derived from the name a person chose.
+///
+/// `CredentialRef::for_instance` admits only a canonical uuid, so `"babelforce-bot"` cannot be an
+/// instance id directly. Deriving one from the name means the Connection ref, every datasource
+/// binding ref and the credential address are the same on every start — where a random id makes a
+/// saved binding reference dead the moment the placement restarts. The name stays the thing anybody
+/// reads; this is only its machine spelling.
+fn instance_id_for_name(name: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"b10x/slack-instance/v1\0");
+    digest.update(name.as_bytes());
     let mut bytes = [0_u8; 16];
-    getrandom::fill(&mut bytes).map_err(|_| SlackError::new("randomness"))?;
+    bytes.copy_from_slice(&digest.finalize()[..16]);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    format_uuid(bytes)
+}
+
+fn format_uuid(bytes: [u8; 16]) -> String {
     let encoded = hex::encode(bytes);
-    Ok(format!(
+    format!(
         "{}-{}-{}-{}-{}",
         &encoded[0..8],
         &encoded[8..12],
         &encoded[12..16],
         &encoded[16..20],
         &encoded[20..32]
-    ))
+    )
+}
+
+fn random_uuid() -> Result<String, SlackError> {
+    let mut bytes = [0_u8; 16];
+    getrandom::fill(&mut bytes).map_err(|_| SlackError::new("randomness"))?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    Ok(format_uuid(bytes))
 }
 
 fn now_ms() -> Option<u64> {

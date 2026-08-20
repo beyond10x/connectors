@@ -285,6 +285,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                         .collect()
                 })
                 .unwrap_or_default(),
+            purpose: None,
         }
     }
 

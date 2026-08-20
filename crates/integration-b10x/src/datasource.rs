@@ -257,6 +257,7 @@ impl B10xBackend {
             binding_ref: self.workspace_datasource_binding_ref(),
             connection_ref: self.config.connection.connection_ref.clone(),
             label: "B10x logical workspaces".to_owned(),
+            purpose: None,
             generation: u64::from_be_bytes(generation).max(1),
         }
     }

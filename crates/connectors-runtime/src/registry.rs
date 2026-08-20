@@ -1079,6 +1079,7 @@ mod tests {
             label: connection_ref.to_owned(),
             provider: "tickets".to_owned(),
             audiences: vec!["operations".to_owned()],
+            purpose: None,
         }
     }
 

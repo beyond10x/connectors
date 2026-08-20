@@ -28,12 +28,16 @@ use protocol::connection::{
     ConnectionSummary, DiscoveryObservationState, DiscoveryObservationSummary, MaterializeRequest,
     ObservationSearchRequest, RouteAdapter,
 };
+use protocol::datasource::{
+    DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
+};
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
 use serde_json::Value;
+use crate::local_workloads::WorkloadSurface;
 use service::{
     plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
 };
@@ -104,6 +108,9 @@ pub struct KubernetesLocalBackend {
     candidates: BTreeMap<String, CandidateBinding>,
     state: Mutex<KubernetesState>,
     activation: tokio::sync::Mutex<()>,
+    /// `kubernetes.workloads`, the same projection the deployment publishes. See
+    /// `crate::local_workloads`.
+    workloads: WorkloadSurface,
 }
 
 impl KubernetesLocalBackend {
@@ -122,6 +129,7 @@ impl KubernetesLocalBackend {
             candidates,
             state: Mutex::new(KubernetesState::default()),
             activation: tokio::sync::Mutex::new(()),
+            workloads: WorkloadSurface::default(),
         })
     }
 
@@ -158,6 +166,47 @@ impl KubernetesLocalBackend {
                 false,
             ))
         }
+    }
+
+    fn check_datasource_context(&self, context: &PrincipalContext) -> Result<(), DatasourceError> {
+        if context == &self.owner {
+            Ok(())
+        } else {
+            Err(DatasourceError::new(
+                DatasourceErrorCode::StaleAuthority,
+                "owner context does not match this Connector generation",
+                false,
+            ))
+        }
+    }
+
+    /// The one cluster this daemon generation has attached, if any.
+    ///
+    /// Personal-local activation binds one kubeconfig context at a time, so taking the first entry
+    /// is the whole of the selection. When a second context is ever activatable this becomes the
+    /// place that has to choose, and it will be a choice a person makes rather than a map order.
+    fn attached_cluster(&self) -> Option<(String, Client)> {
+        let state = lock(&self.state);
+        state
+            .clients
+            .iter()
+            .next()
+            .map(|(connection_ref, client)| (connection_ref.clone(), client.clone()))
+    }
+
+    /// Namespaces this placement offers as datasource bindings.
+    ///
+    /// Configuration is the only source. An empty `namespaces` means cluster-wide *discovery* for
+    /// Services, which is a different question from which namespaces a person may page workloads
+    /// in — enumerating every namespace on a shared cluster would offer hundreds of bindings, most
+    /// of which the operator's own RBAC would then refuse one read at a time.
+    fn readable_namespaces(&self) -> Vec<String> {
+        self.policy
+            .namespaces
+            .iter()
+            .filter(|namespace| valid_dns_label(namespace, 253))
+            .cloned()
+            .collect()
     }
 
     fn search_candidates(
@@ -347,6 +396,7 @@ impl KubernetesLocalBackend {
                 label: child.label.clone(),
                 provider: child.provider.clone(),
                 audiences: monitoring_model::audiences_for_operation(operation_ref),
+                purpose: None,
             })
             .collect()
     }
@@ -628,7 +678,11 @@ impl ConnectorBackend for KubernetesLocalBackend {
             operations: true,
             connections: true,
             events: false,
-            datasources: false,
+            // `kubernetes.workloads`, read through whichever kubeconfig context the operator
+            // activated. Declared unconditionally: a placement that advertised datasources only
+            // once a cluster was attached would make the surface appear and disappear under a
+            // person mid-session, and the refusal for "nothing attached yet" says what to do.
+            datasources: true,
         }
     }
 
@@ -646,6 +700,10 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Search(_) => false,
             _ => false,
         }
+    }
+
+    fn owns_datasource(&self, request: &DatasourceRequest) -> bool {
+        WorkloadSurface::owns(request)
     }
 
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
@@ -704,6 +762,22 @@ impl ConnectorBackend for KubernetesLocalBackend {
             }
             _ => Err(operation_not_found()),
         }
+    }
+
+    async fn handle_datasource(
+        &self,
+        context: &PrincipalContext,
+        request: DatasourceRequest,
+    ) -> Result<DatasourceResult, DatasourceError> {
+        self.check_datasource_context(context)?;
+        self.workloads
+            .handle(
+                context,
+                request,
+                self.attached_cluster(),
+                &self.readable_namespaces(),
+            )
+            .await
     }
 
     async fn handle_connection(

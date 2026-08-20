@@ -88,186 +88,30 @@ impl KubernetesStatusBackend {
         )
     }
 
-    fn resolve_cursor(
-        &self,
-        context: &PrincipalContext,
-        namespace: &str,
-        cursor: Option<&str>,
-    ) -> Result<Option<String>, DatasourceError> {
-        let Some(cursor) = cursor else {
-            return Ok(None);
-        };
-        let mut cursors = self
-            .cursors
-            .lock()
-            .map_err(|_| datasource_unavailable("Kubernetes cursor state is unavailable"))?;
-        let now = SystemTime::now();
-        cursors.retain(|_, state| state.expires_at > now);
-        let state = cursors.remove(cursor).ok_or_else(|| {
-            DatasourceError::new(
-                DatasourceErrorCode::CursorExpired,
-                "Kubernetes datasource cursor is expired or unknown",
-                false,
-            )
-        })?;
-        if state.namespace != namespace
-            || state.principal_subject != context.subject()
-            || state.authority_seed != context.stable_authority_seed()
-        {
-            return Err(datasource_not_granted(
-                "Kubernetes datasource cursor belongs to different authority",
-            ));
-        }
-        Ok(Some(state.provider_cursor))
-    }
-
-    fn store_cursor(
-        &self,
-        context: &PrincipalContext,
-        namespace: &str,
-        provider_cursor: Option<String>,
-    ) -> Result<Option<String>, DatasourceError> {
-        let Some(provider_cursor) = provider_cursor.filter(|value| !value.is_empty()) else {
-            return Ok(None);
-        };
-        let now = SystemTime::now();
-        let nonce = now
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let mut digest = Sha256::new();
-        digest.update(b"b10x/kubernetes-datasource-cursor/v2\0");
-        digest.update(context.stable_authority_seed());
-        digest.update(format!("\0{namespace}\0{provider_cursor}\0{nonce}").as_bytes());
-        let cursor_ref = format!(
-            "cursor:kubernetes:{}",
-            hex::encode(&digest.finalize()[..20])
-        );
-        let mut cursors = self
-            .cursors
-            .lock()
-            .map_err(|_| datasource_unavailable("Kubernetes cursor state is unavailable"))?;
-        cursors.retain(|_, state| state.expires_at > now);
-        if cursors.len() >= 256 {
-            return Err(DatasourceError::new(
-                DatasourceErrorCode::ResultTooLarge,
-                "Kubernetes cursor capacity is exhausted",
-                true,
-            ));
-        }
-        cursors.insert(
-            cursor_ref.clone(),
-            CursorState {
-                namespace: namespace.to_owned(),
-                principal_subject: context.subject().to_owned(),
-                authority_seed: context.stable_authority_seed(),
-                provider_cursor,
-                expires_at: now + CURSOR_TTL,
-            },
-        );
-        Ok(Some(cursor_ref))
-    }
-
+    /// Admission, then the shared read.
+    ///
+    /// Everything this receiver owns is above the seam: the tenant binding, the Identity groups
+    /// that carry read on a configured namespace, and the audit ref this deployment stamps. What a
+    /// workload *is* belongs to `crate::workloads` and is identical in every host mode.
     async fn read_datasource(
         &self,
         context: &PrincipalContext,
         request: ReadRequest,
     ) -> Result<DatasourceResult, DatasourceError> {
-        if request.datasource_ref != DATASOURCE {
-            return Err(datasource_not_found("Kubernetes datasource was not found"));
-        }
-        if request.description_ref != datasource_description_ref(context) {
-            // Recoverable in one call, and the caller is told which one. It used to say only
-            // "authority is stale", which reads like something an operator has to repair.
-            return Err(DatasourceError::new(
-                DatasourceErrorCode::StaleAuthority,
-                "the Kubernetes datasource description lease has moved on; describe it again and retry the read",
-                true,
-            ));
-        }
         let namespace = self
             .binding_namespace(context, &request.binding_ref)?
             .to_owned();
-        let (records, next_cursor, completeness) = match request.read {
-            DatasourceRead::List { limit, cursor } => {
-                let provider_cursor =
-                    self.resolve_cursor(context, &namespace, cursor.as_deref())?;
-                let list = self
-                    .reader
-                    .list_workloads(&namespace, limit, provider_cursor.as_deref())
-                    .await?;
-                let next_cursor = self.store_cursor(context, &namespace, list.next_cursor)?;
-                let records = list
-                    .workloads
-                    .into_iter()
-                    .map(|workload| {
-                        let name = workload.name.clone();
-                        let value = serde_json::to_value(workload).map_err(|_| {
-                            datasource_unavailable("Kubernetes workload could not be encoded")
-                        })?;
-                        Ok(DatasourceRecord {
-                            key: json!({"name": name}),
-                            view: RecordView::Compact,
-                            value,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, DatasourceError>>()?;
-                (records, next_cursor, Completeness::Complete)
-            }
-            DatasourceRead::Get { key } => {
-                let key: WorkloadKey = serde_json::from_value(key).map_err(|_| {
-                    DatasourceError::new(
-                        DatasourceErrorCode::InvalidInput,
-                        "Kubernetes workload key is invalid",
-                        false,
-                    )
-                })?;
-                if !valid_dns_label(&key.name, 253) {
-                    return Err(DatasourceError::new(
-                        DatasourceErrorCode::InvalidInput,
-                        "Kubernetes workload name is invalid",
-                        false,
-                    ));
-                }
-                let detail = self.reader.workload_detail(&namespace, &key.name).await?;
-                let completeness = if detail.related_complete {
-                    Completeness::Complete
-                } else {
-                    Completeness::Partial
-                };
-                let value = serde_json::to_value(detail).map_err(|_| {
-                    datasource_unavailable("Kubernetes workload detail could not be encoded")
-                })?;
-                (
-                    vec![DatasourceRecord {
-                        key: json!({"name": key.name}),
-                        view: RecordView::Detail,
-                        value,
-                    }],
-                    None,
-                    completeness,
-                )
-            }
-        };
-        Ok(DatasourceResult::Read(DatasourcePage {
-            datasource_ref: DATASOURCE.to_owned(),
-            records,
-            next_cursor,
-            completeness,
-            observed_at_unix_ms: now_unix_ms(),
-            provenance: DatasourceProvenance {
-                binding_ref: request.binding_ref,
-                projection_sha256: datasource_projection_sha256(),
-                connector_audit_ref: audit_ref(context, DATASOURCE, &namespace, "workloads"),
-            },
-        }))
+        let connector_audit_ref = audit_ref(context, DATASOURCE, &namespace, "workloads");
+        read_workloads(
+            self.reader.as_ref(),
+            &self.cursors,
+            context,
+            &namespace,
+            request,
+            connector_audit_ref,
+        )
+        .await
     }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct WorkloadKey {
-    name: String,
 }
 
 #[async_trait]
@@ -448,7 +292,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
                     .into_iter()
                     .filter(|namespace| query.is_empty() || namespace.contains(&query))
                     .take(usize::from(limit))
-                    .map(namespace_binding)
+                    .map(|namespace| namespace_binding(CONNECTION, namespace))
                     .collect();
                 Ok(DatasourceResult::Bindings { bindings })
             }
@@ -456,175 +300,4 @@ impl ConnectorBackend for KubernetesStatusBackend {
             _ => Err(datasource_not_found("Kubernetes datasource was not found")),
         }
     }
-}
-
-fn datasource_summary() -> DatasourceSummary {
-    DatasourceSummary {
-        datasource_ref: DATASOURCE.to_owned(),
-        title: "Kubernetes workloads".to_owned(),
-        access_mode: AccessMode::Live,
-        verbs: vec![ReadVerb::List, ReadVerb::Get],
-    }
-}
-
-fn workload_key_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["name"],
-        "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 253}}
-    })
-}
-
-fn compact_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["namespace", "name", "uid", "resource_version", "generation", "observed_generation", "desired_replicas", "updated_replicas", "ready_replicas", "available_replicas", "unavailable_replicas", "rollout_state"],
-        "properties": {
-            "namespace": {"type": "string"}, "name": {"type": "string"},
-            "uid": {"type": "string"}, "resource_version": {"type": "string"},
-            "generation": {"type": "integer"}, "observed_generation": {"type": "integer"},
-            "desired_replicas": {"type": "integer"}, "updated_replicas": {"type": "integer"},
-            "ready_replicas": {"type": "integer"}, "available_replicas": {"type": "integer"},
-            "unavailable_replicas": {"type": "integer"},
-            "rollout_state": {"enum": ["available", "progressing", "degraded"]}
-        }
-    })
-}
-
-fn detail_schema() -> serde_json::Value {
-    let mut schema = compact_schema();
-    let object = schema.as_object_mut().expect("static object schema");
-    object
-        .get_mut("required")
-        .and_then(serde_json::Value::as_array_mut)
-        .expect("static required schema")
-        .extend([json!("pods"), json!("warnings"), json!("related_complete")]);
-    let properties = object
-        .get_mut("properties")
-        .and_then(serde_json::Value::as_object_mut)
-        .expect("static properties schema");
-    properties.insert(
-        "pods".to_owned(),
-        json!({
-            "type": "array",
-            "maxItems": MAX_RELATED_RECORDS,
-            "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["name", "phase", "ready_containers", "total_containers", "restart_count", "containers"],
-                "properties": {
-                    "name": {"type": "string"},
-                    "phase": {"type": "string"},
-                    "ready_containers": {"type": "integer", "minimum": 0},
-                    "total_containers": {"type": "integer", "minimum": 0},
-                    "restart_count": {"type": "integer", "minimum": 0},
-                    "containers": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": ["name", "image", "image_id", "ready", "restart_count", "state_reason"],
-                            "properties": {
-                                "name": {"type": "string"},
-                                "image": {"type": "string"},
-                                "image_id": {"type": "string"},
-                                "ready": {"type": "boolean"},
-                                "restart_count": {"type": "integer", "minimum": 0},
-                                "state_reason": {"type": ["string", "null"]}
-                            }
-                        }
-                    }
-                }
-            }
-        }),
-    );
-    properties.insert(
-        "warnings".to_owned(),
-        json!({
-            "type": "array",
-            "maxItems": MAX_RELATED_RECORDS,
-            "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["involved_kind", "involved_name", "reason", "count", "first_observed_at", "last_observed_at"],
-                "properties": {
-                    "involved_kind": {"type": "string"},
-                    "involved_name": {"type": "string"},
-                    "reason": {"type": "string"},
-                    "count": {"type": "integer", "minimum": 0},
-                    "first_observed_at": {"type": ["string", "null"]},
-                    "last_observed_at": {"type": ["string", "null"]}
-                }
-            }
-        }),
-    );
-    properties.insert("related_complete".to_owned(), json!({"type": "boolean"}));
-    schema
-}
-
-fn datasource_projection_sha256() -> String {
-    let declaration = json!({
-        "protocol": "b10x.value-projection.v1",
-        "datasource_ref": DATASOURCE,
-        "version": 1,
-        "key_schema": workload_key_schema(),
-        "compact_schema": compact_schema(),
-        "detail_schema": detail_schema(),
-        "excluded": ["annotations", "labels", "environment", "secret_references", "event_messages", "raw_objects"]
-    });
-    hex::encode(Sha256::digest(
-        serde_json::to_vec(&declaration).expect("static projection declaration"),
-    ))
-}
-
-fn datasource_description(context: &PrincipalContext) -> DatasourceDescription {
-    DatasourceDescription {
-        summary: datasource_summary(),
-        description: "Live, namespace-scoped Deployment status with bounded Pod, image digest, restart-count, and warning-reason summaries. Raw Kubernetes objects, event messages, labels, annotations, environment values, and Secret data are never returned.".to_owned(),
-        key_schema: workload_key_schema(),
-        compact_schema: compact_schema(),
-        detail_schema: detail_schema(),
-        projection_protocol: "b10x.value-projection.v1".to_owned(),
-        projection_sha256: datasource_projection_sha256(),
-        description_ref: datasource_description_ref(context),
-    }
-}
-
-/// The description lease for the workload datasource.
-///
-/// Seeded from the stable authority and never from the authority snapshot id or sha: the hosted
-/// receiver fills those from the access token, every datasource request travels on the cached
-/// `connectors.catalog.read` token, and that token is refreshed inside five minutes. A describe
-/// and the read that follows can therefore straddle a refresh, and seeding the lease from the
-/// token made that ordinary event look like an authority change.
-pub(crate) fn datasource_description_ref(context: &PrincipalContext) -> String {
-    let mut digest = Sha256::new();
-    digest.update(b"b10x/kubernetes-datasource-description/v2\0");
-    digest.update(context.stable_authority_seed());
-    digest.update(b"\0");
-    digest.update(datasource_projection_sha256().as_bytes());
-    format!(
-        "description:kubernetes:datasource:{}",
-        hex::encode(&digest.finalize()[..16])
-    )
-}
-
-pub(super) fn namespace_binding(namespace: &str) -> DatasourceBinding {
-    let digest = Sha256::digest(format!("{DATASOURCE}\0{namespace}\0v1"));
-    let mut generation_bytes = [0_u8; 8];
-    generation_bytes.copy_from_slice(&digest[..8]);
-    DatasourceBinding {
-        datasource_ref: DATASOURCE.to_owned(),
-        binding_ref: namespace_binding_ref(namespace),
-        connection_ref: CONNECTION.to_owned(),
-        label: namespace.to_owned(),
-        generation: u64::from_be_bytes(generation_bytes),
-    }
-}
-
-fn namespace_binding_ref(namespace: &str) -> String {
-    let digest = Sha256::digest(format!("{DATASOURCE}\0{namespace}\0binding-v1"));
-    format!("binding:kubernetes:{}", hex::encode(&digest[..16]))
 }

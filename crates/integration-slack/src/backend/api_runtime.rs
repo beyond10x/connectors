@@ -1,5 +1,7 @@
 use super::*;
 
+use connector_secrets::StoreError;
+
 impl SlackInner {
     pub(super) fn persist_metadata(&self, state: &StateFile) -> Result<(), SlackError> {
         write_state(
@@ -228,30 +230,38 @@ impl SlackInner {
         let bot_ref =
             CredentialRef::new(self.tenant_id(), AUTHORITY, SERVICE, BOT_TOKEN_CREDENTIAL)
                 .map_err(|_| SlackError::new("credential-address"))?;
-        let app = self
-            .credential_store
-            .get(&app_ref)
-            .await
-            .map_err(|_| SlackError::new("org-app-credential"))?;
+        // Naming a workspace is a policy statement, not a claim that an org-wide app is installed.
+        // These two reads used to collapse `NotFound` into a refusal, so setting `expected_team_id`
+        // on a personal placement — the only way to pin which workspace a Connect Session may bind
+        // — stopped the daemon from starting at all with `org-app-credential`, and the workstation
+        // had to install an org app it never wanted. Nothing stored means no org install; the
+        // workspace pin still holds, because every Connect Session checks the token's own team
+        // against it (`connection_runtime.rs`, `verify_bot`). An unreachable store is still a
+        // refusal: "we cannot say" must never read as "not configured".
+        let app = match self.credential_store.get(&app_ref).await {
+            Ok(app) => app,
+            Err(StoreError::NotFound { .. }) => return Ok(()),
+            Err(_) => return Err(SlackError::new("org-app-credential")),
+        };
         if !valid_slack_token(app.expose_secret(), "xapp-") {
             return Err(SlackError::new("org-app-credential"));
         }
         drop(app);
-        let bot = self
-            .credential_store
-            .get(&bot_ref)
-            .await
-            .map_err(|_| SlackError::new("org-bot-credential"))?;
+        let bot = match self.credential_store.get(&bot_ref).await {
+            Ok(bot) => bot,
+            Err(StoreError::NotFound { .. }) => return Ok(()),
+            Err(_) => return Err(SlackError::new("org-bot-credential")),
+        };
         if !valid_slack_token(bot.expose_secret(), "xoxb-") {
             return Err(SlackError::new("org-bot-credential"));
         }
-        let evidence = self.auth_test("connection:slack:org-bot", &bot).await?;
+        let evidence = self.auth_test(ORG_BOT_CONNECTION, &bot).await?;
         drop(bot);
         if !evidence.is_bot || evidence.team_id != expected_team_id {
             return Err(SlackError::new("credential-workspace"));
         }
         let connection = StoredConnection {
-            connection_ref: "connection:slack:org-bot".to_owned(),
+            connection_ref: ORG_BOT_CONNECTION.to_owned(),
             instance_id: "org-bot".to_owned(),
             label: "Organization Slack bot".to_owned(),
             grant_ref: self.policy.grant_for_profile(PROFILE_ORG_BOT).to_owned(),
@@ -262,6 +272,7 @@ impl SlackInner {
             profile: SlackConnectionProfile::OrgBot,
             external_subject_id: evidence.subject_id,
             scopes: evidence.scopes,
+            purpose: String::new(),
         };
         let mut state = lock(&self.metadata);
         state
@@ -277,13 +288,17 @@ impl SlackInner {
     pub(super) fn connection_is_admitted(&self, connection: &StoredConnection) -> bool {
         connection.grant_ref == self.policy.grant_for_profile(connection.profile.as_str())
             && connection.initiation == self.policy.initiation
-            && ((!connection.profile.receives_events() && connection.allowed_events.is_empty())
-                || (connection.profile.receives_events()
-                    && connection.allowed_events.len() == self.policy.allowed_events.len()
-                    && connection
-                        .allowed_events
-                        .iter()
-                        .all(|event| self.policy.allowed_events.contains(event))))
+            // A stored connection may admit no event its profile cannot receive and no event this
+            // policy does not list — a subset, not an exact match. Equality was the rule until a
+            // connection legitimately carrying *fewer* events appeared: a workstation that supplies
+            // a bot token and no app-level token receives nothing, so its event set is empty, and
+            // an exact-match rule then read that connection as forged and dropped it out of every
+            // datasource search. The invariant is "never more than the policy admits".
+            && (connection.profile.receives_events() || connection.allowed_events.is_empty())
+            && connection
+                .allowed_events
+                .iter()
+                .all(|event| self.policy.allowed_events.contains(event))
             && match self.admission {
                 PrincipalAdmission::Exact(_) => true,
                 PrincipalAdmission::Tenant(_) => {
@@ -504,12 +519,15 @@ impl SlackInner {
             .map(|connection| DatasourceBinding {
                 datasource_ref: datasource_ref.to_owned(),
                 binding_ref: datasource_binding_ref(datasource_ref, &connection),
-                connection_ref: connection.connection_ref,
                 label: format!(
                     "{} ({})",
                     connection.label,
                     datasource_scope_label(connection.profile)
                 ),
+                // Which of several Slack identities to read through is the question a caller
+                // actually has here, and a scope label alone does not answer it.
+                purpose: (!connection.purpose.is_empty()).then(|| connection.purpose.clone()),
+                connection_ref: connection.connection_ref,
                 generation: u64::from(STATE_VERSION),
             })
             .collect::<Vec<_>>();
@@ -721,6 +739,7 @@ impl SlackInner {
                     SlackConnectionProfile::Legacy => "legacy-reconnect-required",
                 }
                 .to_owned()],
+                purpose: (!connection.purpose.is_empty()).then(|| connection.purpose.clone()),
             })
             .collect()
     }

@@ -17,5 +17,6 @@ pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, ConfigError,
     ConnectionConfig, B10xConnectionConfig, B10xIntegrationConfig,
     GrafanaIntegrationConfig, InitiationConfig, KubernetesIntegrationConfig, PersonalConfig,
-    PersonalVoiceConfig, SlackIntegrationConfig,
+    PersonalVoiceConfig, SlackInstanceConfig, SlackInstanceProfile,
+    SlackIntegrationConfig,
 };

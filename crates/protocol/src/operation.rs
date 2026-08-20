@@ -125,6 +125,9 @@ pub struct ConnectionSummary {
     pub provider: String,
     /// Curated Explorer filters from the Provider catalog. Never authorization or visibility.
     pub audiences: Vec<String>,
+    /// When a caller should invoke through this Connection rather than another admitted one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -609,6 +612,7 @@ mod tests {
                         label: "Infrastructure metrics".to_owned(),
                         provider: "prometheus".to_owned(),
                         audiences: vec!["sre".to_owned(), "developer".to_owned()],
+                        purpose: None,
                     }],
                 }],
             },

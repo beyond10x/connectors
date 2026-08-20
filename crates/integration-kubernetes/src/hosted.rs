@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use connectors_config::KubernetesNamespaceAccessConfig;
@@ -15,10 +15,9 @@ use protocol::connection::{
     ConnectionSummary as ControlConnectionSummary, DescribeRequest as ConnectionDescribeRequest,
 };
 use protocol::datasource::{
-    AccessMode, BindingSearchRequest, Completeness, DatasourceBinding, DatasourceDescription,
-    DatasourceError, DatasourceErrorCode, DatasourcePage, DatasourceProvenance, DatasourceRead,
-    DatasourceRecord, DatasourceRequest, DatasourceResult, DatasourceSummary,
-    DescribeRequest as DatasourceDescribeRequest, ReadRequest, ReadVerb, RecordView,
+    BindingSearchRequest,
+    DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
+    DescribeRequest as DatasourceDescribeRequest, ReadRequest,
     SearchRequest as DatasourceSearchRequest,
 };
 use protocol::operation::{
@@ -26,7 +25,7 @@ use protocol::operation::{
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
 use url::Url;
@@ -34,18 +33,15 @@ use zeroize::Zeroizing;
 
 use service::{BackendCapabilities, ConnectorBackend, PrincipalContext};
 
+// The workload projection is shared with every other host mode, so a Deployment read
+// through a workstation kubeconfig and one read through this ServiceAccount are the same
+// record. See `crate::workloads`.
+use crate::workloads::*;
+
 mod datasource;
 
-#[cfg(test)]
-use datasource::namespace_binding;
 
-const STATUS_OPERATION: &str = "kubernetes.deployment.status";
-const RESTART_OPERATION: &str = "kubernetes.deployment.rollout-restart";
-const DATASOURCE: &str = "kubernetes.workloads";
 const CONNECTION: &str = "connection:kubernetes:in-cluster";
-const MAX_KUBERNETES_RESPONSE_BYTES: usize = 256 * 1024;
-const MAX_RELATED_RECORDS: usize = 50;
-const CURSOR_TTL: Duration = Duration::from_secs(300);
 
 #[derive(Debug, thiserror::Error)]
 pub enum KubernetesBackendError {
@@ -64,7 +60,7 @@ pub struct KubernetesStatusBackend {
     namespace_access: BTreeMap<String, NamespaceAccess>,
     operator_groups: BTreeSet<String>,
     reader: Arc<dyn DeploymentReader>,
-    cursors: Mutex<BTreeMap<String, CursorState>>,
+    cursors: CursorStore,
 }
 
 #[derive(Clone)]
@@ -73,52 +69,6 @@ struct NamespaceAccess {
     restart_groups: BTreeSet<String>,
 }
 
-struct CursorState {
-    namespace: String,
-    principal_subject: String,
-    /// Bound to the stable authority, never to the access token: page two of a listing arrives on
-    /// whatever token is current then, and an expired cursor for a rotated token is a refusal a
-    /// caller cannot act on.
-    authority_seed: Vec<u8>,
-    provider_cursor: String,
-    expires_at: SystemTime,
-}
-
-#[async_trait]
-trait DeploymentReader: Send + Sync {
-    async fn read(&self, namespace: &str, name: &str) -> Result<DeploymentStatus, OperationError>;
-
-    async fn list_workloads(
-        &self,
-        _namespace: &str,
-        _limit: u16,
-        _cursor: Option<&str>,
-    ) -> Result<WorkloadList, DatasourceError> {
-        Err(datasource_unavailable(
-            "Kubernetes workload listing is unavailable",
-        ))
-    }
-
-    async fn workload_detail(
-        &self,
-        _namespace: &str,
-        _name: &str,
-    ) -> Result<WorkloadDetail, DatasourceError> {
-        Err(datasource_unavailable(
-            "Kubernetes workload detail is unavailable",
-        ))
-    }
-
-    async fn restart(
-        &self,
-        _namespace: &str,
-        _name: &str,
-        _uid: &str,
-        _resource_version: &str,
-    ) -> Result<RestartAccepted, OperationError> {
-        Err(unavailable("Kubernetes rollout restart is unavailable"))
-    }
-}
 
 struct InClusterReader {
     client: reqwest::Client,
@@ -126,255 +76,6 @@ struct InClusterReader {
     token_file: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct DeploymentStatus {
-    namespace: String,
-    name: String,
-    generation: i64,
-    observed_generation: i64,
-    desired_replicas: i32,
-    ready_replicas: i32,
-    available_replicas: i32,
-    updated_replicas: i32,
-    running: bool,
-    available_condition: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct WorkloadCompact {
-    namespace: String,
-    name: String,
-    uid: String,
-    resource_version: String,
-    generation: i64,
-    observed_generation: i64,
-    desired_replicas: i32,
-    updated_replicas: i32,
-    ready_replicas: i32,
-    available_replicas: i32,
-    unavailable_replicas: i32,
-    rollout_state: String,
-}
-
-struct WorkloadList {
-    workloads: Vec<WorkloadCompact>,
-    next_cursor: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct WorkloadDetail {
-    #[serde(flatten)]
-    workload: WorkloadCompact,
-    pods: Vec<PodSummary>,
-    warnings: Vec<WarningSummary>,
-    related_complete: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct PodSummary {
-    name: String,
-    phase: String,
-    ready_containers: u16,
-    total_containers: u16,
-    restart_count: u32,
-    containers: Vec<ContainerSummary>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ContainerSummary {
-    name: String,
-    image: String,
-    image_id: String,
-    ready: bool,
-    restart_count: u32,
-    state_reason: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct WarningSummary {
-    involved_kind: String,
-    involved_name: String,
-    reason: String,
-    count: i32,
-    first_observed_at: Option<String>,
-    last_observed_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct RestartAccepted {
-    namespace: String,
-    name: String,
-    uid: String,
-    resource_version: String,
-    patch_accepted: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DeploymentInput {
-    namespace: String,
-    name: String,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RestartInput {
-    namespace: String,
-    name: String,
-    uid: String,
-    resource_version: String,
-}
-
-#[derive(Deserialize)]
-struct KubernetesDeployment {
-    metadata: KubernetesMetadata,
-    #[serde(default)]
-    spec: KubernetesDeploymentSpec,
-    #[serde(default)]
-    status: KubernetesDeploymentState,
-}
-
-#[derive(Deserialize)]
-struct KubernetesMetadata {
-    name: String,
-    namespace: String,
-    #[serde(default)]
-    uid: String,
-    #[serde(default, rename = "resourceVersion")]
-    resource_version: String,
-    #[serde(default)]
-    generation: i64,
-}
-
-#[derive(Default, Deserialize)]
-struct KubernetesDeploymentSpec {
-    #[serde(default = "one_replica")]
-    replicas: i32,
-    #[serde(default)]
-    selector: KubernetesLabelSelector,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubernetesLabelSelector {
-    #[serde(default)]
-    match_labels: BTreeMap<String, String>,
-}
-
-const fn one_replica() -> i32 {
-    1
-}
-
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubernetesDeploymentState {
-    #[serde(default)]
-    observed_generation: i64,
-    #[serde(default)]
-    ready_replicas: i32,
-    #[serde(default)]
-    available_replicas: i32,
-    #[serde(default)]
-    updated_replicas: i32,
-    #[serde(default)]
-    unavailable_replicas: i32,
-    #[serde(default)]
-    conditions: Vec<KubernetesCondition>,
-}
-
-#[derive(Deserialize)]
-struct KubernetesList<T> {
-    #[serde(default)]
-    metadata: KubernetesListMetadata,
-    items: Vec<T>,
-}
-
-#[derive(Default, Deserialize)]
-struct KubernetesListMetadata {
-    #[serde(default, rename = "continue")]
-    continue_token: String,
-}
-
-#[derive(Deserialize)]
-struct KubernetesPod {
-    metadata: KubernetesMetadata,
-    #[serde(default)]
-    spec: KubernetesPodSpec,
-    #[serde(default)]
-    status: KubernetesPodStatus,
-}
-
-#[derive(Default, Deserialize)]
-struct KubernetesPodSpec {
-    #[serde(default)]
-    containers: Vec<KubernetesContainer>,
-}
-
-#[derive(Deserialize)]
-struct KubernetesContainer {
-    name: String,
-    image: String,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubernetesPodStatus {
-    #[serde(default)]
-    phase: String,
-    #[serde(default)]
-    container_statuses: Vec<KubernetesContainerStatus>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubernetesContainerStatus {
-    name: String,
-    #[serde(default)]
-    image: String,
-    #[serde(default)]
-    image_id: String,
-    #[serde(default)]
-    ready: bool,
-    #[serde(default)]
-    restart_count: u32,
-    #[serde(default)]
-    state: BTreeMap<String, KubernetesContainerState>,
-}
-
-#[derive(Default, Deserialize)]
-struct KubernetesContainerState {
-    #[serde(default)]
-    reason: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubernetesEvent {
-    involved_object: KubernetesObjectReference,
-    #[serde(default)]
-    reason: String,
-    #[serde(default)]
-    count: i32,
-    #[serde(default)]
-    first_timestamp: Option<String>,
-    #[serde(default)]
-    last_timestamp: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct KubernetesObjectReference {
-    #[serde(default)]
-    kind: String,
-    #[serde(default)]
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct KubernetesCondition {
-    #[serde(rename = "type")]
-    kind: String,
-    status: String,
-}
 
 impl KubernetesStatusBackend {
     pub fn in_cluster(
@@ -418,7 +119,7 @@ impl KubernetesStatusBackend {
                 base,
                 token_file: token_file.into(),
             }),
-            cursors: Mutex::new(BTreeMap::new()),
+            cursors: CursorStore::default(),
         })
     }
 
@@ -436,7 +137,7 @@ impl KubernetesStatusBackend {
             operator_groups,
             expected_tenant,
             reader,
-            cursors: Mutex::new(BTreeMap::new()),
+            cursors: CursorStore::default(),
         })
     }
 
@@ -1024,143 +725,6 @@ async fn bounded_body(response: reqwest::Response) -> Result<Vec<u8>, Datasource
     Ok(body.to_vec())
 }
 
-fn project(deployment: KubernetesDeployment) -> DeploymentStatus {
-    let available_condition = deployment
-        .status
-        .conditions
-        .iter()
-        .any(|condition| condition.kind == "Available" && condition.status == "True");
-    let running = deployment.status.observed_generation >= deployment.metadata.generation
-        && deployment.status.ready_replicas >= deployment.spec.replicas
-        && deployment.status.available_replicas >= deployment.spec.replicas
-        && available_condition;
-    DeploymentStatus {
-        namespace: deployment.metadata.namespace,
-        name: deployment.metadata.name,
-        generation: deployment.metadata.generation,
-        observed_generation: deployment.status.observed_generation,
-        desired_replicas: deployment.spec.replicas,
-        ready_replicas: deployment.status.ready_replicas,
-        available_replicas: deployment.status.available_replicas,
-        updated_replicas: deployment.status.updated_replicas,
-        running,
-        available_condition,
-    }
-}
-
-fn project_compact(deployment: KubernetesDeployment) -> WorkloadCompact {
-    let available = deployment
-        .status
-        .conditions
-        .iter()
-        .any(|condition| condition.kind == "Available" && condition.status == "True");
-    let progressing = deployment
-        .status
-        .conditions
-        .iter()
-        .any(|condition| condition.kind == "Progressing" && condition.status == "True");
-    let rollout_state = if deployment.status.observed_generation < deployment.metadata.generation
-        || deployment.status.updated_replicas < deployment.spec.replicas
-    {
-        "progressing"
-    } else if available
-        && deployment.status.ready_replicas >= deployment.spec.replicas
-        && deployment.status.available_replicas >= deployment.spec.replicas
-    {
-        "available"
-    } else if progressing {
-        "progressing"
-    } else {
-        "degraded"
-    };
-    WorkloadCompact {
-        namespace: deployment.metadata.namespace,
-        name: deployment.metadata.name,
-        uid: deployment.metadata.uid,
-        resource_version: deployment.metadata.resource_version,
-        generation: deployment.metadata.generation,
-        observed_generation: deployment.status.observed_generation,
-        desired_replicas: deployment.spec.replicas,
-        updated_replicas: deployment.status.updated_replicas,
-        ready_replicas: deployment.status.ready_replicas,
-        available_replicas: deployment.status.available_replicas,
-        unavailable_replicas: deployment.status.unavailable_replicas,
-        rollout_state: rollout_state.to_owned(),
-    }
-}
-
-fn project_pod(pod: KubernetesPod) -> PodSummary {
-    let mut statuses = pod
-        .status
-        .container_statuses
-        .into_iter()
-        .map(|status| (status.name.clone(), status))
-        .collect::<BTreeMap<_, _>>();
-    let mut containers = Vec::new();
-    for container in pod.spec.containers {
-        let status = statuses.remove(&container.name);
-        containers.push(ContainerSummary {
-            name: container.name,
-            image: status
-                .as_ref()
-                .filter(|status| !status.image.is_empty())
-                .map_or(container.image, |status| status.image.clone()),
-            image_id: status
-                .as_ref()
-                .map_or_else(String::new, |status| status.image_id.clone()),
-            ready: status.as_ref().is_some_and(|status| status.ready),
-            restart_count: status.as_ref().map_or(0, |status| status.restart_count),
-            state_reason: status.as_ref().and_then(|status| {
-                status
-                    .state
-                    .values()
-                    .filter_map(|state| state.reason.as_ref())
-                    .find(|reason| safe_event_reason(reason))
-                    .cloned()
-            }),
-        });
-    }
-    for (_, status) in statuses {
-        containers.push(ContainerSummary {
-            name: status.name,
-            image: status.image,
-            image_id: status.image_id,
-            ready: status.ready,
-            restart_count: status.restart_count,
-            state_reason: status
-                .state
-                .values()
-                .filter_map(|state| state.reason.as_ref())
-                .find(|reason| safe_event_reason(reason))
-                .cloned(),
-        });
-    }
-    containers.sort_by(|left, right| left.name.cmp(&right.name));
-    let ready_containers = containers
-        .iter()
-        .filter(|container| container.ready)
-        .count();
-    let restart_count = containers
-        .iter()
-        .map(|container| container.restart_count)
-        .sum();
-    PodSummary {
-        name: pod.metadata.name,
-        phase: pod.status.phase,
-        ready_containers: u16::try_from(ready_containers).unwrap_or(u16::MAX),
-        total_containers: u16::try_from(containers.len()).unwrap_or(u16::MAX),
-        restart_count,
-        containers,
-    }
-}
-
-fn safe_event_reason(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-}
 
 fn validate_policy(
     expected_tenant: &str,
@@ -1211,22 +775,6 @@ fn valid_group(value: &str) -> bool {
         })
 }
 
-fn valid_dns_label(value: &str, maximum: usize) -> bool {
-    !value.is_empty()
-        && value.len() <= maximum
-        && value
-            .as_bytes()
-            .first()
-            .is_some_and(u8::is_ascii_alphanumeric)
-        && value
-            .as_bytes()
-            .last()
-            .is_some_and(u8::is_ascii_alphanumeric)
-        && value.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'.')
-        })
-}
-
 fn valid_ref(value: &str, maximum: usize) -> bool {
     !value.is_empty() && value.len() <= maximum && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
@@ -1257,6 +805,7 @@ fn connection() -> ConnectionSummary {
         label: "Development cluster".to_owned(),
         provider: "kubernetes".to_owned(),
         audiences: vec!["operations".to_owned()],
+        purpose: None,
     }
 }
 
@@ -1305,46 +854,6 @@ fn audit_ref(
         context.actor_subject(),
     ));
     format!("audit:kubernetes:{}", hex::encode(&digest[..16]))
-}
-
-fn now_unix_ms() -> u64 {
-    let milliseconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    u64::try_from(milliseconds).unwrap_or(u64::MAX)
-}
-
-fn invalid(message: &'static str) -> OperationError {
-    OperationError::new(OperationErrorCode::InvalidInput, message, false)
-}
-
-fn not_granted(message: &'static str) -> OperationError {
-    OperationError::new(OperationErrorCode::NotGranted, message, false)
-}
-
-fn unavailable(message: &'static str) -> OperationError {
-    OperationError::new(OperationErrorCode::Unavailable, message, true)
-}
-
-fn stale(message: &'static str) -> OperationError {
-    OperationError::new(OperationErrorCode::StaleAuthority, message, false)
-}
-
-fn outcome_unknown(message: &'static str) -> OperationError {
-    OperationError::new(OperationErrorCode::OutcomeUnknown, message, false)
-}
-
-fn datasource_unavailable(message: &'static str) -> DatasourceError {
-    DatasourceError::new(DatasourceErrorCode::Unavailable, message, true)
-}
-
-fn datasource_not_found(message: &'static str) -> DatasourceError {
-    DatasourceError::new(DatasourceErrorCode::NotFound, message, false)
-}
-
-fn datasource_not_granted(message: &'static str) -> DatasourceError {
-    DatasourceError::new(DatasourceErrorCode::NotGranted, message, false)
 }
 
 #[cfg(test)]

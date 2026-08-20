@@ -312,6 +312,7 @@ mod tests {
             initiation: InitiationConfig::Provider,
             allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
             connect_session_ttl_seconds: 30,
+            instances: Vec::new(),
         }
     }
 
@@ -340,6 +341,7 @@ mod tests {
             profile: SlackConnectionProfile::OrgBot,
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["channels:history".to_owned(), "users:read".to_owned()],
+            purpose: String::new(),
         };
 
         assert!(backend.inner.connection_is_admitted(&connection));
@@ -628,6 +630,7 @@ mod tests {
             profile: SlackConnectionProfile::Legacy,
             external_subject_id: String::new(),
             scopes: Vec::new(),
+            purpose: String::new(),
         };
         let payload = serde_json::json!({"type":"message","channel":"C01","text":"hello"});
         store
@@ -677,6 +680,7 @@ mod tests {
             profile: SlackConnectionProfile::CompanionBot,
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["app_mentions:read".to_owned(), "chat:write".to_owned()],
+            purpose: String::new(),
         };
         backend
             .inner
@@ -767,6 +771,7 @@ mod tests {
             profile: SlackConnectionProfile::Legacy,
             external_subject_id: String::new(),
             scopes: Vec::new(),
+            purpose: String::new(),
         };
         lock(&backend.inner.metadata)
             .connections
@@ -940,4 +945,119 @@ mod tests {
         );
         backend.shutdown().await;
     }
+
+    #[test]
+    fn a_local_companion_submission_is_one_bot_token_and_nothing_else() {
+        // The local completion endpoint carries exactly one whitespace-free secret
+        // (`connect-session-transport`, `secret_from_bytes`), so the app-plus-bot pair the hosted
+        // receiver takes cannot be expressed here under any separator. A bot token alone is what
+        // the reads need.
+        let credentials = connection_runtime::parse_companion_submission("xoxb-real-looking-token").unwrap();
+        assert!(credentials.app_token.is_none());
+        assert!(credentials.bot_token.is_some());
+        assert!(credentials.user_token.is_none());
+
+        // An app-level token is not a bot token, and a pair is not a submission this transport
+        // could ever have delivered.
+        assert!(connection_runtime::parse_companion_submission("xapp-token").is_err());
+        assert!(connection_runtime::parse_companion_submission("xapp-token xoxb-token").is_err());
+        assert!(connection_runtime::parse_companion_submission("xapp-token\nxoxb-token").is_err());
+        assert!(connection_runtime::parse_companion_submission("").is_err());
+    }
+
+    #[tokio::test]
+    async fn a_connection_receiving_fewer_events_than_the_policy_lists_is_still_admitted() {
+        // A workstation supplies a bot token and no app-level token, so its connection receives no
+        // events at all. Requiring the stored event set to *equal* the policy's read that as a
+        // forged connection and dropped it out of every datasource search: Slack was connected and
+        // `slack.conversations` never appeared on the page.
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_with_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            false,
+        )
+        .await
+        .unwrap();
+        let companion = |allowed_events: Vec<String>| StoredConnection {
+            connection_ref: "connection:slack:companion".to_owned(),
+            instance_id: "companion".to_owned(),
+            label: "Slack".to_owned(),
+            grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).to_owned(),
+            initiation: InitiationConfig::Provider,
+            allowed_events,
+            owner_subject: owner().subject().to_owned(),
+            team_id: "T012345".to_owned(),
+            profile: SlackConnectionProfile::CompanionBot,
+            external_subject_id: "U012345".to_owned(),
+            scopes: vec!["channels:read".to_owned(), "users:read".to_owned()],
+            purpose: String::new(),
+        };
+
+        assert!(backend.inner.connection_is_admitted(&companion(Vec::new())));
+        assert!(
+            backend
+                .inner
+                .connection_is_admitted(&companion(vec!["app_mention".to_owned()]))
+        );
+        // More than the policy admits stays refused, which is the invariant that matters.
+        assert!(
+            !backend
+                .inner
+                .connection_is_admitted(&companion(vec!["message.im".to_owned()]))
+        );
+        backend.shutdown().await;
+    }
+
+
+    #[test]
+    fn a_declared_instance_name_fixes_its_identity_for_good() {
+        // The whole reason a name exists. A random instance id made `connection:slack:<uuid>` and
+        // every datasource binding ref change on every restart, so anything that referenced one was
+        // dead by the next start. The name a person chose is what pins them.
+        let first = instance_id_for_name("babelforce-bot");
+        assert_eq!(first, instance_id_for_name("babelforce-bot"));
+        assert_ne!(first, instance_id_for_name("timo-ai"));
+        // It has to be a canonical uuid, because that is the only shape a credential address
+        // admits (`connector-address`, `validate_instance`).
+        assert_eq!(first.len(), 36);
+        // The address type is the authority on the shape; building one proves it.
+        assert!(
+            CredentialRef::for_instance("tenant-local", AUTHORITY, &first, SERVICE, "bot_token")
+                .is_ok()
+        );
+        assert_eq!(&first[14..15], "4");
+    }
+
+    #[test]
+    fn a_credential_file_other_accounts_can_read_is_refused_rather_than_used() {
+        // A token another local account can open has already leaked. Using it anyway and saying
+        // nothing is the failure mode worth preventing: nobody would ever find out.
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("bot.token");
+        fs::write(&path, "xoxb-not-a-real-token").unwrap();
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(
+            connection_runtime::read_credential_file(&path).unwrap_err().code,
+            "instance-credential-unsafe"
+        );
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let secret = connection_runtime::read_credential_file(&path).unwrap();
+        assert_eq!(secret.expose_secret(), "xoxb-not-a-real-token");
+
+        // An empty file is a configuration mistake, not a credential.
+        fs::write(&path, "   \n").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(
+            connection_runtime::read_credential_file(&path).unwrap_err().code,
+            "instance-credential-shape"
+        );
+    }
+
 }
