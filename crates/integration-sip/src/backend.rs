@@ -23,7 +23,7 @@ use protocol::operation::{
 use protocol::sip::{
     SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF,
 };
-use service::{admit_voice_dial, AdmittedVoicePlan};
+use service::{admit_sip_dial, admit_voice_dial, AdmittedSipPlan, AdmittedVoicePlan};
 use service::{
     plan_operation, BackendCapabilities, BackendReadinessError, ConnectorBackend,
     PlanningEnvironment, PrincipalContext,
@@ -69,6 +69,16 @@ pub trait SessionLauncher: Send + Sync + 'static {
     async fn ready(&self) -> Result<(), LaunchError>;
 
     async fn launch(&self, admitted: AdmittedVoicePlan) -> Result<LaunchedSession, LaunchError>;
+
+    /// Establish a **raw SIP call**: no application channel, no session authority.
+    ///
+    /// Defaulted to a refusal so an implementation that only carries calls onward to an application
+    /// keeps compiling untouched, and one that only terminates them at the edge implements this and
+    /// refuses [`launch`](Self::launch). Two bindings of one neutral session contract, neither
+    /// pretending to be the other.
+    async fn launch_sip(&self, _admitted: AdmittedSipPlan) -> Result<LaunchedSession, LaunchError> {
+        Err(LaunchError::new("raw-sip-unsupported"))
+    }
 }
 
 /// Configured implementation of the generic operation contract for exactly `sip.dial`.
@@ -396,20 +406,46 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             },
         )
         .map_err(|_| not_granted())?;
-        let admitted =
-            admit_voice_dial(&plan, &input, &self.routes, self.config.application_route())
-                .map_err(|_| not_granted())?;
-        let live_permit = Arc::clone(&self.live_capacity)
-            .try_acquire_owned()
-            .map_err(|_| unavailable())?;
-        self.prune_terminal_records()?;
+        // **Raw SIP and SIP-plus-application-channel are two admissions, and both already exist.**
+        // `admit_sip_dial` produces socket-opening evidence for the call itself; `admit_voice_dial`
+        // additionally admits the application channel the call is carried onward to. Calling the
+        // second unconditionally meant a Connection could not be admitted without an application
+        // route, so raw SIP was unreachable — not because either protocol required the other, but
+        // because this line only knew one of them.
+        // **Raw SIP and SIP-plus-application-channel are two admissions, and both already existed.**
+        // `admit_sip_dial` produces socket-opening evidence for the call itself; `admit_voice_dial`
+        // additionally admits the application channel a call is carried onward to. Calling the
+        // second unconditionally meant a Connection could not be admitted without an application
+        // route, so raw SIP was unreachable — not because either protocol required the other, but
+        // because this line only knew one of them.
+        //
+        // The launch is dispatched here rather than behind one plan type because the two carry
+        // different evidence, and a type that could hold either would let a launcher receive
+        // application evidence it must not act on.
+        let launched = match self.config.application_route() {
+            Some(route) => {
+                let admitted = admit_voice_dial(&plan, &input, &self.routes, route)
+                    .map_err(|_| not_granted())?;
+                let live_permit = Arc::clone(&self.live_capacity)
+                    .try_acquire_owned()
+                    .map_err(|_| unavailable())?;
+                self.prune_terminal_records()?;
+                (self.launcher.launch(admitted).await, live_permit)
+            }
+            None => {
+                let admitted =
+                    admit_sip_dial(&plan, &input, &self.routes).map_err(|_| not_granted())?;
+                let live_permit = Arc::clone(&self.live_capacity)
+                    .try_acquire_owned()
+                    .map_err(|_| unavailable())?;
+                self.prune_terminal_records()?;
+                (self.launcher.launch_sip(admitted).await, live_permit)
+            }
+        };
+        let (launched, live_permit) = launched;
+        let launched = launched.map_err(|_| unavailable())?;
         let execution_ref = opaque_ref("execution")?;
         let audit_ref = opaque_ref("audit")?;
-        let launched = self
-            .launcher
-            .launch(admitted)
-            .await
-            .map_err(|_| unavailable())?;
         let output = match serde_json::to_value(&launched.receipt) {
             Ok(output) => output,
             Err(_) => {
@@ -815,7 +851,7 @@ mod tests {
                 receipt: SipDialEstablished {
                     call: "call-1".to_owned(),
                     session: "session-1".to_owned(),
-                    channel: "channel-1".to_owned(),
+                    channel: Some("channel-1".to_owned()),
                     state: SipDialState::Established,
                 },
                 control: VoiceSessionControl::new(),
@@ -1077,7 +1113,11 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         let alias_context = alias_backend.principal.clone();
         let alias_lease = description_ref(&alias_backend, &alias_context).await;
         let mut changed_route = config();
-        changed_route.application.resource = "different-voice-channel".to_owned();
+        changed_route
+            .application
+            .as_mut()
+            .expect("this fixture configures an application channel")
+            .resource = "different-voice-channel".to_owned();
         let changed_backend = SipOperationBackend::new(
             changed_route,
             Arc::new(FakeLauncher::default()),
