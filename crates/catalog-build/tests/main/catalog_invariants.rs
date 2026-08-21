@@ -1285,6 +1285,61 @@ fn a_full_build_leaves_no_orphaned_artifact() {
 /// dotted `time.start` must carry the normalized symbol `time_start`, and `airtable-record-get`'s
 /// contract description must be the one-line summary *extended* with the error-envelope sentence
 /// — longer than the summary, stating where the vendor's error message lives.
+
+/// **A caller that reads an operation's contract can make the call.**
+///
+/// The contract states which parameters are required. This asserts that supplying exactly those —
+/// and nothing else — is enough for every exposed operation in the catalogue to be *admissible*:
+/// no parameter the caller was never told about may be mandatory.
+///
+/// The defect that prompted it. `slack-conversations-history` declares five parameters and marks
+/// one required, so a caller sent `{"channel": …}` and was refused `connector-invalid-input:
+/// Slack operation input is invalid`, naming nothing. The request resolver required *every*
+/// declared parameter to be present, treating an optional one as "may be null, may not be absent";
+/// the contract said the opposite. Both were internally consistent and together they made an
+/// operation unusable, with a refusal that pointed at the caller's input rather than at the
+/// disagreement. It was never Slack-specific — the same rule sat in front of all 62 providers.
+///
+/// Stated over the catalogue rather than per provider, because that is the shape of the rule: the
+/// sixty-third connector is covered the moment it exists.
+#[test]
+fn every_operations_required_parameters_are_the_ones_a_caller_must_send() {
+    let (workspace, plan) = full_plan();
+    let mut checked = 0;
+    for (provider, document) in documents(&workspace, &plan) {
+        for operation in document["operations"].as_array().into_iter().flatten() {
+            let id = operation["id"].as_str().unwrap_or_default();
+            let required: std::collections::BTreeSet<&str> = operation["contract"]["input_schema"]
+                ["required"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .collect();
+            for param in operation["params"].as_array().into_iter().flatten() {
+                let symbol = param["symbol"].as_str().unwrap_or_default();
+                let position = param["position"].as_str().unwrap_or_default();
+                // The resolver refuses an absent parameter exactly when the document marks it
+                // required, so those are the ones the contract must also list. Anything the
+                // document calls optional may be omitted and the contract need not mention it.
+                if !param["required"].as_bool().unwrap_or(false) {
+                    continue;
+                }
+                checked += 1;
+                assert!(
+                    required.contains(symbol),
+                    "`{provider}`'s `{id}` needs `{symbol}` (position `{position}`) but its \
+                     contract does not require it, so a caller reading the contract cannot call it"
+                );
+            }
+        }
+    }
+    assert!(
+        checked > 0,
+        "the catalogue published no mandatory parameter to check"
+    );
+}
+
 #[test]
 fn the_document_carries_the_callers_contract() {
     let (workspace, plan) = full_plan();

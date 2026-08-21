@@ -262,6 +262,12 @@ struct RawParam {
     /// emitter's allocation.
     #[serde(default)]
     symbol: String,
+    /// Whether the caller must supply this parameter.
+    ///
+    /// Defaulted to optional for a document written before the field existed — the same
+    /// forward-compatibility contract `symbol` carries. Every shipped catalogue emits it.
+    #[serde(default)]
+    required: bool,
 }
 
 /// One operation's request, in the document's closed template vocabulary.
@@ -412,6 +418,17 @@ pub struct Operation {
     symbols: BTreeMap<String, String>,
     /// Caller parameters the template places in a URL path segment (C-478), by symbol.
     caller_path_parameters: BTreeSet<String>,
+    /// The caller-facing symbol of every parameter a caller may simply leave out.
+    ///
+    /// Exactly the ones the document does not mark required, whatever their position.
+    ///
+    /// Position is deliberately not part of this. Across the shipped catalogue every `path`
+    /// parameter is already marked required — there are none that are not — so the URL cannot be
+    /// left holding a literal `{ticket_id}`. What position *would* have excluded is body fields,
+    /// and there are 193 optional ones: an operation like `freshdesk-ticket-create` declares a
+    /// dozen optional fields, and requiring them turned every create in the catalogue into a call
+    /// nobody could make without sending a null for each.
+    caller_omittable_parameters: BTreeSet<String>,
     /// The error-envelope-extended description the model-facing contract carries (C-552).
     description: String,
     /// The lowered, Flux-typed input schema the model-facing contract carries (C-552).
@@ -467,6 +484,7 @@ impl Operation {
         let mut symbols = BTreeMap::new();
         let mut parameters = Vec::new();
         let mut caller_path_parameters = BTreeSet::new();
+        let mut caller_omittable_parameters = BTreeSet::new();
         for param in &raw.params {
             // **The caller-facing symbol is the document's** (C-552): the emitter computed it at
             // build time and stored it beside `name`, so no consumer reproduces the allocation. A
@@ -482,6 +500,9 @@ impl Operation {
             };
             if param.position == "path" {
                 caller_path_parameters.insert(symbol.clone());
+            }
+            if !param.required {
+                caller_omittable_parameters.insert(symbol.clone());
             }
             parameters.push(param.name.clone());
             symbols.insert(param.name.clone(), symbol);
@@ -528,6 +549,7 @@ impl Operation {
             parameters,
             symbols,
             caller_path_parameters,
+            caller_omittable_parameters,
             id: raw.id,
             service: raw.service,
             expose: raw.expose,
@@ -613,6 +635,12 @@ impl Operation {
     /// Caller-visible parameters the request template places in the URL path.
     pub fn caller_path_parameters(&self) -> &BTreeSet<String> {
         &self.caller_path_parameters
+    }
+
+    /// The caller-facing symbol of every parameter a caller may simply leave out.
+    #[must_use]
+    pub fn caller_omittable_parameters(&self) -> &BTreeSet<String> {
+        &self.caller_omittable_parameters
     }
 
     /// The caller-facing name of each declared parameter, in declaration order.
