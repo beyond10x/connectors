@@ -131,6 +131,9 @@ impl SessionLauncher for SipLauncher {
             receipt,
             control,
             completion,
+            // Kept so the call can be signalled after it is up: a raw SIP call is exactly one
+            // session, and this launcher owns it.
+            session: Some(session),
         })
     }
 }

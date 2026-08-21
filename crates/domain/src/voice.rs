@@ -19,6 +19,8 @@ pub enum VoiceError {
     FrameTooLarge,
     #[error("channel signal is invalid")]
     InvalidSignal,
+    #[error("this telephony binding cannot send channel signals")]
+    SignalUnsupported,
     #[error("voice session is already terminated")]
     Terminated,
     #[error("telephony endpoint failed: {0}")]
@@ -163,6 +165,28 @@ pub trait TelephonySession: Send + Sync {
     async fn read_input(&self) -> Result<Option<AudioFrame>, VoiceError>;
     async fn write_output(&self, frame: AudioFrame) -> Result<(), VoiceError>;
     async fn next_signal(&self) -> Result<Option<ChannelSignal>, VoiceError>;
+
+    /// Send a signal to the far end.
+    ///
+    /// The write direction of [`TelephonySession::next_signal`], and the reason a call can be
+    /// acted on after it is up: a keypress is not audio, so it cannot travel through
+    /// [`TelephonySession::write_output`], and an IVR that asks for a digit cannot be answered
+    /// without this.
+    ///
+    /// Defaulted to a refusal so a binding that cannot signal says so by name rather than by
+    /// silently accepting a keypress the far end never receives. A caller that gets
+    /// [`VoiceError::SignalUnsupported`] learns the binding's limit; one that got `Ok(())` would
+    /// learn nothing and wait for a response that is not coming.
+    ///
+    /// # Errors
+    ///
+    /// [`VoiceError::SignalUnsupported`] when this binding cannot send signals,
+    /// [`VoiceError::InvalidSignal`] for a signal outside its grammar, and
+    /// [`VoiceError::Terminated`] once the session has ended.
+    async fn send_signal(&self, signal: ChannelSignal) -> Result<(), VoiceError> {
+        let _ = signal;
+        Err(VoiceError::SignalUnsupported)
+    }
     /// Wait for the driver's first terminal fact without guessing from media or signal EOF.
     async fn wait_terminated(&self) -> Result<TerminationReason, VoiceError>;
     async fn interrupt_output(&self) -> Result<(), VoiceError>;
