@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use connector_resolve::document::{Document, HostEffect, ProtocolDriver};
+use domain::voice::TelephonySession;
 use domain::{
     voice::TerminationReason, AdmittedOperation, Capability, ConnectionAuthority, DriverId,
 };
@@ -19,7 +20,7 @@ use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest, SessionState,
-    SessionStatus, SessionTerminateRequest, SessionTermination,
+    SessionSignalRequest, SessionStatus, SessionTerminateRequest, SessionTermination,
 };
 use protocol::sip::{
     SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF,
@@ -32,12 +33,14 @@ use service::{
     PlanningEnvironment, PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
+
+mod sessions;
 use tokio::sync::{watch, Semaphore};
 use voice_runtime::VoiceSessionControl;
 
 use connectors_config::PersonalVoiceConfig;
 
-const B10X_DOCUMENT: &str = include_str!("../../../catalog/b10x.catalog.json");
+const B10X_DOCUMENT: &str = include_str!("../../../../catalog/b10x.catalog.json");
 const MAX_LIVE_SESSIONS: usize = 64;
 const MAX_SESSION_RECORDS: usize = 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
@@ -62,6 +65,13 @@ pub struct LaunchedSession {
     pub receipt: SipDialEstablished,
     pub control: VoiceSessionControl,
     pub completion: watch::Receiver<Option<SessionTermination>>,
+    /// The live session, kept so the call can be acted on after it is established.
+    ///
+    /// `control` can only end a call; signalling into one needs the session itself. Optional
+    /// because a launcher that composes a call out of parts it does not own -- the application
+    /// channel binding -- has no single session to hand back, and saying so is better than
+    /// handing back one of the halves.
+    pub session: Option<Arc<dyn TelephonySession>>,
 }
 
 /// Socket-owning runtime seam. Tests can prove operation semantics without opening SIP/RTVBP.
@@ -103,6 +113,7 @@ struct SessionRecord {
     operation_ref: String,
     connection_ref: String,
     audit_ref: String,
+    session: Option<Arc<dyn TelephonySession>>,
     control: VoiceSessionControl,
     completion: watch::Receiver<Option<SessionTermination>>,
     terminating: bool,
@@ -520,6 +531,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                 operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
                 connection_ref: self.config.connection.connection_ref.clone(),
                 audit_ref: audit_ref.clone(),
+                session: launched.session,
                 control: launched.control,
                 completion: launched.completion,
                 terminating: false,
@@ -560,60 +572,6 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         Ok(FixedHostResolution(resolved))
     }
 
-    fn prune_terminal_records(&self) -> Result<(), OperationError> {
-        let mut sessions = lock(&self.sessions);
-        if sessions.len() < MAX_SESSION_RECORDS {
-            return Ok(());
-        }
-        let remove = sessions
-            .iter()
-            .filter(|(_, record)| record.completion.borrow().is_some())
-            .map(|(execution_ref, _)| execution_ref.clone())
-            .take(sessions.len() - MAX_SESSION_RECORDS + 1)
-            .collect::<Vec<_>>();
-        for execution_ref in remove {
-            sessions.remove(&execution_ref);
-        }
-        if sessions.len() >= MAX_SESSION_RECORDS {
-            Err(unavailable())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn session_status(&self, request: SessionRequest) -> Result<SessionStatus, OperationError> {
-        let sessions = lock(&self.sessions);
-        let record = sessions.get(&request.execution_ref).ok_or_else(not_found)?;
-        Ok(status(&request.execution_ref, record))
-    }
-
-    fn session_terminate(
-        &self,
-        request: SessionTerminateRequest,
-    ) -> Result<SessionStatus, OperationError> {
-        let mut sessions = lock(&self.sessions);
-        let record = sessions
-            .get_mut(&request.execution_ref)
-            .ok_or_else(not_found)?;
-        if record.completion.borrow().is_none() {
-            self.audit
-                .append(AuditEvent {
-                    audit_ref: &record.audit_ref,
-                    execution_ref: &request.execution_ref,
-                    operation_ref: &record.operation_ref,
-                    connection_ref: &record.connection_ref,
-                    tenant_id: &self.config.owner.tenant_id,
-                    agent_id: &self.config.owner.agent_id,
-                    action: "termination_requested",
-                    termination: Some(requested_termination(request.reason)),
-                })
-                .map_err(|_| unavailable())?;
-            if record.control.terminate(termination_reason(request.reason)) {
-                record.terminating = true;
-            }
-        }
-        Ok(status(&request.execution_ref, record))
-    }
 }
 
 #[async_trait]
@@ -641,6 +599,9 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
                 lock(&self.sessions).contains_key(&request.execution_ref)
             }
             OperationRequest::SessionTerminate(request) => {
+                lock(&self.sessions).contains_key(&request.execution_ref)
+            }
+            OperationRequest::SessionSignal(request) => {
                 lock(&self.sessions).contains_key(&request.execution_ref)
             }
             OperationRequest::Search(_) => false,
@@ -676,6 +637,9 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
             )),
             OperationRequest::SessionTerminate(request) => Ok(OperationResult::SessionTerminate(
                 self.session_terminate(request)?,
+            )),
+            OperationRequest::SessionSignal(request) => Ok(OperationResult::SessionSignal(
+                self.session_signal(request).await?,
             )),
             OperationRequest::SessionReconcile(request) => {
                 let status = self.session_status(request).map_err(|error| {
@@ -760,40 +724,6 @@ fn effect(effects: &[HostEffect]) -> EffectClass {
     }
 }
 
-fn status(execution_ref: &str, record: &SessionRecord) -> SessionStatus {
-    let termination = *record.completion.borrow();
-    let state = if termination.is_some() {
-        SessionState::Terminated
-    } else if record.terminating {
-        SessionState::Terminating
-    } else {
-        SessionState::Established
-    };
-    SessionStatus {
-        execution_ref: execution_ref.to_owned(),
-        operation_ref: record.operation_ref.clone(),
-        connection_ref: record.connection_ref.clone(),
-        state,
-        termination,
-        connector_audit_ref: record.audit_ref.clone(),
-    }
-}
-
-fn termination_reason(reason: RequestedSessionTermination) -> TerminationReason {
-    match reason {
-        RequestedSessionTermination::Completed => TerminationReason::Completed,
-        RequestedSessionTermination::Cancelled => TerminationReason::Cancelled,
-        RequestedSessionTermination::Revoked => TerminationReason::AuthorityRevoked,
-    }
-}
-
-fn requested_termination(reason: RequestedSessionTermination) -> SessionTermination {
-    match reason {
-        RequestedSessionTermination::Completed => SessionTermination::Completed,
-        RequestedSessionTermination::Cancelled => SessionTermination::Cancelled,
-        RequestedSessionTermination::Revoked => SessionTermination::Revoked,
-    }
-}
 
 fn require_operation(actual: &str) -> Result<(), OperationError> {
     if actual == SIP_DIAL_TOOL_REF {
@@ -849,7 +779,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use std::os::unix::fs::PermissionsExt as _;
+    use domain::voice::ChannelSignal;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use protocol::operation::{
@@ -895,6 +825,7 @@ mod tests {
                 },
                 control: VoiceSessionControl::new(),
                 completion,
+                session: None,
             })
         }
     }
@@ -1020,6 +951,210 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
             input: serde_json::json!({"target": target}),
             approval_evidence_ref: approval.map(str::to_owned),
         })
+    }
+
+    /// A session that records what it was asked to signal, and can refuse.
+    struct SignallingSession {
+        descriptor: domain::voice::VoiceSessionDescriptor,
+        sent: Mutex<Vec<String>>,
+        refuse: Option<domain::voice::VoiceError>,
+    }
+
+    #[async_trait]
+    impl TelephonySession for SignallingSession {
+        fn descriptor(&self) -> &domain::voice::VoiceSessionDescriptor {
+            &self.descriptor
+        }
+        async fn read_input(
+            &self,
+        ) -> Result<Option<domain::voice::AudioFrame>, domain::voice::VoiceError> {
+            Ok(None)
+        }
+        async fn write_output(
+            &self,
+            _frame: domain::voice::AudioFrame,
+        ) -> Result<(), domain::voice::VoiceError> {
+            Ok(())
+        }
+        async fn next_signal(&self) -> Result<Option<ChannelSignal>, domain::voice::VoiceError> {
+            Ok(None)
+        }
+        async fn send_signal(
+            &self,
+            signal: ChannelSignal,
+        ) -> Result<(), domain::voice::VoiceError> {
+            if let Some(error) = &self.refuse {
+                return Err(error.clone());
+            }
+            let ChannelSignal::Dtmf { digits } = signal;
+            lock(&self.sent).push(digits);
+            Ok(())
+        }
+        async fn wait_terminated(
+            &self,
+        ) -> Result<domain::voice::TerminationReason, domain::voice::VoiceError> {
+            Ok(domain::voice::TerminationReason::Completed)
+        }
+        async fn interrupt_output(&self) -> Result<(), domain::voice::VoiceError> {
+            Ok(())
+        }
+        async fn terminate(
+            &self,
+            _reason: domain::voice::TerminationReason,
+        ) -> Result<(), domain::voice::VoiceError> {
+            Ok(())
+        }
+    }
+
+    fn signalling_session(
+        refuse: Option<domain::voice::VoiceError>,
+    ) -> Arc<SignallingSession> {
+        Arc::new(SignallingSession {
+            descriptor: domain::voice::VoiceSessionDescriptor {
+                call: domain::voice::VoiceRef::new("call-1").unwrap(),
+                session: domain::voice::VoiceRef::new("session-1").unwrap(),
+                channel: domain::voice::VoiceRef::new("channel-1").unwrap(),
+                participant: domain::voice::ParticipantContext {
+                    reference: domain::voice::VoiceRef::new("peer-1").unwrap(),
+                    trust: domain::voice::ContextTrust::Untrusted,
+                    display: None,
+                },
+                media: domain::voice::MediaDescriptor::pcm_s16le_8khz_mono_20ms(),
+            },
+            sent: Mutex::new(Vec::new()),
+            refuse,
+        })
+    }
+
+    /// Register a live session directly, so signalling is tested without opening a socket.
+    fn record_live_session(
+        backend: &SipOperationBackend<FakeLauncher>,
+        execution_ref: &str,
+        session: Option<Arc<dyn TelephonySession>>,
+    ) {
+        let (_sender, completion) = watch::channel(None);
+        lock(&backend.sessions).insert(
+            execution_ref.to_owned(),
+            SessionRecord {
+                operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
+                connection_ref: "connection-asterisk-dev".to_owned(),
+                audit_ref: "audit-1".to_owned(),
+                session,
+                control: VoiceSessionControl::new(),
+                completion,
+                terminating: false,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn a_signal_reaches_the_live_session_and_leaves_it_established() {
+        // The gap this closes: a call outlives the invocation that placed it, so a keypress
+        // answering an IVR prompt has nowhere to go until a session can be addressed after the
+        // fact.
+        let root = state_root();
+        let backend =
+            SipOperationBackend::new(config(), Arc::new(FakeLauncher::default()), root.path())
+                .unwrap();
+        let context = backend.principal.clone();
+        let session = signalling_session(None);
+        record_live_session(&backend, "execution-1", Some(session.clone()));
+
+        let result = backend
+            .handle(
+                &context,
+                OperationRequest::SessionSignal(SessionSignalRequest {
+                    execution_ref: "execution-1".to_owned(),
+                    signal: ChannelSignal::Dtmf {
+                        digits: "123".to_owned(),
+                    },
+                }),
+            )
+            .await
+            .expect("a live session accepts a signal");
+        match result {
+            OperationResult::SessionSignal(status) => {
+                assert_eq!(status.execution_ref, "execution-1");
+                // Signalling is not terminating: the call is still there to answer the next prompt.
+                assert_eq!(status.state, SessionState::Established);
+            }
+            other => panic!("unexpected result: {other:?}"),
+        }
+        assert_eq!(lock(&session.sent).as_slice(), ["123"]);
+    }
+
+    #[tokio::test]
+    async fn a_binding_that_cannot_signal_refuses_rather_than_dropping_the_keypress() {
+        // The composed application-channel launcher owns neither leg alone and hands back no
+        // session. Accepting the digit and discarding it would leave a caller waiting for a
+        // response to a keypress that never travelled.
+        let root = state_root();
+        let backend =
+            SipOperationBackend::new(config(), Arc::new(FakeLauncher::default()), root.path())
+                .unwrap();
+        let context = backend.principal.clone();
+        record_live_session(&backend, "execution-2", None);
+
+        let error = backend
+            .handle(
+                &context,
+                OperationRequest::SessionSignal(SessionSignalRequest {
+                    execution_ref: "execution-2".to_owned(),
+                    signal: ChannelSignal::Dtmf {
+                        digits: "1".to_owned(),
+                    },
+                }),
+            )
+            .await
+            .expect_err("a session with no signalling binding refuses");
+        assert_eq!(error.code, OperationErrorCode::Unavailable);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_session_is_not_found_and_a_refused_signal_is_reported() {
+        let root = state_root();
+        let backend =
+            SipOperationBackend::new(config(), Arc::new(FakeLauncher::default()), root.path())
+                .unwrap();
+        let context = backend.principal.clone();
+
+        let unknown = backend
+            .handle(
+                &context,
+                OperationRequest::SessionSignal(SessionSignalRequest {
+                    execution_ref: "execution-missing".to_owned(),
+                    signal: ChannelSignal::Dtmf {
+                        digits: "1".to_owned(),
+                    },
+                }),
+            )
+            .await
+            .expect_err("an unknown session is refused");
+        assert_eq!(unknown.code, OperationErrorCode::NotFound);
+
+        // A driver that refuses mid-call is reported as retriable rather than as a bad request:
+        // the digit was well-formed and the session was live.
+        record_live_session(
+            &backend,
+            "execution-3",
+            Some(signalling_session(Some(domain::voice::VoiceError::Endpoint(
+                "media refused".to_owned(),
+            )))),
+        );
+        let refused = backend
+            .handle(
+                &context,
+                OperationRequest::SessionSignal(SessionSignalRequest {
+                    execution_ref: "execution-3".to_owned(),
+                    signal: ChannelSignal::Dtmf {
+                        digits: "1".to_owned(),
+                    },
+                }),
+            )
+            .await
+            .expect_err("a driver refusal surfaces");
+        assert_eq!(refused.code, OperationErrorCode::Unavailable);
+        assert!(refused.retriable);
     }
 
     #[tokio::test]

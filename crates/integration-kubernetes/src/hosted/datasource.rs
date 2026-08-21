@@ -148,7 +148,8 @@ impl ConnectorBackend for KubernetesStatusBackend {
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => false,
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => false,
         }
     }
 

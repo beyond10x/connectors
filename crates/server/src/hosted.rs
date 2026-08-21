@@ -640,7 +640,10 @@ async fn operation(
         protocol::operation::OperationRequest::Invoke(_)
         | protocol::operation::OperationRequest::SessionStatus(_)
         | protocol::operation::OperationRequest::SessionTerminate(_)
-        | protocol::operation::OperationRequest::SessionReconcile(_) => "connectors.invoke",
+        | protocol::operation::OperationRequest::SessionReconcile(_)
+        // Acting on a live call, so it sits with the acting family rather than the reading one:
+        // a keypress reaches someone else's system and cannot be undone.
+        | protocol::operation::OperationRequest::SessionSignal(_) => "connectors.invoke",
     };
     if principal.tenant_id != request.context.tenant_id || !principal.allows(required_scope) {
         return operation_failure(
@@ -659,6 +662,10 @@ async fn operation(
             | protocol::operation::OperationRequest::SessionStatus(_)
             | protocol::operation::OperationRequest::SessionTerminate(_)
             | protocol::operation::OperationRequest::SessionReconcile(_)
+            // Listed explicitly, because this is a `matches!` and not a `match`: a new acting
+            // variant that is forgotten here compiles cleanly and skips the management policy
+            // entirely, which is the quietest way to lose an authorization check.
+            | protocol::operation::OperationRequest::SessionSignal(_)
     ) && !state.policy.admits_operation(&principal, &request.request)
     {
         return operation_failure(
