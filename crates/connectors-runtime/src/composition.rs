@@ -488,16 +488,20 @@ impl HostedRuntime {
             {
                 return Err(connectors_config::HostedServerConfigError::Invalid.into());
             }
-            // A hosted SIP deployment always carries calls onward to an application channel — that
-            // is what it is for — so a configuration without one is incomplete rather than raw.
-            let authority = voice
-                .authority
-                .as_ref()
-                .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
-            let application = voice
-                .application
-                .as_ref()
-                .ok_or(connectors_config::HostedServerConfigError::Invalid)?;
+            // **A hosted placement may also terminate a call at the edge.**
+            //
+            // This used to demand an authority and an application channel, on the reasoning that a
+            // hosted SIP deployment exists to carry calls onward. That is true of the cloud
+            // deployment and false of a hosted placement running on someone's own machine, where
+            // terminating the call locally is the whole point — and it made `sip.dial` unreachable
+            // from the workbench, because the local stack serves hosted.
+            //
+            // So the arm is chosen by what is configured, exactly as the personal arm chooses it.
+            // Neither posture decides whether a call is carried onward; the configuration does.
+            let carried_onward = voice.authority.clone().zip(voice.application.clone());
+            let backend: Arc<dyn ConnectorBackend> = if let Some((authority, application)) =
+                carried_onward.as_ref()
+            {
             let issuer = Arc::new(load_authority_issuer(authority)?);
             let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
                 let store = credential_stores
@@ -525,12 +529,24 @@ impl HostedRuntime {
                     application.tls_server_name.clone(),
                 ))
             };
-            backends.push(Arc::new(SipOperationBackend::new_postgres(
-                voice,
-                launcher,
-                &config.storage.state_root,
-                hosted_state.clone(),
-            )?));
+                Arc::new(SipOperationBackend::new_with_state(
+                    voice,
+                    launcher,
+                    &config.storage.state_root,
+                    Arc::new(hosted_state.clone()),
+                )?)
+            } else {
+                // No application channel: the call is established and terminates here. The same
+                // launcher the personal posture uses, and the same media binding -- a hosted
+                // placement on a workstation has a speaker like any other.
+                Arc::new(SipOperationBackend::new_with_state(
+                    voice,
+                    Arc::new(integration_sip::SipLauncher::new(CredentialSet::default())),
+                    &config.storage.state_root,
+                    Arc::new(hosted_state.clone()),
+                )?)
+            };
+            backends.push(backend);
         }
         if config.grafana.enabled {
             let store = credential_stores
