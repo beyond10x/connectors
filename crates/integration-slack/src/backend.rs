@@ -21,7 +21,7 @@ use connector_secrets::{
     SecretProposalDigest, SecretTransactionGeneration, SecretTransactionId, SecretTransactionState,
     TenantLayout,
 };
-use hosted_state::PostgresState;
+use connector_state::{StateError, StateStore};
 use protocol::connection::{
     ChannelState, ChannelSummary as ConnectionChannelSummary, ConnectSessionStatus,
     ConnectionActor, ConnectionDescription, ConnectionError, ConnectionErrorCode,
@@ -140,7 +140,7 @@ struct SlackInner {
     completion_mode: CompletionMode,
     policy: SlackIntegrationConfig,
     state_root: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     credential_store: Arc<dyn PreparedSecretStore>,
     metadata: Mutex<StateFile>,
     sessions: Mutex<ConnectSessionLifecycle>,
@@ -325,14 +325,14 @@ struct PendingCommit {
 
 struct EventStore {
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     events: Mutex<Vec<StoredEvent>>,
     notify: Notify,
 }
 
 struct AuditJournal {
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     state: Mutex<AuditJournalState>,
 }
 
@@ -361,7 +361,7 @@ struct StoredEvent {
 
 struct ReplyClaimStore {
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     claimed: Mutex<BTreeSet<String>>,
 }
 
@@ -466,7 +466,7 @@ impl SlackBackend {
         policy: SlackIntegrationConfig,
         state_root: &Path,
         credential_store: Arc<dyn PreparedSecretStore>,
-        hosted_state: PostgresState,
+        hosted_state: Arc<dyn StateStore>,
         egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, SlackError> {
         Self::open_inner(SlackOpenContext {
@@ -514,7 +514,7 @@ impl SlackBackend {
             hosted_state,
             supervision_enabled,
         } = context;
-        let metadata = read_state(&state_root.join("connections.json"), hosted_state.as_ref())?;
+        let metadata = read_state(state_root, hosted_state.as_deref())?;
         let event_store = Arc::new(EventStore::open(
             state_root.join("events.jsonl"),
             hosted_state.clone(),
@@ -578,7 +578,7 @@ struct SlackOpenContext<'a> {
     state_root: &'a Path,
     credential_store: Arc<dyn PreparedSecretStore>,
     egress: Arc<dyn EgressTransport>,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     supervision_enabled: bool,
 }
 
@@ -1074,7 +1074,7 @@ impl ConnectorBackend for SlackBackend {
 mod api_runtime;
 mod connection_runtime;
 impl AuditJournal {
-    fn new(path: PathBuf, hosted_state: Option<PostgresState>) -> Self {
+    fn new(path: PathBuf, hosted_state: Option<Arc<dyn StateStore>>) -> Self {
         Self {
             path,
             hosted_state,
@@ -1103,7 +1103,7 @@ impl AuditJournal {
                 .append(AUDIT_STATE_KEY, line, MAX_AUDIT_BYTES as usize)
                 .map(|_| ())
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => SlackError::new("audit-bound"),
+                    StateError::Capacity => SlackError::new("audit-bound"),
                     _ => SlackError::new("audit-store"),
                 });
         }
@@ -1203,7 +1203,7 @@ fn audit_line(event: AuditEvent<'_>, at_unix_ms: u64) -> Result<Vec<u8>, SlackEr
 }
 
 impl EventStore {
-    fn open(path: PathBuf, hosted_state: Option<PostgresState>) -> Result<Self, SlackError> {
+    fn open(path: PathBuf, hosted_state: Option<Arc<dyn StateStore>>) -> Result<Self, SlackError> {
         let events = if let Some(hosted_state) = &hosted_state {
             let bytes = hosted_state
                 .read(EVENT_STATE_KEY, MAX_EVENT_STORE_BYTES as usize)
@@ -1261,7 +1261,7 @@ impl EventStore {
             hosted_state
                 .append(EVENT_STATE_KEY, &line, MAX_EVENT_STORE_BYTES as usize)
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => SlackError::new("event-store-capacity"),
+                    StateError::Capacity => SlackError::new("event-store-capacity"),
                     _ => SlackError::new("event-store"),
                 })?;
         } else {
@@ -1326,7 +1326,7 @@ impl EventStore {
 }
 
 impl ReplyClaimStore {
-    fn open(path: PathBuf, hosted_state: Option<PostgresState>) -> Result<Self, SlackError> {
+    fn open(path: PathBuf, hosted_state: Option<Arc<dyn StateStore>>) -> Result<Self, SlackError> {
         let bytes = if let Some(state) = &hosted_state {
             state
                 .read(REPLY_CLAIM_STATE_KEY, MAX_REPLY_CLAIM_BYTES as usize)
@@ -1383,7 +1383,7 @@ impl ReplyClaimStore {
             state
                 .append(REPLY_CLAIM_STATE_KEY, &line, MAX_REPLY_CLAIM_BYTES as usize)
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => SlackError::new("reply-claim-capacity"),
+                    StateError::Capacity => SlackError::new("reply-claim-capacity"),
                     _ => SlackError::new("reply-claim-store"),
                 })?;
         } else {

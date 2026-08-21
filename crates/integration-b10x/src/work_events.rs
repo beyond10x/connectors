@@ -3,9 +3,9 @@ use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::os::unix::fs::OpenOptionsExt as _;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use hosted_state::PostgresState;
+use connector_state::StateStore;
 use protocol::event::{DataEvent, EventError, EventErrorCode};
 use serde::{Deserialize, Serialize};
 
@@ -52,7 +52,7 @@ struct StoredEvent {
 pub(super) struct ModuleEventStore {
     module: &'static str,
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     hosted_key: &'static str,
     state: Mutex<State>,
 }
@@ -62,7 +62,7 @@ impl ModuleEventStore {
         module: &'static str,
         path: PathBuf,
         legacy_tenant: Option<&str>,
-        hosted_state: Option<PostgresState>,
+        hosted_state: Option<Arc<dyn StateStore>>,
         hosted_key: &'static str,
     ) -> Result<Self, ()> {
         let bytes = if let Some(hosted_state) = &hosted_state {

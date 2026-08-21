@@ -14,7 +14,7 @@ workspace = "../connectors-runtime"
 async-trait = "0.1"
 connector-secrets = { version = "0.1.0", path = "../connector-secrets", features = ["vault"] }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
-hosted-state = { version = "0.1.0", path = "../hosted-state" }
+connector-state = { version = "0.1.0", path = "../connector-state" }
 futures-util = "0.3"
 hex = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }

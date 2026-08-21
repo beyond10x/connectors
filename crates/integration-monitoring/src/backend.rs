@@ -16,6 +16,7 @@ use connector_resolve::auth::{acquire, Assembled};
 use connector_resolve::document::ProtocolDriver;
 use connector_resolve::{resolve, Request};
 use connector_secrets::{CredentialRef, Secret, SecretStore};
+use connector_state::StateStore;
 use domain::{
     AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
@@ -133,7 +134,7 @@ struct MonitoringInner {
     tasks: Mutex<Vec<JoinHandle<()>>>,
     executor: Arc<dyn HttpExecutor>,
     audit: Mutex<()>,
-    hosted_state: Option<hosted_state::PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
 }
 
 #[derive(Clone)]
@@ -226,7 +227,7 @@ impl MonitoringBackend {
         operator_groups: Vec<String>,
         state_root: &Path,
         credential_store: Arc<dyn SecretStore>,
-        hosted_state: hosted_state::PostgresState,
+        hosted_state: Arc<dyn StateStore>,
         egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, MonitoringError> {
         ensure_owner_directory(state_root)?;
@@ -258,7 +259,7 @@ impl MonitoringBackend {
         state_root: &Path,
         credential_store: Arc<dyn SecretStore>,
         executor: Arc<E>,
-        hosted_state: Option<hosted_state::PostgresState>,
+        hosted_state: Option<Arc<dyn StateStore>>,
     ) -> Result<Self, MonitoringError> {
         let credential_ref = grafana_credential_ref(&owner)?;
         let origin = hosted
@@ -1487,7 +1488,7 @@ impl MonitoringInner {
                 .append(AUDIT_STATE_KEY, &line, MAX_AUDIT_BYTES as usize)
                 .map(|_| ())
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => MonitoringError::new("audit-bound"),
+                    connector_state::StateError::Capacity => MonitoringError::new("audit-bound"),
                     _ => MonitoringError::new("audit"),
                 });
         }

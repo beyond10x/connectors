@@ -1,6 +1,7 @@
 use std::path::Path;
+use std::sync::Arc;
 
-use hosted_state::PostgresState;
+use connector_state::StateStore;
 
 use super::*;
 
@@ -28,12 +29,16 @@ impl B10xBackend {
         Self::hosted_inner(config, tenant_ids, state_root, None)
     }
 
-    /// Compose hosted B10x state against the service-owned PostgreSQL database.
-    pub fn hosted_postgres(
+    /// Compose hosted B10x state against the durable store the deployment bound.
+    ///
+    /// This used to name PostgreSQL, and naming it meant a person running the product on their own
+    /// machine had to keep a database server alive to hold an audit journal and an event cursor.
+    /// Which backend holds them is the deployment's choice; nothing below can see it.
+    pub fn hosted_with_state(
         config: B10xIntegrationConfig,
         tenant_ids: Vec<String>,
         state_root: &Path,
-        hosted_state: PostgresState,
+        hosted_state: Arc<dyn StateStore>,
     ) -> Result<Self, B10xIntegrationError> {
         Self::hosted_inner(config, tenant_ids, state_root, Some(hosted_state))
     }
@@ -42,7 +47,7 @@ impl B10xBackend {
         config: B10xIntegrationConfig,
         tenant_ids: Vec<String>,
         state_root: &Path,
-        hosted_state: Option<PostgresState>,
+        hosted_state: Option<Arc<dyn StateStore>>,
     ) -> Result<Self, B10xIntegrationError> {
         if tenant_ids.is_empty() {
             return Err(B10xIntegrationError::InvalidConfiguration);
@@ -59,7 +64,7 @@ impl B10xBackend {
         config: B10xIntegrationConfig,
         admission: PrincipalAdmission,
         state_root: &Path,
-        hosted_state: Option<PostgresState>,
+        hosted_state: Option<Arc<dyn StateStore>>,
     ) -> Result<Self, B10xIntegrationError> {
         for socket in config.module_sockets.values() {
             transport::validate_module_socket(socket)?;

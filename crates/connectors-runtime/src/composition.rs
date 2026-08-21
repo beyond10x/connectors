@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStore, SecretStore};
+use connector_state::StateStore;
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
@@ -25,6 +26,7 @@ use serde_json::{json, Value};
 use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
 use service::{ConnectorBackend, CredentialSet, EgressTransport};
+use state_sqlite::SqliteState;
 
 use crate::BackendRegistry;
 
@@ -71,8 +73,20 @@ pub enum RuntimeError {
     Egress(#[from] server::egress::EgressError),
     #[error("the personal credential store could not be opened")]
     CredentialStore,
-    #[error("CONNECTORS_DATABASE_URL is required for hosted Connector state")]
-    MissingHostedDatabase,
+    #[error(
+        "hosted Connector state needs exactly one store: set CONNECTORS_DATABASE_URL for \
+         PostgreSQL, or CONNECTORS_SQLITE with a file path"
+    )]
+    MissingHostedState,
+    #[error(
+        "CONNECTORS_DATABASE_URL and CONNECTORS_SQLITE name two different stores for hosted \
+         Connector state; set one and unset the other"
+    )]
+    AmbiguousHostedState,
+    /// Carries the path, because the store the process could not open is the one fact the person
+    /// who set the variable needs and the one the backend's own error does not carry.
+    #[error("CONNECTORS_SQLITE names {path}, which could not be opened as a SQLite database")]
+    UnusableSqliteState { path: String },
     /// Raised only by a build carrying `local-identity`. See `identity_http::local_identity`.
     #[error(
         "this binary was built with the loopback Identity exception, so it serves only a loopback \
@@ -411,15 +425,16 @@ impl HostedRuntime {
             return Err(RuntimeError::LocalIdentityRefused);
         }
         validate_state_root(&config.storage.state_root)?;
-        let database_url =
-            env::var("CONNECTORS_DATABASE_URL").map_err(|_| RuntimeError::MissingHostedDatabase)?;
-        let hosted_state = PostgresState::connect(&database_url)?;
+        let hosted_state = hosted_state_store(
+            env::var("CONNECTORS_DATABASE_URL").ok(),
+            env::var("CONNECTORS_SQLITE").ok(),
+        )?;
         let credential_stores = if config.vault.enabled {
             let store = HostedVaultStore::new(&config.vault)?;
             store.initialize().await?;
             let store = Arc::new(store);
             let secret_store: Arc<dyn SecretStore> = store;
-            let prepared = PreparedVaultStore::open_postgres(
+            let prepared = PreparedVaultStore::open_shared(
                 secret_store.clone(),
                 hosted_state.clone(),
                 "vault.prepared-transactions",
@@ -533,7 +548,7 @@ impl HostedRuntime {
                     voice,
                     launcher,
                     &config.storage.state_root,
-                    Arc::new(hosted_state.clone()),
+                    hosted_state.clone(),
                 )?)
             } else {
                 // No application channel: the call is established and terminates here. The same
@@ -543,7 +558,7 @@ impl HostedRuntime {
                     voice,
                     Arc::new(integration_sip::SipLauncher::new(CredentialSet::default())),
                     &config.storage.state_root,
-                    Arc::new(hosted_state.clone()),
+                    hosted_state.clone(),
                 )?)
             };
             backends.push(backend);
@@ -575,7 +590,7 @@ impl HostedRuntime {
         let b10x_enabled = config.b10x.is_some();
         let admitted_module_tenants = config.admitted_module_tenants();
         if let Some(b10x) = config.b10x {
-            backends.push(Arc::new(B10xBackend::hosted_postgres(
+            backends.push(Arc::new(B10xBackend::hosted_with_state(
                 b10x,
                 admitted_module_tenants,
                 &config.storage.state_root,
@@ -786,6 +801,47 @@ pub fn default_config_path() -> Result<PathBuf, RuntimeError> {
         .ok_or(RuntimeError::MissingConfigPath)
 }
 
+/// Bind the one durable store a hosted placement writes its Integrations' bookkeeping into.
+///
+/// # Why two environment variables rather than a derived path
+///
+/// A hosted Connector in the cluster keeps this in PostgreSQL because several replicas must agree
+/// on which Connections exist. A person running the whole product on their own machine has one
+/// replica and no reason to keep a database server alive for it — and keeping one alive is what
+/// went wrong: a stale volume was recreated underneath a signed-in session, Identity was wiped, and
+/// the workbench started refusing with `NotGranted` for reasons invisible from the page.
+///
+/// The SQLite path is named, not derived from `[storage] state_root`, because a derived path can
+/// never be absent. "Neither variable is set" would silently become "write a database file
+/// somewhere", so a deployment whose database URL failed to reach the process would come up serving
+/// from a fresh empty local file and look healthy — the connection list gone, every Connection
+/// apparently never granted. Naming it makes both stores refusable, and refusing is the only
+/// honest answer to a placement that did not say where its state lives.
+///
+/// # Errors
+///
+/// [`RuntimeError::AmbiguousHostedState`] when both are set — two stores is not a merge, it is a
+/// coin toss over which half of the bookkeeping a restart reads. [`RuntimeError::MissingHostedState`]
+/// when neither is.
+fn hosted_state_store(
+    database_url: Option<String>,
+    sqlite_path: Option<String>,
+) -> Result<Arc<dyn StateStore>, RuntimeError> {
+    match (
+        database_url.filter(|value| !value.trim().is_empty()),
+        sqlite_path.filter(|value| !value.trim().is_empty()),
+    ) {
+        (Some(_), Some(_)) => Err(RuntimeError::AmbiguousHostedState),
+        (None, None) => Err(RuntimeError::MissingHostedState),
+        (Some(database_url), None) => Ok(Arc::new(PostgresState::connect(&database_url)?)),
+        (None, Some(path)) => {
+            let store = SqliteState::open(Path::new(&path))
+                .map_err(|_| RuntimeError::UnusableSqliteState { path })?;
+            Ok(Arc::new(store))
+        }
+    }
+}
+
 pub fn validate_state_root(root: &Path) -> Result<(), RuntimeError> {
     use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 
@@ -845,5 +901,76 @@ mod tests {
             validate_state_root(Path::new(env!("CARGO_MANIFEST_DIR"))),
             Err(RuntimeError::UnsafeStateRoot)
         ));
+    }
+
+    #[test]
+    fn a_hosted_placement_keeps_its_state_in_a_file_when_no_database_is_offered() {
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("connectors.sqlite3");
+        let store = hosted_state_store(
+            None,
+            Some(path.to_str().expect("a UTF-8 test path").to_owned()),
+        )
+        .expect("a named SQLite file is a complete answer to where hosted state lives");
+        store.replace("connections", b"one", 64).unwrap();
+        let read_back = store.read("connections", 64).unwrap();
+        assert_eq!(read_back.as_deref(), Some(&b"one"[..]));
+        assert!(path.exists(), "the bookkeeping went to the named file");
+    }
+
+    #[test]
+    fn naming_both_stores_is_refused_rather_than_one_of_them_quietly_winning() {
+        assert!(matches!(
+            hosted_state_store(
+                Some("postgres://localhost/connectors".to_owned()),
+                Some("/var/lib/connectors/state.sqlite3".to_owned()),
+            ),
+            Err(RuntimeError::AmbiguousHostedState)
+        ));
+    }
+
+    #[test]
+    fn naming_no_store_is_refused_rather_than_a_database_file_appearing_somewhere() {
+        assert!(matches!(
+            hosted_state_store(None, None),
+            Err(RuntimeError::MissingHostedState)
+        ));
+    }
+
+    /// A supervisor that interpolates an unset variable hands the process an empty string, not an
+    /// absent one. Treating that as a store would either dial an empty database URL or open a file
+    /// called nothing; both come up looking healthy with no bookkeeping in them.
+    #[test]
+    fn an_empty_variable_is_no_store_at_all() {
+        assert!(matches!(
+            hosted_state_store(Some(String::new()), Some("   ".to_owned())),
+            Err(RuntimeError::MissingHostedState)
+        ));
+    }
+
+    /// A path that cannot hold a database is a typo in a variable, and the person who typed it
+    /// needs to see which path the process tried rather than "state is unavailable".
+    #[test]
+    fn an_unopenable_sqlite_path_is_named_in_the_refusal() {
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("absent/connectors.sqlite3");
+        let path = path.to_str().expect("a UTF-8 test path").to_owned();
+        let Err(refusal) = hosted_state_store(None, Some(path.clone())) else {
+            panic!("a SQLite path under a missing directory must be refused");
+        };
+        assert!(refusal.to_string().contains(&path), "{refusal}");
+    }
+
+    /// The sentence a person reads when the placement did not say where its state lives has to name
+    /// what to set. The previous one named only the database URL, and stayed on the screen long
+    /// after a second store existed.
+    #[test]
+    fn the_refusal_names_both_stores_a_deployment_may_choose() {
+        let Err(refusal) = hosted_state_store(None, None) else {
+            panic!("a placement that named no store must be refused");
+        };
+        let refusal = refusal.to_string();
+        assert!(refusal.contains("CONNECTORS_DATABASE_URL"), "{refusal}");
+        assert!(refusal.contains("CONNECTORS_SQLITE"), "{refusal}");
     }
 }

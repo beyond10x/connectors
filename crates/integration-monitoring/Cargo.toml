@@ -20,7 +20,7 @@ connectors-config = { version = "0.1.0", path = "../connectors-config" }
 domain = { version = "0.1.0", path = "../domain" }
 getrandom = "0.3"
 hex = "0.4"
-hosted-state = { version = "0.1.0", path = "../hosted-state" }
+connector-state = { version = "0.1.0", path = "../connector-state" }
 monitoring-model = { version = "0.1.0", path = "../monitoring-model" }
 protocol = { version = "0.1.0", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["fs", "process"] }

@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use connector_secrets::PreparedSecretStore;
+use connector_state::StateStore;
 use connectors_config::HostedGitlabConfig;
-use hosted_state::PostgresState;
 
 use crate::backend::{GitlabBackend, GitlabError};
 use crate::state::GitlabState;
@@ -17,13 +17,15 @@ use crate::state::GitlabState;
 impl GitlabBackend {
     /// Open a hosted adapter with policy-only configuration and injected secret custody.
     ///
-    /// The bookkeeping lives in Postgres because a hosted Connector runs as several replicas and
-    /// they must agree on which Connections exist.
+    /// The bookkeeping lives in the deployment's shared state store, because a hosted Connector
+    /// may run as several replicas and they must agree on which Connections exist. Which backend
+    /// that is — PostgreSQL in the cluster, SQLite on one machine — is the deployment's choice and
+    /// nothing here can see it.
     pub async fn open_hosted(
         tenant_id: String,
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
-        state_store: PostgresState,
+        state_store: Arc<dyn StateStore>,
     ) -> Result<Self, GitlabError> {
         Self::open_inner(
             tenant_id,
