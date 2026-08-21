@@ -171,8 +171,7 @@
             }
           },
           "required": [
-            "table",
-            "limit"
+            "table"
           ],
           "type": "object"
         }

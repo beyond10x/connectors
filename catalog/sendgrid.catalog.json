@@ -55,10 +55,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "generations",
-            "page_size"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -282,10 +279,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "start_time",
-            "end_time"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -401,8 +395,7 @@
             }
           },
           "required": [
-            "email",
-            "source"
+            "email"
           ],
           "type": "object"
         }

@@ -993,7 +993,8 @@ impl ConnectorBackend for B10xBackend {
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => false,
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => false,
         }
     }
 
@@ -1041,7 +1042,8 @@ impl ConnectorBackend for B10xBackend {
             OperationRequest::Invoke(request) => self.invoke(context, request).await,
             OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => Err(not_found()),
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => Err(not_found()),
         }
     }
 

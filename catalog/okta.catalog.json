@@ -68,9 +68,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -343,9 +341,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -473,8 +469,7 @@
             }
           },
           "required": [
-            "user_id",
-            "limit"
+            "user_id"
           ],
           "type": "object"
         }
@@ -609,8 +604,7 @@
             }
           },
           "required": [
-            "user_id",
-            "send_email"
+            "user_id"
           ],
           "type": "object"
         }

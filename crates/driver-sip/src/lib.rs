@@ -14,6 +14,7 @@ use domain::voice::{
 use service::{AdmittedSipPlan, CredentialSet, SipSignalingTransport};
 use sipx_call::{CallEvent, Codecs, DialOptions, EndCause, Served};
 use sipx_media::{Interrupt, MediaSession, Playback};
+use sipx_rtp::dtmf::Digit;
 use sipx_sip::{Host, Uri};
 use sipx_transport::{Config, Target, TransportKind};
 use tokio::sync::{mpsc, Notify};
@@ -22,6 +23,15 @@ use tokio_util::sync::CancellationToken;
 
 const SAMPLES_PER_FRAME: usize = 160;
 const SIGNAL_CAPACITY: usize = 16;
+/// How long one outbound DTMF tone is held.
+///
+/// RFC 4733 gives no required duration; receivers key off the event's own duration field. 160 ms
+/// is comfortably above the ~40 ms floor most gateways accept and short enough that a PIN does not
+/// take a second per digit.
+const DTMF_TONE: std::time::Duration = std::time::Duration::from_millis(160);
+/// Silence between consecutive tones, so two of the same digit are two keypresses and not one long
+/// one. A receiver separates repeated events by the gap, not by the marker bit alone.
+const DTMF_GAP: std::time::Duration = std::time::Duration::from_millis(80);
 static SESSION_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 /// Closed establishment failures. Credential values and call audio are absent from every error.
@@ -108,7 +118,14 @@ pub async fn establish_outbound(
         SipSignalingTransport::Udp => TransportKind::Udp,
         SipSignalingTransport::Tcp => TransportKind::Tcp,
     };
-    let target = Target::new(route.target, transport);
+    // Always already resolved: `admit_sip_dial` turns a named trunk into an address *before*
+    // admission, so that address could be aperture-checked. An unresolved target reaching here
+    // would mean admission was bypassed, which is a refusal rather than a lookup to perform.
+    let Some(signaling_target) = route.target.address() else {
+        endpoint.shutdown().await;
+        return Err(DriverError::InvalidUri);
+    };
+    let target = Target::new(signaling_target, transport);
     if cancelled.is_cancelled() {
         endpoint.shutdown().await;
         return Err(DriverError::Cancelled);
@@ -337,6 +354,38 @@ impl TelephonySession for SipTelephonySession {
         Ok(self.signals.lock().await.recv().await)
     }
 
+    /// Send DTMF as RFC 4733 telephone-events on the negotiated media session.
+    ///
+    /// Named events rather than audible tones: an in-band tone is indistinguishable from someone
+    /// speaking a tone, survives transcoding badly, and is exactly what `chan_sip`'s default
+    /// `dtmfmode=rfc2833` does not listen for. `sipx` sends the event through the same paced queue
+    /// as audio, so the tone occupies the slots audio would have — which is what RFC 4733 requires,
+    /// and why the far end does not hear the keypress twice.
+    async fn send_signal(&self, signal: ChannelSignal) -> Result<(), VoiceError> {
+        // The grammar is checked before the terminal state so a malformed keypress is reported as
+        // malformed rather than as a closed call, which are different faults for a caller.
+        signal.validate()?;
+        if self.shared.terminal.lock().map_err(lock_error)?.is_some() {
+            return Err(VoiceError::Terminated);
+        }
+        let ChannelSignal::Dtmf { digits } = signal;
+        for character in digits.chars() {
+            // `validate` already admitted only the RFC 4733 keypad, so this cannot fail -- but it
+            // is mapped rather than unwrapped, because the two alphabets are defined in different
+            // crates and only a test keeps them equal.
+            let digit = Digit::from_char(character).ok_or(VoiceError::InvalidSignal)?;
+            if !self.media.send_digit(digit, DTMF_TONE).await {
+                return Err(VoiceError::Endpoint(
+                    "the media session refused a DTMF event".to_owned(),
+                ));
+            }
+            // The gap between keypresses. Without it a receiver sees one long tone rather than
+            // two digits, because RFC 4733 separates events by silence and not by a marker alone.
+            tokio::time::sleep(DTMF_GAP).await;
+        }
+        Ok(())
+    }
+
     async fn wait_terminated(&self) -> Result<TerminationReason, VoiceError> {
         Ok(self.shared.wait_terminal().await)
     }
@@ -435,6 +484,46 @@ fn lock_error<T>(error: std::sync::PoisonError<T>) -> VoiceError {
 }
 
 #[cfg(test)]
+mod dtmf_alphabet {
+    use super::*;
+
+    #[test]
+    fn every_digit_the_domain_admits_is_one_sipx_can_send() {
+        // `ChannelSignal::validate` and `Digit::from_char` are defined in different crates, and
+        // `send_signal` maps a mismatch to `InvalidSignal` rather than unwrapping. This is what
+        // keeps that arm unreachable: if either alphabet moves, this fails instead of a call
+        // silently dropping a keypress mid-PIN.
+        for character in "0123456789*#ABCD".chars() {
+            let signal = ChannelSignal::Dtmf {
+                digits: character.to_string(),
+            };
+            assert!(
+                signal.validate().is_ok(),
+                "the domain refuses {character:?}, which sipx accepts"
+            );
+            assert!(
+                Digit::from_char(character).is_some(),
+                "sipx refuses {character:?}, which the domain accepts"
+            );
+        }
+        // Lower case is a sipx convenience the domain deliberately does not admit, so it is
+        // refused before it reaches the driver rather than silently upper-cased.
+        assert!(ChannelSignal::Dtmf {
+            digits: "a".to_owned()
+        }
+        .validate()
+        .is_err());
+    }
+
+    #[test]
+    fn a_tone_is_long_enough_to_be_heard_and_separated_from_the_next() {
+        // Both bounds are what make repeated digits two keypresses instead of one long tone.
+        assert!(DTMF_TONE >= std::time::Duration::from_millis(40));
+        assert!(!DTMF_GAP.is_zero());
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -449,7 +538,7 @@ mod tests {
     use rtvbp::{ControlFrame, Envelope as _, Transport as _};
     use rtvbp_voice_endpoint::{VoiceEndpoint, INITIALIZE_METHOD, PROFILE};
     use service::authority::{AuthorityIssuer, IssueRequest, ProofKey};
-    use service::{admit_sip_plan, SipDeploymentRoute, SocketAperture};
+    use service::{admit_sip_plan, SipDeploymentRoute, SipSignalingTarget, SocketAperture};
     use tokio::sync::oneshot;
 
     use super::*;
@@ -498,7 +587,7 @@ mod tests {
                 connection: "connection-1".to_owned(),
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
-                target: callee.local_addr(),
+                target: SipSignalingTarget::Address(callee.local_addr()),
                 signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -508,6 +597,7 @@ mod tests {
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
                 network_mode: service::SipNetworkMode::Loopback,
+                accepts_dialed_number: false,
             },
         )
         .unwrap();
@@ -666,7 +756,7 @@ mod tests {
                 connection: "connection-1".to_owned(),
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
-                target: callee.local_addr(),
+                target: SipSignalingTarget::Address(callee.local_addr()),
                 signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -676,6 +766,7 @@ mod tests {
                 media_apertures: vec![all_loopback_ports],
                 dial_timeout: Duration::from_secs(5),
                 network_mode: service::SipNetworkMode::Loopback,
+                accepts_dialed_number: false,
             },
         )
         .unwrap();

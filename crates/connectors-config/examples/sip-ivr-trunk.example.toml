@@ -1,0 +1,73 @@
+# Documentation template only. Every identity, address, aperture and approval reference is a
+# deployment-owned fact and must be replaced before use.
+#
+# **A default trunk reached by name, dialled by number.** This is what makes
+#
+#     connectors operation invoke sip.dial --input '{"number":"12341234"}'
+#
+# reach an internal IVR: the Connection names the trunk, the caller names only the party.
+#
+# There is no `[authority]` or `[application]` block, and that is the point -- SIP terminates a
+# call at the edge on its own. Those blocks describe carrying a call onward to an application
+# channel, which is a different protocol and not a stage SIP depends on.
+
+[owner]
+tenant_id = "tenant-development"
+agent_id = "harness-development"
+agent_revision = 1
+authority_snapshot_id = "snapshot-development-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[connection]
+connection_ref = "connection-ivr-development"
+label = "Internal IVR"
+grant_ref = "grant-sip-dial-development-1"
+initiation = "b10x"
+approval_evidence_ref = "approval-sip-dial-development-1"
+
+[sip]
+# The trunk a `sip.dial` without a target selects. Without this, a dial carrying only a number is
+# refused rather than guessed -- a Connection with two trunks has no defensible default.
+default = "ivr"
+
+[[sip.targets]]
+alias = "ivr"
+permission_subject = "private:ivr-development"
+
+# **A name, not an address.** It is resolved once per dial, so a Service that moves is still
+# reachable, and the address that comes back is checked against `signaling_apertures` below exactly
+# as a literal one would be. Resolving after admission would make DNS an aperture bypass.
+target = "ivr.latest.cluster.svc.local:5060"
+signaling_transport = "udp"
+
+# `accepts_dialed_number` is what admits `{"number": "12341234"}` at all. Off by default: a trunk
+# reached by alias must not silently become an open dialler.
+accepts_dialed_number = true
+
+# The dialled number replaces the user part of this URI and nothing else. The host below is what
+# decides where the call goes, and it is never caller-supplied -- `{"number":"12341234"}` produces
+# `sip:12341234@ivr.latest.cluster.svc.local`.
+to_uri = "sip:ivr@ivr.latest.cluster.svc.local"
+from_uri = "sip:b10x@10.42.0.10"
+
+signaling_bind = "10.42.0.10:0"
+sent_by = "10.42.0.10"
+media_advertised = "10.42.0.10"
+media_bind = "10.42.0.10"
+dial_timeout_seconds = 10
+network_mode = "operator_authorized_development"
+
+# **`prefix` is why a name is usable here.** A headless Service answers with a different pod
+# address per lookup, so an exact aperture would refuse the call the moment the trunk was
+# rescheduled. The prefix bounds where that name is allowed to land; `address` must be the network
+# itself, so `10.42.0.0` with `prefix = 16`, never `10.42.0.7`.
+#
+# A Service with a stable ClusterIP needs no prefix -- pin the address exactly and omit it.
+signaling_apertures = [
+  { address = "10.42.0.10", first_port = 1, last_port = 65535 },
+  { address = "10.42.0.0", prefix = 16, first_port = 5060, last_port = 5060 },
+]
+media_apertures = [
+  { address = "10.42.0.10", first_port = 10000, last_port = 20000 },
+  { address = "10.42.0.0", prefix = 16, first_port = 10000, last_port = 20000 },
+]

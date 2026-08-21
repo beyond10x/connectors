@@ -291,7 +291,8 @@ impl ConnectorBackend for JiraBackend {
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => false,
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => false,
         }
     }
 
@@ -405,7 +406,8 @@ impl ConnectorBackend for JiraBackend {
             OperationRequest::Invoke(request) => self.inner.invoke(context, request).await,
             OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => Err(operation_not_found()),
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => Err(operation_not_found()),
         }
     }
 

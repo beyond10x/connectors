@@ -348,7 +348,7 @@ impl ConnectorBackend for GitlabBackend {
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) => false,
+            | OperationRequest::SessionReconcile(_) | OperationRequest::SessionSignal(_) => false,
         }
     }
 
@@ -502,7 +502,7 @@ impl ConnectorBackend for GitlabBackend {
                 .inner
                 .describe_operation(context, &request.operation_ref),
             OperationRequest::Invoke(request) => self.inner.invoke(context, request).await,
-            OperationRequest::SessionStatus(_)
+            OperationRequest::SessionStatus(_) | OperationRequest::SessionSignal(_)
             | OperationRequest::SessionTerminate(_)
             | OperationRequest::SessionReconcile(_) => Err(operation_not_found()),
         }

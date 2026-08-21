@@ -53,6 +53,7 @@ pub enum OperationRequest {
     SessionStatus(SessionRequest),
     SessionTerminate(SessionTerminateRequest),
     SessionReconcile(SessionRequest),
+    SessionSignal(SessionSignalRequest),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +92,30 @@ pub struct SessionRequest {
 pub struct SessionTerminateRequest {
     pub execution_ref: String,
     pub reason: RequestedSessionTermination,
+}
+
+/// The signal grammar, re-exported because it is part of this request's wire surface.
+///
+/// A caller building a `SessionSignal` needs the type; making it reach for `domain` would put a
+/// planning-layer crate in the dependency list of every frontend that wants to press a key.
+pub use domain::voice::ChannelSignal;
+
+/// Send a signal into a session that is already established.
+///
+/// # Why this is a session operation and not an invoke
+///
+/// The call outlives the invocation that placed it. A keypress answering an IVR prompt has no
+/// meaning at establishment time -- the prompt has not been heard yet -- so it cannot be an
+/// argument to `sip.dial`, and it addresses the live session by the same `execution_ref` its
+/// siblings use.
+///
+/// It carries no destination and no route: a signal reaches whatever the session is already
+/// connected to, which is what keeps it from being a second way to choose where a call goes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionSignalRequest {
+    pub execution_ref: String,
+    pub signal: domain::voice::ChannelSignal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,6 +237,7 @@ pub enum OperationResult {
     SessionStatus(SessionStatus),
     SessionTerminate(SessionStatus),
     SessionReconcile(SessionStatus),
+    SessionSignal(SessionStatus),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -310,6 +336,16 @@ impl RequestEnvelope {
             OperationRequest::SessionTerminate(request) => {
                 require_ref(&request.execution_ref)?;
             }
+            OperationRequest::SessionSignal(request) => {
+                require_ref(&request.execution_ref)?;
+                // The signal grammar is the domain's, checked here so a malformed keypress is
+                // refused at the edge rather than partway through a sequence the far end has
+                // already begun receiving.
+                request
+                    .signal
+                    .validate()
+                    .map_err(|_| invalid_input("session signal is invalid"))?;
+            }
         }
         Ok(())
     }
@@ -400,7 +436,8 @@ fn validate_result(result: &OperationResult) -> Result<(), OperationError> {
         }
         OperationResult::SessionStatus(status)
         | OperationResult::SessionTerminate(status)
-        | OperationResult::SessionReconcile(status) => validate_status(status)?,
+        | OperationResult::SessionReconcile(status)
+        | OperationResult::SessionSignal(status) => validate_status(status)?,
     }
     Ok(())
 }

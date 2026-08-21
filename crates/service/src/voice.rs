@@ -93,9 +93,10 @@ pub fn admit_voice_dial(
     input: &SipDialInput,
     sip_routes: &SipDialRouteTable,
     application: VoiceApplicationRoute,
+    resolver: &dyn crate::sip::SipHostResolver,
 ) -> Result<AdmittedVoicePlan, VoiceAdmissionError> {
     validate_voice_application_route(&application)?;
-    let sip = admit_sip_dial(plan, input, sip_routes)?;
+    let sip = admit_sip_dial(plan, input, sip_routes, resolver)?;
     Ok(AdmittedVoicePlan {
         sip,
         application,
@@ -144,7 +145,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::SocketAperture;
+    use crate::{SipSignalingTarget, SocketAperture};
 
     fn plan() -> ZeroIoPlan {
         ZeroIoPlan::new(
@@ -180,7 +181,7 @@ mod tests {
             connection: "connection".to_owned(),
             signaling_bind: SocketAddr::new(loopback, 0),
             sent_by: "127.0.0.1".to_owned(),
-            target: SocketAddr::new(loopback, 5_060),
+            target: SipSignalingTarget::Address(SocketAddr::new(loopback, 5_060)),
             signaling_transport: crate::SipSignalingTransport::Udp,
             to_uri: "sip:callee@127.0.0.1:5060".to_owned(),
             from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -190,6 +191,7 @@ mod tests {
             media_apertures: vec![aperture],
             dial_timeout: Duration::from_secs(5),
             network_mode: crate::SipNetworkMode::Loopback,
+            accepts_dialed_number: false,
         }
     }
 

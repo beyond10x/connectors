@@ -20698,8 +20698,7 @@
             }
           },
           "required": [
-            "response_id",
-            "limit"
+            "response_id"
           ],
           "type": "object"
         }
@@ -29121,9 +29120,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -29291,9 +29288,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit"
-          ],
+          "required": [],
           "type": "object"
         }
       },

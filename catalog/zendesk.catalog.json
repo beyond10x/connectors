@@ -2040,8 +2040,7 @@
             }
           },
           "required": [
-            "start_time",
-            "per_page"
+            "start_time"
           ],
           "type": "object"
         }
@@ -2619,8 +2618,7 @@
             }
           },
           "required": [
-            "start_time",
-            "per_page"
+            "start_time"
           ],
           "type": "object"
         }
@@ -3053,9 +3051,7 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "include_ui_path"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -10083,9 +10079,7 @@
             }
           },
           "required": [
-            "ticket_id",
-            "include_inline_images",
-            "per_page"
+            "ticket_id"
           ],
           "type": "object"
         }
@@ -10505,8 +10499,7 @@
             }
           },
           "required": [
-            "ticket_id",
-            "ticket"
+            "ticket_id"
           ],
           "type": "object"
         }
@@ -14009,9 +14002,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "start_time"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -14594,9 +14585,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "start_time"
-          ],
+          "required": [],
           "type": "object"
         }
       },

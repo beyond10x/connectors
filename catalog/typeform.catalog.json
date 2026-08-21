@@ -128,12 +128,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "page",
-            "page_size",
-            "sort_by",
-            "order_by"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -493,14 +488,7 @@
             }
           },
           "required": [
-            "form_id",
-            "page_size",
-            "before",
-            "after",
-            "since",
-            "until",
-            "response_type",
-            "sort"
+            "form_id"
           ],
           "type": "object"
         }

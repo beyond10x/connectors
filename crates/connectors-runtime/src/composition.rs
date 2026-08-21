@@ -136,6 +136,7 @@ impl PersonalRuntime {
         validate_state_root(&state_root)?;
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
         let mut verifying_key = None;
+        let mut sip_dial_configured = false;
         let mut slack_connections = None;
         let mut monitoring_connections = None;
         let mut kubernetes_candidates = None;
@@ -220,6 +221,10 @@ impl PersonalRuntime {
             };
 
             if let Some(voice) = config.voice()? {
+                // Recorded from what was composed, not from the authority key. A raw SIP trunk has
+                // no authority -- that belongs to the application channel -- so deriving this from
+                // the key told an operator with a working dialler that `sip.dial` was unconfigured.
+                sip_dial_configured = true;
                 // **Which launcher, decided by what was configured.** An application channel means
                 // the call is carried onward and needs a session authority to issue its join
                 // credential; without one the call terminates at the edge and neither exists. The
@@ -348,7 +353,7 @@ impl PersonalRuntime {
                 protocol::event::CONTRACT,
             ],
             "socket": daemon.socket_path(),
-            "sip_dial_configured": verifying_key.is_some(),
+            "sip_dial_configured": sip_dial_configured,
             "voice_authority_verifying_key": verifying_key,
             "slack_configured": slack_connections.is_some(),
             "slack_connections": slack_connections,

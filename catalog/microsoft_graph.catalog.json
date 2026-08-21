@@ -1262,10 +1262,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "_top",
-            "_skip"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -8092,10 +8089,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "_top",
-            "_skip"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -9432,10 +9426,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "_top",
-            "_skip"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -9569,10 +9560,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "_top",
-            "_skip"
-          ],
+          "required": [],
           "type": "object"
         }
       },

@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use service::PrincipalContext;
 use service::{
     AudioDeploymentRoute, BrowserDeploymentRoute, SipDeploymentRoute, SipDialRouteTable,
-    SipNetworkMode, SipSignalingTransport, SocketAperture, VoiceApplicationRoute,
+    SipNetworkMode, SipSignalingTarget, SipSignalingTransport, SocketAperture,
+    VoiceApplicationRoute,
 };
 
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
@@ -250,6 +251,13 @@ pub struct ApplicationConfig {
 #[serde(deny_unknown_fields)]
 pub struct SipConfig {
     pub targets: Vec<SipTargetConfig>,
+    /// The trunk a `sip.dial` without a target selects.
+    ///
+    /// This is what makes `sip.dial` with only a number expressible: the Connection already says
+    /// which trunk, so the caller supplies the party and nothing else. A Connection with several
+    /// trunks and no default refuses an untargeted dial rather than picking one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
 }
 
 /// Value-free Slack Integration policy. App tokens arrive only through a Connect Session.
@@ -448,10 +456,19 @@ pub struct BrowserIntegrationConfig {
 #[serde(deny_unknown_fields)]
 pub struct SipTargetConfig {
     pub alias: String,
+    /// Whether a caller may dial a number through this trunk.
+    ///
+    /// Off by default and declared per trunk: a fixed endpoint reached by alias must not silently
+    /// become an open dialler because a caller passed a number. When on, the number becomes the
+    /// user part of `to_uri` and nothing else -- the host, port, transport and apertures stay
+    /// exactly as configured here.
+    #[serde(default)]
+    pub accepts_dialed_number: bool,
     pub permission_subject: String,
     pub signaling_bind: SocketAddr,
     pub sent_by: String,
-    pub target: SocketAddr,
+    /// Where signalling goes: `host:port` resolved per dial, or a literal `ip:port`.
+    pub target: String,
     pub signaling_transport: SignalingTransportConfig,
     pub to_uri: String,
     pub from_uri: String,
@@ -482,6 +499,15 @@ pub enum NetworkModeConfig {
 #[serde(deny_unknown_fields)]
 pub struct ApertureConfig {
     pub address: IpAddr,
+    /// Bits of `address` that must match. Absent is one exact address, which is the default and
+    /// what every aperture written before prefixes existed means.
+    ///
+    /// A prefix exists for a trunk reached by name: a headless cluster Service answers with a
+    /// different pod address per lookup, so an exact aperture would refuse the call the moment the
+    /// trunk moved. `address` must name the network itself — `10.0.0.7` with `prefix = 24` is
+    /// refused rather than read as `10.0.0.0/24`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<u8>,
     pub first_port: u16,
     pub last_port: u16,
 }
@@ -1072,7 +1098,7 @@ impl PersonalVoiceConfig {
                     connection: self.connection.connection_ref.clone(),
                     signaling_bind: target.signaling_bind,
                     sent_by: target.sent_by.clone(),
-                    target: target.target,
+                    target: signaling_target(&target.target)?,
                     signaling_transport: match target.signaling_transport {
                         SignalingTransportConfig::Udp => SipSignalingTransport::Udp,
                         SignalingTransportConfig::Tcp => SipSignalingTransport::Tcp,
@@ -1084,6 +1110,7 @@ impl PersonalVoiceConfig {
                     signaling_apertures: apertures(&target.signaling_apertures)?,
                     media_apertures: apertures(&target.media_apertures)?,
                     dial_timeout: Duration::from_secs(target.dial_timeout_seconds),
+                    accepts_dialed_number: target.accepts_dialed_number,
                     network_mode: match target.network_mode {
                         NetworkModeConfig::Loopback => SipNetworkMode::Loopback,
                         NetworkModeConfig::OperatorAuthorizedDevelopment => {
@@ -1095,8 +1122,12 @@ impl PersonalVoiceConfig {
                 Ok((target.alias.clone(), route))
             })
             .collect::<Result<Vec<_>, ConfigError>>()?;
-        SipDialRouteTable::new(&self.connection.connection_ref, routes)
-            .map_err(|_| ConfigError::Invalid)
+        SipDialRouteTable::with_default(
+            &self.connection.connection_ref,
+            routes,
+            self.sip.default.clone(),
+        )
+        .map_err(|_| ConfigError::Invalid)
     }
 
     /// The application-channel route, when this Connection carries a call onward to one.
@@ -1213,13 +1244,35 @@ fn apertures(config: &[ApertureConfig]) -> Result<Vec<SocketAperture>, ConfigErr
     config
         .iter()
         .map(|aperture| {
-            SocketAperture::new(
-                aperture.address,
-                RangeInclusive::new(aperture.first_port, aperture.last_port),
-            )
+            let ports = RangeInclusive::new(aperture.first_port, aperture.last_port);
+            match aperture.prefix {
+                Some(prefix) => SocketAperture::network(aperture.address, prefix, ports),
+                None => SocketAperture::new(aperture.address, ports),
+            }
             .map_err(|_| ConfigError::Invalid)
         })
         .collect()
+}
+
+/// Read a trunk's configured signalling destination.
+///
+/// An address is taken exactly as written. Anything else is a name plus a port, resolved per dial
+/// so a cluster Service that moves is still reachable, and aperture-checked after resolution.
+fn signaling_target(value: &str) -> Result<SipSignalingTarget, ConfigError> {
+    if let Ok(address) = value.parse::<SocketAddr>() {
+        return Ok(SipSignalingTarget::Address(address));
+    }
+    // `rsplit_once` so an IPv6 literal that failed to parse above cannot be split through one of
+    // its own colons and silently become a nonsense host.
+    let (host, port) = value.rsplit_once(':').ok_or(ConfigError::Invalid)?;
+    let port: u16 = port.parse().map_err(|_| ConfigError::Invalid)?;
+    if host.is_empty() || port == 0 || host.contains('[') {
+        return Err(ConfigError::Invalid);
+    }
+    Ok(SipSignalingTarget::Host {
+        host: host.to_owned(),
+        port,
+    })
 }
 
 fn config_ref(value: &str, maximum: usize) -> bool {
@@ -1243,6 +1296,60 @@ mod tests {
             config.permission_subject("asterisk-dev"),
             Some("private:asterisk-development")
         );
+    }
+
+    #[test]
+    fn the_named_default_trunk_example_parses_and_dials_by_number() {
+        // The shipped answer to "call 12341234 on the internal IVR": a trunk reached by name, set
+        // as the default, admitting a dialled number.
+        let config: PersonalConfig =
+            toml::from_str(include_str!("../examples/sip-ivr-trunk.example.toml")).unwrap();
+        config.validate().unwrap();
+        let voice = config.voice().unwrap().expect("a voice configuration");
+        // No application channel: SIP terminates the call at the edge on its own.
+        assert!(voice.application_route().is_none());
+
+        let routes = voice.sip_routes().expect("the trunk table builds");
+        assert_eq!(routes.default_alias(), Some("ivr"));
+
+        // A dial carrying only a number selects the default trunk and is authorized against it.
+        let dial = protocol::sip::SipDialInput {
+            target: None,
+            number: Some("12341234".to_owned()),
+        };
+        assert_eq!(routes.selected_alias(&dial).unwrap(), "ivr");
+        assert_eq!(
+            voice.permission_subject("ivr"),
+            Some("private:ivr-development")
+        );
+
+        // The trunk is a name, so it is resolved per dial rather than pinned at config load.
+        assert_eq!(
+            routes.pending_host(&dial).unwrap(),
+            Some(("ivr.latest.cluster.svc.local".to_owned(), 5_060))
+        );
+    }
+
+    #[test]
+    fn a_trunk_address_may_be_a_literal_or_a_name_and_nothing_else() {
+        assert!(matches!(
+            signaling_target("192.0.2.30:5060").unwrap(),
+            SipSignalingTarget::Address(_)
+        ));
+        assert!(matches!(
+            signaling_target("[2001:db8::1]:5060").unwrap(),
+            SipSignalingTarget::Address(_)
+        ));
+        assert!(matches!(
+            signaling_target("ivr.latest.cluster.svc.local:5060").unwrap(),
+            SipSignalingTarget::Host { port: 5_060, .. }
+        ));
+        // A bare hostname is refused: SIP needs a port, and defaulting to 5060 would silently
+        // choose a destination the operator did not write down.
+        assert!(signaling_target("ivr.latest.cluster.svc.local").is_err());
+        assert!(signaling_target("host:0").is_err());
+        assert!(signaling_target(":5060").is_err());
+        assert!(signaling_target("host:not-a-port").is_err());
     }
 
     #[test]

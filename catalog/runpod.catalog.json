@@ -634,9 +634,7 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "includeClusterPods"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -2558,12 +2556,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -3518,9 +3511,7 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "globalNetwork"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4079,13 +4070,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN",
-            "clusterId"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4441,12 +4426,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4719,13 +4699,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN",
-            "networkVolumeId"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5072,13 +5046,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN",
-            "podId"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5437,13 +5405,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "startTime",
-            "endTime",
-            "bucketSize",
-            "lastN",
-            "serverlessId"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -5802,9 +5764,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "source"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -6819,8 +6779,7 @@
             }
           },
           "required": [
-            "id",
-            "name"
+            "id"
           ],
           "type": "object"
         }
@@ -7696,8 +7655,7 @@
           "required": [
             "dataCenter",
             "name",
-            "size",
-            "type"
+            "size"
           ],
           "type": "object"
         }
@@ -7970,9 +7928,7 @@
             }
           },
           "required": [
-            "id",
-            "name",
-            "size"
+            "id"
           ],
           "type": "object"
         }
@@ -10031,7 +9987,6 @@
             }
           },
           "required": [
-            "name",
             "resource"
           ],
           "type": "object"

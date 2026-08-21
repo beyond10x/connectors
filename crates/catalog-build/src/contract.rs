@@ -67,8 +67,8 @@ pub struct Contract {
 pub fn contract_of(operation: &Operation) -> Result<Contract> {
     let mut allocator = Symbols::new();
     let mut symbols = BTreeMap::new();
-    // (symbol, vendor schema) in declaration order — the input schema's property source.
-    let mut declared: Vec<(String, &Value)> = Vec::new();
+    // (symbol, vendor schema, required) in declaration order — the input schema's property source.
+    let mut declared: Vec<(String, &Value, bool)> = Vec::new();
 
     let mut allocate =
         |param: &Param| -> Result<String> { Ok(allocator.allocate(&operation.id, &param.name)?) };
@@ -80,7 +80,7 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
     ] {
         for param in group {
             let symbol = allocate(param)?;
-            declared.push((symbol.clone(), &param.schema));
+            declared.push((symbol.clone(), &param.schema, param.required));
             symbols.insert(param.name.clone(), symbol);
         }
     }
@@ -89,7 +89,7 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
         // only the declared ones reach the map and the schema.
         let symbol = allocate(param)?;
         if constant(param).is_none() {
-            declared.push((symbol.clone(), &param.schema));
+            declared.push((symbol.clone(), &param.schema, param.required));
             symbols.insert(param.name.clone(), symbol);
         }
     }
@@ -104,7 +104,8 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
         let symbol = allocator
             .allocate(&operation.id, FREE_FORM_BODY)
             .map_err(|error| anyhow!(error))?;
-        declared.push((symbol.clone(), schema));
+        // A free-form body stays required: there is nothing else to send.
+        declared.push((symbol.clone(), schema, true));
         symbols.insert(FREE_FORM_BODY.to_string(), symbol);
     }
 
@@ -117,11 +118,21 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
             .map_err(|error| anyhow!(error))?;
     }
 
+    // **Requiredness is carried across, not asserted.**
+    //
+    // This projection used to mark every declared parameter required. That is true of most
+    // operations and false of 248 of them, and the failure mode is not a rejected call: a model
+    // told a parameter is mandatory supplies a value for it, so an optional filter becomes an
+    // invented one and the operation returns a narrowed result the caller never asked to narrow.
+    //
+    // A free-form body stays required because there is nothing else to send.
     let mut properties = Map::new();
     let mut required: Vec<Value> = Vec::new();
-    for (symbol, schema) in &declared {
+    for (symbol, schema, mandatory) in &declared {
         properties.insert(symbol.clone(), lowered(schema));
-        required.push(Value::String(symbol.clone()));
+        if *mandatory {
+            required.push(Value::String(symbol.clone()));
+        }
     }
 
     Ok(Contract {

@@ -862,7 +862,8 @@ mod tests {
                 }
                 OperationRequest::SessionStatus(_)
                 | OperationRequest::SessionTerminate(_)
-                | OperationRequest::SessionReconcile(_) => self.claims_direct_operation,
+                | OperationRequest::SessionReconcile(_)
+                | OperationRequest::SessionSignal(_) => self.claims_direct_operation,
                 OperationRequest::Search(_) => false,
             }
         }
@@ -908,7 +909,8 @@ mod tests {
                 }
                 OperationRequest::SessionStatus(_)
                 | OperationRequest::SessionTerminate(_)
-                | OperationRequest::SessionReconcile(_) => {
+                | OperationRequest::SessionReconcile(_)
+                | OperationRequest::SessionSignal(_) => {
                     self.calls.operation_direct.fetch_add(1, Ordering::SeqCst);
                     Err(operation_not_found(
                         "synthetic runtime reference was not found",

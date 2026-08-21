@@ -1369,6 +1369,12 @@ fn the_contract_and_the_params_state_the_same_symbols() {
                 declared.len(),
                 "`{provider}`'s `{id}` hands one symbol to two parameters"
             );
+            // **Requiredness is carried, not asserted.** This used to demand that every declared
+            // symbol appear in `required`, which pinned a projection that marked all 989
+            // operations' parameters mandatory -- including the 248 that declare optional ones.
+            // The invariant worth holding is that the contract and the params never disagree, and
+            // that is now checked in the direction that can actually drift: a symbol is required in
+            // the contract exactly when its parameter says it is.
             let required: Vec<&str> = operation["contract"]["input_schema"]["required"]
                 .as_array()
                 .map(Vec::as_slice)
@@ -1376,9 +1382,17 @@ fn the_contract_and_the_params_state_the_same_symbols() {
                 .iter()
                 .map(|value| value.as_str().unwrap_or_default())
                 .collect();
+            let declared_required: Vec<&str> = operation["params"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|param| param["required"].as_bool().unwrap_or(true))
+                .map(|param| param["symbol"].as_str().unwrap_or_default())
+                .collect();
             assert_eq!(
-                required, declared,
-                "`{provider}`'s `{id}` contract requires different symbols than its params declare"
+                required, declared_required,
+                "`{provider}`'s `{id}` contract requires different symbols than its params declare \
+                 as required"
             );
             let keys: BTreeSet<&str> = operation["contract"]["input_schema"]["properties"]
                 .as_object()

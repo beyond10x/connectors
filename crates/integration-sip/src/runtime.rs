@@ -113,6 +113,10 @@ impl SessionLauncher for RuntimeLauncher {
             receipt,
             control,
             completion,
+            // None, and deliberately: this launcher joins a SIP call to an application channel and
+            // owns neither half alone. Handing back one of them would let a signal reach a
+            // different leg than the caller meant.
+            session: None,
         })
     }
 }
@@ -368,7 +372,7 @@ pub(crate) fn termination(
 
 #[cfg(test)]
 mod tests {
-    use std::os::unix::fs::{symlink, PermissionsExt as _};
+    use std::os::unix::fs::symlink;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use connector_secrets::{MemoryStore, Secret};
