@@ -205,15 +205,31 @@ impl Derivation<'_> {
             ),
         })?;
 
-        // Every declared parameter must be supplied, exactly as flux's own composite dispatch
-        // requires. An *optional* parameter is one a caller may pass `null` for, not one they may
-        // omit: a guarded query field turns null into "do not send this filter", while an absent
-        // path parameter would quietly leave `{ticket_id}` in the URL.
+        // A *path* parameter must be supplied: an absent one would leave `{ticket_id}` verbatim in
+        // the URL, and a request to a literal `{ticket_id}` is worse than a refusal.
+        //
+        // A parameter the document marks optional may simply be left out, and leaving it out
+        // means exactly what passing `null` means: do not send this one. A parameter it marks
+        // required must be supplied wherever it sits. `param` already answers `Null` for an
+        // absent name and the query builder already skips a null, so the two spellings produced
+        // identical requests; the only thing that differed was that one of them was refused.
+        //
+        // Requiring the null spelling was unusable in practice and the refusal did not say so. An
+        // operation's own `input_schema` marks these parameters optional, so a caller that reads
+        // the contract sends only what it wants — and got `connector-invalid-input: input is
+        // invalid`, naming nothing, for a request that was valid. `slack-conversations-history`
+        // declares five parameters and requires one; asking for a channel's history cost three
+        // explicit nulls nobody could know to send.
         for name in operation.caller_parameters() {
-            let value = params.get(name).ok_or_else(|| Error::MissingParameter {
-                operation: operation.id.clone(),
-                parameter: name.to_owned(),
-            })?;
+            let Some(value) = params.get(name) else {
+                if !operation.caller_omittable_parameters().contains(name) {
+                    return Err(Error::MissingParameter {
+                        operation: operation.id.clone(),
+                        parameter: name.to_owned(),
+                    });
+                }
+                continue;
+            };
             if operation.caller_path_parameters().contains(name) {
                 if let Value::String(text) = value {
                     Slot::Path
@@ -412,12 +428,47 @@ mod tests {
     }
 
     #[test]
-    fn an_omitted_parameter_is_refused_and_names_itself() {
+    fn an_optional_query_filter_may_simply_be_left_out() {
+        // The defect this pins: `slack-conversations-history` declares five parameters and
+        // requires one, and asking for a channel's history was refused with
+        // `connector-invalid-input: Slack operation input is invalid` — naming nothing — unless
+        // the caller also sent `latest`, `oldest` and `cursor` as explicit nulls. Nothing in the
+        // operation's own contract said to: its `input_schema` marks them optional.
+        let (operation, base) = zendesk("zendesk-ticket-show");
+        build_request(
+            operation,
+            base,
+            &json!({"ticket_id": 42}),
+            &endpoints(&[("subdomain", "acme")]),
+        )
+        .expect("an absent optional query filter is not a missing parameter");
+    }
+
+    #[test]
+    fn an_omitted_required_parameter_is_refused_and_names_itself() {
+        // Required-ness is the whole rule, so this asserts it where the document states it: the
+        // path id. `ticket` sits beside it and the document marks it optional, so leaving that one
+        // out is a caller saying "change nothing else", not a missing parameter.
         let (operation, base) = zendesk("zendesk-ticket-update");
         assert!(matches!(
-            build_request(operation, base, &json!({"ticket_id": 42}), &endpoints(&[("subdomain", "acme")])),
-            Err(Error::MissingParameter { parameter, .. }) if parameter == "ticket"
+            build_request(operation, base, &json!({"ticket": {"status": "open"}}), &endpoints(&[("subdomain", "acme")])),
+            Err(Error::MissingParameter { parameter, .. }) if parameter == "ticket_id"
         ));
+    }
+
+    #[test]
+    fn an_omitted_optional_body_field_is_not_a_missing_parameter() {
+        // 193 optional body fields ship in the catalogue. Refusing an absent one made every create
+        // and update uncallable unless the caller sent an explicit null per field — which no
+        // contract asks for, because each `input_schema` marks them optional.
+        let (operation, base) = zendesk("zendesk-ticket-update");
+        build_request(
+            operation,
+            base,
+            &json!({"ticket_id": 42}),
+            &endpoints(&[("subdomain", "acme")]),
+        )
+        .expect("an absent optional parameter is not a missing one");
     }
 
     #[test]
