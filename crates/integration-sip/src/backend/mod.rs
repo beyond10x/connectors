@@ -15,7 +15,7 @@ use domain::voice::TelephonySession;
 use domain::{
     voice::TerminationReason, AdmittedOperation, Capability, ConnectionAuthority, DriverId,
 };
-use hosted_state::PostgresState;
+use connector_state::StateStore;
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
@@ -121,7 +121,15 @@ struct SessionRecord {
 
 struct AuditJournal {
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    /// Where the audit trail is appended, when a deployment supplies somewhere durable.
+    ///
+    /// A port, not a database. This was `Option<PostgresState>`, which made the *only* thing SIP
+    /// used a database for — this journal — into a hard PostgreSQL edge for the whole backend, and
+    /// the hosted arm therefore refused to compose without one. Nothing about placing a call needs
+    /// a database. A local placement appends to an owner-only file, a SQLite one to a file it can
+    /// transact, a hosted one to PostgreSQL; all three satisfy this and the call does not know
+    /// which it got.
+    state: Option<Arc<dyn StateStore>>,
     writer: Mutex<()>,
 }
 
@@ -150,12 +158,12 @@ impl AuditJournal {
         }))
         .map_err(std::io::Error::other)?;
         line.push(b'\n');
-        if let Some(hosted_state) = &self.hosted_state {
-            return hosted_state
+        if let Some(state) = &self.state {
+            return state
                 .append(AUDIT_STATE_KEY, &line, MAX_AUDIT_BYTES as usize)
                 .map(|_| ())
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => std::io::Error::new(
+                    connector_state::StateError::Capacity => std::io::Error::new(
                         std::io::ErrorKind::FileTooLarge,
                         "connector audit bound reached",
                     ),
@@ -216,21 +224,24 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         Self::new_inner(config, launcher, state_root, None)
     }
 
-    /// Construct hosted SIP audit state against the service-owned PostgreSQL database.
-    pub fn new_postgres(
+    /// Construct with a durable audit sink the deployment supplies.
+    ///
+    /// Named `new_postgres` when PostgreSQL was the only thing it could take. It takes the port
+    /// now, so the same constructor serves a SQLite placement or any other store.
+    pub fn new_with_state(
         config: PersonalVoiceConfig,
         launcher: Arc<L>,
         state_root: &Path,
-        hosted_state: PostgresState,
+        state: Arc<dyn StateStore>,
     ) -> Result<Self, OperationError> {
-        Self::new_inner(config, launcher, state_root, Some(hosted_state))
+        Self::new_inner(config, launcher, state_root, Some(state))
     }
 
     fn new_inner(
         config: PersonalVoiceConfig,
         launcher: Arc<L>,
         state_root: &Path,
-        hosted_state: Option<PostgresState>,
+        state: Option<Arc<dyn StateStore>>,
     ) -> Result<Self, OperationError> {
         let principal = config.principal_context().map_err(|_| unavailable())?;
         let document = Document::parse(B10X_DOCUMENT).map_err(|_| unavailable())?;
@@ -262,7 +273,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             sessions: Mutex::new(BTreeMap::new()),
             audit: Arc::new(AuditJournal {
                 path: state_root.join("connector-audit.jsonl"),
-                hosted_state,
+                state,
                 writer: Mutex::new(()),
             }),
             live_capacity: Arc::new(Semaphore::new(MAX_LIVE_SESSIONS)),
