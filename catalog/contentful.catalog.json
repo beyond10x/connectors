@@ -230,10 +230,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit",
-            "skip"
-          ],
+          "required": [],
           "type": "object"
         }
       },

@@ -137,8 +137,7 @@
             }
           },
           "required": [
-            "space_id",
-            "archived"
+            "space_id"
           ],
           "type": "object"
         }
@@ -274,12 +273,7 @@
             }
           },
           "required": [
-            "list_id",
-            "archived",
-            "page",
-            "order_by",
-            "reverse",
-            "include_closed"
+            "list_id"
           ],
           "type": "object"
         }
@@ -526,8 +520,7 @@
             }
           },
           "required": [
-            "task_id",
-            "include_subtasks"
+            "task_id"
           ],
           "type": "object"
         }
@@ -674,11 +667,7 @@
           },
           "required": [
             "list_id",
-            "name",
-            "description",
-            "status",
-            "priority",
-            "due_date"
+            "name"
           ],
           "type": "object"
         }
@@ -867,12 +856,7 @@
             }
           },
           "required": [
-            "task_id",
-            "name",
-            "description",
-            "status",
-            "priority",
-            "due_date"
+            "task_id"
           ],
           "type": "object"
         }

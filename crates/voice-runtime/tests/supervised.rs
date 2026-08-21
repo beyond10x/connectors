@@ -18,8 +18,9 @@ use service::authority::{
     ProofKey, RedemptionRequest, AUTHORIZATION_SCHEME, DPOP_HEADER,
 };
 use service::{
-    admit_voice_dial, AdmittedVoicePlan, CredentialSet, SipDeploymentRoute, SipDialRouteTable,
-    SipNetworkMode, SipSignalingTransport, SocketAperture, VoiceApplicationRoute,
+    admit_voice_dial, AdmittedVoicePlan, CredentialSet, NoHostResolution, SipDeploymentRoute,
+    SipDialRouteTable, SipNetworkMode, SipSignalingTarget, SipSignalingTransport, SocketAperture,
+    VoiceApplicationRoute,
 };
 use service::{plan_operation, PlanningEnvironment};
 use sipx_call::Codecs;
@@ -161,7 +162,7 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
                 connection: "connection-1".to_owned(),
                 signaling_bind: SocketAddr::new(loopback(), 0),
                 sent_by: "127.0.0.1".to_owned(),
-                target: callee.local_addr(),
+                target: SipSignalingTarget::Address(callee.local_addr()),
                 signaling_transport: SipSignalingTransport::Udp,
                 to_uri: format!("sip:callee@{}", callee.local_addr()),
                 from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -171,6 +172,7 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
                 media_apertures: vec![aperture],
                 dial_timeout: Duration::from_secs(5),
                 network_mode: SipNetworkMode::Loopback,
+                accepts_dialed_number: false,
             },
         )],
     )
@@ -178,10 +180,12 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
     let admitted = admit_voice_dial(
         &plan(),
         &SipDialInput {
-            target: "asterisk-dev".to_owned(),
+            target: Some("asterisk-dev".to_owned()),
+            number: None,
         },
         &sip_routes,
         application_route(),
+        &NoHostResolution,
     )
     .unwrap();
 

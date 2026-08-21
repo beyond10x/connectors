@@ -1064,6 +1064,7 @@ dependencies = [
  "service",
  "sipx-call",
  "sipx-media",
+ "sipx-rtp",
  "sipx-sip",
  "sipx-transport",
  "thiserror 2.0.20",

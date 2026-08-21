@@ -384,9 +384,7 @@
             }
           },
           "required": [
-            "account_sid",
-            "page",
-            "page_size"
+            "account_sid"
           ],
           "type": "object"
         }
@@ -803,10 +801,7 @@
             }
           },
           "required": [
-            "account_sid",
-            "status",
-            "page",
-            "page_size"
+            "account_sid"
           ],
           "type": "object"
         }
@@ -1238,11 +1233,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "IncludeSoftDeleted",
-            "PageSize",
-            "Page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1521,8 +1512,7 @@
             }
           },
           "required": [
-            "Sid",
-            "IncludeSoftDeleted"
+            "Sid"
           ],
           "type": "object"
         }
@@ -1742,11 +1732,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "IncludeSubaccounts",
-            "PageSize",
-            "Page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1979,10 +1965,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "PageSize",
-            "Page"
-          ],
+          "required": [],
           "type": "object"
         }
       },

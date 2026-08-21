@@ -20,6 +20,7 @@ domain = { version = "0.1.0", path = "../domain" }
 service = { version = "0.1.0", path = "../service" }
 sipx-call = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 sipx-media = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
+sipx-rtp = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 sipx-sip = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 sipx-transport = { git = "https://github.com/codewandler/sipx", rev = "004ac534b8b222060ad2d2308763efe6e1dedc10" }
 thiserror = "2"

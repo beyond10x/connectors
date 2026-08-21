@@ -237,6 +237,19 @@ enum OperationCommand {
         #[arg(long)]
         state_root: Option<PathBuf>,
     },
+    /// Send DTMF into a session that is already established.
+    Signal {
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// The `execution_ref` the invocation that placed the call returned.
+        #[arg(long)]
+        execution_ref: String,
+        /// Digits to send, from `0123456789*#ABCD`.
+        #[arg(long)]
+        dtmf: String,
+        #[arg(long)]
+        state_root: Option<PathBuf>,
+    },
     /// Invoke an operation using a fresh description lease.
     Invoke {
         #[arg(long)]
@@ -680,6 +693,19 @@ async fn operation(format: Format, command: OperationCommand) -> Result<(), Main
             state_root,
             OperationRequest::Describe(OperationDescribeRequest {
                 operation_ref: operation,
+            }),
+        ),
+        OperationCommand::Signal {
+            config,
+            execution_ref,
+            dtmf,
+            state_root,
+        } => (
+            config,
+            state_root,
+            OperationRequest::SessionSignal(protocol::operation::SessionSignalRequest {
+                execution_ref,
+                signal: protocol::operation::ChannelSignal::Dtmf { digits: dtmf },
             }),
         ),
         OperationCommand::Invoke {

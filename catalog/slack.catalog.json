@@ -455,8 +455,7 @@
           },
           "required": [
             "channel",
-            "text",
-            "thread_ts"
+            "text"
           ],
           "type": "object"
         }
@@ -1729,11 +1728,7 @@
             }
           },
           "required": [
-            "channel",
-            "latest",
-            "oldest",
-            "limit",
-            "cursor"
+            "channel"
           ],
           "type": "object"
         }
@@ -3062,10 +3057,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "include_locale",
-            "user"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4423,11 +4415,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "limit",
-            "cursor",
-            "team_id"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -4601,15 +4589,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "team_ids",
-            "query",
-            "limit",
-            "cursor",
-            "search_channel_types",
-            "sort",
-            "sort_dir"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -6091,10 +6071,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "limit",
-            "cursor"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -6242,9 +6219,7 @@
             }
           },
           "required": [
-            "team_id",
-            "cursor",
-            "limit"
+            "team_id"
           ],
           "type": "object"
         }

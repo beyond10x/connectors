@@ -539,8 +539,7 @@
             }
           },
           "required": [
-            "channel_id",
-            "limit"
+            "channel_id"
           ],
           "type": "object"
         }
@@ -734,8 +733,7 @@
           },
           "required": [
             "channel_id",
-            "content",
-            "tts"
+            "content"
           ],
           "type": "object"
         }

@@ -219,9 +219,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "projectId"
-          ],
+          "required": [],
           "type": "object"
         }
       },

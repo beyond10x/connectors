@@ -96,9 +96,7 @@
             }
           },
           "required": [
-            "namespace",
-            "limit",
-            "continue"
+            "namespace"
           ],
           "type": "object"
         }

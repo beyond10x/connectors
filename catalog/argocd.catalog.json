@@ -73,12 +73,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "name",
-            "selector",
-            "repo",
-            "appNamespace"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -364,8 +359,7 @@
             }
           },
           "required": [
-            "name",
-            "appNamespace"
+            "name"
           ],
           "type": "object"
         }
@@ -598,9 +592,7 @@
             }
           },
           "required": [
-            "applicationName",
-            "appNamespace",
-            "project"
+            "applicationName"
           ],
           "type": "object"
         }
@@ -826,12 +818,7 @@
             }
           },
           "required": [
-            "name",
-            "resourceNamespace",
-            "resourceName",
-            "resourceUID",
-            "appNamespace",
-            "project"
+            "name"
           ],
           "type": "object"
         }
@@ -1051,9 +1038,7 @@
             }
           },
           "required": [
-            "name",
-            "appNamespace",
-            "project"
+            "name"
           ],
           "type": "object"
         }
@@ -1233,14 +1218,7 @@
             }
           },
           "required": [
-            "applicationName",
-            "namespace",
-            "name",
-            "group",
-            "version",
-            "kind",
-            "appNamespace",
-            "project"
+            "applicationName"
           ],
           "type": "object"
         }
@@ -1484,9 +1462,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "name"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -1706,12 +1682,7 @@
             }
           },
           "required": [
-            "name",
-            "appNamespace",
-            "dryRun",
-            "project",
-            "prune",
-            "revision"
+            "name"
           ],
           "type": "object"
         }
@@ -2005,9 +1976,7 @@
             }
           },
           "required": [
-            "name",
-            "appNamespace",
-            "project"
+            "name"
           ],
           "type": "object"
         }
@@ -2129,11 +2098,7 @@
           },
           "required": [
             "name",
-            "appNamespace",
-            "dryRun",
-            "id",
-            "project",
-            "prune"
+            "id"
           ],
           "type": "object"
         }

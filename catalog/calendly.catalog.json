@@ -143,8 +143,7 @@
             }
           },
           "required": [
-            "user",
-            "count"
+            "user"
           ],
           "type": "object"
         }
@@ -292,9 +291,7 @@
             }
           },
           "required": [
-            "user",
-            "status",
-            "count"
+            "user"
           ],
           "type": "object"
         }
@@ -614,9 +611,7 @@
             }
           },
           "required": [
-            "uuid",
-            "status",
-            "count"
+            "uuid"
           ],
           "type": "object"
         }

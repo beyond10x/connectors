@@ -31,9 +31,7 @@
               "type": "number"
             }
           },
-          "required": [
-            "per_page"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -130,12 +128,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "req_id",
-            "req_email",
-            "company_id",
-            "updated"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -595,22 +588,10 @@
             }
           },
           "required": [
-            "phone",
-            "name",
-            "requester_id",
             "subject",
             "description",
             "status",
-            "priority",
-            "source",
-            "responder_id",
-            "type",
-            "email_config_id",
-            "group_id",
-            "product_id",
-            "tags",
-            "cc_emails",
-            "custom_fields"
+            "priority"
           ],
           "type": "object"
         }
@@ -1069,22 +1050,7 @@
             }
           },
           "required": [
-            "id",
-            "subject",
-            "description",
-            "status",
-            "priority",
-            "requester_id",
-            "responder_id",
-            "name",
-            "phone",
-            "email",
-            "type",
-            "email_config_id",
-            "group_id",
-            "product_id",
-            "tags",
-            "custom_fields"
+            "id"
           ],
           "type": "object"
         }
@@ -1490,10 +1456,7 @@
           },
           "required": [
             "id",
-            "body",
-            "private",
-            "incoming",
-            "notify_emails"
+            "body"
           ],
           "type": "object"
         }
@@ -1695,13 +1658,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "phone",
-            "email",
-            "mobile",
-            "company_id",
-            "state"
-          ],
+          "required": [],
           "type": "object"
         }
       },
@@ -2075,9 +2032,7 @@
             }
           },
           "required": [
-            "name",
-            "email",
-            "phone"
+            "name"
           ],
           "type": "object"
         }
