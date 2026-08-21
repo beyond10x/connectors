@@ -2101,6 +2101,7 @@ dependencies = [
  "catalog",
  "connector-resolve",
  "connector-secrets",
+ "connector-state",
  "connectors-config",
  "domain",
  "driver-audio",
