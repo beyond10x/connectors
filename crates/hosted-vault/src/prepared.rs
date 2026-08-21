@@ -13,7 +13,7 @@ use connector_secrets::{
     SecretTransactionId, SecretTransactionState, StoreError, TenantLayout,
     MAX_TERMINAL_TRANSACTIONS,
 };
-use hosted_state::PostgresState;
+use connector_state::StateStore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
@@ -30,7 +30,13 @@ pub struct PreparedVaultStore {
 
 enum JournalStorage {
     File(PathBuf),
-    Postgres { state: PostgresState, key: String },
+    /// One cell in whatever durable store the deployment bound. Naming the backend here is what
+    /// made a workstation need a database server to hold a value-free journal of transaction
+    /// addresses; the journal never cared which SQL engine held it.
+    Shared {
+        state: Arc<dyn StateStore>,
+        key: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,23 +107,27 @@ impl PreparedVaultStore {
         })
     }
 
-    /// Open a value-free prepared transaction journal in the service-owned PostgreSQL database.
-    pub fn open_postgres(
+    /// Open a value-free prepared transaction journal in the deployment's shared state store.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Unreachable`] when the cell cannot be read or does not decode.
+    pub fn open_shared(
         inner: Arc<dyn SecretStore>,
-        state: PostgresState,
+        state: Arc<dyn StateStore>,
         key: impl Into<String>,
     ) -> Result<Self, StoreError> {
         let key = key.into();
         let journal = match state
             .read(&key, MAX_JOURNAL_BYTES as usize)
-            .map_err(database_journal_error)?
+            .map_err(shared_journal_error)?
         {
-            Some(bytes) => decode_journal(&bytes, "<postgresql>")?,
+            Some(bytes) => decode_journal(&bytes, SHARED_JOURNAL_LABEL)?,
             None => Journal::default(),
         };
         Ok(Self {
             inner,
-            storage: JournalStorage::Postgres { state, key },
+            storage: JournalStorage::Shared { state, key },
             journal: Mutex::new(journal),
         })
     }
@@ -125,13 +135,13 @@ impl PreparedVaultStore {
     fn persist(&self, journal: &Journal) -> Result<(), StoreError> {
         match &self.storage {
             JournalStorage::File(path) => write_journal(path, journal),
-            JournalStorage::Postgres { state, key } => {
+            JournalStorage::Shared { state, key } => {
                 let bytes = serde_json::to_vec(journal).map_err(|_| {
-                    journal_error_label("<postgresql>", "journal could not be encoded")
+                    journal_error_label(SHARED_JOURNAL_LABEL, "journal could not be encoded")
                 })?;
                 state
                     .replace(key, &bytes, MAX_JOURNAL_BYTES as usize)
-                    .map_err(database_journal_error)
+                    .map_err(shared_journal_error)
             }
         }
     }
@@ -644,8 +654,13 @@ fn journal_error_label(location: &str, reason: &str) -> StoreError {
     }
 }
 
-fn database_journal_error(error: hosted_state::StateError) -> StoreError {
-    journal_error_label("<postgresql>", &error.to_string())
+/// A journal in the shared store has no path to name, and naming the engine would be a guess: the
+/// same code now runs over SQLite and over PostgreSQL. The reader needs to know it is the shared
+/// journal rather than a file beside the socket, and the reason.
+const SHARED_JOURNAL_LABEL: &str = "<shared-state>";
+
+fn shared_journal_error(error: connector_state::StateError) -> StoreError {
+    journal_error_label(SHARED_JOURNAL_LABEL, &error.to_string())
 }
 
 #[cfg(test)]
@@ -735,6 +750,56 @@ mod tests {
         let reopened =
             PreparedVaultStore::open(inner, root.path().join("vault-prepared-transactions.json"))
                 .expect("reopen");
+        reopened.initialize().await.expect("recover");
+        assert_eq!(
+            reopened.state(id).await.expect("state"),
+            SecretTransactionState::Committed
+        );
+    }
+
+    /// A half-committed credential rotation must still be recoverable after a restart when the
+    /// journal lives in the deployment's shared store rather than in a file. This used to be
+    /// reachable only through PostgreSQL, so the recovery path a hosted placement depends on could
+    /// not be exercised without a database server standing by.
+    #[tokio::test]
+    async fn a_journal_in_the_shared_store_recovers_a_committed_transaction_after_a_restart() {
+        let inner = Arc::new(MemoryStore::new());
+        inner
+            .put(&reference(), &Secret::new(OLD))
+            .await
+            .expect("seed");
+        let state: Arc<dyn StateStore> = Arc::new(connector_state::MemoryState::new());
+        let store = PreparedVaultStore::open_shared(
+            inner.clone(),
+            Arc::clone(&state),
+            "vault.prepared-transactions",
+        )
+        .expect("open");
+        store.initialize().await.expect("initialize");
+        let id = transaction();
+        store
+            .prepare(
+                id,
+                SecretProposalDigest::from_protocol_bytes([3; 32]),
+                &batch(NEW),
+            )
+            .await
+            .expect("prepare");
+        store.commit(id).await.expect("commit");
+
+        let journal = state
+            .read("vault.prepared-transactions", MAX_JOURNAL_BYTES as usize)
+            .expect("read the journal cell")
+            .expect("a committed transaction leaves a journal");
+        let journal = String::from_utf8(journal).expect("the journal is UTF-8 JSON");
+        // Addresses and states only: a journal that leaked a candidate value would put the
+        // rotated secret in whichever store the deployment bound.
+        assert!(!journal.contains(OLD), "the journal holds no secret");
+        assert!(!journal.contains(NEW), "the journal holds no secret");
+
+        drop(store);
+        let reopened = PreparedVaultStore::open_shared(inner, state, "vault.prepared-transactions")
+            .expect("reopen");
         reopened.initialize().await.expect("recover");
         assert_eq!(
             reopened.state(id).await.expect("state"),

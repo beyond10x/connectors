@@ -11,8 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use connector_secrets::{PreparedSecretStore, Secret};
+use connector_state::StateStore;
 use connectors_config::{HostedJiraConfig, InitiationConfig, JiraSharedAuth};
-use hosted_state::PostgresState;
 use protocol::connection::{
     ConnectionActor, ConnectionDescription, ConnectionError, ConnectionErrorCode,
     ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionScope,
@@ -92,7 +92,7 @@ pub(super) struct JiraInner {
     pub(super) site_origin: url::Url,
     pub(super) public_origin: url::Url,
     pub(super) gateway_origin: url::Url,
-    pub(super) state_store: PostgresState,
+    pub(super) state_store: Arc<dyn StateStore>,
     pub(super) credential_store: Arc<dyn PreparedSecretStore>,
     pub(super) metadata: Mutex<StateFile>,
     pub(super) sessions: Mutex<ConnectSessionLifecycle>,
@@ -189,7 +189,7 @@ impl JiraBackend {
         tenant_id: String,
         policy: HostedJiraConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
-        state_store: PostgresState,
+        state_store: Arc<dyn StateStore>,
     ) -> Result<Self, JiraError> {
         let site_origin = parse_origin(&policy.site_origin)?;
         let public_origin =

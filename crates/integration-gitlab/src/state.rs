@@ -1,8 +1,9 @@
 //! Where this Integration keeps its own bookkeeping.
 //!
 //! Not GitLab data — the list of Connections that exist and the credential transactions that are
-//! half-committed. A hosted placement runs several replicas of one Connector, so that list has to
-//! be shared and Postgres holds it. A personal placement is one process on one machine, where an
+//! half-committed. A hosted placement may run several replicas of one Connector, so that list has
+//! to be shared: it lives in whatever durable store the deployment bound, PostgreSQL in the cluster
+//! and SQLite on one machine. A personal placement is one process on one machine, where an
 //! owner-only file is both sufficient and correct.
 //!
 //! Only the hosted half existed, so `GitlabBackend` could not be constructed anywhere without a
@@ -14,14 +15,16 @@ use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 
-use hosted_state::PostgresState;
+use std::sync::Arc;
+
+use connector_state::StateStore;
 
 use crate::backend::GitlabError;
 
 /// The bookkeeping store behind one placement.
 pub(crate) enum GitlabState {
-    /// Shared across replicas of one hosted Connector.
-    Hosted(PostgresState),
+    /// Shared across replicas of one hosted Connector, in whichever backend was bound.
+    Hosted(Arc<dyn StateStore>),
     /// Owner-only files beside one personal placement's socket.
     Local { root: PathBuf },
 }

@@ -4,11 +4,7 @@ use connector_secrets::StoreError;
 
 impl SlackInner {
     pub(super) fn persist_metadata(&self, state: &StateFile) -> Result<(), SlackError> {
-        write_state(
-            &self.state_root.join("connections.json"),
-            self.hosted_state.as_ref(),
-            state,
-        )
+        write_state(&self.state_root, self.hosted_state.as_deref(), state)
     }
 
     pub(super) fn tenant_id(&self) -> &str {

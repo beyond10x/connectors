@@ -3,10 +3,10 @@ use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use hosted_state::PostgresState;
+use connector_state::StateStore;
 use serde::Serialize;
 
 use super::lock;
@@ -16,7 +16,7 @@ const AUDIT_STATE_KEY: &str = "b10x.audit";
 
 pub(super) struct AuditJournal {
     path: PathBuf,
-    hosted_state: Option<PostgresState>,
+    hosted_state: Option<Arc<dyn StateStore>>,
     state: Mutex<AuditJournalState>,
 }
 
@@ -47,7 +47,7 @@ pub(super) struct AuditEvent<'a> {
 }
 
 impl AuditJournal {
-    pub(super) fn new(path: PathBuf, hosted_state: Option<PostgresState>) -> Self {
+    pub(super) fn new(path: PathBuf, hosted_state: Option<Arc<dyn StateStore>>) -> Self {
         Self {
             path,
             hosted_state,
@@ -73,7 +73,7 @@ impl AuditJournal {
                 .append(AUDIT_STATE_KEY, bytes, MAX_AUDIT_BYTES as usize)
                 .map(|_| ())
                 .map_err(|error| match error {
-                    hosted_state::StateError::Capacity => std::io::Error::new(
+                    connector_state::StateError::Capacity => std::io::Error::new(
                         std::io::ErrorKind::FileTooLarge,
                         "connector audit bound reached",
                     ),

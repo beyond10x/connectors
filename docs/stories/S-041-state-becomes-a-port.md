@@ -7,7 +7,7 @@ priority: 2
 design: ../design/12-one-owner-for-every-outside-connection.md
 epic: local-product
 areas: [service, state, testing]
-note: "the port, the in-memory and SQLite backends and the shared conformance suite have landed, all three verified equivalent including against a live PostgreSQL; converting the five Integrations off their private state shapes remains"
+note: "the port, its three backends and the shared conformance suite have landed, and every hosted state seam now takes Arc<dyn StateStore> — serve-hosted runs on SQLite with no database server. What remains is the personal posture: slack and gitlab still keep an owner-only file branch beside the port, and jira has no personal constructor at all."
 ---
 
 # State becomes a port, with a SQLite backend
@@ -90,8 +90,11 @@ first case in the suite.
       bounded reads, delete idempotence and key validation on **every** operation including reads.
 - [x] The suite passes against a live PostgreSQL, so backend equivalence is measured rather than
       claimed.
-- [ ] The five Integrations drop their private state shapes and take `Arc<dyn StateStore>`.
-- [ ] `integration-jira` composes locally, which today it cannot.
+- [x] The five Integrations drop their private state shapes and take `Arc<dyn StateStore>` on the
+      hosted seam, and `hosted-vault`'s prepared-transaction journal with them.
+- [ ] `integration-jira` composes locally, which today it cannot. It no longer *requires* a
+      database — its constructor takes the port — but no personal-posture constructor wires it.
+- [ ] `slack` and `gitlab` collapse their owner-only file branch into the port as well.
 
 ## Evidence
 
@@ -103,6 +106,28 @@ Measured 2026-08-20:
   `CONNECTORS_DATABASE_URL=… cargo test -p hosted-state -- --ignored` → **1 passed**, and
   `SELECT count(*) … WHERE state_key LIKE 'conformance.%'` → **0**, so the suite cleans up after
   itself in a shared database.
+
+## What landed on 2026-08-21
+
+`serve-hosted` picks its store rather than demanding one. Exactly one of `CONNECTORS_DATABASE_URL`
+and `CONNECTORS_SQLITE`; both is refused and neither is refused, because a derived default would
+turn a database URL that failed to reach the process into a placement serving from a fresh empty
+file — coming up healthy with every Connection apparently never granted.
+
+To get there, every hosted state seam moved to the port: `integration-{slack,gitlab,jira,b10x,
+monitoring}` and `hosted-vault`'s prepared-transaction journal took `Arc<dyn StateStore>` in place of
+a concrete `PostgresState`. `hosted-vault`, `integration-jira` and `integration-gitlab` no longer
+depend on `hosted-state` at all.
+
+Admission did not move. Hosted mode still resolves the caller's access token against Identity and
+still checks `operator_groups`; `crates/server` and `crates/identity-http` are untouched. Connectors
+verifies no signed module request of its own, so there is no `(issuer, jti)` replay ledger here to
+port — Connectors is the *signer* of module requests, and the modules hold the ledgers.
+
+Measured: `connectors-runtime` workspace **187 passed, 0 failed**; root workspace **985 passed, 0
+failed**; `connectors-cli` **4 passed, 0 failed**. `serve-hosted` on SQLite with the B10x
+Integration composed published `"ready":true,"b10x_enabled":true` with no database server
+running.
 
 ## Next
 

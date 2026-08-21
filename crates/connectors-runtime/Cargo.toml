@@ -40,6 +40,7 @@ local-identity = ["identity-http/local-identity"]
 async-trait = "0.1"
 axum = { version = "0.8", features = ["json", "tokio"] }
 connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
+connector-state = { version = "0.1.0", path = "../connector-state" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }
 futures-util = "0.3"
 hosted-vault = { version = "0.1.0", path = "../hosted-vault" }
@@ -60,6 +61,7 @@ serde_json = "1"
 server = { version = "0.1.0", path = "../server" }
 service = { version = "0.1.0", path = "../service" }
 sha2 = "0.10"
+state-sqlite = { version = "0.1.0", path = "../state-sqlite" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["net", "time"] }
 url = "2"
