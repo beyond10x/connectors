@@ -396,4 +396,16 @@ mod port_tests {
         let store = PostgresState::connect(&url).expect("the database is reachable");
         connector_state::conformance::run(&store);
     }
+
+    /// The grant-evaluation exercise against a live PostgreSQL, when one is offered — the same
+    /// records, admissions and neutral refusals every other backend answers, under the same
+    /// visible-skip discipline as [`the_postgres_backend_conforms`].
+    #[test]
+    #[ignore = "requires a PostgreSQL named by CONNECTORS_DATABASE_URL"]
+    fn the_postgres_backend_serves_grant_evaluation() {
+        let url = std::env::var("CONNECTORS_DATABASE_URL")
+            .expect("CONNECTORS_DATABASE_URL names the database to test against");
+        let store = PostgresState::connect(&url).expect("the database is reachable");
+        domain::grant_conformance::run(std::sync::Arc::new(store));
+    }
 }

@@ -90,18 +90,27 @@ pub struct AdmittedOperation {
 
 impl AdmittedOperation {
     /// Admission proven by a Grant evaluation. [`GrantDecision`] has no public constructor, so
-    /// reaching this call means the evaluator module produced the decision (S-044 lands the
-    /// production evaluator; until then only tests hold one).
-    pub fn from_decision(decision: GrantDecision) -> Self {
-        let parts = decision.into_parts();
-        Self {
+    /// reaching this call means `GrantEvaluator::evaluate` produced the decision.
+    ///
+    /// **An expired decision refuses at use**: the caller states its `now` and a decision past
+    /// its bound expiry answers the same neutral refusal every other refusal is.
+    ///
+    /// # Errors
+    ///
+    /// [`crate::GrantRefusal::Refused`] when the decision has expired.
+    pub fn from_decision(
+        decision: GrantDecision,
+        now: std::time::SystemTime,
+    ) -> Result<Self, crate::GrantRefusal> {
+        let parts = decision.into_parts(now)?;
+        Ok(Self {
             provider: parts.provider,
             operation: parts.operation,
             organization: parts.organization,
             principal: parts.principal,
             grant: parts.grant,
             connection: parts.connection,
-        }
+        })
     }
 
     /// Admission asserted, not evaluated: the caller vouches that the requesting principal IS
@@ -257,8 +266,17 @@ impl ZeroIoPlan {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet as Set;
+    use std::sync::Arc;
+    use std::time::SystemTime;
+
+    use connector_state::MemoryState;
+
     use super::*;
-    use crate::InitiationPolicy;
+    use crate::{
+        Grant, GrantAction, GrantEvaluator, GrantFacts, GrantIdempotency, GrantRequest, GrantRisk,
+        GrantSelector, GrantSet, InitiationPolicy,
+    };
 
     #[test]
     fn a_grant_decision_is_the_hosted_admission_path() {
@@ -267,15 +285,54 @@ mod tests {
             InitiationPolicy::b10x_only(),
         )
         .expect("valid connection reference");
-        let decision = GrantDecision::admitted_for_tests(
-            "grafana",
-            "grafana/datasource.query",
-            "tenant:acme",
-            "principal:svc-observer",
-            "grant:observability-read",
-            connection.clone(),
-        );
-        let admitted = AdmittedOperation::from_decision(decision);
+        // The only production route to a decision is the evaluator over a bound store; there
+        // is no test builder to keep honest separately.
+        let store = MemoryState::new();
+        GrantSet {
+            revision: 12,
+            grants: vec![Grant {
+                grant: "grant:observability-read".to_owned(),
+                provider: "grafana".to_owned(),
+                connection: "connection:grafana:ops".to_owned(),
+                selector: Some(GrantSelector {
+                    risk_ceiling: GrantRisk::Low,
+                    effects: Set::from([crate::GrantEffect::Read]),
+                    idempotency: Set::from([GrantIdempotency::Idempotent]),
+                }),
+                allow: Set::new(),
+                deny: Set::new(),
+                inbound_events: Set::new(),
+            }],
+        }
+        .write(&store, "tenant:acme")
+        .expect("seed");
+        let now = SystemTime::now();
+        let decision = GrantEvaluator::bound(Arc::new(store))
+            .evaluate(
+                &GrantRequest {
+                    issuer: "https://identity.example".to_owned(),
+                    tenant: "tenant:acme".to_owned(),
+                    subject: "principal:svc-observer".to_owned(),
+                    actor: None,
+                    provider: "grafana".to_owned(),
+                    connection: connection.clone(),
+                    catalog_generation: "generation:1".to_owned(),
+                    description_ref: "description:grafana:1".to_owned(),
+                    input_digest: "sha256:abcd".to_owned(),
+                    action: GrantAction::Invoke {
+                        operation: "grafana/datasource.query".to_owned(),
+                        facts: GrantFacts {
+                            risk: GrantRisk::Low,
+                            effects: Set::from([crate::GrantEffect::Read]),
+                            idempotency: GrantIdempotency::Idempotent,
+                        },
+                    },
+                },
+                now,
+            )
+            .expect("the seeded grant admits");
+        let admitted =
+            AdmittedOperation::from_decision(decision, now).expect("a live decision admits");
         assert_eq!(admitted.provider(), "grafana");
         assert_eq!(admitted.operation(), "grafana/datasource.query");
         assert_eq!(admitted.organization(), "tenant:acme");

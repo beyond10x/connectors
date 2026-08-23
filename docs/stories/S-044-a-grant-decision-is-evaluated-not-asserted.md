@@ -2,11 +2,12 @@
 id: S-044
 title: "A Grant decision is evaluated, not asserted"
 pillar: Platform
-status: ready
+status: done
 priority: 2
 design: ../design/13-grant-evaluation-and-approval-redemption.md
 epic: enforced-authority
 areas: [domain, service, state]
+note: "GrantEvaluator + revisioned Grant records land in domain over the S-041 port; the cfg(test) decision builder is deleted, so the evaluator is the only constructor; grant_conformance runs on memory, SQLite (memory+file) and #[ignore]d live PostgreSQL; hosted wiring stays with S-046"
 ---
 
 # A Grant decision is evaluated, not asserted
