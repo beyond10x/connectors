@@ -1,7 +1,11 @@
 # AGENTS.md
 
-Orientation for agents (and humans) working in this component. The root
-[`AGENTS.md`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/AGENTS.md) applies throughout; this file adds component rules.
+Orientation for agents (and humans) working in this repository.
+**github.com/beyond10x/connectors is the canonical home of Connectors.** It was extracted from the
+b10x monorepo with full history on 2026-08-23; the monorepo baseline is
+[`b10x/b10x` @ `bf685971`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/AGENTS.md),
+whose root rules this file carried forward where they still apply. The b10x Zwirn product
+consumes this repository as a pinned git dependency; nothing here depends on the monorepo.
 
 ## Status
 
@@ -28,12 +32,12 @@ graph rather than caution, name the blocked stories and what unblocks each.
 **Deferred by Timo on 2026-08-13:** a family-level architecture review across the `architecture`,
 `connectors` and `substrate` components — how everything connects — postponed until `substrate`'s
 documents are finished. The procedure now exists as the `architecture-review` run-mode of the
-`b10x` main agent (`.agents/agents/b10x.md`); trigger it when Timo says substrate is
+`b10x` main agent (`.agents/agents/b10x.md` in the b10x monorepo); trigger it when Timo says substrate is
 done.
 
 ## Commits
 
-- The monorepo is private. Its visibility must not change without Timo's explicit approval.
+- This repository is private. Its visibility must not change without Timo's explicit approval.
 - Lowercase `area: summary` titles (`docs:`, `research:`, `scripts:`, `chore:`), body with
   bullet points. Write messages via `git commit -F -` with a quoted heredoc, never `-m` with
   backticks.
@@ -167,16 +171,16 @@ and consumer list in the same change; do not claim the invariant suite checks th
 
 ## Gate
 
-The monorepo-local gate is authoritative. From the repository root run:
+The repository gate is authoritative. From the repository root run:
 
 ```text
-bash scripts/check-local.sh --all
+bash scripts/gate.sh
 ```
 
-For a focused Connectors iteration, run `python3 scripts/check-links.py`,
-`python3 scripts/check-stories.py`, the affected Cargo workspace's locked test/clippy/fmt commands,
-and `cargo run --locked --offline -p catalog-cli -- check` from `foundation/connectors`. The root
-gate remains required before treating the monorepo change as green. `catalog check` independently
+It runs every Cargo workspace's `cargo test --workspace --locked`, the catalog lock verifier
+(`catalog-cli -- check`), `scripts/check-links.py`, and `scripts/check-stories.py`. For a focused
+iteration run the affected workspace's locked test/clippy/fmt commands directly; the full gate
+remains required before treating a change as green. `catalog check` independently
 rehashes provider declarations, vendored specs, lock rows, and generated artifacts.
 
 `json-schemas.toml` is the closed inventory for JSON. Every component-owned JSON document names a
