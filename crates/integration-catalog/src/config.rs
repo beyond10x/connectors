@@ -38,7 +38,11 @@ impl DeclaredConfig {
 
     /// The non-secret user half of a `basic` credential, named by the credential it joins.
     #[must_use]
-    pub fn with_username(mut self, credential: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn with_username(
+        mut self,
+        credential: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
         self.usernames.insert(credential.into(), value.into());
         self
     }

@@ -81,8 +81,7 @@ struct NullPlayback {
 
 impl AudioPlayback for NullPlayback {
     fn write(&mut self, pcm: &[u8]) -> Result<(), AudioDeviceError> {
-        self.written
-            .fetch_add(pcm.len() as u64, Ordering::Relaxed);
+        self.written.fetch_add(pcm.len() as u64, Ordering::Relaxed);
         std::thread::sleep(duration_of(pcm.len(), self.format));
         Ok(())
     }

@@ -316,9 +316,12 @@ impl Inner {
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no such catalogued operation"))?;
         // Any admitting Connection proves the operation is describable here; which one serves a
         // call is the caller's choice at invocation.
-        let binding = self
-            .binding_for_operation(operation)
-            .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no Connection for its provider"))?;
+        let binding = self.binding_for_operation(operation).ok_or_else(|| {
+            refusal(
+                OperationErrorCode::NotFound,
+                "no Connection for its provider",
+            )
+        })?;
         if !binding.admits(operation) {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
@@ -326,12 +329,15 @@ impl Inner {
             ));
         }
         let description_ref = lease_ref(operation_ref);
-        self.leases.lock().expect("the lease map is not poisoned").insert(
-            description_ref.clone(),
-            Lease {
-                operation_ref: operation_ref.to_owned(),
-            },
-        );
+        self.leases
+            .lock()
+            .expect("the lease map is not poisoned")
+            .insert(
+                description_ref.clone(),
+                Lease {
+                    operation_ref: operation_ref.to_owned(),
+                },
+            );
         Ok(OperationDescription {
             operation_ref: operation_ref.to_owned(),
             title: operation_ref.to_owned(),
@@ -345,7 +351,9 @@ impl Inner {
             connections: self
                 .bindings
                 .iter()
-                .filter(|candidate| candidate.provider.id == operation.provider && candidate.admits(operation))
+                .filter(|candidate| {
+                    candidate.provider.id == operation.provider && candidate.admits(operation)
+                })
                 .map(|candidate| self.summary(candidate))
                 .collect(),
             description_ref,
@@ -365,7 +373,10 @@ impl Inner {
         input: serde_json::Value,
     ) -> Result<InvocationResult, OperationError> {
         if serde_json::to_vec(&input).map_or(true, |bytes| bytes.len() > MAX_INPUT_BYTES) {
-            return Err(refusal(OperationErrorCode::InvalidInput, "caller input is too large"));
+            return Err(refusal(
+                OperationErrorCode::InvalidInput,
+                "caller input is too large",
+            ));
         }
         {
             let leases = self.leases.lock().expect("the lease map is not poisoned");
@@ -400,18 +411,29 @@ impl Inner {
                 "this Connection's grant admits reads only; connect with --allow writes to raise it",
             ));
         }
-        if !binding.initiation.allows(domain::ConnectionInitiator::B10x) {
+        if !binding
+            .initiation
+            .allows(domain::ConnectionInitiator::B10x)
+        {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
                 "this Connection does not permit B10x to initiate operations",
             ));
         }
 
-        let document = connector_resolve::document::provider(binding.provider.id)
-            .ok_or_else(|| refusal(OperationErrorCode::Unavailable, "the provider document is absent"))?;
-        let declared = document
-            .operation(operation_ref)
-            .ok_or_else(|| refusal(OperationErrorCode::NotFound, "the operation has no request template"))?;
+        let document =
+            connector_resolve::document::provider(binding.provider.id).ok_or_else(|| {
+                refusal(
+                    OperationErrorCode::Unavailable,
+                    "the provider document is absent",
+                )
+            })?;
+        let declared = document.operation(operation_ref).ok_or_else(|| {
+            refusal(
+                OperationErrorCode::NotFound,
+                "the operation has no request template",
+            )
+        })?;
 
         let assembly = connector_resolve::assemble_credentials(
             operation,
@@ -442,12 +464,26 @@ impl Inner {
             )
         })?;
 
-        let base_url = document
-            .base_url(operation.service)
-            .ok_or_else(|| refusal(OperationErrorCode::Unavailable, "the service has no base URL"))?;
+        let base_url = document.base_url(operation.service).ok_or_else(|| {
+            refusal(
+                OperationErrorCode::Unavailable,
+                "the service has no base URL",
+            )
+        })?;
 
-        let plan = connector_resolve::resolve(declared, base_url, &input, &endpoints, &assembly.credentials)
-            .map_err(|_| refusal(OperationErrorCode::InvalidInput, "caller input did not satisfy the declared request"))?;
+        let plan = connector_resolve::resolve(
+            declared,
+            base_url,
+            &input,
+            &endpoints,
+            &assembly.credentials,
+        )
+        .map_err(|_| {
+            refusal(
+                OperationErrorCode::InvalidInput,
+                "caller input did not satisfy the declared request",
+            )
+        })?;
 
         let response = self
             .egress
@@ -488,8 +524,9 @@ impl Inner {
                 "the provider refused the request",
             ));
         }
-        let output = serde_json::from_slice(&response.body)
-            .unwrap_or_else(|_| serde_json::Value::String(String::from_utf8_lossy(&response.body).into_owned()));
+        let output = serde_json::from_slice(&response.body).unwrap_or_else(|_| {
+            serde_json::Value::String(String::from_utf8_lossy(&response.body).into_owned())
+        });
 
         Ok(InvocationResult {
             operation_ref: operation_ref.to_owned(),
@@ -634,10 +671,7 @@ fn credential_leaf(
             .find(|credential| credential.name == name)
             .map(|credential| credential.leaf)
             .ok_or_else(|| {
-                CatalogIntegrationError::UnknownCredential(
-                    provider.id.to_owned(),
-                    name.to_owned(),
-                )
+                CatalogIntegrationError::UnknownCredential(provider.id.to_owned(), name.to_owned())
             }),
         // The provider's first declared credential. Declaration order is the catalogue's own
         // preference order, so this is the one a reviewer put first rather than an arbitrary pick.
@@ -741,7 +775,11 @@ fn instance_for(provider: &str, name: &str) -> Result<InstanceId, CatalogIntegra
     let hex = hex::encode(bytes);
     let text = format!(
         "{}-{}-{}-{}-{}",
-        &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32]
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
     );
     InstanceId::parse(&text)
         .map_err(|_| CatalogIntegrationError::UnknownProvider(provider.to_owned()))
@@ -916,7 +954,10 @@ mod tests {
             .effects
             .iter()
             .any(|effect| matches!(effect, HostEffect::Network)));
-        assert!(read_only.admits(ordinary), "a network effect must not disqualify a read");
+        assert!(
+            read_only.admits(ordinary),
+            "a network effect must not disqualify a read"
+        );
         assert!(
             !ordinary
                 .effects
@@ -1040,7 +1081,10 @@ mod tests {
         // elided form is what a single-connection deployment already stored.
         let unnamed = entry("gitlab", &[]);
         let address = credential_address("local", "com.gitlab.api", &unnamed, "token").unwrap();
-        assert!(address.instance().is_none(), "no instance segment for an unnamed entry");
+        assert!(
+            address.instance().is_none(),
+            "no instance segment for an unnamed entry"
+        );
         assert_eq!(address.tenant(), "local");
         assert_eq!(address.authority(), "com.gitlab.api");
         assert_eq!(address.credential(), "token");
@@ -1055,7 +1099,10 @@ mod tests {
         let slack = instance_for("slack", "shared-name").unwrap();
         let datadog = instance_for("datadog", "shared-name").unwrap();
         assert_ne!(slack.as_str(), datadog.as_str());
-        assert_eq!(slack.as_str(), instance_for("slack", "shared-name").unwrap().as_str());
+        assert_eq!(
+            slack.as_str(),
+            instance_for("slack", "shared-name").unwrap().as_str()
+        );
         assert_eq!(slack.as_str().len(), 36);
     }
 
@@ -1071,7 +1118,10 @@ mod tests {
                 addressable += 1;
             }
         }
-        assert!(addressable >= 56, "only {addressable} providers are addressable");
+        assert!(
+            addressable >= 56,
+            "only {addressable} providers are addressable"
+        );
     }
 
     #[test]

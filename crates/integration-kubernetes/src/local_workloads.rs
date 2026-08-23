@@ -20,11 +20,11 @@ use service::PrincipalContext;
 
 use crate::workloads::{
     datasource_description, datasource_not_found, datasource_summary, datasource_unavailable,
-    namespace_binding, namespace_binding_ref, project_compact, project_pod, read_workloads,
-    safe_event_reason, unavailable, valid_dns_label, CursorStore, DeploymentReader,
-    DeploymentStatus, KubernetesDeployment, KubernetesEvent, KubernetesList, KubernetesPod,
-    now_unix_ms, outcome_unknown, project, stale, RestartAccepted, WarningSummary, WorkloadDetail,
-    WorkloadList, DATASOURCE, MAX_KUBERNETES_RESPONSE_BYTES, MAX_RELATED_RECORDS,
+    namespace_binding, namespace_binding_ref, now_unix_ms, outcome_unknown, project,
+    project_compact, project_pod, read_workloads, safe_event_reason, stale, unavailable,
+    valid_dns_label, CursorStore, DeploymentReader, DeploymentStatus, KubernetesDeployment,
+    KubernetesEvent, KubernetesList, KubernetesPod, RestartAccepted, WarningSummary,
+    WorkloadDetail, WorkloadList, DATASOURCE, MAX_KUBERNETES_RESPONSE_BYTES, MAX_RELATED_RECORDS,
 };
 
 /// Reads the Kubernetes API through a `kube::Client` bound to one kubeconfig context.
@@ -239,9 +239,8 @@ impl DeploymentReader for KubeconfigReader {
                 .collect()
         };
 
-        let field_selector = format!(
-            "type=Warning,involvedObject.kind=Deployment,involvedObject.name={name}"
-        );
+        let field_selector =
+            format!("type=Warning,involvedObject.kind=Deployment,involvedObject.name={name}");
         let path = format!(
             "/api/v1/namespaces/{namespace}/events?{}",
             query(&[

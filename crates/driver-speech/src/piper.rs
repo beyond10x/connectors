@@ -469,13 +469,16 @@ mod tests {
 
     #[test]
     fn an_absent_synthesizer_refuses_with_its_path_and_remediation() {
-        let engine = PiperSpeechEngine::new(PiperConfig {
-            synthesizer: Some(PathBuf::from("/nonexistent/piper-tts")),
-            voice: PathBuf::from("/nonexistent/voice.onnx"),
-            voice_config: None,
-            voice_sha256: None,
-            maximum_utterance: Duration::from_secs(1),
-        }, headless());
+        let engine = PiperSpeechEngine::new(
+            PiperConfig {
+                synthesizer: Some(PathBuf::from("/nonexistent/piper-tts")),
+                voice: PathBuf::from("/nonexistent/voice.onnx"),
+                voice_config: None,
+                voice_sha256: None,
+                maximum_utterance: Duration::from_secs(1),
+            },
+            headless(),
+        );
         let error = engine
             .resolve_synthesizer()
             .expect_err("absent synthesizer");
@@ -492,13 +495,16 @@ mod tests {
 
     #[test]
     fn voice_configuration_defaults_to_the_model_path_plus_json() {
-        let engine = PiperSpeechEngine::new(PiperConfig {
-            synthesizer: None,
-            voice: PathBuf::from("/voices/en_US-ryan-high.onnx"),
-            voice_config: None,
-            voice_sha256: None,
-            maximum_utterance: Duration::from_secs(1),
-        }, headless());
+        let engine = PiperSpeechEngine::new(
+            PiperConfig {
+                synthesizer: None,
+                voice: PathBuf::from("/voices/en_US-ryan-high.onnx"),
+                voice_config: None,
+                voice_sha256: None,
+                maximum_utterance: Duration::from_secs(1),
+            },
+            headless(),
+        );
         assert_eq!(
             engine.voice_config_path(),
             PathBuf::from("/voices/en_US-ryan-high.onnx.json")

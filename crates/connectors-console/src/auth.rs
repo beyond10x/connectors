@@ -144,7 +144,9 @@ const fn subject_of(subject: catalog::Subject) -> &'static str {
 ///
 /// The same preference order the runtime composes with, so `auth status` reports the store the
 /// daemon actually reads rather than a different one that happens to be openable.
-pub(crate) fn open_store(state_root: &Path) -> Result<(Arc<dyn SecretStore>, &'static str), StoreError> {
+pub(crate) fn open_store(
+    state_root: &Path,
+) -> Result<(Arc<dyn SecretStore>, &'static str), StoreError> {
     if let Ok(keyring) = KeyringStore::open() {
         return Ok((Arc::new(keyring), "keyring"));
     }
@@ -174,7 +176,12 @@ mod tests {
             assert!(
                 matches!(
                     key.as_str(),
-                    "provider" | "instance" | "credentials" | "status" | "verify" | "detail"
+                    "provider"
+                        | "instance"
+                        | "credentials"
+                        | "status"
+                        | "verify"
+                        | "detail"
                         | "satisfied_mechanisms"
                 ),
                 "`{key}` is not one of the value-free fields this report may carry"

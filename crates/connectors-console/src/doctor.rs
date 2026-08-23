@@ -115,7 +115,10 @@ fn check_config(path: &Path) -> Check {
         return Check::new(
             "configuration",
             Status::Fail,
-            format!("no configuration at {}; run `connectors init`", path.display()),
+            format!(
+                "no configuration at {}; run `connectors init`",
+                path.display()
+            ),
         );
     }
     match PersonalConfig::read(path) {
@@ -172,7 +175,10 @@ fn check_state_root(path: &Path) -> Check {
         return Check::new(
             "state-root",
             Status::Warn,
-            format!("{} does not exist yet; it is created on first serve", path.display()),
+            format!(
+                "{} does not exist yet; it is created on first serve",
+                path.display()
+            ),
         );
     };
     if !metadata.is_dir() {
@@ -187,7 +193,11 @@ fn check_state_root(path: &Path) -> Check {
         return Check::new(
             "state-root",
             Status::Fail,
-            format!("{} belongs to uid {}, not {owner}", path.display(), metadata.uid()),
+            format!(
+                "{} belongs to uid {}, not {owner}",
+                path.display(),
+                metadata.uid()
+            ),
         );
     }
     if metadata.permissions().mode() & 0o077 != 0 {
@@ -201,7 +211,11 @@ fn check_state_root(path: &Path) -> Check {
             ),
         );
     }
-    Check::new("state-root", Status::Ok, format!("{} is owner-only", path.display()))
+    Check::new(
+        "state-root",
+        Status::Ok,
+        format!("{} is owner-only", path.display()),
+    )
 }
 
 /// The two socket paths the daemon will bind, measured against what `bind(2)` accepts.
@@ -263,7 +277,11 @@ fn check_daemon(state_root: &Path) -> Check {
         );
     }
     match std::os::unix::net::UnixStream::connect(&socket) {
-        Ok(_) => Check::new("daemon", Status::Ok, format!("listening on {}", socket.display())),
+        Ok(_) => Check::new(
+            "daemon",
+            Status::Ok,
+            format!("listening on {}", socket.display()),
+        ),
         // A socket file with nothing behind it is what an ungraceful stop leaves. The next `serve`
         // removes it, so this is a warning rather than a failure — but silence here would read as
         // "the daemon is up".
@@ -341,8 +359,16 @@ mod tests {
         let root_len = MAX_SOCKET_PATH_BYTES - CONNECT_SESSION_PATH_BYTES + 1;
         let root = std::path::PathBuf::from(format!("/{}", "x".repeat(root_len - 1)));
         let checks = check_socket_budget(&root);
-        assert_eq!(checks[0].status, Status::Ok, "the control socket still fits");
-        assert_eq!(checks[1].status, Status::Fail, "a credential endpoint does not");
+        assert_eq!(
+            checks[0].status,
+            Status::Ok,
+            "the control socket still fits"
+        );
+        assert_eq!(
+            checks[1].status,
+            Status::Fail,
+            "a credential endpoint does not"
+        );
         assert!(checks[1].detail.contains("cannot accept a credential"));
     }
 

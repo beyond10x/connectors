@@ -278,8 +278,14 @@ mod tests {
 
     #[test]
     fn the_snapshot_digest_is_stable_and_moves_with_the_admitted_set() {
-        assert_eq!(derive_snapshot(&["kubernetes"]), derive_snapshot(&["kubernetes"]));
-        assert_ne!(derive_snapshot(&["kubernetes"]), derive_snapshot(&["slack"]));
+        assert_eq!(
+            derive_snapshot(&["kubernetes"]),
+            derive_snapshot(&["kubernetes"])
+        );
+        assert_ne!(
+            derive_snapshot(&["kubernetes"]),
+            derive_snapshot(&["slack"])
+        );
         assert_ne!(
             derive_snapshot(&["kubernetes"]),
             derive_snapshot(&["kubernetes", "slack"])
@@ -328,7 +334,8 @@ mod tests {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let path = directory.path().join("connectors.toml");
         std::fs::write(&path, "owner = {}").expect("a pre-existing file");
-        let error = run(&path, directory.path(), &[], false, false).expect_err("refuses to clobber");
+        let error =
+            run(&path, directory.path(), &[], false, false).expect_err("refuses to clobber");
         assert!(matches!(error, InitError::Exists(_)));
         assert_eq!(
             std::fs::read_to_string(&path).expect("the original survives"),

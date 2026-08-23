@@ -56,7 +56,11 @@ fn a_replaced_cell_reads_back_exactly(store: &dyn StateStore) {
     // and invalid UTF-8. A backend that round-trips through a string would corrupt both.
     let body = vec![0_u8, 1, 2, 255, 254, b'\n', 0];
     store.replace(&key, &body, 1024).expect("replace");
-    assert_eq!(store.read(&key, 1024), Ok(Some(body)), "byte-exact round trip");
+    assert_eq!(
+        store.read(&key, 1024),
+        Ok(Some(body)),
+        "byte-exact round trip"
+    );
     let _ = store.delete(&key);
 }
 
@@ -101,7 +105,11 @@ fn append_refuses_without_mutating_when_the_bound_would_break(store: &dyn StateS
          surfaces later, somewhere else"
     );
     // Exactly at the bound is admitted: the check is `>`, not `>=`.
-    assert_eq!(store.append(&key, b"678", 8), Ok(8), "exactly the bound fits");
+    assert_eq!(
+        store.append(&key, b"678", 8),
+        Ok(8),
+        "exactly the bound fits"
+    );
     let _ = store.delete(&key);
 }
 
@@ -134,7 +142,11 @@ fn an_invalid_key_is_refused_by_every_operation(store: &dyn StateStore) {
     // Every operation, not just the writes: a backend that validates on write and not on read
     // answers `None` for a key it should have refused, which reads as "not configured".
     for bad in ["", "Upper", "has space", "sl/ash"] {
-        assert_eq!(store.read(bad, 16), Err(StateError::Invalid), "read {bad:?}");
+        assert_eq!(
+            store.read(bad, 16),
+            Err(StateError::Invalid),
+            "read {bad:?}"
+        );
         assert_eq!(
             store.replace(bad, b"x", 16),
             Err(StateError::Invalid),
@@ -145,7 +157,11 @@ fn an_invalid_key_is_refused_by_every_operation(store: &dyn StateStore) {
             Err(StateError::Invalid),
             "append {bad:?}"
         );
-        assert_eq!(store.delete(bad), Err(StateError::Invalid), "delete {bad:?}");
+        assert_eq!(
+            store.delete(bad),
+            Err(StateError::Invalid),
+            "delete {bad:?}"
+        );
     }
 }
 

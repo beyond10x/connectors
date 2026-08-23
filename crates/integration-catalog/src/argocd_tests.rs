@@ -78,7 +78,10 @@ impl EgressTransport for FakeArgoCd {
             })
         };
         if url.ends_with("/api/v1/session") {
-            return answer(self.sign_in_status, serde_json::json!({"token": "session-jwt"}));
+            return answer(
+                self.sign_in_status,
+                serde_json::json!({"token": "session-jwt"}),
+            );
         }
         if url.ends_with("/token") {
             return answer(self.mint_status, serde_json::json!({"token": "minted-jwt"}));
@@ -238,8 +241,15 @@ fn every_generated_policy_is_one_argo_cd_will_accept() {
         assert_eq!(parts[0], "p");
         assert_eq!(parts[1], "proj:babelforce:b10x");
         assert!(
-            ["applications", "applicationsets", "repositories", "exec", "logs", "clusters"]
-                .contains(&parts[2]),
+            [
+                "applications",
+                "applicationsets",
+                "repositories",
+                "exec",
+                "logs",
+                "clusters"
+            ]
+            .contains(&parts[2]),
             "{policy} names a resource no project role may carry"
         );
         assert!(parts[4].starts_with("babelforce/"), "{policy}");
@@ -253,7 +263,11 @@ async fn a_rejected_sign_in_says_so_rather_than_reporting_a_missing_project() {
     argocd.sign_in_status = 401;
     let error = acquire(&argocd, request()).await.expect_err("refusal");
     assert!(matches!(error, AcquireError::SignInRejected));
-    assert_eq!(argocd.paths().len(), 1, "nothing is attempted after a refusal");
+    assert_eq!(
+        argocd.paths().len(),
+        1,
+        "nothing is attempted after a refusal"
+    );
 }
 
 #[tokio::test]
@@ -286,7 +300,10 @@ async fn a_zero_lifetime_is_refused_rather_than_meaning_forever() {
         acquire(&argocd, never).await.expect_err("refusal"),
         AcquireError::NeverExpires
     ));
-    assert!(argocd.paths().is_empty(), "nothing is sent before validation");
+    assert!(
+        argocd.paths().is_empty(),
+        "nothing is sent before validation"
+    );
 }
 
 /// A name with a `/` in it would silently become a different URL path. Refused before any request,

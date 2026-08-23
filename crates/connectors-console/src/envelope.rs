@@ -94,7 +94,10 @@ mod tests {
         };
         let reduced = reduce_envelope!(envelope);
         let error = reduced.expect_err("a refusal must not reduce to a result");
-        assert_eq!(error.code, "not_found", "the Connector's own code is forwarded");
+        assert_eq!(
+            error.code, "not_found",
+            "the Connector's own code is forwarded"
+        );
     }
 
     #[test]

@@ -134,7 +134,9 @@ impl CatalogIntegrationConfig {
     /// The human label, defaulting to the instance.
     #[must_use]
     pub fn label(&self) -> String {
-        self.label.clone().unwrap_or_else(|| self.instance().to_owned())
+        self.label
+            .clone()
+            .unwrap_or_else(|| self.instance().to_owned())
     }
 
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
@@ -1211,9 +1213,7 @@ impl PersonalVoiceConfig {
         if endpoint.host_str() != Some(application.tls_server_name.as_str()) {
             return Err(ConfigError::Invalid);
         }
-        let route = self
-            .application_route()
-            .ok_or(ConfigError::Invalid)?;
+        let route = self.application_route().ok_or(ConfigError::Invalid)?;
         service::validate_voice_application_route(&route).map_err(|_| ConfigError::Invalid)?;
         Ok(())
     }

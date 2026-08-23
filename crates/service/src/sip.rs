@@ -725,7 +725,9 @@ mod tests {
             connection: "connection".to_owned(),
             signaling_bind: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0).into(),
             sent_by: "127.0.0.1".to_owned(),
-            target: SipSignalingTarget::Address(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 5_060).into()),
+            target: SipSignalingTarget::Address(
+                SocketAddrV4::new(Ipv4Addr::LOCALHOST, 5_060).into(),
+            ),
             signaling_transport: SipSignalingTransport::Udp,
             to_uri: "sip:callee@127.0.0.1:5060".to_owned(),
             from_uri: "sip:caller@127.0.0.1".to_owned(),
@@ -769,9 +771,13 @@ mod tests {
             Some("ivr".to_owned()),
         )
         .unwrap();
-        let admitted =
-            admit_sip_dial(&plan(), &dial(None, Some("12341234")), &routes, &NoHostResolution)
-                .unwrap();
+        let admitted = admit_sip_dial(
+            &plan(),
+            &dial(None, Some("12341234")),
+            &routes,
+            &NoHostResolution,
+        )
+        .unwrap();
         assert_eq!(admitted.route().to_uri, "sip:12341234@127.0.0.1:5060");
     }
 
@@ -811,8 +817,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            admit_sip_dial(&plan(), &dial(None, Some("100")), &routes, &NoHostResolution)
-                .unwrap_err(),
+            admit_sip_dial(
+                &plan(),
+                &dial(None, Some("100")),
+                &routes,
+                &NoHostResolution
+            )
+            .unwrap_err(),
             SipAdmissionError::NumberNotAdmitted
         );
     }
@@ -825,7 +836,9 @@ mod tests {
         let mut trunk = named_trunk();
         trunk.network_mode = SipNetworkMode::OperatorAuthorizedDevelopment;
         trunk.signaling_apertures =
-            vec![SocketAperture::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)), 5_060..=5_060).unwrap()];
+            vec![
+                SocketAperture::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)), 5_060..=5_060).unwrap(),
+            ];
         let routes = SipDialRouteTable::with_default(
             "connection",
             [("ivr".to_owned(), trunk)],
@@ -892,12 +905,9 @@ mod tests {
 
     #[test]
     fn a_prefix_aperture_admits_its_network_and_refuses_outside_it() {
-        let network = SocketAperture::network(
-            IpAddr::V4(Ipv4Addr::new(10, 42, 0, 0)),
-            16,
-            5_060..=5_060,
-        )
-        .expect("a /16 aperture");
+        let network =
+            SocketAperture::network(IpAddr::V4(Ipv4Addr::new(10, 42, 0, 0)), 16, 5_060..=5_060)
+                .expect("a /16 aperture");
         assert!(network.contains(SocketAddr::from(([10, 42, 0, 7], 5_060))));
         assert!(network.contains(SocketAddr::from(([10, 42, 255, 254], 5_060))));
         assert!(!network.contains(SocketAddr::from(([10, 43, 0, 1], 5_060))));
@@ -914,7 +924,8 @@ mod tests {
             SipAdmissionError::InvalidAperture
         );
         assert_eq!(
-            SocketAperture::network(IpAddr::V4(Ipv4Addr::LOCALHOST), 33, 5_060..=5_060).unwrap_err(),
+            SocketAperture::network(IpAddr::V4(Ipv4Addr::LOCALHOST), 33, 5_060..=5_060)
+                .unwrap_err(),
             SipAdmissionError::InvalidAperture
         );
     }
@@ -973,7 +984,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            admitted.route().target.address().map(|target| target.port()),
+            admitted
+                .route()
+                .target
+                .address()
+                .map(|target| target.port()),
             Some(5_060)
         );
 
@@ -995,8 +1010,9 @@ mod tests {
     fn stable_network_and_aperture_widening_refuse_before_the_driver() {
         let mut stable = route();
         stable.network_mode = SipNetworkMode::Loopback;
-        stable.target =
-            SipSignalingTarget::Address(SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 5_060).into());
+        stable.target = SipSignalingTarget::Address(
+            SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 5_060).into(),
+        );
         stable.signaling_apertures =
             vec![
                 SocketAperture::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 5_060..=5_060).unwrap(),

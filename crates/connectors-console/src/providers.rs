@@ -119,7 +119,12 @@ mod tests {
         // GitLab is the worked example throughout this story's plan: an authority, several
         // credentials, and a declared probe.
         assert_eq!(gitlab["providers"][0]["ready"], true);
-        assert!(gitlab["providers"][0]["mechanisms"].as_u64().expect("a count") > 1);
+        assert!(
+            gitlab["providers"][0]["mechanisms"]
+                .as_u64()
+                .expect("a count")
+                > 1
+        );
         assert_eq!(
             gitlab["summary"]["operations"],
             gitlab["providers"][0]["operations"]

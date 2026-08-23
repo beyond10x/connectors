@@ -977,7 +977,10 @@ impl SlackInner {
             {
                 continue;
             }
-            if let Err(error) = self.register_declared_instance(&instance, instance_id).await {
+            if let Err(error) = self
+                .register_declared_instance(&instance, instance_id)
+                .await
+            {
                 eprintln!(
                     "slack: instance `{}` was declared and is not connected: {}",
                     instance.name, error.code
@@ -1080,8 +1083,8 @@ impl SlackInner {
 /// must not be pulled into memory whole.
 pub(super) fn read_credential_file(path: &Path) -> Result<Secret, SlackError> {
     const MAX_CREDENTIAL_FILE_BYTES: u64 = 8 * 1024;
-    let metadata =
-        fs::symlink_metadata(path).map_err(|_| SlackError::new("instance-credential-unreadable"))?;
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|_| SlackError::new("instance-credential-unreadable"))?;
     if !metadata.file_type().is_file()
         || metadata.uid() != rustix::process::geteuid().as_raw()
         || metadata.permissions().mode() & 0o077 != 0

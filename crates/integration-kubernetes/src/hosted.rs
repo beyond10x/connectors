@@ -15,9 +15,8 @@ use protocol::connection::{
     ConnectionSummary as ControlConnectionSummary, DescribeRequest as ConnectionDescribeRequest,
 };
 use protocol::datasource::{
-    BindingSearchRequest,
-    DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
-    DescribeRequest as DatasourceDescribeRequest, ReadRequest,
+    BindingSearchRequest, DatasourceError, DatasourceErrorCode, DatasourceRequest,
+    DatasourceResult, DescribeRequest as DatasourceDescribeRequest, ReadRequest,
     SearchRequest as DatasourceSearchRequest,
 };
 use protocol::operation::{
@@ -39,7 +38,6 @@ use service::{BackendCapabilities, ConnectorBackend, PrincipalContext};
 use crate::workloads::*;
 
 mod datasource;
-
 
 const CONNECTION: &str = "connection:kubernetes:in-cluster";
 
@@ -69,13 +67,11 @@ struct NamespaceAccess {
     restart_groups: BTreeSet<String>,
 }
 
-
 struct InClusterReader {
     client: reqwest::Client,
     base: Url,
     token_file: PathBuf,
 }
-
 
 impl KubernetesStatusBackend {
     pub fn in_cluster(
@@ -724,7 +720,6 @@ async fn bounded_body(response: reqwest::Response) -> Result<Vec<u8>, Datasource
     }
     Ok(body.to_vec())
 }
-
 
 fn validate_policy(
     expected_tenant: &str,

@@ -13,6 +13,10 @@ publish = false
 resolver = "3"
 members = ["."]
 
+[lib]
+name = "connectors_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "connectors"
 path = "src/main.rs"

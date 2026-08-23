@@ -205,6 +205,9 @@ mod tests {
     fn an_absent_field_is_omitted_from_the_wire_rather_than_sent_as_null() {
         let rendered = serde_json::to_value(dial(None, Some("100"))).expect("input renders");
         assert!(rendered.get("target").is_none());
-        assert_eq!(rendered.get("number").and_then(serde_json::Value::as_str), Some("100"));
+        assert_eq!(
+            rendered.get("number").and_then(serde_json::Value::as_str),
+            Some("100")
+        );
     }
 }
