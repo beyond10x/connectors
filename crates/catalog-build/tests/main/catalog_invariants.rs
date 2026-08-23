@@ -54,6 +54,11 @@
 //!     invocation's `approval_evidence_ref` (S-047): admission is decided upstream by the sealed
 //!     `GrantDecision` → `ApprovalRedemption` → `AdmittedOperation` chain, and the field reaches
 //!     a backend only as a named audit-correlation use — of which there are none today.
+//! 16. [`a_session_signal_reaches_a_backend_only_through_the_admission_seam`] — the operation
+//!     protocol's request grammar is a pinned closed set, the hosted route names every variant,
+//!     and the S-049 signal admission seam exists: a new signal-shaped route cannot fall through
+//!     the hosted catch-all dispatch silently, which is exactly how `SessionSignal` escaped the
+//!     enforced-authority epic.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -1646,6 +1651,118 @@ fn no_effect_backend_is_reachable_without_an_admission_proof() {
          in `APPROVAL_EVIDENCE_AUDIT_CORRELATION_USES` with its reason:\n{}",
         violations.join("\n")
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// 16. A session signal reaches a backend only through the admission seam
+// ---------------------------------------------------------------------------------------------
+
+/// The operation protocol's request grammar, exactly as `OperationRequest` declares it — a
+/// pinned closed set, in declaration order.
+///
+/// `SessionSignal` escaped the enforced-authority epic (S-043..S-047) because it fell through
+/// the hosted route's catch-all dispatch: nothing forced its author to place it behind the
+/// admission seam, and the compiler was happy. This pin is that force. Adding a request variant
+/// — in particular a new signal-shaped route — fails the invariant until the variant is named
+/// here, and naming it here is this test demanding, in its failure message, that the hosted
+/// route decide the variant's admission on purpose.
+const OPERATION_REQUEST_VARIANTS: &[&str] = &[
+    "Search",
+    "Describe",
+    "Invoke",
+    "SessionStatus",
+    "SessionTerminate",
+    "SessionReconcile",
+    "SessionSignal",
+];
+
+/// No session signal — nor any future acting variant — reaches a backend without the hosted
+/// route deciding its admission (S-049, design 13).
+///
+/// Three claims, each mechanical: the protocol's request grammar is exactly the pinned closed
+/// set above; the hosted route's production code names every variant of that grammar, so none
+/// can exist that the route never considered; and the S-049 signal seam is present — the
+/// admission call (`admit_signal`) and the proof-consuming dispatch (`dispatch_admitted_signal`)
+/// — so deleting or bypassing it is loud. The local placement stays out of scope on purpose:
+/// the owner speaking over their own 0700 socket is design 13's named local-owner admission
+/// path, not a Grant decision.
+#[test]
+fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
+    let root = repo_root();
+    let protocol_source = root.join("crates/protocol/src/operation.rs");
+    let protocol = std::fs::read_to_string(&protocol_source)
+        .unwrap_or_else(|error| panic!("read {}: {error}", protocol_source.display()));
+    let declared = operation_request_variants(&protocol);
+    assert_eq!(
+        declared, OPERATION_REQUEST_VARIANTS,
+        "`OperationRequest` no longer matches the pinned request grammar. A new variant is a \
+         new route: route it through the hosted admission seam (`crates/server/src/hosted.rs`, \
+         the S-049 block that admits `SessionSignal`) or the invoke seam on purpose, add route \
+         tests proving an ungranted request refuses, and only then extend \
+         `OPERATION_REQUEST_VARIANTS`"
+    );
+    let hosted_source = root.join("crates/server/src/hosted.rs");
+    let hosted = std::fs::read_to_string(&hosted_source)
+        .unwrap_or_else(|error| panic!("read {}: {error}", hosted_source.display()));
+    let hosted_production = production_lines(&hosted)
+        .into_iter()
+        .map(|(_, line)| line)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for variant in OPERATION_REQUEST_VARIANTS {
+        assert!(
+            hosted_production.contains(&format!("OperationRequest::{variant}")),
+            "the hosted route's production code never names `OperationRequest::{variant}`: \
+             every request variant must be considered by the route, or it reaches the backend \
+             through the catch-all dispatch with no admission decision"
+        );
+    }
+    for seam in ["admit_signal", "dispatch_admitted_signal"] {
+        assert!(
+            hosted_production.contains(seam),
+            "the hosted route lost its session-signal admission seam (`{seam}`): an \
+             effect-bearing signal must be refused unless a Grant admits the session's own \
+             operation (S-049)"
+        );
+    }
+}
+
+/// The variants of `pub enum OperationRequest`, parsed from the protocol source in declaration
+/// order: brace-tracked to the enum's closing brace, one variant per `Name(...)` line.
+fn operation_request_variants(protocol: &str) -> Vec<String> {
+    let mut variants = Vec::new();
+    let mut inside = false;
+    let mut depth: i64 = 0;
+    for line in protocol.lines() {
+        if !inside {
+            if line.starts_with("pub enum OperationRequest {") {
+                inside = true;
+                depth = 1;
+            }
+            continue;
+        }
+        let opens = i64::try_from(line.matches('{').count()).expect("line braces fit");
+        let closes = i64::try_from(line.matches('}').count()).expect("line braces fit");
+        depth += opens - closes;
+        if depth <= 0 {
+            break;
+        }
+        let trimmed = line.trim();
+        if let Some((name, _)) = trimmed.split_once('(') {
+            if !name.is_empty()
+                && name.chars().next().is_some_and(char::is_uppercase)
+                && name.chars().all(char::is_alphanumeric)
+            {
+                variants.push(name.to_owned());
+            }
+        }
+    }
+    assert!(
+        inside,
+        "`pub enum OperationRequest` was not found in the protocol source; if the enum moved, \
+         point this invariant at its new home rather than deleting it"
+    );
+    variants
 }
 
 /// Every `.rs` file under one directory, recursively.
