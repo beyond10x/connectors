@@ -204,6 +204,20 @@ mod tests {
     }
 
     #[test]
+    fn the_in_memory_backend_serves_grant_evaluation() {
+        domain::grant_conformance::run(std::sync::Arc::new(
+            SqliteState::in_memory().expect("in-memory database"),
+        ));
+    }
+
+    #[test]
+    fn the_file_backend_serves_grant_evaluation() {
+        let directory = tempfile::tempdir().expect("a temporary directory");
+        let store = SqliteState::open(&directory.path().join("state.db")).expect("a database file");
+        domain::grant_conformance::run(std::sync::Arc::new(store));
+    }
+
+    #[test]
     fn a_cell_survives_reopening_the_file() {
         // The property the whole crate exists for on a workstation. Asserted rather than assumed,
         // because a `journal_mode` or `synchronous` change could quietly cost it.

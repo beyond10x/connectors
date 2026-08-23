@@ -312,6 +312,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "connector-state"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -465,7 +472,9 @@ name = "domain"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "connector-state",
  "serde",
+ "serde_json",
  "thiserror 2.0.20",
 ]
 

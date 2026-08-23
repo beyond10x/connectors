@@ -14,3 +14,8 @@ workspace = "../connectors-runtime"
 connector-state = { version = "0.1.0", path = "../connector-state" }
 postgres = "0.19"
 thiserror = "2"
+
+[dev-dependencies]
+# The grant-evaluation exercise (`domain::grant_conformance`): the same Grant records evaluated
+# through this backend must produce the same admissions and neutral refusals as every other.
+domain = { version = "0.1.0", path = "../domain" }
