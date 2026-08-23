@@ -2,8 +2,7 @@
 id: S-055
 title: "A self-service scope subset needs no operator"
 pillar: Platform
-status: ready
-priority: 3
+status: done
 design: ../design/14-mcp-transport-for-the-hosted-connectors-server.md
 epic: mcp-entry
 areas: [identity]
@@ -33,3 +32,6 @@ demands `operator`.
 ## Progress
 
 - 2026-08-24 — filed from design 14 (scope-subset gap found during MCP exploration).
+- 2026-08-24 — landed in beyond10x/identity as `f8c02a1`, merged to identity main `9732617`
+  after independent review (PASS, 0 blocking, 1 minor: assertions exercise the policy fn per the
+  acceptance's own wording; handler-level /v1/access-token coverage is a pre-existing gap).
