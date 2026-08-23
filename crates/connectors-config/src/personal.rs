@@ -204,8 +204,9 @@ pub struct ConnectionConfig {
 /// Deployment-owned Connection for B10x service and device capabilities.
 ///
 /// This shape deliberately has no approval reference. A static configured string is not
-/// receiver-verifiable evidence for one invocation, so the B10x Integration refuses its
-/// approval-required operations until an approval verifier is composed at the Connector boundary.
+/// receiver-verifiable evidence for one invocation; since S-046/S-047 the hosted proof chain
+/// (Grant evaluation plus one-time approval redemption) is the admission authority, and the
+/// personal placement is the owner's own admission over their 0700 socket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct B10xConnectionConfig {
