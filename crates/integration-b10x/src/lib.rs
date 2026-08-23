@@ -376,7 +376,10 @@ impl B10xBackend {
             self.config.initiation_policy(),
         )
         .map_err(|_| not_granted())?;
-        let admission = AdmittedOperation::from_grant_decision(
+        // The hosted registry serves this backend too, so read-only operations that pass the
+        // hosted fence reach this owner assertion for a hosted principal. S-046 replaces it
+        // with a GrantDecision on that path.
+        let admission = AdmittedOperation::for_local_owner(
             PROVIDER,
             canonical,
             context.tenant_id(),

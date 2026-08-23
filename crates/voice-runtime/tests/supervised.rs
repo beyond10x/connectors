@@ -98,7 +98,7 @@ fn plan() -> ZeroIoPlan {
     plan_operation(
         SIP_DIAL_PROVIDER,
         operation,
-        AdmittedOperation::from_grant_decision(
+        AdmittedOperation::for_local_owner(
             SIP_DIAL_PROVIDER,
             SIP_DIAL_OPERATION,
             "org-1",

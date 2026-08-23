@@ -240,7 +240,7 @@ mod tests {
     }
 
     fn admission_with(initiation: InitiationPolicy) -> AdmittedOperation {
-        AdmittedOperation::from_grant_decision(
+        AdmittedOperation::for_local_owner(
             "acme",
             "acme-call",
             "org-1",
@@ -327,7 +327,7 @@ mod tests {
             r#"{"method":"GET","url":"{base}/api/v1/query","headers":{},"query":[]}"#,
         );
         let operation = document.operation("acme-call").expect("operation");
-        let admission = AdmittedOperation::from_grant_decision(
+        let admission = AdmittedOperation::for_local_owner(
             "acme",
             "acme-call",
             "org-1",

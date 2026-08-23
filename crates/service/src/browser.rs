@@ -309,7 +309,7 @@ mod tests {
                 ]),
                 permission_subjects: vec!["browser:dedicated-profile".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 operation,
                 "org",
@@ -338,7 +338,7 @@ mod tests {
     fn a_plan_for_another_driver_or_operation_is_refused() {
         let foreign = ZeroIoPlan::new(
             plan(BROWSER_OPEN_OPERATION).facts().clone(),
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 BROWSER_OPEN_OPERATION,
                 "org",
@@ -368,7 +368,7 @@ mod tests {
         facts.interaction = Interaction::Unary;
         let unary = ZeroIoPlan::new(
             facts,
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 BROWSER_SNAPSHOT_OPERATION,
                 "org",

@@ -775,7 +775,10 @@ impl MonitoringInner {
             initiation_policy(self.policy.initiation),
         )
         .map_err(|_| operation_not_granted())?;
-        let admission = AdmittedOperation::from_grant_decision(
+        // This backend also serves the hosted registry, where read-only operations pass the
+        // hosted fence and land here: the owner assertion below is then made for a hosted
+        // principal. S-046 replaces it with a GrantDecision on that path.
+        let admission = AdmittedOperation::for_local_owner(
             GRAFANA,
             &operation.id,
             context.tenant_id(),
@@ -835,7 +838,9 @@ impl MonitoringInner {
             DomainRouteAdapter::GrafanaDatasourceProxyV1,
         )
         .map_err(|_| operation_not_granted())?;
-        let admission = AdmittedOperation::from_grant_decision(
+        // Same hosted reachability as `execute_direct`: read-only mediated operations arrive
+        // here for hosted principals until S-046 lands the GrantDecision path.
+        let admission = AdmittedOperation::for_local_owner(
             &child.provider,
             &operation.id,
             context.tenant_id(),

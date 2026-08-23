@@ -74,7 +74,7 @@ will spawn children as each milestone is designed.
 | [S-036](S-036-the-os-keyring-becomes-the-local-store.md) | The OS keyring becomes the local credential store | in-progress | Platform | connector-secrets, runtime, cli |
 | [S-041](S-041-state-becomes-a-port.md) | State becomes a port, with a SQLite backend | in-progress | Platform | service, state, testing |
 | [S-042](S-042-one-composed-local-placement.md) | One composed local placement, called by both the CLI and Zwirn | backlog | Platform | runtime, cli, zwirn |
-| [S-043](S-043-admission-proofs-become-unforgeable.md) | Admission proofs become unforgeable | ready | Platform | domain, service, integrations |
+| [S-043](S-043-admission-proofs-become-unforgeable.md) | Admission proofs become unforgeable | done | Platform | domain, service, integrations |
 | [S-044](S-044-a-grant-decision-is-evaluated-not-asserted.md) | A Grant decision is evaluated, not asserted | ready | Platform | domain, service, state |
 | [S-045](S-045-an-approval-is-redeemed-exactly-once.md) | An approval is redeemed exactly once | ready | Platform | domain, service, state, audit |
 | [S-046](S-046-the-hosted-route-enforces-instead-of-refusing.md) | The hosted route enforces instead of refusing | backlog | Platform | server, service |
