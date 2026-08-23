@@ -136,13 +136,13 @@ impl ConnectorBackend for KubernetesStatusBackend {
             OperationRequest::Describe(request) => {
                 matches!(
                     request.operation_ref.as_str(),
-                    STATUS_OPERATION | RESTART_OPERATION
+                    STATUS_OPERATION | RESTART_OPERATION | LOGS_OPERATION
                 )
             }
             OperationRequest::Invoke(request) => {
                 matches!(
                     request.operation_ref.as_str(),
-                    STATUS_OPERATION | RESTART_OPERATION
+                    STATUS_OPERATION | RESTART_OPERATION | LOGS_OPERATION
                 ) && request.connection_ref == CONNECTION
             }
             OperationRequest::Search(_)
@@ -183,12 +183,16 @@ impl ConnectorBackend for KubernetesStatusBackend {
                         "running",
                         "status",
                         "restart",
+                        "log",
+                        "logs",
+                        "pod",
                     ]
                     .iter()
                     .any(|term| query.contains(term));
                 let mut operations = Vec::new();
                 if matches_query && self.has_read_access(context) {
                     operations.push(status_summary());
+                    operations.push(logs_summary());
                 }
                 if matches_query && self.has_restart_access(context) {
                     operations.push(restart_summary());
