@@ -1686,6 +1686,12 @@ const OPERATION_REQUEST_VARIANTS: &[&str] = &[
 /// — so deleting or bypassing it is loud. The local placement stays out of scope on purpose:
 /// the owner speaking over their own 0700 socket is design 13's named local-owner admission
 /// path, not a Grant decision.
+///
+/// 2026-08-24 (S-053, design 14): `/mcp` is a funneled entry. The MCP transport
+/// (`crates/server/src/hosted/mcp.rs`) synthesizes operation and datasource envelopes and
+/// hands them to the decided halves of the hosted handlers (`operation_decided`,
+/// `datasource_decided`) inside `hosted.rs`, so every decision this rule pins also covers MCP
+/// callers; rule 17 below keeps the MCP modules free of every direct-backend token.
 #[test]
 fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
     let root = repo_root();
@@ -1793,6 +1799,59 @@ fn operation_request_variants(protocol: &str) -> Vec<String> {
          point this invariant at its new home rather than deleting it"
     );
     variants
+}
+
+// ---------------------------------------------------------------------------------------------
+// 17. The MCP transport reaches a backend only through the decided admission seams
+// ---------------------------------------------------------------------------------------------
+
+/// The direct-backend vocabulary the MCP modules must never speak: the backend field and
+/// trait, and the proven dispatch and admission seams, which belong to `hosted.rs` alone.
+const MCP_DIRECT_BACKEND_TOKENS: &[&str] = &[
+    ".backend",
+    "ConnectorBackend",
+    "dispatch_admitted",
+    "admit_",
+];
+
+/// The MCP modules whose production lines are scanned.
+const MCP_MODULES: &[&str] = &[
+    "crates/server/src/hosted/mcp.rs",
+    "crates/server/src/hosted/mcp/toolset.rs",
+];
+
+/// The MCP transport adds zero policy (S-053, design 14): every `tool_search`,
+/// `tool_describe` and `tool_invoke` funnels through the decided halves of the hosted
+/// handlers — `operation_decided` and `datasource_decided` in `crates/server/src/hosted.rs` —
+/// where the scope map, the receiver policy, re-description, and Grant/approval admission
+/// live. A line in the MCP modules that names the backend field, the backend trait, a proven
+/// dispatch seam, or an admission call is that module starting to re-decide admission beside
+/// the seam, which is exactly the split this rule's sibling (rule 16) exists to prevent for
+/// signals. Line comments are cut before matching so prose about the seams stays legal; the
+/// scan refuses a module it cannot read, so renaming a file does not silently retire the rule.
+#[test]
+fn the_mcp_transport_reaches_a_backend_only_through_the_decided_seams() {
+    let root = repo_root();
+    let mut violations = Vec::new();
+    for relative in MCP_MODULES {
+        let source = root.join(relative);
+        let text = std::fs::read_to_string(&source)
+            .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
+        for (index, line) in production_lines(&text) {
+            let code = line.split("//").next().unwrap_or("");
+            for token in MCP_DIRECT_BACKEND_TOKENS {
+                if code.contains(token) {
+                    violations.push(format!("{relative}:{}: `{}`", index + 1, line.trim()));
+                }
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "an MCP module names a direct-backend token; every MCP call must reach backends \
+         through `operation_decided`/`datasource_decided` in `hosted.rs` (S-053, design 14):\n{}",
+        violations.join("\n")
+    );
 }
 
 /// Every `.rs` file under one directory, recursively.
