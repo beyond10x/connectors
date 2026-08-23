@@ -4,6 +4,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
+use crate::local_services::{
+    can_get_service, can_proxy_service, discover_services, normalize_services, proxy_json,
+    service_is_current, verify_identity,
+};
+use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
+use crate::workloads::{
+    restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
+    RESTART_OPERATION, STATUS_OPERATION,
+};
 use async_trait::async_trait;
 use connector_resolve::document::ProtocolDriver;
 use connector_resolve::resolve;
@@ -28,15 +37,6 @@ use protocol::operation::{
     ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
-};
-use crate::local_services::{
-    can_get_service, can_proxy_service, discover_services, normalize_services, proxy_json,
-    service_is_current, verify_identity,
-};
-use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
-use crate::workloads::{
-    restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
-    RESTART_OPERATION, STATUS_OPERATION,
 };
 use service::{
     plan_operation, BackendCapabilities, ConnectorBackend, PlanningEnvironment, PrincipalContext,
@@ -633,7 +633,8 @@ impl KubernetesLocalBackend {
         if request.connection_ref != connection_ref {
             return Err(operation_not_found());
         }
-        if request.description_ref != self.operation_description_ref(context, &request.operation_ref)
+        if request.description_ref
+            != self.operation_description_ref(context, &request.operation_ref)
         {
             return Err(OperationError::new(
                 OperationErrorCode::StaleAuthority,
@@ -649,14 +650,14 @@ impl KubernetesLocalBackend {
         let reader = KubeconfigReader::new(client);
         let output = match request.operation_ref.as_str() {
             STATUS_OPERATION => {
-                let input: DeploymentInput = serde_json::from_value(request.input)
-                    .map_err(|_| operation_invalid())?;
+                let input: DeploymentInput =
+                    serde_json::from_value(request.input).map_err(|_| operation_invalid())?;
                 serde_json::to_value(reader.read(&input.namespace, &input.name).await?)
                     .map_err(|_| operation_unavailable())?
             }
             RESTART_OPERATION => {
-                let input: RestartInput = serde_json::from_value(request.input)
-                    .map_err(|_| operation_invalid())?;
+                let input: RestartInput =
+                    serde_json::from_value(request.input).map_err(|_| operation_invalid())?;
                 serde_json::to_value(
                     reader
                         .restart(
@@ -830,7 +831,9 @@ impl ConnectorBackend for KubernetesLocalBackend {
                 .connections_for_operation(&request.operation_ref)
                 .is_empty(),
             OperationRequest::Invoke(request) => {
-                lock(&self.state).children.contains_key(&request.connection_ref)
+                lock(&self.state)
+                    .children
+                    .contains_key(&request.connection_ref)
                     || (matches!(
                         request.operation_ref.as_str(),
                         STATUS_OPERATION | RESTART_OPERATION
@@ -1102,7 +1105,6 @@ fn context_uses_credential_plugin(kubeconfig: &Kubeconfig, context_name: &str) -
             .is_some_and(|auth| auth.exec.is_some() || auth.auth_provider.is_some())
     })
 }
-
 
 fn child_is_current(state: &KubernetesState, child: &KubernetesServiceConnection) -> bool {
     state

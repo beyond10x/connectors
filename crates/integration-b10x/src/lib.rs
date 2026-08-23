@@ -15,8 +15,8 @@ use async_trait::async_trait;
 use connector_resolve::document::{Document, ProtocolDriver};
 use connectors_config::B10xIntegrationConfig;
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
-use driver_speech::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use driver_cdp::LocalBrowserDriver;
+use driver_speech::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use protocol::audio::{SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION};
 use protocol::browser::{
     BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_GOTO_OPERATION,

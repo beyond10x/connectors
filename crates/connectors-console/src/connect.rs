@@ -112,7 +112,11 @@ pub async fn run(
         return kubernetes(&client, &owner, label, context).await;
     }
 
-    let display_name = if provider == "slack" { "Slack" } else { "Grafana" };
+    let display_name = if provider == "slack" {
+        "Slack"
+    } else {
+        "Grafana"
+    };
     let label = label.unwrap_or_else(|| display_name.to_owned());
     // Straight to the terminal, and deliberately not part of the returned value: this is the
     // instruction that makes the next line safe to type, and it is worthless in a JSON document.

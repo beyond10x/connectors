@@ -253,7 +253,11 @@ mod tests {
 
     #[test]
     fn compact_leaves_a_single_record_as_one_line() {
-        let rendered = render(Format::Compact, &json!({"ready": true, "socket": "/x.sock"})).unwrap();
+        let rendered = render(
+            Format::Compact,
+            &json!({"ready": true, "socket": "/x.sock"}),
+        )
+        .unwrap();
         assert_eq!(rendered, "ready=true\tsocket=/x.sock");
     }
 
@@ -278,10 +282,14 @@ mod tests {
 
     #[test]
     fn the_result_discriminant_is_stripped_so_compact_can_see_the_records() {
-        let tagged = json!({"result": "candidate_search", "value": {"candidates": [{"a": 1}, {"a": 2}]}});
+        let tagged =
+            json!({"result": "candidate_search", "value": {"candidates": [{"a": 1}, {"a": 2}]}});
         let stripped = payload(tagged);
         assert_eq!(stripped, json!({"candidates": [{"a": 1}, {"a": 2}]}));
-        assert_eq!(render(Format::Compact, &stripped).unwrap().lines().count(), 2);
+        assert_eq!(
+            render(Format::Compact, &stripped).unwrap().lines().count(),
+            2
+        );
     }
 
     #[test]

@@ -190,15 +190,16 @@ impl PersonalRuntime {
                 // keyring is reachable and the first open is skipped, and refused to start
                 // anywhere without a Secret Service: a server, a container, and any placement
                 // spawned with a different `HOME` than the session that has the bus.
-                let file: Option<Arc<FileStore>> =
-                    if config.slack.is_some() || (keyring.is_none() && !config.catalog.is_empty()) {
-                        Some(Arc::new(
-                            FileStore::open(state_root.join("credentials.store"))
-                                .map_err(|_| RuntimeError::CredentialStore)?,
-                        ))
-                    } else {
-                        None
-                    };
+                let file: Option<Arc<FileStore>> = if config.slack.is_some()
+                    || (keyring.is_none() && !config.catalog.is_empty())
+                {
+                    Some(Arc::new(
+                        FileStore::open(state_root.join("credentials.store"))
+                            .map_err(|_| RuntimeError::CredentialStore)?,
+                    ))
+                } else {
+                    None
+                };
                 // The prepared (two-phase) store has no keyring implementation yet, so Slack keeps
                 // the file-backed one. Named here rather than hidden: it is the remaining
                 // unencrypted credential surface on a workstation, and it is why the reported
@@ -247,27 +248,27 @@ impl PersonalRuntime {
                 // to express.
                 // Each arm yields the trait object: the two launchers are different types, and the
                 // registry holds backends by capability rather than by which binding built them.
-                let backend: Arc<dyn ConnectorBackend> = match (&voice.authority, &voice.application)
-                {
-                    (Some(authority), Some(application)) => {
-                        let issuer = Arc::new(load_authority_issuer(authority)?);
-                        verifying_key = Some(hex::encode(issuer.verifying_key().to_bytes()));
-                        let launcher = Arc::new(RuntimeLauncher::new(
-                            Arc::clone(&issuer),
-                            application.endpoint.clone(),
-                            application.connect_address,
-                            application.tls_server_name.clone(),
-                        ));
-                        Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
-                    }
-                    _ => {
-                        // Raw SIP: no signing key to load, no application endpoint to reach. The
-                        // trunk's own credentials, when the peer authenticates, still arrive
-                        // through the plan.
-                        let launcher = Arc::new(SipLauncher::new(CredentialSet::default()));
-                        Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
-                    }
-                };
+                let backend: Arc<dyn ConnectorBackend> =
+                    match (&voice.authority, &voice.application) {
+                        (Some(authority), Some(application)) => {
+                            let issuer = Arc::new(load_authority_issuer(authority)?);
+                            verifying_key = Some(hex::encode(issuer.verifying_key().to_bytes()));
+                            let launcher = Arc::new(RuntimeLauncher::new(
+                                Arc::clone(&issuer),
+                                application.endpoint.clone(),
+                                application.connect_address,
+                                application.tls_server_name.clone(),
+                            ));
+                            Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
+                        }
+                        _ => {
+                            // Raw SIP: no signing key to load, no application endpoint to reach. The
+                            // trunk's own credentials, when the peer authenticates, still arrive
+                            // through the plan.
+                            let launcher = Arc::new(SipLauncher::new(CredentialSet::default()));
+                            Arc::new(SipOperationBackend::new(voice, launcher, &state_root)?)
+                        }
+                    };
                 backends.push(backend);
             }
             if let Some(grafana) = config.grafana {
@@ -514,53 +515,52 @@ impl HostedRuntime {
             // So the arm is chosen by what is configured, exactly as the personal arm chooses it.
             // Neither posture decides whether a call is carried onward; the configuration does.
             let carried_onward = voice.authority.clone().zip(voice.application.clone());
-            let backend: Arc<dyn ConnectorBackend> = if let Some((authority, application)) =
-                carried_onward.as_ref()
-            {
-            let issuer = Arc::new(load_authority_issuer(authority)?);
-            let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
-                let store = credential_stores
-                    .values
-                    .as_ref()
-                    .ok_or(connectors_config::HostedServerConfigError::Invalid)?
-                    .clone();
-                let source = Arc::new(StoredSipCredentials::new(
-                    store,
-                    config.tenant_id.clone(),
-                    credentials,
-                )?);
-                Arc::new(RuntimeLauncher::with_credential_source(
-                    issuer,
-                    application.endpoint.clone(),
-                    application.connect_address,
-                    application.tls_server_name.clone(),
-                    source,
-                ))
-            } else {
-                Arc::new(RuntimeLauncher::new(
-                    issuer,
-                    application.endpoint.clone(),
-                    application.connect_address,
-                    application.tls_server_name.clone(),
-                ))
-            };
-                Arc::new(SipOperationBackend::new_with_state(
-                    voice,
-                    launcher,
-                    &config.storage.state_root,
-                    hosted_state.clone(),
-                )?)
-            } else {
-                // No application channel: the call is established and terminates here. The same
-                // launcher the personal posture uses, and the same media binding -- a hosted
-                // placement on a workstation has a speaker like any other.
-                Arc::new(SipOperationBackend::new_with_state(
-                    voice,
-                    Arc::new(integration_sip::SipLauncher::new(CredentialSet::default())),
-                    &config.storage.state_root,
-                    hosted_state.clone(),
-                )?)
-            };
+            let backend: Arc<dyn ConnectorBackend> =
+                if let Some((authority, application)) = carried_onward.as_ref() {
+                    let issuer = Arc::new(load_authority_issuer(authority)?);
+                    let launcher = if let Some(credentials) = config.sip.credentials.as_ref() {
+                        let store = credential_stores
+                            .values
+                            .as_ref()
+                            .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                            .clone();
+                        let source = Arc::new(StoredSipCredentials::new(
+                            store,
+                            config.tenant_id.clone(),
+                            credentials,
+                        )?);
+                        Arc::new(RuntimeLauncher::with_credential_source(
+                            issuer,
+                            application.endpoint.clone(),
+                            application.connect_address,
+                            application.tls_server_name.clone(),
+                            source,
+                        ))
+                    } else {
+                        Arc::new(RuntimeLauncher::new(
+                            issuer,
+                            application.endpoint.clone(),
+                            application.connect_address,
+                            application.tls_server_name.clone(),
+                        ))
+                    };
+                    Arc::new(SipOperationBackend::new_with_state(
+                        voice,
+                        launcher,
+                        &config.storage.state_root,
+                        hosted_state.clone(),
+                    )?)
+                } else {
+                    // No application channel: the call is established and terminates here. The same
+                    // launcher the personal posture uses, and the same media binding -- a hosted
+                    // placement on a workstation has a speaker like any other.
+                    Arc::new(SipOperationBackend::new_with_state(
+                        voice,
+                        Arc::new(integration_sip::SipLauncher::new(CredentialSet::default())),
+                        &config.storage.state_root,
+                        hosted_state.clone(),
+                    )?)
+                };
             backends.push(backend);
         }
         if config.grafana.enabled {

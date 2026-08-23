@@ -160,7 +160,8 @@ impl SecretStore for KeyringStore {
         // No trimming. `secret-tool` writes the stored bytes and nothing else, and a credential
         // that legitimately ends in whitespace must survive a round trip unchanged.
         let value = Zeroizing::new(
-            String::from_utf8(output.stdout).map_err(|_| unreachable("the Secret Service did not answer"))?,
+            String::from_utf8(output.stdout)
+                .map_err(|_| unreachable("the Secret Service did not answer"))?,
         );
         Ok(Secret::new(value.as_str()))
     }
@@ -181,12 +182,17 @@ impl SecretStore for KeyringStore {
         {
             // Scoped so the pipe closes before the wait: `secret-tool` reads until EOF, and holding
             // the handle open would deadlock both processes.
-            let mut stdin = child.stdin.take().ok_or(unreachable("the Secret Service did not answer"))?;
+            let mut stdin = child
+                .stdin
+                .take()
+                .ok_or(unreachable("the Secret Service did not answer"))?;
             stdin
                 .write_all(secret.expose_secret().as_bytes())
                 .map_err(|_| unreachable("the Secret Service did not answer"))?;
         }
-        let status = child.wait().map_err(|_| unreachable("the Secret Service did not answer"))?;
+        let status = child
+            .wait()
+            .map_err(|_| unreachable("the Secret Service did not answer"))?;
         if status.success() {
             Ok(())
         } else {
@@ -310,7 +316,11 @@ mod tests {
             .await
             .expect("store");
         assert_eq!(
-            store.get(&reference).await.expect("read back").expose_secret(),
+            store
+                .get(&reference)
+                .await
+                .expect("read back")
+                .expose_secret(),
             value
         );
 
@@ -319,6 +329,9 @@ mod tests {
             store.get(&reference).await,
             Err(StoreError::NotFound { .. })
         ));
-        store.delete(&reference).await.expect("delete is idempotent");
+        store
+            .delete(&reference)
+            .await
+            .expect("delete is idempotent");
     }
 }

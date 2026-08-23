@@ -1,9 +1,9 @@
 //! Catalog-backed generic operation projection for the admitted SIP voice runtime.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::net::ToSocketAddrs as _;
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
+use std::net::ToSocketAddrs as _;
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -11,16 +11,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use connector_resolve::document::{Document, HostEffect, ProtocolDriver};
+use connector_state::StateStore;
 use domain::voice::TelephonySession;
 use domain::{
     voice::TerminationReason, AdmittedOperation, Capability, ConnectionAuthority, DriverId,
 };
-use connector_state::StateStore;
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
-    OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest, SessionState,
-    SessionSignalRequest, SessionStatus, SessionTerminateRequest, SessionTermination,
+    OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest,
+    SessionSignalRequest, SessionState, SessionStatus, SessionTerminateRequest, SessionTermination,
 };
 use protocol::sip::{
     SipDialEstablished, SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF,
@@ -563,11 +563,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         &self,
         input: &SipDialInput,
     ) -> Result<FixedHostResolution, OperationError> {
-        let Some((host, port)) = self
-            .routes
-            .pending_host(input)
-            .map_err(|_| not_granted())?
-        else {
+        let Some((host, port)) = self.routes.pending_host(input).map_err(|_| not_granted())? else {
             return Ok(FixedHostResolution(Vec::new()));
         };
         let resolved = tokio::task::spawn_blocking(move || {
@@ -582,7 +578,6 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         .map_err(|_| unavailable())?;
         Ok(FixedHostResolution(resolved))
     }
-
 }
 
 #[async_trait]
@@ -734,7 +729,6 @@ fn effect(effects: &[HostEffect]) -> EffectClass {
         EffectClass::ReadOnly
     }
 }
-
 
 fn require_operation(actual: &str) -> Result<(), OperationError> {
     if actual == SIP_DIAL_TOOL_REF {
@@ -936,7 +930,9 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
                 // `required[0] == "target"` while the projection marked every parameter mandatory
                 // regardless of what the provider declared.
                 assert_eq!(
-                    description.input_schema["required"].as_array().map(Vec::len),
+                    description.input_schema["required"]
+                        .as_array()
+                        .map(Vec::len),
                     Some(0)
                 );
                 let properties = description.input_schema["properties"]
@@ -1017,9 +1013,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         }
     }
 
-    fn signalling_session(
-        refuse: Option<domain::voice::VoiceError>,
-    ) -> Arc<SignallingSession> {
+    fn signalling_session(refuse: Option<domain::voice::VoiceError>) -> Arc<SignallingSession> {
         Arc::new(SignallingSession {
             descriptor: domain::voice::VoiceSessionDescriptor {
                 call: domain::voice::VoiceRef::new("call-1").unwrap(),
@@ -1148,9 +1142,9 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         record_live_session(
             &backend,
             "execution-3",
-            Some(signalling_session(Some(domain::voice::VoiceError::Endpoint(
-                "media refused".to_owned(),
-            )))),
+            Some(signalling_session(Some(
+                domain::voice::VoiceError::Endpoint("media refused".to_owned()),
+            ))),
         );
         let refused = backend
             .handle(

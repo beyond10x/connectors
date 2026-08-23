@@ -41,8 +41,9 @@ pub use runtime::{
 };
 pub use sip::{
     admit_sip_dial, admit_sip_plan, validate_sip_deployment_route, AdmittedSipPlan,
-    FixedHostResolution, NoHostResolution, SipAdmissionError, SipDeploymentRoute, SipDialRouteTable, SipHostResolver,
-    SipNetworkMode, SipSignalingTarget, SipSignalingTransport, SocketAperture,
+    FixedHostResolution, NoHostResolution, SipAdmissionError, SipDeploymentRoute,
+    SipDialRouteTable, SipHostResolver, SipNetworkMode, SipSignalingTarget, SipSignalingTransport,
+    SocketAperture,
 };
 pub use voice::{
     admit_voice_dial, admit_voice_plan, validate_voice_application_route, AdmittedVoicePlan,

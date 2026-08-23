@@ -9,12 +9,12 @@ use std::collections::BTreeSet;
 
 use connectors_config::KubernetesIntegrationConfig;
 use futures_util::AsyncReadExt as _;
+use http::{Method, Request as HttpRequest};
+use k8s_openapi::api::authentication::v1::SelfSubjectReview;
 use k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
 };
-use k8s_openapi::api::authentication::v1::SelfSubjectReview;
 use k8s_openapi::api::core::v1::{Service, ServicePort};
-use http::{Method, Request as HttpRequest};
 use kube::api::{ListParams, PostParams};
 use kube::{Api, Client};
 use protocol::connection::{

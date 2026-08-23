@@ -189,7 +189,12 @@ pub async fn acquire(
         match response.status {
             200 => token_field(&response.body, "sign-in")?,
             401 | 403 => return Err(AcquireError::SignInRejected),
-            status => return Err(AcquireError::Unexpected { step: "sign-in", status }),
+            status => {
+                return Err(AcquireError::Unexpected {
+                    step: "sign-in",
+                    status,
+                })
+            }
         }
     };
 
@@ -391,12 +396,7 @@ fn get(origin: &str, path: &str, session: Option<&Zeroizing<String>>) -> Request
     }
 }
 
-fn post(
-    origin: &str,
-    path: &str,
-    session: Option<&Zeroizing<String>>,
-    body: &Value,
-) -> Request {
+fn post(origin: &str, path: &str, session: Option<&Zeroizing<String>>, body: &Value) -> Request {
     Request {
         method: "POST".to_owned(),
         url: format!("{origin}{path}"),

@@ -107,9 +107,7 @@ impl GitlabState {
                     .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
                     .open(&path)
                     .map_err(|_| GitlabError::new("audit-store"))?;
-                if file.metadata().map(|data| data.len()).unwrap_or_default()
-                    > bound as u64
-                {
+                if file.metadata().map(|data| data.len()).unwrap_or_default() > bound as u64 {
                     return Err(GitlabError::new("audit-store"));
                 }
                 file.write_all(line)

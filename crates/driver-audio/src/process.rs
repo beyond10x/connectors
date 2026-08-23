@@ -85,12 +85,9 @@ impl AudioDevice for ProcessAudioDevice {
             .map_err(|error| AudioDeviceError::Unavailable {
                 reason: format!("`{}`: {error}", self.playback_path.display()),
             })?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| AudioDeviceError::Failed {
-                reason: "the playback command's stdin was not captured".to_owned(),
-            })?;
+        let stdin = child.stdin.take().ok_or_else(|| AudioDeviceError::Failed {
+            reason: "the playback command's stdin was not captured".to_owned(),
+        })?;
         Ok(Box::new(ProcessPlayback {
             child,
             stdin: Some(stdin),

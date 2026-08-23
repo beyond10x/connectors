@@ -33,7 +33,10 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         }
     }
 
-    pub(super) fn session_status(&self, request: SessionRequest) -> Result<SessionStatus, OperationError> {
+    pub(super) fn session_status(
+        &self,
+        request: SessionRequest,
+    ) -> Result<SessionStatus, OperationError> {
         let sessions = lock(&self.sessions);
         let record = sessions.get(&request.execution_ref).ok_or_else(not_found)?;
         Ok(status(&request.execution_ref, record))
@@ -98,8 +101,10 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             })?
         };
 
-        session.send_signal(request.signal.clone()).await.map_err(
-            |error| match error {
+        session
+            .send_signal(request.signal.clone())
+            .await
+            .map_err(|error| match error {
                 domain::voice::VoiceError::InvalidSignal => OperationError::new(
                     OperationErrorCode::InvalidInput,
                     "the signal is outside the admitted grammar",
@@ -115,8 +120,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                     "the session refused the signal",
                     true,
                 ),
-            },
-        )?;
+            })?;
 
         // Audited after the fact, and only on success: a keypress that reached the far end is an
         // outward effect on someone else's system, and the record says it happened rather than

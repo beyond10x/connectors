@@ -512,7 +512,6 @@ pub(crate) fn datasource_not_granted(message: &'static str) -> DatasourceError {
     DatasourceError::new(DatasourceErrorCode::NotGranted, message, false)
 }
 
-
 pub(crate) fn datasource_summary() -> DatasourceSummary {
     DatasourceSummary {
         datasource_ref: DATASOURCE.to_owned(),

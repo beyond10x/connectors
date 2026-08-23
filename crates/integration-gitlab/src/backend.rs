@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::state::GitlabState;
 use async_trait::async_trait;
 use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use connector_secrets::{
@@ -12,7 +13,6 @@ use connector_secrets::{
     TenantLayout,
 };
 use connectors_config::{HostedGitlabConfig, InitiationConfig};
-use crate::state::GitlabState;
 use protocol::connection::{
     ConnectSessionStatus, ConnectionActor, ConnectionDescription, ConnectionError,
     ConnectionErrorCode, ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionScope,
@@ -262,15 +262,13 @@ impl GitlabBackend {
         let origin = parse_origin(&policy.origin)?;
         let public_origin = url::Url::parse(&policy.public_origin)
             .map_err(|_| GitlabError::new("public-origin"))?;
-        let metadata = state_store
-            .read(STATE_KEY, MAX_STATE_BYTES)?
-            .map_or_else(
-                || Ok(StateFile::default()),
-                |bytes| {
-                    serde_json::from_slice::<StateFile>(&bytes)
-                        .map_err(|_| GitlabError::new("connection-state"))
-                },
-            )?;
+        let metadata = state_store.read(STATE_KEY, MAX_STATE_BYTES)?.map_or_else(
+            || Ok(StateFile::default()),
+            |bytes| {
+                serde_json::from_slice::<StateFile>(&bytes)
+                    .map_err(|_| GitlabError::new("connection-state"))
+            },
+        )?;
         if metadata.version != STATE_VERSION
             || metadata.next_transaction_generation == 0
             || metadata.connections.len() > 1_024
@@ -308,7 +306,6 @@ impl GitlabBackend {
         inner.recover_pending().await?;
         Ok(Self { inner })
     }
-
 
     #[must_use]
     pub fn connection_count(&self) -> usize {
@@ -348,7 +345,8 @@ impl ConnectorBackend for GitlabBackend {
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
-            | OperationRequest::SessionReconcile(_) | OperationRequest::SessionSignal(_) => false,
+            | OperationRequest::SessionReconcile(_)
+            | OperationRequest::SessionSignal(_) => false,
         }
     }
 
@@ -502,7 +500,8 @@ impl ConnectorBackend for GitlabBackend {
                 .inner
                 .describe_operation(context, &request.operation_ref),
             OperationRequest::Invoke(request) => self.inner.invoke(context, request).await,
-            OperationRequest::SessionStatus(_) | OperationRequest::SessionSignal(_)
+            OperationRequest::SessionStatus(_)
+            | OperationRequest::SessionSignal(_)
             | OperationRequest::SessionTerminate(_)
             | OperationRequest::SessionReconcile(_) => Err(operation_not_found()),
         }

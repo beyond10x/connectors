@@ -90,7 +90,10 @@ impl SqliteState {
 impl StateStore for SqliteState {
     fn read(&self, key: &str, maximum: usize) -> Result<Option<Vec<u8>>, StateError> {
         validate_request(key, maximum)?;
-        let connection = self.connection.lock().map_err(|_| StateError::Unavailable)?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StateError::Unavailable)?;
         let body: Option<Vec<u8>> = connection
             .query_row(
                 "SELECT body FROM connector_state_cells WHERE state_key = ?1",
@@ -110,7 +113,10 @@ impl StateStore for SqliteState {
         if body.len() > maximum {
             return Err(StateError::Capacity);
         }
-        let connection = self.connection.lock().map_err(|_| StateError::Unavailable)?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StateError::Unavailable)?;
         connection
             .execute(
                 "INSERT INTO connector_state_cells (state_key, body)
@@ -128,7 +134,10 @@ impl StateStore for SqliteState {
         if suffix.len() > maximum {
             return Err(StateError::Capacity);
         }
-        let mut connection = self.connection.lock().map_err(|_| StateError::Unavailable)?;
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StateError::Unavailable)?;
         // `Immediate` takes the write lock at BEGIN rather than at first write, so a concurrent
         // appender cannot read the same length and then both write.
         let transaction = connection
@@ -164,7 +173,10 @@ impl StateStore for SqliteState {
 
     fn delete(&self, key: &str) -> Result<(), StateError> {
         validate_key(key)?;
-        let connection = self.connection.lock().map_err(|_| StateError::Unavailable)?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StateError::Unavailable)?;
         connection
             .execute(
                 "DELETE FROM connector_state_cells WHERE state_key = ?1",
@@ -199,7 +211,9 @@ mod tests {
         let path = directory.path().join("state.db");
         {
             let store = SqliteState::open(&path).expect("first open");
-            store.replace("survives.restart", b"\x00\xffbytes", 64).expect("write");
+            store
+                .replace("survives.restart", b"\x00\xffbytes", 64)
+                .expect("write");
         }
         let store = SqliteState::open(&path).expect("second open");
         assert_eq!(
@@ -214,8 +228,12 @@ mod tests {
         // The specific bug this implementation avoids: SQLite's `||` coerces BLOB operands to TEXT,
         // truncating at the first zero byte. Appending across one is the case that would expose it.
         let store = SqliteState::in_memory().expect("in-memory database");
-        store.append("binary.append", b"\x00\x01", 64).expect("first");
-        store.append("binary.append", b"\x00\xfe", 64).expect("second");
+        store
+            .append("binary.append", b"\x00\x01", 64)
+            .expect("first");
+        store
+            .append("binary.append", b"\x00\xfe", 64)
+            .expect("second");
         assert_eq!(
             store.read("binary.append", 64),
             Ok(Some(vec![0, 1, 0, 254])),
