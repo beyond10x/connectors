@@ -167,11 +167,7 @@ impl SecretStore for KeyringStore {
     }
 
     async fn put(&self, reference: &CredentialRef, secret: &Secret) -> Result<(), StoreError> {
-        let label = format!(
-            "b10x {} {}",
-            reference.authority(),
-            reference.credential()
-        );
+        let label = format!("b10x {} {}", reference.authority(), reference.credential());
         let mut child = self
             .run("store", reference, Some(&label))
             .stdin(Stdio::piped())
