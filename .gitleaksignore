@@ -73,3 +73,5 @@ ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:b
 ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:discord-api-token:246
 ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:new-relic-user-api-id:464
 ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:sentry-access-token:579
+64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:discord-api-token:276
+64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:new-relic-user-api-id:494
