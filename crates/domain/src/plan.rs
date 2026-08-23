@@ -280,11 +280,9 @@ mod tests {
 
     #[test]
     fn a_grant_decision_is_the_hosted_admission_path() {
-        let connection = ConnectionAuthority::new(
-            "connection:grafana:ops",
-            InitiationPolicy::b10x_only(),
-        )
-        .expect("valid connection reference");
+        let connection =
+            ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+                .expect("valid connection reference");
         // The only production route to a decision is the evaluator over a bound store; there
         // is no test builder to keep honest separately.
         let store = MemoryState::new();
@@ -344,7 +342,7 @@ mod tests {
     #[test]
     fn the_local_owner_path_carries_the_same_evidence_shape() {
         let connection =
-            ConnectionAuthority::new("connection:local", InitiationPolicy::b10x_only())
+            ConnectionAuthority::new("connection:local", InitiationPolicy::platform_only())
                 .expect("valid connection reference");
         let admitted = AdmittedOperation::for_local_owner(
             "sip",

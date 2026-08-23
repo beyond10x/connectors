@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use connectors_config::B10xIntegrationConfig;
+use connectors_config::PlatformIntegrationConfig;
 use ed25519_dalek::pkcs8::DecodePrivateKey as _;
 use ed25519_dalek::{Signer as _, SigningKey};
 use protocol::operation::{OperationError, OperationErrorCode};
@@ -16,7 +16,7 @@ use sha2::{Digest as _, Sha256};
 use crate::surface::{
     MODULE_AUTHORIZATION_SCHEME, MODULE_REQUEST_TTL_SECONDS, MODULE_REQUEST_TYPE,
 };
-use crate::B10xIntegrationError;
+use crate::PlatformIntegrationError;
 
 pub(super) struct ModuleSigner {
     issuer: String,
@@ -56,8 +56,8 @@ struct ModuleRequestClaims<'a> {
 
 impl ModuleSigner {
     pub(super) fn load(
-        config: &B10xIntegrationConfig,
-    ) -> Result<Option<Self>, B10xIntegrationError> {
+        config: &PlatformIntegrationConfig,
+    ) -> Result<Option<Self>, PlatformIntegrationError> {
         if config.work_origin.is_none()
             && config.ontology_origin.is_none()
             && config.planner_origin.is_none()
@@ -70,30 +70,30 @@ impl ModuleSigner {
             config
                 .module_signing_key_file
                 .as_deref()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+                .ok_or(PlatformIntegrationError::InvalidConfiguration)?,
         )
-        .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+        .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
         let key = if encoded.starts_with("-----BEGIN PRIVATE KEY-----") {
             SigningKey::from_pkcs8_pem(&encoded)
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?
+                .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?
         } else {
             let decoded = URL_SAFE_NO_PAD
                 .decode(encoded)
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+                .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
             let bytes: [u8; 32] = decoded
                 .try_into()
-                .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+                .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
             SigningKey::from_bytes(&bytes)
         };
         Ok(Some(Self {
             issuer: config
                 .module_signing_issuer
                 .clone()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+                .ok_or(PlatformIntegrationError::InvalidConfiguration)?,
             kid: config
                 .module_signing_key_id
                 .clone()
-                .ok_or(B10xIntegrationError::InvalidConfiguration)?,
+                .ok_or(PlatformIntegrationError::InvalidConfiguration)?,
             key,
         }))
     }

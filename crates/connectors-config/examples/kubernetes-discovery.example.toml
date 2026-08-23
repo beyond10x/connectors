@@ -7,7 +7,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 [kubernetes]
 grant_ref = "grant:kubernetes:local-discovery"
-initiation = "b10x"
+initiation = "platform"
 namespaces = ["monitoring"]
 allow_exec_auth = false
 resource_limit = 256

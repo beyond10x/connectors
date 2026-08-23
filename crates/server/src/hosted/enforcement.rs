@@ -300,7 +300,7 @@ impl HostedAuthority {
             .map(|connection| connection.provider.clone())
             .ok_or(GrantRefusal::Refused)?;
         let connection =
-            ConnectionAuthority::new(connection_ref, InitiationPolicy::b10x_only())
+            ConnectionAuthority::new(connection_ref, InitiationPolicy::platform_only())
                 .map_err(|_| GrantRefusal::Refused)?;
         let request = GrantRequest {
             issuer: principal.issuer.clone(),

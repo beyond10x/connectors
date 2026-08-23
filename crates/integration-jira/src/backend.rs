@@ -618,12 +618,11 @@ fn user_connection_is_admitted(
 
 pub(super) fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
-        InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
+        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
         InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-        InitiationConfig::Both => vec![
-            ConnectionInitiator::B10x,
-            ConnectionInitiator::Provider,
-        ],
+        InitiationConfig::Both => {
+            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+        }
     }
 }
 
@@ -700,7 +699,7 @@ fn oauth_completion_page(authorize_url: &str) -> HostedCompletionPage {
     HostedCompletionPage {
         title: "Connect Jira".to_owned(),
         html: format!(
-            "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect Jira</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}a{{display:inline-block;padding:.8rem 1rem;background:#1868db;color:white;border-radius:.4rem;text-decoration:none}}</style><h1>Connect Jira</h1><p>Authorize B10x to use Jira with your own account permissions. Organization Jira remains a separate read-only connection.</p><p><a href=\"{link}\" rel=\"noreferrer\">Continue to Atlassian</a></p>"
+            "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect Jira</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}a{{display:inline-block;padding:.8rem 1rem;background:#1868db;color:white;border-radius:.4rem;text-decoration:none}}</style><h1>Connect Jira</h1><p>Authorize the platform to use Jira with your own account permissions. Organization Jira remains a separate read-only connection.</p><p><a href=\"{link}\" rel=\"noreferrer\">Continue to Atlassian</a></p>"
         ),
     }
 }
@@ -751,7 +750,7 @@ mod tests {
 
     #[test]
     fn organization_and_user_profiles_are_distinct() {
-        let organization = organization_connection_summary(InitiationConfig::B10x, false);
+        let organization = organization_connection_summary(InitiationConfig::Platform, false);
         assert_eq!(organization.scope, Some(ConnectionScope::Tenant));
         assert_eq!(organization.actor, Some(ConnectionActor::App));
         assert_eq!(organization.state, ConnectionState::Degraded);

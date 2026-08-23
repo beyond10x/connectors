@@ -15,7 +15,7 @@ clean-room client
 ```
 
 `connectors serve` needs no config and safely returns an empty operation search result. A strict
-deployment file enables B10x's development-gated `sip.dial` member with Asterisk as the
+deployment file enables the platform's development-gated `sip.dial` member with Asterisk as the
 configured example peer:
 
 ```sh

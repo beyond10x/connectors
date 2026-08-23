@@ -209,7 +209,7 @@ impl CatalogBackend {
                 label: entry.label(),
                 grant_ref: entry.grant_ref.clone(),
                 initiation: match entry.initiation {
-                    InitiationConfig::B10x => InitiationPolicy::b10x_only(),
+                    InitiationConfig::Platform => InitiationPolicy::platform_only(),
                     InitiationConfig::Provider => InitiationPolicy::provider_only(),
                     InitiationConfig::Both => InitiationPolicy::bidirectional(),
                 },
@@ -413,11 +413,11 @@ impl Inner {
         }
         if !binding
             .initiation
-            .allows(domain::ConnectionInitiator::B10x)
+            .allows(domain::ConnectionInitiator::Platform)
         {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
-                "this Connection does not permit B10x to initiate operations",
+                "this Connection does not permit the platform to initiate operations",
             ));
         }
 
@@ -883,7 +883,7 @@ mod tests {
             connection_ref: "connection:gitlab:test".to_owned(),
             label: "GitLab".to_owned(),
             grant_ref: "grant:gitlab:test".to_owned(),
-            initiation: InitiationPolicy::b10x_only(),
+            initiation: InitiationPolicy::platform_only(),
             config: DeclaredConfig::default(),
             allow_writes: false,
         }
@@ -986,7 +986,7 @@ mod tests {
             instance: None,
             label: None,
             grant_ref: format!("grant:{provider}:test"),
-            initiation: InitiationConfig::B10x,
+            initiation: InitiationConfig::Platform,
             allow_writes: false,
             endpoints: endpoints
                 .iter()

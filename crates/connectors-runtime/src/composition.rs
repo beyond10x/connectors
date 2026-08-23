@@ -13,11 +13,11 @@ use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_catalog::{CatalogBackend, CatalogIntegrationError};
-use integration_b10x::{B10xBackend, B10xIntegrationError};
 use integration_gitlab::GitlabBackend;
 use integration_jira::JiraBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
+use integration_platform::{PlatformBackend, PlatformIntegrationError};
 use integration_sip::{
     load_authority_issuer, RuntimeLauncher, SipLauncher, SipOperationBackend, StoredSipCredentials,
 };
@@ -63,7 +63,7 @@ pub enum RuntimeError {
     #[error(transparent)]
     KubernetesLocal(#[from] integration_kubernetes::KubernetesLocalError),
     #[error(transparent)]
-    B10x(#[from] B10xIntegrationError),
+    Platform(#[from] PlatformIntegrationError),
     #[error(transparent)]
     CatalogIntegration(#[from] CatalogIntegrationError),
     #[error(transparent)]
@@ -174,7 +174,7 @@ impl PersonalRuntime {
         let mut monitoring_connections = None;
         let mut kubernetes_candidates = None;
         let mut kubernetes_connections = None;
-        let mut b10x_configured = false;
+        let mut platform_configured = false;
         let mut catalog_connections = None;
         let mut credential_backend = None;
 
@@ -308,13 +308,13 @@ impl PersonalRuntime {
                 kubernetes_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
-            if let Some(b10x) = config.b10x {
-                backends.push(Arc::new(B10xBackend::personal(
-                    b10x,
+            if let Some(platform) = config.platform {
+                backends.push(Arc::new(PlatformBackend::personal(
+                    platform,
                     owner.clone(),
                     &state_root,
                 )?));
-                b10x_configured = true;
+                platform_configured = true;
             }
             // Every provider the catalogue declares, served by one adapter. Composed before Slack
             // for the same reason everything else is: it can still fail, and a failed composition
@@ -400,7 +400,7 @@ impl PersonalRuntime {
             "kubernetes_configured": kubernetes_candidates.is_some(),
             "kubernetes_candidates": kubernetes_candidates,
             "kubernetes_connections": kubernetes_connections,
-            "b10x_configured": b10x_configured,
+            "platform_configured": platform_configured,
             "catalog_configured": catalog_connections.is_some(),
             "catalog_connections": catalog_connections,
             "credential_store": credential_backend,
@@ -610,11 +610,11 @@ impl HostedRuntime {
                 .await?,
             ));
         }
-        let b10x_enabled = config.b10x.is_some();
+        let platform_enabled = config.platform.is_some();
         let admitted_module_tenants = config.admitted_module_tenants();
-        if let Some(b10x) = config.b10x {
-            backends.push(Arc::new(B10xBackend::hosted_with_state(
-                b10x,
+        if let Some(platform) = config.platform {
+            backends.push(Arc::new(PlatformBackend::hosted_with_state(
+                platform,
                 admitted_module_tenants,
                 &config.storage.state_root,
                 hosted_state.clone(),
@@ -709,7 +709,7 @@ impl HostedRuntime {
             "vault_enabled": config.vault.enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
-            "b10x_enabled": b10x_enabled,
+            "platform_enabled": platform_enabled,
             "slack_enabled": slack_enabled,
             "gitlab_enabled": gitlab_enabled,
             "jira_enabled": jira_enabled,

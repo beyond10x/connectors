@@ -56,10 +56,10 @@ pub const BROWSER_OPERATIONS: [&str; 5] = [
     BROWSER_CLOSE_OPERATION,
 ];
 
-/// Stable Provider id for the B10x-owned browser capability.
+/// Stable Provider id for the platform-owned browser capability.
 pub const BROWSER_PROVIDER: &str = "b10x";
 
-/// Permanent Provider authority for B10x-owned Connector capabilities.
+/// Permanent Provider authority for platform-owned Connector capabilities.
 pub const BROWSER_PROVIDER_AUTHORITY: &str = "io.b10x";
 
 /// The label wrapping everything a page contributed.

@@ -34,7 +34,7 @@ pub enum PlanError {
     CapabilityUnavailable(&'static str),
     #[error("operation has no reviewed permission subject")]
     PermissionSubjectMissing,
-    #[error("Connection does not permit B10x to initiate operations")]
+    #[error("Connection does not permit the platform to initiate operations")]
     ConnectionInitiationRefused,
     #[error("mediated route adapter `{0}` is not available in this deployment")]
     RouteAdapterUnavailable(&'static str),
@@ -66,7 +66,7 @@ pub fn plan_operation(
     if !admission
         .connection_authority()
         .initiation()
-        .allows(ConnectionInitiator::B10x)
+        .allows(ConnectionInitiator::Platform)
     {
         return Err(PlanError::ConnectionInitiationRefused);
     }
@@ -251,7 +251,7 @@ mod tests {
     }
 
     fn admission() -> AdmittedOperation {
-        admission_with(InitiationPolicy::b10x_only())
+        admission_with(InitiationPolicy::platform_only())
     }
 
     fn environment(driver: DriverId) -> PlanningEnvironment {
@@ -315,7 +315,7 @@ mod tests {
             admission_with(InitiationPolicy::bidirectional()),
             &environment(DriverId::SipV1),
         )
-        .expect("B10x is one allowed initiator");
+        .expect("the platform is one allowed initiator");
         assert_eq!(plan.admission().grant(), "grant-1");
     }
 
@@ -335,7 +335,7 @@ mod tests {
             "child-grant",
             ConnectionAuthority::mediated(
                 "prometheus-via-grafana",
-                InitiationPolicy::b10x_only(),
+                InitiationPolicy::platform_only(),
                 "grafana-infra",
                 "observation:datasource-1",
                 RouteAdapter::GrafanaDatasourceProxyV1,

@@ -2352,7 +2352,7 @@ fn completion_page(profile: GitlabProfile, oauth_url: Option<&str>) -> HostedCom
         GitlabProfile::OAuthUser => {
             let link = oauth_url.map(html_escape).unwrap_or_default();
             format!(
-                "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect GitLab</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}a{{display:inline-block;padding:.8rem 1rem;background:#7759c2;color:white;border-radius:.4rem;text-decoration:none}}</style><h1>Connect GitLab</h1><p>Authorize B10x to use GitLab with your own account permissions.</p><p><a href=\"{link}\" rel=\"noreferrer\">Continue to GitLab</a></p>"
+                "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Connect GitLab</title><style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}a{{display:inline-block;padding:.8rem 1rem;background:#7759c2;color:white;border-radius:.4rem;text-decoration:none}}</style><h1>Connect GitLab</h1><p>Authorize the platform to use GitLab with your own account permissions.</p><p><a href=\"{link}\" rel=\"noreferrer\">Continue to GitLab</a></p>"
             )
         }
         GitlabProfile::PersonalToken => PAT_SETUP_PAGE.to_owned(),
@@ -2523,12 +2523,11 @@ fn connection_summary(
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
-        InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
+        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
         InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-        InitiationConfig::Both => vec![
-            ConnectionInitiator::B10x,
-            ConnectionInitiator::Provider,
-        ],
+        InitiationConfig::Both => {
+            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+        }
     }
 }
 

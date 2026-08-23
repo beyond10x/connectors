@@ -1,11 +1,15 @@
-# B10x module admission
+# Platform module admission
 
-The B10x Integration admits exact code-first Work and Ontology contracts from the
+*Retitled from "B10x module admission" on 2026-08-24: D5 names the platform
+"platform" (S-052). The `b10x` provider id, module collection, and wire values below
+are published identity and keep their spelling.*
+
+The platform Integration admits exact code-first Work and Ontology contracts from the
 `b10x/modules` collection. Hosted configuration can make a sorted subset available to every
 Identity-verified member of its tenant:
 
 ```toml
-[b10x]
+[platform]
 tenant_member_modules = ["ontology", "planner", "work"]
 work_origin = "http://b10x-work:8080"
 ontology_origin = "http://b10x-ontology:8080"
@@ -23,13 +27,13 @@ Personal-local composition can route the same module operations to owner-only Un
 of hosted origins:
 
 ```toml
-[b10x.connection]
+[platform.connection]
 connection_ref = "connection:module:work"
 label = "Work (local)"
 grant_ref = "grant:module:work"
-initiation = "b10x"
+initiation = "platform"
 
-[b10x.module_sockets]
+[platform.module_sockets]
 work = "/absolute/private/runtime/work.sock"
 ```
 
@@ -51,7 +55,7 @@ public key. See [design 11](11-hosted-module-request-authority.md).
 
 Identity-verified tenant members may invoke the fixed read-only Work/Ontology subset without the
 deployment operator group. The hosted receiver checks this exact subset before dispatch; writes,
-other B10x operations, and external-provider invocations remain operator-only. Module global
+other platform operations, and external-provider invocations remain operator-only. Module global
 operation IDs such as `work/request.list` and `ontology/claim.query` are accepted by
 Describe/Invoke in addition to established Connector compatibility names. This lets Agent resolve
 a declarative UI contribution's `required_operations` without guessing provider names. It remains

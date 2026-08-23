@@ -1974,12 +1974,11 @@ fn post_dispatch_error(operation_ref: &str) -> OperationError {
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
-        InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
+        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
         InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-        InitiationConfig::Both => vec![
-            ConnectionInitiator::B10x,
-            ConnectionInitiator::Provider,
-        ],
+        InitiationConfig::Both => {
+            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+        }
     }
 }
 
