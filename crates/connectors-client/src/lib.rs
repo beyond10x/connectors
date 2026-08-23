@@ -768,8 +768,6 @@ fn request_id() -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::os::unix::fs::PermissionsExt as _;
-
     use axum::body::Bytes;
     use axum::extract::State;
     use axum::http::HeaderMap;
@@ -780,7 +778,7 @@ mod tests {
         SearchRequest,
     };
     use tempfile::tempdir;
-    use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
+    use tokio::io::BufReader;
     use tokio::net::{TcpListener, UnixListener};
 
     use super::*;

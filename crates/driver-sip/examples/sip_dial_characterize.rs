@@ -150,8 +150,10 @@ async fn main() {
         };
         let close_samples = frame
             .bytes
-            .chunks_exact(2)
-            .map(|sample| i16::from_le_bytes([sample[0], sample[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|sample| i16::from_le_bytes(*sample))
             .filter(|actual| (i32::from(*actual) - i32::from(expected)).abs() <= 128)
             .count();
         if close_samples >= 150 {

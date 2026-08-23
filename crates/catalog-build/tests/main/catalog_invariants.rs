@@ -1279,13 +1279,6 @@ fn a_full_build_leaves_no_orphaned_artifact() {
 // 9–12. The caller's contract (S-001)
 // ---------------------------------------------------------------------------------------------
 
-/// **Every operation stores the model-facing contract, and every parameter its symbol** (S-001).
-///
-/// The two measured cases that motivated the predecessor's C-552 are pinned by name: babelforce's
-/// dotted `time.start` must carry the normalized symbol `time_start`, and `airtable-record-get`'s
-/// contract description must be the one-line summary *extended* with the error-envelope sentence
-/// — longer than the summary, stating where the vendor's error message lives.
-
 /// **A caller that reads an operation's contract can make the call.**
 ///
 /// The contract states which parameters are required. This asserts that supplying exactly those —
@@ -1339,6 +1332,13 @@ fn every_operations_required_parameters_are_the_ones_a_caller_must_send() {
         "the catalogue published no mandatory parameter to check"
     );
 }
+
+/// **Every operation stores the model-facing contract, and every parameter its symbol** (S-001).
+///
+/// The two measured cases that motivated the predecessor's C-552 are pinned by name: babelforce's
+/// dotted `time.start` must carry the normalized symbol `time_start`, and `airtable-record-get`'s
+/// contract description must be the one-line summary *extended* with the error-envelope sentence
+/// — longer than the summary, stating where the vendor's error message lives.
 
 #[test]
 fn the_document_carries_the_callers_contract() {
