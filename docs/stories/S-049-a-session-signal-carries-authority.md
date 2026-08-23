@@ -2,7 +2,7 @@
 id: S-049
 title: "A session signal carries authority"
 pillar: Platform
-status: backlog
+status: done
 design: ../design/13-grant-evaluation-and-approval-redemption.md
 epic: enforced-authority
 areas: [server, domain, service]
@@ -55,3 +55,7 @@ from the Grant that admitted the session's creation — and bring the dispatch b
   no session to name), so ghost-ref spraying leaves a trail; design 13's amendment records that
   and the deliberate gap that revocation silences but cannot end an established session while
   hosted `SessionTerminate` stays 503-fenced.
+- 2026-08-23 — merged to main as `b4fa118` after independent review (round 1 REWORK: the rule-16
+  grammar parser silently skipped struct/unit variants; rework `397ff25` closes the parser over
+  line shapes, journals ghost-ref refusals, strips comments from the seam scan, and completes the
+  design-13 revocation-vs-termination sentence; re-review PASS, five empirical attacks all red).
