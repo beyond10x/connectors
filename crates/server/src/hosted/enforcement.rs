@@ -20,6 +20,10 @@
 //! callers whose Grants cover no effects: evaluation still runs, and an admitting Grant produces
 //! the proof, but a refusal falls back to the receiver-policy path that already admitted every
 //! hosted read before this story.
+//!
+//! S-049 adds the session-signal seam: a signal into a live session is admitted by the Grant
+//! that admits the session's own operation ([`HostedAuthority::admit_signal`]), with every
+//! decision journaled under [`SIGNAL_AUDIT_STATE_KEY`] before dispatch.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -33,7 +37,10 @@ use domain::{
     GrantEffect, GrantEvaluator, GrantFacts, GrantIdempotency, GrantRefusal, GrantRequest,
     GrantRisk, InitiationPolicy,
 };
-use protocol::operation::{ApprovalPosture, EffectClass, InvokeRequest, OperationDescription};
+use protocol::operation::{
+    ApprovalPosture, EffectClass, InvokeRequest, OperationDescription, SessionSignalRequest,
+    SessionStatus,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
@@ -45,6 +52,14 @@ const ISSUED_KEY_PREFIX: &str = "approval.issued.";
 
 /// An issued approval record is one bounded cell; reads use this generous bound.
 const MAX_ISSUED_CELL_BYTES: usize = 16 * 1024;
+
+/// The session-signal admission journal's state cell: newline-delimited JSON rows, one per
+/// decision — admitted and refused alike — written before the signal can dispatch (S-049).
+pub const SIGNAL_AUDIT_STATE_KEY: &str = "signal.audit";
+
+/// Journal ceiling for signal decision rows. Once the journal is this full, new signals refuse
+/// as unavailable rather than act unaudited — the same posture the approval journal takes.
+const MAX_SIGNAL_AUDIT_BYTES: usize = 4 * 1024 * 1024;
 
 /// Enforcement refusal shape. Two-valued like [`GrantRefusal`], and for the same reason: the axis
 /// that refused — grant, approval, replay, expiry — is not represented at all.
@@ -92,6 +107,8 @@ pub struct RecoveryError;
 pub struct HostedAuthority {
     evaluator: Arc<GrantEvaluator>,
     approvals: Option<HostedApprovals>,
+    /// The deployment's one bound state store, where the signal admission journal lives.
+    store: Option<Arc<dyn StateStore>>,
 }
 
 #[derive(Clone)]
@@ -109,8 +126,9 @@ impl HostedAuthority {
             evaluator: Arc::new(GrantEvaluator::bound(store.clone())),
             approvals: Some(HostedApprovals {
                 gate: Arc::new(ApprovalGate::new(store.clone(), approval_issuer)),
-                store,
+                store: store.clone(),
             }),
+            store: Some(store),
         }
     }
 
@@ -121,6 +139,7 @@ impl HostedAuthority {
         Self {
             evaluator: Arc::new(GrantEvaluator::unbound()),
             approvals: None,
+            store: None,
         }
     }
 
@@ -139,7 +158,14 @@ impl HostedAuthority {
             return Err(EnforcementRefusal::NotAdmitted);
         }
         let input_digest = canonical_input_digest(&invoke.input);
-        let decision = match self.evaluate(principal, invoke, description, &input_digest) {
+        let evaluated = self.evaluate_operation(
+            principal,
+            &invoke.operation_ref,
+            &invoke.connection_ref,
+            description,
+            &input_digest,
+        );
+        let decision = match evaluated {
             Ok(decision) => decision,
             Err(GrantRefusal::Refused | GrantRefusal::Unavailable) if read_path => {
                 return Ok(InvokeAdmission::ReadPath);
@@ -202,10 +228,65 @@ impl HostedAuthority {
         let _ = approvals.gate.conclude(redemption, outcome, now_seconds());
     }
 
-    fn evaluate(
+    /// Decide one session signal against the session's own authority (S-049).
+    ///
+    /// A signal has no authority of its own to describe: it addresses a live session by
+    /// `execution_ref` and reaches whatever that session is already connected to. The authority
+    /// it rides is therefore the session's — the operation and Connection that created it,
+    /// re-described by the Connector itself — so the Grant that admits that operation admits
+    /// signalling into its sessions, and revoking the Grant refuses the next keypress.
+    ///
+    /// Deliberately no approval redemption here: the one-time approval governs establishment
+    /// and was spent by the invocation that created the session; a per-keypress one-time record
+    /// would make interacting with a live far end impossible. There is also no read path — a
+    /// signal is always effect-bearing — so a Grant refusal never falls back to the
+    /// receiver-policy path that serves described reads.
+    ///
+    /// Every decision lands in the signal admission journal ([`SIGNAL_AUDIT_STATE_KEY`]) before
+    /// the caller can dispatch — admitted and refused rows alike, the refused row as axis-free
+    /// as the refusal itself. A journal that cannot take the row refuses as unavailable rather
+    /// than act unaudited.
+    pub(super) fn admit_signal(
         &self,
         principal: &HostedPrincipal,
-        invoke: &InvokeRequest,
+        session: &SessionStatus,
+        signal: &SessionSignalRequest,
+        description: &OperationDescription,
+    ) -> Result<Box<AdmittedOperation>, EnforcementRefusal> {
+        let input =
+            serde_json::to_value(&signal.signal).map_err(|_| EnforcementRefusal::NotAdmitted)?;
+        let input_digest = canonical_input_digest(&input);
+        let admission = self
+            .evaluate_operation(
+                principal,
+                &session.operation_ref,
+                &session.connection_ref,
+                description,
+                &input_digest,
+            )
+            .and_then(|decision| {
+                // Real wall-clock time, exactly as the invoke seam: an expired decision refuses
+                // at use, through the same neutral refusal.
+                AdmittedOperation::from_decision(decision, SystemTime::now())
+                    .map_err(|_| GrantRefusal::Refused)
+            });
+        let operation = match admission {
+            Ok(operation) => operation,
+            Err(GrantRefusal::Unavailable) => return Err(EnforcementRefusal::Unavailable),
+            Err(GrantRefusal::Refused) => {
+                self.journal_signal("refused", principal, session, &input_digest)?;
+                return Err(EnforcementRefusal::NotAdmitted);
+            }
+        };
+        self.journal_signal("admitted", principal, session, &input_digest)?;
+        Ok(Box::new(operation))
+    }
+
+    fn evaluate_operation(
+        &self,
+        principal: &HostedPrincipal,
+        operation: &str,
+        connection_ref: &str,
         description: &OperationDescription,
         input_digest: &str,
     ) -> Result<GrantDecision, GrantRefusal> {
@@ -215,14 +296,12 @@ impl HostedAuthority {
         let provider = description
             .connections
             .iter()
-            .find(|connection| connection.connection_ref == invoke.connection_ref)
+            .find(|connection| connection.connection_ref == connection_ref)
             .map(|connection| connection.provider.clone())
             .ok_or(GrantRefusal::Refused)?;
-        let connection = ConnectionAuthority::new(
-            invoke.connection_ref.clone(),
-            InitiationPolicy::b10x_only(),
-        )
-        .map_err(|_| GrantRefusal::Refused)?;
+        let connection =
+            ConnectionAuthority::new(connection_ref, InitiationPolicy::b10x_only())
+                .map_err(|_| GrantRefusal::Refused)?;
         let request = GrantRequest {
             issuer: principal.issuer.clone(),
             tenant: principal.tenant_id.clone(),
@@ -238,11 +317,84 @@ impl HostedAuthority {
             description_ref: description.description_ref.clone(),
             input_digest: input_digest.to_owned(),
             action: GrantAction::Invoke {
-                operation: invoke.operation_ref.clone(),
+                operation: operation.to_owned(),
                 facts: undeclared_facts(),
             },
         };
         self.evaluator.evaluate(&request, SystemTime::now())
+    }
+
+    /// Journal the refusal of a signal addressing a session no backend holds (S-049 review).
+    ///
+    /// The route refuses such a signal with the same bytes as every other refusal before any
+    /// admission runs; without this row, a caller spraying guessed execution refs would be
+    /// invisible in the journal. The row's operation and connection are empty because the
+    /// deployment holds no session to name — the emptiness is the honest record.
+    pub(super) fn journal_unknown_signal(
+        &self,
+        principal: &HostedPrincipal,
+        signal: &SessionSignalRequest,
+    ) -> Result<(), EnforcementRefusal> {
+        let input =
+            serde_json::to_value(&signal.signal).map_err(|_| EnforcementRefusal::Unavailable)?;
+        let input_digest = canonical_input_digest(&input);
+        self.append_signal_row(
+            "refused",
+            principal,
+            "",
+            "",
+            &signal.execution_ref,
+            &input_digest,
+        )
+    }
+
+    /// Append one signal decision row. The `refused` kind is as axis-free as the refusal it
+    /// records: the row says a signal was refused, never which axis refused it.
+    fn journal_signal(
+        &self,
+        kind: &'static str,
+        principal: &HostedPrincipal,
+        session: &SessionStatus,
+        input_digest: &str,
+    ) -> Result<(), EnforcementRefusal> {
+        self.append_signal_row(
+            kind,
+            principal,
+            &session.operation_ref,
+            &session.connection_ref,
+            &session.execution_ref,
+            input_digest,
+        )
+    }
+
+    fn append_signal_row(
+        &self,
+        kind: &'static str,
+        principal: &HostedPrincipal,
+        operation: &str,
+        connection: &str,
+        execution_ref: &str,
+        input_digest: &str,
+    ) -> Result<(), EnforcementRefusal> {
+        let Some(store) = &self.store else {
+            return Err(EnforcementRefusal::Unavailable);
+        };
+        let row = SignalAuditRow {
+            kind,
+            tenant: &principal.tenant_id,
+            subject: &principal.subject,
+            operation,
+            connection,
+            execution_ref,
+            input_digest,
+            at_seconds: now_seconds(),
+        };
+        let mut framed = serde_json::to_vec(&row).map_err(|_| EnforcementRefusal::Unavailable)?;
+        framed.push(b'\n');
+        store
+            .append(SIGNAL_AUDIT_STATE_KEY, &framed, MAX_SIGNAL_AUDIT_BYTES)
+            .map(|_| ())
+            .map_err(|_| EnforcementRefusal::Unavailable)
     }
 
     fn redeem(
@@ -289,6 +441,21 @@ fn undeclared_facts() -> GrantFacts {
         effects: BTreeSet::from(GrantEffect::ALL),
         idempotency: GrantIdempotency::NonIdempotent,
     }
+}
+
+/// One signal admission journal row (S-049). An `execution_ref` is a session handle, not a
+/// capability — the capability is the Grant — so unlike an approval reference it may appear in
+/// the journal verbatim.
+#[derive(Serialize)]
+struct SignalAuditRow<'a> {
+    kind: &'static str,
+    tenant: &'a str,
+    subject: &'a str,
+    operation: &'a str,
+    connection: &'a str,
+    execution_ref: &'a str,
+    input_digest: &'a str,
+    at_seconds: u64,
 }
 
 /// The stored shape of one externally issued approval record. The reference is deliberately not

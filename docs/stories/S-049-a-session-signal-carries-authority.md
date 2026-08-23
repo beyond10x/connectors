@@ -33,3 +33,25 @@ from the Grant that admitted the session's creation — and bring the dispatch b
 
 - 2026-08-23 — filed from the S-046/S-047 review findings (ungated signal dispatch, recover()
   multi-replica question).
+- 2026-08-23 — implemented on `impl/S-049` as the session-scoped admission (design 13,
+  amendment of this date): the hosted route resolves the session's own operation and Connection,
+  re-describes, and runs the `GrantEvaluator` (`HostedAuthority::admit_signal`,
+  `crates/server/src/hosted/enforcement.rs`); the proof is consumed by value at
+  `dispatch_admitted_signal` (`crates/server/src/hosted.rs`), which cross-checks it against the
+  exact session. Refusals render byte-identically to the invoke path's 403 — including an
+  unknown `execution_ref`, so the seam is no existence oracle — and every decision lands in the
+  `signal.audit` journal before dispatch. No approval redemption per signal (establishment spent
+  it; the Grant is the continuing authority) and no read path (a signal is always
+  effect-bearing). Route tests: `crates/server/src/hosted/tests/signal.rs`. Catalogue invariant
+  rule 16 (`a_session_signal_reaches_a_backend_only_through_the_admission_seam`) pins the
+  request grammar as a closed set and the seam's presence; demonstrated red against both a
+  grammar extension and a deleted seam. The `ApprovalGate::recover` single-replica assumption is
+  stated in design 13's second amendment rather than fenced.
+- 2026-08-23 — review rework: rule 16's grammar parser is now closed over line shapes (a
+  struct- or unit-shaped variant is parsed, an unrecognized line inside the enum fails rather
+  than skips; demonstrated red against `SessionBarge { … }`, `SessionBarge,` and a non-variant
+  line). The seam scan cuts line comments before matching. A signal addressing a session no
+  backend holds now journals its refusal too (empty operation/connection — the deployment holds
+  no session to name), so ghost-ref spraying leaves a trail; design 13's amendment records that
+  and the deliberate gap that revocation silences but cannot end an established session while
+  hosted `SessionTerminate` stays 503-fenced.

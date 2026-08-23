@@ -1,7 +1,7 @@
 # Design — Grant evaluation and approval redemption are enforced authority
 
 **Status:** draft (2026-08-23) · **Pillar:** Platform · **Backs:** S-043, S-044, S-045, S-046,
-S-047 · **Epic:** `enforced-authority`
+S-047, S-049 · **Epic:** `enforced-authority`
 
 ## Problem
 
@@ -76,3 +76,61 @@ before its gates exist.
 | S-045 | approval verifier + atomic one-time redemption + attempted/terminal audit transaction | S-043 |
 | S-046 | hosted route replaces its two fences with evaluator + approval gate; effect-bearing invocation enabled behind them; end-to-end refusal/replay/success tests | S-044, S-045 |
 | S-047 | integrations drop local approval-presence checks in favor of the proofs; catalogue invariant: no effect backend reachable without proof | S-046 |
+| S-049 | session signals admitted by the session's own Grant; signal admission journal; catalogue invariant: the request grammar is a pinned closed set | S-046 |
+
+## Amendments
+
+### 2026-08-23 — S-049: a session signal carries the session's authority
+
+`SessionSignal` escaped the epic above because it carries no operation ref, description, or
+Connection — nothing a `GrantRequest` can name — and so fell through the hosted route's
+catch-all dispatch behind scope and operator-group policy alone (S-046/S-047 reviews). Of the
+two shapes the story offered, the landed one is the **session-scoped admission derived from the
+Grant that admitted the session's creation**, not a described session-signal operation per
+provider: a signal reaches whatever the session is already connected to, so its authority *is*
+the session's, and inventing a parallel per-provider operation would have given the same
+authority a second name to drift under.
+
+Mechanics, all in the hosted route (`crates/server/src/hosted.rs` +
+`hosted/enforcement.rs::admit_signal`):
+
+- The route resolves the session's own record (operation ref, Connection) through the
+  Connector backend, re-describes that operation, and runs the S-044 `GrantEvaluator` over it —
+  worst-case facts, exactly as every invocation until declared facts travel with the
+  description. The proof is an `AdmittedOperation` via `from_decision`, consumed by value at
+  the signal's own dispatch seam, which cross-checks the proof against the exact session.
+- **No approval redemption per signal.** The one-time approval governs establishment and was
+  spent by the invocation that created the session; the Grant is the session's continuing
+  authority, and revoking it refuses the next signal. A per-keypress one-time record would make
+  interacting with a live far end impossible. Revocation silences the session but does not end
+  it: the established call keeps running, because hosted `SessionTerminate` remains 503-fenced —
+  ending a live session from the hosted route is the durable-session-decisions work, and stating
+  that gap here is deliberate.
+- **No read path.** A signal is always effect-bearing; a Grant refusal never falls back to the
+  receiver-policy path that serves described reads.
+- **Refusals are axis-free and journaled.** Signal refusals render byte-identically to the
+  invoke path's 403; a session nobody holds answers the same bytes, so the seam is not an
+  existence oracle for execution refs — and that refusal is journaled too, with empty operation
+  and Connection because the deployment holds no session to name, so a caller spraying guessed
+  execution refs leaves a trail. Every decision — admitted and refused — lands in the signal
+  admission journal (`signal.audit` state cell, NDJSON rows) before dispatch; a journal that
+  cannot take the row refuses as unavailable rather than act unaudited. The terminal
+  "signal sent" record stays where it already was: the Integration's own audit journal, written
+  on success.
+- The catalogue invariant family gains rule 16: the operation-protocol request grammar is a
+  pinned closed set and the hosted route must name every variant, so the next signal-shaped
+  route variant fails red until its admission is decided on purpose.
+
+### 2026-08-23 — `ApprovalGate::recover` assumes a single hosted replica
+
+The S-047 review asked whether the startup recovery scan is safe under multiple replicas. It is
+not, and the assumption is now stated rather than fenced: `recover` reads the whole journal and
+appends settlement rows with no fencing token, so two replicas recovering concurrently can
+double-settle the same anchors, and a replica recovering while another is serving can settle a
+live attempted presentation as `aborted` while its owner goes on to redeem it. The hosted
+placement therefore runs **exactly one replica**, and `HostedRuntime` runs recovery to
+completion before serving (`crates/connectors-runtime/src/composition.rs`). This is an honest
+deployment constraint, not a policy: a multi-replica hosted placement must bring a fencing
+mechanism — a lease or generation token on the journal cell, or a backend with cross-key
+transactions — with the story that introduces it. Until then, running a second replica against
+the same store is operator error.
