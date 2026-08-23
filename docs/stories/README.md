@@ -81,6 +81,8 @@ will spawn children as each milestone is designed.
 | [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | done | Platform | integrations, testing |
 | [S-048](S-048-a-companion-reply-is-claimed-exactly-once-locally.md) | A companion reply is claimed exactly once, locally too | done | Platform | integrations, state, config |
 | [S-049](S-049-a-session-signal-carries-authority.md) | A session signal carries authority | done | Platform | server, domain, service |
+| [S-050](S-050-the-claims-journal-survives-a-full-life.md) | The claims journal survives a full life | backlog | Platform | state, integrations |
+| [S-051](S-051-one-connection-config-shape.md) | One connection config shape | backlog | Platform | config, integrations |
 
 ## Epics in this seed
 
