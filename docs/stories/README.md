@@ -83,7 +83,7 @@ will spawn children as each milestone is designed.
 | [S-049](S-049-a-session-signal-carries-authority.md) | A session signal carries authority | done | Platform | server, domain, service |
 | [S-050](S-050-the-claims-journal-survives-a-full-life.md) | The claims journal survives a full life | backlog | Platform | state, integrations |
 | [S-051](S-051-one-connection-config-shape.md) | One connection config shape | backlog | Platform | config, integrations |
-| [S-052](S-052-the-platform-connector-is-named-platform.md) | The platform connector is named platform | ready | Platform | integrations, config, server |
+| [S-052](S-052-the-platform-connector-is-named-platform.md) | The platform connector is named platform | done | Platform | integrations, config, server |
 
 ## Epics in this seed
 

@@ -2,8 +2,7 @@
 id: S-052
 title: "The platform connector is named platform"
 pillar: Platform
-status: ready
-priority: 1
+status: done
 areas: [integrations, config, server]
 ---
 
@@ -44,3 +43,7 @@ serde alias or a documented migration — an existing personal config must keep 
   platform; `docs/design/09-b10x-modules.md` → `09-platform-modules.md` with a dated retitle
   note; check-brand.sh D5 class shrunk to published identity + serialized state and now carries a
   negative self-test that runs on every gate.
+- 2026-08-24 — merged to main after independent review (PASS, 0 blocking, 2 minor: the fence's
+  whole-line allowlist filter can swallow a violation co-located with an allowed token —
+  pre-existing class, surface shrank with this diff; and the initiator wire token's serialize
+  direction rides on serde rename bidirectionality plus the bundles round-trip test).
