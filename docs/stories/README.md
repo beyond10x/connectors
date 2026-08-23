@@ -79,6 +79,8 @@ will spawn children as each milestone is designed.
 | [S-045](S-045-an-approval-is-redeemed-exactly-once.md) | An approval is redeemed exactly once | done | Platform | domain, service, state, audit |
 | [S-046](S-046-the-hosted-route-enforces-instead-of-refusing.md) | The hosted route enforces instead of refusing | done | Platform | server, service |
 | [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | done | Platform | integrations, testing |
+| [S-048](S-048-a-companion-reply-is-claimed-exactly-once-locally.md) | A companion reply is claimed exactly once, locally too | backlog | Platform | integrations, state, config |
+| [S-049](S-049-a-session-signal-carries-authority.md) | A session signal carries authority | backlog | Platform | server, domain, service |
 
 ## Epics in this seed
 
