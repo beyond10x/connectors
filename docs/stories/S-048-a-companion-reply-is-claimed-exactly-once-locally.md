@@ -2,7 +2,7 @@
 id: S-048
 title: "A companion reply is claimed exactly once, locally too"
 pillar: Platform
-status: backlog
+status: done
 design: ../design/13-grant-evaluation-and-approval-redemption.md
 epic: enforced-authority
 areas: [integrations, state, config]
@@ -50,3 +50,6 @@ field turns out to be the right shape).
   examples, the sip test fixture, and the connectors-cli README. Known-red left in place:
   `architecture_fence::product_cli_is_a_thin_frontend` fails at the merge base (856 > 828 CLI
   production lines) independently of this story.
+- 2026-08-23 — merged to main as `95ffc8f` after independent review (PASS, 0 blocking, 2 minor:
+  best-effort refusal journaling on the replay branch; retiring the required field makes existing
+  SIP personal configs carrying `approval_evidence_ref` refuse to parse until edited).
