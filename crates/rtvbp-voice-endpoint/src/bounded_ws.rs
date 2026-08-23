@@ -719,7 +719,6 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::task::{Context, Poll};
 
-    use futures_util::SinkExt as _;
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
     use tokio_tungstenite::tungstenite::protocol::Role;
 

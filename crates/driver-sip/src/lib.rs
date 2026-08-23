@@ -330,8 +330,10 @@ impl TelephonySession for SipTelephonySession {
             .store(frame.sequence, Ordering::Release);
         let samples = frame
             .bytes
-            .chunks_exact(2)
-            .map(|sample| i16::from_le_bytes([sample[0], sample[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|sample| i16::from_le_bytes(*sample))
             .collect::<Vec<_>>();
         let playback = self.media.start_playback(samples, Interrupt::Never);
         *self.active_playback.lock().map_err(lock_error)? = Some(playback.clone());
@@ -688,8 +690,10 @@ mod tests {
             let inbound = media.read_frame().await.unwrap();
             let heard = inbound
                 .data
-                .chunks_exact(2)
-                .map(|sample| i16::from_le_bytes([sample[0], sample[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|sample| i16::from_le_bytes(*sample))
                 .collect::<Vec<_>>();
             assert!(heard
                 .iter()

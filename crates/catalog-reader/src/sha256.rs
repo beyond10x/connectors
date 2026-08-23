@@ -42,26 +42,25 @@ pub(crate) fn digest(message: &[u8]) -> [u8; 32] {
     let mut state = H0;
 
     // Process every whole 64-byte block of the message itself.
-    let mut blocks = message.chunks_exact(64);
-    for block in &mut blocks {
-        compress(&mut state, block.try_into().expect("a 64-byte chunk"));
+    let (blocks, remainder) = message.as_chunks::<64>();
+    for block in blocks {
+        compress(&mut state, block);
     }
 
     // Padding (§5.1.1): the remainder, `0x80`, zeros to 56 mod 64, then the bit length, big-endian.
-    let remainder = blocks.remainder();
     let mut tail = [0u8; 128];
     tail[..remainder.len()].copy_from_slice(remainder);
     tail[remainder.len()] = 0x80;
     let tail_len = if remainder.len() < 56 { 64 } else { 128 };
     let bit_length = (message.len() as u64).wrapping_mul(8);
     tail[tail_len - 8..tail_len].copy_from_slice(&bit_length.to_be_bytes());
-    for block in tail[..tail_len].chunks_exact(64) {
-        compress(&mut state, block.try_into().expect("a 64-byte chunk"));
+    for block in tail[..tail_len].as_chunks::<64>().0 {
+        compress(&mut state, block);
     }
 
     let mut out = [0u8; 32];
-    for (chunk, word) in out.chunks_exact_mut(4).zip(state) {
-        chunk.copy_from_slice(&word.to_be_bytes());
+    for (chunk, word) in out.as_chunks_mut::<4>().0.iter_mut().zip(state) {
+        *chunk = word.to_be_bytes();
     }
     out
 }
@@ -79,8 +78,8 @@ pub(crate) fn hex_digest(message: &[u8]) -> String {
 /// One compression round over one 64-byte block (§6.2.2).
 fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
     let mut w = [0u32; 64];
-    for (i, chunk) in block.chunks_exact(4).enumerate() {
-        w[i] = u32::from_be_bytes(chunk.try_into().expect("a 4-byte chunk"));
+    for (i, chunk) in block.as_chunks::<4>().0.iter().enumerate() {
+        w[i] = u32::from_be_bytes(*chunk);
     }
     for i in 16..64 {
         let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
