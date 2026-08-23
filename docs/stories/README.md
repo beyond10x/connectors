@@ -79,7 +79,7 @@ will spawn children as each milestone is designed.
 | [S-045](S-045-an-approval-is-redeemed-exactly-once.md) | An approval is redeemed exactly once | done | Platform | domain, service, state, audit |
 | [S-046](S-046-the-hosted-route-enforces-instead-of-refusing.md) | The hosted route enforces instead of refusing | done | Platform | server, service |
 | [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | done | Platform | integrations, testing |
-| [S-048](S-048-a-companion-reply-is-claimed-exactly-once-locally.md) | A companion reply is claimed exactly once, locally too | backlog | Platform | integrations, state, config |
+| [S-048](S-048-a-companion-reply-is-claimed-exactly-once-locally.md) | A companion reply is claimed exactly once, locally too | done | Platform | integrations, state, config |
 | [S-049](S-049-a-session-signal-carries-authority.md) | A session signal carries authority | backlog | Platform | server, domain, service |
 
 ## Epics in this seed
@@ -96,7 +96,7 @@ will spawn children as each milestone is designed.
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-component conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
-| `enforced-authority` | S-043, S-044, S-045, S-046, S-047 | Turning the F-001 refusal fences into enforced Grant and approval authority, so effect-bearing hosted operations become reachable only through unforgeable proofs. |
+| `enforced-authority` | S-043, S-044, S-045, S-046, S-047, S-048, S-049 | Turning the F-001 refusal fences into enforced Grant and approval authority, so effect-bearing hosted operations become reachable only through unforgeable proofs. |
 | `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 
