@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Orientation for agents (and humans) working in this component. The root
-[`AGENTS.md`](../../AGENTS.md) applies throughout; this file adds component rules.
+[`AGENTS.md`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/AGENTS.md) applies throughout; this file adds component rules.
 
 ## Status
 
@@ -223,7 +223,7 @@ The agent instruction is therefore short:
   [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
   references: mine them, copy from them per the architecture inventory, and never edit them from
   here. The durable housing decision is
-  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](../../architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
+  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
 
 `predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
 navigable authority. The surrounding comment must restate the rule the current implementation uses;

@@ -24,7 +24,7 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
 - Before the monorepo migration, the component workflow covered repository links, story-index
   consistency, the Rust workspace, generated catalogue drift, the independent lock verifier, and
   the declared MSRV. The current local entry point is the root
-  [`scripts/check-local.sh --all`](../../../../scripts/check-local.sh); no hosted workflow currently
+  [`scripts/check-local.sh --all`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/scripts/check-local.sh); no hosted workflow currently
   invokes it, and the web suite remains an absent arm rather than a present-tense claim.
 - **`cargo metadata --locked --offline` needs a fetched registry.** The MSRV fence and the no-network
   fence both shell out to it, and a partially-fetched registry has already broken it once
