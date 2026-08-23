@@ -2,8 +2,7 @@
 id: S-054
 title: "Pod logs are a hosted read-only Kubernetes operation"
 pillar: Platform
-status: in-progress
-priority: 2
+status: done
 design: ../design/14-mcp-transport-for-the-hosted-connectors-server.md
 epic: mcp-entry
 areas: [integrations, server]
@@ -45,3 +44,7 @@ Gate admission on the same `namespace_access.read_groups` as deployment status v
   (search visibility, describe schemas + lease, input passthrough + default, non-admitted
   namespace, stale lease, caps, upstream refusal passthrough, oversized-body trim with a
   validating envelope) plus the server policy unit test.
+- 2026-08-24 — merged to main after independent review (PASS, 0 blocking, 3 minor: the
+  in-cluster HTTP mapping is code-read only, parity with STATUS/RESTART; exact-128KiB logs
+  over-claim truncation in the safe direction; above-limitBytes bodies refuse unavailable,
+  matching the existing read posture).
