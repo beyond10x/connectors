@@ -264,6 +264,12 @@ impl KubernetesStatusBackend {
                 description_ref: description_ref(context, RESTART_OPERATION),
             });
         }
+        if operation_ref == LOGS_OPERATION && self.has_read_access(context) {
+            return Ok(logs_operation(
+                vec![connection()],
+                description_ref(context, LOGS_OPERATION),
+            ));
+        }
         Err(not_granted(
             "Kubernetes operation is not granted to this principal",
         ))
@@ -342,6 +348,52 @@ impl KubernetesStatusBackend {
                         RESTART_OPERATION,
                         &input.namespace,
                         &input.name,
+                    ),
+                    execution_ref: None,
+                }))
+            }
+            LOGS_OPERATION => {
+                if request.description_ref != description_ref(context, LOGS_OPERATION) {
+                    return Err(stale("Kubernetes pod log authority is stale"));
+                }
+                let input: PodLogsInput = serde_json::from_value(request.input)
+                    .map_err(|_| invalid("Kubernetes pod log input is invalid"))?;
+                if !(1..=1000).contains(&input.tail_lines)
+                    || input
+                        .since_seconds
+                        .is_some_and(|seconds| !(1..=86400).contains(&seconds))
+                    || !valid_dns_label(&input.pod, 253)
+                    || input
+                        .container
+                        .as_deref()
+                        .is_some_and(|container| !valid_dns_label(container, 253))
+                {
+                    return Err(invalid("Kubernetes pod log input is out of bounds"));
+                }
+                if !self.can_read(context, &input.namespace) {
+                    return Err(not_granted("Kubernetes namespace or Pod is not admitted"));
+                }
+                let logs = self
+                    .reader
+                    .pod_logs(
+                        &input.namespace,
+                        &input.pod,
+                        input.container.as_deref(),
+                        input.tail_lines,
+                        input.since_seconds,
+                    )
+                    .await?;
+                // Serialize, then trim whole oldest lines: a log read must never surface
+                // `result_too_large`.
+                let output = fit_pod_logs(logs)?;
+                Ok(OperationResult::Invoke(InvocationResult {
+                    operation_ref: LOGS_OPERATION.to_owned(),
+                    output,
+                    connector_audit_ref: audit_ref(
+                        context,
+                        LOGS_OPERATION,
+                        &input.namespace,
+                        &input.pod,
                     ),
                     execution_ref: None,
                 }))
@@ -536,6 +588,91 @@ impl DeploymentReader for InClusterReader {
             pods,
             warnings,
             related_complete,
+        })
+    }
+
+    async fn pod_logs(
+        &self,
+        namespace: &str,
+        pod: &str,
+        container: Option<&str>,
+        tail_lines: u32,
+        since_seconds: Option<u32>,
+    ) -> Result<PodLogs, OperationError> {
+        let mut endpoint = self
+            .api_url(&["api", "v1", "namespaces", namespace, "pods", pod, "log"])
+            .map_err(|_| unavailable("Kubernetes API endpoint is invalid"))?;
+        {
+            let mut query = endpoint.query_pairs_mut();
+            query.append_pair("tailLines", &tail_lines.to_string());
+            query.append_pair("limitBytes", &MAX_POD_LOG_BYTES.to_string());
+            if let Some(container) = container {
+                query.append_pair("container", container);
+            }
+            if let Some(seconds) = since_seconds {
+                query.append_pair("sinceSeconds", &seconds.to_string());
+            }
+        }
+        // The token is re-read per call, like `read()`: the kubelet-projected token rotates and
+        // a cached copy would outlive its validity.
+        let token = self
+            .token()
+            .map_err(|_| unavailable("Kubernetes workload identity is unavailable"))?;
+        let response = self
+            .client
+            .get(endpoint)
+            .bearer_auth(token.trim())
+            .send()
+            .await
+            .map_err(|_| unavailable("Kubernetes API request failed"))?;
+        match response.status() {
+            reqwest::StatusCode::NOT_FOUND => {
+                return Err(OperationError::new(
+                    OperationErrorCode::NotFound,
+                    "Kubernetes Pod or container was not found",
+                    false,
+                ));
+            }
+            reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::UNAUTHORIZED => {
+                return Err(not_granted(
+                    "Kubernetes workload identity refused the log read",
+                ));
+            }
+            status if !status.is_success() => {
+                return Err(unavailable(
+                    "Kubernetes API returned a non-success response",
+                ));
+            }
+            _ => {}
+        }
+        // Bounded plain-text read. `limitBytes` was requested, so a body above the budget is the
+        // API misbehaving, not a large log; refuse it as unavailable rather than buffering it.
+        if response.content_length().is_some_and(|length| {
+            length > u64::try_from(MAX_POD_LOG_BYTES).expect("bound fits u64")
+        }) {
+            return Err(unavailable(
+                "Kubernetes returned more log data than requested",
+            ));
+        }
+        let body = response
+            .bytes()
+            .await
+            .map_err(|_| unavailable("Kubernetes response could not be read"))?;
+        if body.len() > MAX_POD_LOG_BYTES {
+            return Err(unavailable(
+                "Kubernetes returned more log data than requested",
+            ));
+        }
+        // Output honesty: a body that filled the whole budget was cut by `limitBytes`, and the
+        // cut can land mid-character, so the decode is lossy by design.
+        let truncated = body.len() == MAX_POD_LOG_BYTES;
+        Ok(PodLogs {
+            namespace: namespace.to_owned(),
+            pod: pod.to_owned(),
+            container: container.map(ToOwned::to_owned),
+            tail_lines,
+            text: String::from_utf8_lossy(&body).into_owned(),
+            truncated,
         })
     }
 
@@ -773,6 +910,16 @@ fn status_summary() -> OperationSummary {
     OperationSummary {
         operation_ref: STATUS_OPERATION.to_owned(),
         title: "Read Kubernetes deployment status".to_owned(),
+        effect: EffectClass::ReadOnly,
+        approval: ApprovalPosture::NotRequired,
+        connections: vec![connection()],
+    }
+}
+
+fn logs_summary() -> OperationSummary {
+    OperationSummary {
+        operation_ref: LOGS_OPERATION.to_owned(),
+        title: "Read Kubernetes pod logs".to_owned(),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
         connections: vec![connection()],

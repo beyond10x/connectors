@@ -118,6 +118,7 @@ impl HostedAdmissionPolicy {
         };
         let groups = match invoke.operation_ref.as_str() {
             "kubernetes.deployment.status" => &self.kubernetes_read_groups,
+            "kubernetes.pod.logs" => &self.kubernetes_read_groups,
             "kubernetes.deployment.rollout-restart" => &self.kubernetes_restart_groups,
             _ => return false,
         };
@@ -1409,6 +1410,35 @@ mod tests {
                 "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'"
             );
         }
+    }
+
+    #[test]
+    fn pod_log_transport_gate_admits_only_kubernetes_read_groups_or_operator() {
+        let policy = HostedAdmissionPolicy::new(["operator".to_owned()])
+            .with_kubernetes_groups(["dev".to_owned(), "sre".to_owned()], ["sre".to_owned()]);
+        let request = OperationRequest::Invoke(InvokeRequest {
+            operation_ref: "kubernetes.pod.logs".to_owned(),
+            connection_ref: "connection:kubernetes:in-cluster".to_owned(),
+            description_ref: "description:test".to_owned(),
+            input: serde_json::json!({}),
+            approval_evidence_ref: None,
+        });
+        let principal = |group: &str| HostedPrincipal {
+            issuer: "https://identity.example.test".to_owned(),
+            tenant_id: "tenant-dev".to_owned(),
+            subject: "person:test".to_owned(),
+            actor_subject: "person:test".to_owned(),
+            email: None,
+            token_id: "token-test".to_owned(),
+            scopes: BTreeSet::new(),
+            groups: BTreeSet::from([group.to_owned()]),
+            authority_snapshot_sha256: "b".repeat(64),
+            deployment_id: None,
+        };
+        assert!(policy.admits_operation(&principal("dev"), &request));
+        assert!(policy.admits_operation(&principal("sre"), &request));
+        assert!(policy.admits_operation(&principal("operator"), &request));
+        assert!(!policy.admits_operation(&principal("viewer"), &request));
     }
 
     #[test]
