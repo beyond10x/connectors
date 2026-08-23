@@ -287,7 +287,7 @@ mod tests {
                 required_capabilities: BTreeSet::from([Capability::Device]),
                 permission_subjects: vec!["device:local-audio-output".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 operation,
                 "org",
@@ -314,7 +314,7 @@ mod tests {
     fn a_plan_for_another_driver_or_operation_is_refused() {
         let foreign = ZeroIoPlan::new(
             plan(SPEECH_SPEAK_OPERATION).facts().clone(),
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 SPEECH_SPEAK_OPERATION,
                 "org",

@@ -2,11 +2,12 @@
 id: S-043
 title: "Admission proofs become unforgeable"
 pillar: Platform
-status: ready
+status: done
 priority: 1
 design: ../design/13-grant-evaluation-and-approval-redemption.md
 epic: enforced-authority
 areas: [domain, service, integrations]
+note: "GrantDecision sealed in domain::evaluator (S-044 owns the production constructor); all 22 call sites moved to for_local_owner; the hosted-registry backends that reach it on read-only invocations are flagged for S-046"
 ---
 
 # Admission proofs become unforgeable

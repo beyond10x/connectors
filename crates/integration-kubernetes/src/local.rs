@@ -724,7 +724,7 @@ impl KubernetesLocalBackend {
             DomainRouteAdapter::KubernetesServiceProxyV1,
         )
         .map_err(|_| operation_not_granted())?;
-        let admission = AdmittedOperation::from_grant_decision(
+        let admission = AdmittedOperation::for_local_owner(
             &child.provider,
             &operation.id,
             context.tenant_id(),

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{ConnectionAuthority, RouteAdapter};
+use crate::{ConnectionAuthority, GrantDecision, RouteAdapter};
 
 /// Closed built-in driver identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -75,8 +75,9 @@ pub struct OperationFacts {
 /// Evidence that authentication and the exact Connector Grant were admitted before planning.
 ///
 /// Fields are private so downstream code cannot reinterpret a tenant, principal, or grant after
-/// the plan is built. The service layer constructs this from its admission result and checks the
-/// catalog identities again while planning.
+/// the plan is built, and both constructors name the authority they stand on: a hosted
+/// invocation is admitted by a [`GrantDecision`] proof, a personal placement by the local-owner
+/// assertion. There is no constructor over bare caller-supplied claims.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedOperation {
     provider: String,
@@ -88,8 +89,28 @@ pub struct AdmittedOperation {
 }
 
 impl AdmittedOperation {
-    /// Construct admission evidence from an already successful grant decision.
-    pub fn from_grant_decision(
+    /// Admission proven by a Grant evaluation. [`GrantDecision`] has no public constructor, so
+    /// reaching this call means the evaluator module produced the decision (S-044 lands the
+    /// production evaluator; until then only tests hold one).
+    pub fn from_decision(decision: GrantDecision) -> Self {
+        let parts = decision.into_parts();
+        Self {
+            provider: parts.provider,
+            operation: parts.operation,
+            organization: parts.organization,
+            principal: parts.principal,
+            grant: parts.grant,
+            connection: parts.connection,
+        }
+    }
+
+    /// Admission asserted, not evaluated: the caller vouches that the requesting principal IS
+    /// the deployment owner — a peer already authenticated on the owner-only Unix socket, or
+    /// in-process composition inside a personal placement the owner started.
+    ///
+    /// No Grant evaluation runs on this path. Hosted request handling must never construct
+    /// admission through it; a hosted invocation is admitted only by a [`GrantDecision`].
+    pub fn for_local_owner(
         provider: impl Into<String>,
         operation: impl Into<String>,
         organization: impl Into<String>,
@@ -231,5 +252,52 @@ impl ZeroIoPlan {
 
     pub fn protocol(&self) -> &ProtocolPlan {
         &self.protocol
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::InitiationPolicy;
+
+    #[test]
+    fn a_grant_decision_is_the_hosted_admission_path() {
+        let connection = ConnectionAuthority::new(
+            "connection:grafana:ops",
+            InitiationPolicy::b10x_only(),
+        )
+        .expect("valid connection reference");
+        let decision = GrantDecision::admitted_for_tests(
+            "grafana",
+            "grafana/datasource.query",
+            "tenant:acme",
+            "principal:svc-observer",
+            "grant:observability-read",
+            connection.clone(),
+        );
+        let admitted = AdmittedOperation::from_decision(decision);
+        assert_eq!(admitted.provider(), "grafana");
+        assert_eq!(admitted.operation(), "grafana/datasource.query");
+        assert_eq!(admitted.organization(), "tenant:acme");
+        assert_eq!(admitted.principal(), "principal:svc-observer");
+        assert_eq!(admitted.grant(), "grant:observability-read");
+        assert_eq!(admitted.connection_authority(), &connection);
+    }
+
+    #[test]
+    fn the_local_owner_path_carries_the_same_evidence_shape() {
+        let connection =
+            ConnectionAuthority::new("connection:local", InitiationPolicy::b10x_only())
+                .expect("valid connection reference");
+        let admitted = AdmittedOperation::for_local_owner(
+            "sip",
+            "sip/dial",
+            "tenant:local",
+            "principal:owner",
+            "grant:local-owner",
+            connection,
+        );
+        assert_eq!(admitted.provider(), "sip");
+        assert_eq!(admitted.connection(), "connection:local");
     }
 }

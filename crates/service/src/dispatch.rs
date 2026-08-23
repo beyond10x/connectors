@@ -204,7 +204,7 @@ mod tests {
                 required_capabilities: BTreeSet::from([Capability::PublicNetwork]),
                 permission_subjects: vec!["public:pbx.example".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "acme",
                 "acme-call",
                 "org",

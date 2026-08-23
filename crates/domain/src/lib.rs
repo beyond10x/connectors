@@ -5,6 +5,7 @@
 pub mod audio;
 mod connection;
 mod discovery;
+mod evaluator;
 mod plan;
 pub mod voice;
 
@@ -15,6 +16,7 @@ pub use connection::{
 pub use discovery::{
     ConnectionCandidate, ConnectionCandidateSource, DiscoveryError, DiscoveryObservation,
 };
+pub use evaluator::GrantDecision;
 pub use plan::{
     AdmittedOperation, AudioPlan, BrowserPlan, Capability, DriverId, HttpPlan, Implementation,
     Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,

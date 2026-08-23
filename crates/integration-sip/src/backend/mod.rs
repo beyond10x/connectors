@@ -417,7 +417,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             self.config.initiation_policy(),
         )
         .map_err(|_| not_granted())?;
-        let admission = AdmittedOperation::from_grant_decision(
+        let admission = AdmittedOperation::for_local_owner(
             SIP_DIAL_PROVIDER,
             SIP_DIAL_OPERATION,
             context.tenant_id(),

@@ -159,7 +159,7 @@ mod tests {
                 required_capabilities: BTreeSet::from([Capability::PrivateNetwork]),
                 permission_subjects: vec!["loopback:127.0.0.1".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "loopback-pbx",
                 "call-establish",
                 "org",

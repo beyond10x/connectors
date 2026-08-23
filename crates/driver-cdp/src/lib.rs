@@ -495,7 +495,7 @@ mod tests {
                 ]),
                 permission_subjects: vec!["browser:dedicated-profile".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 operation,
                 "org",
@@ -838,7 +838,7 @@ mod live {
                 ]),
                 permission_subjects: vec!["browser:dedicated-profile".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 operation,
                 "org",

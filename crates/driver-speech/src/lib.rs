@@ -338,7 +338,7 @@ mod tests {
                 required_capabilities: BTreeSet::from([Capability::Device]),
                 permission_subjects: vec!["device:local-audio-output".to_owned()],
             },
-            AdmittedOperation::from_grant_decision(
+            AdmittedOperation::for_local_owner(
                 "b10x",
                 operation,
                 "org",
