@@ -88,6 +88,7 @@ will spawn children as each milestone is designed.
 | [S-054](S-054-pod-logs-are-a-hosted-read-only-kubernetes-operation.md) | Pod logs are a hosted read-only Kubernetes operation | ready | Platform | integrations, server |
 | [S-055](S-055-a-self-service-scope-subset-needs-no-operator.md) | A self-service scope subset needs no operator | done | Platform | identity |
 | [S-056](S-056-the-cli-bridges-mcp-over-stdio.md) | The CLI bridges MCP over stdio | backlog | Platform | config, integrations |
+| [S-057](S-057-kubernetes-joins-the-catalog.md) | Kubernetes joins the catalog | backlog | Platform | integrations, catalog, server |
 
 ## Epics in this seed
 
