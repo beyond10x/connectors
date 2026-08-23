@@ -13,8 +13,8 @@ use protocol::datasource::{
 };
 use protocol::event::{EventError, EventErrorCode, EventRequest, EventResult};
 use protocol::operation::{
-    OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
-    OperationSummary,
+    ApprovalPosture, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
+    OperationResult, OperationSummary,
 };
 use service::{
     BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectorBackend,
@@ -22,16 +22,42 @@ use service::{
 };
 use sha2::{Digest as _, Sha256};
 
+use crate::claims::{ClaimError, EventReplyClaims};
+
 /// Closed, deterministic registry of configured Integration backends.
 pub struct BackendRegistry {
     backends: Vec<Arc<dyn ConnectorBackend>>,
+    /// The personal placement's one-time claim over `event:` evidence (S-048). `None` on the
+    /// hosted placement, whose `ApprovalGate` spends approval records upstream of this registry.
+    event_reply_claims: Option<EventReplyClaims>,
 }
 
 impl BackendRegistry {
     /// Register a closed backend set. Backend order cannot affect non-search dispatch.
     #[must_use]
     pub fn new(backends: Vec<Arc<dyn ConnectorBackend>>) -> Self {
-        Self { backends }
+        Self {
+            backends,
+            event_reply_claims: None,
+        }
+    }
+
+    /// Register a closed backend set behind the local one-time event-reply claim.
+    ///
+    /// The personal composition binds this shape: an invocation whose description demands
+    /// approval and which presents an `event:` evidence reference spends that reference exactly
+    /// once at this seam, before any Integration is reached — the honest local counterpart of
+    /// the hosted route's approval redemption, and the reason no adapter reads the evidence
+    /// itself (catalog invariant rule 15).
+    #[must_use]
+    pub fn with_event_reply_claims(
+        backends: Vec<Arc<dyn ConnectorBackend>>,
+        claims: EventReplyClaims,
+    ) -> Self {
+        Self {
+            backends,
+            event_reply_claims: Some(claims),
+        }
     }
 
     fn operation_claims(&self, request: &OperationRequest) -> Vec<&Arc<dyn ConnectorBackend>> {
@@ -235,6 +261,23 @@ impl ConnectorBackend for BackendRegistry {
                 invoke
                     .description_ref
                     .clone_from(&selected.1.description_ref);
+                // The local one-time claim (S-048), spent before the backend can produce the
+                // outward effect: at most one reply per triggering event, even when the claim's
+                // dispatch then fails. Only an approval-demanding operation presenting an
+                // `event:` reference is claimed — a reference nothing demands stays unspent.
+                if let Some(claims) = &self.event_reply_claims {
+                    if selected.1.approval == ApprovalPosture::Required {
+                        if let Some(reference) = invoke
+                            .approval_evidence_ref
+                            .as_deref()
+                            .filter(|reference| reference.starts_with("event:"))
+                        {
+                            claims
+                                .claim(reference, &invoke.operation_ref)
+                                .map_err(claim_refusal)?;
+                        }
+                    }
+                }
                 backend
                     .handle(context, OperationRequest::Invoke(invoke))
                     .await
@@ -637,6 +680,28 @@ fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     encoded
+}
+
+fn claim_refusal(error: ClaimError) -> OperationError {
+    match error {
+        ClaimError::Replayed => OperationError::new(
+            OperationErrorCode::ApprovalDenied,
+            "the triggering event has already authorized one reply",
+            false,
+        ),
+        // Fail closed, in both cases: a claim that could not be made durable must not reply,
+        // because a restarted daemon would grant it again.
+        ClaimError::Capacity => OperationError::new(
+            OperationErrorCode::Unavailable,
+            "the local reply-claim journal is full",
+            false,
+        ),
+        ClaimError::Unavailable => OperationError::new(
+            OperationErrorCode::Unavailable,
+            "the local reply-claim journal is unavailable",
+            true,
+        ),
+    }
 }
 
 fn operation_not_found(message: &'static str) -> OperationError {
@@ -1376,4 +1441,9 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, EventErrorCode::Protocol);
     }
+
+    // The S-048 local claim-seam tests, textually included so they share this module's fixtures
+    // while the file itself stays under the module size fence — the same shape
+    // `integration-slack/src/backend.rs` uses for its test sibling.
+    include!("registry_claims_tests.rs");
 }

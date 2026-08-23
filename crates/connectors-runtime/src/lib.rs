@@ -2,9 +2,11 @@
 
 //! Reusable daemon composition below the command-line surface.
 
+mod claims;
 mod composition;
 mod registry;
 
+pub use claims::{ClaimError, EventReplyClaims};
 pub use composition::{
     acquire_argocd_token, argocd_acquisition, default_config_path, default_state_root,
     validate_state_root, HostedRuntime, PersonalCredentialStores, PersonalRuntime, RuntimeError,
