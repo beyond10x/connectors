@@ -344,7 +344,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new(connection, InitiationPolicy::b10x_only()).unwrap(),
+                ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::AudioV1(AudioPlan {
                 connection: connection.to_owned(),

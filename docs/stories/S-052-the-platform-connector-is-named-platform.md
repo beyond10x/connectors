@@ -33,3 +33,14 @@ serde alias or a documented migration — an existing personal config must keep 
 ## Progress
 
 - 2026-08-23 — filed on D5's resolution; the D5-blocked inventory is in the brand-sweep report.
+- 2026-08-24 — implemented on impl/S-052: crate `integration-b10x` → `integration-platform`;
+  `B10x{Connection,Integration}Config`/`B10xBackend`/`B10xIntegrationError` →
+  `Platform*`; `ConnectionInitiator::B10x` → `::Platform` (wire id stays `b10x` via
+  serde rename, pinned by the contract vectors); `InitiationConfig::B10x` → `::Platform`
+  (serializes `platform`, old spelling alias-parsed); config field `b10x` → `platform`
+  behind `#[serde(alias = "b10x")]` in personal and hosted configs, proven by
+  `an_existing_{personal,hosted}_config_with_the_old_b10x_section_parses_unchanged`;
+  `b10x_only()` → `platform_only()` and companions; consent pages and design/guide prose say
+  platform; `docs/design/09-b10x-modules.md` → `09-platform-modules.md` with a dated retitle
+  note; check-brand.sh D5 class shrunk to published identity + serialized state and now carries a
+  negative self-test that runs on every gate.

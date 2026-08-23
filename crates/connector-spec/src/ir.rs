@@ -1183,7 +1183,7 @@ impl RouteAdapter {
     }
 }
 
-/// One closed normalization from a vendor-observed type to a native B10x Provider.
+/// One closed normalization from a vendor-observed type to a native platform Provider.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DiscoveryMapping {

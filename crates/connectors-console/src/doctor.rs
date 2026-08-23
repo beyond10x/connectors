@@ -133,8 +133,8 @@ fn check_config(path: &Path) -> Check {
             if config.kubernetes.is_some() {
                 declared.push("kubernetes");
             }
-            if config.b10x.is_some() {
-                declared.push("b10x");
+            if config.platform.is_some() {
+                declared.push("platform");
             }
             if config.sip.is_some() {
                 declared.push("sip");

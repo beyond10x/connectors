@@ -286,7 +286,7 @@ impl MonitoringBackend {
         let policy = GrafanaIntegrationConfig {
             origin,
             grant_ref,
-            initiation: InitiationConfig::B10x,
+            initiation: InitiationConfig::Platform,
             target_grants: BTreeMap::new(),
             connect_session_ttl_seconds: 300,
         };
@@ -829,7 +829,7 @@ impl MonitoringInner {
     ) -> Result<Value, OperationError> {
         let connection = ConnectionAuthority::mediated(
             &child.connection_ref,
-            InitiationPolicy::b10x_only(),
+            InitiationPolicy::platform_only(),
             &child.parent_connection_ref,
             &child.resource_binding,
             DomainRouteAdapter::GrafanaDatasourceProxyV1,
@@ -1015,7 +1015,7 @@ impl MonitoringInner {
             } else {
                 ConnectionState::Degraded
             },
-            initiation: vec![ConnectionInitiator::B10x],
+            initiation: vec![ConnectionInitiator::Platform],
             route: ConnectionRoute::ViaConnection {
                 parent_connection_ref: child.parent_connection_ref.clone(),
                 route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
@@ -1587,18 +1587,17 @@ fn child_is_current(state: &MonitoringState, child: &ChildConnection) -> bool {
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
-        InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
+        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
         InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-        InitiationConfig::Both => vec![
-            ConnectionInitiator::B10x,
-            ConnectionInitiator::Provider,
-        ],
+        InitiationConfig::Both => {
+            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+        }
     }
 }
 
 fn initiation_policy(config: InitiationConfig) -> InitiationPolicy {
     match config {
-        InitiationConfig::B10x => InitiationPolicy::b10x_only(),
+        InitiationConfig::Platform => InitiationPolicy::platform_only(),
         InitiationConfig::Provider => InitiationPolicy::provider_only(),
         InitiationConfig::Both => InitiationPolicy::bidirectional(),
     }

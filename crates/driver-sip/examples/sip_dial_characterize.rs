@@ -43,7 +43,7 @@ async fn main() {
     let connection = "asterisk-dev-characterization";
     let alias = "asterisk-dev";
     let document = Document::parse(include_str!("../../../catalog/b10x.catalog.json"))
-        .expect("canonical B10x catalog parses");
+        .expect("canonical platform catalog parses");
     let operation = document
         .operation(SIP_DIAL_OPERATION)
         .expect("sip.dial is published");
@@ -56,7 +56,7 @@ async fn main() {
             "development",
             "operator",
             "characterization-grant",
-            ConnectionAuthority::new(connection, InitiationPolicy::b10x_only()).unwrap(),
+            ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
         ),
         &PlanningEnvironment {
             available_drivers: BTreeSet::from([DriverId::SipV1]),

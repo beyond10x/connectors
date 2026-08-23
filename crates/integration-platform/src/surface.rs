@@ -142,7 +142,7 @@ pub(super) const OPERATIONS: [(&str, &str, &str); 72] = [
     ("colab-workspace-detach", "colab.workspaces.detach", "Detach a checkout from a conversation"),
 ];
 
-impl super::B10xBackend {
+impl super::PlatformBackend {
     /// Resolve one operation by any of its names.
     pub(super) fn operation(&self, operation_ref: &str) -> Option<ResolvedOperation<'_>> {
         let (canonical, _, title) = super::operation_row(operation_ref)?;

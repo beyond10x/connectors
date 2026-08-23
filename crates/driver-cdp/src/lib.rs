@@ -501,7 +501,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new(connection, InitiationPolicy::b10x_only()).unwrap(),
+                ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
                 connection: connection.to_owned(),
@@ -844,7 +844,7 @@ mod live {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("live", InitiationPolicy::b10x_only()).unwrap(),
+                ConnectionAuthority::new("live", InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
                 connection: "live".to_owned(),

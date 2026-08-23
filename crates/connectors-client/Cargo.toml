@@ -1,6 +1,6 @@
 [package]
 name = "connectors-client"
-description = "Reusable typed clients for B10x Connector control protocols."
+description = "Reusable typed clients for platform Connector control protocols."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

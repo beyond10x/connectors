@@ -12,7 +12,7 @@
 //! slack        Option<PostgresState> + state_root: PathBuf
 //! gitlab       enum GitlabState { Postgres, Local { root } }
 //! jira         state_store: PostgresState        ← no local branch at all
-//! b10x   enum PersistedState + Option<PostgresState>
+//! platform     enum PersistedState + Option<PostgresState>
 //! sip          Option<PostgresState>
 //! monitoring   state_root: PathBuf only
 //! ```

@@ -22,7 +22,7 @@ members = [
     "../integration-gitlab",
     "../integration-jira",
     "../integration-catalog",
-    "../integration-b10x",
+    "../integration-platform",
     "../integration-monitoring",
     "../integration-sip",
     "../integration-slack",
@@ -50,7 +50,7 @@ integration-kubernetes = { version = "0.1.0", path = "../integration-kubernetes"
 integration-gitlab = { version = "0.1.0", path = "../integration-gitlab" }
 integration-jira = { version = "0.1.0", path = "../integration-jira" }
 integration-catalog = { version = "0.1.0", path = "../integration-catalog" }
-integration-b10x = { version = "0.1.0", path = "../integration-b10x" }
+integration-platform = { version = "0.1.0", path = "../integration-platform" }
 integration-monitoring = { version = "0.1.0", path = "../integration-monitoring" }
 integration-sip = { version = "0.1.0", path = "../integration-sip" }
 integration-slack = { version = "0.1.0", path = "../integration-slack" }

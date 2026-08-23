@@ -8,7 +8,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 [grafana]
 origin = "https://grafana.monitoring.example"
 grant_ref = "grant:grafana-read"
-initiation = "b10x"
+initiation = "platform"
 connect_session_ttl_seconds = 300
 
 [grafana.target_grants]

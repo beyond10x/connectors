@@ -136,7 +136,9 @@ pub enum ConnectionActor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionInitiator {
-    B10x,
+    /// Wire id `b10x`: pinned by the connector-connection contract vectors (D5).
+    #[serde(rename = "b10x")]
+    Platform,
     Provider,
 }
 
@@ -817,7 +819,7 @@ mod tests {
             integration_ref: "integration:prometheus".to_owned(),
             label: "Prometheus via Grafana".to_owned(),
             state: ConnectionState::Callable,
-            initiation: vec![ConnectionInitiator::B10x],
+            initiation: vec![ConnectionInitiator::Platform],
             route,
             scope: None,
             actor: None,

@@ -40,7 +40,7 @@ unambiguous mapping. Synthetic tests exercise independent tenant checkpoints.
 ## Key custody
 
 The private key file is deployment-owned, absolute, owner-readable, and used only by the
-B10x Integration signer. Modules receive a public key under their own audience. Key ID is
+platform Integration signer. Modules receive a public key under their own audience. Key ID is
 part of the protected header. A rotation may configure a bounded public-key overlap at receivers;
 private Identity, database, SIP, Slack, and provider credentials are never reused.
 

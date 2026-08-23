@@ -293,7 +293,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::b10x_only())
+                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::AudioV1(AudioPlan {
@@ -320,7 +320,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::b10x_only())
+                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::SipV1(domain::SipPlan {

@@ -5,13 +5,13 @@ use connector_state::StateStore;
 
 use super::*;
 
-impl B10xBackend {
+impl PlatformBackend {
     /// Compose a personal-local backend pinned to one exact Agent authority snapshot.
     pub fn personal(
-        config: B10xIntegrationConfig,
+        config: PlatformIntegrationConfig,
         principal: PrincipalContext,
         state_root: &Path,
-    ) -> Result<Self, B10xIntegrationError> {
+    ) -> Result<Self, PlatformIntegrationError> {
         Self::new(
             config,
             PrincipalAdmission::Exact(Box::new(principal)),
@@ -22,35 +22,35 @@ impl B10xBackend {
 
     /// Compose a hosted backend for Identity-verified principals in one tenant.
     pub fn hosted(
-        config: B10xIntegrationConfig,
+        config: PlatformIntegrationConfig,
         tenant_ids: Vec<String>,
         state_root: &Path,
-    ) -> Result<Self, B10xIntegrationError> {
+    ) -> Result<Self, PlatformIntegrationError> {
         Self::hosted_inner(config, tenant_ids, state_root, None)
     }
 
-    /// Compose hosted B10x state against the durable store the deployment bound.
+    /// Compose hosted platform state against the durable store the deployment bound.
     ///
     /// This used to name PostgreSQL, and naming it meant a person running the product on their own
     /// machine had to keep a database server alive to hold an audit journal and an event cursor.
     /// Which backend holds them is the deployment's choice; nothing below can see it.
     pub fn hosted_with_state(
-        config: B10xIntegrationConfig,
+        config: PlatformIntegrationConfig,
         tenant_ids: Vec<String>,
         state_root: &Path,
         hosted_state: Arc<dyn StateStore>,
-    ) -> Result<Self, B10xIntegrationError> {
+    ) -> Result<Self, PlatformIntegrationError> {
         Self::hosted_inner(config, tenant_ids, state_root, Some(hosted_state))
     }
 
     fn hosted_inner(
-        config: B10xIntegrationConfig,
+        config: PlatformIntegrationConfig,
         tenant_ids: Vec<String>,
         state_root: &Path,
         hosted_state: Option<Arc<dyn StateStore>>,
-    ) -> Result<Self, B10xIntegrationError> {
+    ) -> Result<Self, PlatformIntegrationError> {
         if tenant_ids.is_empty() {
-            return Err(B10xIntegrationError::InvalidConfiguration);
+            return Err(PlatformIntegrationError::InvalidConfiguration);
         }
         Self::new(
             config,
@@ -61,11 +61,11 @@ impl B10xBackend {
     }
 
     fn new(
-        config: B10xIntegrationConfig,
+        config: PlatformIntegrationConfig,
         admission: PrincipalAdmission,
         state_root: &Path,
         hosted_state: Option<Arc<dyn StateStore>>,
-    ) -> Result<Self, B10xIntegrationError> {
+    ) -> Result<Self, PlatformIntegrationError> {
         for socket in config.module_sockets.values() {
             transport::validate_module_socket(socket)?;
         }
@@ -78,18 +78,18 @@ impl B10xBackend {
         };
         let module_signer = ModuleSigner::load(&config)?;
         let document = Document::parse(DOCUMENT)
-            .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+            .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
         let catalog: Value = serde_json::from_str(DOCUMENT)
-            .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+            .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
         if document.connector != PROVIDER {
-            return Err(B10xIntegrationError::InvalidConfiguration);
+            return Err(PlatformIntegrationError::InvalidConfiguration);
         }
         let client = http_client(HTTP_CONNECT_TIMEOUT, HTTP_TOTAL_TIMEOUT)?;
         let deployment_sha256 = format!(
             "{:x}",
             Sha256::digest(
                 serde_json::to_vec(&config)
-                    .map_err(|_| B10xIntegrationError::InvalidConfiguration)?,
+                    .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?,
             )
         );
         let work_events = ModuleEventStore::open(
@@ -99,7 +99,7 @@ impl B10xBackend {
             hosted_state.clone(),
             "b10x.work-events",
         )
-        .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
+        .map_err(|()| PlatformIntegrationError::InvalidConfiguration)?;
         let planner_events = ModuleEventStore::open(
             "planner",
             state_root.join("b10x-planner-events.json"),
@@ -107,7 +107,7 @@ impl B10xBackend {
             hosted_state.clone(),
             "b10x.planner-events",
         )
-        .map_err(|()| B10xIntegrationError::InvalidConfiguration)?;
+        .map_err(|()| PlatformIntegrationError::InvalidConfiguration)?;
         Ok(Self {
             audio: config.audio_route().map(|_| Arc::new(Mutex::new(None))),
             browser: config.browser_route().map(|_| Arc::new(Mutex::new(None))),

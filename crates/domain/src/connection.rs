@@ -48,9 +48,12 @@ pub enum ConnectionRoute {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionInitiator {
-    /// A B10x principal may ask Connectors to start a declared Operation at the provider.
-    B10x,
-    /// The provider may start a declared Channel or session toward B10x.
+    /// A platform principal may ask Connectors to start a declared Operation at the provider.
+    /// The wire and state id stays `b10x`: it is the published initiator id (D5 keeps
+    /// provider identity irreversible; only the Rust name follows the platform's name).
+    #[serde(rename = "b10x")]
+    Platform,
+    /// The provider may start a declared Channel or session toward the platform.
     Provider,
 }
 
@@ -74,9 +77,9 @@ impl InitiationPolicy {
     }
 
     #[must_use]
-    pub fn b10x_only() -> Self {
+    pub fn platform_only() -> Self {
         Self {
-            allowed: BTreeSet::from([ConnectionInitiator::B10x]),
+            allowed: BTreeSet::from([ConnectionInitiator::Platform]),
         }
     }
 
@@ -90,10 +93,7 @@ impl InitiationPolicy {
     #[must_use]
     pub fn bidirectional() -> Self {
         Self {
-            allowed: BTreeSet::from([
-                ConnectionInitiator::B10x,
-                ConnectionInitiator::Provider,
-            ]),
+            allowed: BTreeSet::from([ConnectionInitiator::Platform, ConnectionInitiator::Provider]),
         }
     }
 
@@ -213,16 +213,16 @@ mod tests {
 
     #[test]
     fn the_three_policies_are_explicit_sets() {
-        let b10x = InitiationPolicy::b10x_only();
-        assert!(b10x.allows(ConnectionInitiator::B10x));
-        assert!(!b10x.allows(ConnectionInitiator::Provider));
+        let platform = InitiationPolicy::platform_only();
+        assert!(platform.allows(ConnectionInitiator::Platform));
+        assert!(!platform.allows(ConnectionInitiator::Provider));
 
         let provider = InitiationPolicy::provider_only();
-        assert!(!provider.allows(ConnectionInitiator::B10x));
+        assert!(!provider.allows(ConnectionInitiator::Platform));
         assert!(provider.allows(ConnectionInitiator::Provider));
 
         let both = InitiationPolicy::bidirectional();
-        assert!(both.allows(ConnectionInitiator::B10x));
+        assert!(both.allows(ConnectionInitiator::Platform));
         assert!(both.allows(ConnectionInitiator::Provider));
     }
 
@@ -238,7 +238,7 @@ mod tests {
     fn mediated_route_is_explicit_and_cannot_self_reference() {
         let connection = ConnectionAuthority::mediated(
             "prometheus-via-grafana",
-            InitiationPolicy::b10x_only(),
+            InitiationPolicy::platform_only(),
             "grafana-infra",
             "observation:datasource-1",
             RouteAdapter::GrafanaDatasourceProxyV1,
@@ -253,7 +253,7 @@ mod tests {
         assert_eq!(
             ConnectionAuthority::mediated(
                 "same",
-                InitiationPolicy::b10x_only(),
+                InitiationPolicy::platform_only(),
                 "same",
                 "observation:1",
                 RouteAdapter::GrafanaDatasourceProxyV1,

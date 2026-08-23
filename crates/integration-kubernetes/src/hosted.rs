@@ -805,7 +805,7 @@ fn control_connection() -> ControlConnectionSummary {
         integration_ref: "kubernetes".to_owned(),
         label: "Development cluster".to_owned(),
         state: ConnectionState::Callable,
-        initiation: vec![ConnectionInitiator::B10x],
+        initiation: vec![ConnectionInitiator::Platform],
         route: ConnectionRoute::Direct,
         scope: None,
         actor: None,
