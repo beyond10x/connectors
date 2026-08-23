@@ -18,7 +18,7 @@ use protocol::operation::{
 use service::{ConnectorBackend, PrincipalContext};
 
 use super::enforcement::EnforcementRefusal;
-use super::{operation_failure, HostedState};
+use super::{operation_failure, HostedPrincipal, HostedState};
 
 /// Dispatch one proven invocation, consuming the [`AdmittedOperation`] by value.
 ///
@@ -86,9 +86,12 @@ fn signal_proof_gap() -> OperationError {
 ///
 /// A session nobody holds answers the same refusal a session no Grant admits: hosted callers
 /// cannot read session state at all today, and the signal seam must not become the way to
-/// probe which execution refs exist.
+/// probe which execution refs exist. The refusal is journaled like every other signal
+/// decision, so a caller spraying guessed execution refs leaves a trail — and a journal that
+/// cannot take the row refuses as unavailable rather than refuse unaudited.
 pub(super) async fn session_for_signal(
     state: &HostedState,
+    principal: &HostedPrincipal,
     owner: &PrincipalContext,
     request_id: &str,
     signal: &SessionSignalRequest,
@@ -109,9 +112,13 @@ pub(super) async fn session_for_signal(
             wrong_recheck_result(),
             StatusCode::INTERNAL_SERVER_ERROR,
         ))),
-        Err(error) if error.code == OperationErrorCode::NotFound => Err(Box::new(
-            enforcement_refusal_response(request_id, EnforcementRefusal::NotAdmitted),
-        )),
+        Err(error) if error.code == OperationErrorCode::NotFound => {
+            let refusal = match state.authority.journal_unknown_signal(principal, signal) {
+                Ok(()) => EnforcementRefusal::NotAdmitted,
+                Err(unavailable) => unavailable,
+            };
+            Err(Box::new(enforcement_refusal_response(request_id, refusal)))
+        }
         Err(error) => Err(Box::new(operation_failure(
             request_id,
             error,

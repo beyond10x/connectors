@@ -1704,9 +1704,13 @@ fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
     let hosted_source = root.join("crates/server/src/hosted.rs");
     let hosted = std::fs::read_to_string(&hosted_source)
         .unwrap_or_else(|error| panic!("read {}: {error}", hosted_source.display()));
+    // Production lines with line comments cut away: a comment that merely mentions a seam or a
+    // variant must not satisfy this invariant. (Cutting at `//` inside a string literal is a
+    // theoretical false negative; the tokens searched here never share a line with such a
+    // string, and a false negative fails loudly rather than admitting a bypass.)
     let hosted_production = production_lines(&hosted)
         .into_iter()
-        .map(|(_, line)| line)
+        .map(|(_, line)| line.split("//").next().unwrap_or(""))
         .collect::<Vec<_>>()
         .join("\n");
     for variant in OPERATION_REQUEST_VARIANTS {
@@ -1728,34 +1732,60 @@ fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
 }
 
 /// The variants of `pub enum OperationRequest`, parsed from the protocol source in declaration
-/// order: brace-tracked to the enum's closing brace, one variant per `Name(...)` line.
+/// order — and **closed over line shapes**: every line directly inside the enum body must be
+/// blank, a comment, an attribute, or a variant this parser recognizes (tuple, struct, or unit
+/// shaped). An unrecognized line is a failure, not a skip — a variant shape the parser cannot
+/// read is exactly how a new route could slip past the pin, so the parser refuses to guess.
 fn operation_request_variants(protocol: &str) -> Vec<String> {
     let mut variants = Vec::new();
     let mut inside = false;
-    let mut depth: i64 = 0;
-    for line in protocol.lines() {
+    // Brace and paren depth at the *start* of the current line: a line opening at brace depth 1
+    // and paren depth 0 introduces a variant (or is trivia); anything deeper is a variant's own
+    // body (struct fields, a reformatted tuple payload) and is not a declaration site.
+    let mut braces: i64 = 0;
+    let mut parens: i64 = 0;
+    for (index, line) in protocol.lines().enumerate() {
         if !inside {
             if line.starts_with("pub enum OperationRequest {") {
                 inside = true;
-                depth = 1;
+                braces = 1;
             }
             continue;
         }
-        let opens = i64::try_from(line.matches('{').count()).expect("line braces fit");
-        let closes = i64::try_from(line.matches('}').count()).expect("line braces fit");
-        depth += opens - closes;
-        if depth <= 0 {
+        let starts_interior = braces > 1 || parens > 0;
+        braces += i64::try_from(line.matches('{').count()).expect("line braces fit")
+            - i64::try_from(line.matches('}').count()).expect("line braces fit");
+        parens += i64::try_from(line.matches('(').count()).expect("line parens fit")
+            - i64::try_from(line.matches(')').count()).expect("line parens fit");
+        if braces <= 0 {
             break;
         }
-        let trimmed = line.trim();
-        if let Some((name, _)) = trimmed.split_once('(') {
-            if !name.is_empty()
-                && name.chars().next().is_some_and(char::is_uppercase)
-                && name.chars().all(char::is_alphanumeric)
-            {
-                variants.push(name.to_owned());
-            }
+        if starts_interior {
+            continue;
         }
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("#[") {
+            continue;
+        }
+        let name: String = trimmed
+            .chars()
+            .take_while(|character| character.is_ascii_alphanumeric())
+            .collect();
+        let rest = trimmed[name.len()..].trim_start();
+        let variant_shaped = name.chars().next().is_some_and(char::is_uppercase)
+            && (rest.is_empty()
+                || rest.starts_with('(')
+                || rest.starts_with('{')
+                || rest.starts_with(','));
+        assert!(
+            variant_shaped,
+            "line {} inside `pub enum OperationRequest` is not a shape this invariant can read \
+             (`{trimmed}`). The parser is deliberately closed so no variant can slip past the \
+             pinned grammar; teach `operation_request_variants` the new shape on purpose, then \
+             route the variant through the hosted admission seam",
+            index + 1
+        );
+        variants.push(name);
     }
     assert!(
         inside,

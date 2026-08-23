@@ -102,14 +102,19 @@ Mechanics, all in the hosted route (`crates/server/src/hosted.rs` +
 - **No approval redemption per signal.** The one-time approval governs establishment and was
   spent by the invocation that created the session; the Grant is the session's continuing
   authority, and revoking it refuses the next signal. A per-keypress one-time record would make
-  interacting with a live far end impossible.
+  interacting with a live far end impossible. Revocation silences the session but does not end
+  it: the established call keeps running, because hosted `SessionTerminate` remains 503-fenced —
+  ending a live session from the hosted route is the durable-session-decisions work, and stating
+  that gap here is deliberate.
 - **No read path.** A signal is always effect-bearing; a Grant refusal never falls back to the
   receiver-policy path that serves described reads.
 - **Refusals are axis-free and journaled.** Signal refusals render byte-identically to the
   invoke path's 403; a session nobody holds answers the same bytes, so the seam is not an
-  existence oracle for execution refs. Every decision — admitted and refused — lands in the
-  signal admission journal (`signal.audit` state cell, NDJSON rows) before dispatch; a journal
-  that cannot take the row refuses as unavailable rather than act unaudited. The terminal
+  existence oracle for execution refs — and that refusal is journaled too, with empty operation
+  and Connection because the deployment holds no session to name, so a caller spraying guessed
+  execution refs leaves a trail. Every decision — admitted and refused — lands in the signal
+  admission journal (`signal.audit` state cell, NDJSON rows) before dispatch; a journal that
+  cannot take the row refuses as unavailable rather than act unaudited. The terminal
   "signal sent" record stays where it already was: the Integration's own audit journal, written
   on success.
 - The catalogue invariant family gains rule 16: the operation-protocol request grammar is a
