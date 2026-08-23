@@ -33,7 +33,7 @@ use connectors_console::{
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "connectors", version, about = "B10x Connectors service")]
+#[command(name = "connectors", version, about = "b10x Connectors service")]
 struct Cli {
     /// How results are rendered. `json` and `yaml` also carry failures on stdout, so a pipe reads
     /// the refusal instead of an empty stream.

@@ -70,7 +70,7 @@ exclude = [
 [workspace.package]
 edition = "2021"
 # The predecessor differential has passed and its 0.26 line is retired. `0.1.0` is the first
-# b10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
+# beyond10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/b10x/b10x"

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/web/catalog.schema.json",
+  "$id": "https://github.com/beyond10x/connectors/blob/main/web/catalog.schema.json",
   "title": "connectors documentation-site catalog projection",
   "type": "object",
   "additionalProperties": false,

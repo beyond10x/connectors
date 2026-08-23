@@ -1,4 +1,4 @@
-# Vision: b10x/connectors
+# Vision: b10x connectors
 
 **Status:** historical founding document; superseded where noted below · **Date:** 2026-08-13
 

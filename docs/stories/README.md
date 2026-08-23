@@ -1,4 +1,4 @@
-# b10x/connectors — backlog
+# b10x connectors — backlog
 
 The opening backlog. One file per story lives in this directory (`S-NNN-<slug>.md`); frontmatter
 carries `id`, `title`, `pillar`, `status`, `priority`, `epic`, optional `design`, query-only `areas`,
@@ -113,7 +113,7 @@ will spawn children as each milestone is designed.
   the final plugin-host deletion) are unfiled here; S-010 covers wave 1 only.
 - **Application migration waves remain historical planning input.** Their unavailable predecessor
   record is not normative; each future wave must restate its own parity and deletion rules in a
-  B10x story before work starts.
+  b10x story before work starts.
 - **Later-shaped work** named in the vision — SDKs, the platform CLI, an MCP endpoint, the SaaS org
   lifecycle, catalog overlays, the coverage-matrix projection, the meta-tools discovery surface — is
   deliberately unfiled until its milestone is in reach.

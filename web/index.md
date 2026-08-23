@@ -67,5 +67,5 @@ an unsafe or incomplete request.
 ## Follow the project
 
 The source, release history, local build instructions, and contribution workflow live in the
-[private monorepo](https://github.com/b10x/b10x) under `foundation/connectors`. The public site stays focused
+[private repository](https://github.com/beyond10x/connectors). The public site stays focused
 on the connector catalogue and its user-facing contract.

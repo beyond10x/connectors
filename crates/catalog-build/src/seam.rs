@@ -33,7 +33,7 @@ pub use connector_spec::Connector;
 
 /// The generator identity stamped into every artifact.
 ///
-/// The b10x/connectors product identity and workspace version. It remains part of the lock
+/// The beyond10x/connectors product identity and workspace version. It remains part of the lock
 /// hash domain, so a generator change invalidates generated output rather than preserving stale
 /// artifacts. The predecessor differential has passed; its identity is no longer an input.
 pub fn generator() -> String {

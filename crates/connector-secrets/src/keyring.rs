@@ -44,7 +44,7 @@ use crate::{Secret, SecretStore, StoreError};
 
 /// The collection attribute every entry this component owns carries.
 ///
-/// One well-known value so an operator can find, audit and revoke everything B10x stored
+/// One well-known value so an operator can find, audit and revoke everything b10x stored
 /// with a single `secret-tool search service b10x-connectors` — and so nothing this component
 /// writes can collide with another application's entry.
 const SERVICE_ATTRIBUTE: &str = "b10x-connectors";
@@ -168,7 +168,7 @@ impl SecretStore for KeyringStore {
 
     async fn put(&self, reference: &CredentialRef, secret: &Secret) -> Result<(), StoreError> {
         let label = format!(
-            "B10x {} {}",
+            "b10x {} {}",
             reference.authority(),
             reference.credential()
         );

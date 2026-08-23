@@ -3,7 +3,7 @@
 Gitleaks 8.30.1 reports 73 findings represented by 72 exact fingerprints in the repository's
 pre-hardening history. The current tree has no finding. Review classified the historical material
 as imported examples, generated connector descriptors, vendored research, or a conformance-test
-sentinel; none is runtime credential material issued to B10x.
+sentinel; none is runtime credential material issued to b10x.
 
 | Historical source | Findings | Disposition |
 | --- | ---: | --- |

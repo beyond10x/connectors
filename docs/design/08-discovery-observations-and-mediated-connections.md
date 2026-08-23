@@ -27,7 +27,7 @@ core nouns is Grafana-specific.
 | **Agent Endpoint** | The value-free Harness projection of a materialized Connection. An Endpoint Grant separately controls run visibility. | Agent-owned projection, not a Connector route or replacement Grant. |
 | **Capability resource** | A broad Agent graph node such as a workspace, repository, cluster, database, or execution environment. | No authority by itself. |
 | **Datasource** | A named, declared, read-only record/entity surface with an explicit access mode and a concrete binding. Use **Grafana data source** only for Grafana's vendor object. | No authority by itself. |
-| **Federation** | B10x central-to-satellite topology. | Separate from mediated routing. |
+| **Federation** | b10x central-to-satellite topology. | Separate from mediated routing. |
 
 “Host discovery” retires for this use. A discovered Grafana data source can name a logical cluster,
 proxy, service, or hosted backend rather than one host. “Endpoint discovery” is also too early:

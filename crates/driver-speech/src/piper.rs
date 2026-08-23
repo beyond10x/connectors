@@ -582,7 +582,7 @@ mod live {
         };
         let mut engine = PiperSpeechEngine::new(config, speaker());
         engine.probe().expect("probe");
-        let utterance = Utterance::new("B10x speech is online.", 1_000).expect("utterance");
+        let utterance = Utterance::new("b10x speech is online.", 1_000).expect("utterance");
         let outcome = engine
             .speak(&utterance, &SpeechCancellation::new())
             .expect("speak");

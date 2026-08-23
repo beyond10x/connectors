@@ -35,7 +35,7 @@ We use the majority nouns; every divergence below says why.
 
 **2026-08-14 identity-boundary amendment.** This section supersedes the founding vision's wording
 that assigned identity, organizations, login sessions, and one reusable client token to this
-platform. General identity belongs to `b10x/identity`; Connectors owns only personal-local
+platform. General identity belongs to `beyond10x/identity`; Connectors owns only personal-local
 authentication plus receiver-side admission, connector capabilities, and connector Grants.
 
 ### Admitted principal and tenant projection

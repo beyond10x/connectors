@@ -1,7 +1,7 @@
 # Design 03: beyond HTTP — drivers, satellites, and the byte plane
 
 **Status:** accepted v1 design; native-voice amendment accepted; external runtime artifacts deferred · **Date:** 2026-08-13
-**Inputs:** the predecessor rich-runtime program; B10x architecture repository boundaries;
+**Inputs:** the predecessor rich-runtime program; the architecture boundaries pinned from the b10x monorepo;
 how AMI/AGI (Sangoma Asterisk), DNS/UDP, SIP, TCP protocols and audio channels reach the connector
 model.
 
@@ -69,7 +69,7 @@ Connectors admits the principal and grant, resolves the connection, and dispatch
 its closed driver registry. A missing driver or capability is a named refusal before credential
 access; it never falls back to HTTP, Flux, an ambient executable or another billing/authority domain.
 
-`b10x/substrate` is a separate, Flux-free execution service. It knows how to run and observe
+`beyond10x/substrate` is a separate, Flux-free execution service. It knows how to run and observe
 bounded processes, containers and workloads; it does not understand providers, connector grants,
 vendor handshakes or catalog documents. Built-in drivers do not require substrate merely because
 they open a socket. If a later connector driver is supplied as an executable artifact, connectors
@@ -164,7 +164,7 @@ least these constraints:
 Until that decision exists, every supported driver is built into connectors and reviewed with the
 platform.
 
-## 8. Ownership across the B10x stack
+## 8. Ownership across the b10x stack
 
 | Owner | Beyond-HTTP responsibility |
 |---|---|

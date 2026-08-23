@@ -3,7 +3,7 @@
 # `schema` entries are JSON Schemas and are validated against the meta-schema named by their own
 # `$schema`. `document` entries are repository-owned JSON and validate against the named local
 # schema. `syntax` entries are imported source inputs: we promise well-formed JSON, not that an
-# upstream vendor conforms to a B10x-owned data model. Syntax-only entries are intentionally
+# upstream vendor conforms to a b10x-owned data model. Syntax-only entries are intentionally
 # exact paths so a newly added JSON file cannot inherit an exemption from its directory.
 
 version = 1
