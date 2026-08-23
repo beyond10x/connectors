@@ -1,64 +1,6 @@
 use super::*;
 
 impl SlackInner {
-    pub(super) fn authorize_companion_event_reply(
-        &self,
-        connection: &StoredConnection,
-        operation_ref: &str,
-        event_ref: &str,
-        input: &mut Value,
-    ) -> Result<(), OperationError> {
-        if connection.profile != SlackConnectionProfile::CompanionBot
-            || operation_ref != "slack-chat-post-message"
-        {
-            return Err(OperationError::new(
-                OperationErrorCode::ApprovalRequired,
-                "an event may authorize only its companion bot's message reply",
-                false,
-            ));
-        }
-        let event = self
-            .event_store
-            .replay(event_ref)
-            .filter(|event| {
-                event.connection_ref == connection.connection_ref
-                    && event.event_type == "app_mention"
-            })
-            .ok_or_else(|| {
-                OperationError::new(
-                    OperationErrorCode::ApprovalRequired,
-                    "the Slack mention does not authorize this Connection",
-                    false,
-                )
-            })?;
-        let now = now_ms().ok_or_else(operation_unavailable)?;
-        if now < event.received_at_unix_ms
-            || now.saturating_sub(event.received_at_unix_ms) > AUTO_REPLY_MAX_AGE_MS
-        {
-            return Err(OperationError::new(
-                OperationErrorCode::ApprovalRequired,
-                "the Slack mention reply window has expired",
-                false,
-            ));
-        }
-        let payload = event.payload.as_object().ok_or_else(operation_invalid)?;
-        let channel = payload
-            .get("channel")
-            .and_then(Value::as_str)
-            .filter(|value| valid_slack_id(value))
-            .ok_or_else(operation_invalid)?;
-        let thread_ts = payload
-            .get("thread_ts")
-            .and_then(Value::as_str)
-            .or_else(|| payload.get("ts").and_then(Value::as_str))
-            .filter(|value| valid_slack_timestamp(value))
-            .ok_or_else(operation_invalid)?;
-        let input = input.as_object_mut().ok_or_else(operation_invalid)?;
-        input.insert("channel".to_owned(), Value::String(channel.to_owned()));
-        input.insert("thread_ts".to_owned(), Value::String(thread_ts.to_owned()));
-        Ok(())
-    }
-
     pub(super) fn describe(&self, connection: &StoredConnection) -> ConnectionDescription {
         let state = lock(&self.channel_states)
             .get(&connection.connection_ref)

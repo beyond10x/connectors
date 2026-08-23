@@ -10,6 +10,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
+use domain::AdmittedOperation;
 use futures_util::StreamExt as _;
 use protocol::catalog::{
     RequestEnvelope as CatalogRequestEnvelope, ResponseEnvelope as CatalogResponseEnvelope,
@@ -27,18 +28,20 @@ use protocol::event::{
     ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
 };
 use protocol::operation::{
-    DescribeRequest, OperationError, OperationErrorCode, OperationRequest, OperationResult,
-    RequestEnvelope, ResponseEnvelope, MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
+    DescribeRequest, InvokeRequest, OperationError, OperationErrorCode, OperationRequest,
+    OperationResult, RequestEnvelope, ResponseEnvelope,
+    MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
+    PrincipalContext,
 };
 
 mod enforcement;
 mod principal;
 
-pub use enforcement::{canonical_input_digest, issue_approval, HostedAuthority};
+pub use enforcement::{canonical_input_digest, issue_approval, HostedAuthority, RecoveryError};
 use enforcement::{EnforcementRefusal, InvokeAdmission};
 pub use principal::HostedPrincipal;
 
@@ -687,6 +690,7 @@ async fn operation(
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
+    let mut admitted = None;
     let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
         let description = state
@@ -727,9 +731,16 @@ async fn operation(
             // for callers whose Grants cover no effects.
             Ok(InvokeAdmission::ReadPath) => {}
             // Admission proven: the AdmittedOperation was built through `from_decision`
-            // against wall-clock time inside the authority. S-047 threads the proof into the
-            // effect backends in place of their local approval-presence checks.
-            Ok(InvokeAdmission::Proven { redemption }) => redeemed = redemption,
+            // against wall-clock time inside the authority, and the dispatch seam below
+            // consumes it by value — the Integrations' own approval-presence checks are
+            // deleted in its favour (S-047).
+            Ok(InvokeAdmission::Proven {
+                operation,
+                redemption,
+            }) => {
+                admitted = Some(operation);
+                redeemed = redemption;
+            }
             // One axis-free body for every 403: grant, approval, and replay refusals render
             // byte-identically, and replay is distinct only in the gate's own journal.
             Err(EnforcementRefusal::NotAdmitted) => {
@@ -773,7 +784,14 @@ async fn operation(
         );
     }
     let request_id = request.request_id;
-    let outcome = state.backend.handle(&owner, request.request).await;
+    let outcome = match (request.request, admitted) {
+        // The proven seam: an invocation the authority admitted as effect-capable reaches the
+        // backend only here, with the AdmittedOperation consumed by value.
+        (OperationRequest::Invoke(invoke), Some(operation)) => {
+            dispatch_admitted(&*state.backend, &owner, *operation, invoke).await
+        }
+        (request, _) => state.backend.handle(&owner, request).await,
+    };
     if let Some(redemption) = redeemed {
         // The terminal outcome row follows dispatch; the attempted row was durable before it.
         state.authority.conclude(redemption, outcome.is_ok());
@@ -787,6 +805,33 @@ async fn operation(
         Err(error) => ResponseEnvelope::failure(request_id, error),
     };
     Json(response).into_response()
+}
+
+/// Dispatch one proven invocation, consuming the [`AdmittedOperation`] by value.
+///
+/// This is the only seam through which an invocation the authority admitted as effect-capable
+/// reaches a backend, and it holds the proof for exactly the length of dispatch (S-047). The
+/// proof's own operation and Connection must be the ones dispatched — the description lease
+/// already binds them, and repeating the identity here keeps the proof load-bearing rather than
+/// ceremonial.
+async fn dispatch_admitted(
+    backend: &dyn ConnectorBackend,
+    owner: &PrincipalContext,
+    operation: AdmittedOperation,
+    invoke: InvokeRequest,
+) -> Result<OperationResult, OperationError> {
+    if operation.operation() != invoke.operation_ref
+        || operation.connection() != invoke.connection_ref
+    {
+        return Err(OperationError::new(
+            OperationErrorCode::NotGranted,
+            "the admission proof does not cover this invocation",
+            false,
+        ));
+    }
+    backend
+        .handle(owner, OperationRequest::Invoke(invoke))
+        .await
 }
 
 async fn event(

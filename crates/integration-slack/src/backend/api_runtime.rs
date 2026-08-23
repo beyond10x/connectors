@@ -824,7 +824,7 @@ impl SlackInner {
     pub(super) async fn invoke(
         &self,
         context: &PrincipalContext,
-        mut request: InvokeRequest,
+        request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         if !is_slack_operation(&request.operation_ref) {
             return Err(operation_not_found());
@@ -847,29 +847,13 @@ impl SlackInner {
                 false,
             ));
         }
-        let mut event_reply_claim = None;
-        if operation_approval(&request.operation_ref) == ApprovalPosture::Required {
-            match request.approval_evidence_ref.as_deref() {
-                None => {
-                    return Err(OperationError::new(
-                        OperationErrorCode::ApprovalRequired,
-                        "this Slack write requires correlated approval evidence",
-                        false,
-                    ));
-                }
-                Some(event_ref) if event_ref.starts_with("event:") => {
-                    let event_ref = event_ref.to_owned();
-                    self.authorize_companion_event_reply(
-                        &connection,
-                        &request.operation_ref,
-                        &event_ref,
-                        &mut request.input,
-                    )?;
-                    event_reply_claim = Some(event_ref);
-                }
-                Some(_) => {}
-            }
-        }
+        // Writes describe `ApprovalPosture::Required`; the demanded approval is verified and
+        // spent one-time upstream by the sealed proof chain (S-045, S-046) before this
+        // Integration is reachable, so no local reading of the evidence reference decides
+        // admission (S-047). The event-authorized companion reply — an `event:` reference
+        // standing in for an approval, pinned to the mention's thread and spent through a
+        // local claim store — went with it: an event that should authorize a reply must be
+        // issued as an approval record, not re-decided here.
         let operation = connector_resolve::document::operation(&request.operation_ref)
             .ok_or_else(operation_not_found)?;
         let validator = jsonschema::validator_for(operation.input_schema())
@@ -931,18 +915,6 @@ impl SlackInner {
             return Err(operation_not_granted());
         }
         let outbound = plan.request;
-        if let Some(event_ref) = event_reply_claim {
-            self.reply_claims
-                .claim(&event_ref, now_ms().ok_or_else(operation_unavailable)?)
-                .map_err(|error| match error.code {
-                    "reply-already-claimed" => OperationError::new(
-                        OperationErrorCode::ApprovalRequired,
-                        "the Slack mention has already authorized one reply",
-                        false,
-                    ),
-                    _ => operation_unavailable(),
-                })?;
-        }
         let audit_ref = format!(
             "audit:slack:{}",
             random_uuid().map_err(|_| operation_unavailable())?

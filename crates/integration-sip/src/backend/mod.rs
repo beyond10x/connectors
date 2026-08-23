@@ -335,8 +335,6 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         digest.update(self.config.connection.connection_ref.as_bytes());
         digest.update(b"\0");
         digest.update(self.config.connection.grant_ref.as_bytes());
-        digest.update(b"\0");
-        digest.update(self.config.connection.approval_evidence_ref.as_bytes());
         format!("description-sha256-{:x}", digest.finalize())
     }
 
@@ -379,23 +377,11 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                 false,
             ));
         }
-        match request.approval_evidence_ref.as_deref() {
-            None => {
-                return Err(OperationError::new(
-                    OperationErrorCode::ApprovalRequired,
-                    "external approval evidence is required",
-                    false,
-                ))
-            }
-            Some(actual) if actual != self.config.connection.approval_evidence_ref => {
-                return Err(OperationError::new(
-                    OperationErrorCode::ApprovalDenied,
-                    "external approval evidence is not current",
-                    false,
-                ))
-            }
-            Some(_) => {}
-        }
+        // The dial describes `ApprovalPosture::Required`; the demanded approval is verified and
+        // spent upstream by the sealed proof chain (S-045, S-046) on the hosted route, and a
+        // personal placement is the owner's own local admission. The configured evidence string
+        // is no longer read: a deployment-config value must never act as a shared approval
+        // password (S-047).
         let input: SipDialInput = serde_json::from_value(request.input).map_err(|_| invalid())?;
         input.validate().map_err(|_| invalid())?;
         // The trunk actually selected, which is the default when the caller named none. Looking it
@@ -950,13 +936,15 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         }
     }
 
-    fn invoke(description_ref: String, approval: Option<&str>, target: &str) -> OperationRequest {
+    fn invoke(description_ref: String, target: &str) -> OperationRequest {
         OperationRequest::Invoke(InvokeRequest {
             operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
             connection_ref: "connection-asterisk-dev".to_owned(),
             description_ref,
             input: serde_json::json!({"target": target}),
-            approval_evidence_ref: approval.map(str::to_owned),
+            // The demanded approval is verified and spent upstream by the proof chain
+            // (S-047); the Integration no longer reads the evidence reference.
+            approval_evidence_ref: None,
         })
     }
 
@@ -1186,29 +1174,14 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         assert_eq!(operations[0].operation_ref, SIP_DIAL_TOOL_REF);
         let lease = description_ref(&backend, &context).await;
 
-        let missing_approval = backend
-            .handle(&context, invoke(lease.clone(), None, "asterisk-dev"))
-            .await
-            .unwrap_err();
-        assert_eq!(missing_approval.code, OperationErrorCode::ApprovalRequired);
         let injected_destination = backend
-            .handle(
-                &context,
-                invoke(
-                    lease.clone(),
-                    Some("approval-sip-dial-1"),
-                    "sip:callee@127.0.0.1:5060",
-                ),
-            )
+            .handle(&context, invoke(lease.clone(), "sip:callee@127.0.0.1:5060"))
             .await
             .unwrap_err();
         assert_eq!(injected_destination.code, OperationErrorCode::InvalidInput);
 
         let result = backend
-            .handle(
-                &context,
-                invoke(lease, Some("approval-sip-dial-1"), "asterisk-dev"),
-            )
+            .handle(&context, invoke(lease, "asterisk-dev"))
             .await
             .unwrap();
         let OperationResult::Invoke(invocation) = result else {
@@ -1293,10 +1266,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
         let context = backend.principal.clone();
         let lease = description_ref(&backend, &context).await;
         let refused = backend
-            .handle(
-                &context,
-                invoke(lease, Some("approval-sip-dial-1"), "asterisk-dev"),
-            )
+            .handle(&context, invoke(lease, "asterisk-dev"))
             .await
             .unwrap_err();
         assert_eq!(refused.code, OperationErrorCode::NotGranted);
@@ -1325,10 +1295,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
             "description leases must bind deployment-selected routing"
         );
         let unknown_alias = alias_backend
-            .handle(
-                &alias_context,
-                invoke(alias_lease, Some("approval-sip-dial-1"), "unconfigured-pbx"),
-            )
+            .handle(&alias_context, invoke(alias_lease, "unconfigured-pbx"))
             .await
             .unwrap_err();
         assert_eq!(unknown_alias.code, OperationErrorCode::NotGranted);

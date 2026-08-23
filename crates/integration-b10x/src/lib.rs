@@ -61,8 +61,8 @@ mod work_events;
 use audit::{AuditEvent, AuditJournal};
 use module_signing::ModuleSigner;
 use policy::{
-    all_operation_rows, approval, check_approval, effect, module_operation, operation_row,
-    post_dispatch_error, response_schema,
+    all_operation_rows, approval, effect, module_operation, operation_row, post_dispatch_error,
+    response_schema,
 };
 use transport::{module_client, module_id, module_origin};
 use work_events::ModuleEventStore;
@@ -266,11 +266,10 @@ impl B10xBackend {
                 false,
             ));
         }
-        check_approval(
-            canonical,
-            operation.effects(),
-            request.approval_evidence_ref.as_deref(),
-        )?;
+        // Writes and the named device operations describe `ApprovalPosture::Required`; the
+        // demanded approval is verified and spent upstream by the sealed proof chain (S-045,
+        // S-046) on the hosted route, and a personal placement is the owner's own local
+        // admission. No local reading of the evidence reference decides admission (S-047).
         validate_json(operation.input_schema(), &request.input).map_err(|_| invalid())?;
         validate_semantic_input(canonical, &request.input)?;
         let plan = self.plan(context, operation, canonical)?;

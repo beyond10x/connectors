@@ -812,14 +812,20 @@ async fn planner_invocation_crosses_the_private_http_boundary_with_signed_author
 }
 
 #[tokio::test]
-async fn copied_static_approval_text_cannot_authorize_an_effect() {
+async fn a_write_passes_no_local_approval_gate() {
+    // S-047: the local approval ceremony is gone. A declared write proceeds past admission
+    // whether or not the caller carries an evidence reference — the demanded approval is
+    // verified and spent upstream by the proof chain on the hosted route, and a personal
+    // placement is the owner's own local admission. `{}` violates the operation's input
+    // schema, so both refusals now come from validation, past the point where the approval
+    // gate used to refuse, and nothing is dispatched or audited.
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let backend =
         B10xBackend::personal(config(temporary.path()), principal(), temporary.path())
             .unwrap();
 
-    let missing = invoke_operation(
+    let bare = invoke_operation(
         &backend,
         "work.requests.create",
         serde_json::json!({}),
@@ -827,9 +833,9 @@ async fn copied_static_approval_text_cannot_authorize_an_effect() {
     )
     .await
     .unwrap_err();
-    assert_eq!(missing.code, OperationErrorCode::ApprovalRequired);
+    assert_eq!(bare.code, OperationErrorCode::InvalidInput);
 
-    let copied = invoke_operation(
+    let carried = invoke_operation(
         &backend,
         "work.requests.create",
         serde_json::json!({}),
@@ -837,7 +843,7 @@ async fn copied_static_approval_text_cannot_authorize_an_effect() {
     )
     .await
     .unwrap_err();
-    assert_eq!(copied.code, OperationErrorCode::ApprovalDenied);
+    assert_eq!(carried.code, OperationErrorCode::InvalidInput);
     assert!(!temporary
         .path()
         .join("b10x-operation-audit.jsonl")

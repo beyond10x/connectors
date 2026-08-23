@@ -52,13 +52,12 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/integration-slack/src/backend.rs",
-        2_385,
+        2_282,
         "the first hosted companion slice keeps acquisition recovery, Socket Mode supervision, \
          event persistence, and outcome-aware audit together while their shared transaction \
-         invariants settle; the final growth closes hosted-session expiry, and no further growth \
-         is admitted before those arms split, +25 for the named-instance fields a placement \
-         holding several Slack identities needs — `purpose`, `carries_operations` and their \
-         reasons",
+         invariants settle; no further growth is admitted before those arms split. S-047 \
+         deleted the local reply-claim approval machinery in favour of the upstream proof \
+         chain, which is why this ceiling went down rather than up",
     ),
     (
         "crates/catalog-build/src/document.rs",
