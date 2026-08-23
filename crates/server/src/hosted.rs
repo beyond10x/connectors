@@ -10,7 +10,6 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
-use domain::AdmittedOperation;
 use futures_util::StreamExt as _;
 use protocol::catalog::{
     RequestEnvelope as CatalogRequestEnvelope, ResponseEnvelope as CatalogResponseEnvelope,
@@ -28,21 +27,26 @@ use protocol::event::{
     ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
 };
 use protocol::operation::{
-    DescribeRequest, InvokeRequest, OperationError, OperationErrorCode, OperationRequest,
-    OperationResult, RequestEnvelope, ResponseEnvelope,
+    OperationError, OperationErrorCode, OperationRequest, RequestEnvelope, ResponseEnvelope,
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
-    PrincipalContext,
 };
 
+mod admission;
 mod enforcement;
 mod principal;
 
-pub use enforcement::{canonical_input_digest, issue_approval, HostedAuthority, RecoveryError};
-use enforcement::{EnforcementRefusal, InvokeAdmission};
+use admission::{
+    dispatch_admitted, dispatch_admitted_signal, enforcement_refusal_response, redescribe,
+    session_for_signal,
+};
+use enforcement::InvokeAdmission;
+pub use enforcement::{
+    canonical_input_digest, issue_approval, HostedAuthority, RecoveryError, SIGNAL_AUDIT_STATE_KEY,
+};
 pub use principal::HostedPrincipal;
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
@@ -693,36 +697,11 @@ async fn operation(
     let mut admitted = None;
     let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
-        let description = state
-            .backend
-            .handle(
-                &owner,
-                OperationRequest::Describe(DescribeRequest {
-                    operation_ref: invoke.operation_ref.clone(),
-                }),
-            )
-            .await;
-        let description = match description {
-            Ok(OperationResult::Describe(description)) => description,
-            Ok(_) => {
-                return operation_failure(
-                    &request.request_id,
-                    OperationError::new(
-                        OperationErrorCode::Protocol,
-                        "the Connector backend returned the wrong result while rechecking invocation authority",
-                        false,
-                    ),
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                );
-            }
-            Err(error) => {
-                return operation_failure(
-                    &request.request_id,
-                    error,
-                    StatusCode::SERVICE_UNAVAILABLE,
-                );
-            }
-        };
+        let description =
+            match redescribe(&state, &owner, &request.request_id, &invoke.operation_ref).await {
+                Ok(description) => description,
+                Err(response) => return *response,
+            };
         match state
             .authority
             .admit_invoke(&principal, invoke, &description)
@@ -741,32 +720,39 @@ async fn operation(
                 admitted = Some(operation);
                 redeemed = redemption;
             }
-            // One axis-free body for every 403: grant, approval, and replay refusals render
-            // byte-identically, and replay is distinct only in the gate's own journal.
-            Err(EnforcementRefusal::NotAdmitted) => {
-                return operation_failure(
-                    &request.request_id,
-                    OperationError::new(
-                        OperationErrorCode::NotGranted,
-                        "the Connector authority does not admit this invocation",
-                        false,
-                    ),
-                    StatusCode::FORBIDDEN,
-                );
-            }
-            Err(EnforcementRefusal::Unavailable) => {
-                return operation_failure(
-                    &request.request_id,
-                    OperationError::new(
-                        OperationErrorCode::Unavailable,
-                        "the Connector Grant authority is unavailable",
-                        true,
-                    ),
-                    StatusCode::SERVICE_UNAVAILABLE,
-                );
+            Err(refusal) => {
+                return enforcement_refusal_response(&request.request_id, refusal);
             }
         }
     }
+    // S-049: a session signal carries the session's own authority. The signal names only an
+    // `execution_ref`, so the Connector's own session record supplies what a GrantRequest can
+    // name — the operation and Connection that created the session — and the Grant admitting
+    // that operation admits signalling into it. No proof, no dispatch.
+    let mut admitted_signal = None;
+    if let OperationRequest::SessionSignal(signal) = &request.request {
+        let session = match session_for_signal(&state, &owner, &request.request_id, signal).await {
+            Ok(session) => session,
+            Err(response) => return *response,
+        };
+        let description =
+            match redescribe(&state, &owner, &request.request_id, &session.operation_ref).await {
+                Ok(description) => description,
+                Err(response) => return *response,
+            };
+        match state
+            .authority
+            .admit_signal(&principal, &session, signal, &description)
+        {
+            Ok(operation) => admitted_signal = Some((session, operation)),
+            Err(refusal) => {
+                return enforcement_refusal_response(&request.request_id, refusal);
+            }
+        }
+    }
+    // `SessionSignal` is deliberately not in this fence: it is enabled behind the S-049
+    // admission above, while the session-lifecycle reads and writes stay disabled until the
+    // durable session decisions exist.
     if matches!(
         &request.request,
         OperationRequest::SessionStatus(_)
@@ -790,6 +776,14 @@ async fn operation(
         (OperationRequest::Invoke(invoke), Some(operation)) => {
             dispatch_admitted(&*state.backend, &owner, *operation, invoke).await
         }
+        // The signal twin of the proven seam (S-049): a keypress reaches the backend only with
+        // the proof covering the exact session it enters. The admission block above either
+        // produced the proof or returned a refusal already; `dispatch_admitted_signal` refuses
+        // a `None` rather than dispatching, so a future edit that breaks that construction
+        // fails closed instead of reopening the ungated path.
+        (OperationRequest::SessionSignal(signal), _) => {
+            dispatch_admitted_signal(&*state.backend, &owner, admitted_signal, signal).await
+        }
         (request, _) => state.backend.handle(&owner, request).await,
     };
     if let Some(redemption) = redeemed {
@@ -805,33 +799,6 @@ async fn operation(
         Err(error) => ResponseEnvelope::failure(request_id, error),
     };
     Json(response).into_response()
-}
-
-/// Dispatch one proven invocation, consuming the [`AdmittedOperation`] by value.
-///
-/// This is the only seam through which an invocation the authority admitted as effect-capable
-/// reaches a backend, and it holds the proof for exactly the length of dispatch (S-047). The
-/// proof's own operation and Connection must be the ones dispatched — the description lease
-/// already binds them, and repeating the identity here keeps the proof load-bearing rather than
-/// ceremonial.
-async fn dispatch_admitted(
-    backend: &dyn ConnectorBackend,
-    owner: &PrincipalContext,
-    operation: AdmittedOperation,
-    invoke: InvokeRequest,
-) -> Result<OperationResult, OperationError> {
-    if operation.operation() != invoke.operation_ref
-        || operation.connection() != invoke.connection_ref
-    {
-        return Err(OperationError::new(
-            OperationErrorCode::NotGranted,
-            "the admission proof does not cover this invocation",
-            false,
-        ));
-    }
-    backend
-        .handle(owner, OperationRequest::Invoke(invoke))
-        .await
 }
 
 async fn event(
@@ -1006,6 +973,7 @@ mod tests {
 
     mod contract_validation;
     mod enforcement;
+    mod signal;
 
     struct Verifier;
 
