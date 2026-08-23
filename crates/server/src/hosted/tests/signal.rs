@@ -209,6 +209,14 @@ async fn a_signal_refusal_matches_the_invoke_refusal_bytes() {
     let backend = Arc::new(SessionBackend::default());
     seed_session_grant(&store);
     let unknown_session = signal(app(&store, &backend), "execution:ghost").await;
+    // A sprayed guess is refused with the same bytes but is not invisible: the refusal lands in
+    // the journal, naming the guessed ref and nothing the deployment does not hold.
+    let journal = signal_journal(&store);
+    assert!(journal.contains("\"kind\":\"refused\""), "{journal}");
+    assert!(
+        journal.contains("\"execution_ref\":\"execution:ghost\""),
+        "{journal}"
+    );
 
     let ungranted = Arc::new(MemoryState::new());
     let refusals = [

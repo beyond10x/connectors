@@ -731,10 +731,12 @@ async fn operation(
     // that operation admits signalling into it. No proof, no dispatch.
     let mut admitted_signal = None;
     if let OperationRequest::SessionSignal(signal) = &request.request {
-        let session = match session_for_signal(&state, &owner, &request.request_id, signal).await {
-            Ok(session) => session,
-            Err(response) => return *response,
-        };
+        let session =
+            match session_for_signal(&state, &principal, &owner, &request.request_id, signal).await
+            {
+                Ok(session) => session,
+                Err(response) => return *response,
+            };
         let description =
             match redescribe(&state, &owner, &request.request_id, &session.operation_ref).await {
                 Ok(description) => description,

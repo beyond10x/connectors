@@ -324,6 +324,30 @@ impl HostedAuthority {
         self.evaluator.evaluate(&request, SystemTime::now())
     }
 
+    /// Journal the refusal of a signal addressing a session no backend holds (S-049 review).
+    ///
+    /// The route refuses such a signal with the same bytes as every other refusal before any
+    /// admission runs; without this row, a caller spraying guessed execution refs would be
+    /// invisible in the journal. The row's operation and connection are empty because the
+    /// deployment holds no session to name — the emptiness is the honest record.
+    pub(super) fn journal_unknown_signal(
+        &self,
+        principal: &HostedPrincipal,
+        signal: &SessionSignalRequest,
+    ) -> Result<(), EnforcementRefusal> {
+        let input =
+            serde_json::to_value(&signal.signal).map_err(|_| EnforcementRefusal::Unavailable)?;
+        let input_digest = canonical_input_digest(&input);
+        self.append_signal_row(
+            "refused",
+            principal,
+            "",
+            "",
+            &signal.execution_ref,
+            &input_digest,
+        )
+    }
+
     /// Append one signal decision row. The `refused` kind is as axis-free as the refusal it
     /// records: the row says a signal was refused, never which axis refused it.
     fn journal_signal(
@@ -333,6 +357,25 @@ impl HostedAuthority {
         session: &SessionStatus,
         input_digest: &str,
     ) -> Result<(), EnforcementRefusal> {
+        self.append_signal_row(
+            kind,
+            principal,
+            &session.operation_ref,
+            &session.connection_ref,
+            &session.execution_ref,
+            input_digest,
+        )
+    }
+
+    fn append_signal_row(
+        &self,
+        kind: &'static str,
+        principal: &HostedPrincipal,
+        operation: &str,
+        connection: &str,
+        execution_ref: &str,
+        input_digest: &str,
+    ) -> Result<(), EnforcementRefusal> {
         let Some(store) = &self.store else {
             return Err(EnforcementRefusal::Unavailable);
         };
@@ -340,9 +383,9 @@ impl HostedAuthority {
             kind,
             tenant: &principal.tenant_id,
             subject: &principal.subject,
-            operation: &session.operation_ref,
-            connection: &session.connection_ref,
-            execution_ref: &session.execution_ref,
+            operation,
+            connection,
+            execution_ref,
             input_digest,
             at_seconds: now_seconds(),
         };
