@@ -2,8 +2,7 @@
 id: S-053
 title: "The hosted server speaks MCP through the admission seam"
 pillar: Platform
-status: ready
-priority: 1
+status: done
 design: ../design/14-mcp-transport-for-the-hosted-connectors-server.md
 epic: mcp-entry
 areas: [server, testing]
@@ -57,3 +56,7 @@ order-independent.
   demonstrated red against a planted `.backend` token, then restored byte-identically.
   Eleven route tests in `crates/server/src/hosted/tests/mcp.rs` cover the Acceptance; all
   failed 404 at base 2bb7d40 before the route existed.
+- 2026-08-24 — merged to main after independent review (PASS, 0 blocking, 1 minor: the rule
+  16/17 line scanner's string-literal `//` limitation, a pre-existing shared mechanic). The
+  verified-split was independently confirmed byte-identical (datasource) / call-site-only
+  (operation); spoofing, evidence-not-demanded, retry-once and robustness probes all held.
