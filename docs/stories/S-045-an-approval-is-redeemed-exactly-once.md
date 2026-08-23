@@ -2,11 +2,12 @@
 id: S-045
 title: "An approval is redeemed exactly once"
 pillar: Platform
-status: ready
+status: done
 priority: 2
 design: ../design/13-grant-evaluation-and-approval-redemption.md
 epic: enforced-authority
 areas: [domain, service, state, audit]
+note: "ApprovalGate in domain::approval — axis-free verification; the one-time claim is a bounded append to approval.redemption.<sha256(reference)> whose payload IS the attempted-audit row; replay is its own journal kind; ApprovalGate::recover is the documented startup crash scan. SQLite concurrency/replay/crash evidence in state-sqlite/tests/approval_gate.rs; S-046 wires the hosted route"
 ---
 
 # An approval is redeemed exactly once

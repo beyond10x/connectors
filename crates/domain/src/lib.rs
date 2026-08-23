@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
 //! Protocol-neutral Connectors domain types. Planning is data and performs no I/O; Grant
-//! evaluation reads revisioned tenant Grants through the S-041 state port and opens nothing
-//! itself.
+//! evaluation and the approval gate are the deliberate exceptions, and their only I/O is the
+//! S-041 state port.
 
+mod approval;
 pub mod audio;
 mod connection;
 mod discovery;
@@ -12,6 +13,10 @@ mod grant;
 mod plan;
 pub mod voice;
 
+pub use approval::{
+    ApprovalAuditKind, ApprovalError, ApprovalGate, ApprovalInvocation, ApprovalOutcome,
+    ApprovalRecord, ApprovalRedemption, RecoveredPresentation, APPROVAL_AUDIT_STATE_KEY,
+};
 pub use connection::{
     ConnectionAuthority, ConnectionAuthorityError, ConnectionInitiator, ConnectionRoute,
     InitiationPolicy, RouteAdapter,
