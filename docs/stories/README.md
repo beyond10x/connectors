@@ -86,7 +86,7 @@ will spawn children as each milestone is designed.
 | [S-052](S-052-the-platform-connector-is-named-platform.md) | The platform connector is named platform | done | Platform | integrations, config, server |
 | [S-053](S-053-the-hosted-server-speaks-mcp-through-the-admission-seam.md) | The hosted server speaks MCP through the admission seam | ready | Platform | server, testing |
 | [S-054](S-054-pod-logs-are-a-hosted-read-only-kubernetes-operation.md) | Pod logs are a hosted read-only Kubernetes operation | ready | Platform | integrations, server |
-| [S-055](S-055-a-self-service-scope-subset-needs-no-operator.md) | A self-service scope subset needs no operator | ready | Platform | identity |
+| [S-055](S-055-a-self-service-scope-subset-needs-no-operator.md) | A self-service scope subset needs no operator | done | Platform | identity |
 | [S-056](S-056-the-cli-bridges-mcp-over-stdio.md) | The CLI bridges MCP over stdio | backlog | Platform | config, integrations |
 
 ## Epics in this seed
