@@ -45,3 +45,15 @@ order-independent.
 
 - 2026-08-24 — filed from design 14 (Timo's decisions: three meta-tools, entry point on the
   hosted server, no new service).
+- 2026-08-24 — implemented on `impl/S-053`: `POST /mcp` registered in the hosted router
+  (512 KiB frame bound; GET/DELETE answer 405); `operation()`/`datasource()` split into
+  verify + `operation_decided`/`datasource_decided` halves inside `hosted.rs` (1472 lines,
+  fence holds without the connect.rs valve); new `hosted/mcp.rs` (JSON-RPC layer, bearer
+  verified once before any JSON-RPC processing, server name `b10x-connectors`) and
+  `hosted/mcp/toolset.rs` (TOOLSET_VERSION v1, five entries incl. requirement-hidden
+  `k8s_pod_logs`, seam-derived role projection, server-side describe→invoke with one silent
+  stale-authority retry, approval_required pre-check with evidence passthrough). Rule 17
+  invariant lands beside rule 16 (dated note on 16 names `/mcp` as a funneled entry) and was
+  demonstrated red against a planted `.backend` token, then restored byte-identically.
+  Eleven route tests in `crates/server/src/hosted/tests/mcp.rs` cover the Acceptance; all
+  failed 404 at base 2bb7d40 before the route existed.

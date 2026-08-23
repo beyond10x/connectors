@@ -37,6 +37,7 @@ use service::{
 
 mod admission;
 mod enforcement;
+mod mcp;
 mod principal;
 
 use admission::{
@@ -265,6 +266,10 @@ pub fn router(
         .route(
             "/datasources",
             post(datasource).layer(DefaultBodyLimit::max(DATASOURCE_MAX_FRAME_BYTES)),
+        )
+        .route(
+            "/mcp",
+            post(mcp::handle).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
         )
         .route(
             "/connect-sessions/{session_ref}",
@@ -646,6 +651,19 @@ async fn operation(
             return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
         }
     };
+    operation_decided(&state, &principal, request).await
+}
+
+/// The decide half of the `/operations` route: the scope map, the receiver policy, the S-047
+/// re-describe and Grant/approval admission, and dispatch — every admission decision, behind a
+/// principal the caller of this function has already verified. The MCP transport
+/// (`hosted/mcp.rs`) funnels its synthesized envelopes through exactly this seam and
+/// `datasource_decided`; it never reaches a backend itself (design 14, S-053).
+async fn operation_decided(
+    state: &HostedState,
+    principal: &HostedPrincipal,
+    request: RequestEnvelope,
+) -> Response {
     let required_scope = match &request.request {
         protocol::operation::OperationRequest::Search(_)
         | protocol::operation::OperationRequest::Describe(_) => "connectors.catalog.read",
@@ -678,7 +696,7 @@ async fn operation(
             // variant that is forgotten here compiles cleanly and skips the management policy
             // entirely, which is the quietest way to lose an authorization check.
             | protocol::operation::OperationRequest::SessionSignal(_)
-    ) && !state.policy.admits_operation(&principal, &request.request)
+    ) && !state.policy.admits_operation(principal, &request.request)
     {
         return operation_failure(
             &request.request_id,
@@ -698,13 +716,13 @@ async fn operation(
     let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
         let description =
-            match redescribe(&state, &owner, &request.request_id, &invoke.operation_ref).await {
+            match redescribe(state, &owner, &request.request_id, &invoke.operation_ref).await {
                 Ok(description) => description,
                 Err(response) => return *response,
             };
         match state
             .authority
-            .admit_invoke(&principal, invoke, &description)
+            .admit_invoke(principal, invoke, &description)
         {
             // Described read-only and demanding nothing: the pre-existing read path, unchanged
             // for callers whose Grants cover no effects.
@@ -732,19 +750,18 @@ async fn operation(
     let mut admitted_signal = None;
     if let OperationRequest::SessionSignal(signal) = &request.request {
         let session =
-            match session_for_signal(&state, &principal, &owner, &request.request_id, signal).await
-            {
+            match session_for_signal(state, principal, &owner, &request.request_id, signal).await {
                 Ok(session) => session,
                 Err(response) => return *response,
             };
         let description =
-            match redescribe(&state, &owner, &request.request_id, &session.operation_ref).await {
+            match redescribe(state, &owner, &request.request_id, &session.operation_ref).await {
                 Ok(description) => description,
                 Err(response) => return *response,
             };
         match state
             .authority
-            .admit_signal(&principal, &session, signal, &description)
+            .admit_signal(principal, &session, signal, &description)
         {
             Ok(operation) => admitted_signal = Some((session, operation)),
             Err(refusal) => {
@@ -881,6 +898,18 @@ async fn datasource(
             return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
         }
     };
+    datasource_decided(&state, &principal, request).await
+}
+
+/// The decide half of the `/datasources` route: tenant binding, the catalog-read scope, and
+/// dispatch, behind a principal the caller of this function has already verified. Like
+/// `operation_decided`, this seam is the only way the MCP transport reaches datasource state
+/// (design 14, S-053).
+async fn datasource_decided(
+    state: &HostedState,
+    principal: &HostedPrincipal,
+    request: DatasourceRequestEnvelope,
+) -> Response {
     if principal.tenant_id != request.context.tenant_id
         || !principal.allows("connectors.catalog.read")
     {
@@ -975,6 +1004,7 @@ mod tests {
 
     mod contract_validation;
     mod enforcement;
+    mod mcp;
     mod signal;
 
     struct Verifier;
