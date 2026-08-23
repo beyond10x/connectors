@@ -28,6 +28,7 @@ use server::local::LocalOperationDaemon;
 use service::{ConnectorBackend, CredentialSet, EgressTransport};
 use state_sqlite::SqliteState;
 
+use crate::claims::EventReplyClaims;
 use crate::BackendRegistry;
 
 /// Failure to validate or assemble a complete Connector runtime.
@@ -73,6 +74,10 @@ pub enum RuntimeError {
     Egress(#[from] server::egress::EgressError),
     #[error("the personal credential store could not be opened")]
     CredentialStore,
+    /// A journal this build cannot read is unknown claim state; serving over it could post a
+    /// reply its triggering event already authorized once (S-048).
+    #[error("the local reply-claim journal could not be opened")]
+    ReplyClaimJournal,
     #[error(
         "hosted Connector state needs exactly one store: set CONNECTORS_DATABASE_URL for \
          PostgreSQL, or CONNECTORS_SQLITE with a file path"
@@ -150,6 +155,18 @@ impl PersonalRuntime {
         supplied_stores: Option<PersonalCredentialStores>,
     ) -> Result<Self, RuntimeError> {
         validate_state_root(&state_root)?;
+        // The local dispatch seam's one-time claim (S-048): an approval-demanding invocation
+        // presenting an `event:` reference spends it exactly once, durably, before any
+        // Integration is reached. Wired for every personal placement — the journal exists from
+        // first boot, not from the first Integration that needs it — and never for the hosted
+        // placement, whose ApprovalGate redeems approval records upstream of the registry.
+        // Opened before any adapter so a refusal here cannot leak a live supervision task.
+        let claim_store: Arc<dyn StateStore> = Arc::new(
+            SqliteState::open(&state_root.join("event-reply-claims.sqlite"))
+                .map_err(|_| RuntimeError::ReplyClaimJournal)?,
+        );
+        let event_reply_claims =
+            EventReplyClaims::open(claim_store).map_err(|_| RuntimeError::ReplyClaimJournal)?;
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
         let mut verifying_key = None;
         let mut sip_dial_configured = false;
@@ -350,7 +367,10 @@ impl PersonalRuntime {
             }
         }
 
-        let registry = Arc::new(BackendRegistry::new(backends));
+        let registry = Arc::new(BackendRegistry::with_event_reply_claims(
+            backends,
+            event_reply_claims,
+        ));
         let daemon =
             match LocalOperationDaemon::bind(state_root.join("connectors.sock"), registry.clone())
                 .await
@@ -370,6 +390,7 @@ impl PersonalRuntime {
                 protocol::event::CONTRACT,
             ],
             "socket": daemon.socket_path(),
+            "event_reply_claims": true,
             "sip_dial_configured": sip_dial_configured,
             "voice_authority_verifying_key": verifying_key,
             "slack_configured": slack_connections.is_some(),
@@ -900,7 +921,12 @@ mod tests {
         let state_root = temporary.path().join("state");
         let runtime = PersonalRuntime::bind(None, &state_root).await.unwrap();
         assert_eq!(runtime.readiness()["ready"], true);
+        assert_eq!(runtime.readiness()["event_reply_claims"], true);
         assert!(state_root.join("connectors.sock").exists());
+        assert!(
+            state_root.join("event-reply-claims.sqlite").exists(),
+            "the local reply-claim journal exists from first boot"
+        );
         assert!(!state_root.join("credentials.store").exists());
         runtime.serve_until(std::future::ready(())).await.unwrap();
         assert!(!state_root.join("connectors.sock").exists());
