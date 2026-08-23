@@ -27,17 +27,19 @@ use protocol::event::{
     ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
 };
 use protocol::operation::{
-    ApprovalPosture, DescribeRequest, EffectClass, OperationError, OperationErrorCode,
-    OperationRequest, OperationResult, RequestEnvelope, ResponseEnvelope,
-    MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
+    DescribeRequest, OperationError, OperationErrorCode, OperationRequest, OperationResult,
+    RequestEnvelope, ResponseEnvelope, MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
 };
 
+mod enforcement;
 mod principal;
 
+pub use enforcement::{canonical_input_digest, issue_approval, HostedAuthority};
+use enforcement::{EnforcementRefusal, InvokeAdmission};
 pub use principal::HostedPrincipal;
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
@@ -218,6 +220,7 @@ struct HostedState {
     verifier: Arc<dyn IdentityVerifier>,
     backend: Arc<dyn ConnectorBackend>,
     policy: HostedAdmissionPolicy,
+    authority: HostedAuthority,
 }
 
 #[derive(Debug, Serialize)]
@@ -230,6 +233,7 @@ pub fn router(
     verifier: Arc<dyn IdentityVerifier>,
     backend: Arc<dyn ConnectorBackend>,
     policy: HostedAdmissionPolicy,
+    authority: HostedAuthority,
 ) -> Router {
     Router::new()
         .route("/livez", get(liveness))
@@ -266,6 +270,7 @@ pub fn router(
             verifier,
             backend,
             policy,
+            authority,
         })
 }
 
@@ -682,18 +687,8 @@ async fn operation(
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
+    let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
-        if invoke.approval_evidence_ref.is_some() {
-            return operation_failure(
-                &request.request_id,
-                OperationError::new(
-                    OperationErrorCode::ApprovalDenied,
-                    "approval evidence cannot be accepted until the Connector-owned verifier and one-time redemption store are available",
-                    false,
-                ),
-                StatusCode::FORBIDDEN,
-            );
-        }
         let description = state
             .backend
             .handle(
@@ -703,21 +698,8 @@ async fn operation(
                 }),
             )
             .await;
-        match description {
-            Ok(OperationResult::Describe(description))
-                if description.effect == EffectClass::ReadOnly
-                    && description.approval == ApprovalPosture::NotRequired => {}
-            Ok(OperationResult::Describe(_)) => {
-                return operation_failure(
-                    &request.request_id,
-                    OperationError::new(
-                        OperationErrorCode::Unavailable,
-                        "effect-bearing hosted invocation is disabled until Connector Grant and approval decisions are durably enforced",
-                        false,
-                    ),
-                    StatusCode::SERVICE_UNAVAILABLE,
-                );
-            }
+        let description = match description {
+            Ok(OperationResult::Describe(description)) => description,
             Ok(_) => {
                 return operation_failure(
                     &request.request_id,
@@ -733,6 +715,42 @@ async fn operation(
                 return operation_failure(
                     &request.request_id,
                     error,
+                    StatusCode::SERVICE_UNAVAILABLE,
+                );
+            }
+        };
+        match state
+            .authority
+            .admit_invoke(&principal, invoke, &description)
+        {
+            // Described read-only and demanding nothing: the pre-existing read path, unchanged
+            // for callers whose Grants cover no effects.
+            Ok(InvokeAdmission::ReadPath) => {}
+            // Admission proven: the AdmittedOperation was built through `from_decision`
+            // against wall-clock time inside the authority. S-047 threads the proof into the
+            // effect backends in place of their local approval-presence checks.
+            Ok(InvokeAdmission::Proven { redemption }) => redeemed = redemption,
+            // One axis-free body for every 403: grant, approval, and replay refusals render
+            // byte-identically, and replay is distinct only in the gate's own journal.
+            Err(EnforcementRefusal::NotAdmitted) => {
+                return operation_failure(
+                    &request.request_id,
+                    OperationError::new(
+                        OperationErrorCode::NotGranted,
+                        "the Connector authority does not admit this invocation",
+                        false,
+                    ),
+                    StatusCode::FORBIDDEN,
+                );
+            }
+            Err(EnforcementRefusal::Unavailable) => {
+                return operation_failure(
+                    &request.request_id,
+                    OperationError::new(
+                        OperationErrorCode::Unavailable,
+                        "the Connector Grant authority is unavailable",
+                        true,
+                    ),
                     StatusCode::SERVICE_UNAVAILABLE,
                 );
             }
@@ -755,7 +773,12 @@ async fn operation(
         );
     }
     let request_id = request.request_id;
-    let response = match state.backend.handle(&owner, request.request).await {
+    let outcome = state.backend.handle(&owner, request.request).await;
+    if let Some(redemption) = redeemed {
+        // The terminal outcome row follows dispatch; the attempted row was durable before it.
+        state.authority.conclude(redemption, outcome.is_ok());
+    }
+    let response = match outcome {
         Ok(result) => ResponseEnvelope::success(&request_id, result),
         Err(error) => ResponseEnvelope::failure(&request_id, error),
     };
@@ -930,13 +953,14 @@ mod tests {
         SearchRequest as DatasourceSearchRequest,
     };
     use protocol::operation::{
-        InvocationResult, InvokeRequest, OperationDescription, OperationRequest, OperationResult,
-        OwnerContext, SearchRequest,
+        ApprovalPosture, EffectClass, InvocationResult, InvokeRequest, OperationDescription,
+        OperationRequest, OperationResult, OwnerContext, SearchRequest,
     };
     use service::PrincipalContext;
     use tower::ServiceExt as _;
 
     mod contract_validation;
+    mod enforcement;
 
     struct Verifier;
 
@@ -1034,59 +1058,6 @@ mod tests {
             _request: OperationRequest,
         ) -> Result<OperationResult, OperationError> {
             unreachable!("readiness never dispatches an operation")
-        }
-    }
-
-    struct GuardBackend;
-
-    #[async_trait]
-    impl ConnectorBackend for GuardBackend {
-        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
-            Ok(())
-        }
-
-        async fn handle(
-            &self,
-            context: &PrincipalContext,
-            request: OperationRequest,
-        ) -> Result<OperationResult, OperationError> {
-            assert_eq!(context.issuer(), Some("https://identity.example.test"));
-            assert_eq!(context.token_id(), Some("token-test"));
-            assert_eq!(context.request_id(), Some("request-1"));
-            assert_eq!(context.trace_id(), Some("request-1"));
-            match request {
-                OperationRequest::Describe(request) => {
-                    let read_only = request.operation_ref == "test/read";
-                    Ok(OperationResult::Describe(OperationDescription {
-                        operation_ref: request.operation_ref,
-                        title: "test".to_owned(),
-                        description: "test".to_owned(),
-                        input_schema: serde_json::json!({"type": "object"}),
-                        output_schema: serde_json::json!({"type": "object"}),
-                        effect: if read_only {
-                            EffectClass::ReadOnly
-                        } else {
-                            EffectClass::Mutating
-                        },
-                        approval: if read_only {
-                            ApprovalPosture::NotRequired
-                        } else {
-                            ApprovalPosture::Required
-                        },
-                        connections: Vec::new(),
-                        description_ref: "description:test".to_owned(),
-                    }))
-                }
-                OperationRequest::Invoke(request) => {
-                    Ok(OperationResult::Invoke(InvocationResult {
-                        operation_ref: request.operation_ref,
-                        output: serde_json::json!({"ok": true}),
-                        connector_audit_ref: "audit:test".to_owned(),
-                        execution_ref: None,
-                    }))
-                }
-                _ => unreachable!("guard test sends only describe and invoke"),
-            }
         }
     }
 
@@ -1255,6 +1226,7 @@ mod tests {
             Arc::new(Verifier),
             Arc::new(Backend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         let request = Request::post("/operations")
             .header(header::CONTENT_TYPE, "application/json")
@@ -1288,48 +1260,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hosted_invocation_is_read_only_until_grants_and_approvals_are_durable() {
-        let app = router(
-            Arc::new(Verifier),
-            Arc::new(GuardBackend),
-            HostedAdmissionPolicy::new(["operator".to_owned()]),
-        );
-        let read = invocation_envelope("test/read", None);
-        assert_eq!(
-            app.clone()
-                .oneshot(operation_http_request(&read))
-                .await
-                .unwrap()
-                .status(),
-            StatusCode::OK
-        );
-
-        let effect = invocation_envelope("test/write", None);
-        assert_eq!(
-            app.clone()
-                .oneshot(operation_http_request(&effect))
-                .await
-                .unwrap()
-                .status(),
-            StatusCode::SERVICE_UNAVAILABLE
-        );
-
-        let forged_approval = invocation_envelope("test/write", Some("approval:unchecked"));
-        assert_eq!(
-            app.oneshot(operation_http_request(&forged_approval))
-                .await
-                .unwrap()
-                .status(),
-            StatusCode::FORBIDDEN
-        );
-    }
-
-    #[tokio::test]
     async fn hosted_connection_route_uses_the_same_identity_boundary() {
         let app = router(
             Arc::new(Verifier),
             Arc::new(Backend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         let request = Request::post("/connections")
             .header(header::CONTENT_TYPE, "application/json")
@@ -1347,6 +1283,7 @@ mod tests {
             Arc::new(Verifier),
             Arc::new(Backend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         let refused = Request::post("/datasources")
             .header(header::CONTENT_TYPE, "application/json")
@@ -1379,6 +1316,7 @@ mod tests {
             Arc::new(Verifier),
             Arc::new(Backend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         assert_eq!(
             app.clone()
@@ -1403,6 +1341,7 @@ mod tests {
             Arc::new(Verifier),
             Arc::new(UnavailableBackend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         assert_eq!(
             app.clone()
@@ -1427,6 +1366,7 @@ mod tests {
             Arc::new(Verifier),
             Arc::new(Backend),
             HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
         );
         for request in [
             Request::get("/connect-sessions/connect-session:unknown")

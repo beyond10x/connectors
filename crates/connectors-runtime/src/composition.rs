@@ -659,7 +659,12 @@ impl HostedRuntime {
             server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone())
                 .with_kubernetes_groups(kubernetes_read_groups, kubernetes_restart_groups)
                 .with_monitoring_groups(monitoring_read_groups);
-        let connector_router = server::hosted::router(verifier, backend.clone(), admission);
+        // The enforcement authority binds the same store the hosted bookkeeping uses, and
+        // accepts approval records from the deployment's one Identity issuer.
+        let authority =
+            server::hosted::HostedAuthority::bound(hosted_state, config.identity.origin.clone());
+        let connector_router =
+            server::hosted::router(verifier, backend.clone(), admission, authority);
         let application = if config.server.base_path == "/" {
             connector_router
         } else {
