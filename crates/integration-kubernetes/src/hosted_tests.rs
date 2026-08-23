@@ -107,6 +107,111 @@ mod tests {
         }
     }
 
+    /// One recorded `pod_logs` call: namespace, pod, container, tail lines, since seconds.
+    type SeenLogRead = (String, String, Option<String>, u32, Option<u32>);
+
+    /// A pod-log fake: records every call it sees and answers with a configured body, standing in
+    /// for the in-cluster reader after it has already mapped the Kubernetes API response.
+    struct LogReader {
+        text: String,
+        truncated: bool,
+        refusal: Option<OperationError>,
+        seen: std::sync::Mutex<Vec<SeenLogRead>>,
+    }
+
+    impl LogReader {
+        fn returning(text: impl Into<String>) -> Self {
+            Self {
+                text: text.into(),
+                truncated: false,
+                refusal: None,
+                seen: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn refusing(refusal: OperationError) -> Self {
+            Self {
+                refusal: Some(refusal),
+                ..Self::returning(String::new())
+            }
+        }
+    }
+
+    #[async_trait]
+    impl DeploymentReader for Arc<LogReader> {
+        async fn read(
+            &self,
+            _namespace: &str,
+            _name: &str,
+        ) -> Result<DeploymentStatus, OperationError> {
+            Err(unavailable("deployment status is not part of this test"))
+        }
+
+        async fn pod_logs(
+            &self,
+            namespace: &str,
+            pod: &str,
+            container: Option<&str>,
+            tail_lines: u32,
+            since_seconds: Option<u32>,
+        ) -> Result<PodLogs, OperationError> {
+            self.seen.lock().unwrap().push((
+                namespace.to_owned(),
+                pod.to_owned(),
+                container.map(ToOwned::to_owned),
+                tail_lines,
+                since_seconds,
+            ));
+            if let Some(refusal) = &self.refusal {
+                return Err(refusal.clone());
+            }
+            Ok(PodLogs {
+                namespace: namespace.to_owned(),
+                pod: pod.to_owned(),
+                container: container.map(ToOwned::to_owned),
+                tail_lines,
+                text: self.text.clone(),
+                truncated: self.truncated,
+            })
+        }
+    }
+
+    fn log_backend(reader: &Arc<LogReader>) -> KubernetesStatusBackend {
+        KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Arc::clone(reader)),
+        )
+        .unwrap()
+    }
+
+    async fn logs_lease(backend: &KubernetesStatusBackend, context: &PrincipalContext) -> String {
+        let OperationResult::Describe(description) = backend
+            .handle(
+                context,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: LOGS_OPERATION.to_owned(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("pod log description expected");
+        };
+        description.description_ref
+    }
+
+    fn logs_invoke(description_ref: String, input: serde_json::Value) -> OperationRequest {
+        OperationRequest::Invoke(InvokeRequest {
+            operation_ref: LOGS_OPERATION.to_owned(),
+            connection_ref: CONNECTION.to_owned(),
+            description_ref,
+            input,
+            approval_evidence_ref: None,
+        })
+    }
+
     fn owner(tenant: &str) -> PrincipalContext {
         owner_with_groups(tenant, ["dev", "sre"])
     }
@@ -130,6 +235,292 @@ mod tests {
             read_groups: vec!["dev".to_owned(), "sre".to_owned()],
             restart_groups: vec!["sre".to_owned()],
         }]
+    }
+
+    #[tokio::test]
+    async fn search_lists_pod_logs_for_read_group_principals_and_hides_it_otherwise() {
+        let backend = KubernetesStatusBackend::with_reader(
+            "tenant-dev".to_owned(),
+            policy(),
+            Vec::new(),
+            Arc::new(Reader),
+        )
+        .unwrap();
+        let search = |query: &str| {
+            OperationRequest::Search(protocol::operation::SearchRequest {
+                query: query.to_owned(),
+                limit: 16,
+            })
+        };
+        let reader_principal = owner_with_groups("tenant-dev", ["dev"]);
+        let OperationResult::Search { operations } = backend
+            .handle(&reader_principal, search("logs"))
+            .await
+            .unwrap()
+        else {
+            panic!("search result expected");
+        };
+        assert!(
+            operations
+                .iter()
+                .any(|operation| operation.operation_ref == "kubernetes.pod.logs"),
+            "{operations:?}"
+        );
+
+        let outsider = owner_with_groups("tenant-dev", ["unrelated"]);
+        let OperationResult::Search { operations } = backend
+            .handle(&outsider, search("logs"))
+            .await
+            .unwrap()
+        else {
+            panic!("search result expected");
+        };
+        assert!(
+            operations
+                .iter()
+                .all(|operation| operation.operation_ref != "kubernetes.pod.logs"),
+            "{operations:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn pod_log_description_carries_schemas_and_a_lease_for_read_principals_only() {
+        let reader = Arc::new(LogReader::returning("ready\n"));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let OperationResult::Describe(description) = backend
+            .handle(
+                &context,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: LOGS_OPERATION.to_owned(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("pod log description expected");
+        };
+        assert_eq!(description.operation_ref, LOGS_OPERATION);
+        assert_eq!(description.effect, EffectClass::ReadOnly);
+        assert_eq!(description.approval, ApprovalPosture::NotRequired);
+        assert_eq!(
+            description.input_schema["required"],
+            json!(["namespace", "pod"])
+        );
+        assert_eq!(
+            description.input_schema["properties"]["tail_lines"]["maximum"],
+            json!(1000)
+        );
+        assert_eq!(
+            description.input_schema["properties"]["since_seconds"]["maximum"],
+            json!(86400)
+        );
+        assert_eq!(
+            description.output_schema["required"],
+            json!(["namespace", "pod", "tail_lines", "text", "truncated"])
+        );
+        assert_eq!(
+            description.description_ref,
+            description_ref(&context, LOGS_OPERATION)
+        );
+
+        let outsider = owner_with_groups("tenant-dev", ["unrelated"]);
+        let refused = backend
+            .handle(
+                &outsider,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: LOGS_OPERATION.to_owned(),
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, OperationErrorCode::NotGranted);
+    }
+
+    #[tokio::test]
+    async fn pod_log_invoke_passes_the_input_through_and_defaults_tail_lines() {
+        let reader = Arc::new(LogReader::returning("line-1\nline-2\n"));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let lease = logs_lease(&backend, &context).await;
+        let OperationResult::Invoke(result) = backend
+            .handle(
+                &context,
+                logs_invoke(
+                    lease.clone(),
+                    json!({
+                        "namespace": "b10x",
+                        "pod": "backend-abc12",
+                        "container": "app",
+                        "tail_lines": 7,
+                        "since_seconds": 3600
+                    }),
+                ),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("pod log invocation expected");
+        };
+        assert_eq!(result.operation_ref, LOGS_OPERATION);
+        assert_eq!(result.output["namespace"], "b10x");
+        assert_eq!(result.output["pod"], "backend-abc12");
+        assert_eq!(result.output["container"], "app");
+        assert_eq!(result.output["tail_lines"], 7);
+        assert_eq!(result.output["text"], "line-1\nline-2\n");
+        assert_eq!(result.output["truncated"], false);
+
+        backend
+            .handle(
+                &context,
+                logs_invoke(
+                    lease,
+                    json!({"namespace": "b10x", "pod": "backend-abc12"}),
+                ),
+            )
+            .await
+            .unwrap();
+        let seen = reader.seen.lock().unwrap();
+        assert_eq!(
+            *seen,
+            vec![
+                (
+                    "b10x".to_owned(),
+                    "backend-abc12".to_owned(),
+                    Some("app".to_owned()),
+                    7,
+                    Some(3600),
+                ),
+                (
+                    "b10x".to_owned(),
+                    "backend-abc12".to_owned(),
+                    None,
+                    200,
+                    None,
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn pod_log_invoke_refuses_a_non_admitted_namespace_and_a_stale_lease() {
+        let reader = Arc::new(LogReader::returning("ready\n"));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let lease = logs_lease(&backend, &context).await;
+
+        let refused = backend
+            .handle(
+                &context,
+                logs_invoke(
+                    lease,
+                    json!({"namespace": "kube-system", "pod": "backend-abc12"}),
+                ),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, OperationErrorCode::NotGranted);
+
+        let stale = backend
+            .handle(
+                &context,
+                logs_invoke(
+                    "description:kubernetes:stale".to_owned(),
+                    json!({"namespace": "b10x", "pod": "backend-abc12"}),
+                ),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(stale.code, OperationErrorCode::StaleAuthority);
+        assert!(reader.seen.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn pod_log_invoke_enforces_the_input_caps_before_the_reader() {
+        let reader = Arc::new(LogReader::returning("ready\n"));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let lease = logs_lease(&backend, &context).await;
+        for input in [
+            json!({"namespace": "b10x", "pod": "backend-abc12", "tail_lines": 0}),
+            json!({"namespace": "b10x", "pod": "backend-abc12", "tail_lines": 1001}),
+            json!({"namespace": "b10x", "pod": "backend-abc12", "since_seconds": 0}),
+            json!({"namespace": "b10x", "pod": "backend-abc12", "since_seconds": 86_401}),
+            json!({"namespace": "b10x", "pod": "-not-a-label"}),
+            json!({"namespace": "b10x", "pod": "backend-abc12", "container": "-bad"}),
+            json!({"namespace": "b10x", "pod": "backend-abc12", "follow": true}),
+        ] {
+            let refused = backend
+                .handle(&context, logs_invoke(lease.clone(), input.clone()))
+                .await
+                .unwrap_err();
+            assert_eq!(refused.code, OperationErrorCode::InvalidInput, "{input}");
+        }
+        assert!(reader.seen.lock().unwrap().is_empty());
+    }
+
+    /// The in-cluster reader maps an upstream 401/403 to `not_granted` ("Kubernetes workload
+    /// identity refused the log read"); the invoke path must surface that refusal untouched
+    /// rather than reshaping it.
+    #[tokio::test]
+    async fn an_upstream_log_refusal_surfaces_as_not_granted() {
+        let reader = Arc::new(LogReader::refusing(not_granted(
+            "Kubernetes workload identity refused the log read",
+        )));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let lease = logs_lease(&backend, &context).await;
+        let refused = backend
+            .handle(
+                &context,
+                logs_invoke(
+                    lease,
+                    json!({"namespace": "b10x", "pod": "backend-abc12"}),
+                ),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.code, OperationErrorCode::NotGranted);
+        assert!(refused.message.contains("refused the log read"));
+    }
+
+    /// An oversized log body is front-trimmed to whole lines after serialization, marked
+    /// truncated, and the resulting envelope validates — a log read never surfaces
+    /// `result_too_large`.
+    #[tokio::test]
+    async fn an_oversized_log_body_is_front_trimmed_inside_a_validating_envelope() {
+        let newest = 2_999;
+        let text = (0..=newest)
+            .map(|index| format!("line-{index:06} {}\n", "x".repeat(88)))
+            .collect::<String>();
+        assert!(text.len() > protocol::operation::MAX_RESULT_BYTES);
+        let reader = Arc::new(LogReader::returning(text));
+        let backend = log_backend(&reader);
+        let context = owner_with_groups("tenant-dev", ["dev"]);
+        let lease = logs_lease(&backend, &context).await;
+        let result = backend
+            .handle(
+                &context,
+                logs_invoke(
+                    lease,
+                    json!({"namespace": "b10x", "pod": "backend-abc12"}),
+                ),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Invoke(invocation) = &result else {
+            panic!("pod log invocation expected");
+        };
+        assert_eq!(invocation.output["truncated"], true);
+        let kept = invocation.output["text"].as_str().unwrap();
+        // Whole oldest lines went; the text still starts at a line boundary and ends with the
+        // newest line.
+        assert!(kept.starts_with("line-"), "{:?}", &kept[..32]);
+        assert!(!kept.contains("line-000000"));
+        assert!(kept.ends_with(&format!("line-{newest:06} {}\n", "x".repeat(88))));
+        protocol::operation::ResponseEnvelope::success("request-logs", result)
+            .validate()
+            .expect("a trimmed log envelope must validate");
     }
 
     #[tokio::test]
