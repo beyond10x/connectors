@@ -2,8 +2,7 @@
 
 **How a connector, its services, its operations and a tenant's credentials are named.**
 
-Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
-`foundation/connectors`, which compiles reviewed
+Part of the private [beyond10x/connectors](https://github.com/beyond10x/connectors) repository, which compiles reviewed
 connector declarations into canonical catalog documents.
 
 ```toml

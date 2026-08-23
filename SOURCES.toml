@@ -108,7 +108,7 @@ upstream = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/opena
 refresh = "manual"
 pins = "specs/alertmanager.provenance.toml"
 consumers = ["providers/alertmanager.toml", "catalog/alertmanager.catalog.json"]
-note = "Pins Alertmanager's official v0.31.0 Swagger 2 source and the reviewed OpenAPI 3 projection of the one read operation B10x ships."
+note = "Pins Alertmanager's official v0.31.0 Swagger 2 source and the reviewed OpenAPI 3 projection of the one read operation b10x ships."
 
 [[source]]
 id = "slack-web-and-events"

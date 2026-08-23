@@ -4,7 +4,7 @@ Orientation for agents (and humans) working in this repository.
 **github.com/beyond10x/connectors is the canonical home of Connectors.** It was extracted from the
 b10x monorepo with full history on 2026-08-23; the monorepo baseline is
 [`b10x/b10x` @ `bf685971`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/AGENTS.md),
-whose root rules this file carried forward where they still apply. The b10x Zwirn product
+whose root rules this file carried forward where they still apply. The Zwirn product in the b10x monorepo
 consumes this repository as a pinned git dependency; nothing here depends on the monorepo.
 
 ## Status
@@ -95,7 +95,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    documentation. OpenAPI ingest is for very large surfaces — and ingest **selects nothing by
    default**: a 398-operation document with no patch yields zero operations, deliberately.
 2. **Specs are authoritative and truthfully owned.** Every connector begins in `specs/`. A spec is
-   either the vendor's published artifact (`origin = "vendor"`) or a B10x-authored artifact
+   either the vendor's published artifact (`origin = "vendor"`) or a b10x-authored artifact
    (`origin = "repository-authored"`). The latter must say that it is ours, cite the exact official
    references from which every endpoint, parameter and auth fact was derived, state its coverage,
    and pin its bytes. Never present an authored document as vendor-published. For an agent
@@ -187,7 +187,7 @@ rehashes provider declarations, vendored specs, lock rows, and generated artifac
 local schema, and the dedicated governance gate validates it with the pinned Draft 2020-12
 implementation. Every JSON Schema declares and validates against that same meta-schema. Imported
 vendor specs are listed by exact path as `vendored-source`: the gate syntax-checks their bytes but
-does not pretend they conform to a B10x-owned schema. An unclassified JSON file, an unknown
+does not pretend they conform to a b10x-owned schema. An unclassified JSON file, an unknown
 schema reference, malformed imported JSON, or an invalid owned document fails the gate. The ignored
 site projection is additionally validated against the embedded bytes of `web/catalog.schema.json`
 inside the generator before the write plan can receive it.
@@ -231,4 +231,4 @@ The agent instruction is therefore short:
 
 `predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
 navigable authority. The surrounding comment must restate the rule the current implementation uses;
-a private predecessor document can never be the only explanation for a B10x behavior.
+a private predecessor document can never be the only explanation for a b10x behavior.

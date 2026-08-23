@@ -1,4 +1,4 @@
-# b10x/connectors
+# b10x connectors
 
 A unified integration platform for agent automation: a text-declared connector catalog compiled
 to a canonical data artifact, plus a deployable service owning Connector-local connections,

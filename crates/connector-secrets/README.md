@@ -2,8 +2,7 @@
 
 **A host library: where a connector's `CredentialRef` resolves to a value.**
 
-Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
-`foundation/connectors`, the governed connector
+Part of the private [beyond10x/connectors](https://github.com/beyond10x/connectors) repository, the governed connector
 catalog and platform workspace.
 
 ```toml

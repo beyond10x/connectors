@@ -4,7 +4,7 @@ Dependency-free reader for the connectors **catalog pack** — every connector's
 document, compiled into one embedded, versioned, digest-checked file.
 
 The pack is built by `catalog build` in the private
-[B10x monorepo](https://github.com/b10x/b10x) at `foundation/connectors`
+[beyond10x/connectors](https://github.com/beyond10x/connectors) repository
 from the reviewed per-provider documents (`catalog/<name>.catalog.json`). This crate embeds the
 pack that matches its own release and serves it with **zero non-optional dependencies**: no JSON
 parser, no compression codec, no hash crate — the container is offset-indexed UTF-8 and the
@@ -38,8 +38,8 @@ serving a single record, each by name.
 
 ## Fetching a newer catalogue than the crate embeds
 
-B10x has no pre-v1 release artifacts. Historical predecessor release assets are provenance
-only; they are not a B10x distribution channel and consumers must not treat them as current
+b10x has no pre-v1 release artifacts. Historical predecessor release assets are provenance
+only; they are not a b10x distribution channel and consumers must not treat them as current
 contract bundles.
 
 The first supported distribution must follow architecture ADR 0019 and S-031: a private OCI

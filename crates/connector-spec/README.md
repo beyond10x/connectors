@@ -3,8 +3,7 @@
 **The connector IR and its two front-ends: provider TOML and OpenAPI ingest. Performs no network
 IO.**
 
-Part of the private [B10x monorepo](https://github.com/b10x/b10x) at
-`foundation/connectors`, which compiles reviewed
+Part of the private [beyond10x/connectors](https://github.com/beyond10x/connectors) repository, which compiles reviewed
 connector declarations into canonical catalog documents.
 
 ```toml
