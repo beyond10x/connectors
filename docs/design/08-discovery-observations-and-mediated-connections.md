@@ -5,7 +5,7 @@ implemented; first explicit Agent Endpoint-Grant projection implemented · **Dat
 
 **Inputs:** [Design 01](01-domain-model.md) · [Design 02](02-architecture.md) ·
 [Design 07](07-credential-custody-topologies.md) ·
-[ADR 0031](../../../../architecture/adr/0031-capability-resources-and-datasources-are-distinct.md) ·
+[ADR 0031](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0031-capability-resources-and-datasources-are-distinct.md) ·
 [Grafana data-source HTTP API](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/) ·
 [Grafana data sources](https://grafana.com/docs/grafana/latest/datasources/) ·
 [Grafana Alertmanager data source](https://grafana.com/docs/grafana/latest/datasources/alertmanager/)
