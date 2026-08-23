@@ -191,6 +191,7 @@ dependencies = [
  "connector-state",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
 ]
 

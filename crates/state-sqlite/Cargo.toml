@@ -19,7 +19,10 @@ connector-state = { version = "0.1.0", path = "../connector-state" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 
 [dev-dependencies]
-# The grant-evaluation exercise (`domain::grant_conformance`): the same Grant records evaluated
-# through this backend must produce the same admissions and neutral refusals as every other.
+# The grant-evaluation exercise (`domain::grant_conformance`) and the approval gate's acceptance
+# evidence (S-045) both run against this backend: the same Grant records must produce the same
+# admissions and neutral refusals as every other backend, and real threads over real SQLite prove
+# the exactly-once claim across a reopened database file.
 domain = { version = "0.1.0", path = "../domain" }
+serde_json = "1"
 tempfile = "3"

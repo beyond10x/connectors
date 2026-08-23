@@ -11,10 +11,12 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-# The S-041 state port and nothing behind it: grant evaluation reads revisioned tenant Grants
-# through `StateStore`, and which backend answers is a deployment binding, not a domain concern.
-connector-state = { version = "0.1.0", path = "../connector-state" }
+# The S-041 state port and nothing behind it: grant evaluation and approval redemption read and
+# claim through `StateStore`, and which backend answers is a deployment binding, not a domain
+# concern.
+connector-state.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 
