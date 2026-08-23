@@ -31,6 +31,7 @@ async fn hosted_route_refuses_a_malformed_backend_contract() {
         Arc::new(Verifier),
         Arc::new(MalformedBackend),
         HostedAdmissionPolicy::new(["operator".to_owned()]),
+        HostedAuthority::unbound(),
     );
     let response = app
         .oneshot(operation_http_request(&envelope("tenant-dev")))
