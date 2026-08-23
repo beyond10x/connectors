@@ -696,7 +696,6 @@ impl KubernetesLocalBackend {
         if !kubernetes_route_operation(&request.operation_ref)
             || request.description_ref
                 != self.operation_description_ref(context, &request.operation_ref)
-            || request.approval_evidence_ref.is_some()
         {
             return Err(operation_not_granted());
         }

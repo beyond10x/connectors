@@ -3,7 +3,7 @@
 mod hosted_setup;
 mod state_file;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
@@ -83,14 +83,10 @@ const MAX_APP_TOKEN_BYTES: usize = 1024;
 const MAX_STATE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_EVENT_STORE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
-const MAX_REPLY_CLAIM_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_STORED_EVENTS: usize = 10_000;
-const MAX_REPLY_CLAIMS: usize = 10_000;
-const AUTO_REPLY_MAX_AGE_MS: u64 = 10 * 60 * 1000;
 const CONNECTION_STATE_KEY: &str = "slack.connections";
 const EVENT_STATE_KEY: &str = "slack.events";
 const AUDIT_STATE_KEY: &str = "slack.audit";
-const REPLY_CLAIM_STATE_KEY: &str = "slack.reply-claims";
 const MAX_SOCKET_MESSAGE_BYTES: usize = 1024 * 1024;
 const APPS_CONNECTIONS_OPEN: &str = "https://slack.com/api/apps.connections.open";
 const AUTH_TEST: &str = "https://slack.com/api/auth.test";
@@ -149,7 +145,6 @@ struct SlackInner {
     oauth_states: Mutex<BTreeMap<String, OAuthPending>>,
     hosted_completion_lock: tokio::sync::Mutex<()>,
     event_store: Arc<EventStore>,
-    reply_claims: ReplyClaimStore,
     audit: AuditJournal,
     channel_states: Mutex<BTreeMap<String, ChannelState>>,
     supervisors_started: Mutex<std::collections::BTreeSet<String>>,
@@ -359,19 +354,6 @@ struct StoredEvent {
     event: DataEvent,
 }
 
-struct ReplyClaimStore {
-    path: PathBuf,
-    hosted_state: Option<Arc<dyn StateStore>>,
-    claimed: Mutex<BTreeSet<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ReplyClaim {
-    event_ref: String,
-    claimed_at_unix_ms: u64,
-}
-
 /// Secret-bearing response from Slack. Deliberately neither `Debug` nor `Serialize`: its URL is a
 /// temporary bearer ticket and must not enter logs, state, events, or client responses.
 #[derive(Deserialize)]
@@ -519,10 +501,6 @@ impl SlackBackend {
             state_root.join("events.jsonl"),
             hosted_state.clone(),
         )?);
-        let reply_claims = ReplyClaimStore::open(
-            state_root.join("slack-reply-claims.jsonl"),
-            hosted_state.clone(),
-        )?;
         let (shutdown, _) = watch::channel(false);
         let inner = Arc::new(SlackInner {
             admission,
@@ -541,7 +519,6 @@ impl SlackBackend {
             oauth_states: Mutex::new(BTreeMap::new()),
             hosted_completion_lock: tokio::sync::Mutex::new(()),
             event_store,
-            reply_claims,
             audit: AuditJournal::new(state_root.join("slack-operation-audit.jsonl"), hosted_state),
             channel_states: Mutex::new(BTreeMap::new()),
             supervisors_started: Mutex::new(std::collections::BTreeSet::new()),
@@ -1324,88 +1301,6 @@ impl EventStore {
             .iter()
             .find(|stored| stored.event.event_ref == event_ref)
             .map(|stored| stored.event.clone())
-    }
-}
-
-impl ReplyClaimStore {
-    fn open(path: PathBuf, hosted_state: Option<Arc<dyn StateStore>>) -> Result<Self, SlackError> {
-        let bytes = if let Some(state) = &hosted_state {
-            state
-                .read(REPLY_CLAIM_STATE_KEY, MAX_REPLY_CLAIM_BYTES as usize)
-                .map_err(|_| SlackError::new("reply-claim-store"))?
-                .unwrap_or_default()
-        } else {
-            let Some(mut file) = open_owner_read(&path, MAX_REPLY_CLAIM_BYTES)? else {
-                let _ = open_owner_append(&path)?;
-                return Ok(Self {
-                    path,
-                    hosted_state,
-                    claimed: Mutex::new(BTreeSet::new()),
-                });
-            };
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)
-                .map_err(|_| SlackError::new("reply-claim-store"))?;
-            bytes
-        };
-        let text = std::str::from_utf8(&bytes).map_err(|_| SlackError::new("reply-claim-store"))?;
-        let mut claimed = BTreeSet::new();
-        for line in text.lines() {
-            if line.is_empty() || claimed.len() >= MAX_REPLY_CLAIMS {
-                return Err(SlackError::new("reply-claim-store"));
-            }
-            let claim: ReplyClaim =
-                serde_json::from_str(line).map_err(|_| SlackError::new("reply-claim-store"))?;
-            if !claim.event_ref.starts_with("event:") || !claimed.insert(claim.event_ref) {
-                return Err(SlackError::new("reply-claim-store"));
-            }
-        }
-        Ok(Self {
-            path,
-            hosted_state,
-            claimed: Mutex::new(claimed),
-        })
-    }
-
-    fn claim(&self, event_ref: &str, claimed_at_unix_ms: u64) -> Result<(), SlackError> {
-        let mut claimed = lock(&self.claimed);
-        if claimed.contains(event_ref) {
-            return Err(SlackError::new("reply-already-claimed"));
-        }
-        if claimed.len() >= MAX_REPLY_CLAIMS {
-            return Err(SlackError::new("reply-claim-capacity"));
-        }
-        let mut line = serde_json::to_vec(&ReplyClaim {
-            event_ref: event_ref.to_owned(),
-            claimed_at_unix_ms,
-        })
-        .map_err(|_| SlackError::new("reply-claim-store"))?;
-        line.push(b'\n');
-        if let Some(state) = &self.hosted_state {
-            state
-                .append(REPLY_CLAIM_STATE_KEY, &line, MAX_REPLY_CLAIM_BYTES as usize)
-                .map_err(|error| match error {
-                    StateError::Capacity => SlackError::new("reply-claim-capacity"),
-                    _ => SlackError::new("reply-claim-store"),
-                })?;
-        } else {
-            let mut file = open_owner_append(&self.path)?;
-            let current = file
-                .metadata()
-                .map_err(|_| SlackError::new("reply-claim-store"))?
-                .len();
-            if current
-                .checked_add(line.len() as u64)
-                .is_none_or(|size| size > MAX_REPLY_CLAIM_BYTES)
-            {
-                return Err(SlackError::new("reply-claim-capacity"));
-            }
-            file.write_all(&line)
-                .and_then(|()| file.sync_data())
-                .map_err(|_| SlackError::new("reply-claim-store"))?;
-        }
-        claimed.insert(event_ref.to_owned());
-        Ok(())
     }
 }
 

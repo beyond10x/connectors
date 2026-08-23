@@ -54,6 +54,42 @@ pub enum GrantEffect {
     HumanVisible,
 }
 
+impl GrantEffect {
+    /// Every declared effect, in declaration order. A worst-case claim — an operation whose
+    /// declared facts are not yet served — must name all of them, and it must do so through
+    /// this constant rather than by hand.
+    ///
+    /// Exhaustive by construction: the `match` below names every variant without a wildcard,
+    /// so adding one refuses to compile until this list is revisited — a new effect can widen
+    /// a worst-case claim but can never be silently missing from it.
+    pub const ALL: [Self; 10] = {
+        match Self::Pure {
+            Self::Pure
+            | Self::Read
+            | Self::Model
+            | Self::Network
+            | Self::WriteFile
+            | Self::WriteDb
+            | Self::SendExternal
+            | Self::Delete
+            | Self::Money
+            | Self::HumanVisible => {}
+        }
+        [
+            Self::Pure,
+            Self::Read,
+            Self::Model,
+            Self::Network,
+            Self::WriteFile,
+            Self::WriteDb,
+            Self::SendExternal,
+            Self::Delete,
+            Self::Money,
+            Self::HumanVisible,
+        ]
+    };
+}
+
 /// Whether repeating the operation repeats its consequence. A grant names the classes it admits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

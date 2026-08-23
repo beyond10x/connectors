@@ -671,9 +671,6 @@ impl MonitoringInner {
                 false,
             ));
         }
-        if request.approval_evidence_ref.is_some() {
-            return Err(operation_invalid());
-        }
         validate_input(&request.operation_ref, &request.input)?;
         let provider = provider_for_operation(&request.operation_ref);
         let operation =

@@ -78,7 +78,7 @@ will spawn children as each milestone is designed.
 | [S-044](S-044-a-grant-decision-is-evaluated-not-asserted.md) | A Grant decision is evaluated, not asserted | done | Platform | domain, service, state |
 | [S-045](S-045-an-approval-is-redeemed-exactly-once.md) | An approval is redeemed exactly once | done | Platform | domain, service, state, audit |
 | [S-046](S-046-the-hosted-route-enforces-instead-of-refusing.md) | The hosted route enforces instead of refusing | done | Platform | server, service |
-| [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | backlog | Platform | integrations, testing |
+| [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | done | Platform | integrations, testing |
 
 ## Epics in this seed
 

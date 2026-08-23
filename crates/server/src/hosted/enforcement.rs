@@ -63,16 +63,27 @@ pub(super) enum InvokeAdmission {
     /// receiver-policy read path, unchanged for callers whose Grants cover no effects.
     ReadPath,
     /// Admission proven: the [`AdmittedOperation`] was constructed through `from_decision`
-    /// against real wall-clock time. S-047 hands the proof itself to the effect backends in
-    /// place of their local approval-presence checks; until that consumer exists the route
-    /// holds it only for the length of admission.
+    /// against real wall-clock time, and dispatch consumes it **by value** (S-047) — an
+    /// effect-bearing invocation reaches a backend only through the seam holding this proof,
+    /// and the Integrations' own approval-presence checks are deleted in its favour.
     Proven {
+        /// The proof itself, buildable only from a [`GrantDecision`] here at admission time.
+        /// Boxed because the proof dwarfs the other variants, not to share it: dispatch still
+        /// consumes it by value.
+        operation: Box<AdmittedOperation>,
         /// Present when the description demanded approval: the one-time proof whose attempted
         /// audit row is already durable. Hand it back through [`HostedAuthority::conclude`]
         /// after dispatch.
         redemption: Option<ApprovalRedemption>,
     },
 }
+
+/// The approval redemption journal could not be settled at startup: attempted presentations
+/// without a terminal outcome exist, and the store cannot answer or cannot take their
+/// settlement rows. Damaged approval authority is an outage, never a policy statement.
+#[derive(Debug, thiserror::Error)]
+#[error("the approval redemption journal could not be settled at startup")]
+pub struct RecoveryError;
 
 /// The Connector-owned enforcement authority the hosted route consults on every invocation:
 /// the S-044 Grant evaluator and the S-045 approval gate, both over the deployment's one bound
@@ -138,14 +149,40 @@ impl HostedAuthority {
         };
         // Real wall-clock time, never cached or caller-supplied: an expired decision refuses at
         // use, and this constructor is the only way the hosted path forms an admission.
-        let _operation = AdmittedOperation::from_decision(decision, SystemTime::now())
+        let operation = AdmittedOperation::from_decision(decision, SystemTime::now())
             .map_err(|_| EnforcementRefusal::NotAdmitted)?;
         let redemption = if demanded {
             Some(self.redeem(principal, invoke, &input_digest)?)
         } else {
             None
         };
-        Ok(InvokeAdmission::Proven { redemption })
+        Ok(InvokeAdmission::Proven {
+            operation: Box::new(operation),
+            redemption,
+        })
+    }
+
+    /// Run the S-045 startup crash-recovery scan over the approval journal: settle every
+    /// attempted presentation that has no outcome row — `aborted` when the redemption never
+    /// happened, `indeterminate` when it did and the terminal row is missing. Returns how many
+    /// presentations were settled; a placement that bound no store has nothing to settle.
+    ///
+    /// The hosted composition runs this once before serving. A journal that cannot be settled
+    /// is damaged approval authority, and refusing to start is the honest outage.
+    ///
+    /// # Errors
+    ///
+    /// [`RecoveryError`] when the journal cannot be read, holds a row this build cannot parse,
+    /// or cannot take a settlement row.
+    pub fn recover(&self) -> Result<usize, RecoveryError> {
+        let Some(approvals) = &self.approvals else {
+            return Ok(0);
+        };
+        approvals
+            .gate
+            .recover(now_seconds())
+            .map(|settled| settled.len())
+            .map_err(|_| RecoveryError)
     }
 
     /// Write the terminal outcome row for a dispatch this authority admitted.
@@ -244,22 +281,12 @@ impl HostedAuthority {
 /// operation's reviewed risk, effect set, or idempotency class, so the route claims the worst on
 /// every axis. A selector therefore admits only when it admits everything, and the exact allow
 /// exception is the expected admission shape until the declared facts travel with the
-/// description.
+/// description. The effect set is [`GrantEffect::ALL`], which is exhaustive by construction —
+/// a future effect variant cannot silently weaken this worst-case claim.
 fn undeclared_facts() -> GrantFacts {
     GrantFacts {
         risk: GrantRisk::Destructive,
-        effects: BTreeSet::from([
-            GrantEffect::Pure,
-            GrantEffect::Read,
-            GrantEffect::Model,
-            GrantEffect::Network,
-            GrantEffect::WriteFile,
-            GrantEffect::WriteDb,
-            GrantEffect::SendExternal,
-            GrantEffect::Delete,
-            GrantEffect::Money,
-            GrantEffect::HumanVisible,
-        ]),
+        effects: BTreeSet::from(GrantEffect::ALL),
         idempotency: GrantIdempotency::NonIdempotent,
     }
 }

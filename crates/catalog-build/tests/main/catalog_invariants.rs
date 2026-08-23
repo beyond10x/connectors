@@ -50,6 +50,10 @@
 //! 14. [`the_browser_surface_is_read_only_and_carries_no_interaction_member`] — every `cdp_v1`
 //!     member is a B10x-owned read on a lease, and no interaction member exists anywhere in
 //!     the catalogue: clicking and typing are mutations and wait on the approval round-trip.
+//! 15. [`no_effect_backend_is_reachable_without_an_admission_proof`] — no Integration reads the
+//!     invocation's `approval_evidence_ref` (S-047): admission is decided upstream by the sealed
+//!     `GrantDecision` → `ApprovalRedemption` → `AdmittedOperation` chain, and the field reaches
+//!     a backend only as a named audit-correlation use — of which there are none today.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -1550,4 +1554,164 @@ fn the_credential_requirement_agrees_with_the_auth_list() {
         }
     }
     assert!(checked >= 835, "only {checked} operations checked");
+}
+
+// ---------------------------------------------------------------------------------------------
+// 15. Effect backends trust only proofs
+// ---------------------------------------------------------------------------------------------
+
+/// Every admission-relevant reading of `approval_evidence_ref` an Integration is allowed: none.
+///
+/// The field may reach a backend **only as audit correlation**, and any such use must be named
+/// here as `"crates/integration-<id>/src/<file>.rs:<line>"` with a reason in the adjacent
+/// comment — the same pinned-allowlist shape the auth-list invariant uses. An empty list is the
+/// expected state: today no Integration reads the field at all.
+const APPROVAL_EVIDENCE_AUDIT_CORRELATION_USES: &[&str] = &[];
+
+/// No effect-bearing backend code path is reachable without an `AdmittedOperation` built from
+/// proofs (S-047, design 13).
+///
+/// One rule over every Integration, discovered from the tree, so the next Integration crate is
+/// covered the moment it exists. The sealed admission chain — `GrantEvaluator` →
+/// `GrantDecision`, `ApprovalGate` → `ApprovalRedemption`, both consumed by
+/// `AdmittedOperation::from_decision` in `crates/server/src/hosted/enforcement.rs` — is the only
+/// authority over Grant and approval admission. An Integration that reads the invocation's
+/// `approval_evidence_ref` re-decides admission locally on a caller-supplied string, which is
+/// exactly the representational check the 2026-08-17 review's F-001 found bypassable. Writing
+/// `approval_evidence_ref: None` (carrying no evidence into an internally built invocation) is
+/// construction, not a read, and stays admitted.
+#[test]
+fn no_effect_backend_is_reachable_without_an_admission_proof() {
+    let root = repo_root();
+    let mut integrations = Vec::new();
+    let crates_dir = root.join("crates");
+    let entries = std::fs::read_dir(&crates_dir)
+        .unwrap_or_else(|error| panic!("read {}: {error}", crates_dir.display()));
+    for entry in entries {
+        let path = entry.expect("directory entry").path();
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_owned();
+        if path.is_dir() && name.starts_with("integration-") {
+            integrations.push((name, path));
+        }
+    }
+    integrations.sort();
+    assert!(
+        integrations.len() >= 8,
+        "the tree carries 8 Integration crates; the scan found {}",
+        integrations.len()
+    );
+    let mut violations = Vec::new();
+    for (_, integration) in &integrations {
+        for source in rust_sources(&integration.join("src")) {
+            let file_name = source
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            // House convention: test modules live in `tests.rs` / `*_tests.rs` siblings or in
+            // inline `#[cfg(test)]` items; both build invocations and are not admission reads.
+            if file_name.ends_with("tests.rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&source)
+                .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
+            let relative = source
+                .strip_prefix(&root)
+                .expect("integration sources live under the repository root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            for (index, line) in production_lines(&text) {
+                if !line.contains("approval_evidence_ref") {
+                    continue;
+                }
+                if line.trim() == "approval_evidence_ref: None," {
+                    continue;
+                }
+                let place = format!("{relative}:{}", index + 1);
+                if APPROVAL_EVIDENCE_AUDIT_CORRELATION_USES.contains(&place.as_str()) {
+                    continue;
+                }
+                violations.push(format!("{place}: `{}`", line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "an Integration reads `approval_evidence_ref`, re-deciding admission outside the sealed \
+         proof chain (S-043..S-046); delete the check — the hosted route already refused or \
+         admitted this invocation — or, for a genuine audit-correlation use, name the exact line \
+         in `APPROVAL_EVIDENCE_AUDIT_CORRELATION_USES` with its reason:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// Every `.rs` file under one directory, recursively.
+fn rust_sources(root: &Path) -> Vec<PathBuf> {
+    fn visit(path: &Path, sources: &mut Vec<PathBuf>) {
+        let entries = std::fs::read_dir(path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            if path.is_dir() {
+                visit(&path, sources);
+            } else if path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
+                sources.push(path);
+            }
+        }
+    }
+    let mut sources = Vec::new();
+    visit(root, &mut sources);
+    sources.sort();
+    sources
+}
+
+/// The production lines of one source file: everything outside `#[cfg(test)]` items.
+///
+/// Brace-tracked rather than cut-at-first-marker, because `#[cfg(test)]` also guards mid-file
+/// helpers (`integration-kubernetes/src/hosted.rs` has one), and cutting to the end of the file
+/// there would hide production code from the invariant.
+fn production_lines(text: &str) -> Vec<(usize, &str)> {
+    let mut lines = Vec::new();
+    // The brace depth the scanner must return to for the excluded item to be over.
+    let mut excluded_base: Option<i64> = None;
+    // A `#[cfg(test)]` was seen and the guarded item's body has not opened yet.
+    let mut pending = false;
+    let mut depth: i64 = 0;
+    for (index, line) in text.lines().enumerate() {
+        let opens = i64::try_from(line.matches('{').count()).expect("line braces fit");
+        let closes = i64::try_from(line.matches('}').count()).expect("line braces fit");
+        let after = depth + opens - closes;
+        if let Some(base) = excluded_base {
+            depth = after;
+            if depth <= base {
+                excluded_base = None;
+            }
+            continue;
+        }
+        if pending {
+            if opens > 0 {
+                excluded_base = Some(depth);
+                pending = false;
+                depth = after;
+                if depth <= excluded_base.expect("just set") {
+                    excluded_base = None;
+                }
+            } else if line.trim_end().ends_with(';') {
+                // A braceless guarded item (`#[cfg(test)] use …;`) excludes only itself.
+                pending = false;
+            }
+            // Attribute and signature lines between the marker and the body stay excluded.
+            continue;
+        }
+        if line.trim_start().starts_with("#[cfg(test)]") {
+            pending = true;
+            continue;
+        }
+        depth = after;
+        lines.push((index, line));
+    }
+    lines
 }

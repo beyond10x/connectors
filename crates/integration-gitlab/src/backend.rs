@@ -1205,15 +1205,9 @@ impl GitlabInner {
                 false,
             ));
         }
-        if operation_approval(&request.operation_ref) == ApprovalPosture::Required
-            && request.approval_evidence_ref.is_none()
-        {
-            return Err(OperationError::new(
-                OperationErrorCode::ApprovalRequired,
-                "this GitLab write requires correlated approval evidence",
-                false,
-            ));
-        }
+        // Writes describe `ApprovalPosture::Required`; the demanded approval is verified and
+        // spent upstream by the sealed proof chain (S-045, S-046) before this Integration is
+        // reachable, so no local reading of the evidence reference decides admission (S-047).
         let operation = connector_resolve::document::operation(&request.operation_ref)
             .ok_or_else(operation_not_found)?;
         let validator = jsonschema::validator_for(operation.input_schema())

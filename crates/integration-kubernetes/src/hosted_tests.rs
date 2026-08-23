@@ -485,7 +485,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn restart_requires_sre_group_fresh_approval_and_exact_resource_authority() {
+    async fn restart_requires_sre_group_and_exact_resource_authority_without_local_approval() {
         let backend = KubernetesStatusBackend::with_reader(
             "tenant-dev".to_owned(),
             policy(),
@@ -527,21 +527,9 @@ mod tests {
             "uid": "uid-backend",
             "resource_version": "42"
         });
-        let missing_approval = backend
-            .handle(
-                &sre,
-                OperationRequest::Invoke(InvokeRequest {
-                    operation_ref: RESTART_OPERATION.to_owned(),
-                    connection_ref: CONNECTION.to_owned(),
-                    description_ref: description.description_ref.clone(),
-                    input: input.clone(),
-                    approval_evidence_ref: None,
-                }),
-            )
-            .await
-            .unwrap_err();
-        assert_eq!(missing_approval.code, OperationErrorCode::ApprovalRequired);
-
+        // No local approval ceremony: the description declares `ApprovalPosture::Required` and
+        // the demanded approval is verified and spent upstream by the proof chain (S-047), so
+        // the invocation carries no evidence reference and dispatches.
         let OperationResult::Invoke(accepted) = backend
             .handle(
                 &sre,
@@ -550,7 +538,7 @@ mod tests {
                     connection_ref: CONNECTION.to_owned(),
                     description_ref: description.description_ref,
                     input,
-                    approval_evidence_ref: Some("approval:test:one".to_owned()),
+                    approval_evidence_ref: None,
                 }),
             )
             .await

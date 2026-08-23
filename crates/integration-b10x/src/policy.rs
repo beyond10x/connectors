@@ -4,7 +4,7 @@ use protocol::browser::BROWSER_SCREENSHOT_OPERATION;
 use protocol::operation::{ApprovalPosture, EffectClass, OperationError, OperationErrorCode};
 use serde_json::Value;
 
-use super::{invalid, unavailable, OPERATIONS};
+use super::{unavailable, OPERATIONS};
 
 pub(super) fn all_operation_rows(
 ) -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
@@ -216,31 +216,6 @@ pub(super) fn approval(canonical: &str, effects: &[HostEffect]) -> ApprovalPostu
         ApprovalPosture::Required
     } else {
         ApprovalPosture::NotRequired
-    }
-}
-
-pub(super) fn check_approval(
-    canonical: &str,
-    effects: &[HostEffect],
-    evidence: Option<&str>,
-) -> Result<(), OperationError> {
-    match (approval(canonical, effects), evidence) {
-        (ApprovalPosture::Required, None) => Err(OperationError::new(
-            OperationErrorCode::ApprovalRequired,
-            "external approval evidence is required",
-            false,
-        )),
-        // An opaque caller-supplied reference is not proof. Until the Connector process has a
-        // verifier that binds issuer, principal, invocation digest, decision, and freshness, every
-        // presented value is refused. In particular, no deployment-config string acts as a shared
-        // approval password.
-        (ApprovalPosture::Required, Some(_)) => Err(OperationError::new(
-            OperationErrorCode::ApprovalDenied,
-            "receiver-verifiable invocation approval is not configured",
-            false,
-        )),
-        (ApprovalPosture::NotRequired, Some(_)) => Err(invalid()),
-        _ => Ok(()),
     }
 }
 

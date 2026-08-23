@@ -94,6 +94,8 @@ pub enum RuntimeError {
     )]
     LocalIdentityRefused,
     #[error(transparent)]
+    ApprovalRecovery(#[from] server::hosted::RecoveryError),
+    #[error(transparent)]
     HostedState(#[from] hosted_state::StateError),
     #[error(transparent)]
     HostedVault(#[from] hosted_vault::HostedVaultError),
@@ -663,6 +665,10 @@ impl HostedRuntime {
         // accepts approval records from the deployment's one Identity issuer.
         let authority =
             server::hosted::HostedAuthority::bound(hosted_state, config.identity.origin.clone());
+        // The S-045 crash-recovery scan settles every attempted approval presentation that has
+        // no terminal outcome, before anything can present a new one. A journal that cannot be
+        // settled is damaged approval authority, and this placement refuses to serve on it.
+        authority.recover()?;
         let connector_router =
             server::hosted::router(verifier, backend.clone(), admission, authority);
         let application = if config.server.base_path == "/" {

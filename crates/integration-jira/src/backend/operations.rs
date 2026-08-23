@@ -135,15 +135,9 @@ impl JiraInner {
                 false,
             ));
         }
-        if operation_approval(&request.operation_ref) == ApprovalPosture::Required
-            && request.approval_evidence_ref.is_none()
-        {
-            return Err(OperationError::new(
-                OperationErrorCode::ApprovalRequired,
-                "this Jira write requires correlated approval evidence",
-                false,
-            ));
-        }
+        // Writes describe `ApprovalPosture::Required`; the demanded approval is verified and
+        // spent upstream by the sealed proof chain (S-045, S-046) before this Integration is
+        // reachable, so no local reading of the evidence reference decides admission (S-047).
         self.admit_operation_projects(&request.operation_ref, &request.input)?;
         let operation = connector_resolve::document::operation(&request.operation_ref)
             .ok_or_else(operation_not_found)?;

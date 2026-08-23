@@ -281,9 +281,7 @@ impl KubernetesStatusBackend {
         }
         match request.operation_ref.as_str() {
             STATUS_OPERATION => {
-                if request.description_ref != description_ref(context, STATUS_OPERATION)
-                    || request.approval_evidence_ref.is_some()
-                {
+                if request.description_ref != description_ref(context, STATUS_OPERATION) {
                     return Err(stale("Kubernetes status authority is stale"));
                 }
                 let input: DeploymentInput = serde_json::from_value(request.input)
@@ -312,13 +310,10 @@ impl KubernetesStatusBackend {
                 if request.description_ref != description_ref(context, RESTART_OPERATION) {
                     return Err(stale("Kubernetes restart authority is stale"));
                 }
-                if request.approval_evidence_ref.is_none() {
-                    return Err(OperationError::new(
-                        OperationErrorCode::ApprovalRequired,
-                        "Kubernetes rollout restart requires fresh human approval",
-                        false,
-                    ));
-                }
+                // The description declares `ApprovalPosture::Required`, and the demanded
+                // approval is verified and spent upstream by the sealed proof chain (S-045,
+                // S-046) before this Integration is reachable; no local reading of the
+                // caller-supplied evidence reference decides admission here (S-047).
                 let input: RestartInput = serde_json::from_value(request.input)
                     .map_err(|_| invalid("Kubernetes restart input is invalid"))?;
                 if !self.can_restart(context, &input.namespace)
