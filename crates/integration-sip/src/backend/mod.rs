@@ -836,7 +836,6 @@ connection_ref = "connection-asterisk-dev"
 label = "Asterisk development cluster"
 grant_ref = "grant-sip-dial-1"
 initiation = "b10x"
-approval_evidence_ref = "approval-sip-dial-1"
 
 [authority]
 issuer = "https://connectors.example"

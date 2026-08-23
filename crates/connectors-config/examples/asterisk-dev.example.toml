@@ -1,5 +1,5 @@
-# Documentation template only. Every identity, address, aperture and approval reference is a
-# deployment-owned fact and must be replaced before use.
+# Documentation template only. Every identity, address and aperture is a deployment-owned fact
+# and must be replaced before use.
 
 [owner]
 tenant_id = "tenant-development"
@@ -13,7 +13,6 @@ connection_ref = "connection-asterisk-development"
 label = "Asterisk development cluster"
 grant_ref = "grant-sip-dial-development-1"
 initiation = "b10x"
-approval_evidence_ref = "approval-sip-dial-development-1"
 
 [authority]
 issuer = "https://connectors.development.example"

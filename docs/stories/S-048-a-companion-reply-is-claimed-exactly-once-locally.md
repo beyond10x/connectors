@@ -34,3 +34,19 @@ field turns out to be the right shape).
 
 - 2026-08-23 — filed from the S-047 review findings (local one-shot regression, dead config
   field).
+- 2026-08-23 — implemented on `impl/S-048`. The claim lives at the local dispatch seam:
+  `EventReplyClaims` (`crates/connectors-runtime/src/claims.rs`) spends an `event:` evidence
+  reference exactly once over the S-041 state port, and `BackendRegistry::with_event_reply_claims`
+  applies it in the Invoke branch before any Integration is reached, only when the resolved
+  description demands approval. The personal composition binds it over a `SqliteState` at
+  `<state_root>/event-reply-claims.sqlite` from first boot; the hosted registry stays claim-free
+  because its `ApprovalGate` redeems upstream. A refused replay journals under
+  `local.event-reply-refusals` and returns `ApprovalDenied`; a claim that cannot be made durable
+  refuses rather than replies. Real-concurrency proof:
+  `registry::tests::a_companion_reply_is_claimed_exactly_once_locally` (two OS threads, one
+  barrier, exactly one dispatch) plus `claims::tests::parallel_presentations_take_exactly_one_claim`
+  (8 threads) and a restart-durability test. Rule 15 untouched and green, allowlist still empty.
+  The dead SIP `approval_evidence_ref` config field is retired from `ConnectionConfig`, both
+  examples, the sip test fixture, and the connectors-cli README. Known-red left in place:
+  `architecture_fence::product_cli_is_a_thin_frontend` fails at the merge base (856 > 828 CLI
+  production lines) independently of this story.
