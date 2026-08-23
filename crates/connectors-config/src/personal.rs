@@ -160,7 +160,7 @@ impl CatalogIntegrationConfig {
 pub struct PersonalVoiceConfig {
     /// Exact personal owner and current authority snapshot.
     pub owner: OwnerConfig,
-    /// Connection, Grant and approval facts selected outside caller input.
+    /// Connection and Grant facts selected outside caller input.
     pub connection: ConnectionConfig,
     /// Session-authority issuer identity and private-key location.
     ///
@@ -190,7 +190,15 @@ pub struct OwnerConfig {
     pub authority_snapshot_sha256: String,
 }
 
-/// Deployment-owned Connection and independent operation authority.
+/// Deployment-owned Connection facts.
+///
+/// This shape deliberately carries no approval reference. It used to: a configured
+/// `approval_evidence_ref` string was passed on every `sip.dial`, which made a static
+/// deployment-config value act as a shared approval password. S-047 deleted the last reader —
+/// the hosted proof chain (Grant evaluation plus one-time approval redemption) is the admission
+/// authority, and the personal placement is the owner's own admission over their 0700 socket —
+/// and S-048 retires the field itself rather than keeping dead configuration a deployment must
+/// still invent a value for.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionConfig {
@@ -198,7 +206,6 @@ pub struct ConnectionConfig {
     pub label: String,
     pub grant_ref: String,
     pub initiation: InitiationConfig,
-    pub approval_evidence_ref: String,
 }
 
 /// Deployment-owned Connection for B10x service and device capabilities.
@@ -1172,7 +1179,6 @@ impl PersonalVoiceConfig {
             || self.connection.label.is_empty()
             || self.connection.label.len() > 1024
             || !config_ref(&self.connection.grant_ref, 512)
-            || !config_ref(&self.connection.approval_evidence_ref, 512)
             || self.sip.targets.is_empty()
             || self
                 .sip

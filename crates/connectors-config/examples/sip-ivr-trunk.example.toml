@@ -1,5 +1,5 @@
-# Documentation template only. Every identity, address, aperture and approval reference is a
-# deployment-owned fact and must be replaced before use.
+# Documentation template only. Every identity, address and aperture is a deployment-owned fact
+# and must be replaced before use.
 #
 # **A default trunk reached by name, dialled by number.** This is what makes
 #
@@ -23,7 +23,6 @@ connection_ref = "connection-ivr-development"
 label = "Internal IVR"
 grant_ref = "grant-sip-dial-development-1"
 initiation = "b10x"
-approval_evidence_ref = "approval-sip-dial-development-1"
 
 [sip]
 # The trunk a `sip.dial` without a target selects. Without this, a dial carrying only a number is

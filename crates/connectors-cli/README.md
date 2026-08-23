@@ -180,8 +180,7 @@ tenant, Grant, or credential. It supplies only the configured alias:
       "operation_ref": "sip.dial",
       "connection_ref": "connection-asterisk-development",
       "description_ref": "description-sha256-...",
-      "input": {"target": "asterisk-dev"},
-      "approval_evidence_ref": "approval-sip-dial-development-1"
+      "input": {"target": "asterisk-dev"}
     }
   }
 }
@@ -194,6 +193,5 @@ After a daemon process restart, an execution absent from the new generation reco
 `outcome_unknown`; the process cannot pretend it still owns an old socket task.
 
 The example file uses documentation-only addresses. Replace every route, aperture, identity,
-snapshot, approval reference, and key path with reviewed deployment facts before use. This is a
-development profile while sipx remains pinned to a release candidate; it is not a stable or hosted
-support claim.
+snapshot, and key path with reviewed deployment facts before use. This is a development profile
+while sipx remains pinned to a release candidate; it is not a stable or hosted support claim.
