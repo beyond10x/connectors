@@ -1,4 +1,4 @@
-//! B10x Session Authority v1 issuance and serving-endpoint redemption.
+//! platform Session Authority v1 issuance and serving-endpoint redemption.
 
 use std::collections::BTreeSet;
 use std::sync::Mutex;
@@ -47,7 +47,7 @@ pub struct Confirmation {
     pub jkt: String,
 }
 
-/// Closed B10x Session Authority v1 claims.
+/// Closed platform Session Authority v1 claims.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SessionAuthorityClaims {

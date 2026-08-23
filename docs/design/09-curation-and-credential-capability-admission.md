@@ -98,7 +98,7 @@ Enterprise installation, or allowed operation from a prefix.
 ### 3.1 A Zwirn caller is not a Slack credential subject
 
 “The bot does something on behalf of me” describes two separate facts. Zwirn is the authenticated
-B10x caller. Slack sees whichever credential belongs to the selected Connection:
+platform caller. Slack sees whichever credential belongs to the selected Connection:
 
 ```text
 Zwirn caller ── Grant ──▶ tenant-shared Slack bot Connection ── xoxb ──▶ Slack sees the app bot
@@ -139,7 +139,7 @@ tokens may carry `read_api` for reads or `api` for reads and writes. Every read 
 `read_api OR api` on each exact credential purpose; the write declares only `api`.
 
 A developer normally chooses **As myself** (OAuth, with PAT as the explicit alternative). A
-B10x or babelforce automation normally chooses **As automation**, then supplies a service
+platform or babelforce automation normally chooses **As automation**, then supplies a service
 account, group, or project token according to the intended resource boundary. No client-credentials
 grant is invented: GitLab does not offer one for this use case.
 

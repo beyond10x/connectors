@@ -71,7 +71,7 @@ Day-one changes, from the precedents analysis and the predecessor's own stories:
 | `crates/domain` | the nouns of design 01 as types: entities, closed vocabularies (risk, effects, audit actions…), ports (traits) for every store, and the **proof-type gates** (admission → grant → dispatch). No IO, no HTTP, no persistence. |
 | `crates/protocol` | versioned wire contracts: protocol identities (`connectors.api.v1`, `connectors.invoke-request.v1`, …), request/response DTOs, strict conformance (`deny_unknown_fields`, bounded diagnostics). The single source for SDK generation later. |
 | `crates/service` | use-cases over ports: connection lifecycle, connect sessions, acquisition, grant admission and CAS mutation, invocation assembly (document → plan → placed request), event routing, delivery queues. Pure logic; testable without a socket. |
-| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, personal-local authentication or the released B10x Identity verifier adapter, injected state + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. It never implements OIDC login or Identity session/service-credential storage. |
+| `crates/server` | composition: axum transport with routes-as-data + `Access` on the route, personal-local authentication or the released platform Identity verifier adapter, injected state + secret-store bindings, the closed protocol-driver registry, egress, channel supervision, WS subscriptions, the binary's serve path. It never implements OIDC login or Identity session/service-credential storage. |
 
 The predecessor's two-crate split (host/server) was right; its failure mode was god modules
 (one 10.7k-line route file). The four-crate split above moves the pressure points (`service`,
@@ -105,7 +105,7 @@ remains the personal tier's contract — secure local material is generated auto
 
 **2026-08-14 identity-boundary amendment.** The personal posture above remains Connectors-owned.
 Organization and hosted postures do not terminate OIDC or mint/store login or service credentials.
-They consume the released B10x Identity validated-envelope/verifier contract and apply a
+They consume the released platform Identity validated-envelope/verifier contract and apply a
 second, Connectors-owned audience-scope and Grant decision. This amendment supersedes the founding
 `local owner / OIDC / hosted` server split and every M2 reference to Connectors-owned hosted login.
 
@@ -382,7 +382,7 @@ personal account, never a long-lived PAT. In-workflow commits may alternatively 
 | **M2 skeleton** | `domain`/`protocol`/`service`/`server` scaffolds; personal-local authentication; hosted Identity verifier port; fixed tenant/principal projection; closed connector audience scopes, Grants, and connector audit; no Identity-owned store | personal posture is healthy; hosted conformance passes the pinned Identity owner bundle; routes/dependency fences prove Identity implementation and persistence stay absent |
 | **M3 connections** | integrations, connect sessions, acquisition (OAuth + API key), connections lifecycle, grants, declared-operation invoke; raw proxy remains deferred to S-030 | end-to-end: admit local or Identity authority → connect a real provider → grant → invoke, all audited |
 | **M4 events** | channels, webhook terminator, event store, deliveries + replay, subscriptions | a provider event reaches a client by push and by pull, with provenance |
-| **M5 clients** | externally gated until Flux records B10x adoption; then flux re-point (embedded client + local supervise) and the first measured plugin-retirement wave (gitlab), as recorded in S-010 | downstream adoption record exists; flux invokes gitlab through the platform; the gitlab plugin is deleted |
+| **M5 clients** | externally gated until Flux records platform adoption; then flux re-point (embedded client + local supervise) and the first measured plugin-retirement wave (gitlab), as recorded in S-010 | downstream adoption record exists; flux invokes gitlab through the platform; the gitlab plugin is deleted |
 
 ## Open questions
 

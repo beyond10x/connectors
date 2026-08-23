@@ -706,8 +706,7 @@ mod tests {
                 organization,
                 "principal",
                 "grant",
-                ConnectionAuthority::new("connection", InitiationPolicy::b10x_only())
-                    .unwrap(),
+                ConnectionAuthority::new("connection", InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),

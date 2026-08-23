@@ -1,6 +1,6 @@
 use super::*;
 use connector_resolve::document::HostEffect;
-use connectors_config::{B10xConnectionConfig, InitiationConfig};
+use connectors_config::{InitiationConfig, PlatformConnectionConfig};
 use protocol::datasource::{
     BindingSearchRequest, DatasourceRead, DatasourceRequest, DatasourceResult,
     DescribeRequest as DatasourceDescribeRequest, ReadRequest,
@@ -17,7 +17,7 @@ use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
-fn config(root: &Path) -> B10xIntegrationConfig {
+fn config(root: &Path) -> PlatformIntegrationConfig {
     let signing_key = root.join("module-signing.key");
     if !signing_key.exists() {
         fs::write(
@@ -27,12 +27,12 @@ fn config(root: &Path) -> B10xIntegrationConfig {
         .unwrap();
         fs::set_permissions(&signing_key, fs::Permissions::from_mode(0o600)).unwrap();
     }
-    B10xIntegrationConfig {
-        connection: B10xConnectionConfig {
-            connection_ref: "connection-b10x".to_owned(),
-            label: "B10x local".to_owned(),
-            grant_ref: "grant-b10x".to_owned(),
-            initiation: InitiationConfig::B10x,
+    PlatformIntegrationConfig {
+        connection: PlatformConnectionConfig {
+            connection_ref: "connection-platform".to_owned(),
+            label: "platform local".to_owned(),
+            grant_ref: "grant-platform".to_owned(),
+            initiation: InitiationConfig::Platform,
         },
         tenant_member_modules: None,
         work_origin: Some("http://127.0.0.1:4180".to_owned()),
@@ -160,7 +160,7 @@ fn stalling_http(delay: Duration) -> (String, thread::JoinHandle<()>) {
 }
 
 async fn invoke_operation(
-    backend: &B10xBackend,
+    backend: &PlatformBackend,
     operation_ref: &str,
     input: Value,
     approval_evidence_ref: Option<&str>,
@@ -182,7 +182,7 @@ async fn invoke_operation(
             &principal(),
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation_ref.to_owned(),
-                connection_ref: "connection-b10x".to_owned(),
+                connection_ref: "connection-platform".to_owned(),
                 description_ref: description.description_ref,
                 input,
                 approval_evidence_ref: approval_evidence_ref.map(ToOwned::to_owned),
@@ -191,7 +191,7 @@ async fn invoke_operation(
         .await
 }
 
-async fn invoke_read(backend: &B10xBackend, operation_ref: &str, input: Value) -> Value {
+async fn invoke_read(backend: &PlatformBackend, operation_ref: &str, input: Value) -> Value {
     let OperationResult::Invoke(result) = invoke_operation(backend, operation_ref, input, None)
         .await
         .unwrap()
@@ -219,8 +219,7 @@ async fn search_projects_only_configured_capabilities() {
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let backend =
-        B10xBackend::personal(config(temporary.path()), principal(), temporary.path())
-            .unwrap();
+        PlatformBackend::personal(config(temporary.path()), principal(), temporary.path()).unwrap();
     let OperationResult::Search { operations } = backend
         .handle(
             &principal(),
@@ -262,7 +261,7 @@ async fn search_projects_only_configured_capabilities() {
 }
 
 /// Configure every module origin so search projects the whole module surface at once.
-fn every_module_config(root: &Path) -> B10xIntegrationConfig {
+fn every_module_config(root: &Path) -> PlatformIntegrationConfig {
     let mut configured = config(root);
     configured.ontology_origin = Some("http://127.0.0.1:4181".to_owned());
     configured.planner_origin = Some("http://127.0.0.1:4182".to_owned());
@@ -275,7 +274,7 @@ fn every_module_config(root: &Path) -> B10xIntegrationConfig {
 async fn search_names_each_operation_once_and_never_by_its_second_name() {
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-    let backend = B10xBackend::personal(
+    let backend = PlatformBackend::personal(
         every_module_config(temporary.path()),
         principal(),
         temporary.path(),
@@ -336,7 +335,7 @@ async fn search_names_each_operation_once_and_never_by_its_second_name() {
 async fn every_name_of_an_operation_describes_one_operation() {
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-    let backend = B10xBackend::personal(
+    let backend = PlatformBackend::personal(
         every_module_config(temporary.path()),
         principal(),
         temporary.path(),
@@ -382,7 +381,7 @@ async fn workspace_datasource_projects_only_the_logical_read_model() {
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut configured = config(temporary.path());
     configured.workspaces_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     assert!(backend.capabilities().datasources);
 
     let DatasourceResult::Describe(description) = backend
@@ -476,7 +475,7 @@ async fn a_workspace_read_survives_the_access_token_rotation_between_describe_an
     let mut configured = config(temporary.path());
     configured.workspaces_origin = Some(origin);
     let backend =
-        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+        PlatformBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
             .unwrap();
 
     let describing = hosted_principal("token-catalog-1", 'c');
@@ -539,7 +538,7 @@ async fn an_unknown_workspace_binding_is_named_rather_than_reported_as_stale() {
     let mut configured = config(temporary.path());
     configured.workspaces_origin = Some("http://127.0.0.1:1".to_owned());
     let backend =
-        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+        PlatformBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
             .unwrap();
     let context = hosted_principal("token-catalog-1", 'c');
     let DatasourceResult::Describe(description) = backend
@@ -581,14 +580,14 @@ fn hosted_tenant_member_defaults_are_an_explicit_module_ceiling() {
     let mut configured = config(temporary.path());
     configured.tenant_member_modules = Some(Vec::new());
     let backend =
-        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+        PlatformBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
             .unwrap();
     assert!(!backend.configured("work-request-list"));
 
     let mut configured = config(temporary.path());
     configured.tenant_member_modules = Some(vec!["work".to_owned()]);
     let backend =
-        B10xBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
+        PlatformBackend::hosted(configured, vec!["tenant-test".to_owned()], temporary.path())
             .unwrap();
     assert!(backend.configured("work-request-list"));
 }
@@ -598,8 +597,7 @@ async fn module_global_ids_resolve_for_declarative_ui_requirements() {
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let backend =
-        B10xBackend::personal(config(temporary.path()), principal(), temporary.path())
-            .unwrap();
+        PlatformBackend::personal(config(temporary.path()), principal(), temporary.path()).unwrap();
     let described = backend
         .handle(
             &principal(),
@@ -624,7 +622,7 @@ async fn work_owner_events_are_checkpointed_into_connector_sequence_space() {
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut configured = config(temporary.path());
     configured.work_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let result = backend
         .handle_event(
             &principal(),
@@ -667,7 +665,7 @@ async fn planner_owner_events_are_checkpointed_into_connector_sequence_space() {
     let mut configured = config(temporary.path());
     configured.work_origin = None;
     configured.planner_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let result = backend
         .handle_event(
             &principal(),
@@ -751,7 +749,7 @@ async fn work_invocation_crosses_the_private_http_boundary_with_signed_authority
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut configured = config(temporary.path());
     configured.work_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let output = invoke_read(
         &backend,
         "work.requests.list",
@@ -775,7 +773,7 @@ async fn local_work_invocation_is_constrained_to_the_configured_unix_socket() {
     let mut configured = config(temporary.path());
     configured.work_origin = None;
     configured.module_sockets.insert("work".to_owned(), socket);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let output = invoke_read(
         &backend,
         "work.requests.list",
@@ -797,7 +795,7 @@ async fn planner_invocation_crosses_the_private_http_boundary_with_signed_author
     let mut configured = config(temporary.path());
     configured.work_origin = None;
     configured.planner_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let output = invoke_read(
         &backend,
         "planner/project.list",
@@ -822,8 +820,7 @@ async fn a_write_passes_no_local_approval_gate() {
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let backend =
-        B10xBackend::personal(config(temporary.path()), principal(), temporary.path())
-            .unwrap();
+        PlatformBackend::personal(config(temporary.path()), principal(), temporary.path()).unwrap();
 
     let bare = invoke_operation(
         &backend,
@@ -857,7 +854,7 @@ async fn invalid_post_dispatch_output_is_audited_as_indeterminate() {
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut configured = config(temporary.path());
     configured.work_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
 
     let error = invoke_operation(
         &backend,
@@ -882,8 +879,7 @@ async fn total_http_deadline_bounds_a_stalled_private_service() {
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let mut configured = config(temporary.path());
     configured.work_origin = Some(origin);
-    let mut backend =
-        B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let mut backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     backend.client = http_client(Duration::from_millis(25), Duration::from_millis(50)).unwrap();
     backend.http_total_timeout = Duration::from_millis(50);
 
@@ -912,7 +908,7 @@ async fn ontology_invocation_carries_request_bound_signed_authority() {
     let mut configured = config(temporary.path());
     configured.work_origin = None;
     configured.ontology_origin = Some(origin);
-    let backend = B10xBackend::personal(configured, principal(), temporary.path()).unwrap();
+    let backend = PlatformBackend::personal(configured, principal(), temporary.path()).unwrap();
     let output = invoke_read(
         &backend,
         "knowledge.query",

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use connector_address::credential::CredentialRef;
 
 use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
-use crate::personal::{B10xIntegrationConfig, InitiationConfig, SlackIntegrationConfig};
+use crate::personal::{InitiationConfig, PlatformIntegrationConfig, SlackIntegrationConfig};
 
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
@@ -40,8 +40,8 @@ pub struct HostedServerConfig {
     pub gitlab: Option<HostedGitlabConfig>,
     #[serde(default)]
     pub jira: Option<HostedJiraConfig>,
-    #[serde(default)]
-    pub b10x: Option<B10xIntegrationConfig>,
+    #[serde(default, alias = "b10x")]
+    pub platform: Option<PlatformIntegrationConfig>,
 }
 
 /// Deployment acknowledgement for the transport invariant enforced by credential-bearing
@@ -501,9 +501,9 @@ impl HostedServerConfig {
             || (self.vault.enabled != vault_required)
             || !valid_dns_label(&self.vault.mount, 63)
             || self
-                .b10x
+                .platform
                 .as_ref()
-                .is_some_and(|b10x| b10x.validate().is_err())
+                .is_some_and(|platform| platform.validate().is_err())
             || !valid_groups(&self.authority.operator_groups)
             || !slack_valid
             || !gitlab_valid
@@ -760,6 +760,54 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_existing_hosted_config_with_the_old_b10x_section_parses_unchanged() {
+        // D5 (S-052): a hosted deployment written before the rename carries `[b10x]`
+        // and `initiation = "b10x"` and must keep parsing into the platform field.
+        let config: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "babelforce"
+module_tenant_ids = ["babelforce"]
+[server]
+listen = "0.0.0.0:8080"
+base_path = "/api/connectors/v1"
+[identity]
+origin = "https://identity.code.dev.babelforce.com"
+[authority]
+operator_groups = ["operator"]
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[egress]
+policy = "connection_bound_post_dns_v1"
+[kubernetes]
+enabled = false
+namespaces = []
+[vault]
+enabled = false
+mount = "b10x-connectors"
+[sip]
+enabled = false
+listen = "0.0.0.0:5060"
+[b10x]
+work_origin = "http://b10x-work:8080"
+[b10x.connection]
+connection_ref = "connection:b10x:b10x"
+label = "platform private services"
+grant_ref = "grant:deployment:b10x:b10x"
+initiation = "b10x"
+"#,
+        )
+        .unwrap();
+        let platform = config
+            .platform
+            .as_ref()
+            .expect("the old [b10x] section lands in the platform field");
+        assert!(matches!(
+            platform.connection.initiation,
+            InitiationConfig::Platform
+        ));
+    }
+
+    #[test]
     fn hosted_deployment_accepts_planner_integration() {
         let config: HostedServerConfig = toml::from_str(
             r#"
@@ -802,7 +850,7 @@ companion_grant_ref = "grant:slack:workspace-companion"
 initiation = "provider"
 allowed_events = ["app_mention"]
 connect_session_ttl_seconds = 300
-[b10x]
+[platform]
 tenant_member_modules = ["ontology", "planner", "work"]
 module_signing_key_file = "/var/run/b10x-module-auth/private.pem"
 module_signing_key_id = "developer-1"
@@ -810,11 +858,11 @@ module_signing_issuer = "urn:b10x:connectors:b10x:b10x"
 work_origin = "http://b10x-work:8080"
 ontology_origin = "http://b10x-ontology:8080"
 planner_origin = "http://b10x-planner:8080"
-[b10x.connection]
+[platform.connection]
 connection_ref = "connection:b10x:b10x"
-label = "B10x private services"
+label = "platform private services"
 grant_ref = "grant:deployment:b10x:b10x"
-initiation = "b10x"
+initiation = "platform"
 "#,
         )
         .unwrap();
@@ -1213,7 +1261,7 @@ user_oauth_client_id = "jira-user-client"
 oauth_redirect_uri = "https://code.example.test/api/connectors/v1/oauth/jira/callback"
 organization_read_grant_ref = "grant:jira:organization-read"
 user_grant_ref = "grant:jira:delegated-user"
-initiation = "b10x"
+initiation = "platform"
 "#,
         )
         .unwrap();

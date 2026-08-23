@@ -593,7 +593,7 @@ impl KubernetesLocalBackend {
                 integration_ref: child.provider.clone(),
                 label: child.label.clone(),
                 state: ConnectionState::Callable,
-                initiation: vec![ConnectionInitiator::B10x],
+                initiation: vec![ConnectionInitiator::Platform],
                 route: ConnectionRoute::ViaConnection {
                     parent_connection_ref: child.parent_connection_ref.clone(),
                     route_adapter: RouteAdapter::KubernetesServiceProxyV1,
@@ -717,7 +717,7 @@ impl KubernetesLocalBackend {
         }
         let connection = ConnectionAuthority::mediated(
             &child.connection_ref,
-            InitiationPolicy::b10x_only(),
+            InitiationPolicy::platform_only(),
             &child.parent_connection_ref,
             &child.resource_binding,
             DomainRouteAdapter::KubernetesServiceProxyV1,
@@ -1238,12 +1238,11 @@ fn kubernetes_route_operation(operation_ref: &str) -> bool {
 
 fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
     match config {
-        InitiationConfig::B10x => vec![ConnectionInitiator::B10x],
+        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
         InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-        InitiationConfig::Both => vec![
-            ConnectionInitiator::B10x,
-            ConnectionInitiator::Provider,
-        ],
+        InitiationConfig::Both => {
+            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+        }
     }
 }
 

@@ -142,7 +142,7 @@ const COVERED_FLOOR: usize = 835;
 // The same C-30 deferral leaves 123 measured absences. The ceiling stays one above that figure so
 // one honest absence remains admissible while the smallest shipped two-operation connector arriving
 // with no response shapes still fails.
-// Raised 124 -> 127 with the B10x module admission. Ontology adds three code-first write
+// Raised 124 -> 127 with the platform module admission. Ontology adds three code-first write
 // operations whose exact successful response is JSON null. The catalogue deliberately records
 // those as honest response-shape absences rather than pretending null constrains a response body;
 // twelve other admitted module operations carry schemas. The measured absence is 126, so 127 keeps

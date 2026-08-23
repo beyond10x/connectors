@@ -8,7 +8,7 @@
 
 ## The goal, in one sentence
 
-**Connectors is the single owner of every connection B10x makes to something outside itself —
+**Connectors is the single owner of every connection the platform makes to something outside itself —
 the credential, its acquisition, its refresh, its storage, and the request it authorises — and it
 works the same way on a laptop with no deployment as it does in a cluster.**
 
@@ -79,7 +79,7 @@ foundation/connectors/
     driver-speech              directions; driver-speech is TTS/STT over it
     integration-sip            voice sessions
     integration-kubernetes     only what kubeconfig exec auth adds beyond HTTP
-    integration-b10x     module sockets and signed module requests
+    integration-platform     module sockets and signed module requests
 
     ── composition: the central place ──────────────────────────────────
     connectors-runtime         compose(config, ports) -> BackendRegistry

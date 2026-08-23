@@ -1,6 +1,6 @@
 [package]
-name = "integration-b10x"
-description = "B10x-owned native driver and private service Connector Integration."
+name = "integration-platform"
+description = "The platform-owned native driver and private service Connector Integration."
 edition = "2021"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"

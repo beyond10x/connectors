@@ -1184,7 +1184,7 @@ mod tests {
             integration_ref: "tickets".to_owned(),
             label: connection_ref.to_owned(),
             state: ConnectionState::Callable,
-            initiation: vec![ConnectionInitiator::B10x],
+            initiation: vec![ConnectionInitiator::Platform],
             route: ConnectionRoute::Direct,
             scope: None,
             actor: None,

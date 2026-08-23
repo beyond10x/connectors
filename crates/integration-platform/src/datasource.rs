@@ -5,7 +5,7 @@ const LIST_OPERATION: &str = "workspaces-list";
 const GET_OPERATION: &str = "workspaces-get";
 const PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
 
-impl B10xBackend {
+impl PlatformBackend {
     pub(super) fn workspace_datasource_admitted(&self) -> bool {
         self.config.module_configured("workspaces")
             && self.module_admitted("workspaces")
@@ -256,7 +256,7 @@ impl B10xBackend {
             datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
             binding_ref: self.workspace_datasource_binding_ref(),
             connection_ref: self.config.connection.connection_ref.clone(),
-            label: "B10x logical workspaces".to_owned(),
+            label: "platform logical workspaces".to_owned(),
             purpose: None,
             generation: u64::from_be_bytes(generation).max(1),
         }
@@ -319,7 +319,7 @@ impl B10xBackend {
 fn workspace_datasource_summary() -> DatasourceSummary {
     DatasourceSummary {
         datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
-        title: "B10x workspaces".to_owned(),
+        title: "platform workspaces".to_owned(),
         access_mode: AccessMode::Live,
         verbs: vec![ReadVerb::List, ReadVerb::Get],
     }

@@ -44,11 +44,11 @@
 //! 12. [`the_credential_requirement_agrees_with_the_auth_list`] — the stored token (S-001) is
 //!     `declared` exactly when the effective `auth` list is non-empty; the empty side carries one
 //!     of the two distinction tokens the old derivation could not tell apart.
-//! 13. [`sip_catalog_surface_is_the_bounded_b10x_dial_member`] — the closed runtime
-//!     vocabulary can land first, but only the repository-owned B10x Provider may publish
+//! 13. [`sip_catalog_surface_is_the_bounded_platform_dial_member`] — the closed runtime
+//!     vocabulary can land first, but only the repository-owned platform Provider may publish
 //!     the bounded native SIP member; a configured PBX remains a peer rather than its owner.
 //! 14. [`the_browser_surface_is_read_only_and_carries_no_interaction_member`] — every `cdp_v1`
-//!     member is a B10x-owned read on a lease, and no interaction member exists anywhere in
+//!     member is a platform-owned read on a lease, and no interaction member exists anywhere in
 //!     the catalogue: clicking and typing are mutations and wait on the approval round-trip.
 //! 15. [`no_effect_backend_is_reachable_without_an_admission_proof`] — no Integration reads the
 //!     invocation's `approval_evidence_ref` (S-047): admission is decided upstream by the sealed
@@ -129,7 +129,7 @@ fn documents(workspace: &Workspace, plan: &Plan) -> BTreeMap<String, Value> {
 /// must make the same source/runtime case explicitly instead of inheriting permission from the
 /// existence of the driver vocabulary.
 #[test]
-fn sip_catalog_surface_is_the_bounded_b10x_dial_member() {
+fn sip_catalog_surface_is_the_bounded_platform_dial_member() {
     let (workspace, plan) = full_plan();
     let sip = documents(&workspace, &plan)
         .into_iter()
@@ -175,17 +175,17 @@ fn sip_catalog_surface_is_the_bounded_b10x_dial_member() {
 
     let provenance: toml::Value = toml::from_str(
         &std::fs::read_to_string(repo_root().join("specs/b10x.provenance.toml"))
-            .expect("read B10x source provenance"),
+            .expect("read platform source provenance"),
     )
-    .expect("B10x source provenance is TOML");
+    .expect("platform source provenance is TOML");
     assert_eq!(provenance["origin"].as_str(), Some("repository-authored"));
     let provider_bytes = std::fs::read(repo_root().join("providers/b10x.toml"))
-        .expect("read B10x Provider source");
+        .expect("read platform Provider source");
     let measured_provider_sha256 = connector_spec::sha256_hex(&provider_bytes);
     assert_eq!(
         provenance["provider_sha256"].as_str(),
         Some(measured_provider_sha256.as_str()),
-        "the authored B10x Provider moved without its provenance pin"
+        "the authored platform Provider moved without its provenance pin"
     );
 }
 
@@ -231,7 +231,7 @@ fn the_browser_surface_is_read_only_and_carries_no_interaction_member() {
 
     for (provider, operation) in &browser {
         let id = operation["id"].as_str().expect("id");
-        assert_eq!(provider, "b10x", "{id} is not B10x-owned");
+        assert_eq!(provider, "b10x", "{id} is not platform-owned");
         assert_eq!(
             operation["direction"], "read",
             "{id} is not read-only, so it needs the approval round-trip first"

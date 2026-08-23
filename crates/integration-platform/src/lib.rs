@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
-//! Runtime composition for B10x-owned Connector capabilities.
+//! Runtime composition for platform-owned Connector capabilities.
 //!
-//! This Integration is the only runtime adapter that joins the reviewed B10x catalog to the
+//! This Integration is the only runtime adapter that joins the reviewed platform catalog to the
 //! closed local audio/CDP drivers and to deployment-owned private Work/Ontology/Planner origins. Agent sees
 //! only the credential-free operation protocol. It cannot select a driver, executable, profile,
 //! voice, filesystem path, HTTP origin, bearer, or placement.
@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use connector_resolve::document::{Document, ProtocolDriver};
-use connectors_config::B10xIntegrationConfig;
+use connectors_config::PlatformIntegrationConfig;
 use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
 use driver_cdp::LocalBrowserDriver;
 use driver_speech::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
@@ -77,10 +77,10 @@ use surface::{
 
 /// Runtime construction failure. Messages deliberately carry no bearer or remote response body.
 #[derive(Debug, thiserror::Error)]
-pub enum B10xIntegrationError {
-    #[error("B10x Integration configuration is invalid")]
+pub enum PlatformIntegrationError {
+    #[error("platform Integration configuration is invalid")]
     InvalidConfiguration,
-    #[error("B10x Integration HTTP client is unavailable")]
+    #[error("platform Integration HTTP client is unavailable")]
     HttpClient,
 }
 
@@ -90,9 +90,9 @@ enum PrincipalAdmission {
     Tenants(BTreeSet<String>),
 }
 
-/// One composed B10x Provider backend.
-pub struct B10xBackend {
-    config: B10xIntegrationConfig,
+/// One composed platform Provider backend.
+pub struct PlatformBackend {
+    config: PlatformIntegrationConfig,
     admission: PrincipalAdmission,
     document: Document,
     catalog: Value,
@@ -108,7 +108,7 @@ pub struct B10xBackend {
     module_signer: Option<ModuleSigner>,
 }
 
-impl B10xBackend {
+impl PlatformBackend {
     fn check_context(&self, context: &PrincipalContext) -> Result<(), OperationError> {
         if self.context_admitted(context) {
             Ok(())
@@ -195,14 +195,13 @@ impl B10xBackend {
 
     fn lifecycle_connection(&self) -> LifecycleConnectionSummary {
         let initiation = match self.config.connection.initiation {
-            connectors_config::InitiationConfig::B10x => {
-                vec![ConnectionInitiator::B10x]
+            connectors_config::InitiationConfig::Platform => {
+                vec![ConnectionInitiator::Platform]
             }
             connectors_config::InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
-            connectors_config::InitiationConfig::Both => vec![
-                ConnectionInitiator::B10x,
-                ConnectionInitiator::Provider,
-            ],
+            connectors_config::InitiationConfig::Both => {
+                vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+            }
         };
         LifecycleConnectionSummary {
             connection_ref: self.config.connection.connection_ref.clone(),
@@ -709,7 +708,7 @@ impl B10xBackend {
         module_origin(&self.config, canonical)
     }
 
-    fn module_client(&self, module: &str) -> Result<reqwest::Client, B10xIntegrationError> {
+    fn module_client(&self, module: &str) -> Result<reqwest::Client, PlatformIntegrationError> {
         module_client(
             &self.config,
             &self.client,
@@ -968,7 +967,7 @@ fn browser_url_symbol(input: Value) -> Result<String, OperationError> {
 }
 
 #[async_trait]
-impl ConnectorBackend for B10xBackend {
+impl ConnectorBackend for PlatformBackend {
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         // Construction validates local drivers and configured origins. Remote Work/Ontology
         // availability is operation-scoped and must not become global process readiness.
@@ -1107,7 +1106,7 @@ impl ConnectorBackend for B10xBackend {
             }
             _ => Err(ConnectionError::new(
                 ConnectionErrorCode::NotFound,
-                "B10x Integration Connection was not found",
+                "platform Integration Connection was not found",
                 false,
             )),
         }
@@ -1221,19 +1220,19 @@ impl ConnectorBackend for B10xBackend {
 fn http_client(
     connect_timeout: Duration,
     total_timeout: Duration,
-) -> Result<reqwest::Client, B10xIntegrationError> {
+) -> Result<reqwest::Client, PlatformIntegrationError> {
     if connect_timeout.is_zero() || total_timeout.is_zero() || connect_timeout > total_timeout {
-        return Err(B10xIntegrationError::InvalidConfiguration);
+        return Err(PlatformIntegrationError::InvalidConfiguration);
     }
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(connect_timeout)
         .timeout(total_timeout)
         .build()
-        .map_err(|_| B10xIntegrationError::HttpClient)
+        .map_err(|_| PlatformIntegrationError::HttpClient)
 }
 
-fn work_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
+fn work_event_channel(config: &PlatformIntegrationConfig) -> ChannelSummary {
     ChannelSummary {
         channel_ref: WORK_EVENT_CHANNEL.to_owned(),
         connection_ref: config.connection.connection_ref.clone(),
@@ -1247,7 +1246,7 @@ fn work_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
     }
 }
 
-fn planner_event_channel(config: &B10xIntegrationConfig) -> ChannelSummary {
+fn planner_event_channel(config: &PlatformIntegrationConfig) -> ChannelSummary {
     ChannelSummary {
         channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
         connection_ref: config.connection.connection_ref.clone(),

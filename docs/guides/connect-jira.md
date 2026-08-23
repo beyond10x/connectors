@@ -39,7 +39,7 @@ user_oauth_client_id = "USER_3LO_CLIENT_ID"
 oauth_redirect_uri = "https://api.example.com/api/connectors/v1/oauth/jira/callback"
 organization_read_grant_ref = "grant:jira:organization-read"
 user_grant_ref = "grant:jira:delegated-user"
-initiation = "b10x"
+initiation = "platform"
 connect_session_ttl_seconds = 300
 refresh_skew_seconds = 300
 ```

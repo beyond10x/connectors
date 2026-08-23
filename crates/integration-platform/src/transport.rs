@@ -2,21 +2,21 @@ use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _}
 use std::path::Path;
 use std::time::Duration;
 
-use connectors_config::B10xIntegrationConfig;
+use connectors_config::PlatformIntegrationConfig;
 
-use super::{is_ontology_operation, B10xIntegrationError};
+use super::{is_ontology_operation, PlatformIntegrationError};
 
-pub(super) fn validate_module_socket(socket: &Path) -> Result<(), B10xIntegrationError> {
+pub(super) fn validate_module_socket(socket: &Path) -> Result<(), PlatformIntegrationError> {
     if !socket.is_absolute() {
-        return Err(B10xIntegrationError::InvalidConfiguration);
+        return Err(PlatformIntegrationError::InvalidConfiguration);
     }
     let parent = socket
         .parent()
-        .ok_or(B10xIntegrationError::InvalidConfiguration)?;
+        .ok_or(PlatformIntegrationError::InvalidConfiguration)?;
     let parent_metadata = std::fs::symlink_metadata(parent)
-        .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+        .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
     let socket_metadata = std::fs::symlink_metadata(socket)
-        .map_err(|_| B10xIntegrationError::InvalidConfiguration)?;
+        .map_err(|_| PlatformIntegrationError::InvalidConfiguration)?;
     let owner = rustix::process::geteuid().as_raw();
     if !parent_metadata.is_dir()
         || parent_metadata.file_type().is_symlink()
@@ -27,7 +27,7 @@ pub(super) fn validate_module_socket(socket: &Path) -> Result<(), B10xIntegratio
         || socket_metadata.uid() != owner
         || socket_metadata.permissions().mode() & 0o077 != 0
     {
-        return Err(B10xIntegrationError::InvalidConfiguration);
+        return Err(PlatformIntegrationError::InvalidConfiguration);
     }
     Ok(())
 }
@@ -36,13 +36,13 @@ pub(super) fn http_client_on_socket(
     connect_timeout: Duration,
     total_timeout: Duration,
     socket: &Path,
-) -> Result<reqwest::Client, B10xIntegrationError> {
+) -> Result<reqwest::Client, PlatformIntegrationError> {
     if connect_timeout.is_zero()
         || total_timeout.is_zero()
         || connect_timeout > total_timeout
         || !socket.is_absolute()
     {
-        return Err(B10xIntegrationError::InvalidConfiguration);
+        return Err(PlatformIntegrationError::InvalidConfiguration);
     }
     validate_module_socket(socket)?;
     reqwest::Client::builder()
@@ -51,7 +51,7 @@ pub(super) fn http_client_on_socket(
         .timeout(total_timeout)
         .unix_socket(socket)
         .build()
-        .map_err(|_| B10xIntegrationError::HttpClient)
+        .map_err(|_| PlatformIntegrationError::HttpClient)
 }
 
 pub(super) fn module_id(canonical: &str) -> Option<&'static str> {
@@ -70,10 +70,7 @@ pub(super) fn module_id(canonical: &str) -> Option<&'static str> {
     }
 }
 
-pub(super) fn module_origin(
-    config: &B10xIntegrationConfig,
-    canonical: &str,
-) -> Option<String> {
+pub(super) fn module_origin(config: &PlatformIntegrationConfig, canonical: &str) -> Option<String> {
     let module = module_id(canonical)?;
     let origin = match module {
         "ontology" => config.ontology_origin(),
@@ -91,12 +88,12 @@ pub(super) fn module_origin(
 }
 
 pub(super) fn module_client(
-    config: &B10xIntegrationConfig,
+    config: &PlatformIntegrationConfig,
     network_client: &reqwest::Client,
     module: &str,
     connect_timeout: Duration,
     total_timeout: Duration,
-) -> Result<reqwest::Client, B10xIntegrationError> {
+) -> Result<reqwest::Client, PlatformIntegrationError> {
     config.module_socket(module).map_or_else(
         || Ok(network_client.clone()),
         |socket| http_client_on_socket(connect_timeout, total_timeout, socket),

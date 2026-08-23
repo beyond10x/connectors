@@ -91,7 +91,7 @@ fn loopback() -> IpAddr {
 
 fn plan() -> ZeroIoPlan {
     let document = Document::parse(include_str!("../../../catalog/b10x.catalog.json"))
-        .expect("canonical B10x catalog parses");
+        .expect("canonical platform catalog parses");
     let operation = document
         .operation(SIP_DIAL_OPERATION)
         .expect("sip.dial is published");
@@ -104,7 +104,7 @@ fn plan() -> ZeroIoPlan {
             "org-1",
             "principal-1",
             "grant-1",
-            ConnectionAuthority::new("connection-1", InitiationPolicy::b10x_only()).unwrap(),
+            ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only()).unwrap(),
         ),
         &PlanningEnvironment {
             available_drivers: BTreeSet::from([DriverId::SipV1]),
