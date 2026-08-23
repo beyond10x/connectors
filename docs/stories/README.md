@@ -74,6 +74,11 @@ will spawn children as each milestone is designed.
 | [S-036](S-036-the-os-keyring-becomes-the-local-store.md) | The OS keyring becomes the local credential store | in-progress | Platform | connector-secrets, runtime, cli |
 | [S-041](S-041-state-becomes-a-port.md) | State becomes a port, with a SQLite backend | in-progress | Platform | service, state, testing |
 | [S-042](S-042-one-composed-local-placement.md) | One composed local placement, called by both the CLI and Zwirn | backlog | Platform | runtime, cli, zwirn |
+| [S-043](S-043-admission-proofs-become-unforgeable.md) | Admission proofs become unforgeable | ready | Platform | domain, service, integrations |
+| [S-044](S-044-a-grant-decision-is-evaluated-not-asserted.md) | A Grant decision is evaluated, not asserted | ready | Platform | domain, service, state |
+| [S-045](S-045-an-approval-is-redeemed-exactly-once.md) | An approval is redeemed exactly once | ready | Platform | domain, service, state, audit |
+| [S-046](S-046-the-hosted-route-enforces-instead-of-refusing.md) | The hosted route enforces instead of refusing | backlog | Platform | server, service |
+| [S-047](S-047-effect-backends-trust-only-proofs.md) | Effect backends trust only proofs | backlog | Platform | integrations, testing |
 
 ## Epics in this seed
 
@@ -89,6 +94,7 @@ will spawn children as each milestone is designed.
 | `substrate-integration` | S-029 | The source-scoped, snapshot-first bounded-cursor to durable-delivery bridge and its gap-recovery contract; implementation waits for released substrate vectors and platform crates. |
 | `contract-release` | S-031 | Reproducible, signed, pinned schemas and cross-component conformance bundles. |
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
+| `enforced-authority` | S-043, S-044, S-045, S-046, S-047 | Turning the F-001 refusal fences into enforced Grant and approval authority, so effect-bearing hosted operations become reachable only through unforgeable proofs. |
 | `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 
