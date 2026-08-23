@@ -33,7 +33,7 @@ use protocol::datasource::{
 };
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, EffectClass, OperationDescription, OperationError,
-    OperationErrorCode,
+    OperationErrorCode, MAX_RESULT_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -43,8 +43,16 @@ use service::PrincipalContext;
 
 pub(crate) const STATUS_OPERATION: &str = "kubernetes.deployment.status";
 pub(crate) const RESTART_OPERATION: &str = "kubernetes.deployment.rollout-restart";
+pub(crate) const LOGS_OPERATION: &str = "kubernetes.pod.logs";
 pub(crate) const DATASOURCE: &str = "kubernetes.workloads";
 pub(crate) const MAX_KUBERNETES_RESPONSE_BYTES: usize = 256 * 1024;
+/// The `limitBytes` budget one pod log read requests from the Kubernetes API.
+pub(crate) const MAX_POD_LOG_BYTES: usize = 128 * 1024;
+/// Bytes reserved for the invocation envelope around a pod log output value: the protocol
+/// wrapper, the operation ref, the audit ref (every ref is capped well below this). The output
+/// value is trimmed to `MAX_RESULT_BYTES` minus this headroom, so the serialized envelope can
+/// never trip `result_too_large`.
+pub(crate) const POD_LOG_ENVELOPE_HEADROOM: usize = 4 * 1024;
 pub(crate) const MAX_RELATED_RECORDS: usize = 50;
 pub(crate) const CURSOR_TTL: Duration = Duration::from_secs(300);
 
@@ -81,6 +89,23 @@ pub(crate) trait DeploymentReader: Send + Sync {
         _resource_version: &str,
     ) -> Result<RestartAccepted, OperationError> {
         Err(unavailable("Kubernetes rollout restart is unavailable"))
+    }
+
+    /// Defaulted so the local placement and existing fakes compile unchanged: the local
+    /// placement does not advertise the operation yet (design 14 leaves local pod logs as an
+    /// open follow-up), and a placement that never offers `kubernetes.pod.logs` must still
+    /// refuse honestly if the call arrives.
+    async fn pod_logs(
+        &self,
+        _namespace: &str,
+        _pod: &str,
+        _container: Option<&str>,
+        _tail_lines: u32,
+        _since_seconds: Option<u32>,
+    ) -> Result<PodLogs, OperationError> {
+        Err(unavailable(
+            "pod logs are not implemented on this placement",
+        ))
     }
 }
 
@@ -159,6 +184,17 @@ pub(crate) struct WarningSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub(crate) struct PodLogs {
+    pub(crate) namespace: String,
+    pub(crate) pod: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) container: Option<String>,
+    pub(crate) tail_lines: u32,
+    pub(crate) text: String,
+    pub(crate) truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct RestartAccepted {
     pub(crate) namespace: String,
     pub(crate) name: String,
@@ -172,6 +208,23 @@ pub(crate) struct RestartAccepted {
 pub(crate) struct DeploymentInput {
     pub(crate) namespace: String,
     pub(crate) name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PodLogsInput {
+    pub(crate) namespace: String,
+    pub(crate) pod: String,
+    #[serde(default)]
+    pub(crate) container: Option<String>,
+    #[serde(default = "default_tail_lines")]
+    pub(crate) tail_lines: u32,
+    #[serde(default)]
+    pub(crate) since_seconds: Option<u32>,
+}
+
+pub(crate) const fn default_tail_lines() -> u32 {
+    200
 }
 
 #[derive(Deserialize)]
@@ -955,6 +1008,83 @@ pub(crate) fn status_operation(
         approval: ApprovalPosture::NotRequired,
         connections,
         description_ref,
+    }
+}
+
+pub(crate) fn logs_operation(
+    connections: Vec<ConnectionSummary>,
+    description_ref: String,
+) -> OperationDescription {
+    OperationDescription {
+        operation_ref: LOGS_OPERATION.to_owned(),
+        title: "Read Kubernetes pod logs".to_owned(),
+        description: "Reads the most recent log lines of one container in one admitted Kubernetes Pod, bounded to 128 KiB. Logs may contain whatever the workload printed; the namespace grant is the containment. It cannot read Secrets or mutate cluster state.".to_owned(),
+        input_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "pod"],
+            "properties": {
+                "namespace": {"type": "string", "minLength": 1, "maxLength": 63},
+                "pod": {"type": "string", "minLength": 1, "maxLength": 253},
+                "container": {"type": "string", "minLength": 1, "maxLength": 253},
+                "tail_lines": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 200},
+                "since_seconds": {"type": "integer", "minimum": 1, "maximum": 86400}
+            }
+        }),
+        output_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["namespace", "pod", "tail_lines", "text", "truncated"],
+            "properties": {
+                "namespace": {"type": "string"}, "pod": {"type": "string"},
+                "container": {"type": "string"},
+                "tail_lines": {"type": "integer", "minimum": 1, "maximum": 1000},
+                "text": {"type": "string"},
+                "truncated": {"type": "boolean"}
+            }
+        }),
+        effect: EffectClass::ReadOnly,
+        approval: ApprovalPosture::NotRequired,
+        connections,
+        description_ref,
+    }
+}
+
+/// Fits one pod log output value under the invocation result bound, or says it cannot.
+///
+/// Serialize first, then trim: JSON escaping can multiply the raw log bytes several times over
+/// (a control byte becomes six characters), so only the serialized length decides. Whole oldest
+/// lines are dropped — the newest lines are the ones a person reading logs came for — and any
+/// trim forces `truncated: true`. Dropping `n` raw bytes removes at least `n` serialized bytes,
+/// so the loop settles in at most a couple of passes; a single line larger than the budget is
+/// dropped whole, leaving honest emptiness rather than a broken line.
+pub(crate) fn fit_pod_logs(mut logs: PodLogs) -> Result<serde_json::Value, OperationError> {
+    let budget = MAX_RESULT_BYTES.saturating_sub(POD_LOG_ENVELOPE_HEADROOM);
+    loop {
+        let encoded = serde_json::to_vec(&logs)
+            .map_err(|_| unavailable("Kubernetes pod logs could not be encoded"))?;
+        if encoded.len() <= budget {
+            return serde_json::to_value(logs)
+                .map_err(|_| unavailable("Kubernetes pod logs could not be encoded"));
+        }
+        let overage = encoded.len() - budget;
+        if logs.text.is_empty() {
+            // Unreachable while the input caps hold — the fixed fields serialize far below the
+            // budget — but a spin here would be worse than a refusal.
+            return Err(unavailable("Kubernetes pod logs could not be bounded"));
+        }
+        let mut cut = 0;
+        while cut < overage {
+            match logs.text[cut..].find('\n') {
+                Some(position) => cut += position + 1,
+                None => {
+                    cut = logs.text.len();
+                    break;
+                }
+            }
+        }
+        logs.text.drain(..cut);
+        logs.truncated = true;
     }
 }
 

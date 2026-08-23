@@ -2,7 +2,7 @@
 id: S-054
 title: "Pod logs are a hosted read-only Kubernetes operation"
 pillar: Platform
-status: ready
+status: in-progress
 priority: 2
 design: ../design/14-mcp-transport-for-the-hosted-connectors-server.md
 epic: mcp-entry
@@ -36,3 +36,12 @@ Gate admission on the same `namespace_access.read_groups` as deployment status v
 ## Progress
 
 - 2026-08-24 — filed from design 14 (pod logs chosen as a new hosted operation over Loki).
+- 2026-08-24 — implemented on `impl/S-054`: `LOGS_OPERATION` + `PodLogs`/`PodLogsInput`,
+  defaulted `DeploymentReader::pod_logs` (local placement and fakes compile unchanged),
+  in-cluster reader against the pod log subresource with `limitBytes` 128 KiB and per-call token
+  re-read, `fit_pod_logs()` serialize-then-trim-oldest-lines under `MAX_RESULT_BYTES` minus a
+  4 KiB envelope headroom, describe/invoke/search wiring gated on read access, and the one
+  `admits_kubernetes_operation` arm on `kubernetes_read_groups`. Covered by seven hosted tests
+  (search visibility, describe schemas + lease, input passthrough + default, non-admitted
+  namespace, stale lease, caps, upstream refusal passthrough, oversized-body trim with a
+  validating envelope) plus the server policy unit test.
