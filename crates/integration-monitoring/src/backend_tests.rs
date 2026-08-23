@@ -109,7 +109,7 @@ mod tests {
             r#"
 origin = "https://grafana.example"
 grant_ref = "grant:grafana"
-initiation = "b10x"
+initiation = "platform"
 connect_session_ttl_seconds = 300
 
 [target_grants]

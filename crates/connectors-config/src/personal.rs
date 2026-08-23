@@ -42,8 +42,8 @@ pub struct PersonalConfig {
     pub grafana: Option<GrafanaIntegrationConfig>,
     #[serde(default)]
     pub kubernetes: Option<KubernetesIntegrationConfig>,
-    #[serde(default)]
-    pub b10x: Option<B10xIntegrationConfig>,
+    #[serde(default, alias = "b10x")]
+    pub platform: Option<PlatformIntegrationConfig>,
     /// Providers served generically from the catalogue, with no per-provider Rust.
     #[serde(default)]
     pub catalog: Vec<CatalogIntegrationConfig>,
@@ -208,7 +208,7 @@ pub struct ConnectionConfig {
     pub initiation: InitiationConfig,
 }
 
-/// Deployment-owned Connection for B10x service and device capabilities.
+/// Deployment-owned Connection for platform service and device capabilities.
 ///
 /// This shape deliberately has no approval reference. A static configured string is not
 /// receiver-verifiable evidence for one invocation; since S-046/S-047 the hosted proof chain
@@ -216,7 +216,7 @@ pub struct ConnectionConfig {
 /// personal placement is the owner's own admission over their 0700 socket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct B10xConnectionConfig {
+pub struct PlatformConnectionConfig {
     pub connection_ref: String,
     pub label: String,
     pub grant_ref: String,
@@ -227,7 +227,10 @@ pub struct B10xConnectionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InitiationConfig {
-    B10x,
+    /// Written `platform` since S-052; `b10x` is the pre-rename spelling an existing
+    /// configuration may still carry.
+    #[serde(alias = "b10x")]
+    Platform,
     Provider,
     Both,
 }
@@ -395,11 +398,11 @@ pub struct KubernetesIntegrationConfig {
     pub resource_limit: u16,
 }
 
-/// Deployment-owned routes for B10x's native drivers and private services.
+/// Deployment-owned routes for the platform's native drivers and private services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct B10xIntegrationConfig {
-    pub connection: B10xConnectionConfig,
+pub struct PlatformIntegrationConfig {
+    pub connection: PlatformConnectionConfig,
     /// Modules granted by default to every Identity-verified member of the hosted tenant.
     /// `None` preserves the pre-policy behavior for personal and existing hosted configurations.
     #[serde(default)]
@@ -624,8 +627,8 @@ impl PersonalConfig {
         if let Some(kubernetes) = &self.kubernetes {
             kubernetes.validate()?;
         }
-        if let Some(b10x) = &self.b10x {
-            b10x.validate()?;
+        if let Some(platform) = &self.platform {
+            platform.validate()?;
         }
         for provider in &self.catalog {
             provider.validate()?;
@@ -634,7 +637,7 @@ impl PersonalConfig {
             && self.slack.is_none()
             && self.grafana.is_none()
             && self.kubernetes.is_none()
-            && self.b10x.is_none()
+            && self.platform.is_none()
             && self.catalog.is_empty()
         {
             return Err(ConfigError::Invalid);
@@ -643,7 +646,7 @@ impl PersonalConfig {
     }
 }
 
-impl B10xIntegrationConfig {
+impl PlatformIntegrationConfig {
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
         if !valid_connection(&self.connection)
             || matches!(self.connection.initiation, InitiationConfig::Provider)
@@ -729,7 +732,7 @@ impl B10xIntegrationConfig {
     #[must_use]
     pub fn initiation_policy(&self) -> InitiationPolicy {
         match self.connection.initiation {
-            InitiationConfig::B10x => InitiationPolicy::b10x_only(),
+            InitiationConfig::Platform => InitiationPolicy::platform_only(),
             InitiationConfig::Provider => InitiationPolicy::provider_only(),
             InitiationConfig::Both => InitiationPolicy::bidirectional(),
         }
@@ -839,7 +842,7 @@ impl B10xIntegrationConfig {
     }
 }
 
-fn valid_connection(connection: &B10xConnectionConfig) -> bool {
+fn valid_connection(connection: &PlatformConnectionConfig) -> bool {
     config_ref(&connection.connection_ref, 512)
         && !connection.label.is_empty()
         && connection.label.len() <= 1024
@@ -910,7 +913,7 @@ impl SlackIntegrationConfig {
             || !valid_client
             || !valid_redirect
             || self.oauth_client_id.is_some() != self.oauth_redirect_uri.is_some()
-            || matches!(self.initiation, InitiationConfig::B10x)
+            || matches!(self.initiation, InitiationConfig::Platform)
             || events != self.allowed_events
             || events.is_empty()
             || events
@@ -1091,7 +1094,7 @@ impl PersonalVoiceConfig {
     #[must_use]
     pub fn initiation_policy(&self) -> InitiationPolicy {
         match self.connection.initiation {
-            InitiationConfig::B10x => InitiationPolicy::b10x_only(),
+            InitiationConfig::Platform => InitiationPolicy::platform_only(),
             InitiationConfig::Provider => InitiationPolicy::provider_only(),
             InitiationConfig::Both => InitiationPolicy::bidirectional(),
         }
@@ -1433,5 +1436,43 @@ allowed_events = ["app_mention", "message.channels"]
         assert!(!encoded.contains("token"));
         assert!(!encoded.contains("password"));
         assert!(!encoded.contains("secret"));
+    }
+
+    #[test]
+    fn an_existing_personal_config_with_the_old_b10x_section_parses_unchanged() {
+        // D5 (S-052): the platform's config section is `[platform]`, but a personal
+        // configuration written before the rename carries `[b10x]` and
+        // `initiation = "b10x"` and must keep parsing without migration.
+        let config: PersonalConfig = toml::from_str(
+            r#"
+[owner]
+tenant_id = "tenant-local"
+agent_id = "agent-dev"
+agent_revision = 1
+authority_snapshot_id = "authority-1"
+authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[b10x]
+
+[b10x.module_sockets]
+work = "/run/platform/work.sock"
+
+[b10x.connection]
+connection_ref = "connection-platform"
+label = "platform local"
+grant_ref = "grant-platform"
+initiation = "b10x"
+"#,
+        )
+        .unwrap();
+        config.validate().unwrap();
+        let platform = config
+            .platform
+            .as_ref()
+            .expect("the old [b10x] section lands in the platform field");
+        assert!(matches!(
+            platform.connection.initiation,
+            InitiationConfig::Platform
+        ));
     }
 }

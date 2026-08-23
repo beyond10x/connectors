@@ -40,7 +40,7 @@ use voice_runtime::VoiceSessionControl;
 
 use connectors_config::PersonalVoiceConfig;
 
-const B10X_DOCUMENT: &str = include_str!("../../../../catalog/b10x.catalog.json");
+const PLATFORM_DOCUMENT: &str = include_str!("../../../../catalog/b10x.catalog.json");
 const MAX_LIVE_SESSIONS: usize = 64;
 const MAX_SESSION_RECORDS: usize = 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
@@ -244,7 +244,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         state: Option<Arc<dyn StateStore>>,
     ) -> Result<Self, OperationError> {
         let principal = config.principal_context().map_err(|_| unavailable())?;
-        let document = Document::parse(B10X_DOCUMENT).map_err(|_| unavailable())?;
+        let document = Document::parse(PLATFORM_DOCUMENT).map_err(|_| unavailable())?;
         let operation = document
             .operation(SIP_DIAL_OPERATION)
             .ok_or_else(unavailable)?;
@@ -254,8 +254,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         {
             return Err(unavailable());
         }
-        let output_schema = response_schema(B10X_DOCUMENT)?;
-        let catalog_sha256 = format!("{:x}", Sha256::digest(B10X_DOCUMENT.as_bytes()));
+        let output_schema = response_schema(PLATFORM_DOCUMENT)?;
+        let catalog_sha256 = format!("{:x}", Sha256::digest(PLATFORM_DOCUMENT.as_bytes()));
         let deployment_sha256 = format!(
             "{:x}",
             Sha256::digest(serde_json::to_vec(&config).map_err(|_| unavailable())?)
@@ -835,7 +835,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 connection_ref = "connection-asterisk-dev"
 label = "Asterisk development cluster"
 grant_ref = "grant-sip-dial-1"
-initiation = "b10x"
+initiation = "platform"
 
 [authority]
 issuer = "https://connectors.example"

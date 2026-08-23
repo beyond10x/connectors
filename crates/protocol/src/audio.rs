@@ -18,10 +18,10 @@ pub const SPEECH_STATUS_OPERATION: &str = "speech-status";
 /// Model/harness-facing operation reference derived from [`SPEECH_STATUS_OPERATION`].
 pub const SPEECH_STATUS_TOOL_REF: &str = "speech.status";
 
-/// Stable Provider id for the B10x-owned local speech capability.
+/// Stable Provider id for the platform-owned local speech capability.
 pub const SPEECH_PROVIDER: &str = "b10x";
 
-/// Permanent Provider authority for B10x-owned Connector capabilities.
+/// Permanent Provider authority for platform-owned Connector capabilities.
 pub const SPEECH_PROVIDER_AUTHORITY: &str = "io.b10x";
 
 /// The per-utterance character bound the catalog publishes.

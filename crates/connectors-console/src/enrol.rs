@@ -230,7 +230,7 @@ pub async fn run(
         instance: options.instance.clone(),
         label: None,
         grant_ref: format!("grant:{provider_id}:local"),
-        initiation: connectors_config::InitiationConfig::B10x,
+        initiation: connectors_config::InitiationConfig::Platform,
         allow_writes: options.allow_writes,
         endpoints: endpoints.clone(),
         operator_approved: true,
@@ -399,7 +399,7 @@ fn append_entry(
     let _ = write!(
         block,
         "\n[[catalog]]\nprovider = \"{provider}\"\ngrant_ref = \"grant:{provider}:local\"\n\
-         initiation = \"b10x\"\nallow_writes = {}\ncredential = \"{credential}\"\n\
+         initiation = \"platform\"\nallow_writes = {}\ncredential = \"{credential}\"\n\
          operator_approved = true\n",
         options.allow_writes
     );

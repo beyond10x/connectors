@@ -12,7 +12,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 connection_ref = "connection-asterisk-development"
 label = "Asterisk development cluster"
 grant_ref = "grant-sip-dial-development-1"
-initiation = "b10x"
+initiation = "platform"
 
 [authority]
 issuer = "https://connectors.development.example"

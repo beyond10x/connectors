@@ -90,7 +90,7 @@ ca_file = "/etc/b10x-vault-ca/ca.crt"
 enabled = false
 listen = "0.0.0.0:5060"
 
-[b10x]
+[platform]
 tenant_member_modules = ["ontology", "planner", "work"]
 work_origin = "http://b10x-work:8080"
 ontology_origin = "http://b10x-ontology:8080"

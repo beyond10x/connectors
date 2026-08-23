@@ -45,7 +45,7 @@ That binding is not a Connectors-owned Organization record:
 
 - **personal:** one implicit deployment-local tenant and one local-owner subject, derived from an
   owner-permissioned Unix peer or generated owner-held bearer;
-- **organization/hosted:** a closed validated principal from the B10x Identity verifier,
+- **organization/hosted:** a closed validated principal from the platform Identity verifier,
   matched against the receiver-configured audience, tenant, deployment posture, token lifetime,
   key generation, and revocation freshness.
 

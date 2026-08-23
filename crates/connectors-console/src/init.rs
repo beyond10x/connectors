@@ -134,7 +134,7 @@ pub fn run(
         slack: None,
         grafana: None,
         kubernetes,
-        b10x: None,
+        platform: None,
         catalog: Vec::new(),
     };
     let rendered = toml::to_string_pretty(&config)?;
@@ -256,7 +256,7 @@ fn kubeconfig_readable() -> bool {
 fn kubernetes_config(allow_exec_auth: bool) -> KubernetesIntegrationConfig {
     KubernetesIntegrationConfig {
         grant_ref: "grant:kubernetes:local".to_owned(),
-        initiation: InitiationConfig::B10x,
+        initiation: InitiationConfig::Platform,
         namespaces: Vec::new(),
         target_grants: BTreeMap::from([
             ("prometheus".to_owned(), "grant:prometheus:local".to_owned()),
@@ -321,7 +321,7 @@ mod tests {
             slack: None,
             grafana: None,
             kubernetes: Some(kubernetes_config(false)),
-            b10x: None,
+            platform: None,
             catalog: Vec::new(),
         };
         let rendered = toml::to_string_pretty(&config).expect("the config renders as TOML");

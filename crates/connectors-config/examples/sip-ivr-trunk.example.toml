@@ -22,7 +22,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 connection_ref = "connection-ivr-development"
 label = "Internal IVR"
 grant_ref = "grant-sip-dial-development-1"
-initiation = "b10x"
+initiation = "platform"
 
 [sip]
 # The trunk a `sip.dial` without a target selects. Without this, a dial carrying only a number is

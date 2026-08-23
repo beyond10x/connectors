@@ -12,13 +12,13 @@ This document turns the accepted cross-component boundary into a Connectors impl
 The platform-family plan/dispatch seam, alpha `VoiceSession` owner bundle, one-shot authority, and
 memory RTVBP endpoint now exist. The exact `sipx` driver, proof-bearing admission, locally
 bounded WebSocket endpoints, application adapter, and a supervised runtime leaf now also exist.
-That leaf resolves the generated B10x `sip-dial` member, proves authenticated model-free duplex
+That leaf resolves the generated platform `sip-dial` member, proves authenticated model-free duplex
 composition and one terminal result over real loopback SIP/RTP plus RTVBP WebSocket, and returns an
 operation receipt at establishment. A separate operator-authorized characterization has established
 TCP SIP and an RTP echo against a configured dev-cluster Asterisk peer. Stable serving, the remaining lifecycle
 and placement matrix, and a signed release remain gated work.
 
-**2026-08-16 Provider-ownership correction.** Native `sip.dial` is a B10x capability under
+**2026-08-16 Provider-ownership correction.** Native `sip.dial` is a platform capability under
 the permanent Provider identity `b10x` / `io.b10x`. Asterisk never owned this member:
 its `asterisk` / `org.asterisk.ari` Provider remains the vendor ARI surface, while Asterisk is one
 possible Connection-owned SIP peer alongside carriers, SBCs, and other PBXs. This correction
@@ -115,7 +115,7 @@ connectors/
     └── S-033-neutral-rtvbp-bridges-the-call-to-an-application-channel.md
 ```
 
-The native capability Provider is B10x, with permanent authority `io.b10x`. Asterisk's
+The native capability Provider is the platform, with permanent authority `io.b10x`. Asterisk's
 separate `org.asterisk.ari` authority remains attached only to its ARI surface. Its pinned
 first-party SIP and RTP samples provide interoperability evidence for the configured development
 peer, not ownership or provenance for `sip.dial`. No `vendor/sipx`,
@@ -180,7 +180,7 @@ keepalive pumps, lease expiry, first-wins termination, teardown, and payload-fre
 owns no SIP, RTVBP, or product semantics.
 
 `connectors-cli` is a fourth nested workspace and the product composition leaf. It reads the
-canonical B10x member, verifies the exact personal owner snapshot, Connection initiation,
+canonical platform member, verifies the exact personal owner snapshot, Connection initiation,
 Grant reference, description lease, external approval reference and configured alias before
 constructing an admitted voice plan. It depends on `voice-runtime`, not directly on either adapter.
 The owner-only Unix socket is in `server`; the binary owns deployment config, authority signing-key
@@ -229,12 +229,12 @@ interval elapsed.
 ## 4. Catalog and admission
 
 `sip_v1` is a closed catalog `protocol_driver` value. It is not itself a provider. The
-repository-owned B10x Provider declares the capability; a carrier, Asterisk, SBC, or other
+repository-owned platform Provider declares the capability; a carrier, Asterisk, SBC, or other
 PBX is a Connection-owned peer and does not become the operation's Provider merely because it
 speaks SIP. RTVBP and `VoiceSession` are not separate providers or callable operations; they are
 the post-admission binding and semantic contract behind the SIP member.
 
-The repository-authored B10x declaration uses:
+The repository-authored platform declaration uses:
 
 - interaction shape `session_establishment`;
 - protocol driver `sip_v1`;
@@ -262,7 +262,7 @@ at least one such canonical provider member is served and discoverable through t
 catalog.
 
 The Connection separately declares whether `b10x`, `provider`, or both may initiate. A
-B10x/harness call must pass both that Connection gate and the operation Grant; neither is a
+A platform or harness call must pass both that Connection gate and the operation Grant; neither is a
 substitute for the other. Inbound dialogs match exactly one configured
 Connection plus tenant/application-channel binding; zero or multiple matches refuse before product
 work. SIP credentials and SRTP material never enter protocol DTOs, RTVBP frames, events, audit,
@@ -276,10 +276,10 @@ channel signals, output interruption, observable loss, and typed termination. It
 RTVBP, carrier, credential, IVR, recording, transcript, tool, or Agent-lifecycle type.
 
 RTVBP provides reusable envelope/runtime/transport machinery. `rtvbp-voice-endpoint` owns the
-voice-side mapping from `VoiceSession` to the exact B10x profile
+voice-side mapping from `VoiceSession` to the exact platform profile
 `b10x.voice.v1`; the AI Agent Platform owns an independently implemented application-side
 mapping. The binding manifest and fixtures ship with the Connectors owner bundle and both adapters
-must pass the same generic semantic vectors. No B10x catalog needs to be compiled into the
+must pass the same generic semantic vectors. No platform catalog needs to be compiled into the
 upstream SDK.
 
 The first implementation profile maps signed 16-bit little-endian PCM at 8 kHz, mono, 20 ms and
@@ -355,7 +355,7 @@ replacement or a reviewed maintained fork and a repinned owner bundle.
 3. Complete S-033's cross-component lifecycle vectors, including lease, revocation, generation
    drain, and an outward satellite/unserved fixture. The local WebSocket now proves immediate
    causal overload and bounded joined teardown even when writes never progress.
-4. The repository-authored B10x Provider declaration, generated `sip-dial` member, source
+4. The repository-authored platform Provider declaration, generated `sip-dial` member, source
    pin, lock row, pack, and web projection land atomically with the runtime proof. Asterisk's
    separate source remains interoperability evidence for one configured peer.
 5. The operator-authorized non-loopback mode has completed one exact dev-cluster TCP SIP and RTP

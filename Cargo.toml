@@ -57,7 +57,7 @@ exclude = [
     "crates/identity-http",
     "crates/integration-kubernetes",
     "crates/integration-catalog",
-    "crates/integration-b10x",
+    "crates/integration-platform",
     "crates/integration-gitlab",
     "crates/integration-jira",
     "crates/integration-monitoring",

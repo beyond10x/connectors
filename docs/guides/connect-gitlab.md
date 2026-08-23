@@ -1,7 +1,7 @@
 # Connect GitLab
 
 Choose the identity GitLab should see. This is independent of whether a person, Zwirn, or another
-B10x agent invokes the Connection later.
+platform agent invokes the Connection later.
 
 ## As myself
 
@@ -15,7 +15,7 @@ enables writes. The harness, model, and client never receive the token.
 
 ## As automation
 
-Use a non-human GitLab identity for B10x or babelforce automation. Select the narrowest kind:
+Use a non-human GitLab identity for platform or babelforce automation. Select the narrowest kind:
 
 - **Project access token** for one project.
 - **Group access token** for one group and its projects.
@@ -38,7 +38,7 @@ Zwirn ── Grant ──▶ your GitLab Connection ──▶ GitLab attributes 
 
 Zwirn is the caller in both cases. It does not exchange an automation token for your authority.
 When you authorize a user Connection, you delegate permission to use that specific Connection under
-B10x's Connection and operation Grants. The user and automation Connections remain separate,
+the platform's Connection and operation Grants. The user and automation Connections remain separate,
 have separate credential generations, and never fall back to one another.
 
 The current repository ships this catalog and acquisition contract. The general Connect Session,

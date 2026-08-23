@@ -433,11 +433,8 @@ pub mod conformance {
     const DAMAGED_TENANT: &str = "conformance.grants.damaged";
 
     fn connection() -> ConnectionAuthority {
-        ConnectionAuthority::new(
-            "connection:grafana:ops",
-            InitiationPolicy::b10x_only(),
-        )
-        .expect("valid connection reference")
+        ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+            .expect("valid connection reference")
     }
 
     fn read_facts() -> GrantFacts {
@@ -610,11 +607,8 @@ mod tests {
     const TENANT: &str = "tenant:acme";
 
     fn connection() -> ConnectionAuthority {
-        ConnectionAuthority::new(
-            "connection:grafana:ops",
-            InitiationPolicy::b10x_only(),
-        )
-        .expect("valid connection reference")
+        ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+            .expect("valid connection reference")
     }
 
     fn read_facts() -> GrantFacts {
