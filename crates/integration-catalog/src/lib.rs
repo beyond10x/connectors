@@ -502,11 +502,12 @@ impl Inner {
             // this crate's first live invocation a wrong guess — the host resolved to a private
             // address and the aperture was public, which reads exactly like the site being down.
             .map_err(|error| match error {
-                // `Refused` covers both a destination the aperture never admitted and a transport
-                // that failed, because the egress layer deliberately does not tell a caller which
-                // — distinguishing them to a caller would confirm whether an address exists. The
+                // `Refused` covers a destination the aperture never admitted and `Transport` an
+                // admitted one that failed; they wear one caller-facing message deliberately —
+                // distinguishing them to a caller would confirm whether an address exists. The
                 // operator-facing hint belongs here, where the configuration that decides it is.
-                service::EgressTransportError::Refused => refusal(
+                service::EgressTransportError::Refused
+                | service::EgressTransportError::Transport(_) => refusal(
                     OperationErrorCode::Unavailable,
                     "the provider was not reached: either it is unreachable, or this Connection's \
                      destination aperture does not admit its address — a self-hosted instance on \
