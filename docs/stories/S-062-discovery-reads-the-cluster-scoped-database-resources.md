@@ -2,7 +2,7 @@
 id: S-062
 title: "Discovery reads the cluster-scoped database resources"
 pillar: Platform
-status: in-progress
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations, server]
