@@ -155,6 +155,7 @@ pub enum ProtocolDriver {
     SipV1,
     AudioV1,
     CdpV1,
+    SqlV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -228,6 +229,7 @@ enum RawProtocolOperation {
     SipV1 { request: EmptySipRequest },
     AudioV1 { request: EmptyAudioRequest },
     CdpV1 { request: EmptyCdpRequest },
+    SqlV1 { request: EmptySqlRequest },
 }
 
 #[derive(Debug, Deserialize)]
@@ -241,6 +243,10 @@ struct EmptyAudioRequest {}
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EmptyCdpRequest {}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptySqlRequest {}
 
 /// The stored model-facing contract projection: the ToolSpec's description and input schema, as the
 /// build computed them from the emitted declaration's own lowering.
@@ -456,6 +462,8 @@ pub enum ProtocolRequestTemplate {
     AudioV1,
     /// One admitted browser operation on a leased `DevTools` session.
     CdpV1,
+    /// One admitted bounded database read over the closed SQL driver.
+    SqlV1,
 }
 
 impl ProtocolRequestTemplate {
@@ -466,6 +474,7 @@ impl ProtocolRequestTemplate {
             Self::SipV1 => ProtocolDriver::SipV1,
             Self::AudioV1 => ProtocolDriver::AudioV1,
             Self::CdpV1 => ProtocolDriver::CdpV1,
+            Self::SqlV1 => ProtocolDriver::SqlV1,
         }
     }
 
@@ -473,7 +482,7 @@ impl ProtocolRequestTemplate {
     pub const fn http(&self) -> Option<&RequestTemplate> {
         match self {
             Self::HttpV1(request) => Some(request),
-            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 | Self::SqlV1 => None,
         }
     }
 }
@@ -540,6 +549,10 @@ impl Operation {
             RawProtocolOperation::CdpV1 { request } => {
                 let EmptyCdpRequest {} = request;
                 ProtocolRequestTemplate::CdpV1
+            }
+            RawProtocolOperation::SqlV1 { request } => {
+                let EmptySqlRequest {} = request;
+                ProtocolRequestTemplate::SqlV1
             }
         };
 

@@ -318,6 +318,12 @@ pub enum ProtocolDriver {
     /// The external system is the browser process the driver launched on its own dedicated
     /// profile; page, element and navigation meaning stay here rather than moving to Substrate.
     CdpV1,
+    /// A relational database server, spoken to over its own native wire protocol. Closed and built
+    /// into connectors. One driver word covers both shipped engines (MySQL and PostgreSQL) the way
+    /// `cdp_v1` covers Chrome, Chromium and Brave: the engines differ in wire bytes, not in what
+    /// the operation surface means, and the engine is a Connection-owned fact — never selected by
+    /// a caller.
+    SqlV1,
 }
 
 /// Driver-specific request facts for one operation.
@@ -348,6 +354,10 @@ pub enum OperationRequest {
     /// the executable, dedicated profile directory and artifact directory are deployment-owned
     /// facts resolved only after admission.
     CdpV1,
+    /// One admitted read against a relational database. No HTTP-shaped fields: the statement and
+    /// bounds are ordinary declared parameters, and every connection fact — engine, host, port,
+    /// database, credential reference — is deployment-owned and resolved only after admission.
+    SqlV1,
 }
 
 impl OperationRequest {
@@ -358,6 +368,7 @@ impl OperationRequest {
             Self::SipV1 => ProtocolDriver::SipV1,
             Self::AudioV1 => ProtocolDriver::AudioV1,
             Self::CdpV1 => ProtocolDriver::CdpV1,
+            Self::SqlV1 => ProtocolDriver::SqlV1,
         }
     }
 
@@ -365,7 +376,7 @@ impl OperationRequest {
     pub const fn http_method(&self) -> Option<HttpMethod> {
         match self {
             Self::HttpV1 { method, .. } => Some(*method),
-            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 | Self::SqlV1 => None,
         }
     }
 
@@ -373,7 +384,7 @@ impl OperationRequest {
     pub fn http_path(&self) -> Option<&str> {
         match self {
             Self::HttpV1 { path, .. } => Some(path),
-            Self::SipV1 | Self::AudioV1 | Self::CdpV1 => None,
+            Self::SipV1 | Self::AudioV1 | Self::CdpV1 | Self::SqlV1 => None,
         }
     }
 }
@@ -1706,6 +1717,12 @@ impl<'de> Deserialize<'de> for Operation {
             (ProtocolDriver::CdpV1, _, _) => {
                 return Err(serde::de::Error::custom(
                     "cdp_v1 operation refuses HTTP-only `method` and `path`",
+                ));
+            }
+            (ProtocolDriver::SqlV1, None, None) => OperationRequest::SqlV1,
+            (ProtocolDriver::SqlV1, _, _) => {
+                return Err(serde::de::Error::custom(
+                    "sql_v1 operation refuses HTTP-only `method` and `path`",
                 ));
             }
         };

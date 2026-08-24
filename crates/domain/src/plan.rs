@@ -9,6 +9,7 @@ pub enum DriverId {
     SipV1,
     AudioV1,
     CdpV1,
+    SqlV1,
 }
 
 impl DriverId {
@@ -19,6 +20,7 @@ impl DriverId {
             Self::SipV1 => "sip_v1",
             Self::AudioV1 => "audio_v1",
             Self::CdpV1 => "cdp_v1",
+            Self::SqlV1 => "sql_v1",
         }
     }
 }
@@ -208,7 +210,15 @@ pub struct BrowserPlan {
     pub connection: String,
 }
 
-/// Exactly one closed driver plan. HTTP, SIP, audio and browser fields cannot coexist.
+/// An inert SQL plan. The engine, host, port, database name and credential reference are
+/// deployment-selected facts resolved after admission; no caller-provided host, port, user or
+/// credential value appears here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqlPlan {
+    pub connection: String,
+}
+
+/// Exactly one closed driver plan. HTTP, SIP, audio, browser and SQL fields cannot coexist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolPlan {
     HttpV1(HttpPlan),
@@ -216,6 +226,7 @@ pub enum ProtocolPlan {
     SipV1(SipPlan),
     AudioV1(AudioPlan),
     CdpV1(BrowserPlan),
+    SqlV1(SqlPlan),
 }
 
 impl ProtocolPlan {
@@ -226,6 +237,7 @@ impl ProtocolPlan {
             Self::SipV1(_) => DriverId::SipV1,
             Self::AudioV1(_) => DriverId::AudioV1,
             Self::CdpV1(_) => DriverId::CdpV1,
+            Self::SqlV1(_) => DriverId::SqlV1,
         }
     }
 }

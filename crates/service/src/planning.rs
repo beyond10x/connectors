@@ -7,7 +7,7 @@ use connector_resolve::document::{
 use domain::{
     AdmittedOperation, AudioPlan, BrowserPlan, Capability, ConnectionInitiator, ConnectionRoute,
     DriverId, HttpPlan, Implementation, Interaction, MediatedHttpPlan, OperationFacts, Placement,
-    ProtocolPlan, RouteAdapter, SipPlan, ZeroIoPlan,
+    ProtocolPlan, RouteAdapter, SipPlan, SqlPlan, ZeroIoPlan,
 };
 
 /// Deployment facts consulted during pure planning.
@@ -112,6 +112,11 @@ pub fn plan_operation(
                 connection: admission.connection().to_owned(),
             })
         }
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::SqlV1) => {
+            ProtocolPlan::SqlV1(SqlPlan {
+                connection: admission.connection().to_owned(),
+            })
+        }
         (
             ConnectionRoute::ViaConnection {
                 parent_connection,
@@ -140,7 +145,8 @@ pub fn plan_operation(
             ConnectionRoute::ViaConnection { .. },
             ProtocolRequestTemplate::SipV1
             | ProtocolRequestTemplate::AudioV1
-            | ProtocolRequestTemplate::CdpV1,
+            | ProtocolRequestTemplate::CdpV1
+            | ProtocolRequestTemplate::SqlV1,
         ) => {
             return Err(PlanError::MediatedRouteDriverMismatch);
         }
@@ -164,6 +170,7 @@ fn driver_of(operation: &Operation) -> DriverId {
         ProtocolRequestTemplate::SipV1 => DriverId::SipV1,
         ProtocolRequestTemplate::AudioV1 => DriverId::AudioV1,
         ProtocolRequestTemplate::CdpV1 => DriverId::CdpV1,
+        ProtocolRequestTemplate::SqlV1 => DriverId::SqlV1,
     }
 }
 
