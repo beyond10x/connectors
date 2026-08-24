@@ -6,6 +6,7 @@ mod tests {
     use connector_secrets::{MemoryStore, StoreError};
     use monitoring_model::{GRAFANA_DASHBOARDS_LIST, PROMETHEUS_QUERY_RANGE};
     use protocol::connection::ConnectSessionState;
+    use service::{EgressHttpResponse, EgressTransportError, EgressWebSocket};
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
     use tokio::net::UnixStream;
 
@@ -60,7 +61,7 @@ mod tests {
             &self,
             _connection_ref: &str,
             request: Request,
-        ) -> Result<Value, MonitoringError> {
+        ) -> Result<Value, UpstreamFailure> {
             let output = if request.url.contains("/apis/dashboard.grafana.app/") {
                 serde_json::json!({
                     "items": [
@@ -90,13 +91,48 @@ mod tests {
             &self,
             _connection_ref: &str,
             _request: Request,
-        ) -> Result<Value, MonitoringError> {
+        ) -> Result<Value, UpstreamFailure> {
             let call = self.calls.fetch_add(1, Ordering::SeqCst);
             if call == 0 {
                 self.entered.notify_one();
                 self.release.notified().await;
             }
             Ok(serde_json::json!([]))
+        }
+    }
+
+    /// One scripted upstream outcome per exchange, under the real `PortExecutor`: either a
+    /// status with a deliberately non-JSON body (which must never travel into any refusal or
+    /// log), or a transport-level failure before any status arrived.
+    #[derive(Default)]
+    struct ScriptedEgress {
+        outcome: Mutex<Option<Result<u16, EgressTransportError>>>,
+    }
+
+    #[async_trait]
+    impl EgressTransport for ScriptedEgress {
+        async fn execute(
+            &self,
+            _authority_ref: &str,
+            _request: EgressHttpRequest,
+        ) -> Result<EgressHttpResponse, EgressTransportError> {
+            match lock(&self.outcome).take().expect("a scripted outcome is set") {
+                Ok(status) => Ok(EgressHttpResponse {
+                    status,
+                    headers: BTreeMap::new(),
+                    body: b"upstream body content must never travel".to_vec(),
+                }),
+                Err(error) => Err(error),
+            }
+        }
+
+        async fn connect_websocket(
+            &self,
+            _authority_ref: &str,
+            _url: String,
+            _maximum_message_bytes: usize,
+        ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+            Err(EgressTransportError::Refused)
         }
     }
 
@@ -340,6 +376,245 @@ alertmanager = "grant:alertmanager"
             request.url,
             "https://grafana.example/apis/dashboard.grafana.app/v1/namespaces/default/dashboards"
         );
+    }
+
+    /// S-065: a refused dispatch names the upstream failure class. Five upstream outcomes —
+    /// 401, 403, 404, 500 and a transport failure — must not collapse into one context-free
+    /// `unavailable`: the refusal message distinguishes "upstream refused (status class)"
+    /// from "upstream unreachable", while never carrying upstream body content, so a live
+    /// refusal is diagnosable. The exact status (401 vs 403 vs 404) belongs to the
+    /// server-side log line, not the client message.
+    #[tokio::test]
+    async fn refused_dispatches_distinguish_upstream_status_class_from_transport() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let egress = Arc::new(ScriptedEgress::default());
+        let backend = MonitoringBackend::open(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            Arc::clone(&egress) as Arc<dyn EgressTransport>,
+        )
+        .unwrap();
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        });
+        store
+            .put(&credential_ref, &Secret::new("SENTINEL-NOT-A-REAL-SECRET"))
+            .await
+            .unwrap();
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+
+        let mut refusals = Vec::new();
+        for outcome in [
+            Ok(401),
+            Ok(403),
+            Ok(404),
+            Ok(500),
+            Err(EgressTransportError::Refused),
+        ] {
+            *lock(&egress.outcome) = Some(outcome);
+            let error = backend
+                .handle(
+                    &owner,
+                    OperationRequest::Invoke(InvokeRequest {
+                        operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                        connection_ref: "connection:grafana:test".to_owned(),
+                        description_ref: description.description_ref.clone(),
+                        input: serde_json::json!({"namespace": "default"}),
+                        approval_evidence_ref: None,
+                    }),
+                )
+                .await
+                .unwrap_err();
+            // The protocol contract holds: the code stays `unavailable` and stays retriable.
+            assert_eq!(error.code, OperationErrorCode::Unavailable);
+            assert!(
+                !error.message.contains("body content must never travel"),
+                "upstream body leaked into the refusal: {}",
+                error.message
+            );
+            refusals.push(error.message);
+        }
+
+        assert!(
+            refusals[0].contains("4xx"),
+            "the 401 refusal names its status class: {}",
+            refusals[0]
+        );
+        assert!(
+            refusals[3].contains("5xx"),
+            "the 500 refusal names its status class: {}",
+            refusals[3]
+        );
+        assert!(
+            refusals[4].contains("unreachable"),
+            "the transport refusal names unreachability: {}",
+            refusals[4]
+        );
+        assert_ne!(
+            refusals[0], refusals[3],
+            "a 4xx and a 5xx refusal must not be byte-identical"
+        );
+        assert_ne!(
+            refusals[0], refusals[4],
+            "an upstream status and a transport failure must not be byte-identical"
+        );
+    }
+
+    /// S-065: the structured refusal record carries the operation, the route, and the exact
+    /// upstream status — that is what makes a 401 distinguishable from a 403 or 404 in
+    /// `kubectl logs` — and nothing body- or credential-shaped. The record content is asserted
+    /// here as a pure value; `refuse_dispatch` emits exactly this value as one stderr line,
+    /// following the crate's `eprintln!` logging idiom, which the crate does not capture-test.
+    #[test]
+    fn refusal_log_record_names_operation_route_and_exact_upstream_status() {
+        let status = refusal_log_line(
+            monitoring_model::ALERTMANAGER_ALERTS_LIST,
+            ROUTE_MEDIATED,
+            RefusalCause::Upstream(UpstreamFailure::Status(403)),
+        );
+        assert_eq!(status["event"], "monitoring_dispatch_refused");
+        assert_eq!(status["operation_ref"], "alertmanager-alerts-list");
+        assert_eq!(status["route"], "mediated");
+        assert_eq!(status["cause"], "upstream-status");
+        assert_eq!(status["upstream_status"], 403);
+        assert_ne!(
+            status,
+            refusal_log_line(
+                monitoring_model::ALERTMANAGER_ALERTS_LIST,
+                ROUTE_MEDIATED,
+                RefusalCause::Upstream(UpstreamFailure::Status(401)),
+            ),
+            "a 401 and a 403 must produce distinct records"
+        );
+
+        let transport = refusal_log_line(
+            GRAFANA_DASHBOARDS_LIST,
+            ROUTE_DIRECT,
+            RefusalCause::Upstream(UpstreamFailure::Transport),
+        );
+        assert_eq!(transport["route"], "direct");
+        assert_eq!(transport["cause"], "upstream-transport");
+        assert!(transport.get("upstream_status").is_none());
+
+        let body = refusal_log_line(
+            GRAFANA_DASHBOARDS_LIST,
+            ROUTE_DIRECT,
+            RefusalCause::Upstream(UpstreamFailure::Body),
+        );
+        assert_eq!(body["cause"], "upstream-body");
+
+        let custody = refusal_log_line(
+            GRAFANA_DASHBOARDS_LIST,
+            ROUTE_DIRECT,
+            RefusalCause::CredentialCustody,
+        );
+        assert_eq!(custody["cause"], "credential-custody");
+        assert!(custody.get("upstream_status").is_none());
+    }
+
+    /// S-065: a credential store that fails for a reason other than "nothing stored" is a
+    /// custody failure, distinguished from every upstream failure class — and the store's
+    /// internal detail (paths, reasons) never reaches the refusal.
+    #[tokio::test]
+    async fn credential_custody_failure_is_distinguished_from_upstream_failures() {
+        struct CustodyFailingStore;
+
+        #[async_trait]
+        impl SecretStore for CustodyFailingStore {
+            async fn ready(&self) -> Result<(), StoreError> {
+                Ok(())
+            }
+
+            async fn get(&self, _reference: &CredentialRef) -> Result<Secret, StoreError> {
+                Err(StoreError::Unreachable {
+                    path: "vault/private-path".to_owned(),
+                    reason: "injected custody failure".to_owned(),
+                })
+            }
+
+            async fn put(
+                &self,
+                _reference: &CredentialRef,
+                _secret: &Secret,
+            ) -> Result<(), StoreError> {
+                Ok(())
+            }
+
+            async fn delete(&self, _reference: &CredentialRef) -> Result<(), StoreError> {
+                Ok(())
+            }
+        }
+
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let backend = MonitoringBackend::with_executor(
+            owner.clone(),
+            policy(),
+            root.path(),
+            Arc::new(CustodyFailingStore),
+            credential_ref,
+            Arc::new(FakeExecutor::default()),
+        );
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        });
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+
+        let error = backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                    connection_ref: "connection:grafana:test".to_owned(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({"namespace": "default"}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, OperationErrorCode::Unavailable);
+        assert!(
+            error.message.contains("credential custody"),
+            "the custody refusal names its class: {}",
+            error.message
+        );
+        assert!(!error.message.contains("upstream"));
+        assert!(!error.message.contains("private-path"));
+        assert!(!error.message.contains("injected custody failure"));
     }
 
     /// S-064: integer epoch seconds ride the mediated Prometheus route end to end — the
