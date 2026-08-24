@@ -11,6 +11,7 @@ for workspace in \
   crates/driver-speech \
   crates/driver-cdp \
   crates/driver-sip \
+  crates/driver-sql \
   crates/rtvbp-voice-endpoint \
   crates/voice-local-audio \
   crates/voice-runtime; do

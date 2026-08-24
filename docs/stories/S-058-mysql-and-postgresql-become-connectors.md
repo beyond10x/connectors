@@ -38,3 +38,20 @@ read path; mutations are a later grant-gated story.
 
 - 2026-08-24 — filed from design 15 (Timo: "there should be a generic sql/mysql/postgres
   connector").
+- 2026-08-24 — implemented on `impl/S-058`. The closed `sql_v1` driver word joins the whole
+  vocabulary chain (connector-spec IR, provider/document/site schemas, catalog, resolve, domain
+  `DriverId`/`SqlPlan`, service planning + dispatch slot; integration-platform refuses it like
+  SIP). Providers `mysql` (authority `com.mysql.server`) and `postgresql`
+  (`org.postgresql.server`) declare four read-only unary operations each — bounded query,
+  schemas-list, tables-list, table-describe — as repository-authored native members in the
+  b10x mold; SOURCES.toml registers both against official-doc references. The new
+  `crates/driver-sql` nested workspace owns the wire: sqlparser-based statement admission
+  (single statement, SELECT/SHOW/DESCRIBE class, keyword fence + AST walk) refuses writes
+  before credential resolution or any socket; tokio-postgres runs the read as a cursor in a
+  `BEGIN READ ONLY` transaction, mysql_async streams inside `START TRANSACTION READ ONLY`;
+  row/byte caps live in one shared accumulator with honest truncation causes. Credentials are
+  custody references (file/env resolve today; the S-059 `secret_ref{name,namespace}` Kubernetes
+  shape is declared behind the same trait and refuses by name until its resolver is composed).
+  Proven by 28 unit tests plus 14 `#[ignore]`d live tests run against real postgres:17 and
+  mysql:8.4 containers. Deferred: the runtime integration that serves these operations behind a
+  Connection (needs S-059 descriptors), and MCP exposure (S-060/S-061).
