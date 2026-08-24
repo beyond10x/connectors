@@ -1066,7 +1066,7 @@ o zoom-meeting-delete zoom default 16459124 2358
 o zoom-user-get zoom default 16461488 5881
 payload 16467651
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Airtable access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -1614,7 +1614,7 @@ payload 16467651
   "vendor": "Airtable"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "io.prometheus.alertmanager.api",
   "config": [
     {
@@ -1703,7 +1703,7 @@ payload 16467651
   "verify": "alertmanager-alerts-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "An Algolia API key with the ACLs this connector needs: `search` and `browse` for the reads, `addObject` and `deleteObject` for the writes. Scope it to the indices this connection should reach rather than using the Admin key",
@@ -2435,7 +2435,7 @@ payload 16467651
   "verify": "algolia-index-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Anthropic API key, sent as x-api-key",
@@ -3641,7 +3641,7 @@ payload 16467651
   "verify": "anthropic-models-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Argo CD JWT, from `argocd account generate-token` for a local account or from an AppProject role token. Its Argo CD RBAC policy is what bounds this Connection: a token with only `applications, get` cannot sync whatever this catalogue declares. Entered or resolved at the Connector placement and never returned to the caller",
@@ -6034,7 +6034,7 @@ payload 16467651
   "verify": "argocd-applications-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Asana access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -6538,7 +6538,7 @@ payload 16467651
   "vendor": "Asana"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Asterisk ARI Basic authentication password, paired with the deployment's ARI username",
@@ -27046,7 +27046,7 @@ payload 16467651
   "verify": "asterisk-ari-asterisk-ping"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "babelforce access token. Either supplied through the environment, or obtained by the host running one of the grants below",
@@ -145390,7 +145390,7 @@ payload 16467651
   "verify": "babelforce-agent-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Bitbucket Cloud Access Token, sent as a bearer token. A Workspace Access Token is valid for exactly one workspace, which is the same boundary this connector's pinned `workspace` describes; scope it to repository:read plus pullrequest:write for the writes below",
@@ -146607,7 +146607,7 @@ payload 16467651
   "verify": "bitbucket-repository-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Box access token sent as a bearer — an OAuth2 access token or a Developer Console token",
@@ -147232,7 +147232,7 @@ payload 16467651
   "verify": "box-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Calendly access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -148006,7 +148006,7 @@ payload 16467651
   "verify": "calendly-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "ClickUp personal API token, sent as the raw value of the Authorization header with no scheme word. Grant access to the workspaces, spaces and lists the operations below need to read or write",
@@ -149037,7 +149037,7 @@ payload 16467651
   "verify": "clickup-team-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Cloudflare API Token, sent as a bearer token, scoped to Zone:Read, DNS:Edit and Cache Purge on the zones this connector should reach",
@@ -149775,7 +149775,7 @@ payload 16467651
   "verify": "cloudflare-zone-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Atlassian API token; the user half is the account email that minted it. This is the same token a Jira connection uses, but it is stored at a separate address and must be supplied again",
@@ -150767,7 +150767,7 @@ payload 16467651
   "verify": "confluence-space-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Contentful Content Delivery API (CDA) access token, sent as a bearer. Read-only: published content in one space only, and only the Delivery API accepts it",
@@ -151478,7 +151478,7 @@ payload 16467651
   "verify": "contentful-entries-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "io.b10x",
   "connector": "b10x",
   "description": "B10x-owned Connector capabilities implemented by closed built-in protocol drivers",
@@ -289594,7 +289594,7 @@ payload 16467651
   "vendor": "B10x"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Datadog API key. Identifies the organization; required on every request together with the Application Key — neither key alone authenticates a call",
@@ -290008,7 +290008,7 @@ payload 16467651
   "verify": "datadog-monitor-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Discord bot token, sent as `Authorization: Bot <token>`. The `Bot ` scheme word is supplied by the connector; the token is the value alone. `Bearer ` is a valid Discord scheme word for a different credential — an OAuth2 user token — so sending this token with that prefix yields a 401 indistinguishable from a revoked token",
@@ -290934,7 +290934,7 @@ payload 16467651
   "verify": "discord-current-user"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "DocuSign OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -291752,7 +291752,7 @@ payload 16467651
   "verify": "docusign-verify"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Dropbox access token sent as a bearer — a scoped app access token or an OAuth2 access token",
@@ -292361,7 +292361,7 @@ payload 16467651
   "verify": "dropbox-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Figma personal access token, sent as the whole value of X-Figma-Token. Grants read access to whatever files, projects and comments the token's account can see",
@@ -293025,7 +293025,7 @@ payload 16467651
   "verify": "figma-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Fly access token, preferably scoped to the app or organization this connection manages",
@@ -293837,7 +293837,7 @@ payload 16467651
   "verify": "fly-regions-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "com.freshdesk.api",
   "config": [
     {
@@ -296056,7 +296056,7 @@ payload 16467651
   "verify": "freshdesk-test"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Front API token sent as a bearer",
@@ -296793,7 +296793,7 @@ payload 16467651
   "verify": "front-verify"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "GitHub token sent as a bearer — a GitHub App installation token, a fine-grained PAT, or a classic PAT",
@@ -305812,7 +305812,7 @@ payload 16467651
   "verify": "github-user-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Personal access token entered once through a protected Connect Session. Acts as the person who created it; choose read_api for reads or api for writes",
@@ -309406,7 +309406,7 @@ payload 16467651
   "verify": "gitlab-user-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Google OAuth2 access token sent as a bearer; short-lived, and refreshed by the host rather than by generated Flux",
@@ -310456,7 +310456,7 @@ payload 16467651
   "vendor": "Google Workspace"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Grafana service account token with dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller",
@@ -311079,7 +311079,7 @@ payload 16467651
   "verify": "grafana-datasources-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "HubSpot private-app access token (pat-…) with crm.objects.contacts.read/write, crm.objects.companies.read and crm.objects.deals.read",
@@ -311694,7 +311694,7 @@ payload 16467651
   "vendor": "HubSpot"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Intercom access token sent as a bearer — an OAuth app token or a workspace access token",
@@ -312635,7 +312635,7 @@ payload 16467651
   "vendor": "Intercom"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Atlassian API token; the user half is the account email that minted it",
@@ -314219,7 +314219,7 @@ payload 16467651
   "vendor": "Jira"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Klaviyo private API key for one account. Travels as the whole Authorization header behind Klaviyo's own scheme word. Keys are scoped per key: one minted without the scopes the shipped operations need will authenticate, pass verification, and fail on exactly the call that needs the missing scope",
@@ -315252,7 +315252,7 @@ payload 16467651
   "verify": "klaviyo-account-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "LaunchDarkly API access token, sent as the entire value of the Authorization header with no scheme word in front of it — LaunchDarkly rejects a `Bearer `-prefixed value",
@@ -316063,7 +316063,7 @@ payload 16467651
   "verify": "launchdarkly-project-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "com.grafana.loki.api",
   "config": [
     {
@@ -316274,7 +316274,7 @@ payload 16467651
   "verify": "loki-query-range"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Mailchimp Marketing API key, granting whatever the account that issued it can do. Travels as `Authorization: Bearer <key>`, the alternative Mailchimp documents beside its Basic form. The key's trailing `-us14`-style suffix names the account's datacentre; that value is asked for separately as configuration and is never read back out of this credential",
@@ -317383,7 +317383,7 @@ payload 16467651
   "verify": "mailchimp-ping"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Microsoft Entra ID OAuth2 access token sent as a bearer; short-lived, minted outside flux (delegated sign-in or application client-credentials), and refreshed by the host rather than by generated Flux",
@@ -327099,7 +327099,7 @@ payload 16467651
   "verify": "microsoft_graph-calendar-calendar-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Miro access token (a personal access token or an OAuth2 access token), sent as a bearer token, scoped to read and write boards, board items and sticky notes",
@@ -328209,7 +328209,7 @@ payload 16467651
   "verify": "miro-board-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "com.mysql.server",
   "connector": "mysql",
   "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
@@ -328608,7 +328608,7 @@ payload 16467651
   "verify": "mysql-schemas-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "New Relic User API key, authorizing REST v2 calls as the New Relic user it was created by. Travels as the `X-Api-Key` header on every request. A key is issued in one region and is not valid against the other region's host — a 401 from this connector is as likely to be a wrong `host` as a wrong key",
@@ -329406,7 +329406,7 @@ payload 16467651
   "verify": "newrelic-application-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Notion integration token sent as a bearer — an internal integration token or an OAuth-issued access token",
@@ -329960,7 +329960,7 @@ payload 16467651
   "verify": "notion-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Okta API token, sent as `Authorization: SSWS <token>`. The `SSWS ` scheme word is supplied by the connector; the token is the value alone",
@@ -330652,7 +330652,7 @@ payload 16467651
   "verify": "okta-user-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "OpenAI API key, sent as a bearer token",
@@ -360283,7 +360283,7 @@ payload 16467651
   "vendor": "OpenAI"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "OpenRouter API key, sent as a bearer token",
@@ -360693,7 +360693,7 @@ payload 16467651
   "vendor": "OpenRouter"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "PagerDuty REST API access key, sent as the Authorization header after the literal `Token token=`. A read-only key satisfies the four read operations; the two incident writes need a full-access key",
@@ -361813,7 +361813,7 @@ payload 16467651
   "verify": "pagerduty-service-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "org.postgresql.server",
   "connector": "postgresql",
   "description": "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
@@ -362212,7 +362212,7 @@ payload 16467651
   "verify": "postgresql-schemas-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Postmark Server API token, scoped to one server. Authenticates sending and that server's own message history; cannot list or manage servers",
@@ -362888,7 +362888,7 @@ payload 16467651
   "verify": "postmark-deliverystats-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "authority": "io.prometheus.api",
   "config": [
     {
@@ -363091,7 +363091,7 @@ payload 16467651
   "verify": "prometheus-query-range"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Resend API key, sent as a bearer token on every request. Minted in the Resend dashboard and scoped there to full access or sending only; this repository holds the reference, never the value",
@@ -363683,7 +363683,7 @@ payload 16467651
   "verify": "resend-domain-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Runpod API key, created in the Runpod console under Settings → API Keys with the minimum permission the connection needs",
@@ -377552,7 +377552,7 @@ payload 16467651
   "verify": "runpod-get-ssh-keys"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Salesforce OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -378176,7 +378176,7 @@ payload 16467651
   "verify": "salesforce-whoami"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "SendGrid API key sent as a bearer",
@@ -378703,7 +378703,7 @@ payload 16467651
   "verify": "sendgrid-template-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Sentry auth token sent as a bearer — an organization, user or internal-integration token",
@@ -379500,7 +379500,7 @@ payload 16467651
   "vendor": "Sentry"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Shopify Admin API access token, sent as the whole value of X-Shopify-Access-Token, with read_orders, read_products, write_products, read_customers and read_inventory scopes",
@@ -380307,7 +380307,7 @@ payload 16467651
   "vendor": "Shopify"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Workspace bot token for either the deployment-owned organization app or one principal-owned companion app. Calls are attributed to that exact bot",
@@ -386703,7 +386703,7 @@ payload 16467651
   "verify": "slack-users-info"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Statuspage API key, sent as the Authorization header after the literal scheme word `OAuth ` — a static key from the account's own API settings, not an OAuth2 access token",
@@ -387553,7 +387553,7 @@ payload 16467651
   "verify": "statuspage-component-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Stripe secret key sent as a bearer. A live key moves real money; a test key does not. A restricted key limited to Charges, PaymentIntents, Refunds, Customers and Balance is sufficient",
@@ -389503,7 +389503,7 @@ payload 16467651
   "verify": "stripe-balance-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Supabase project anon (publishable) key. Travels as the `apikey` header on every request. Requests made with it run as the project's `anon` Postgres role, so everything they return is bounded by the project's row-level-security policies — it is not the `service_role` key and confers none of that key's authority",
@@ -389843,7 +389843,7 @@ payload 16467651
   "verify": "supabase-schema-describe"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Trello API key, identifying the Power-Up registration a call is made through. Travels as the `key` query parameter on every request, always together with the token; neither authenticates a call alone",
@@ -390725,7 +390725,7 @@ payload 16467651
   "verify": "trello-board-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Twilio Account SID and Auth Token, sent as HTTP Basic credentials",
@@ -392909,7 +392909,7 @@ payload 16467651
   "verify": "twilio-account-get"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Typeform access token sent as a bearer — a personal access token or an OAuth2 access token",
@@ -393762,7 +393762,7 @@ payload 16467651
   "verify": "typeform-user-me"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Vercel access token sent as a bearer",
@@ -394360,7 +394360,7 @@ payload 16467651
   "verify": "vercel-projects-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Webflow API token (a Site API token or an OAuth2 access token), sent as a bearer token, scoped to read sites, collections and items, and to publish",
@@ -395011,7 +395011,7 @@ payload 16467651
   "verify": "webflow-site-list"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Zendesk API token; the user half is the agent email with Zendesk's /token marker",
@@ -418837,7 +418837,7 @@ payload 16467651
   "verify": "zendesk-test"
 }
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Zoom server-to-server OAuth access token, sent as a bearer. Minted outside flux and supplied through the environment; it expires within the hour and nothing here can refresh it",

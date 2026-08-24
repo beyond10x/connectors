@@ -7,24 +7,24 @@ provider_sha256 = "f66f6dc6aaa83f3c36c822cbcdf1b0301ed16df257e2339f0735cf6b29a63
 coverage = "exact-shipped-native-and-module-operation-event-capability-surface"
 purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work, Ontology, Planner, Workspaces, and Colab module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
 references = [
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0018-connectors-satellite-federation.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0039-work-is-the-standalone-request-and-task-domain.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0042-logical-workspaces-are-a-product-neutral-control-plane.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0043-workspaces-is-an-independently-released-domain-module.md",
-  "https://github.com/b10x/b10x/blob/main/architecture/adr/0044-zwirn-is-a-product-and-colab-is-a-domain-module.md",
-  "https://github.com/b10x/b10x/tree/main/model/modules",
-  "https://github.com/b10x/b10x/tree/main/model/modules/modules/planner/contracts/planner/v1",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0024-native-voice-uses-sip-and-rtvbp-at-the-channel-edge.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0026-native-voice-contracts-are-protocol-neutral.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/rfcs/0009-native-sip-and-rtvbp-voice-boundary.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0010-beyond-http-is-a-five-axis-connector-model.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0018-connectors-satellite-federation.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0035-device-and-browser-capabilities-are-connector-drivers.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0039-work-is-the-standalone-request-and-task-domain.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0042-logical-workspaces-are-a-product-neutral-control-plane.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0043-workspaces-is-an-independently-released-domain-module.md",
+  "https://github.com/beyond10x/b10x/blob/main/architecture/adr/0044-zwirn-is-a-product-and-colab-is-a-domain-module.md",
+  "https://github.com/beyond10x/b10x/tree/main/model/modules",
+  "https://github.com/beyond10x/b10x/tree/main/model/modules/modules/planner/contracts/planner/v1",
 ]
 
 # These development contracts are generated and reviewed in the same monorepo change. The exact
 # manifest and vendored-byte hashes below are the source identity until a signed release bundle
 # replaces the all-zero development release digest.
-module_repository = "https://github.com/b10x/b10x"
+module_repository = "https://github.com/beyond10x/b10x"
 module_source_path = "model/modules"
 module_release_version = "0.2.0-dev.1"
 module_release_stability = "development"
@@ -32,7 +32,7 @@ module_release_bundle_sha256 = "000000000000000000000000000000000000000000000000
 
 [[spec]]
 service = "knowledge"
-owner_repository = "https://github.com/b10x/ontology"
+owner_repository = "https://github.com/beyond10x/ontology"
 owner_path = "contracts/ontology/v0alpha1/openapi.json"
 vendored_path = "specs/b10x/ontology-v0alpha1.openapi.json"
 sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
@@ -40,7 +40,7 @@ vendoring = "exact-bytes"
 
 [[spec]]
 service = "tasks"
-owner_repository = "https://github.com/b10x/work"
+owner_repository = "https://github.com/beyond10x/work"
 owner_path = "contracts/work/v0alpha1/openapi.json"
 vendored_path = "specs/b10x/work-v0alpha1.openapi.json"
 sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
@@ -49,7 +49,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "knowledge"
 kind = "openapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/ontology/contracts/ontology/v0alpha2/openapi.json"
 owner_manifest_path = "model/modules/modules/ontology/contracts/ontology/v0alpha2/manifest.json"
 owner_manifest_sha256 = "f91dab52ccbbc9795e9a8009713ba2c5737e93a59f13667eca0db5e0b92dd8ea"
@@ -60,7 +60,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "tasks"
 kind = "openapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/work/contracts/work/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/work/contracts/work/v1/module.json"
 owner_manifest_sha256 = "6e76b0838d2563e1e9e0c844194f3dcbadcaebd10ad4d30d0ffaed30e3eb584d"
@@ -71,7 +71,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "tasks"
 kind = "asyncapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/work/contracts/work/v1/asyncapi.yaml"
 owner_manifest_path = "model/modules/modules/work/contracts/work/v1/module.json"
 owner_manifest_sha256 = "6e76b0838d2563e1e9e0c844194f3dcbadcaebd10ad4d30d0ffaed30e3eb584d"
@@ -82,7 +82,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "planning"
 kind = "openapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/planner/contracts/planner/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 owner_manifest_sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
@@ -93,7 +93,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "planning"
 kind = "asyncapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/planner/contracts/planner/v1/asyncapi.yaml"
 owner_manifest_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 owner_manifest_sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
@@ -104,7 +104,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "planning"
 kind = "module-manifest"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 vendored_path = "specs/b10x/planner-v1.module.json"
 sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
@@ -113,7 +113,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "workspaces"
 kind = "openapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/workspaces/contracts/workspaces/v2/openapi.json"
 owner_manifest_path = "model/modules/modules/workspaces/contracts/workspaces/v2/module.json"
 owner_manifest_sha256 = "11e7bdc6de9c2c6733216a7b68cef41649bc551e8e4f79373505fd46db28a2e9"
@@ -124,7 +124,7 @@ vendoring = "exact-bytes"
 [[spec]]
 service = "collaboration"
 kind = "openapi"
-owner_repository = "https://github.com/b10x/b10x"
+owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/colab/contracts/colab/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/colab/contracts/colab/v1/module.json"
 owner_manifest_sha256 = "46207ef571063a806f4c60ff4b43a848392013c9b0828233ce90f0696e69c143"

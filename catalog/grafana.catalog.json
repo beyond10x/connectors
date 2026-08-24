@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Grafana service account token with dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller",

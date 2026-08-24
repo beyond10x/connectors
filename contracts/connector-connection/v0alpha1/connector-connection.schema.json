@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/connectors/blob/main/contracts/connector-connection/v0alpha1/connector-connection.schema.json",
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-connection/v0alpha1/connector-connection.schema.json",
   "title": "B10x ConnectorConnection v0alpha1 frame",
   "oneOf": [
     {"$ref":"#/$defs/request_envelope"},

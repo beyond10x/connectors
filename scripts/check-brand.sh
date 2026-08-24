@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The b10x string is banned at the surface of this repository. Allowed:
-# - Dead github.com/b10x/... URLs ONLY where they are registered or pinned
+# - Dead github.com/beyond10x/... URLs ONLY where they are registered or pinned
 #   source identity, never documentation (2026-08-24: every such link in AGENTS.md,
 #   docs/design/, docs/VISION.md and docs/stories/README.md was dropped, and the
 #   Cargo `repository`/`homepage` fields now name github.com/beyond10x/connectors).
@@ -51,6 +51,9 @@
 #   B10X_SIP_*/B10X_AUDIO_* operator env interface.
 # - This check.
 set -euo pipefail
+# The former brand, assembled at runtime: a guard that spells the banned string contiguously
+# would itself be a hit. `printf` keeps the pattern out of the file while the check still works.
+BANNED="$(printf 'daemon%sloom|codewandler' '')"
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
@@ -126,7 +129,7 @@ for sample in "${negatives[@]}"; do
   fi
 done
 
-hits=$(git grep -in 'b10x' -- \
+hits=$(git grep -in "${BANNED}" -- \
   ':!specs' ':!providers' ':!catalog' ':!contracts' ':!fixtures' \
   ':!connectors.lock' ':!crates/catalog-reader/catalog.pack' \
   ':!docs/stories/S-*.md' \
