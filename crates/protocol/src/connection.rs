@@ -16,7 +16,7 @@ pub const MAX_SEARCH_RESULTS: u16 = 64;
 
 const MAX_BROWSER_CAPABILITY_TOKEN_BYTES: usize = 256;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RequestEnvelope {
     pub protocol: String,
@@ -25,7 +25,7 @@ pub struct RequestEnvelope {
     pub request: ConnectionRequest,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(
     tag = "method",
     content = "params",
@@ -47,7 +47,7 @@ pub enum ConnectionRequest {
     ConnectSessionStatus(ConnectSessionStatusRequest),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CandidateSearchRequest {
     pub integration_ref: String,
@@ -55,7 +55,7 @@ pub struct CandidateSearchRequest {
     pub limit: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CandidateActivateRequest {
     /// Opaque candidate identity. Credential-source and provider routes remain Connector-owned.
@@ -63,20 +63,20 @@ pub struct CandidateActivateRequest {
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SearchRequest {
     pub query: String,
     pub limit: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeRequest {
     pub connection_ref: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ObservationSearchRequest {
     pub source_connection_ref: String,
@@ -84,14 +84,14 @@ pub struct ObservationSearchRequest {
     pub limit: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MaterializeRequest {
     /// Opaque observation identity. Resource bindings and route selection remain Connector-owned.
     pub observation_ref: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectSessionCreateRequest {
     pub integration_ref: String,
@@ -101,13 +101,13 @@ pub struct ConnectSessionCreateRequest {
     pub auth_profile: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectSessionStatusRequest {
     pub connect_session_ref: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionState {
     Created,
@@ -118,7 +118,7 @@ pub enum ConnectionState {
 }
 
 /// Durable authority owner for a Connection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionScope {
     Tenant,
@@ -126,14 +126,14 @@ pub enum ConnectionScope {
 }
 
 /// External actor whose identity the provider observes for calls through a Connection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionActor {
     App,
     User,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionInitiator {
     /// Wire id `b10x`: pinned by the connector-connection contract vectors (D5).
@@ -142,7 +142,7 @@ pub enum ConnectionInitiator {
     Provider,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelState {
     Starting,
@@ -151,7 +151,7 @@ pub enum ChannelState {
     Stopped,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteAdapter {
     GrafanaDatasourceProxyV1,
@@ -162,7 +162,7 @@ pub enum RouteAdapter {
 ///
 /// The Connector-owned resource binding is deliberately absent: callers need to know that a route
 /// is mediated, not the Grafana data-source UID or proxy path used to implement it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConnectionRoute {
     Direct,
@@ -172,7 +172,7 @@ pub enum ConnectionRoute {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ChannelSummary {
     pub channel_ref: String,
@@ -181,7 +181,7 @@ pub struct ChannelSummary {
     pub events: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionSummary {
     pub connection_ref: String,
@@ -199,7 +199,7 @@ pub struct ConnectionSummary {
     pub auth_profile: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionDescription {
     #[serde(flatten)]
@@ -207,7 +207,7 @@ pub struct ConnectionDescription {
     pub channels: Vec<ChannelSummary>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryObservationState {
     Observed,
@@ -216,7 +216,7 @@ pub enum DiscoveryObservationState {
     Withdrawn,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionCandidateState {
     Detected,
@@ -224,7 +224,7 @@ pub enum ConnectionCandidateState {
 }
 
 /// Value-free projection of a potential direct Connection found in trusted local configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionCandidateSummary {
     pub candidate_ref: String,
@@ -237,7 +237,7 @@ pub struct ConnectionCandidateSummary {
 }
 
 /// Value-free projection of one already-reconciled discovery observation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiscoveryObservationSummary {
     pub observation_ref: String,
@@ -254,7 +254,7 @@ pub struct DiscoveryObservationSummary {
     pub connection_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectSessionState {
     Pending,
@@ -267,7 +267,7 @@ pub enum ConnectSessionState {
 ///
 /// Completion endpoints are short-lived Connector-owned endpoints, not Agent Endpoints and not
 /// the durable Connection. They are present only while pending and accept one completion attempt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectSessionStatus {
     pub connect_session_ref: String,
@@ -283,7 +283,7 @@ pub struct ConnectSessionStatus {
     pub connection_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(
     tag = "result",
     content = "value",
@@ -307,7 +307,7 @@ pub enum ConnectionResult {
     ConnectSessionStatus(ConnectSessionStatus),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionErrorCode {
     Unavailable,
@@ -319,7 +319,7 @@ pub enum ConnectionErrorCode {
     Protocol,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema)]
 #[error("{code:?}: {message}")]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionError {
@@ -339,14 +339,14 @@ impl ConnectionError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     Ok,
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResponseEnvelope {
     pub protocol: String,

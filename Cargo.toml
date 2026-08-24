@@ -83,6 +83,7 @@ rust-version = "1.88"
 publish = false
 
 [workspace.dependencies]
+schemars = "1"
 # Internal crates. Path-local names: the package name, the library name and the workspace key are
 # the same word, so there is no `package = "…"` alias to keep in step with anything.
 connector-address = { version = "0.1.0", path = "crates/connector-address" }

@@ -25,8 +25,76 @@ use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 use sha2::Digest as _;
 
-/// The committed contract, served byte for byte.
-const OPENAPI_JSON: &str = include_str!("docs/openapi.json");
+/// The committed skeleton: paths, info, security, and the schemas that have no
+/// struct source (the hand-rolled MCP transport and the axum-level error body).
+/// Every envelope schema is generated from the `protocol` payload structs at first
+/// use — the structs are the contract; the skeleton only says where they bind.
+const OPENAPI_SKELETON: &str = include_str!("docs/openapi.json");
+
+/// The served document: skeleton plus the ten envelope schemas generated from the
+/// exact `protocol` types the routes deserialize with, inlined so no name can
+/// collide across modules. Built once per process.
+pub(in crate::hosted) fn document_json() -> &'static str {
+    static DOCUMENT: OnceLock<String> = OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        let mut document: Value = serde_json::from_str(OPENAPI_SKELETON)
+            .expect("the committed OpenAPI skeleton is JSON");
+        let schemas = document
+            .pointer_mut("/components/schemas")
+            .expect("the skeleton declares components.schemas");
+        let mut settings = schemars::generate::SchemaSettings::draft2020_12();
+        settings.inline_subschemas = true;
+        fn generated<T: schemars::JsonSchema>(
+            settings: &schemars::generate::SchemaSettings,
+        ) -> Value {
+            let mut schema = settings.clone().into_generator().root_schema_for::<T>();
+            let object = schema.ensure_object();
+            object.remove("$schema");
+            Value::Object(std::mem::take(object))
+        }
+        let entries: [(&str, Value); 10] = [
+            ("operation.requestEnvelope", generated::<protocol::operation::RequestEnvelope>(&settings)),
+            ("operation.responseEnvelope", generated::<protocol::operation::ResponseEnvelope>(&settings)),
+            ("connection.request_envelope", generated::<protocol::connection::RequestEnvelope>(&settings)),
+            ("connection.response_envelope", generated::<protocol::connection::ResponseEnvelope>(&settings)),
+            ("catalog.requestEnvelope", generated::<protocol::catalog::RequestEnvelope>(&settings)),
+            ("catalog.responseEnvelope", generated::<protocol::catalog::ResponseEnvelope>(&settings)),
+            ("event.request_envelope", generated::<protocol::event::RequestEnvelope>(&settings)),
+            ("event.response_envelope", generated::<protocol::event::ResponseEnvelope>(&settings)),
+            ("datasource.request_envelope", generated::<protocol::datasource::RequestEnvelope>(&settings)),
+            ("datasource.response_envelope", generated::<protocol::datasource::ResponseEnvelope>(&settings)),
+        ];
+        let contracts: [(&str, &str); 10] = [
+            ("operation.requestEnvelope", protocol::operation::CONTRACT),
+            ("operation.responseEnvelope", protocol::operation::CONTRACT),
+            ("connection.request_envelope", protocol::connection::CONTRACT),
+            ("connection.response_envelope", protocol::connection::CONTRACT),
+            ("catalog.requestEnvelope", protocol::catalog::CONTRACT),
+            ("catalog.responseEnvelope", protocol::catalog::CONTRACT),
+            ("event.request_envelope", protocol::event::CONTRACT),
+            ("event.response_envelope", protocol::event::CONTRACT),
+            ("datasource.request_envelope", protocol::datasource::CONTRACT),
+            ("datasource.response_envelope", protocol::datasource::CONTRACT),
+        ];
+        let table = schemas
+            .as_object_mut()
+            .expect("components.schemas is an object");
+        for (name, mut schema) in entries {
+            // The `protocol` field is an open string on the struct; `validate()` refuses
+            // anything but the module's contract identity, and the document says so.
+            let contract = contracts
+                .iter()
+                .find(|(entry, _)| *entry == name)
+                .map(|(_, contract)| *contract)
+                .expect("every envelope root has a contract identity");
+            if let Some(field) = schema.pointer_mut("/properties/protocol") {
+                *field = serde_json::json!({ "type": "string", "const": contract });
+            }
+            table.insert(name.to_owned(), schema);
+        }
+        serde_json::to_string_pretty(&document).expect("the merged document serializes")
+    })
+}
 
 /// The five envelope endpoints in reading order, each with the request and response
 /// example name the page leads with. Every name must exist in the document; a rename
@@ -91,10 +159,10 @@ fn quoted_content_hash(bytes: &[u8]) -> String {
     etag
 }
 
-/// [`quoted_content_hash`] of [`OPENAPI_JSON`], computed once per process.
+/// [`quoted_content_hash`] of the generated document, computed once per process.
 fn content_hash_etag() -> &'static str {
     static ETAG: OnceLock<String> = OnceLock::new();
-    ETAG.get_or_init(|| quoted_content_hash(OPENAPI_JSON.as_bytes()))
+    ETAG.get_or_init(|| quoted_content_hash(document_json().as_bytes()))
 }
 
 /// [`quoted_content_hash`] of the rendered page, computed once per process.
@@ -109,7 +177,7 @@ fn page_html() -> &'static str {
     static PAGE: OnceLock<String> = OnceLock::new();
     PAGE.get_or_init(|| {
         let doc: Value =
-            serde_json::from_str(OPENAPI_JSON).expect("the committed OpenAPI document is JSON");
+            serde_json::from_str(document_json()).expect("the served OpenAPI document is JSON");
         render(&doc)
     })
 }
@@ -122,7 +190,7 @@ pub(super) async fn openapi() -> Response {
             (header::CONTENT_TYPE, "application/json"),
             (header::ETAG, content_hash_etag()),
         ],
-        OPENAPI_JSON,
+        document_json(),
     )
         .into_response()
 }
@@ -234,24 +302,72 @@ fn scopes(bearer_description: &str) -> Vec<&str> {
 }
 
 /// Every closed refusal-code vocabulary in the document, as `(family, codes)`.
+/// Test seam: the drift suite asserts the page against the same extraction.
+#[cfg(test)]
+pub(in crate::hosted) fn refusal_rows_for_tests(doc: &Value) -> Vec<(String, Vec<String>)> {
+    refusal_rows(doc)
+}
+
 fn refusal_rows(doc: &Value) -> Vec<(String, Vec<String>)> {
-    doc["components"]["schemas"]
+    let schemas = doc["components"]["schemas"]
         .as_object()
-        .expect("the document declares schemas")
-        .iter()
-        .filter_map(|(name, schema)| {
-            let codes = schema.pointer("/properties/code/enum")?.as_array()?;
-            let family = name.strip_suffix(".error")?.to_owned();
-            Some((
-                family,
-                codes
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_owned)
-                    .collect(),
-            ))
+        .expect("the document declares schemas");
+    let mut rows = Vec::new();
+    for (family, envelope) in [
+        ("operation", "operation.responseEnvelope"),
+        ("connection", "connection.response_envelope"),
+        ("catalog", "catalog.responseEnvelope"),
+        ("event", "event.response_envelope"),
+        ("datasource", "datasource.response_envelope"),
+    ] {
+        let codes = match find_code_enum(&schemas[envelope]) {
+            Some(codes) => codes,
+            // The catalog error code is an open string on the wire; the documented
+            // refusal examples carry the codes the hosted route actually produces.
+            None => catalog_example_codes(doc),
+        };
+        rows.push((family.to_owned(), codes));
+    }
+    rows
+}
+
+/// Depth-first search for the generated error object's `code` enum inside an inlined
+/// envelope schema. The closed Rust error enums surface here; an open string does not.
+fn find_code_enum(schema: &Value) -> Option<Vec<String>> {
+    if let Some(codes) = schema.pointer("/properties/code/enum").and_then(Value::as_array) {
+        return Some(
+            codes
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect(),
+        );
+    }
+    match schema {
+        Value::Object(map) => map.values().find_map(find_code_enum),
+        Value::Array(items) => items.iter().find_map(find_code_enum),
+        _ => None,
+    }
+}
+
+/// The catalog refusal codes, read from the documented refusal examples on `/catalog`.
+fn catalog_example_codes(doc: &Value) -> Vec<String> {
+    let mut codes: Vec<String> = doc["paths"]["/catalog"]["post"]["responses"]
+        .as_object()
+        .expect("the catalog path documents responses")
+        .values()
+        .filter_map(|response| {
+            response
+                .pointer("/content/application~1json/examples")?
+                .as_object()
         })
-        .collect()
+        .flat_map(|examples| examples.values())
+        .filter_map(|example| example.pointer("/value/error/code")?.as_str())
+        .map(str::to_owned)
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes
 }
 
 /// Render the whole page from the parsed document. Every dynamic string is extracted
