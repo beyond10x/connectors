@@ -76,4 +76,38 @@ pub enum EgressTransportError {
     Refused,
     #[error("Connector egress response exceeded its admitted bound")]
     ResponseTooLarge,
+    /// The transport failed after the exchange was admitted and before a full upstream answer
+    /// arrived. The class is the only fact that travels (S-066): the underlying error's Display
+    /// string can embed the full request URL and therefore never leaves the transport.
+    #[error("Connector egress transport failed before an upstream answer arrived")]
+    Transport(EgressTransportFailure),
+}
+
+/// Which way an admitted exchange failed, reduced to a closed vocabulary of fixed tokens so a
+/// refusal log line can carry it verbatim (S-066).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EgressTransportFailure {
+    /// The connect or overall request deadline elapsed.
+    Timeout,
+    /// The TCP connection could not be established.
+    Connect,
+    /// The TLS handshake or certificate verification failed.
+    Tls,
+    /// The upstream answered a status but its body stream failed mid-read.
+    BodyRead,
+    /// A transport failure outside the named classes.
+    Other,
+}
+
+impl EgressTransportFailure {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
+            Self::Connect => "connect",
+            Self::Tls => "tls",
+            Self::BodyRead => "body-read",
+            Self::Other => "other",
+        }
+    }
 }

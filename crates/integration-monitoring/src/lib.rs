@@ -4,5 +4,6 @@
 
 mod backend;
 mod errors;
+mod projection;
 
 pub use backend::{MonitoringBackend, MonitoringError};

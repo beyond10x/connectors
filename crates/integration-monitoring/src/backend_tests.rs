@@ -6,7 +6,7 @@ mod tests {
     use connector_secrets::{MemoryStore, StoreError};
     use monitoring_model::{GRAFANA_DASHBOARDS_LIST, PROMETHEUS_QUERY_RANGE};
     use protocol::connection::ConnectSessionState;
-    use service::{EgressHttpResponse, EgressTransportError, EgressWebSocket};
+    use service::{EgressHttpResponse, EgressTransportError, EgressTransportFailure, EgressWebSocket};
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
     use tokio::net::UnixStream;
 
@@ -371,11 +371,13 @@ alertmanager = "grant:alertmanager"
 
         let requests = lock(&executor.requests);
         let request = requests.last().unwrap();
-        // The omitted optional parameters travel nowhere: no `limit=`, no `continue=`.
+        // The caller's omitted cursor travels nowhere, while the dispatch always bounds the
+        // upstream page (S-066): the unbounded listing is what breached the result bound live.
         assert_eq!(
             request.url,
-            "https://grafana.example/apis/dashboard.grafana.app/v1/namespaces/default/dashboards"
+            "https://grafana.example/apis/dashboard.grafana.app/v1/namespaces/default/dashboards?limit=5"
         );
+        assert!(!request.url.contains("continue="));
     }
 
     /// S-065: a refused dispatch names the upstream failure class. Five upstream outcomes —
@@ -509,11 +511,37 @@ alertmanager = "grant:alertmanager"
         let transport = refusal_log_line(
             GRAFANA_DASHBOARDS_LIST,
             ROUTE_DIRECT,
-            RefusalCause::Upstream(UpstreamFailure::Transport),
+            RefusalCause::Upstream(UpstreamFailure::Transport(EgressTransportFailure::Timeout)),
         );
         assert_eq!(transport["route"], "direct");
         assert_eq!(transport["cause"], "upstream-transport");
         assert!(transport.get("upstream_status").is_none());
+
+        // S-066: the transport arm carries its class as a fixed token — never the transport
+        // error's Display string — and an oversized response is its own cause, not a transport.
+        for (class, expected) in [
+            (EgressTransportFailure::Timeout, "timeout"),
+            (EgressTransportFailure::Connect, "connect"),
+            (EgressTransportFailure::Tls, "tls"),
+            (EgressTransportFailure::BodyRead, "body-read"),
+            (EgressTransportFailure::Other, "other"),
+        ] {
+            let line = refusal_log_line(
+                GRAFANA_DASHBOARDS_LIST,
+                ROUTE_DIRECT,
+                RefusalCause::Upstream(UpstreamFailure::Transport(class)),
+            );
+            assert_eq!(line["cause"], "upstream-transport");
+            assert_eq!(line["transport_class"], expected);
+        }
+        let oversized = refusal_log_line(
+            GRAFANA_DASHBOARDS_LIST,
+            ROUTE_DIRECT,
+            RefusalCause::Upstream(UpstreamFailure::ResponseTooLarge),
+        );
+        assert_eq!(oversized["cause"], "upstream-response-too-large");
+        assert!(oversized.get("transport_class").is_none());
+        assert!(oversized.get("upstream_status").is_none());
 
         let body = refusal_log_line(
             GRAFANA_DASHBOARDS_LIST,
@@ -1047,6 +1075,375 @@ alertmanager = "grant:alertmanager"
             .await
             .is_err());
         backend.shutdown().await;
+    }
+
+    /// A transport holding a body past the executor's admitted result bound, enforcing
+    /// `maximum_response_bytes` exactly as the real egress does: the stream refuses with
+    /// `ResponseTooLarge` once the bound is crossed, before any body byte travels.
+    struct OversizedBodyEgress;
+
+    #[async_trait]
+    impl EgressTransport for OversizedBodyEgress {
+        async fn execute(
+            &self,
+            _authority_ref: &str,
+            request: EgressHttpRequest,
+        ) -> Result<EgressHttpResponse, EgressTransportError> {
+            let body = vec![b'x'; protocol::operation::MAX_RESULT_BYTES + 1];
+            if body.len() > request.maximum_response_bytes {
+                return Err(EgressTransportError::ResponseTooLarge);
+            }
+            Ok(EgressHttpResponse {
+                status: 200,
+                headers: BTreeMap::new(),
+                body,
+            })
+        }
+
+        async fn connect_websocket(
+            &self,
+            _authority_ref: &str,
+            _url: String,
+            _maximum_message_bytes: usize,
+        ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+            Err(EgressTransportError::Refused)
+        }
+    }
+
+    /// An upstream that pages like Grafana's app-platform list API: it echoes the requested
+    /// `limit` as that many items and always offers another page through `continue`. A request
+    /// carrying no `limit` is answered the way the live server answers it — everything at once.
+    #[derive(Default)]
+    struct PagingExecutor {
+        requests: Mutex<Vec<Request>>,
+    }
+
+    #[async_trait]
+    impl HttpExecutor for PagingExecutor {
+        async fn execute(
+            &self,
+            _connection_ref: &str,
+            request: Request,
+        ) -> Result<Value, UpstreamFailure> {
+            let query_value = |name: &str| {
+                request.url.split_once(&format!("{name}=")).map(|(_, rest)| {
+                    rest.split('&').next().unwrap_or_default().to_owned()
+                })
+            };
+            let page = query_value("continue")
+                .and_then(|token| token.strip_prefix('t').map(str::to_owned))
+                .and_then(|index| index.parse::<usize>().ok())
+                .unwrap_or(0);
+            let count = query_value("limit")
+                .and_then(|limit| limit.parse::<usize>().ok())
+                .unwrap_or(1000);
+            let items = (0..count)
+                .map(|index| {
+                    serde_json::json!({
+                        "metadata": {"name": format!("d{page}-{index}")},
+                        "spec": {"title": "Dash", "tags": []}
+                    })
+                })
+                .collect::<Vec<_>>();
+            let metadata = if query_value("limit").is_some() {
+                serde_json::json!({"continue": format!("t{}", page + 1)})
+            } else {
+                serde_json::json!({})
+            };
+            let output = serde_json::json!({"items": items, "metadata": metadata});
+            lock(&self.requests).push(request);
+            Ok(output)
+        }
+    }
+
+    /// A Grafana upstream whose only datasource is an Alertmanager, so a mediated
+    /// `alertmanager-alerts-list` dispatch can be driven through the real resolve path.
+    #[derive(Default)]
+    struct AlertmanagerExecutor {
+        requests: Mutex<Vec<Request>>,
+    }
+
+    #[async_trait]
+    impl HttpExecutor for AlertmanagerExecutor {
+        async fn execute(
+            &self,
+            _connection_ref: &str,
+            request: Request,
+        ) -> Result<Value, UpstreamFailure> {
+            let output = if request.url.contains("/api/datasources") && !request.url.contains("/proxy/")
+            {
+                serde_json::json!([
+                    {"id":1,"uid":"am-main","name":"Alerts","type":"alertmanager"}
+                ])
+            } else {
+                serde_json::json!([])
+            };
+            lock(&self.requests).push(request);
+            Ok(output)
+        }
+    }
+
+    /// S-066: an executor cap breach is its own refusal class. The live diagnosis pinned
+    /// `grafana_dashboards_list` to exactly this — a 4.6 MB namespace listing against the
+    /// 256 KiB result bound — refused as "unreachable", which sent the diagnosis toward the
+    /// network. An oversized upstream body refuses as "exceeds the result bound", never
+    /// "unreachable".
+    #[tokio::test]
+    async fn oversized_upstream_body_refuses_as_result_bound_not_unreachable() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let backend = MonitoringBackend::open(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            Arc::new(OversizedBodyEgress),
+        )
+        .unwrap();
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        });
+        store
+            .put(&credential_ref, &Secret::new("SENTINEL-NOT-A-REAL-SECRET"))
+            .await
+            .unwrap();
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+
+        let error = backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                    connection_ref: "connection:grafana:test".to_owned(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({"namespace": "default"}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            !error.message.contains("unreachable"),
+            "a cap breach must not wear the transport refusal: {}",
+            error.message
+        );
+        assert!(
+            error.message.contains("exceeds the result bound"),
+            "the oversized-body refusal names its class: {}",
+            error.message
+        );
+        assert_eq!(error.code, OperationErrorCode::ResultTooLarge);
+    }
+
+    /// S-066: the dashboards dispatch always sends a bounded upstream page `limit` and follows
+    /// `continue` server-side up to a hard fetch budget — the S-063 walk. The live namespace
+    /// serves 4.6 MB in one unbounded answer, so an unbounded dispatch can only breach the
+    /// result bound. When the budget runs out first, the short page with a cursor is the
+    /// honest answer: `next_cursor` set, `complete` false.
+    #[tokio::test]
+    async fn dashboards_list_pages_upstream_with_a_bounded_limit_and_fetch_budget() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let executor = Arc::new(PagingExecutor::default());
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let backend = MonitoringBackend::with_executor(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            credential_ref.clone(),
+            Arc::clone(&executor),
+        );
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        });
+        store
+            .put(&credential_ref, &Secret::new("SENTINEL-NOT-A-REAL-SECRET"))
+            .await
+            .unwrap();
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+
+        let result = backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                    connection_ref: "connection:grafana:test".to_owned(),
+                    description_ref: description.description_ref.clone(),
+                    input: serde_json::json!({"namespace": "default"}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Invoke(invocation) = result else {
+            panic!("expected invocation")
+        };
+        {
+            let requests = lock(&executor.requests);
+            assert!(
+                requests
+                    .iter()
+                    .all(|request| request.url.contains("limit=5")),
+                "every upstream fetch carries the bounded page limit: {}",
+                requests.first().map_or(String::new(), |req| req.url.clone())
+            );
+            assert_eq!(requests.len(), 20, "the walk stops at the fetch budget");
+        }
+        let dashboards = invocation.output["dashboards"].as_array().unwrap();
+        assert_eq!(
+            dashboards.len(),
+            100,
+            "pages aggregate up to the default listing limit"
+        );
+        assert_eq!(invocation.output["next_cursor"], "t20");
+        assert_eq!(invocation.output["complete"], false);
+
+        // A caller limit below one upstream page still travels bounded, and the last page
+        // shrinks to exactly the remainder.
+        lock(&executor.requests).clear();
+        let result = backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                    connection_ref: "connection:grafana:test".to_owned(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({"namespace": "default", "limit": 7}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Invoke(invocation) = result else {
+            panic!("expected invocation")
+        };
+        let requests = lock(&executor.requests);
+        assert_eq!(requests.len(), 2);
+        assert!(requests[0].url.contains("limit=5"), "{}", requests[0].url);
+        assert!(requests[1].url.contains("limit=2"), "{}", requests[1].url);
+        assert_eq!(
+            invocation.output["dashboards"].as_array().unwrap().len(),
+            7
+        );
+    }
+
+    /// S-066: the mediated Alertmanager dispatch resolves the v2 API sub-path. The live
+    /// diagnosis proved `{base}/alerts` answers 403 "plugin proxy route access denied"
+    /// through the Grafana datasource proxy while `{base}/api/v2/alerts` answers 200 with
+    /// the same token and uid — the 403 was a document defect, not provisioning.
+    #[tokio::test]
+    async fn mediated_alertmanager_dispatch_resolves_the_v2_api_path() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let executor = Arc::new(AlertmanagerExecutor::default());
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let backend = MonitoringBackend::with_executor(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            credential_ref.clone(),
+            Arc::clone(&executor),
+        );
+        let parent = ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        };
+        let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
+        let output = backend
+            .inner
+            .execute_direct(
+                &owner,
+                &parent,
+                &token,
+                operation_document(GRAFANA_DATASOURCES_LIST).unwrap(),
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        backend
+            .inner
+            .reconcile_observations(&parent.connection_ref, &output)
+            .unwrap();
+        lock(&backend.inner.state).parent = Some(parent);
+        store.put(&credential_ref, &token).await.unwrap();
+        let observations = backend.inner.search_observations("", 64);
+        let alertmanager = observations
+            .iter()
+            .find(|observation| observation.observed_type == "alertmanager")
+            .unwrap();
+        let child = backend
+            .inner
+            .materialize(&alertmanager.observation_ref)
+            .unwrap();
+
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: monitoring_model::ALERTMANAGER_ALERTS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+        backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: monitoring_model::ALERTMANAGER_ALERTS_LIST.to_owned(),
+                    connection_ref: child.summary.connection_ref.clone(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap();
+
+        let requests = lock(&executor.requests);
+        let alerts = requests.last().unwrap();
+        assert_eq!(
+            alerts.url,
+            "https://grafana.example/api/datasources/proxy/uid/am-main/api/v2/alerts"
+        );
     }
 
     #[test]

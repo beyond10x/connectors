@@ -2,14 +2,14 @@ openapi: 3.1.0
 info:
   title: Alertmanager API v2 alerts read projection
   version: "0.31.0"
-  description: Deterministic OpenAPI 3 projection of GET /alerts from Alertmanager's official Swagger 2 source.
+  description: Deterministic OpenAPI 3 projection of GET /alerts from Alertmanager's official Swagger 2 source. The upstream basePath /api/v2 is composed into the path itself so every consumer — a direct placement and the Grafana datasource-proxy mediation alike — resolves the v2 API sub-path (S-066).
 x-b10x-origin: vendor-derived
 x-b10x-upstream: https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml
 x-b10x-coverage: GET /api/v2/alerts only
 servers:
-  - url: https://alertmanager.example/api/v2
+  - url: https://alertmanager.example
 paths:
-  /alerts:
+  /api/v2/alerts:
     get:
       operationId: getAlerts
       summary: Get the alerts currently visible through this Alertmanager

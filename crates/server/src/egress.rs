@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use futures_util::{SinkExt as _, StreamExt as _};
 use reqwest::{Method, RequestBuilder};
 use service::{
-    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError, EgressWebSocket,
-    EgressWebSocketFrame,
+    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError,
+    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
 };
 use tokio::net::{lookup_host, TcpStream};
 use tokio_tungstenite::tungstenite::handshake::client::Response;
@@ -281,7 +281,7 @@ impl EgressTransport for ConnectionEgress {
         let mut response = outbound
             .send()
             .await
-            .map_err(|_| EgressTransportError::Refused)?;
+            .map_err(|error| EgressTransportError::Transport(classify_send_failure(&error)))?;
         if response
             .content_length()
             .is_some_and(|size| size > request.maximum_response_bytes as u64)
@@ -310,7 +310,7 @@ impl EgressTransport for ConnectionEgress {
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|_| EgressTransportError::Refused)?
+            .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::BodyRead))?
         {
             if body
                 .len()
@@ -398,6 +398,30 @@ impl EgressWebSocket for ServerWebSocket {
 struct ResolvedDestination {
     host: String,
     addresses: Vec<SocketAddr>,
+}
+
+/// Classify a failed send into the closed egress vocabulary (S-066). Only the class leaves this
+/// function: the error's Display string can embed the full request URL, so it never travels.
+/// A TLS failure surfaces inside reqwest's connect phase, so the source chain is inspected for a
+/// TLS or certificate marker before the connect class is chosen; the marker match is textual
+/// because this transport deliberately depends on no TLS backend type to downcast to.
+fn classify_send_failure(error: &reqwest::Error) -> EgressTransportFailure {
+    if error.is_timeout() {
+        return EgressTransportFailure::Timeout;
+    }
+    let mut source = std::error::Error::source(error);
+    while let Some(current) = source {
+        let text = current.to_string().to_ascii_lowercase();
+        if text.contains("tls") || text.contains("certificate") || text.contains("handshake") {
+            return EgressTransportFailure::Tls;
+        }
+        source = current.source();
+    }
+    if error.is_connect() {
+        EgressTransportFailure::Connect
+    } else {
+        EgressTransportFailure::Other
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
