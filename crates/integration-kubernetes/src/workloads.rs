@@ -41,7 +41,9 @@ use sha2::{Digest as _, Sha256};
 
 use service::PrincipalContext;
 
-use crate::databases::{CrossplaneDatabase, DatabaseEngine, DatabaseList};
+use crate::databases::{
+    CrossplaneDatabase, CrossplaneProviderConfig, DatabaseEngine, DatabaseList,
+};
 
 pub(crate) const STATUS_OPERATION: &str = "kubernetes.deployment.status";
 pub(crate) const RESTART_OPERATION: &str = "kubernetes.deployment.rollout-restart";
@@ -93,13 +95,14 @@ pub(crate) trait DeploymentReader: Send + Sync {
         Err(unavailable("Kubernetes rollout restart is unavailable"))
     }
 
-    /// One engine's page of Crossplane Database managed resources (S-059). Defaulted for the
-    /// same reason `pod_logs` is: only the hosted placement discovers database endpoints
-    /// today, the local placement and existing fakes compile unchanged, and a placement that
-    /// never offers `kubernetes.databases` must still refuse honestly if the call arrives.
+    /// One engine's page of the CLUSTER-scoped Crossplane Database collection (S-059, S-062) —
+    /// no namespace reaches the reader, because the resources have none; the namespace gate is
+    /// the projection's association filter. Defaulted for the same reason `pod_logs` is: only
+    /// the hosted placement discovers database endpoints today, the local placement and
+    /// existing fakes compile unchanged, and a placement that never offers
+    /// `kubernetes.databases` must still refuse honestly if the call arrives.
     async fn list_databases(
         &self,
-        _namespace: &str,
         _engine: DatabaseEngine,
         _limit: u16,
         _cursor: Option<&str>,
@@ -109,16 +112,27 @@ pub(crate) trait DeploymentReader: Send + Sync {
         ))
     }
 
-    /// One Crossplane Database managed resource by name (S-059); defaulted like
+    /// One cluster-scoped Crossplane Database managed resource by name (S-059); defaulted like
     /// `list_databases`.
     async fn database_detail(
         &self,
-        _namespace: &str,
         _engine: DatabaseEngine,
         _name: &str,
     ) -> Result<CrossplaneDatabase, DatasourceError> {
         Err(datasource_unavailable(
             "Kubernetes database endpoint detail is unavailable",
+        ))
+    }
+
+    /// The engine group's cluster-scoped ProviderConfigs (S-062): the join surface that turns
+    /// a Database's `providerConfigRef` into a connection-secret reference — and nothing else
+    /// of the config is ever read. Defaulted like `list_databases`.
+    async fn provider_configs(
+        &self,
+        _engine: DatabaseEngine,
+    ) -> Result<Vec<CrossplaneProviderConfig>, DatasourceError> {
+        Err(datasource_unavailable(
+            "Kubernetes provider-config listing is unavailable",
         ))
     }
 

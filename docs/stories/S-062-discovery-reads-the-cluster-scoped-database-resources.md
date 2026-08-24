@@ -2,7 +2,7 @@
 id: S-062
 title: "Discovery reads the cluster-scoped database resources"
 pillar: Platform
-status: ready
+status: in-progress
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations, server]
@@ -42,3 +42,39 @@ provider-sql shape, found live:
 
 - Found by live e2e; the conformance-style fake in `hosted_database_tests.rs` modeled the
   namespaced shape and passed — the fake must be corrected to the real cluster-scoped shape.
+- **Decision (2026-08-24): the namespace gate over a cluster-scoped inventory is the
+  connection secret's namespace.** The binding stays per admitted namespace (the same
+  `read_groups` admission as every other Kubernetes datasource), and a binding lists exactly
+  the Databases whose referenced ProviderConfig keeps its `credentials.connectionSecretRef`
+  in that namespace — on the dev cluster all 47 resources resolve to secrets in the product
+  namespace (`latest`), so the existing binding sees the whole inventory. A Database whose
+  secret lives in a non-admitted namespace, whose `providerConfigRef` dangles, or whose
+  ProviderConfig carries no secret reference associates with **no** binding: it is excluded
+  (and a get through the binding answers `not_found`), never guessed into one and never an
+  error. Rationale: the secret's namespace is the one honest, admission-relevant namespace
+  fact the resource chain declares — it is where the credential custody (S-058) will read —
+  and gating on it keeps "you may see what your namespace holds" true for cluster-scoped
+  resources without inventing a second admission model.
+
+## Progress
+
+- 2026-08-24 — filed from the live e2e findings (release rev 14: 0 records where 24 + 23 exist).
+- 2026-08-24 — implemented on `impl/S-062`. The reader lists the CLUSTER-scoped collections
+  (`/apis/{group}/v1alpha1/databases`) and joins each Database's `spec.providerConfigRef`
+  against the group's cluster-scoped ProviderConfigs (one bounded page; a truncated
+  ProviderConfig list is refused rather than joined half-read). Descriptors are now
+  `{engine, name, provider_config, secret_ref{name, namespace}, ready}` (projection version 2)
+  — the host/port/database fields the resources never declared are gone, and the secret
+  reference comes from the ProviderConfig's `credentials.connectionSecretRef`; no code path
+  reads a Secret value. Wrong-scope honesty: a 404 on a collection list consults the group's
+  own discovery document (`/apis/{group}/v1alpha1`) — group absent → empty inventory, group
+  served and listing the collection → `unavailable` error (`absent_collection_is_empty` in
+  `crate::databases`). The datasource description now says cluster-scoped and names the
+  per-binding association. The fake in `hosted_database_tests.rs` models the real
+  cluster-scoped shape (no `metadata.namespace`, spec `{deletionPolicy, providerConfigRef}`,
+  ProviderConfig join), which is what failed RED against the old namespaced wire types.
+  Failing-first proof at merge base 97c8616: `missing field namespace` parse panic. Still
+  open: the live e2e read (24 + 23 records) needs a deployment; **chart RBAC must move to a
+  ClusterRole** — cluster-scoped get+list on plural `databases` AND `providerconfigs` in both
+  groups (`mysql.sql.crossplane.io`, `postgresql.sql.crossplane.io`); the namespaced RBAC
+  S-059 recorded cannot authorize the cluster-scoped list.
