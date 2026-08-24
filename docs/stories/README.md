@@ -91,7 +91,7 @@ will spawn children as each milestone is designed.
 | [S-057](S-057-kubernetes-joins-the-catalog.md) | Kubernetes joins the catalog | backlog | Platform | integrations, catalog, server |
 | [S-058](S-058-mysql-and-postgresql-become-connectors.md) | MySQL and PostgreSQL become connectors | ready | Platform | catalog, integrations, server |
 | [S-059](S-059-kubernetes-discovers-database-endpoints.md) | Kubernetes discovers database endpoints | ready | Platform | integrations, server |
-| [S-060](S-060-monitoring-joins-the-mcp-toolset.md) | Monitoring joins the MCP toolset | ready | Platform | server |
+| [S-060](S-060-monitoring-joins-the-mcp-toolset.md) | Monitoring joins the MCP toolset | done | Platform | server |
 | [S-061](S-061-a-logged-in-person-needs-no-configuration.md) | A logged-in person needs no configuration | backlog | Platform | config, integrations |
 
 ## Epics in this seed

@@ -2,8 +2,7 @@
 id: S-060
 title: "Monitoring joins the MCP toolset"
 pillar: Platform
-status: ready
-priority: 1
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [server]
@@ -42,3 +41,6 @@ and ride the read path; the toolset adds zero policy.
   (fake monitoring backend, central Grafana + two targets per fleet provider). Argument
   shapes deliberately mirror `monitoring-model::validate_input` exactly — no defaults are
   invented, so a schema-valid call is input-valid.
+- 2026-08-24 — merged to main after independent review (PASS, 0 blocking, 2 minor: the
+  zero-connection refusal's empty label list reads oddly, and a comment overclaims schema/
+  validate_input equivalence on code-point vs byte length). Toolset grows 5 -> 11 tools.
