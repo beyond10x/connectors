@@ -546,3 +546,140 @@ async fn a_stale_monitoring_invoke_re_resolves_the_same_target_exactly_once() {
         )]
     );
 }
+
+/// S-064: the projected monitoring schemas tell the truth. `required` matches what the invoke
+/// path enforces — the document's own required parameters, plus `target` exactly when several
+/// connections are configured — cursors are optional, and range timestamps admit integer
+/// epoch seconds beside strings.
+#[tokio::test]
+async fn monitoring_tool_schemas_state_the_documents_contract() {
+    let backend = Arc::new(MonitoringBackend::default());
+
+    // The document requires only the namespace; `limit` and `continue` are omittable
+    // cursor-pagination arguments, and the sole configured Grafana needs no target.
+    let dashboards = call_tool(
+        app(backend.clone()),
+        "obs-token",
+        "tool_describe",
+        json!({"name": "grafana_dashboards_list"}),
+    )
+    .await;
+    assert_eq!(dashboards["isError"], json!(false), "{dashboards}");
+    let schema = &dashboards["structuredContent"]["input_schema"];
+    assert_eq!(schema["required"], json!(["namespace"]), "{schema}");
+    let mut properties: Vec<&str> = schema["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    properties.sort_unstable();
+    assert_eq!(properties, ["continue", "limit", "namespace", "target"]);
+
+    // Two configured Prometheus targets make `target` required: the schema admits no call
+    // the connection resolver would refuse. Timestamps take integer epoch seconds beside
+    // strings.
+    let range = call_tool(
+        app(backend.clone()),
+        "obs-token",
+        "tool_describe",
+        json!({"name": "prometheus_query_range"}),
+    )
+    .await;
+    let schema = &range["structuredContent"]["input_schema"];
+    assert_eq!(
+        schema["required"],
+        json!(["query", "start", "end", "step", "target"]),
+        "{schema}"
+    );
+    for field in ["start", "end", "step"] {
+        assert_eq!(
+            schema["properties"][field]["type"],
+            json!(["string", "integer"]),
+            "{field}"
+        );
+    }
+
+    // Loki keeps string timestamps — a bare integer means nanoseconds to Loki — and the
+    // schema says so instead of leaving the encoding unnamed.
+    let loki = call_tool(
+        app(backend.clone()),
+        "obs-token",
+        "tool_describe",
+        json!({"name": "loki_query_range"}),
+    )
+    .await;
+    let schema = &loki["structuredContent"]["input_schema"];
+    assert_eq!(
+        schema["required"],
+        json!(["query", "start", "end", "limit", "direction", "target"]),
+        "{schema}"
+    );
+    assert!(
+        schema["properties"]["start"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("RFC3339"),
+        "{schema}"
+    );
+
+    // A tool with no operation arguments of its own still names its target when several
+    // are configured.
+    let alerts = call_tool(
+        app(backend),
+        "obs-token",
+        "tool_describe",
+        json!({"name": "alertmanager_alerts"}),
+    )
+    .await;
+    assert_eq!(
+        alerts["structuredContent"]["input_schema"]["required"],
+        json!(["target"]),
+        "{alerts}"
+    );
+}
+
+/// S-064's acceptance sequence at the toolset seam: `grafana_dashboards_list` invoked with a
+/// target and the required-only input, then `prometheus_query_range` with integer epoch
+/// seconds — both dispatch, and the integers travel to the operation untouched.
+#[tokio::test]
+async fn the_acceptance_sequence_invokes_with_a_target_and_integer_epochs() {
+    let backend = Arc::new(MonitoringBackend::default());
+    let listed = call_tool(
+        app(backend.clone()),
+        "obs-token",
+        "tool_invoke",
+        json!({
+            "name": "grafana_dashboards_list",
+            "args": {"target": "central-grafana", "namespace": "default"}
+        }),
+    )
+    .await;
+    assert_eq!(listed["isError"], json!(false), "{listed}");
+    let ranged = call_tool(
+        app(backend.clone()),
+        "obs-token",
+        "tool_invoke",
+        json!({
+            "name": "prometheus_query_range",
+            "args": {
+                "target": "dev-eu-central-1",
+                "query": "up",
+                "start": 1_756_000_000_u64,
+                "end": 1_756_003_600_u64,
+                "step": 60
+            }
+        }),
+    )
+    .await;
+    assert_eq!(ranged["isError"], json!(false), "{ranged}");
+    assert_eq!(
+        backend.dispatched.lock().unwrap()[1].2,
+        json!({
+            "query": "up",
+            "start": 1_756_000_000_u64,
+            "end": 1_756_003_600_u64,
+            "step": 60
+        })
+    );
+}
