@@ -2,8 +2,7 @@
 id: S-059
 title: "Kubernetes discovers database endpoints"
 pillar: Platform
-status: ready
-priority: 3
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations, server]
@@ -55,3 +54,7 @@ anyone writing configuration.
   in-cluster ServiceAccount needs `get` + `list` on the `databases` plural of both API
   groups — `mysql.sql.crossplane.io` and `postgresql.sql.crossplane.io` — in each admitted
   namespace.**
+- 2026-08-24 — merged to main after independent review (PASS, 0 blocking, 2 minor: an unused
+  import warning and the untested trailing-empty-page edge). Chart RBAC needed at deploy time:
+  get+list on plural `databases` in groups mysql.sql.crossplane.io and
+  postgresql.sql.crossplane.io — confirmed present on the live cluster.
