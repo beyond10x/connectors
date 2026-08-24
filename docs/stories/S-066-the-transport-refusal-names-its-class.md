@@ -2,7 +2,7 @@
 id: S-066
 title: "The transport refusal names its class"
 pillar: Platform
-status: in-progress
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations]
