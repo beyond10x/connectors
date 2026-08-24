@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "Argo CD JWT, from `argocd account generate-token` for a local account or from an AppProject role token. Its Argo CD RBAC policy is what bounds this Connection: a token with only `applications, get` cannot sync whatever this catalogue declares. Entered or resolved at the Connector placement and never returned to the caller",

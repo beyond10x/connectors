@@ -64,7 +64,7 @@
     "domain_owner": "b10x/planner",
     "id": "planner",
     "source_path": "modules/planner",
-    "source_repository": "https://github.com/b10x/modules"
+    "source_repository": "https://github.com/beyond10x/modules"
   },
   "operations": [
     {

@@ -66,7 +66,7 @@ pub const SCHEMA_VERSION: u32 = 2;
 /// The schema's `$id`, and the `$schema` every document names — the same repository-addressed form
 /// `schema/provider-toml.schema.json` uses.
 pub const SCHEMA_ID: &str =
-    "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json";
+    "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json";
 
 // ---------------------------------------------------------------------------------------------
 // The wire shape. Declaration order here does NOT survive into the text: `render` round-trips

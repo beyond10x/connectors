@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/connectors/blob/main/fixtures/rtvbp-voice-binding/v1/manifest.schema.json",
+  "$id": "https://github.com/beyond10x/connectors/blob/main/fixtures/rtvbp-voice-binding/v1/manifest.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["artifact", "version", "profile", "voice_contract", "voice_contract_bundle_sha256", "upstream", "negotiation", "envelope", "roles", "methods", "events", "errors", "media", "bounds", "lifecycle"],

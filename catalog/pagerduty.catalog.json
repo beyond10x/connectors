@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "PagerDuty REST API access key, sent as the Authorization header after the literal `Token token=`. A read-only key satisfies the four read operations; the two incident writes need a full-access key",

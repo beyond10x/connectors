@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/b10x/b10x/blob/main/foundation/connectors/crates/connector-spec/schema/provider-toml.schema.json",
+  "$id": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/crates/connector-spec/schema/provider-toml.schema.json",
   "title": "connectors provider definition",
   "description": "The format of `providers/<name>.toml`. TOML has a JSON-shaped data model, so this one schema describes both the file an author writes and the JSON the connector IR encodes to.\n\nThe file plays two roles and this schema serves both: a complete hand-authored connector (write `[[operations]]` inline, omit `[spec]`), or a pointer at a vendored vendor spec plus a patch set that selects and corrects operations from it (write `[spec]` and `[[patch.operations]]`). Both produce the same IR.\n\nEvery object here is closed: an unrecognised key is an error, never a silently ignored one. That is not a style preference — a mistyped `authh` on an operation would otherwise mean `auth` is unset, and unset means the operation inherits the connector's default credentials.\n\nNo credential value appears in a provider file, ever. `env` and `user_env` name environment variables; they never hold their contents.",
   "$ref": "#/$defs/provider",

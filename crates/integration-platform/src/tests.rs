@@ -375,7 +375,7 @@ async fn every_name_of_an_operation_describes_one_operation() {
 #[tokio::test]
 async fn workspace_datasource_projects_only_the_logical_read_model() {
     let (origin, server) = fake_http(
-        r#"{"api_version":"workspaces.b10x.io/v2","request_id":"owner-request","result":{"items":[{"id":"wsp_example","tenant":"tenant:secret","owner":"user:secret","name":"Example","retention":"managed","source":{"forge":"git-hub","canonical_url":"https://github.com/b10x/b10x","repository":"b10x/b10x","connection":"connection:forge:secret","default_branch":"main"},"state":"active","created_at_ms":1,"updated_at_ms":2,"expires_at_ms":null}]}}"#,
+        r#"{"api_version":"workspaces.b10x.io/v2","request_id":"owner-request","result":{"items":[{"id":"wsp_example","tenant":"tenant:secret","owner":"user:secret","name":"Example","retention":"managed","source":{"forge":"git-hub","canonical_url":"https://github.com/beyond10x/b10x","repository":"b10x/b10x","connection":"connection:forge:secret","default_branch":"main"},"state":"active","created_at_ms":1,"updated_at_ms":2,"expires_at_ms":null}]}}"#,
     );
     let temporary = tempfile::tempdir().unwrap();
     fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
