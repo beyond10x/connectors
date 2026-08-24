@@ -2,8 +2,7 @@
 id: S-058
 title: "MySQL and PostgreSQL become connectors"
 pillar: Platform
-status: ready
-priority: 2
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [catalog, integrations, server]
@@ -55,3 +54,10 @@ read path; mutations are a later grant-gated story.
   Proven by 28 unit tests plus 14 `#[ignore]`d live tests run against real postgres:17 and
   mysql:8.4 containers. Deferred: the runtime integration that serves these operations behind a
   Connection (needs S-059 descriptors), and MCP exposure (S-060/S-061).
+- 2026-08-24 — merged to main after two independent reviews (both PASS, 0 blocking; the second
+  ran a 31-case write-admission attack, all structural writes refused before any socket). One
+  minor recorded: admission is a read-statement allowlist, so an admitted SELECT can still call
+  side-effecting server functions (pg_read_file, LOAD_FILE) — read-only at the statement level,
+  with least-privilege DB accounts as the deployment's second fence, documented in the driver.
+  The sql_v1 dispatch slot is present but returns unavailable until custody/discovery compose it
+  (S-059 descriptors, S-061 wiring).
