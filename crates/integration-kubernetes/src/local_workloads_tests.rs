@@ -38,16 +38,29 @@ mod tests {
         let list: KubernetesList<crate::workloads::KubernetesDeployment> =
             serde_json::from_str(DEPLOYMENT_LIST).unwrap();
         assert_eq!(list.metadata.continue_token, "next-page");
-        let workload = project_compact(list.items.into_iter().next().unwrap());
+        let (workload, meta) = project_workload(list.items.into_iter().next().unwrap());
         assert_eq!(workload.name, "zwirn");
-        assert_eq!(workload.namespace, "b10x");
         assert_eq!(workload.desired_replicas, 3);
         assert_eq!(workload.ready_replicas, 3);
         assert_eq!(workload.rollout_state, "available");
-        // Nothing a Secret or an annotation could hide in reaches the record.
-        let encoded = serde_json::to_string(&workload).unwrap();
-        assert!(!encoded.contains("matchLabels"));
-        assert!(!encoded.contains("conditions"));
+        // Object identity stays with the detail record, never with the listing (S-063).
+        assert_eq!(meta.namespace, "b10x");
+        assert_eq!(meta.uid, "u-1");
+        assert_eq!(meta.resource_version, "42");
+        // The list record is the minimal projection and nothing else — no identity metadata,
+        // and nothing a Secret or an annotation could hide in.
+        let record = serde_json::to_value(&workload).unwrap();
+        let mut keys = record
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(
+            keys,
+            ["desired_replicas", "name", "ready_replicas", "rollout_state"]
+        );
     }
 
     #[test]

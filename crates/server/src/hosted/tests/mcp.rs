@@ -73,7 +73,6 @@ impl IdentityVerifier for McpVerifier {
 /// the read groups — exactly what the toolset's requirement mechanism consumes. The invoke arm
 /// proves the seam flow: it refuses any lease other than the one its describe served, and
 /// optionally answers `stale_authority` a configured number of times first.
-#[derive(Default)]
 struct McpBackend {
     /// Describe the operation as `Mutating` + `Required` instead of the read shape.
     demand_approval: bool,
@@ -85,6 +84,22 @@ struct McpBackend {
     evidence: Mutex<Option<Option<String>>>,
     /// Every datasource get key that reached the read arm.
     get_keys: Mutex<Vec<Value>>,
+    /// How many workload records the list arm serves, across protocol pages of `limit`.
+    deployments: usize,
+}
+
+impl Default for McpBackend {
+    fn default() -> Self {
+        Self {
+            demand_approval: false,
+            stale_invokes: AtomicUsize::new(0),
+            describes: AtomicUsize::new(0),
+            invokes: AtomicUsize::new(0),
+            evidence: Mutex::new(None),
+            get_keys: Mutex::new(Vec::new()),
+            deployments: 1,
+        }
+    }
 }
 
 impl McpBackend {
@@ -255,13 +270,50 @@ impl ConnectorBackend for McpBackend {
                     ));
                 }
                 let (view, key, value) = match request.read {
-                    DatasourceRead::List { limit, .. } => {
+                    DatasourceRead::List { limit, cursor } => {
+                        // The toolset's server-side aggregation drives this arm: full
+                        // protocol pages, an opaque offset cursor, `deployments` records in
+                        // all. The first record keeps the classic name `web`.
                         assert!((1..=25).contains(&limit));
-                        (
-                            RecordView::Compact,
-                            json!({"name": "web"}),
-                            json!({"namespace": "dev", "name": "web", "rollout_state": "available"}),
-                        )
+                        let start: usize = cursor.as_deref().map_or(0, |token| {
+                            token
+                                .strip_prefix("page-")
+                                .expect("the cursor is the one this arm issued")
+                                .parse()
+                                .expect("the cursor offset is numeric")
+                        });
+                        let end = self.deployments.min(start + usize::from(limit));
+                        let records = (start..end)
+                            .map(|index| {
+                                let name = if index == 0 {
+                                    "web".to_owned()
+                                } else {
+                                    format!("web-{index:03}")
+                                };
+                                DatasourceRecord {
+                                    key: json!({"name": name}),
+                                    view: RecordView::Compact,
+                                    value: json!({
+                                        "name": name,
+                                        "desired_replicas": 2,
+                                        "ready_replicas": 2,
+                                        "rollout_state": "available",
+                                    }),
+                                }
+                            })
+                            .collect();
+                        return Ok(DatasourceResult::Read(DatasourcePage {
+                            datasource_ref: WORKLOADS.to_owned(),
+                            records,
+                            next_cursor: (end < self.deployments).then(|| format!("page-{end}")),
+                            completeness: Completeness::Complete,
+                            observed_at_unix_ms: 1,
+                            provenance: DatasourceProvenance {
+                                binding_ref: WORKLOADS_BINDING.to_owned(),
+                                projection_sha256: "a".repeat(64),
+                                connector_audit_ref: "audit:workloads".to_owned(),
+                            },
+                        }));
                     }
                     DatasourceRead::Get { key } => {
                         // The real `workload_key_schema()` admits exactly `{"name": <string>}`.
@@ -574,7 +626,7 @@ async fn datasource_backed_tools_route_through_the_datasource_seam() {
         deployments["structuredContent"]["deployments"][0]["name"],
         "web"
     );
-    assert_eq!(deployments["structuredContent"]["completeness"], "complete");
+    assert_eq!(deployments["structuredContent"]["truncated"], json!(false));
 
     let pods = call_tool(
         app(backend.clone(), HostedAuthority::unbound()),
@@ -603,6 +655,64 @@ async fn datasource_backed_tools_route_through_the_datasource_seam() {
     .await;
     assert_eq!(missing["isError"], json!(true));
     assert_eq!(missing["structuredContent"]["code"], "not_found");
+}
+
+/// S-063: the live `latest` namespace shape — over a hundred deployments — must come back
+/// whole from one arg-less call, the seam's pages and cursors aggregated server-side.
+#[tokio::test]
+async fn a_busy_namespace_is_listed_whole_without_a_paging_surface() {
+    let backend = Arc::new(McpBackend {
+        deployments: 120,
+        ..McpBackend::default()
+    });
+    let listed = call_tool(
+        app(backend.clone(), HostedAuthority::unbound()),
+        "sre-token",
+        "tool_invoke",
+        json!({"name": "k8s_deployment_list", "args": {"namespace": "dev"}}),
+    )
+    .await;
+    assert_eq!(listed["isError"], json!(false), "{listed}");
+    let records = listed["structuredContent"]["deployments"]
+        .as_array()
+        .expect("deployments array");
+    assert_eq!(records.len(), 120, "the whole namespace is one listing");
+    assert_eq!(records[0]["name"], "web");
+    assert_eq!(records[119]["name"], "web-119");
+    assert_eq!(listed["structuredContent"]["truncated"], json!(false));
+
+    // The dropped paging surface is really gone: paging args refuse instead of steering.
+    let refused = call_tool(
+        app(backend, HostedAuthority::unbound()),
+        "sre-token",
+        "tool_invoke",
+        json!({"name": "k8s_deployment_list", "args": {"namespace": "dev", "limit": 5}}),
+    )
+    .await;
+    assert_eq!(refused["isError"], json!(true), "{refused}");
+    assert_eq!(refused["structuredContent"]["code"], "invalid_input");
+}
+
+/// The aggregation is never unbounded: past the record cap the listing is cut and says so.
+#[tokio::test]
+async fn a_pathological_namespace_is_cut_with_an_explicit_truncation_marker() {
+    let backend = Arc::new(McpBackend {
+        deployments: 620,
+        ..McpBackend::default()
+    });
+    let listed = call_tool(
+        app(backend, HostedAuthority::unbound()),
+        "sre-token",
+        "tool_invoke",
+        json!({"name": "k8s_deployment_list", "args": {"namespace": "dev"}}),
+    )
+    .await;
+    assert_eq!(listed["isError"], json!(false), "{listed}");
+    let records = listed["structuredContent"]["deployments"]
+        .as_array()
+        .expect("deployments array");
+    assert_eq!(records.len(), 500, "the record cap cuts the walk");
+    assert_eq!(listed["structuredContent"]["truncated"], json!(true));
 }
 
 #[tokio::test]
