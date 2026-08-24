@@ -2,7 +2,7 @@
 id: S-064
 title: "Monitoring tool schemas tell the truth"
 pillar: Platform
-status: in-progress
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations, server]
