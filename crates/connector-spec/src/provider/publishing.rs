@@ -774,6 +774,7 @@ fn compose(
         ProtocolDriver::SipV1 => OperationRequest::SipV1,
         ProtocolDriver::AudioV1 => OperationRequest::AudioV1,
         ProtocolDriver::CdpV1 => OperationRequest::CdpV1,
+        ProtocolDriver::SqlV1 => OperationRequest::SqlV1,
     };
 
     let operation = Operation {

@@ -1,0 +1,37 @@
+[package]
+name = "driver-sql"
+description = "Closed built-in sql_v1 driver: bounded read-only queries and schema inventory against MySQL and PostgreSQL over their native wire protocols."
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/b10x/b10x"
+homepage = "https://github.com/b10x/b10x"
+rust-version = "1.88"
+publish = false
+
+[workspace]
+resolver = "3"
+members = ["."]
+
+[dependencies]
+protocol = { version = "0.1.0", path = "../protocol" }
+thiserror = "2"
+# The resolved credential lives in memory as briefly as possible and never survives a drop.
+zeroize = "1"
+# Statement admission parses to an AST before any connection exists. A read/write decision is a
+# security decision, so it comes from a real parser (the Apache DataFusion sqlparser, MySQL and
+# PostgreSQL dialects) plus a keyword-token fence — never from substring matching, which is the
+# hand-rolled-parser failure mode this repository bans for argv and this crate refuses for SQL.
+sqlparser = "0.62"
+# The canonical async PostgreSQL client (rust-postgres). No TLS backend is enabled: v1 speaks to
+# in-cluster databases over the private network, and a TLS feature would silently widen that.
+tokio-postgres = "0.7"
+# The maintained pure-Rust async MySQL client. `default-features = false` + `minimal` keeps the
+# tree to the protocol itself: no TLS backend, no derive, no histogram metrics.
+mysql_async = { version = "0.37", default-features = false, features = ["minimal"] }
+tokio = { version = "1", default-features = false, features = ["rt", "net", "time"] }
+futures-util = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["macros", "rt"] }

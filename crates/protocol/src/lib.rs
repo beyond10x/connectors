@@ -11,4 +11,5 @@ pub mod datasource;
 pub mod event;
 pub mod operation;
 pub mod sip;
+pub mod sql;
 pub mod voice;

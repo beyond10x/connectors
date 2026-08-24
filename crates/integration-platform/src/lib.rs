@@ -299,7 +299,9 @@ impl PlatformBackend {
                 self.invoke_http(context, canonical, operation, request.input)
                     .await
             }
-            ProtocolDriver::SipV1 => Err(unavailable()),
+            // Neither SIP nor SQL is served by the platform backend: SIP terminates in the
+            // dedicated voice integration, and SQL waits on its own integration story.
+            ProtocolDriver::SipV1 | ProtocolDriver::SqlV1 => Err(unavailable()),
         };
         let dispatched = match dispatched {
             Ok(output) => output,
@@ -421,7 +423,7 @@ impl PlatformBackend {
                     vec![local_socket.map_or(origin, |path| path.display().to_string())],
                 )
             }
-            ProtocolDriver::SipV1 => return Err(unavailable()),
+            ProtocolDriver::SipV1 | ProtocolDriver::SqlV1 => return Err(unavailable()),
         };
         plan_operation(
             PROVIDER,

@@ -644,6 +644,7 @@ enum OperationProtocolEntry {
     SipV1,
     AudioV1,
     CdpV1,
+    SqlV1,
 }
 
 /// The public subset of one patch-selected operation's derived provenance.
@@ -707,9 +708,10 @@ pub fn provider_entry(connector: &Connector) -> Result<ProviderEntry> {
             OperationRequest::HttpV1 { .. } => {
                 vec![surface::host_of(connector.base_url_of(&operation.service))?.to_string()]
             }
-            OperationRequest::SipV1 | OperationRequest::AudioV1 | OperationRequest::CdpV1 => {
-                Vec::new()
-            }
+            OperationRequest::SipV1
+            | OperationRequest::AudioV1
+            | OperationRequest::CdpV1
+            | OperationRequest::SqlV1 => Vec::new(),
         };
         operations.push(operation_entry(connector, operation, hosts));
     }
@@ -1013,6 +1015,7 @@ fn operation_entry(
             OperationRequest::SipV1 => OperationProtocolEntry::SipV1,
             OperationRequest::AudioV1 => OperationProtocolEntry::AudioV1,
             OperationRequest::CdpV1 => OperationProtocolEntry::CdpV1,
+            OperationRequest::SqlV1 => OperationProtocolEntry::SqlV1,
         },
         placement_requirement: operation.placement_requirement,
         implementation_form: operation.implementation_form,

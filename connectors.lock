@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "f3cfb0668a2ac842d0f1e06baa8c36bf749bca05011af6dbc7dcdb138e81f6b1"
+sha256 = "dc9b57bc62acbd231de5b8870dd5b4157feae6456de896c078a7825803459637"
 
 [[provider]]
 id = "airtable"
@@ -485,6 +485,15 @@ ir_sha256 = "c9ce71d5c074d9c7566a6c6966b61249dcb51b9f23475a49e2d7f46e82371a7a"
 "catalog/miro.catalog.json" = "98bf986fa937c38a53e85f4ffa9198a922c080687ba7f8cf79309e2dcf79a3f5"
 
 [[provider]]
+id = "mysql"
+generator = "connectors 0.1.0"
+toml_sha256 = "129a27c03fe7378358a9ce9a3854b7793d5bc231a0b2f1b066fc6a4cc41cb31d"
+ir_sha256 = "05c63da11fbd585ee8880425ceade40ba8a403f9938a0dfed83576f4e5c779a8"
+
+[provider.artifacts]
+"catalog/mysql.catalog.json" = "70328a0cf743ec07186299935c5d32eeab725ec1eb1ddd4832c7909536abe299"
+
+[[provider]]
 id = "newrelic"
 generator = "connectors 0.1.0"
 toml_sha256 = "66e510be2326246dfdc1939bb99bef48aad6ecc9cba0a77cc6aa91145ce83c6f"
@@ -546,6 +555,15 @@ ir_sha256 = "8951126c52675a8061dc226ea9ee94859c60454db0ed17a169ecd9821d145153"
 
 [provider.artifacts]
 "catalog/pagerduty.catalog.json" = "ae83b34e71784d8acab0095d61a41dfd3e6b46525e2b15afaaad4b09a7015710"
+
+[[provider]]
+id = "postgresql"
+generator = "connectors 0.1.0"
+toml_sha256 = "e892bad63c015a07ff5836cb948f7ea7fc58f84c2a3d38cc07d07a7c4ea93bde"
+ir_sha256 = "d555f0d383addf3ed49c8097efc9c79c5203b89b993dd615865dc1a0d840946e"
+
+[provider.artifacts]
+"catalog/postgresql.catalog.json" = "e2a18019645e5a7ca54b6279749912ba6dbf77cb9fe99b4d54553336eb5796d4"
 
 [[provider]]
 id = "postmark"

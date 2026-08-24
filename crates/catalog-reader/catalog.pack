@@ -1,8 +1,8 @@
 connectors-catalog-pack 1
-digest sha256 277514cb1ca467e0b448a90e2829539ad90610955fe1f14f6fb7e83273bb343d
+digest sha256 f0261bc8fd2b0a88c7ed0f7bf20bed29f536f0e5692a6a6d4a40f0a8804344ae
 schema 2
-providers 62
-operations 989
+providers 64
+operations 997
 p airtable 0 18824
 p alertmanager 18824 2464
 p algolia 21288 25082
@@ -40,31 +40,33 @@ p loki 11115971 5070
 p mailchimp 11121041 40733
 p microsoft_graph 11161774 1085594
 p miro 12247368 32577
-p newrelic 12279945 29327
-p notion 12309272 18678
-p okta 12327950 22027
-p openai 12349977 1682675
-p openrouter 14032652 12929
-p pagerduty 14045581 37376
-p postmark 14082957 19882
-p prometheus 14102839 4885
-p resend 14107724 18623
-p runpod 14126347 557714
-p salesforce 14684061 19139
-p sendgrid 14703200 15599
-p sentry 14718799 27677
-p shopify 14746476 27381
-p slack 14773857 233511
-p statuspage 15007368 29637
-p stripe 15037005 70624
-p supabase 15107629 13424
-p trello 15121053 26193
-p twilio 15147246 71256
-p typeform 15218502 28714
-p vercel 15247216 17409
-p webflow 15264625 21941
-p zendesk 15286566 1146361
-p zoom 16432927 9415
+p mysql 12279945 12682
+p newrelic 12292627 29327
+p notion 12321954 18678
+p okta 12340632 22027
+p openai 12362659 1682675
+p openrouter 14045334 12929
+p pagerduty 14058263 37376
+p postgresql 14095639 12627
+p postmark 14108266 19882
+p prometheus 14128148 4885
+p resend 14133033 18623
+p runpod 14151656 557714
+p salesforce 14709370 19139
+p sendgrid 14728509 15599
+p sentry 14744108 27677
+p shopify 14771785 27381
+p slack 14799166 233511
+p statuspage 15032677 29637
+p stripe 15062314 70624
+p supabase 15132938 13424
+p trello 15146362 26193
+p twilio 15172555 71256
+p typeform 15243811 28714
+p vercel 15272525 17409
+p webflow 15289934 21941
+p zendesk 15311875 1146361
+p zoom 16458236 9415
 o airtable-record-create airtable default 5060 4705
 o airtable-record-delete airtable default 14746 3734
 o airtable-record-get airtable default 731 4323
@@ -786,22 +788,26 @@ o miro-board-list miro default 12248770 2851
 o miro-sticky-note-create miro default 12269510 3738
 o miro-sticky-note-delete miro default 12277631 1954
 o miro-sticky-note-update miro default 12273254 4371
-o newrelic-alert-policy-list newrelic default 12291789 3047
-o newrelic-alert-violation-list newrelic default 12294842 4217
-o newrelic-application-get newrelic default 12287623 4160
-o newrelic-application-list newrelic default 12282956 4661
-o newrelic-deployment-create newrelic default 12302761 6144
-o newrelic-deployment-list newrelic default 12299065 3690
-o notion-database-query notion default 12316240 3464
-o notion-page-create notion default 12322901 4755
-o notion-page-get notion default 12312886 3348
-o notion-search notion default 12319710 3185
-o notion-user-me notion default 12310850 2030
-o okta-group-list okta default 12338950 3793
-o okta-user-deactivate okta default 12346558 3076
-o okta-user-get okta default 12335215 3729
-o okta-user-group-list okta default 12342749 3803
-o okta-user-list okta default 12330265 4944
+o mysql-query mysql default 12280340 4163
+o mysql-schemas-list mysql default 12284509 1737
+o mysql-table-describe mysql default 12288696 3628
+o mysql-tables-list mysql default 12286252 2438
+o newrelic-alert-policy-list newrelic default 12304471 3047
+o newrelic-alert-violation-list newrelic default 12307524 4217
+o newrelic-application-get newrelic default 12300305 4160
+o newrelic-application-list newrelic default 12295638 4661
+o newrelic-deployment-create newrelic default 12315443 6144
+o newrelic-deployment-list newrelic default 12311747 3690
+o notion-database-query notion default 12328922 3464
+o notion-page-create notion default 12335583 4755
+o notion-page-get notion default 12325568 3348
+o notion-search notion default 12332392 3185
+o notion-user-me notion default 12323532 2030
+o okta-group-list okta default 12351632 3793
+o okta-user-deactivate okta default 12359240 3076
+o okta-user-get okta default 12347897 3729
+o okta-user-group-list okta default 12355431 3803
+o okta-user-list okta default 12342947 4944
 o ontology-branch-create b10x knowledge 5099551 21208
 o ontology-branch-list b10x knowledge 5095660 3885
 o ontology-branch-schema-extend b10x knowledge 5120765 2727
@@ -814,24 +820,24 @@ o ontology-proposal-evaluate b10x knowledge 5176150 6624
 o ontology-proposal-get b10x knowledge 5169651 6493
 o ontology-proposal-promote b10x knowledge 5184229 2095
 o ontology-schema-register b10x knowledge 5186330 5429
-o openai-batch-list openai default 14019527 12873
-o openai-chat-completion openai default 12354947 5224
-o openai-embeddings-create openai default 12360177 4010
-o openai-file-list openai default 14014257 5264
-o openai-model-get openai default 12352837 2104
-o openai-models-list openai default 12350668 2163
-o openai-response-get openai default 12364193 1212702
-o openai-response-input-item-list openai default 13576901 437350
-o openrouter-chat-completion openrouter default 14037621 5888
-o openrouter-credits-get openrouter default 14043515 1808
-o openrouter-model-endpoints-list openrouter default 14035003 2612
-o openrouter-models-list openrouter default 14033360 1637
-o pagerduty-incident-acknowledge pagerduty default 14072833 5034
-o pagerduty-incident-get pagerduty default 14055665 5736
-o pagerduty-incident-list pagerduty default 14047169 8490
-o pagerduty-incident-resolve pagerduty default 14077873 4790
-o pagerduty-oncall-list pagerduty default 14067734 5093
-o pagerduty-service-list pagerduty default 14061407 6321
+o openai-batch-list openai default 14032209 12873
+o openai-chat-completion openai default 12367629 5224
+o openai-embeddings-create openai default 12372859 4010
+o openai-file-list openai default 14026939 5264
+o openai-model-get openai default 12365519 2104
+o openai-models-list openai default 12363350 2163
+o openai-response-get openai default 12376875 1212702
+o openai-response-input-item-list openai default 13589583 437350
+o openrouter-chat-completion openrouter default 14050303 5888
+o openrouter-credits-get openrouter default 14056197 1808
+o openrouter-model-endpoints-list openrouter default 14047685 2612
+o openrouter-models-list openrouter default 14046042 1637
+o pagerduty-incident-acknowledge pagerduty default 14085515 5034
+o pagerduty-incident-get pagerduty default 14068347 5736
+o pagerduty-incident-list pagerduty default 14059851 8490
+o pagerduty-incident-resolve pagerduty default 14090555 4790
+o pagerduty-oncall-list pagerduty default 14080416 5093
+o pagerduty-service-list pagerduty default 14074089 6321
 o planner-board-get b10x planning 5242806 199621
 o planner-decision-transition b10x planning 7295513 143410
 o planner-entity-create b10x planning 7438929 182491
@@ -857,146 +863,150 @@ o planner-sync-session-begin b10x planning 9460245 4648
 o planner-sync-session-confirm b10x planning 9877069 2461
 o planner-sync-session-preview b10x planning 9879536 415003
 o planner-sync-session-upload b10x planning 7181283 52735
-o postmark-bounce-get postmark server 14099178 3209
-o postmark-bounce-list postmark server 14094291 4881
-o postmark-deliverystats-get postmark server 14091677 2608
-o postmark-email-send postmark server 14084484 7187
-o prometheus-query-range prometheus default 14103698 3681
-o resend-domain-get resend default 14120944 5175
-o resend-domain-list resend default 14117619 3319
-o resend-email-get resend default 14112804 4809
-o resend-email-send resend default 14108575 4223
-o runpod-create-cluster runpod default 14370688 16834
-o runpod-create-delegation runpod default 14526262 3612
-o runpod-create-endpoint runpod default 14534134 37601
-o runpod-create-network-volume runpod default 14433042 5159
-o runpod-create-pod runpod default 14446031 38990
-o runpod-create-registry runpod default 14520236 3031
-o runpod-create-template runpod default 14647291 14411
-o runpod-delete-cluster runpod default 14403974 1331
-o runpod-delete-endpoint runpod default 14624755 1370
-o runpod-delete-network-volume runpod default 14444659 1366
-o runpod-delete-pod runpod default 14517365 1317
-o runpod-delete-registry runpod default 14532797 1331
-o runpod-delete-template runpod default 14682397 1288
-o runpod-get-cluster runpod default 14387528 7941
-o runpod-get-cpu-type runpod default 14270697 4889
-o runpod-get-data-center runpod default 14282614 5614
-o runpod-get-endpoint runpod default 14571741 19104
-o runpod-get-gpu-type runpod default 14257395 7894
-o runpod-get-network-volume runpod default 14438207 2554
-o runpod-get-pod runpod default 14180986 24874
-o runpod-get-registry runpod default 14531203 1588
-o runpod-get-ssh-keys runpod default 14288234 1402
-o runpod-get-template runpod default 14661708 7223
-o runpod-list-billing runpod default 14240238 17151
-o runpod-list-cluster-billing runpod default 14292655 12819
-o runpod-list-cluster-pods runpod default 14405311 27725
-o runpod-list-clusters runpod default 14361979 8703
-o runpod-list-cpu-types runpod default 14265295 5396
-o runpod-list-data-centers runpod default 14275592 7016
-o runpod-list-delegations runpod default 14523273 2983
-o runpod-list-endpoint-billing runpod default 14305480 9254
-o runpod-list-endpoint-releases runpod default 14626131 6107
-o runpod-list-endpoint-workers runpod default 14632244 7085
-o runpod-list-endpoints runpod default 14205866 21704
-o runpod-list-gpu-types runpod default 14230771 9461
-o runpod-list-network-volume-billing runpod default 14314740 12648
-o runpod-list-network-volumes runpod default 14227576 3189
-o runpod-list-pod-billing runpod default 14327394 12540
-o runpod-list-pods runpod default 14152454 28526
-o runpod-list-public-templates runpod default 14353154 8819
-o runpod-list-registries runpod default 14518688 1542
-o runpod-list-serverless-billing runpod default 14339940 13208
-o runpod-list-templates runpod default 14639335 7950
-o runpod-pod-action runpod default 14127194 25254
-o runpod-revoke-delegation runpod default 14529880 1317
-o runpod-update-cluster runpod default 14395475 8493
-o runpod-update-endpoint runpod default 14590851 33898
-o runpod-update-network-volume runpod default 14440767 3886
-o runpod-update-pod runpod default 14485027 32332
-o runpod-update-ssh-keys runpod default 14289642 3007
-o runpod-update-template runpod default 14668937 13454
-o salesforce-record-create salesforce default 14692247 3265
-o salesforce-record-get salesforce default 14688817 3424
-o salesforce-record-update salesforce default 14695518 2958
-o salesforce-sobject-describe salesforce default 14698482 4425
-o salesforce-whoami salesforce default 14685976 2835
-o sendgrid-email-validate sendgrid default 14714379 4121
-o sendgrid-suppression-bounce-list sendgrid default 14711022 3351
-o sendgrid-template-get sendgrid default 14708653 2363
-o sendgrid-template-list sendgrid default 14704558 4089
-o sentry-issue-event-latest sentry default 14739221 6935
-o sentry-issue-get sentry default 14719528 7008
-o sentry-issue-update sentry default 14726542 6365
-o sentry-project-get sentry default 14732913 6302
-o shopify-customer-get shopify default 14764875 5180
-o shopify-inventory-level-list shopify default 14770061 3461
-o shopify-order-get shopify default 14748364 6452
-o shopify-product-get shopify default 14754822 4772
-o shopify-product-update shopify default 14759600 5269
+o postgresql-query postgresql default 14096049 4185
+o postgresql-schemas-list postgresql default 14100240 1694
+o postgresql-table-describe postgresql default 14104350 3598
+o postgresql-tables-list postgresql default 14101940 2404
+o postmark-bounce-get postmark server 14124487 3209
+o postmark-bounce-list postmark server 14119600 4881
+o postmark-deliverystats-get postmark server 14116986 2608
+o postmark-email-send postmark server 14109793 7187
+o prometheus-query-range prometheus default 14129007 3681
+o resend-domain-get resend default 14146253 5175
+o resend-domain-list resend default 14142928 3319
+o resend-email-get resend default 14138113 4809
+o resend-email-send resend default 14133884 4223
+o runpod-create-cluster runpod default 14395997 16834
+o runpod-create-delegation runpod default 14551571 3612
+o runpod-create-endpoint runpod default 14559443 37601
+o runpod-create-network-volume runpod default 14458351 5159
+o runpod-create-pod runpod default 14471340 38990
+o runpod-create-registry runpod default 14545545 3031
+o runpod-create-template runpod default 14672600 14411
+o runpod-delete-cluster runpod default 14429283 1331
+o runpod-delete-endpoint runpod default 14650064 1370
+o runpod-delete-network-volume runpod default 14469968 1366
+o runpod-delete-pod runpod default 14542674 1317
+o runpod-delete-registry runpod default 14558106 1331
+o runpod-delete-template runpod default 14707706 1288
+o runpod-get-cluster runpod default 14412837 7941
+o runpod-get-cpu-type runpod default 14296006 4889
+o runpod-get-data-center runpod default 14307923 5614
+o runpod-get-endpoint runpod default 14597050 19104
+o runpod-get-gpu-type runpod default 14282704 7894
+o runpod-get-network-volume runpod default 14463516 2554
+o runpod-get-pod runpod default 14206295 24874
+o runpod-get-registry runpod default 14556512 1588
+o runpod-get-ssh-keys runpod default 14313543 1402
+o runpod-get-template runpod default 14687017 7223
+o runpod-list-billing runpod default 14265547 17151
+o runpod-list-cluster-billing runpod default 14317964 12819
+o runpod-list-cluster-pods runpod default 14430620 27725
+o runpod-list-clusters runpod default 14387288 8703
+o runpod-list-cpu-types runpod default 14290604 5396
+o runpod-list-data-centers runpod default 14300901 7016
+o runpod-list-delegations runpod default 14548582 2983
+o runpod-list-endpoint-billing runpod default 14330789 9254
+o runpod-list-endpoint-releases runpod default 14651440 6107
+o runpod-list-endpoint-workers runpod default 14657553 7085
+o runpod-list-endpoints runpod default 14231175 21704
+o runpod-list-gpu-types runpod default 14256080 9461
+o runpod-list-network-volume-billing runpod default 14340049 12648
+o runpod-list-network-volumes runpod default 14252885 3189
+o runpod-list-pod-billing runpod default 14352703 12540
+o runpod-list-pods runpod default 14177763 28526
+o runpod-list-public-templates runpod default 14378463 8819
+o runpod-list-registries runpod default 14543997 1542
+o runpod-list-serverless-billing runpod default 14365249 13208
+o runpod-list-templates runpod default 14664644 7950
+o runpod-pod-action runpod default 14152503 25254
+o runpod-revoke-delegation runpod default 14555189 1317
+o runpod-update-cluster runpod default 14420784 8493
+o runpod-update-endpoint runpod default 14616160 33898
+o runpod-update-network-volume runpod default 14466076 3886
+o runpod-update-pod runpod default 14510336 32332
+o runpod-update-ssh-keys runpod default 14314951 3007
+o runpod-update-template runpod default 14694246 13454
+o salesforce-record-create salesforce default 14717556 3265
+o salesforce-record-get salesforce default 14714126 3424
+o salesforce-record-update salesforce default 14720827 2958
+o salesforce-sobject-describe salesforce default 14723791 4425
+o salesforce-whoami salesforce default 14711285 2835
+o sendgrid-email-validate sendgrid default 14739688 4121
+o sendgrid-suppression-bounce-list sendgrid default 14736331 3351
+o sendgrid-template-get sendgrid default 14733962 2363
+o sendgrid-template-list sendgrid default 14729867 4089
+o sentry-issue-event-latest sentry default 14764530 6935
+o sentry-issue-get sentry default 14744837 7008
+o sentry-issue-update sentry default 14751851 6365
+o sentry-project-get sentry default 14758222 6302
+o shopify-customer-get shopify default 14790184 5180
+o shopify-inventory-level-list shopify default 14795370 3461
+o shopify-order-get shopify default 14773673 6452
+o shopify-product-get shopify default 14780131 4772
+o shopify-product-update shopify default 14784909 5269
 o sip-dial b10x default 5030163 4029
-o slack-admin-app-requests-list slack admin 14929569 4440
-o slack-admin-conversations-search slack admin 14934015 63903
-o slack-admin-teams-list slack admin 14997924 3954
-o slack-admin-users-list slack admin 15001884 4408
-o slack-chat-post-message slack default 14785380 45332
-o slack-conversations-history slack default 14830718 49376
-o slack-reactions-add slack default 14923634 5929
-o slack-users-info slack default 14880100 43528
+o slack-admin-app-requests-list slack admin 14954878 4440
+o slack-admin-conversations-search slack admin 14959324 63903
+o slack-admin-teams-list slack admin 15023233 3954
+o slack-admin-users-list slack admin 15027193 4408
+o slack-chat-post-message slack default 14810689 45332
+o slack-conversations-history slack default 14856027 49376
+o slack-reactions-add slack default 14948943 5929
+o slack-users-info slack default 14905409 43528
 o speech-speak b10x default 5034198 2907
 o speech-status b10x default 5037111 2246
-o statuspage-component-list statuspage default 15032285 4304
-o statuspage-incident-create statuspage default 15018931 6655
-o statuspage-incident-get statuspage default 15014636 4289
-o statuspage-incident-list statuspage default 15009472 5158
-o statuspage-incident-update statuspage default 15025592 6687
-o stripe-balance-get stripe default 15044342 2591
-o stripe-billing-meter-list stripe default 15098177 9091
-o stripe-charge-get stripe default 15050019 3784
-o stripe-charge-refund-create stripe default 15069185 4638
-o stripe-country-spec-list stripe default 15073829 9134
-o stripe-customer-get stripe default 15046939 3074
-o stripe-event-list stripe default 15082969 9442
-o stripe-exchange-rate-list stripe default 15092417 5754
-o stripe-payment-intent-cancel stripe default 15065235 3944
-o stripe-payment-intent-capture stripe default 15060644 4585
-o stripe-payment-intent-get stripe default 15053809 3802
-o stripe-refund-get stripe default 15057617 3021
-o supabase-auth-settings supabase default 15117685 2955
-o supabase-rows-list supabase default 15114321 3358
-o supabase-schema-describe supabase default 15110381 3934
-o trello-board-get trello default 15127442 3619
-o trello-board-list trello default 15123614 3822
-o trello-board-lists trello default 15131067 1604
-o trello-card-archive trello default 15142498 4364
-o trello-card-create trello default 15137366 5126
-o trello-list-cards trello default 15132677 4683
-o twilio-account-get twilio default 15155675 2969
-o twilio-call-get twilio default 15178690 4476
-o twilio-call-list twilio default 15170837 7847
-o twilio-conference-list twilio default 15210478 7683
-o twilio-message-get twilio default 15166001 4830
-o twilio-message-list twilio default 15158650 7345
-o twilio-recording-get twilio default 15193853 8362
-o twilio-recording-list twilio default 15183172 10675
-o twilio-usage-record-list twilio default 15202221 8251
-o typeform-form-get typeform default 15227760 5108
-o typeform-form-list typeform default 15222157 5597
-o typeform-response-delete typeform default 15243936 3050
-o typeform-response-list typeform default 15232874 11056
-o typeform-user-me typeform default 15219878 2273
-o vercel-deployment-cancel vercel default 15261696 2663
-o vercel-deployment-get vercel default 15258735 2955
-o vercel-deployments-list vercel default 15253470 5259
-o vercel-project-get vercel default 15250501 2963
-o vercel-projects-list vercel default 15249023 1472
-o webflow-collection-get webflow default 15272015 4235
-o webflow-collection-item-get webflow default 15280341 3491
-o webflow-collection-item-list webflow default 15276256 4079
-o webflow-collection-list webflow default 15268934 3075
-o webflow-site-list webflow default 15266191 2737
-o webflow-site-publish webflow default 15283838 2360
+o statuspage-component-list statuspage default 15057594 4304
+o statuspage-incident-create statuspage default 15044240 6655
+o statuspage-incident-get statuspage default 15039945 4289
+o statuspage-incident-list statuspage default 15034781 5158
+o statuspage-incident-update statuspage default 15050901 6687
+o stripe-balance-get stripe default 15069651 2591
+o stripe-billing-meter-list stripe default 15123486 9091
+o stripe-charge-get stripe default 15075328 3784
+o stripe-charge-refund-create stripe default 15094494 4638
+o stripe-country-spec-list stripe default 15099138 9134
+o stripe-customer-get stripe default 15072248 3074
+o stripe-event-list stripe default 15108278 9442
+o stripe-exchange-rate-list stripe default 15117726 5754
+o stripe-payment-intent-cancel stripe default 15090544 3944
+o stripe-payment-intent-capture stripe default 15085953 4585
+o stripe-payment-intent-get stripe default 15079118 3802
+o stripe-refund-get stripe default 15082926 3021
+o supabase-auth-settings supabase default 15142994 2955
+o supabase-rows-list supabase default 15139630 3358
+o supabase-schema-describe supabase default 15135690 3934
+o trello-board-get trello default 15152751 3619
+o trello-board-list trello default 15148923 3822
+o trello-board-lists trello default 15156376 1604
+o trello-card-archive trello default 15167807 4364
+o trello-card-create trello default 15162675 5126
+o trello-list-cards trello default 15157986 4683
+o twilio-account-get twilio default 15180984 2969
+o twilio-call-get twilio default 15203999 4476
+o twilio-call-list twilio default 15196146 7847
+o twilio-conference-list twilio default 15235787 7683
+o twilio-message-get twilio default 15191310 4830
+o twilio-message-list twilio default 15183959 7345
+o twilio-recording-get twilio default 15219162 8362
+o twilio-recording-list twilio default 15208481 10675
+o twilio-usage-record-list twilio default 15227530 8251
+o typeform-form-get typeform default 15253069 5108
+o typeform-form-list typeform default 15247466 5597
+o typeform-response-delete typeform default 15269245 3050
+o typeform-response-list typeform default 15258183 11056
+o typeform-user-me typeform default 15245187 2273
+o vercel-deployment-cancel vercel default 15287005 2663
+o vercel-deployment-get vercel default 15284044 2955
+o vercel-deployments-list vercel default 15278779 5259
+o vercel-project-get vercel default 15275810 2963
+o vercel-projects-list vercel default 15274332 1472
+o webflow-collection-get webflow default 15297324 4235
+o webflow-collection-item-get webflow default 15305650 3491
+o webflow-collection-item-list webflow default 15301565 4079
+o webflow-collection-list webflow default 15294243 3075
+o webflow-site-list webflow default 15291500 2737
+o webflow-site-publish webflow default 15309147 2360
 o work-request-create b10x tasks 5191765 6317
 o work-request-get b10x tasks 5198088 4188
 o work-request-list b10x tasks 5202282 8148
@@ -1017,44 +1027,44 @@ o workspaces-create b10x workspaces 7235062 4481
 o workspaces-delete b10x workspaces 7240902 2089
 o workspaces-get b10x workspaces 7239549 1347
 o workspaces-list b10x workspaces 7234024 1032
-o zendesk-custom-object-list zendesk default 15413276 5853
-o zendesk-custom-status-list zendesk default 15618320 5413
-o zendesk-group-list zendesk default 15590159 3756
-o zendesk-help-center-article-create zendesk help-center 15919984 9386
-o zendesk-help-center-article-get zendesk help-center 15898613 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 15911469 8509
-o zendesk-help-center-article-list zendesk help-center 15890122 8485
-o zendesk-help-center-category-list zendesk help-center 15881381 4211
-o zendesk-help-center-section-list zendesk help-center 15885598 4518
-o zendesk-help-center-translation-list zendesk help-center 15906461 5002
-o zendesk-incremental-organization-list zendesk default 15399078 8617
-o zendesk-incremental-ticket-event-list zendesk default 15407701 5569
-o zendesk-incremental-ticket-list zendesk default 15298397 74662
-o zendesk-incremental-user-list zendesk default 15373065 26007
-o zendesk-messaging-conversation-create zendesk messaging 15929376 10167
-o zendesk-messaging-conversation-get zendesk messaging 15939549 10469
-o zendesk-messaging-conversation-update zendesk messaging 15950024 11165
-o zendesk-messaging-message-create zendesk messaging 15968249 276191
-o zendesk-messaging-message-list zendesk messaging 16244446 158036
-o zendesk-messaging-participant-list zendesk messaging 15961195 7048
-o zendesk-messaging-user-create zendesk messaging 16402488 10089
-o zendesk-messaging-user-get zendesk messaging 16412583 9350
-o zendesk-messaging-user-update zendesk messaging 16421939 9961
-o zendesk-organization-show zendesk default 15584154 5999
-o zendesk-test zendesk default 15623739 23020
-o zendesk-ticket-audit-list zendesk default 15292581 5810
-o zendesk-ticket-comment-list zendesk default 15720503 19767
-o zendesk-ticket-field-list zendesk default 15593921 15042
-o zendesk-ticket-form-list zendesk default 15608969 9345
-o zendesk-ticket-recent-list zendesk default 15419135 71467
-o zendesk-ticket-search zendesk default 15646765 5013
-o zendesk-ticket-show zendesk default 15651784 68713
-o zendesk-ticket-update zendesk default 15740276 141099
-o zendesk-user-show zendesk default 15562652 21496
-o zendesk-view-ticket-list zendesk default 15490608 72038
-o zoom-meeting-delete zoom default 16433815 2358
-o zoom-user-get zoom default 16436179 5881
-payload 16442342
+o zendesk-custom-object-list zendesk default 15438585 5853
+o zendesk-custom-status-list zendesk default 15643629 5413
+o zendesk-group-list zendesk default 15615468 3756
+o zendesk-help-center-article-create zendesk help-center 15945293 9386
+o zendesk-help-center-article-get zendesk help-center 15923922 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 15936778 8509
+o zendesk-help-center-article-list zendesk help-center 15915431 8485
+o zendesk-help-center-category-list zendesk help-center 15906690 4211
+o zendesk-help-center-section-list zendesk help-center 15910907 4518
+o zendesk-help-center-translation-list zendesk help-center 15931770 5002
+o zendesk-incremental-organization-list zendesk default 15424387 8617
+o zendesk-incremental-ticket-event-list zendesk default 15433010 5569
+o zendesk-incremental-ticket-list zendesk default 15323706 74662
+o zendesk-incremental-user-list zendesk default 15398374 26007
+o zendesk-messaging-conversation-create zendesk messaging 15954685 10167
+o zendesk-messaging-conversation-get zendesk messaging 15964858 10469
+o zendesk-messaging-conversation-update zendesk messaging 15975333 11165
+o zendesk-messaging-message-create zendesk messaging 15993558 276191
+o zendesk-messaging-message-list zendesk messaging 16269755 158036
+o zendesk-messaging-participant-list zendesk messaging 15986504 7048
+o zendesk-messaging-user-create zendesk messaging 16427797 10089
+o zendesk-messaging-user-get zendesk messaging 16437892 9350
+o zendesk-messaging-user-update zendesk messaging 16447248 9961
+o zendesk-organization-show zendesk default 15609463 5999
+o zendesk-test zendesk default 15649048 23020
+o zendesk-ticket-audit-list zendesk default 15317890 5810
+o zendesk-ticket-comment-list zendesk default 15745812 19767
+o zendesk-ticket-field-list zendesk default 15619230 15042
+o zendesk-ticket-form-list zendesk default 15634278 9345
+o zendesk-ticket-recent-list zendesk default 15444444 71467
+o zendesk-ticket-search zendesk default 15672074 5013
+o zendesk-ticket-show zendesk default 15677093 68713
+o zendesk-ticket-update zendesk default 15765585 141099
+o zendesk-user-show zendesk default 15587961 21496
+o zendesk-view-ticket-list zendesk default 15515917 72038
+o zoom-meeting-delete zoom default 16459124 2358
+o zoom-user-get zoom default 16461488 5881
+payload 16467651
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -328200,6 +328210,405 @@ payload 16442342
 }
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "authority": "com.mysql.server",
+  "connector": "mysql",
+  "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Run one bounded read-only SQL statement (SELECT, SHOW, or DESCRIBE class, https://dev.mysql.com/doc/refman/8.4/en/select.html) against the MySQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+        "input_schema": {
+          "properties": {
+            "max_rows": {
+              "type": "number"
+            },
+            "statement": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "statement"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Run one bounded read-only SQL statement (SELECT, SHOW, or DESCRIBE class, https://dev.mysql.com/doc/refman/8.4/en/select.html) against the MySQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-query",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Exactly one read statement — SELECT, SHOW, or DESCRIBE class. A write statement, a second statement after a `;`, or anything that does not parse as a read is refused before any connection is opened",
+          "name": "statement",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "statement"
+        },
+        {
+          "description": "Optional row bound for this call. The effective bound is the smaller of this and the published 500-row cap: a caller can narrow the cap, never widen it",
+          "name": "max_rows",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "max_rows"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "bytes_returned": {
+            "description": "Counted cell bytes across the returned rows",
+            "type": "integer"
+          },
+          "columns": {
+            "description": "Result column names, in wire order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "Returned rows; every cell is the server's text rendering and null is an SQL NULL",
+            "items": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "rows_returned": {
+            "description": "How many rows were returned",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "Whether the result stopped before the statement's full result set",
+            "type": "boolean"
+          },
+          "truncation_cause": {
+            "description": "Why the page stopped early; absent when truncated is false",
+            "enum": [
+              "row_cap",
+              "byte_cap"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "rows_returned",
+          "bytes_returned",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the schemas (databases) of the MySQL server this Connection resolves, from INFORMATION_SCHEMA.SCHEMATA (https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html), system schemas included",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the schemas (databases) of the MySQL server this Connection resolves, from INFORMATION_SCHEMA.SCHEMATA (https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html), system schemas included",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-schemas-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schemas": {
+            "description": "Schema names, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schemas",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the tables and views of one schema on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.TABLES (https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html)",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the tables and views of one schema on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.TABLES (https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html)",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-tables-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema (database) whose tables to list. MySQL identifiers are at most 64 characters (https://dev.mysql.com/doc/refman/8.4/en/identifier-length.html)",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schema": {
+            "description": "The schema that was listed",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Table and view names in that schema, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "tables",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Describe one table's columns — name, data type, nullability, position — on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.COLUMNS (https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html). Structure only: no default expressions, comments, or row estimates",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            },
+            "table": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema",
+            "table"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Describe one table's columns — name, data type, nullability, position — on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.COLUMNS (https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html). Structure only: no default expressions, comments, or row estimates",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-table-describe",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema (database) holding the table",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        },
+        {
+          "description": "The table to describe",
+          "name": "table",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "table"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "columns": {
+            "description": "The table's columns in ordinal order",
+            "items": {
+              "properties": {
+                "data_type": {
+                  "description": "The server's own data-type word",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "nullable": {
+                  "type": "boolean"
+                },
+                "ordinal": {
+                  "description": "The column's 1-based position",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "data_type",
+                "nullable",
+                "ordinal"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "truncated": {
+            "description": "Whether the column list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "table",
+          "columns",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "developer",
+        "data-analyst"
+      ],
+      "base_url": "https://www.mysql.com",
+      "name": "default",
+      "tags": [
+        "database"
+      ]
+    }
+  ],
+  "vendor": "MySQL",
+  "verify": "mysql-schemas-list"
+}
+{
+  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
       "description": "New Relic User API key, authorizing REST v2 calls as the New Relic user it was created by. Travels as the `X-Api-Key` header on every request. A key is issued in one region and is not valid against the other region's host — a 401 from this connector is as likely to be a wrong `host` as a wrong key",
@@ -361402,6 +361811,405 @@ payload 16442342
   ],
   "vendor": "PagerDuty",
   "verify": "pagerduty-service-list"
+}
+{
+  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "authority": "org.postgresql.server",
+  "connector": "postgresql",
+  "description": "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Run one bounded read-only SQL statement (SELECT class, https://www.postgresql.org/docs/17/sql-select.html) against the PostgreSQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, a data-modifying CTE, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+        "input_schema": {
+          "properties": {
+            "max_rows": {
+              "type": "number"
+            },
+            "statement": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "statement"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Run one bounded read-only SQL statement (SELECT class, https://www.postgresql.org/docs/17/sql-select.html) against the PostgreSQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, a data-modifying CTE, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "postgresql-query",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Exactly one read statement — SELECT class. A write statement, a data-modifying CTE, a second statement after a `;`, or anything that does not parse as a read is refused before any connection is opened",
+          "name": "statement",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "statement"
+        },
+        {
+          "description": "Optional row bound for this call. The effective bound is the smaller of this and the published 500-row cap: a caller can narrow the cap, never widen it",
+          "name": "max_rows",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "max_rows"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "bytes_returned": {
+            "description": "Counted cell bytes across the returned rows",
+            "type": "integer"
+          },
+          "columns": {
+            "description": "Result column names, in wire order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "Returned rows; every cell is the server's text rendering and null is an SQL NULL",
+            "items": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "rows_returned": {
+            "description": "How many rows were returned",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "Whether the result stopped before the statement's full result set",
+            "type": "boolean"
+          },
+          "truncation_cause": {
+            "description": "Why the page stopped early; absent when truncated is false",
+            "enum": [
+              "row_cap",
+              "byte_cap"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "rows_returned",
+          "bytes_returned",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the schemas of the PostgreSQL database this Connection resolves, from information_schema.schemata (https://www.postgresql.org/docs/17/infoschema-schemata.html), system schemas included",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the schemas of the PostgreSQL database this Connection resolves, from information_schema.schemata (https://www.postgresql.org/docs/17/infoschema-schemata.html), system schemas included",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "postgresql-schemas-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schemas": {
+            "description": "Schema names, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schemas",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the tables and views of one schema in the PostgreSQL database this Connection resolves, from information_schema.tables (https://www.postgresql.org/docs/17/infoschema-tables.html)",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the tables and views of one schema in the PostgreSQL database this Connection resolves, from information_schema.tables (https://www.postgresql.org/docs/17/infoschema-tables.html)",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "postgresql-tables-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema whose tables to list. PostgreSQL identifiers are at most 63 bytes (https://www.postgresql.org/docs/17/sql-syntax-lexical.html)",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schema": {
+            "description": "The schema that was listed",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Table and view names in that schema, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "tables",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Describe one table's columns — name, data type, nullability, position — in the PostgreSQL database this Connection resolves, from information_schema.columns (https://www.postgresql.org/docs/17/infoschema-columns.html). Structure only: no default expressions, comments, or row estimates",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            },
+            "table": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema",
+            "table"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Describe one table's columns — name, data type, nullability, position — in the PostgreSQL database this Connection resolves, from information_schema.columns (https://www.postgresql.org/docs/17/infoschema-columns.html). Structure only: no default expressions, comments, or row estimates",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "postgresql-table-describe",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema holding the table",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        },
+        {
+          "description": "The table to describe",
+          "name": "table",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "table"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "columns": {
+            "description": "The table's columns in ordinal order",
+            "items": {
+              "properties": {
+                "data_type": {
+                  "description": "The server's own data-type word",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "nullable": {
+                  "type": "boolean"
+                },
+                "ordinal": {
+                  "description": "The column's 1-based position",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "data_type",
+                "nullable",
+                "ordinal"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "truncated": {
+            "description": "Whether the column list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "table",
+          "columns",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "developer",
+        "data-analyst"
+      ],
+      "base_url": "https://www.postgresql.org",
+      "name": "default",
+      "tags": [
+        "database"
+      ]
+    }
+  ],
+  "vendor": "PostgreSQL",
+  "verify": "postgresql-schemas-list"
 }
 {
   "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",

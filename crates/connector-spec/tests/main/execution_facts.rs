@@ -148,7 +148,7 @@ fn sip_v1_is_a_closed_session_establishment_driver() {
 
     let schema = include_str!("../../schema/provider-toml.schema.json");
     assert!(
-        schema.contains(r#""enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1"]"#),
+        schema.contains(r#""enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1", "sql_v1"]"#),
         "the authored-provider schema must admit the same closed driver vocabulary"
     );
 }
@@ -197,6 +197,56 @@ fn audio_v1_is_a_closed_unary_device_driver() {
         .to_string();
     assert!(
         error.contains("audio_v1 operation refuses HTTP-only `method` and `path`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn sql_v1_is_a_closed_unary_database_driver() {
+    let axes = AXES
+        .replace(
+            "protocol_driver = \"http_v1\"",
+            "protocol_driver = \"sql_v1\"",
+        )
+        .replace(
+            "required_capabilities = [\"public_network\"]",
+            "required_capabilities = [\"private_network\"]",
+        );
+    let source = operation(&format!("effects = [\"read\", \"network\"]\n{axes}"))
+        .replace("id = \"acme-read\"", "id = \"acme-sql-query\"")
+        .replace("method = \"GET\"\n", "")
+        .replace("path = \"/v1/items\"\n", "");
+    let loaded = provider::load("providers/acme.toml", &source).expect("SQL operation loads");
+    let operation = &loaded.connector.operations[0];
+    assert_eq!(operation.interaction_shape, InteractionShape::Unary);
+    assert_eq!(operation.request.driver(), ProtocolDriver::SqlV1);
+    assert!(operation.request.http_method().is_none());
+    assert!(operation.request.http_path().is_none());
+
+    // A database answers one bounded request and returns; connection pooling is a driver fact
+    // below this seam, not a caller-observable lifecycle. No other shape is admitted, and the
+    // HTTP-only request fields remain structurally impossible.
+    let session = source.replace(
+        "interaction_shape = \"unary\"",
+        "interaction_shape = \"leased_session\"",
+    );
+    let error = provider::load("providers/acme.toml", &session)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("SQL v1 is admitted only as `unary`"),
+        "{error}"
+    );
+
+    let with_method = source.replace(
+        "direction = \"read\"",
+        "method = \"GET\"\ndirection = \"read\"",
+    );
+    let error = provider::load("providers/acme.toml", &with_method)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("sql_v1 operation refuses HTTP-only `method` and `path`"),
         "{error}"
     );
 }
