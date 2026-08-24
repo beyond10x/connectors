@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 # The b10x string is banned at the surface of this repository. Allowed:
-# - Pinned provenance URLs (github.com/b10x/...) and the phrase
-#   "the b10x monorepo" in extraction-provenance prose.
+# - Dead github.com/b10x/... URLs ONLY where they are registered or pinned
+#   source identity, never documentation (2026-08-24: every such link in AGENTS.md,
+#   docs/design/, docs/VISION.md and docs/stories/README.md was dropped, and the
+#   Cargo `repository`/`homepage` fields now name github.com/beyond10x/connectors).
+#   What remains, and only in these four files:
+#   * SOURCES.toml — the human twin of the specs/*.provenance.toml reference lists;
+#     the two carry the same bytes and only move together;
+#   * crates/catalog-build/src/document.rs — the catalog document `$id`/`$schema`,
+#     which is embedded in all 65 catalog/*.catalog.json and in catalog.pack, every
+#     one of them sha256-pinned in connectors.lock;
+#   * crates/connector-spec/schema/provider-toml.schema.json — the same, for the
+#     provider-file schema `$id`;
+#   * crates/integration-platform/src/tests.rs — a platform workspaces response
+#     fixture, which is that service's wire bytes and not ours to edit.
+#   The phrase "the b10x monorepo" survives only in SOURCES.toml's note.
 # - Story files (docs/stories/S-*.md): records of what happened, like a
 #   changelog — this repository keeps its history there.
 # - The b10x-bot GitHub App machinery (scripts/as-bot.sh, bot-token.sh,
@@ -42,9 +55,10 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
 patterns=(
-  # provenance
-  'github\.com/b10x'
-  'the b10x monorepo'
+  # dead-monorepo URLs and the monorepo phrase, scoped to the four files that
+  # still carry them as registered or pinned identity (see the header)
+  '^(SOURCES\.toml|crates/catalog-build/src/document\.rs|crates/connector-spec/schema/provider-toml\.schema\.json|crates/integration-platform/src/tests\.rs):[0-9]+:.*github\.com/b10x'
+  '^SOURCES\.toml:[0-9]+:.*the b10x monorepo'
   # bot machinery
   'b10x[-_]bot'
   # provider authority, audiences, wire ids, hash domains, wire keys
@@ -71,7 +85,6 @@ patterns=(
   # provider id grammar: quoted ids, ref/uri grammar, registered artifact
   # paths and file names
   '["'\''`]b10x["'\''`]'
-  '\\"b10x\\"'
   'b10x(:[^:]|@)'
   '[^:]:b10x([^_a-z]|$)'
   '(specs|providers|catalog)/b10x'

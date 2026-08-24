@@ -9,7 +9,7 @@ The 2026-08-17 full-system architecture review's F-001 (critical) found that the
 approval gates were representational: `AdmittedOperation::from_grant_decision` is a public
 constructor over caller-supplied strings, and effect backends checked only the *presence* of an
 approval reference before dispatching
-([review, pinned](https://github.com/b10x/b10x/blob/1e0749233b711744b6e50f9106bba2c33dbbf396/architecture/docs/reviews/2026-08-17-full-system-architecture-review.md)).
+(the pinned review record `architecture/docs/reviews/2026-08-17-full-system-architecture-review.md`).
 
 The refusal half of the disposition has since landed: the hosted route refuses any
 caller-supplied approval reference by name, and re-describes every invocation, refusing anything

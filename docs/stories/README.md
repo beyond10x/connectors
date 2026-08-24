@@ -13,8 +13,8 @@ Context these stories assume, read current authority in order:
 [../design/01-domain-model.md](../design/01-domain-model.md) →
 [../design/02-architecture.md](../design/02-architecture.md) →
 [../VISION.md](../VISION.md) (historical founding intent), grounded by
-[../research/](../research/). Repository housing is governed by
-[`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
+[../research/](../research/). This repository is housed at
+[beyond10x/connectors](https://github.com/beyond10x/connectors).
 
 ## Status
 

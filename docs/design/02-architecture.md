@@ -6,7 +6,7 @@
 inventory (what migrates wholesale, what is redesigned, what is left behind).
 
 Private predecessor decisions are provenance only. Every rule this design carries from them is
-restated here or in an ADR/story in the b10x monorepo so a reader never needs an unavailable record to know the
+restated here or in an ADR/story so a reader never needs an unavailable record to know the
 current contract.
 
 This document fixes the physical shape: repository layout, crate boundaries, storage, the one
