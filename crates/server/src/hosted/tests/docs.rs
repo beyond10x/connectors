@@ -6,6 +6,11 @@
 //! error vocabulary actually contains, and every documented route must exist in the real
 //! router. A deliberately wrong example — an unknown field anywhere — must be refused, which
 //! proves the `deny_unknown_fields` discipline is exercised rather than assumed.
+//!
+//! The public documentation page at `/docs` (S-068) is held to the same standard: every JSON
+//! block it shows must be one of the document's own examples after JSON normalization, the
+//! page must name no absolute origin the document does not, and it must trigger zero
+//! external requests — one self-contained HTML answer.
 
 use serde_json::Value;
 use sha2::Digest as _;
@@ -353,6 +358,250 @@ fn the_document_pins_the_exact_wire_contract_identities_and_audience() {
             "the bearer scheme names the `{scope}` scope"
         );
     }
+}
+
+/// Fetch the public documentation page through the real router, unauthenticated.
+async fn docs_page() -> String {
+    let response = test_router()
+        .oneshot(Request::get("/docs").body(Body::empty()).expect("request"))
+        .await
+        .expect("infallible");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .expect("bounded body");
+    String::from_utf8(body.to_vec()).expect("the page is UTF-8")
+}
+
+/// Reverse the page's HTML escaping; `&amp;` must be undone last or it re-escapes.
+fn unescape_html(text: &str) -> String {
+    text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+}
+
+/// Every JSON block the page marks as lifted from the document, as
+/// `(path, kind, name, parsed value)`. The page wraps each one in an element carrying
+/// `data-example="<path> <kind> <name>"`; the content is HTML-escaped JSON.
+fn page_examples(page: &str) -> Vec<(String, String, String, Value)> {
+    const MARKER: &str = "data-example=\"";
+    let mut examples = Vec::new();
+    let mut rest = page;
+    while let Some(start) = rest.find(MARKER) {
+        let attribute = &rest[start + MARKER.len()..];
+        let (spec, after) = attribute
+            .split_once('"')
+            .expect("the example attribute closes");
+        let mut parts = spec.split(' ');
+        let path = parts.next().expect("the example names its path").to_owned();
+        let kind = parts.next().expect("the example names its kind").to_owned();
+        let name = parts.next().expect("the example names its name").to_owned();
+        assert!(
+            parts.next().is_none(),
+            "the example marker is exactly `<path> <kind> <name>`, got `{spec}`"
+        );
+        let content = &after[after.find('>').expect("the example tag closes") + 1..];
+        let (body, tail) = content
+            .split_once("</")
+            .expect("the example element closes");
+        let value = serde_json::from_str(&unescape_html(body)).unwrap_or_else(|error| {
+            panic!("`{path}` {kind} example `{name}` on the page is not JSON: {error}")
+        });
+        examples.push((path, kind, name, value));
+        rest = tail;
+    }
+    examples
+}
+
+/// Resolve one example the page claims to show back to the document's own value.
+fn documented_example(doc: &Value, path: &str, kind: &str, name: &str) -> Value {
+    let operation = &doc["paths"][path]["post"];
+    let container = match kind {
+        "request" => &operation["requestBody"],
+        "response" => &operation["responses"]["200"],
+        other => panic!("the page marks unknown example kind `{other}`"),
+    };
+    let value = container["content"]["application/json"]["examples"][name]["value"].clone();
+    assert!(
+        !value.is_null(),
+        "the page shows `{path}` {kind} example `{name}`, which the document does not carry"
+    );
+    value
+}
+
+#[tokio::test]
+async fn the_docs_page_is_served_unauthenticated_as_html() {
+    let response = test_router()
+        .oneshot(Request::get("/docs").body(Body::empty()).expect("request"))
+        .await
+        .expect("infallible");
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("text/html; charset=utf-8")
+    );
+    let etag = response
+        .headers()
+        .get(header::ETAG)
+        .and_then(|value| value.to_str().ok())
+        .expect("the page answer carries an ETag")
+        .to_owned();
+    let body = axum::body::to_bytes(response.into_body(), 4 * 1024 * 1024)
+        .await
+        .expect("bounded body");
+    let digest = sha2::Sha256::digest(body.as_ref());
+    let mut expected = String::with_capacity(66);
+    expected.push('"');
+    for byte in digest {
+        expected.push_str(&format!("{byte:02x}"));
+    }
+    expected.push('"');
+    assert_eq!(etag, expected, "the ETag is the content hash of the bytes");
+    let page = String::from_utf8(body.to_vec()).expect("the page is UTF-8");
+    assert!(
+        page.starts_with("<!doctype html>"),
+        "the answer is one HTML document"
+    );
+}
+
+#[tokio::test]
+async fn every_docs_page_example_is_the_documents_example_after_json_normalization() {
+    let doc = document();
+    let page = docs_page().await;
+    let examples = page_examples(&page);
+    // Floor: the five envelope endpoints (request + response each), the MCP
+    // initialize/tools_call requests and initialize response, and the datasource
+    // read-verb blocks.
+    assert!(
+        examples.len() >= 17,
+        "the page keeps its example blocks, found {}",
+        examples.len()
+    );
+    let mut paths = BTreeSet::new();
+    for (path, kind, name, shown) in examples {
+        let documented = documented_example(&doc, &path, &kind, &name);
+        assert_eq!(
+            shown, documented,
+            "`{path}` {kind} example `{name}` on the page drifted from the document"
+        );
+        paths.insert(path);
+    }
+    for path in [
+        "/operations",
+        "/connections",
+        "/catalog",
+        "/events",
+        "/datasources",
+        "/mcp",
+    ] {
+        assert!(
+            paths.contains(path),
+            "the page shows an example for `{path}`"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_docs_page_makes_zero_external_requests() {
+    let doc = document();
+    let page = docs_page().await;
+    // The only absolute origins the page may name are the ones the contract itself
+    // declares (server URLs; an identity origin, were the document to name one). Today
+    // every documented server URL is relative and no origin is named, so the allowed
+    // set is empty and the page must carry no absolute http(s) URL at all.
+    let allowed: Vec<&str> = doc["servers"]
+        .as_array()
+        .expect("the document declares servers")
+        .iter()
+        .filter_map(|server| server["url"].as_str())
+        .filter(|url| url.starts_with("http://") || url.starts_with("https://"))
+        .collect();
+    for scheme in ["http://", "https://"] {
+        let mut rest = page.as_str();
+        while let Some(start) = rest.find(scheme) {
+            let tail = &rest[start..];
+            let url = tail
+                .split(|character: char| {
+                    character.is_whitespace() || matches!(character, '"' | '\'' | '<' | ')')
+                })
+                .next()
+                .unwrap_or(tail);
+            assert!(
+                allowed.iter().any(|origin| url.starts_with(origin)),
+                "the page names a foreign absolute URL: `{url}`"
+            );
+            rest = &tail[scheme.len()..];
+        }
+    }
+    for fetching in [
+        "<script", "<img", "<link", "<iframe", "<object", "<embed", "<video", "<audio", "src=",
+        "srcset=", "@import", "url(",
+    ] {
+        assert!(
+            !page.contains(fetching),
+            "the page must not carry `{fetching}`: one self-contained document, zero requests"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_docs_page_links_the_contract_and_renders_its_version() {
+    let doc = document();
+    let page = docs_page().await;
+    assert!(
+        page.contains("href=\"openapi.json\""),
+        "the page links the machine-readable contract relatively"
+    );
+    let version = doc["info"]["version"]
+        .as_str()
+        .expect("the document declares its version");
+    assert!(
+        page.contains(&format!("<span class=\"version\">{version}</span>")),
+        "the page renders the document's version"
+    );
+    assert!(
+        page.contains(CONNECTORS_AUDIENCE),
+        "the page names the identity audience the document pins"
+    );
+    assert!(
+        page.contains("/v1/access-token"),
+        "the page shows the token mint step"
+    );
+}
+
+#[tokio::test]
+async fn the_docs_page_refusal_table_carries_every_documented_code() {
+    let doc = document();
+    let page = docs_page().await;
+    let schemas = doc["components"]["schemas"]
+        .as_object()
+        .expect("the document declares schemas");
+    let mut families = 0usize;
+    for (name, schema) in schemas {
+        let Some(codes) = schema
+            .pointer("/properties/code/enum")
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        families += 1;
+        for code in codes {
+            let code = code.as_str().expect("a documented code is a string");
+            assert!(
+                page.contains(&format!("<code>{code}</code>")),
+                "the refusal table misses `{code}` from `{name}`"
+            );
+        }
+    }
+    assert_eq!(
+        families, 5,
+        "the closed error vocabularies stay one per envelope endpoint"
+    );
 }
 
 #[tokio::test]
