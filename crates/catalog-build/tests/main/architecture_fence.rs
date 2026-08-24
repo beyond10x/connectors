@@ -28,9 +28,10 @@ const CLI_TOTAL_LINE_LIMIT: usize = 856;
 const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     (
         "crates/connector-spec/src/ir.rs",
-        2_717,
+        2_734,
         "legacy compiler IR pending declaration-family extraction; +14 for the closed `audio_v1` \
-         driver and its request variant, +16 for the closed `cdp_v1` driver and its request variant",
+         driver and its request variant, +16 for the closed `cdp_v1` driver and its request \
+         variant, +17 for the closed `sql_v1` driver and its request variant",
     ),
     (
         "crates/connector-secrets/src/file.rs",
@@ -66,9 +67,10 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/document.rs",
-        2_568,
+        2_592,
         "canonical lowering pending section-oriented extraction; +27 for the closed `audio_v1` \
-         driver's request marker and schema branch, +21 for the closed `cdp_v1` driver's",
+         driver's request marker and schema branch, +21 for the closed `cdp_v1` driver's, +24 \
+         for the closed `sql_v1` driver's",
     ),
     (
         "crates/catalog-build/src/scaffold.rs",
@@ -77,10 +79,10 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/site.rs",
-        1_751,
+        1_754,
         "site projection pending model and renderer split; the growth past 1,718 is in-flight site \
-         work, plus 2 lines for the closed `audio_v1` protocol entry and 4 for the closed `cdp_v1` \
-         one",
+         work, plus 2 lines for the closed `audio_v1` protocol entry, 4 for the closed `cdp_v1` \
+         one, and 3 for the closed `sql_v1` one",
     ),
 ];
 

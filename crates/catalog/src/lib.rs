@@ -206,6 +206,7 @@ pub enum ProtocolDriver {
     SipV1,
     AudioV1,
     CdpV1,
+    SqlV1,
 }
 
 /// Placement requirement before deployment selection.

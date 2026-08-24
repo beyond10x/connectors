@@ -34,5 +34,6 @@ pub use grant::{
 };
 pub use plan::{
     AdmittedOperation, AudioPlan, BrowserPlan, Capability, DriverId, HttpPlan, Implementation,
-    Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
+    Interaction, MediatedHttpPlan, OperationFacts, Placement, ProtocolPlan, SipPlan, SqlPlan,
+    ZeroIoPlan,
 };
