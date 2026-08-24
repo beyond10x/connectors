@@ -94,7 +94,7 @@ will spawn children as each milestone is designed.
 | [S-060](S-060-monitoring-joins-the-mcp-toolset.md) | Monitoring joins the MCP toolset | done | Platform | server |
 | [S-061](S-061-a-logged-in-person-needs-no-configuration.md) | A logged-in person needs no configuration | backlog | Platform | config, integrations |
 | [S-062](S-062-discovery-reads-the-cluster-scoped-database-resources.md) | Discovery reads the cluster-scoped database resources | ready | Platform | integrations, server |
-| [S-063](S-063-the-deployment-list-pages-instead-of-refusing.md) | The deployment list pages instead of refusing | ready | Platform | integrations, server |
+| [S-063](S-063-the-deployment-list-pages-instead-of-refusing.md) | The deployment list pages instead of refusing | done | Platform | integrations, server |
 | [S-064](S-064-monitoring-tool-schemas-tell-the-truth.md) | Monitoring tool schemas tell the truth | done | Platform | integrations, server |
 
 ## Epics in this seed

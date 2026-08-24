@@ -2,7 +2,7 @@
 id: S-063
 title: "The deployment list pages instead of refusing"
 pillar: Platform
-status: in-progress
+status: done
 design: ../design/14-mcp-transport-for-the-hosted-connectors-server.md
 epic: mcp-entry
 areas: [integrations, server]
