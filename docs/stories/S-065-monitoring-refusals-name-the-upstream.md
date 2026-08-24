@@ -2,7 +2,7 @@
 id: S-065
 title: "Monitoring refusals name the upstream"
 pillar: Platform
-status: ready
+status: in-progress
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations]
@@ -23,15 +23,15 @@ same context-free refusal (`integration-monitoring/src/backend.rs:110-114` and t
 
 ## Acceptance
 
-- A refused monitoring dispatch logs one structured server-side line naming the operation,
-  the route (direct/mediated), and the upstream HTTP status (never the body, which may carry
-  data) — enough to distinguish 401 vs 403 vs 404 vs transport failure from `kubectl logs`.
-- The refusal's `structuredContent`/message distinguishes at least "upstream refused
-  (status class)" from "upstream unreachable" from "credential custody failed", without
-  leaking upstream body content.
-- With that in place, the live grafana-parent and alertmanager failures are diagnosed on the
-  dev deployment and their concrete cause is recorded in this story (fix here if it is a
-  document/path bug; a provisioning follow-up if it is credential rights).
+- [x] A refused monitoring dispatch logs one structured server-side line naming the operation,
+      the route (direct/mediated), and the upstream HTTP status (never the body, which may carry
+      data) — enough to distinguish 401 vs 403 vs 404 vs transport failure from `kubectl logs`.
+- [x] The refusal's `structuredContent`/message distinguishes at least "upstream refused
+      (status class)" from "upstream unreachable" from "credential custody failed", without
+      leaking upstream body content.
+- [ ] With that in place, the live grafana-parent and alertmanager failures are diagnosed on the
+      dev deployment and their concrete cause is recorded in this story (fix here if it is a
+      document/path bug; a provisioning follow-up if it is credential rights).
 
 ## Notes
 
@@ -39,3 +39,26 @@ same context-free refusal (`integration-monitoring/src/backend.rs:110-114` and t
   `/apis/dashboard.grafana.app/v1` 401 unauthenticated; five Prometheus targets and Loki
   answer with real data through the proxy; Alertmanager and the Grafana parent both refuse
   `unavailable` after input validation passes.
+
+## Progress
+
+- 2026-08-24 — implemented on `impl/S-065`. The `HttpExecutor` seam
+  (`integration-monitoring/src/backend.rs`) now classifies a failed exchange as
+  `UpstreamFailure::{Transport, Status(u16), Body}` instead of collapsing it at the
+  `PortExecutor`; `refuse_dispatch()` emits one JSON stderr line per refused dispatch
+  (`event: monitoring_dispatch_refused`, `operation_ref`, `route: direct|mediated`, `cause:
+  upstream-status|upstream-transport|upstream-body|credential-custody`, and `upstream_status`
+  with the exact numeric status when one arrived) and answers the still-`unavailable`,
+  still-retriable refusal with a class-naming message ("upstream_status 4xx" / "upstream is
+  unreachable" / "non-JSON response" / "credential custody failed"). `load_credential` refuses
+  custody failures (store reachable-but-failing) distinctly from an absent credential
+  (unchanged `not_granted`). The upstream body never travels into either the log or the
+  message. Tests: `refused_dispatches_distinguish_upstream_status_class_from_transport`
+  (401/403/404/500/transport through the real `PortExecutor` over a scripted egress),
+  `refusal_log_record_names_operation_route_and_exact_upstream_status`,
+  `credential_custody_failure_is_distinguished_from_upstream_failures`. The stderr emission
+  itself is a plain `eprintln!` matching the crate idiom (integration-slack precedent) and is
+  not capture-tested — the record content is tested as a pure value.
+- **Live diagnosis pending deploy** (acceptance item 3): the dev-deployment grafana-parent and
+  alertmanager causes are to be read from the new `monitoring_dispatch_refused` lines after
+  the next deploy and recorded here.

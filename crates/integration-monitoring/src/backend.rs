@@ -58,6 +58,8 @@ const GRAFANA_CREDENTIAL_LEAF: &str = "service_account_token";
 const AUDIT_STATE_KEY: &str = "monitoring.audit";
 const DEFAULT_SERVICE: &str = "default";
 const TARGET_BASE: &str = "https://mediated-target.invalid";
+const ROUTE_DIRECT: &str = "direct";
+const ROUTE_MEDIATED: &str = "mediated";
 const MAX_CONNECT_SESSIONS: usize = 16;
 const MAX_TOKEN_BYTES: usize = 8 * 1024;
 const MAX_AUDIT_BYTES: u64 = 16 * 1024 * 1024;
@@ -82,7 +84,7 @@ trait HttpExecutor: Send + Sync + 'static {
         &self,
         connection_ref: &str,
         request: Request,
-    ) -> Result<Value, MonitoringError>;
+    ) -> Result<Value, UpstreamFailure>;
 }
 
 struct PortExecutor {
@@ -95,7 +97,7 @@ impl HttpExecutor for PortExecutor {
         &self,
         connection_ref: &str,
         request: Request,
-    ) -> Result<Value, MonitoringError> {
+    ) -> Result<Value, UpstreamFailure> {
         let response = self
             .egress
             .execute(
@@ -107,11 +109,11 @@ impl HttpExecutor for PortExecutor {
                 },
             )
             .await
-            .map_err(|_| MonitoringError::new("http-request"))?;
+            .map_err(|_| UpstreamFailure::Transport)?;
         if !response.is_success() {
-            return Err(MonitoringError::new("http-response"));
+            return Err(UpstreamFailure::Status(response.status));
         }
-        serde_json::from_slice(&response.body).map_err(|_| MonitoringError::new("http-json"))
+        serde_json::from_slice(&response.body).map_err(|_| UpstreamFailure::Body)
     }
 }
 
@@ -700,7 +702,9 @@ impl MonitoringInner {
                 .clone()
                 .filter(|parent| parent.connection_ref == request.connection_ref)
                 .ok_or_else(operation_not_granted)?;
-            let token = self.load_credential().await?;
+            let token = self
+                .load_credential(&request.operation_ref, ROUTE_DIRECT)
+                .await?;
             let value = self
                 .execute_direct(context, &parent, &token, operation, request.input)
                 .await?;
@@ -722,7 +726,9 @@ impl MonitoringInner {
             if !child_is_current(&lock(&self.state), &child) {
                 return Err(operation_not_granted());
             }
-            let token = self.load_credential().await?;
+            let token = self
+                .load_credential(&request.operation_ref, ROUTE_MEDIATED)
+                .await?;
             let value = self
                 .execute_mediated(context, &child, &token, operation, request.input)
                 .await?;
@@ -751,11 +757,19 @@ impl MonitoringInner {
         }))
     }
 
-    async fn load_credential(&self) -> Result<Secret, OperationError> {
+    async fn load_credential(
+        &self,
+        operation_ref: &str,
+        route: &str,
+    ) -> Result<Secret, OperationError> {
         match self.credential_store.get(&self.credential_ref).await {
             Ok(secret) => Ok(secret),
             Err(error) if error.is_not_found() => Err(operation_not_granted()),
-            Err(_) => Err(operation_unavailable()),
+            Err(_) => Err(refuse_dispatch(
+                operation_ref,
+                route,
+                RefusalCause::CredentialCustody,
+            )),
         }
     }
 
@@ -816,7 +830,7 @@ impl MonitoringInner {
         self.executor
             .execute(&parent.connection_ref, request.request)
             .await
-            .map_err(|_| operation_unavailable())
+            .map_err(|failure| refuse_dispatch(&operation.id, ROUTE_DIRECT, failure.into()))
     }
 
     async fn execute_mediated(
@@ -894,7 +908,7 @@ impl MonitoringInner {
         self.executor
             .execute(&child.parent_connection_ref, request)
             .await
-            .map_err(|_| operation_unavailable())
+            .map_err(|failure| refuse_dispatch(&operation.id, ROUTE_MEDIATED, failure.into()))
     }
 
     fn connections_for_operation(&self, operation_ref: &str) -> Vec<ConnectionSummary> {
@@ -1147,7 +1161,9 @@ impl MonitoringInner {
             .parent
             .clone()
             .ok_or_else(operation_not_granted)?;
-        let token = self.load_credential().await?;
+        let token = self
+            .load_credential(GRAFANA_DATASOURCES_LIST, ROUTE_DIRECT)
+            .await?;
         let operation =
             operation_document(GRAFANA_DATASOURCES_LIST).ok_or_else(operation_unavailable)?;
         let output = self
