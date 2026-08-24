@@ -2,6 +2,7 @@
 
 //! Kubernetes Integration adapters.
 
+mod databases;
 mod hosted;
 mod local;
 mod local_services;

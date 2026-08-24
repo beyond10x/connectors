@@ -35,3 +35,23 @@ anyone writing configuration.
 
 - 2026-08-24 — filed from design 15 (Timo: k8s is "not only operation provider but also
   endpoint discoverer").
+- 2026-08-24 — implemented on `impl/S-059`: a second hosted datasource `kubernetes.databases`
+  beside `kubernetes.workloads` — bindings per admitted namespace behind the same
+  `read_groups` gate, read verbs list (paged) and get. Descriptors
+  `{engine, name, host?, port?, database?, secret_ref{name, namespace}?, ready}` are derived
+  from the Crossplane `databases.{mysql,postgresql}.sql.crossplane.io/v1alpha1` managed
+  resources (`crate::databases`): engine from the API group, `status.atProvider` over
+  `spec.forProvider`, absent facts stated as `null` rather than guessed, connection-secret
+  references by name only — no code path reads a Secret. The in-cluster reader GETs the two
+  namespaced CRD list endpoints with the shared bounded-read/per-call-token pattern; 403 maps
+  to `not_granted` and 404 (CRD absent) to an empty inventory, so a cluster without
+  Crossplane simply discovers nothing. Listing pages MySQL first then PostgreSQL through an
+  authority-bound cursor store of its own; defaulted `DeploymentReader` methods keep the
+  local placement and existing fakes compiling unchanged (the S-054 `pod_logs` precedent).
+  Nine tests against provider-sql-shaped fakes in `hosted_database_tests.rs` (split out to
+  stay under the 1500-line module fence), including the no-secret-value canary; the
+  repo-wide invariant scans (rule 15's `approval_evidence_ref` sweep, the module-size and
+  brand fences) cover the new module mechanically. **For the close note (chart RBAC): the
+  in-cluster ServiceAccount needs `get` + `list` on the `databases` plural of both API
+  groups — `mysql.sql.crossplane.io` and `postgresql.sql.crossplane.io` — in each admitted
+  namespace.**
