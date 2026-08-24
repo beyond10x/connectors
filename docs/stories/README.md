@@ -97,7 +97,7 @@ will spawn children as each milestone is designed.
 | [S-063](S-063-the-deployment-list-pages-instead-of-refusing.md) | The deployment list pages instead of refusing | done | Platform | integrations, server |
 | [S-064](S-064-monitoring-tool-schemas-tell-the-truth.md) | Monitoring tool schemas tell the truth | done | Platform | integrations, server |
 | [S-065](S-065-monitoring-refusals-name-the-upstream.md) | Monitoring refusals name the upstream | done | Platform | integrations |
-| [S-066](S-066-the-transport-refusal-names-its-class.md) | The transport refusal names its class | ready | Platform | integrations |
+| [S-066](S-066-the-transport-refusal-names-its-class.md) | The transport refusal names its class | done | Platform | integrations |
 | [S-067](S-067-the-server-serves-its-own-openapi-contract.md) | The server serves its own OpenAPI contract | ready | Platform | server, docs |
 | [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | ready | Platform | server, docs |
 
