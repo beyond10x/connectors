@@ -251,6 +251,7 @@ pub fn router(
         .route("/readyz", get(readiness))
         .route("/healthz", get(readiness))
         .route("/openapi.json", get(docs::openapi))
+        .route("/docs", get(docs::page))
         .route(
             "/operations",
             post(operation).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),

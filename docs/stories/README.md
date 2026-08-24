@@ -99,7 +99,7 @@ will spawn children as each milestone is designed.
 | [S-065](S-065-monitoring-refusals-name-the-upstream.md) | Monitoring refusals name the upstream | done | Platform | integrations |
 | [S-066](S-066-the-transport-refusal-names-its-class.md) | The transport refusal names its class | done | Platform | integrations |
 | [S-067](S-067-the-server-serves-its-own-openapi-contract.md) | The server serves its own OpenAPI contract | done | Platform | server, docs |
-| [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | ready | Platform | server, docs |
+| [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | done | Platform | server, docs |
 
 ## Epics in this seed
 
