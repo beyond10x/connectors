@@ -2,7 +2,7 @@
 id: S-065
 title: "Monitoring refusals name the upstream"
 pillar: Platform
-status: in-progress
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [integrations]
@@ -62,3 +62,17 @@ same context-free refusal (`integration-monitoring/src/backend.rs:110-114` and t
 - **Live diagnosis pending deploy** (acceptance item 3): the dev-deployment grafana-parent and
   alertmanager causes are to be read from the new `monitoring_dispatch_refused` lines after
   the next deploy and recorded here.
+
+## Progress
+
+- 2026-08-24, live diagnosis on release rev 16 with the new refusals:
+  - `alertmanager_alerts` (mediated): Grafana's datasource proxy answers **403** — the
+    service-account token lacks alertmanager-datasource query rights in Grafana RBAC.
+    Provisioning follow-up on the infra Grafana (grant the SA alertmanager datasource
+    access); not a code defect.
+  - `grafana_dashboards_list` (direct): **upstream-transport**, while
+    `grafana-datasources-list` succeeds on the same route, credential and origin every
+    300 s reconcile tick (zero reconcile refusals in the log). The failure is specific to
+    the dashboards operation's resolved request; the transport error class
+    (timeout/connect/TLS) is the one detail the refusal log still discards — S-066 adds it
+    and closes the operation.
