@@ -19,35 +19,43 @@ impl KubernetesStatusBackend {
     /// binding ref at all. A ref that names no namespace is the caller's mistake and says so; a
     /// namespace the principal cannot read is a real grant gap and names the namespace, the
     /// groups that carry read, and that group membership can arrive late.
+    ///
+    /// `binding_ref_of` is the datasource's own binding derivation: the workload and database
+    /// bindings are domain-separated digests over the same namespaces, so a ref resolves for
+    /// exactly the datasource that issued it.
     fn binding_namespace<'a>(
         &'a self,
         context: &PrincipalContext,
+        datasource_ref: &str,
         binding_ref: &str,
+        binding_ref_of: fn(&str) -> String,
     ) -> Result<&'a str, DatasourceError> {
         let Some((namespace, access)) = self
             .namespace_access
             .iter()
-            .find(|(namespace, _)| namespace_binding_ref(namespace) == binding_ref)
+            .find(|(namespace, _)| binding_ref_of(namespace) == binding_ref)
         else {
             return Err(DatasourceError::new(
                 DatasourceErrorCode::InvalidInput,
                 format!(
-                    "`{binding_ref}` is not a binding of `{DATASOURCE}`; list its bindings and read through one of those"
+                    "`{binding_ref}` is not a binding of `{datasource_ref}`; list its bindings and read through one of those"
                 ),
                 false,
             ));
         };
         if !self.can_read(context, namespace) {
-            return Err(
-                self.namespace_read_grant_missing(std::iter::once((namespace.as_str(), access)))
-            );
+            return Err(self.namespace_read_grant_missing(
+                datasource_ref,
+                std::iter::once((namespace.as_str(), access)),
+            ));
         }
         Ok(namespace.as_str())
     }
 
     /// The refusal for a principal whose groups grant read on no configured namespace.
-    fn missing_read_grant(&self) -> DatasourceError {
+    fn missing_read_grant(&self, datasource_ref: &str) -> DatasourceError {
         self.namespace_read_grant_missing(
+            datasource_ref,
             self.namespace_access
                 .iter()
                 .map(|(namespace, access)| (namespace.as_str(), access)),
@@ -61,6 +69,7 @@ impl KubernetesStatusBackend {
     /// later, so a caller told "not granted" flatly would escalate a condition that clears.
     fn namespace_read_grant_missing<'a>(
         &self,
+        datasource_ref: &str,
         namespaces: impl Iterator<Item = (&'a str, &'a NamespaceAccess)>,
     ) -> DatasourceError {
         let mut named = Vec::new();
@@ -74,14 +83,14 @@ impl KubernetesStatusBackend {
         if named.is_empty() {
             return DatasourceError::new(
                 DatasourceErrorCode::NotGranted,
-                format!("this deployment configures no readable namespace for `{DATASOURCE}`"),
+                format!("this deployment configures no readable namespace for `{datasource_ref}`"),
                 false,
             );
         }
         DatasourceError::new(
             DatasourceErrorCode::NotGranted,
             format!(
-                "reading `{DATASOURCE}` needs Identity group membership for {}. Ask whoever administers your Identity groups to add you, then retry.",
+                "reading `{datasource_ref}` needs Identity group membership for {}. Ask whoever administers your Identity groups to add you, then retry.",
                 named.join("; ")
             ),
             true,
@@ -92,26 +101,65 @@ impl KubernetesStatusBackend {
     ///
     /// Everything this receiver owns is above the seam: the tenant binding, the Identity groups
     /// that carry read on a configured namespace, and the audit ref this deployment stamps. What a
-    /// workload *is* belongs to `crate::workloads` and is identical in every host mode.
+    /// workload — or a discovered database endpoint — *is* belongs to `crate::workloads` and
+    /// `crate::databases` and is identical in every host mode.
     async fn read_datasource(
         &self,
         context: &PrincipalContext,
         request: ReadRequest,
     ) -> Result<DatasourceResult, DatasourceError> {
-        let namespace = self
-            .binding_namespace(context, &request.binding_ref)?
-            .to_owned();
-        let connector_audit_ref = audit_ref(context, DATASOURCE, &namespace, "workloads");
-        read_workloads(
-            self.reader.as_ref(),
-            &self.cursors,
-            context,
-            &namespace,
-            request,
-            connector_audit_ref,
-        )
-        .await
+        match request.datasource_ref.as_str() {
+            DATASOURCE => {
+                let namespace = self
+                    .binding_namespace(
+                        context,
+                        DATASOURCE,
+                        &request.binding_ref,
+                        namespace_binding_ref,
+                    )?
+                    .to_owned();
+                let connector_audit_ref = audit_ref(context, DATASOURCE, &namespace, "workloads");
+                read_workloads(
+                    self.reader.as_ref(),
+                    &self.cursors,
+                    context,
+                    &namespace,
+                    request,
+                    connector_audit_ref,
+                )
+                .await
+            }
+            DATABASES_DATASOURCE => {
+                let namespace = self
+                    .binding_namespace(
+                        context,
+                        DATABASES_DATASOURCE,
+                        &request.binding_ref,
+                        database_namespace_binding_ref,
+                    )?
+                    .to_owned();
+                let connector_audit_ref =
+                    audit_ref(context, DATABASES_DATASOURCE, &namespace, "databases");
+                read_database_endpoints(
+                    self.reader.as_ref(),
+                    &self.database_cursors,
+                    context,
+                    &namespace,
+                    request,
+                    connector_audit_ref,
+                )
+                .await
+            }
+            _ => Err(datasource_not_found("Kubernetes datasource was not found")),
+        }
     }
+}
+
+/// Both hosted Kubernetes datasources: the workload projection and the database-endpoint
+/// discovery (S-059). One Integration owns both because they are two projections of the same
+/// admitted cluster, behind the same namespace admission.
+fn kubernetes_datasource_ref(reference: &str) -> bool {
+    reference == DATASOURCE || reference == DATABASES_DATASOURCE
 }
 
 #[async_trait]
@@ -159,9 +207,13 @@ impl ConnectorBackend for KubernetesStatusBackend {
 
     fn owns_datasource(&self, request: &DatasourceRequest) -> bool {
         match request {
-            DatasourceRequest::Describe(request) => request.datasource_ref == DATASOURCE,
-            DatasourceRequest::Bindings(request) => request.datasource_ref == DATASOURCE,
-            DatasourceRequest::Read(request) => request.datasource_ref == DATASOURCE,
+            DatasourceRequest::Describe(request) => {
+                kubernetes_datasource_ref(&request.datasource_ref)
+            }
+            DatasourceRequest::Bindings(request) => {
+                kubernetes_datasource_ref(&request.datasource_ref)
+            }
+            DatasourceRequest::Read(request) => kubernetes_datasource_ref(&request.datasource_ref),
             DatasourceRequest::Search(_) => false,
         }
     }
@@ -263,41 +315,67 @@ impl ConnectorBackend for KubernetesStatusBackend {
         match request {
             DatasourceRequest::Search(DatasourceSearchRequest { query, limit }) => {
                 let query = query.to_ascii_lowercase();
-                let definitions = (self.has_read_access(context)
-                    && (query.is_empty()
+                let mut definitions = Vec::new();
+                if self.has_read_access(context) {
+                    if query.is_empty()
                         || ["kubernetes", "deployment", "workload", "pod", "rollout"]
                             .iter()
-                            .any(|term| query.contains(term))))
-                .then(datasource_summary)
-                .into_iter()
-                .take(usize::from(limit))
-                .collect();
+                            .any(|term| query.contains(term))
+                    {
+                        definitions.push(datasource_summary());
+                    }
+                    if query.is_empty()
+                        || [
+                            "kubernetes",
+                            "database",
+                            "sql",
+                            "crossplane",
+                            "endpoint",
+                            "mysql",
+                            "postgresql",
+                        ]
+                        .iter()
+                        .any(|term| query.contains(term))
+                    {
+                        definitions.push(databases_summary());
+                    }
+                }
+                definitions.truncate(usize::from(limit));
                 Ok(DatasourceResult::Search { definitions })
             }
             // A principal without a read grant used to fall through to "Kubernetes datasource was
             // not found" — the datasource exists, the grant does not, and only one of those is
             // something the person can act on.
             DatasourceRequest::Describe(DatasourceDescribeRequest { datasource_ref })
-                if datasource_ref == DATASOURCE =>
+                if kubernetes_datasource_ref(&datasource_ref) =>
             {
-                if self.has_read_access(context) {
-                    Ok(DatasourceResult::Describe(datasource_description(context)))
+                if !self.has_read_access(context) {
+                    return Err(self.missing_read_grant(&datasource_ref));
+                }
+                if datasource_ref == DATABASES_DATASOURCE {
+                    Ok(DatasourceResult::Describe(databases_description(context)))
                 } else {
-                    Err(self.missing_read_grant())
+                    Ok(DatasourceResult::Describe(datasource_description(context)))
                 }
             }
             DatasourceRequest::Bindings(BindingSearchRequest {
                 datasource_ref,
                 query,
                 limit,
-            }) if datasource_ref == DATASOURCE => {
+            }) if kubernetes_datasource_ref(&datasource_ref) => {
                 let query = query.to_ascii_lowercase();
+                let binding_of: fn(&str, &str) -> DatasourceBinding =
+                    if datasource_ref == DATABASES_DATASOURCE {
+                        database_namespace_binding
+                    } else {
+                        namespace_binding
+                    };
                 let bindings = self
                     .readable_namespaces(context)
                     .into_iter()
                     .filter(|namespace| query.is_empty() || namespace.contains(&query))
                     .take(usize::from(limit))
-                    .map(|namespace| namespace_binding(CONNECTION, namespace))
+                    .map(|namespace| binding_of(CONNECTION, namespace))
                     .collect();
                 Ok(DatasourceResult::Bindings { bindings })
             }
