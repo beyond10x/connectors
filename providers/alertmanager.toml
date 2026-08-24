@@ -3,7 +3,10 @@
 id = "alertmanager"
 vendor = "Prometheus Alertmanager"
 authority = "io.prometheus.alertmanager.api"
-base_url = "{origin}/api/v2"
+# The v2 sub-path lives in the operation path, not here: a mediated dispatch resolves against
+# the route adapter's own base, and a base-level sub-path would be silently dropped there —
+# the live 403 "plugin proxy route access denied" behind S-066.
+base_url = "{origin}"
 description = "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection"
 verify = "alertmanager-alerts-list"
 
@@ -12,7 +15,7 @@ path = "specs/alertmanager/http-api-v0.31.0.openapi.yaml"
 source_url = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
 upstream_version = "0.31.0"
 fetched_at = "2026-08-15T00:00:00Z"
-sha256 = "081c702b33459ec2af24df9095b82b3a4cca515a8292e05699aae8fea180d7b4"
+sha256 = "a2ab09feec95d71abc238f7945bc4edac45fa89c6e462473106ea04d43577957"
 
 [[services]]
 name = "default"
