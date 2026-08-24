@@ -41,6 +41,8 @@ use sha2::{Digest as _, Sha256};
 
 use service::PrincipalContext;
 
+use crate::databases::{CrossplaneDatabase, DatabaseEngine, DatabaseList};
+
 pub(crate) const STATUS_OPERATION: &str = "kubernetes.deployment.status";
 pub(crate) const RESTART_OPERATION: &str = "kubernetes.deployment.rollout-restart";
 pub(crate) const LOGS_OPERATION: &str = "kubernetes.pod.logs";
@@ -89,6 +91,35 @@ pub(crate) trait DeploymentReader: Send + Sync {
         _resource_version: &str,
     ) -> Result<RestartAccepted, OperationError> {
         Err(unavailable("Kubernetes rollout restart is unavailable"))
+    }
+
+    /// One engine's page of Crossplane Database managed resources (S-059). Defaulted for the
+    /// same reason `pod_logs` is: only the hosted placement discovers database endpoints
+    /// today, the local placement and existing fakes compile unchanged, and a placement that
+    /// never offers `kubernetes.databases` must still refuse honestly if the call arrives.
+    async fn list_databases(
+        &self,
+        _namespace: &str,
+        _engine: DatabaseEngine,
+        _limit: u16,
+        _cursor: Option<&str>,
+    ) -> Result<DatabaseList, DatasourceError> {
+        Err(datasource_unavailable(
+            "Kubernetes database endpoint listing is unavailable",
+        ))
+    }
+
+    /// One Crossplane Database managed resource by name (S-059); defaulted like
+    /// `list_databases`.
+    async fn database_detail(
+        &self,
+        _namespace: &str,
+        _engine: DatabaseEngine,
+        _name: &str,
+    ) -> Result<CrossplaneDatabase, DatasourceError> {
+        Err(datasource_unavailable(
+            "Kubernetes database endpoint detail is unavailable",
+        ))
     }
 
     /// Defaulted so the local placement and existing fakes compile unchanged: the local
@@ -788,7 +819,7 @@ pub(crate) struct CursorStore {
 }
 
 impl CursorStore {
-    fn resolve(
+    pub(crate) fn resolve(
         &self,
         context: &PrincipalContext,
         namespace: &str,
@@ -821,7 +852,7 @@ impl CursorStore {
         Ok(Some(state.provider_cursor))
     }
 
-    fn store(
+    pub(crate) fn store(
         &self,
         context: &PrincipalContext,
         namespace: &str,

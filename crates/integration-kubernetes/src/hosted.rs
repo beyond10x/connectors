@@ -15,8 +15,8 @@ use protocol::connection::{
     ConnectionSummary as ControlConnectionSummary, DescribeRequest as ConnectionDescribeRequest,
 };
 use protocol::datasource::{
-    BindingSearchRequest, DatasourceError, DatasourceErrorCode, DatasourceRequest,
-    DatasourceResult, DescribeRequest as DatasourceDescribeRequest, ReadRequest,
+    BindingSearchRequest, DatasourceBinding, DatasourceError, DatasourceErrorCode,
+    DatasourceRequest, DatasourceResult, DescribeRequest as DatasourceDescribeRequest, ReadRequest,
     SearchRequest as DatasourceSearchRequest,
 };
 use protocol::operation::{
@@ -34,7 +34,9 @@ use service::{BackendCapabilities, ConnectorBackend, PrincipalContext};
 
 // The workload projection is shared with every other host mode, so a Deployment read
 // through a workstation kubeconfig and one read through this ServiceAccount are the same
-// record. See `crate::workloads`.
+// record. See `crate::workloads`. The database-endpoint discovery projection (S-059) is
+// shared the same way; see `crate::databases`.
+use crate::databases::*;
 use crate::workloads::*;
 
 mod datasource;
@@ -59,6 +61,9 @@ pub struct KubernetesStatusBackend {
     operator_groups: BTreeSet<String>,
     reader: Arc<dyn DeploymentReader>,
     cursors: CursorStore,
+    /// Its own store: a paging cursor is issued by one datasource and must not resolve in the
+    /// other, even for the same namespace and principal.
+    database_cursors: CursorStore,
 }
 
 #[derive(Clone)]
@@ -116,6 +121,7 @@ impl KubernetesStatusBackend {
                 token_file: token_file.into(),
             }),
             cursors: CursorStore::default(),
+            database_cursors: CursorStore::default(),
         })
     }
 
@@ -134,6 +140,7 @@ impl KubernetesStatusBackend {
             expected_tenant,
             reader,
             cursors: CursorStore::default(),
+            database_cursors: CursorStore::default(),
         })
     }
 
@@ -591,6 +598,78 @@ impl DeploymentReader for InClusterReader {
         })
     }
 
+    async fn list_databases(
+        &self,
+        namespace: &str,
+        engine: DatabaseEngine,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<DatabaseList, DatasourceError> {
+        let mut endpoint = self.api_url(&[
+            "apis",
+            engine.group(),
+            DATABASE_CRD_VERSION,
+            "namespaces",
+            namespace,
+            "databases",
+        ])?;
+        {
+            let mut query = endpoint.query_pairs_mut();
+            query.append_pair("limit", &limit.to_string());
+            if let Some(cursor) = cursor {
+                query.append_pair("continue", cursor);
+            }
+        }
+        let list: KubernetesList<CrossplaneDatabase> = match self.get_json(endpoint).await {
+            // A cluster without the Crossplane provider serves no such group, and the API
+            // answers the namespaced list with 404. That is an empty inventory, not a failure:
+            // a deployment without Crossplane simply discovers nothing. (A 403 stays the
+            // `not_granted` refusal `get_json` maps it to.)
+            Err(error) if error.code == DatasourceErrorCode::NotFound => {
+                return Ok(DatabaseList {
+                    items: Vec::new(),
+                    next_cursor: None,
+                });
+            }
+            result => result?,
+        };
+        Ok(DatabaseList {
+            items: list.items,
+            next_cursor: (!list.metadata.continue_token.is_empty())
+                .then_some(list.metadata.continue_token),
+        })
+    }
+
+    async fn database_detail(
+        &self,
+        namespace: &str,
+        engine: DatabaseEngine,
+        name: &str,
+    ) -> Result<CrossplaneDatabase, DatasourceError> {
+        let endpoint = self.api_url(&[
+            "apis",
+            engine.group(),
+            DATABASE_CRD_VERSION,
+            "namespaces",
+            namespace,
+            "databases",
+            name,
+        ])?;
+        let database: CrossplaneDatabase = self.get_json(endpoint).await.map_err(|error| {
+            if error.code == DatasourceErrorCode::NotFound {
+                datasource_not_found("Kubernetes database endpoint was not found")
+            } else {
+                error
+            }
+        })?;
+        if database.metadata.namespace != namespace || database.metadata.name != name {
+            return Err(datasource_unavailable(
+                "Kubernetes returned a different database resource",
+            ));
+        }
+        Ok(database)
+    }
+
     async fn pod_logs(
         &self,
         namespace: &str,
@@ -995,3 +1074,5 @@ fn audit_ref(
 
 #[cfg(test)]
 include!("hosted_tests.rs");
+#[cfg(test)]
+include!("hosted_database_tests.rs");

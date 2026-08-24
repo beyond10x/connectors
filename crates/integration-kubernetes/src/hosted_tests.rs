@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use protocol::datasource::DatasourceRead;
+    use protocol::datasource::{Completeness, DatasourceRead, RecordView};
 
     struct Reader;
 
@@ -216,7 +216,7 @@ mod tests {
         owner_with_groups(tenant, ["dev", "sre"])
     }
 
-    fn owner_with_groups<const N: usize>(tenant: &str, groups: [&str; N]) -> PrincipalContext {
+    pub(super) fn owner_with_groups<const N: usize>(tenant: &str, groups: [&str; N]) -> PrincipalContext {
         PrincipalContext::hosted_with_groups(
             tenant.to_owned(),
             "person:owner".to_owned(),
@@ -229,7 +229,7 @@ mod tests {
         .unwrap()
     }
 
-    fn policy() -> Vec<KubernetesNamespaceAccessConfig> {
+    pub(super) fn policy() -> Vec<KubernetesNamespaceAccessConfig> {
         vec![KubernetesNamespaceAccessConfig {
             namespace: "b10x".to_owned(),
             read_groups: vec!["dev".to_owned(), "sre".to_owned()],
