@@ -367,7 +367,9 @@ async fn send(
         )
         .await
         .map_err(|error| match error {
-            EgressTransportError::Refused => AcquireError::Unreachable,
+            EgressTransportError::Refused | EgressTransportError::Transport(_) => {
+                AcquireError::Unreachable
+            }
             EgressTransportError::ResponseTooLarge => AcquireError::Unexpected { step, status: 0 },
         })
 }

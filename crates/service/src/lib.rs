@@ -30,8 +30,8 @@ pub use dispatch::{
     Dispatcher, SensitiveValue,
 };
 pub use egress::{
-    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError, EgressWebSocket,
-    EgressWebSocketFrame,
+    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError,
+    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
 };
 pub use planning::{plan_operation, PlanError, PlanningEnvironment};
 pub use runtime::{

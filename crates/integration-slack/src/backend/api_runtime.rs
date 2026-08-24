@@ -950,7 +950,8 @@ impl SlackInner {
                         "Slack operation result exceeds the admitted bound",
                         false,
                     ),
-                    service::EgressTransportError::Refused => operation_unavailable(),
+                    service::EgressTransportError::Refused
+                    | service::EgressTransportError::Transport(_) => operation_unavailable(),
                 })?;
             if !response.is_success() {
                 return Err(operation_unavailable());
