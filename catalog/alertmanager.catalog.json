@@ -51,7 +51,7 @@
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
-        "url": "{base}/alerts"
+        "url": "{base}/api/v2/alerts"
       },
       "required_capabilities": [
         "private_network"
@@ -76,7 +76,7 @@
         "developer",
         "support-agent"
       ],
-      "base_url": "{origin}/api/v2",
+      "base_url": "{origin}",
       "name": "default",
       "tags": [
         "observability",
