@@ -71,6 +71,9 @@ path = "fixtures/rtvbp-voice-binding/v1/manifest.schema.json"
 [[schema]]
 path = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
 
+[[schema]]
+path = "crates/server/src/hosted/docs/openapi.schema.json"
+
 [[document]]
 pattern = "catalog/*.catalog.json"
 schema = "catalog/connector-document.schema.json"
@@ -146,6 +149,13 @@ schema = "fixtures/rtvbp-voice-binding/v1/vectors.schema.json"
 [[document]]
 path = "fixtures/rtvbp-voice-binding/v1/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"
+
+# The hosted server's own committed OpenAPI 3.1 contract, served verbatim at /openapi.json
+# (S-067). The server crate's drift tests validate every embedded example against the live
+# protocol types and the live router.
+[[document]]
+path = "crates/server/src/hosted/docs/openapi.json"
+schema = "crates/server/src/hosted/docs/openapi.schema.json"
 
 # Generated and intentionally git-ignored. `catalog build` validates the same bytes before writing;
 # the governance audit validates the file too whenever it exists in the working tree.

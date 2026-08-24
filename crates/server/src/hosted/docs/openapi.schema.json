@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/beyond10x/connectors/blob/main/crates/server/src/hosted/docs/openapi.schema.json",
+  "title": "b10x Connectors hosted OpenAPI document",
+  "description": "Structural governance for the committed OpenAPI 3.1 contract the hosted server serves at /openapi.json. This validates the shape of our own document — the surface it must declare and the members it may use — not full OpenAPI conformance; the server crate's drift tests validate every example against the live protocol types and the live router.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["openapi", "info", "servers", "paths", "components"],
+  "properties": {
+    "openapi": { "const": "3.1.0" },
+    "info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "version", "description"],
+      "properties": {
+        "title": { "type": "string", "pattern": "^b10x " },
+        "version": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "servers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "/operations",
+        "/connections",
+        "/catalog",
+        "/events",
+        "/datasources",
+        "/mcp",
+        "/livez",
+        "/readyz",
+        "/healthz",
+        "/openapi.json"
+      ],
+      "patternProperties": {
+        "^/": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "get": { "$ref": "#/$defs/operation" },
+            "post": { "$ref": "#/$defs/operation" }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["securitySchemes", "schemas"],
+      "properties": {
+        "securitySchemes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identityAccessToken"],
+          "properties": {
+            "identityAccessToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "scheme", "description"],
+              "properties": {
+                "type": { "const": "http" },
+                "scheme": { "const": "bearer" },
+                "description": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "schemas": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "summary", "security", "responses"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "security": { "type": "array" },
+        "requestBody": { "type": "object" },
+        "responses": { "type": "object", "minProperties": 1 }
+      }
+    }
+  }
+}
