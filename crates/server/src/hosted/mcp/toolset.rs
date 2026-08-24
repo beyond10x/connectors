@@ -1,4 +1,5 @@
-//! Toolset v1: the static, versioned table behind the three MCP meta-tools (design 14, S-053).
+//! Toolset v1: the static, versioned table behind the three MCP meta-tools (design 14, S-053;
+//! monitoring entries per design 15, S-060).
 //!
 //! `tools/list` never grows: the projected names below are data — returned by `tool_search`,
 //! described by `tool_describe`, accepted by `tool_invoke`. Role projection is derived, never
@@ -34,8 +35,18 @@ const TOOLSET_VERSION: &str = "v1";
 const WORKLOADS_DATASOURCE: &str = "kubernetes.workloads";
 /// The deployment's one in-cluster Connection, named by every op-backed entry.
 const KUBERNETES_CONNECTION: &str = "connection:kubernetes:in-cluster";
-/// The seam search that discovers the caller's admitted kubernetes operations.
-const REQUIREMENT_QUERY: &str = "kubernetes";
+/// The seam searches that discover the caller's admitted operations: the kubernetes query
+/// behind the k8s entries, and one query per monitoring provider — the monitoring operations'
+/// searchable text shares no single term, so each provider is asked for by name. Every result
+/// set is the caller's own principal-filtered view; the merged refs drive nothing but
+/// requirement checks.
+const REQUIREMENT_QUERIES: &[&str] = &[
+    "kubernetes",
+    "grafana",
+    "prometheus",
+    "loki",
+    "alertmanager",
+];
 
 /// What must hold in the caller's own seam results for a table entry to exist for that caller.
 enum Requirement {
@@ -52,6 +63,11 @@ enum Target {
         operation_ref: &'static str,
         connection_ref: &'static str,
     },
+    /// Server-side describe, then invoke, of one hosted operation whose Connection is chosen
+    /// by the caller's `target` argument from their own described connections — the shape for
+    /// operations with several configured targets (design 15), where a static table can never
+    /// honestly name one Connection.
+    TargetedOperationInvoke { operation_ref: &'static str },
     /// Project the caller's admitted workload bindings as namespaces.
     DatasourceBindings,
     /// Bounded compact list through the named namespace's binding.
@@ -121,6 +137,75 @@ const TOOLSET: &[McpTool] = &[
         },
         input_schema: pod_logs_schema,
     },
+    // The monitoring entries (S-060, design 15): six catalogued read-only operations riding
+    // the read path. Every argument below mirrors the underlying operation's published
+    // caller parameters exactly; the toolset adds only the `target` choice, whose admitted
+    // values come from the caller's own described connections at describe/invoke time —
+    // never from this table.
+    McpTool {
+        name: "grafana_dashboards_list",
+        title: "List Grafana dashboards",
+        description: "List dashboards in one Grafana organization namespace, with bounded \
+                      cursor pagination.",
+        requires: Requirement::Operation("grafana-dashboards-list"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "grafana-dashboards-list",
+        },
+        input_schema: grafana_dashboards_list_schema,
+    },
+    McpTool {
+        name: "grafana_dashboard_get",
+        title: "Get one Grafana dashboard",
+        description: "Read one dashboard by UID from a Grafana organization namespace.",
+        requires: Requirement::Operation("grafana-dashboard-get"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "grafana-dashboard-get",
+        },
+        input_schema: grafana_dashboard_get_schema,
+    },
+    McpTool {
+        name: "grafana_datasources_list",
+        title: "List Grafana data sources",
+        description: "List the data sources the configured Grafana service account can read.",
+        requires: Requirement::Operation("grafana-datasources-list"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "grafana-datasources-list",
+        },
+        input_schema: target_only_schema,
+    },
+    McpTool {
+        name: "prometheus_query_range",
+        title: "Query Prometheus metrics over a time range",
+        description: "Evaluate a PromQL expression over a bounded time range on one \
+                      configured Prometheus target.",
+        requires: Requirement::Operation("prometheus-query-range"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "prometheus-query-range",
+        },
+        input_schema: prometheus_query_range_schema,
+    },
+    McpTool {
+        name: "loki_query_range",
+        title: "Query Loki logs over a time range",
+        description: "Query LogQL streams or metrics over a bounded time range on one \
+                      configured Loki target.",
+        requires: Requirement::Operation("loki-query-range"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "loki-query-range",
+        },
+        input_schema: loki_query_range_schema,
+    },
+    McpTool {
+        name: "alertmanager_alerts",
+        title: "List Alertmanager alerts",
+        description: "List the alerts currently visible through one configured Alertmanager \
+                      target.",
+        requires: Requirement::Operation("alertmanager-alerts-list"),
+        target: Target::TargetedOperationInvoke {
+            operation_ref: "alertmanager-alerts-list",
+        },
+        input_schema: target_only_schema,
+    },
 ];
 
 fn no_args_schema() -> Value {
@@ -175,6 +260,83 @@ fn pod_logs_schema() -> Value {
             "container": { "type": "string", "minLength": 1 },
             "tail_lines": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 },
             "since_seconds": { "type": "integer", "minimum": 1 }
+        }
+    })
+}
+
+/// The one argument the toolset adds to every monitoring entry: which configured Connection
+/// the invoke rides. `tool_describe` narrows it to an enum of the caller's own described
+/// connection labels; it may be omitted only while exactly one Connection is configured.
+fn target_property() -> Value {
+    json!({ "type": "string", "minLength": 1 })
+}
+
+fn target_only_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "target": target_property() }
+    })
+}
+
+// The monitoring argument shapes below mirror `monitoring-model`'s published input contract
+// exactly — every caller parameter present, with its validated bounds — so a schema-valid
+// call is an input-valid invocation and nothing is defaulted on the caller's behalf.
+
+fn grafana_dashboards_list_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["namespace", "limit", "continue"],
+        "properties": {
+            "target": target_property(),
+            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
+            "continue": { "type": "string", "maxLength": 4096 }
+        }
+    })
+}
+
+fn grafana_dashboard_get_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["namespace", "uid"],
+        "properties": {
+            "target": target_property(),
+            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "uid": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+    })
+}
+
+fn prometheus_query_range_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query", "start", "end", "step"],
+        "properties": {
+            "target": target_property(),
+            "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
+            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "step": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+    })
+}
+
+fn loki_query_range_schema() -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query", "start", "end", "limit", "direction"],
+        "properties": {
+            "target": target_property(),
+            "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
+            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
+            "direction": { "enum": ["forward", "backward"] }
         }
     })
 }
@@ -301,6 +463,7 @@ pub(super) async fn tool_describe(
     if !view.admits(&tool.requires) {
         return Ok(not_found("no such tool"));
     }
+    let mut input_schema = (tool.input_schema)();
     let (effect, approval, output_schema) = match &tool.target {
         Target::OperationInvoke { operation_ref, .. } => {
             let description =
@@ -308,6 +471,28 @@ pub(super) async fn tool_describe(
                     Ok(description) => description,
                     Err(error) => return Ok(operation_refusal(&error)),
                 };
+            (
+                serde_json::to_value(description.effect).expect("closed effect vocabulary"),
+                serde_json::to_value(description.approval).expect("closed approval vocabulary"),
+                description.output_schema,
+            )
+        }
+        Target::TargetedOperationInvoke { operation_ref } => {
+            let description =
+                match describe_operation(state, principal, request_id, operation_ref).await {
+                    Ok(description) => description,
+                    Err(error) => return Ok(operation_refusal(&error)),
+                };
+            // The honest `target` surface: exactly the caller's own described connections,
+            // by label, at this moment — a rotated deployment target changes the enum, never
+            // a table.
+            input_schema["properties"]["target"]["enum"] = Value::Array(
+                description
+                    .connections
+                    .iter()
+                    .map(|connection| Value::String(connection.label.clone()))
+                    .collect(),
+            );
             (
                 serde_json::to_value(description.effect).expect("closed effect vocabulary"),
                 serde_json::to_value(description.approval).expect("closed approval vocabulary"),
@@ -362,7 +547,7 @@ pub(super) async fn tool_describe(
         "name": tool.name,
         "title": tool.title,
         "description": tool.description,
-        "input_schema": (tool.input_schema)(),
+        "input_schema": input_schema,
         "output_schema": output_schema,
         "effect": effect,
         "approval": approval,
@@ -404,8 +589,24 @@ pub(super) async fn tool_invoke(
                 principal,
                 request_id,
                 operation_ref,
-                connection_ref,
+                &ConnectionChoice::Fixed(connection_ref),
                 &invoke.args,
+                invoke.approval_evidence_ref.as_deref(),
+            )
+            .await
+        }
+        Target::TargetedOperationInvoke { operation_ref } => {
+            let (target, input) = match split_target(&invoke.args) {
+                Ok(split) => split,
+                Err(refused) => return Ok(refused),
+            };
+            invoke_operation(
+                state,
+                principal,
+                request_id,
+                operation_ref,
+                &ConnectionChoice::Target(target),
+                &input,
                 invoke.approval_evidence_ref.as_deref(),
             )
             .await
@@ -418,15 +619,86 @@ pub(super) async fn tool_invoke(
     })
 }
 
+/// How an op-backed entry picks the Connection its invoke names.
+enum ConnectionChoice {
+    /// The one static Connection the table names.
+    Fixed(&'static str),
+    /// The caller's `target` argument, resolved against their own freshly described
+    /// connections — or the sole described Connection when the argument is absent.
+    Target(Option<String>),
+}
+
+/// Split the caller's `target` choice off one targeted entry's args, leaving exactly the
+/// underlying operation's input.
+fn split_target(args: &Value) -> Result<(Option<String>, Value), Value> {
+    let mut input = args.clone();
+    let object = input
+        .as_object_mut()
+        .expect("tool_invoke admits only object args");
+    let target = match object.remove("target") {
+        None => None,
+        Some(Value::String(target)) => Some(target),
+        Some(_) => return Err(invalid_args("target must be a string".to_owned())),
+    };
+    Ok((target, input))
+}
+
+/// Resolve one [`ConnectionChoice`] against a fresh description's connections. Everything
+/// named here is the caller's own admitted view, so a refusal may honestly list the labels.
+fn resolve_connection(
+    choice: &ConnectionChoice,
+    description: &OperationDescription,
+) -> Result<String, Value> {
+    let target = match choice {
+        ConnectionChoice::Fixed(connection_ref) => return Ok((*connection_ref).to_owned()),
+        ConnectionChoice::Target(target) => target.as_deref(),
+    };
+    let labels = || {
+        description
+            .connections
+            .iter()
+            .map(|connection| connection.label.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match target {
+        None => match description.connections.as_slice() {
+            [connection] => Ok(connection.connection_ref.clone()),
+            _ => Err(invalid_args(format!(
+                "several targets are configured; pass target as one of: {}",
+                labels()
+            ))),
+        },
+        Some(target) => {
+            let mut matched = description
+                .connections
+                .iter()
+                .filter(|connection| connection.label == target);
+            match (matched.next(), matched.next()) {
+                (Some(connection), None) => Ok(connection.connection_ref.clone()),
+                (None, _) => Err(invalid_args(format!(
+                    "the target is not among the configured connections: {}",
+                    labels()
+                ))),
+                (Some(_), Some(_)) => Err(invalid_args(format!(
+                    "the target is ambiguous among the configured connections: {}",
+                    labels()
+                ))),
+            }
+        }
+    }
+}
+
 /// Describe, then invoke, one hosted operation under the fresh server-side lease. On
 /// `stale_authority` the description is silently refreshed exactly once before the refusal
-/// surfaces.
+/// surfaces — and the Connection choice is re-resolved against it, so a targeted invoke never
+/// rides a connection the fresh description no longer carries.
 async fn invoke_operation(
     state: &HostedState,
     principal: &HostedPrincipal,
     request_id: &str,
     operation_ref: &str,
-    connection_ref: &str,
+    choice: &ConnectionChoice,
     input: &Value,
     evidence: Option<&str>,
 ) -> Value {
@@ -435,6 +707,10 @@ async fn invoke_operation(
             Ok(description) => description,
             Err(error) => return operation_refusal(&error),
         };
+    let mut connection_ref = match resolve_connection(choice, &description) {
+        Ok(connection_ref) => connection_ref,
+        Err(refused) => return refused,
+    };
     let mut retried = false;
     loop {
         if description.approval == ApprovalPosture::Required && evidence.is_none() {
@@ -452,7 +728,7 @@ async fn invoke_operation(
             request_id,
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation_ref.to_owned(),
-                connection_ref: connection_ref.to_owned(),
+                connection_ref: connection_ref.clone(),
                 description_ref: description.description_ref.clone(),
                 input: input.clone(),
                 approval_evidence_ref: evidence.map(str::to_owned),
@@ -469,6 +745,10 @@ async fn invoke_operation(
                         Ok(description) => description,
                         Err(error) => return operation_refusal(&error),
                     };
+                connection_ref = match resolve_connection(choice, &description) {
+                    Ok(connection_ref) => connection_ref,
+                    Err(refused) => return refused,
+                };
             }
             Err(error) => return operation_refusal(&error),
         }
@@ -619,24 +899,26 @@ async fn seam_view(
     principal: &HostedPrincipal,
     request_id: &str,
 ) -> Result<SeamView, Value> {
-    let searched = operation_seam(
-        state,
-        principal,
-        request_id,
-        OperationRequest::Search(SearchRequest {
-            query: REQUIREMENT_QUERY.to_owned(),
-            limit: 25,
-        }),
-    )
-    .await;
-    let operations = match searched {
-        Ok(OperationResult::Search { operations }) => operations
-            .into_iter()
-            .map(|operation| operation.operation_ref)
-            .collect(),
-        Ok(_) => return Err(operation_refusal(&operation_seam_gap())),
-        Err(error) => return Err(operation_refusal(&error)),
-    };
+    let mut operations = BTreeSet::new();
+    for query in REQUIREMENT_QUERIES {
+        let searched = operation_seam(
+            state,
+            principal,
+            request_id,
+            OperationRequest::Search(SearchRequest {
+                query: (*query).to_owned(),
+                limit: 25,
+            }),
+        )
+        .await;
+        match searched {
+            Ok(OperationResult::Search { operations: found }) => {
+                operations.extend(found.into_iter().map(|operation| operation.operation_ref));
+            }
+            Ok(_) => return Err(operation_refusal(&operation_seam_gap())),
+            Err(error) => return Err(operation_refusal(&error)),
+        }
+    }
     let has_binding = match workload_bindings(state, principal, request_id, "").await {
         Ok(bindings) => !bindings.is_empty(),
         // A deployment without the workloads datasource hides the entries; it never errors

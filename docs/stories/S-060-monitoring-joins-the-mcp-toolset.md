@@ -32,3 +32,13 @@ and ride the read path; the toolset adds zero policy.
 ## Progress
 
 - 2026-08-24 — filed from design 15 (Timo: the central Grafana "should be made available").
+- 2026-08-24 — implemented on `impl/S-060`. Six `TargetedOperationInvoke` entries in
+  `crates/server/src/hosted/mcp/toolset.rs`; the connection choice is a `target` argument
+  resolved by label against the caller's own freshly described connections (lone connection:
+  optional; several: required, with the admitted labels enumerated into the schema by
+  `tool_describe` and into the refusal at invoke). Requirement discovery runs one seam search
+  per `REQUIREMENT_QUERIES` term and merges refs; the stale-authority retry re-resolves the
+  target against the fresh description. Router tests: `hosted/tests/mcp_monitoring.rs`
+  (fake monitoring backend, central Grafana + two targets per fleet provider). Argument
+  shapes deliberately mirror `monitoring-model::validate_input` exactly — no defaults are
+  invented, so a schema-valid call is input-valid.

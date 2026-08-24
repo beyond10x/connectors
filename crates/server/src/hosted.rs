@@ -819,6 +819,7 @@ mod tests {
     mod contract_validation;
     mod enforcement;
     mod mcp;
+    mod mcp_monitoring;
     mod signal;
 
     struct Verifier;
