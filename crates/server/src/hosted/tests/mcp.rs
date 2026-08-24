@@ -336,8 +336,9 @@ async fn rpc(app: Router, token: &str, method: &str, params: Value) -> Value {
     body_json(response).await
 }
 
-/// One `tools/call`, returning the JSON-RPC result (the MCP tool result object).
-async fn call_tool(app: Router, token: &str, name: &str, arguments: Value) -> Value {
+/// One `tools/call`, returning the JSON-RPC result (the MCP tool result object). Shared with
+/// the monitoring toolset tests (`tests/mcp_monitoring.rs`), which drive the same surface.
+pub(super) async fn call_tool(app: Router, token: &str, name: &str, arguments: Value) -> Value {
     let message = rpc(
         app,
         token,
