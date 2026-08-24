@@ -96,7 +96,7 @@ will spawn children as each milestone is designed.
 | [S-062](S-062-discovery-reads-the-cluster-scoped-database-resources.md) | Discovery reads the cluster-scoped database resources | done | Platform | integrations, server |
 | [S-063](S-063-the-deployment-list-pages-instead-of-refusing.md) | The deployment list pages instead of refusing | done | Platform | integrations, server |
 | [S-064](S-064-monitoring-tool-schemas-tell-the-truth.md) | Monitoring tool schemas tell the truth | done | Platform | integrations, server |
-| [S-065](S-065-monitoring-refusals-name-the-upstream.md) | Monitoring refusals name the upstream | ready | Platform | integrations |
+| [S-065](S-065-monitoring-refusals-name-the-upstream.md) | Monitoring refusals name the upstream | in-progress | Platform | integrations |
 
 ## Epics in this seed
 
