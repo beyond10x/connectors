@@ -179,6 +179,11 @@ iteration run the affected workspace's locked test/clippy/fmt commands directly;
 remains required before treating a change as green. `catalog check` independently
 rehashes provider declarations, vendored specs, lock rows, and generated artifacts.
 
+The former-brand fence is **not** part of this gate and no longer lives in this repository. It is
+org-wide, as `scripts/check-org-brand.sh` in atlas. The per-repo copies drifted apart and several
+were silently broken — they reported "clean" and exited 0 against any input — so there is now one
+fence, verified to fail on a planted string. Do not reintroduce a local copy.
+
 `json-schemas.toml` is the closed inventory for JSON. Every component-owned JSON document names a
 local schema, and the dedicated governance gate validates it with the pinned Draft 2020-12
 implementation. Every JSON Schema declares and validates against that same meta-schema. Imported
