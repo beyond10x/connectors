@@ -24,7 +24,28 @@ step of the diagnosis is blind.
 - The transport arm of the refusal log carries an error class derived from the transport
   error (timeout / connect / tls / body-read / other) — never the error's Display string,
   which can embed the URL.
-- With the class visible, the live `grafana_dashboards_list` failure is diagnosed on dev and
-  fixed here if it is a document/resolution defect (e.g. a response-size or timeout bound the
-  dashboards list trips), or handed to provisioning with the concrete evidence recorded.
-- The alertmanager 403 stays with provisioning (S-065 Progress) — out of scope here.
+- The transport class distinguishes an oversized upstream body from unreachability; an
+  executor cap breach refuses as "response too large", never "unreachable".
+- `grafana_dashboards_list` dispatches with a bounded page `limit` and follows `continue`
+  server-side up to a hard budget, so the 4.6 MB namespace lists instead of refusing.
+- The alertmanager document resolves the v2 API sub-path; `alertmanager_alerts` returns live
+  alerts on dev through the mediated route.
+- The alertmanager 403 is IN scope — diagnosis below proved it a document defect, not
+  provisioning.
+
+## Progress
+
+- 2026-08-24, direct probes against https://grafana.infra.babelforce.com with the tenant's
+  Grafana service-account token (read from Vault custody; token never persisted):
+  - `grafana_dashboards_list`: the app-platform API answers **200 in 0.45 s**; the full
+    namespace listing is **4,615,274 bytes**, and Grafana serves it whole even at
+    `limit=1000`, while `limit=5` pages correctly with a `continue` token. The executor caps
+    responses at `MAX_RESULT_BYTES` (256 KiB, egress.rs `maximum_response_bytes`), and the
+    cap breach is classified as transport — hence "unreachable". Fix: the dispatch sends a
+    small page `limit` and follows `continue`, and the refusal class for an oversized body
+    says so instead of "unreachable".
+  - `alertmanager_alerts`: the document requests `{base}/alerts`; through the Grafana
+    datasource proxy that sub-path answers **403 "plugin proxy route access denied"**, while
+    `{base}/api/v2/alerts` answers **200 with 231,711 bytes** of live alerts using the same
+    token and uid. Fix: the alertmanager document (or the mediation adapter) resolves the
+    Alertmanager v2 API path.

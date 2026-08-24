@@ -73,8 +73,8 @@ edition = "2021"
 # beyond10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/b10x/b10x"
-homepage = "https://github.com/b10x/b10x"
+repository = "https://github.com/beyond10x/connectors"
+homepage = "https://github.com/beyond10x/connectors"
 # Raised for the exact sipx/RTVBP baselines and built/tested by the CI MSRV job.
 rust-version = "1.88"
 # **Nothing publishes** (design 02 §2). Every crate is an internal workspace member with a

@@ -4,8 +4,8 @@ description = "SQLite-backed Connector state cells: in-memory for tests, a file 
 edition = "2021"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/b10x/b10x"
-homepage = "https://github.com/b10x/b10x"
+repository = "https://github.com/beyond10x/connectors"
+homepage = "https://github.com/beyond10x/connectors"
 rust-version = "1.88"
 publish = false
 # Outside the deterministic compiler workspace because it links a bundled C library, and pointed at

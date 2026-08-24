@@ -1,11 +1,8 @@
 # AGENTS.md
 
 Orientation for agents (and humans) working in this repository.
-**github.com/beyond10x/connectors is the canonical home of Connectors.** It was extracted from the
-b10x monorepo with full history on 2026-08-23; the monorepo baseline is
-[`b10x/b10x` @ `bf685971`](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/AGENTS.md),
-whose root rules this file carried forward where they still apply. The Zwirn product in the b10x monorepo
-consumes this repository as a pinned git dependency; nothing here depends on the monorepo.
+**github.com/beyond10x/connectors is the canonical home of Connectors.** The Zwirn product consumes
+this repository as a pinned git dependency; the dependency never runs the other way.
 
 ## Status
 
@@ -31,9 +28,8 @@ graph rather than caution, name the blocked stories and what unblocks each.
 
 **Deferred by Timo on 2026-08-13:** a family-level architecture review across the `architecture`,
 `connectors` and `substrate` components — how everything connects — postponed until `substrate`'s
-documents are finished. The procedure now exists as the `architecture-review` run-mode of the
-`b10x` main agent (`.agents/agents/b10x.md` in the b10x monorepo); trigger it when Timo says substrate is
-done.
+documents are finished. The procedure now exists as the `architecture-review` run-mode of the org's
+main agent definition under `.agents/agents/`; trigger it when Timo says substrate is done.
 
 ## Commits
 
@@ -226,8 +222,7 @@ The agent instruction is therefore short:
   ([`codewandler/flux-connectors`](https://github.com/codewandler/flux-connectors) and
   [`codewandler/flux-exchange`](https://github.com/codewandler/flux-exchange)) are read-only
   references: mine them, copy from them per the architecture inventory, and never edit them from
-  here. The durable housing decision is
-  [`b10x/architecture` ADR 0006 — B10x supersedes selfdirect repository housing](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0006-b10x-supersedes-selfdirect-housing.md).
+  here.
 
 `predecessor:docs/designs/...` citations in code are symbolic, nonnormative provenance markers, not
 navigable authority. The surrounding comment must restate the rule the current implementation uses;

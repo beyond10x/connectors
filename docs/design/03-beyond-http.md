@@ -1,7 +1,7 @@
 # Design 03: beyond HTTP — drivers, satellites, and the byte plane
 
 **Status:** accepted v1 design; native-voice amendment accepted; external runtime artifacts deferred · **Date:** 2026-08-13
-**Inputs:** the predecessor rich-runtime program; the architecture boundaries pinned from the b10x monorepo;
+**Inputs:** the predecessor rich-runtime program; the architecture boundaries pinned from the org architecture records;
 how AMI/AGI (Sangoma Asterisk), DNS/UDP, SIP, TCP protocols and audio channels reach the connector
 model.
 
@@ -84,7 +84,7 @@ deployed near the protocol** in a satellite role. A satellite beside a PBX, clus
 uses local drivers and declared destinations, then establishes an authenticated relationship upward.
 
 Federation makes the topology appear as one effective catalogue under
-[architecture ADR 0018 — Connectors satellites federate outward under bounded authority](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0018-connectors-satellite-federation.md).
+architecture ADR 0018 — Connectors satellites federate outward under bounded authority (`architecture/adr/0018-connectors-satellite-federation.md`).
 The main deployment imports a signed monotonic catalog/policy generation and invokes/subscribes
 through a bounded outward-established remote seam under its own grants and audit. Until that
 implementation exists, clients may connect to two deployments. That is an honest temporary
@@ -113,7 +113,7 @@ the connection, select the fixed driver/placement, negotiate bounded parameters,
 short-lived endpoint authority. Bytes then flow directly between the client and the selected local
 driver, satellite or substrate endpoint. Revocation and expiry remain control-plane facts.
 
-[Architecture ADR 0016 — Direct-byte establishment uses operation-scoped authority](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0016-operation-scoped-session-authority.md)
+Architecture ADR 0016 — Direct-byte establishment uses operation-scoped authority (`architecture/adr/0016-operation-scoped-session-authority.md`)
 fixes that authority as an asymmetrically signed, proof-bound, 60-second, single-redemption grant.
 Reconnect gets a fresh grant. The serving endpoint must be independently reachable; otherwise the
 session is `unserved`, and the federation control path never becomes a byte relay.
@@ -194,12 +194,12 @@ source-grounded catalog member using `sip_v1`, the generic `VoiceSession` owner 
 RTVBP binding, the MSRV change, and released owner evidence.
 
 The ownership and five-axis model are accepted by
-[architecture ADR 0010 — Beyond HTTP is a five-axis connector model](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0010-beyond-http-is-a-five-axis-connector-model.md).
+architecture ADR 0010 — Beyond HTTP is a five-axis connector model (`architecture/adr/0010-beyond-http-is-a-five-axis-connector-model.md`).
 Foundation trust, channel authority, event ingestion, satellite federation, and contract release
 are accepted by architecture ADRs
-[ADR 0015 — Foundation services share one trust envelope](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0015-foundation-trust-envelope.md)
+ADR 0015 — Foundation services share one trust envelope (`architecture/adr/0015-foundation-trust-envelope.md`)
 through
-[ADR 0019 — Foundation contracts ship as signed reproducible bundles](https://github.com/b10x/b10x/blob/bf6859717f986dc0e2a3b8a713e087d426741d92/architecture/adr/0019-contract-release-and-conformance.md).
+ADR 0019 — Foundation contracts ship as signed reproducible bundles (`architecture/adr/0019-contract-release-and-conformance.md`).
 Delivery item 1's document facts landed in S-023. The next seam and later runtime work remain owned
 by S-024 through S-028 and the native-voice slices S-032/S-033 in the story board. The
 connectors-owned
