@@ -4,54 +4,79 @@ mod database_tests {
     use super::*;
     use protocol::datasource::{Completeness, DatasourceRead, RecordView};
 
-    /// A database-endpoint fake shaped like the real Crossplane provider-sql resources: each
-    /// item is full resource JSON — deletionPolicy, providerConfigRef, annotations with a
-    /// credential-shaped canary — parsed through the wire types per call, so what the
-    /// projection drops is proven against the real shape, not against a convenient struct.
+    /// A database-endpoint fake shaped like the real Crossplane provider-sql resources: the
+    /// Database CRDs are CLUSTER-scoped, so an item carries no `metadata.namespace`, its spec is
+    /// only `{deletionPolicy, providerConfigRef}` — no endpoint facts, no
+    /// `writeConnectionSecretToRef` — and the connection-secret reference lives behind the
+    /// referenced cluster-scoped ProviderConfig. Everything is full resource JSON, parsed
+    /// through the wire types per call, so what the projection drops is proven against the real
+    /// shape, not against a convenient struct.
     struct DatabaseReader {
         mysql: Vec<serde_json::Value>,
         postgresql: Vec<serde_json::Value>,
+        mysql_provider_configs: Vec<serde_json::Value>,
+        postgresql_provider_configs: Vec<serde_json::Value>,
     }
 
     impl DatabaseReader {
         fn crossplane() -> Self {
             Self {
                 mysql: vec![
-                    crossplane_database(
-                        "mysql.sql.crossplane.io",
-                        "app-core",
-                        true,
-                        Some(json!({"name": "app-core-conn", "namespace": "b10x"})),
-                        json!({}),
-                    ),
+                    crossplane_database("mysql.sql.crossplane.io", "app-core", true, "sql-default"),
                     crossplane_database(
                         "mysql.sql.crossplane.io",
                         "app-events",
                         false,
-                        None,
-                        json!({}),
+                        "sql-default",
                     ),
+                    // Its ProviderConfig's connection secret lives in another namespace: the
+                    // `b10x` binding must not see it.
+                    crossplane_database("mysql.sql.crossplane.io", "foreign-db", true, "sql-other"),
+                    // A dangling providerConfigRef: no secret reference, no namespace
+                    // association, no descriptor — excluded, not an error.
+                    crossplane_database("mysql.sql.crossplane.io", "orphan-db", true, "gone"),
                 ],
                 postgresql: vec![crossplane_database(
                     "postgresql.sql.crossplane.io",
                     "ledger",
                     true,
-                    Some(json!({"name": "ledger-conn"})),
-                    json!({
-                        "host": "postgresql.endpoints.svc.cluster.local",
-                        "port": 5432,
-                        "database": "ledger"
-                    }),
+                    "sql-default",
+                )],
+                mysql_provider_configs: vec![
+                    provider_config(
+                        "mysql.sql.crossplane.io",
+                        "sql-default",
+                        "MySQLConnectionSecret",
+                        "sql-default-conn",
+                        "b10x",
+                    ),
+                    provider_config(
+                        "mysql.sql.crossplane.io",
+                        "sql-other",
+                        "MySQLConnectionSecret",
+                        "other-conn",
+                        "elsewhere",
+                    ),
+                ],
+                postgresql_provider_configs: vec![provider_config(
+                    "postgresql.sql.crossplane.io",
+                    "sql-default",
+                    "PostgreSQLConnectionSecret",
+                    "pg-default-conn",
+                    "b10x",
                 )],
             }
         }
 
-        /// The in-cluster reader maps a 404 on the group's list endpoint — the CRD is not
-        /// installed — to an empty inventory; this fake stands in for that outcome.
+        /// A cluster without the Crossplane provider serves neither the group nor its
+        /// collections; the in-cluster reader maps that to an empty inventory and this fake
+        /// stands in for that outcome.
         fn without_crossplane() -> Self {
             Self {
                 mysql: Vec::new(),
                 postgresql: Vec::new(),
+                mysql_provider_configs: Vec::new(),
+                postgresql_provider_configs: Vec::new(),
             }
         }
 
@@ -61,31 +86,60 @@ mod database_tests {
                 DatabaseEngine::Postgresql => &self.postgresql,
             }
         }
+
+        fn engine_provider_configs(&self, engine: DatabaseEngine) -> &[serde_json::Value] {
+            match engine {
+                DatabaseEngine::Mysql => &self.mysql_provider_configs,
+                DatabaseEngine::Postgresql => &self.postgresql_provider_configs,
+            }
+        }
+
+        fn page(&self, engine: DatabaseEngine, limit: u16, cursor: Option<&str>) -> DatabaseList {
+            let items = self.engine_items(engine);
+            let start: usize = cursor.map_or(0, |cursor| cursor.parse().expect("fake cursor"));
+            let end = (start + usize::from(limit)).min(items.len());
+            let page = items[start..end]
+                .iter()
+                .map(|resource| {
+                    serde_json::from_value(resource.clone()).expect("fake resource parses")
+                })
+                .collect();
+            DatabaseList {
+                items: page,
+                next_cursor: (end < items.len()).then(|| end.to_string()),
+            }
+        }
+
+        fn detail(
+            &self,
+            engine: DatabaseEngine,
+            name: &str,
+        ) -> Result<CrossplaneDatabase, DatasourceError> {
+            self.engine_items(engine)
+                .iter()
+                .find(|resource| resource["metadata"]["name"] == name)
+                .map(|resource| {
+                    serde_json::from_value(resource.clone()).expect("fake resource parses")
+                })
+                .ok_or_else(|| datasource_not_found("Kubernetes database endpoint was not found"))
+        }
     }
 
-    /// One Crossplane provider-sql Database resource, exactly as the cluster serves it.
+    /// One Crossplane provider-sql Database resource, exactly as the cluster serves it:
+    /// cluster-scoped (no `metadata.namespace`), and its spec carries no endpoint facts —
+    /// only the deletion policy and the ProviderConfig reference.
     fn crossplane_database(
         group: &str,
         name: &str,
         ready: bool,
-        secret: Option<serde_json::Value>,
-        at_provider: serde_json::Value,
+        provider_config: &str,
     ) -> serde_json::Value {
         let ready_status = if ready { "True" } else { "False" };
-        let mut spec = json!({
-            "deletionPolicy": "Orphan",
-            "forProvider": {},
-            "providerConfigRef": {"name": "sql-default"}
-        });
-        if let Some(secret) = secret {
-            spec["writeConnectionSecretToRef"] = secret;
-        }
         json!({
             "apiVersion": format!("{group}/v1alpha1"),
             "kind": "Database",
             "metadata": {
                 "name": name,
-                "namespace": "b10x",
                 "uid": format!("uid-{name}"),
                 "resourceVersion": "17",
                 "annotations": {
@@ -94,13 +148,45 @@ mod database_tests {
                         "{\"spec\":{\"password\":\"hunter2-canary\"}}"
                 }
             },
-            "spec": spec,
+            "spec": {
+                "deletionPolicy": "Delete",
+                "providerConfigRef": {"name": provider_config}
+            },
             "status": {
-                "atProvider": at_provider,
                 "conditions": [
                     {"type": "Ready", "status": ready_status, "reason": "Available"},
                     {"type": "Synced", "status": "True", "reason": "ReconcileSuccess"}
                 ]
+            }
+        })
+    }
+
+    /// One Crossplane provider-sql ProviderConfig, exactly as the cluster serves it:
+    /// cluster-scoped, its credentials naming the server connection Secret by reference —
+    /// name and namespace, never bytes.
+    fn provider_config(
+        group: &str,
+        name: &str,
+        source: &str,
+        secret_name: &str,
+        secret_namespace: &str,
+    ) -> serde_json::Value {
+        json!({
+            "apiVersion": format!("{group}/v1alpha1"),
+            "kind": "ProviderConfig",
+            "metadata": {
+                "name": name,
+                "uid": format!("uid-{name}"),
+                "resourceVersion": "5"
+            },
+            "spec": {
+                "credentials": {
+                    "source": source,
+                    "connectionSecretRef": {
+                        "name": secret_name,
+                        "namespace": secret_namespace
+                    }
+                }
             }
         })
     }
@@ -117,42 +203,32 @@ mod database_tests {
 
         async fn list_databases(
             &self,
-            namespace: &str,
             engine: DatabaseEngine,
             limit: u16,
             cursor: Option<&str>,
         ) -> Result<DatabaseList, DatasourceError> {
-            assert_eq!(namespace, "b10x");
-            let items = self.engine_items(engine);
-            let start: usize = cursor.map_or(0, |cursor| cursor.parse().expect("fake cursor"));
-            let end = (start + usize::from(limit)).min(items.len());
-            let page = items[start..end]
-                .iter()
-                .map(|resource| {
-                    serde_json::from_value(resource.clone()).expect("fake resource parses")
-                })
-                .collect();
-            Ok(DatabaseList {
-                items: page,
-                next_cursor: (end < items.len()).then(|| end.to_string()),
-            })
+            Ok(self.page(engine, limit, cursor))
         }
 
         async fn database_detail(
             &self,
-            _namespace: &str,
             engine: DatabaseEngine,
             name: &str,
         ) -> Result<CrossplaneDatabase, DatasourceError> {
-            self.engine_items(engine)
+            self.detail(engine, name)
+        }
+
+        async fn provider_configs(
+            &self,
+            engine: DatabaseEngine,
+        ) -> Result<Vec<CrossplaneProviderConfig>, DatasourceError> {
+            Ok(self
+                .engine_provider_configs(engine)
                 .iter()
-                .find(|resource| resource["metadata"]["name"] == name)
                 .map(|resource| {
-                    serde_json::from_value(resource.clone()).expect("fake resource parses")
+                    serde_json::from_value(resource.clone()).expect("fake provider config parses")
                 })
-                .ok_or_else(|| {
-                    datasource_not_found("Kubernetes database endpoint was not found")
-                })
+                .collect())
         }
     }
 
@@ -279,7 +355,10 @@ mod database_tests {
         assert_eq!(page.datasource_ref, DATABASES_DATASOURCE);
         assert_eq!(page.completeness, Completeness::Complete);
         assert!(page.next_cursor.is_none());
-        assert_eq!(page.records.len(), 3);
+        // `foreign-db` (its connection secret lives in `elsewhere`) and `orphan-db` (its
+        // providerConfigRef names no ProviderConfig) do not associate with the `b10x`
+        // binding and must not appear.
+        assert_eq!(page.records.len(), 3, "{:?}", page.records);
         assert!(page
             .records
             .iter()
@@ -288,29 +367,39 @@ mod database_tests {
             page.records[0].key,
             json!({"engine": "mysql", "name": "app-core"})
         );
-        let values: Vec<&serde_json::Value> =
-            page.records.iter().map(|record| &record.value).collect();
-        assert_eq!(values[0]["engine"], "mysql");
-        assert_eq!(values[0]["name"], "app-core");
-        assert_eq!(values[0]["ready"], true);
-        assert_eq!(values[0]["secret_ref"]["name"], "app-core-conn");
-        assert_eq!(values[0]["secret_ref"]["namespace"], "b10x");
-        // provider-sql resources carry no endpoint facts; the descriptor says so honestly.
-        assert_eq!(values[0]["host"], serde_json::Value::Null);
-        assert_eq!(values[0]["port"], serde_json::Value::Null);
-        assert_eq!(values[0]["database"], serde_json::Value::Null);
-        assert_eq!(values[1]["engine"], "mysql");
-        assert_eq!(values[1]["name"], "app-events");
-        assert_eq!(values[1]["ready"], false);
-        assert_eq!(values[1]["secret_ref"], serde_json::Value::Null);
-        assert_eq!(values[2]["engine"], "postgresql");
-        assert_eq!(values[2]["name"], "ledger");
-        assert_eq!(values[2]["ready"], true);
-        assert_eq!(values[2]["host"], "postgresql.endpoints.svc.cluster.local");
-        assert_eq!(values[2]["port"], 5432);
-        assert_eq!(values[2]["database"], "ledger");
-        assert_eq!(values[2]["secret_ref"]["name"], "ledger-conn");
-        assert_eq!(values[2]["secret_ref"]["namespace"], serde_json::Value::Null);
+        // Whole-value equality: the descriptor is exactly {engine, name, provider_config,
+        // secret_ref{name, namespace}, ready} — no host, port or database-name facts the
+        // resources never declared, and nothing credential-shaped.
+        assert_eq!(
+            page.records[0].value,
+            json!({
+                "engine": "mysql",
+                "name": "app-core",
+                "provider_config": "sql-default",
+                "secret_ref": {"name": "sql-default-conn", "namespace": "b10x"},
+                "ready": true
+            })
+        );
+        assert_eq!(
+            page.records[1].value,
+            json!({
+                "engine": "mysql",
+                "name": "app-events",
+                "provider_config": "sql-default",
+                "secret_ref": {"name": "sql-default-conn", "namespace": "b10x"},
+                "ready": false
+            })
+        );
+        assert_eq!(
+            page.records[2].value,
+            json!({
+                "engine": "postgresql",
+                "name": "ledger",
+                "provider_config": "sql-default",
+                "secret_ref": {"name": "pg-default-conn", "namespace": "b10x"},
+                "ready": true
+            })
+        );
         protocol::datasource::ResponseEnvelope::success(
             "request-databases",
             DatasourceResult::Read(page),
@@ -388,12 +477,33 @@ mod database_tests {
         };
         assert_eq!(page.records.len(), 1);
         assert_eq!(page.records[0].view, RecordView::Detail);
-        assert_eq!(page.records[0].value["engine"], "postgresql");
         assert_eq!(
-            page.records[0].value["host"],
-            "postgresql.endpoints.svc.cluster.local"
+            page.records[0].value,
+            json!({
+                "engine": "postgresql",
+                "name": "ledger",
+                "provider_config": "sql-default",
+                "secret_ref": {"name": "pg-default-conn", "namespace": "b10x"},
+                "ready": true
+            })
         );
-        assert_eq!(page.records[0].value["secret_ref"]["name"], "ledger-conn");
+
+        // A database whose connection secret lives in another namespace exists on the cluster,
+        // but not for this binding: not found, not leaked.
+        let foreign = backend
+            .handle_datasource(
+                &context,
+                databases_read(
+                    binding_ref.clone(),
+                    lease.clone(),
+                    DatasourceRead::Get {
+                        key: json!({"engine": "mysql", "name": "foreign-db"}),
+                    },
+                ),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(foreign.code, DatasourceErrorCode::NotFound);
 
         let missing = backend
             .handle_datasource(
@@ -465,9 +575,9 @@ mod database_tests {
         assert!(refused.retriable, "{refused:?}");
     }
 
-    /// A cluster without the Crossplane provider serves no Database CRD, the group's list
-    /// endpoint answers 404, and the reader maps that to an empty inventory: discovery finds
-    /// nothing, and nothing is not an error.
+    /// A cluster without the Crossplane provider serves no Database CRD, the group's own
+    /// discovery document is absent, and the reader maps that to an empty inventory: discovery
+    /// finds nothing, and nothing is not an error.
     #[tokio::test]
     async fn a_cluster_without_crossplane_discovers_nothing() {
         let backend = database_backend(DatabaseReader::without_crossplane());
@@ -495,9 +605,58 @@ mod database_tests {
         assert_eq!(page.completeness, Completeness::Complete);
     }
 
+    /// A wrong-scope regression must not hide behind the 404-means-no-Crossplane mapping
+    /// (S-062): when the group's own discovery document IS served and lists the collection, a
+    /// 404 on the collection's list is a wrong read path and surfaces as an error — while an
+    /// unserved group, or a served group without the collection, stays an empty inventory.
+    #[test]
+    fn a_404_from_a_served_group_is_an_error_not_an_empty_inventory() {
+        // The discovery document as `/apis/mysql.sql.crossplane.io/v1alpha1` really answers it.
+        let served: KubernetesApiResourceList = serde_json::from_value(json!({
+            "kind": "APIResourceList",
+            "apiVersion": "v1",
+            "groupVersion": "mysql.sql.crossplane.io/v1alpha1",
+            "resources": [
+                {
+                    "name": "databases",
+                    "singularName": "database",
+                    "namespaced": false,
+                    "kind": "Database",
+                    "verbs": ["get", "list", "watch"]
+                },
+                {
+                    "name": "providerconfigs",
+                    "singularName": "providerconfig",
+                    "namespaced": false,
+                    "kind": "ProviderConfig",
+                    "verbs": ["get", "list", "watch"]
+                }
+            ]
+        }))
+        .expect("the real discovery document parses");
+        let error =
+            absent_collection_is_empty("mysql.sql.crossplane.io", "databases", Some(&served))
+                .unwrap_err();
+        assert_eq!(error.code, DatasourceErrorCode::Unavailable);
+        assert!(error.message.contains("mysql.sql.crossplane.io"), "{error:?}");
+        assert!(error.message.contains("databases"), "{error:?}");
+
+        // The group itself is not served: no Crossplane, and nothing is not an error.
+        assert!(absent_collection_is_empty("mysql.sql.crossplane.io", "databases", None).is_ok());
+
+        // The group is served but does not list the collection: still an empty inventory.
+        let other: KubernetesApiResourceList =
+            serde_json::from_value(json!({"resources": [{"name": "widgets"}]})).unwrap();
+        assert!(
+            absent_collection_is_empty("mysql.sql.crossplane.io", "databases", Some(&other))
+                .is_ok()
+        );
+    }
+
     /// Discovery publishes references, never secret bytes (design 15): the raw resources carry
     /// a credential-shaped canary and provider plumbing, and none of it may survive into any
-    /// datasource output — while the connection-secret NAME must.
+    /// datasource output — while the connection-secret NAME must. The other bindings' inventory
+    /// (`foreign-db`, `orphan-db`, `other-conn`) must not surface either.
     #[tokio::test]
     async fn no_secret_value_ever_appears_in_database_endpoint_output() {
         let backend = database_backend(DatabaseReader::crossplane());
@@ -533,9 +692,10 @@ mod database_tests {
             .unwrap();
         let list = serde_json::to_string(&list).unwrap();
         let get = serde_json::to_string(&get).unwrap();
-        assert!(list.contains("app-core-conn"), "{list}");
+        assert!(list.contains("sql-default-conn"), "{list}");
         for output in [&list, &get] {
             assert!(output.contains("secret_ref"), "{output}");
+            assert!(output.contains("provider_config"), "{output}");
             for forbidden in [
                 "hunter2",
                 "password",
@@ -544,6 +704,13 @@ mod database_tests {
                 "external-name",
                 "providerConfigRef",
                 "deletionPolicy",
+                "credentials",
+                "connectionSecretRef",
+                "MySQLConnectionSecret",
+                "foreign-db",
+                "orphan-db",
+                "other-conn",
+                "elsewhere",
             ] {
                 assert!(!output.contains(forbidden), "`{forbidden}` leaked: {output}");
             }
@@ -623,7 +790,19 @@ mod database_tests {
         assert_eq!(description.key_schema["required"], json!(["engine", "name"]));
         assert_eq!(
             description.compact_schema["required"],
-            json!(["engine", "name", "host", "port", "database", "secret_ref", "ready"])
+            json!(["engine", "name", "provider_config", "secret_ref", "ready"])
+        );
+        // The resources are cluster-scoped and declare no namespace-scoped endpoint facts; the
+        // description must not promise what they do not carry.
+        assert!(
+            !description.description.contains("namespace-scoped"),
+            "{}",
+            description.description
+        );
+        assert!(
+            description.description.contains("cluster-scoped"),
+            "{}",
+            description.description
         );
         assert_eq!(description.description_ref, databases_description_ref(&context));
         // Two datasources, two leases: staleness of one must not refuse the other.
