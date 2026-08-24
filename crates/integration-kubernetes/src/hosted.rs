@@ -496,21 +496,41 @@ impl DeploymentReader for InClusterReader {
         limit: u16,
         cursor: Option<&str>,
     ) -> Result<WorkloadList, DatasourceError> {
-        let mut endpoint =
-            self.api_url(&["apis", "apps", "v1", "namespaces", namespace, "deployments"])?;
-        {
-            let mut query = endpoint.query_pairs_mut();
-            query.append_pair("limit", &limit.to_string());
-            if let Some(cursor) = cursor {
-                query.append_pair("continue", cursor);
+        // Walked in bounded upstream pages (S-063): however small the kept projection is, the
+        // raw objects arrive whole, so fetching a full page in one request exceeds
+        // `MAX_KUBERNETES_RESPONSE_BYTES` on a busy namespace. Each chunk stays inside the
+        // response bound; the caller still sees one page and one cursor. A short page with a
+        // cursor is the honest answer when the fetch budget runs out first.
+        let mut workloads = Vec::new();
+        let mut continue_token = cursor.map(str::to_owned);
+        for _ in 0..MAX_UPSTREAM_LIST_FETCHES {
+            let remaining = usize::from(limit).saturating_sub(workloads.len());
+            if remaining == 0 {
+                break;
+            }
+            let mut endpoint =
+                self.api_url(&["apis", "apps", "v1", "namespaces", namespace, "deployments"])?;
+            {
+                let mut query = endpoint.query_pairs_mut();
+                query.append_pair(
+                    "limit",
+                    &remaining.min(usize::from(UPSTREAM_PAGE_LIMIT)).to_string(),
+                );
+                if let Some(token) = continue_token.as_deref() {
+                    query.append_pair("continue", token);
+                }
+            }
+            let list: KubernetesList<KubernetesDeployment> = self.get_json(endpoint).await?;
+            workloads.extend(list.items.into_iter().map(project_compact));
+            continue_token =
+                (!list.metadata.continue_token.is_empty()).then_some(list.metadata.continue_token);
+            if continue_token.is_none() {
+                break;
             }
         }
-        let list: KubernetesList<KubernetesDeployment> = self.get_json(endpoint).await?;
-        let workloads = list.items.into_iter().map(project_compact).collect();
         Ok(WorkloadList {
             workloads,
-            next_cursor: (!list.metadata.continue_token.is_empty())
-                .then_some(list.metadata.continue_token),
+            next_cursor: continue_token,
         })
     }
 
@@ -590,8 +610,10 @@ impl DeploymentReader for InClusterReader {
             })
             .collect();
 
+        let (workload, meta) = project_workload(deployment);
         Ok(WorkloadDetail {
-            workload: project_compact(deployment),
+            workload,
+            meta,
             pods,
             warnings,
             related_complete,
@@ -1074,5 +1096,7 @@ fn audit_ref(
 
 #[cfg(test)]
 include!("hosted_tests.rs");
+#[cfg(test)]
+include!("hosted_paging_tests.rs");
 #[cfg(test)]
 include!("hosted_database_tests.rs");

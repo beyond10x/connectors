@@ -21,10 +21,11 @@ use service::PrincipalContext;
 use crate::workloads::{
     datasource_description, datasource_not_found, datasource_summary, datasource_unavailable,
     namespace_binding, namespace_binding_ref, now_unix_ms, outcome_unknown, project,
-    project_compact, project_pod, read_workloads, safe_event_reason, stale, unavailable,
-    valid_dns_label, CursorStore, DeploymentReader, DeploymentStatus, KubernetesDeployment,
-    KubernetesEvent, KubernetesList, KubernetesPod, RestartAccepted, WarningSummary,
-    WorkloadDetail, WorkloadList, DATASOURCE, MAX_KUBERNETES_RESPONSE_BYTES, MAX_RELATED_RECORDS,
+    project_compact, project_pod, project_workload, read_workloads, safe_event_reason, stale,
+    unavailable, valid_dns_label, CursorStore, DeploymentReader, DeploymentStatus,
+    KubernetesDeployment, KubernetesEvent, KubernetesList, KubernetesPod, RestartAccepted,
+    WarningSummary, WorkloadDetail, WorkloadList, DATASOURCE, MAX_KUBERNETES_RESPONSE_BYTES,
+    MAX_RELATED_RECORDS, MAX_UPSTREAM_LIST_FETCHES, UPSTREAM_PAGE_LIMIT,
 };
 
 /// Reads the Kubernetes API through a `kube::Client` bound to one kubeconfig context.
@@ -173,24 +174,41 @@ impl DeploymentReader for KubeconfigReader {
         cursor: Option<&str>,
     ) -> Result<WorkloadList, DatasourceError> {
         let namespace = path_segment(namespace)?;
-        let mut pairs = vec![("limit", limit.to_string())];
-        if let Some(cursor) = cursor {
-            pairs.push(("continue", cursor.to_owned()));
+        // The same bounded upstream walk as the in-cluster reader (S-063): raw objects arrive
+        // whole however small the kept projection is, so one request for a full page can
+        // exceed `MAX_KUBERNETES_RESPONSE_BYTES` on a busy namespace. A short page with a
+        // cursor is the honest answer when the fetch budget runs out first.
+        let mut workloads = Vec::new();
+        let mut continue_token = cursor.map(str::to_owned);
+        for _ in 0..MAX_UPSTREAM_LIST_FETCHES {
+            let remaining = usize::from(limit).saturating_sub(workloads.len());
+            if remaining == 0 {
+                break;
+            }
+            let chunk = remaining.min(usize::from(UPSTREAM_PAGE_LIMIT)).to_string();
+            let mut pairs = vec![("limit", chunk)];
+            if let Some(token) = continue_token.as_deref() {
+                pairs.push(("continue", token.to_owned()));
+            }
+            let borrowed = pairs
+                .iter()
+                .map(|(key, value)| (*key, value.as_str()))
+                .collect::<Vec<_>>();
+            let path = format!(
+                "/apis/apps/v1/namespaces/{namespace}/deployments?{}",
+                query(&borrowed)
+            );
+            let list: KubernetesList<KubernetesDeployment> = self.get_json(&path).await?;
+            workloads.extend(list.items.into_iter().map(project_compact));
+            continue_token =
+                (!list.metadata.continue_token.is_empty()).then_some(list.metadata.continue_token);
+            if continue_token.is_none() {
+                break;
+            }
         }
-        let borrowed = pairs
-            .iter()
-            .map(|(key, value)| (*key, value.as_str()))
-            .collect::<Vec<_>>();
-        let path = format!(
-            "/apis/apps/v1/namespaces/{namespace}/deployments?{}",
-            query(&borrowed)
-        );
-        let list: KubernetesList<KubernetesDeployment> = self.get_json(&path).await?;
-        let workloads = list.items.into_iter().map(project_compact).collect();
         Ok(WorkloadList {
             workloads,
-            next_cursor: (!list.metadata.continue_token.is_empty())
-                .then_some(list.metadata.continue_token),
+            next_cursor: continue_token,
         })
     }
 
@@ -266,8 +284,10 @@ impl DeploymentReader for KubeconfigReader {
             })
             .collect();
 
+        let (workload, meta) = project_workload(deployment);
         Ok(WorkloadDetail {
-            workload: project_compact(deployment),
+            workload,
+            meta,
             pods,
             warnings,
             related_complete,
