@@ -1,5 +1,5 @@
 connectors-catalog-pack 1
-digest sha256 f0261bc8fd2b0a88c7ed0f7bf20bed29f536f0e5692a6a6d4a40f0a8804344ae
+digest sha256 1f04850c88c7773e9e1ed51b7de615859bfc60cfca9ade7a78d9e73958897d24
 schema 2
 providers 64
 operations 997
@@ -71,7 +71,7 @@ o airtable-record-create airtable default 5060 4705
 o airtable-record-delete airtable default 14746 3734
 o airtable-record-get airtable default 731 4323
 o airtable-record-update airtable default 9771 4969
-o alertmanager-alerts-list alertmanager default 19709 1208
+o alertmanager-alerts-list alertmanager default 19709 1215
 o algolia-index-list algolia default 23669 4218
 o algolia-index-search algolia default 27893 6831
 o algolia-object-delete algolia default 42765 3309
@@ -1666,7 +1666,7 @@ payload 16467651
       "protocol_driver": "http_v1",
       "request": {
         "method": "GET",
-        "url": "{base}/alerts"
+        "url": "{base}/api/v2/alerts"
       },
       "required_capabilities": [
         "private_network"
@@ -1691,7 +1691,7 @@ payload 16467651
         "developer",
         "support-agent"
       ],
-      "base_url": "{origin}/api/v2",
+      "base_url": "{origin}",
       "name": "default",
       "tags": [
         "observability",
