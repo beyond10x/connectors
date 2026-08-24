@@ -100,7 +100,6 @@ will spawn children as each milestone is designed.
 | [S-066](S-066-the-transport-refusal-names-its-class.md) | The transport refusal names its class | done | Platform | integrations |
 | [S-067](S-067-the-server-serves-its-own-openapi-contract.md) | The server serves its own OpenAPI contract | done | Platform | server, docs |
 | [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | ready | Platform | server, docs |
-| [S-069](S-069-the-openapi-artifact-is-regenerated-not-authored.md) | The OpenAPI artifact is regenerated, not authored | ready | Platform | server, docs |
 
 ## Epics in this seed
 
@@ -118,7 +117,7 @@ will spawn children as each milestone is designed.
 | `native-voice` | S-032, S-033 | The two independently provable owner slices: a closed sipx-backed SIP endpoint, then a neutral RTVBP direct-byte bridge and model-free composed call. |
 | `enforced-authority` | S-043, S-044, S-045, S-046, S-047, S-048, S-049 | Turning the F-001 refusal fences into enforced Grant and approval authority, so effect-bearing hosted operations become reachable only through unforgeable proofs. |
 | `mcp-entry` | S-053, S-054, S-055, S-056, S-063 | An MCP entry point on the hosted server: three meta-tools funneled through the admission seam, pod logs as a hosted read-only operation, and the identity scope subset that lets non-operators use it. |
-| `public-surface` | S-067, S-068, S-069 | The hosted server documents itself: a pinned OpenAPI contract artifact and a self-contained public documentation page rendered from it. |
+| `public-surface` | S-067, S-068 | The hosted server documents itself: a pinned OpenAPI contract artifact and a self-contained public documentation page rendered from it. |
 | `endpoint-plane` | S-058, S-059, S-060, S-061, S-062, S-064, S-065, S-066 | The zero-configuration endpoint plane: databases discovered from the cluster, the fleet Grafana, and a login-and-go client surface, all through the admission seam. |
 | `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
