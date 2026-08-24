@@ -266,9 +266,16 @@ fn pod_logs_schema() -> Value {
 
 /// The one argument the toolset adds to every monitoring entry: which configured Connection
 /// the invoke rides. `tool_describe` narrows it to an enum of the caller's own described
-/// connection labels; it may be omitted only while exactly one Connection is configured.
+/// connection labels — and lists it in `required` while several are configured, because the
+/// resolver refuses a target-less call then; it may be omitted only while exactly one
+/// Connection is configured.
 fn target_property() -> Value {
-    json!({ "type": "string", "minLength": 1 })
+    json!({
+        "type": "string",
+        "minLength": 1,
+        "description": "Which configured target Connection to ride, by label. Required while \
+                        several targets are configured; omittable only while exactly one is."
+    })
 }
 
 fn target_only_schema() -> Value {
@@ -279,20 +286,35 @@ fn target_only_schema() -> Value {
     })
 }
 
-// The monitoring argument shapes below mirror `monitoring-model`'s published input contract
-// exactly — every caller parameter present, with its validated bounds — so a schema-valid
+// The monitoring argument shapes below mirror each operation's canonical document exactly —
+// every caller parameter present with its validated bounds, and `required` listing only what
+// the document (and therefore `monitoring-model`'s validator) requires — so a schema-valid
 // call is an input-valid invocation and nothing is defaulted on the caller's behalf.
+// `tool_describe` then adds the caller-moment truth: the `target` enum, and `target` in
+// `required` while several connections are configured.
 
 fn grafana_dashboards_list_schema() -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["namespace", "limit", "continue"],
+        "required": ["namespace"],
         "properties": {
             "target": target_property(),
-            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
-            "continue": { "type": "string", "maxLength": 4096 }
+            "namespace": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Grafana organization namespace. For the default organization \
+                                this is `default`."
+            },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": 1000,
+                "description": "Maximum number of dashboards to return in this page."
+            },
+            "continue": {
+                "type": "string", "maxLength": 4096,
+                "description": "Opaque continuation token returned by an earlier page. Omit \
+                                it for the first page."
+            }
         }
     })
 }
@@ -304,8 +326,17 @@ fn grafana_dashboard_get_schema() -> Value {
         "required": ["namespace", "uid"],
         "properties": {
             "target": target_property(),
-            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "uid": { "type": "string", "minLength": 1, "maxLength": 256 }
+            "namespace": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Grafana organization namespace. For the default organization \
+                                this is `default`."
+            },
+            "uid": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Dashboard UID, as returned by grafana_dashboards_list."
+            }
         }
     })
 }
@@ -318,9 +349,21 @@ fn prometheus_query_range_schema() -> Value {
         "properties": {
             "target": target_property(),
             "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
-            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "step": { "type": "string", "minLength": 1, "maxLength": 64 }
+            "start": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64,
+                "description": "Start of the range: unix epoch seconds (integer or string) \
+                                or an RFC3339 timestamp."
+            },
+            "end": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64,
+                "description": "End of the range: unix epoch seconds (integer or string) or \
+                                an RFC3339 timestamp."
+            },
+            "step": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64, "minimum": 1,
+                "description": "Resolution step: a PromQL duration string such as `60s`, or \
+                                integer seconds."
+            }
         }
     })
 }
@@ -333,8 +376,18 @@ fn loki_query_range_schema() -> Value {
         "properties": {
             "target": target_property(),
             "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
-            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "start": {
+                "type": "string", "minLength": 1, "maxLength": 64,
+                "description": "Start of the range as a string, passed verbatim to Loki: an \
+                                RFC3339 timestamp or a unix epoch as Loki reads it. Bare \
+                                integers are refused — Loki parses them as nanoseconds."
+            },
+            "end": {
+                "type": "string", "minLength": 1, "maxLength": 64,
+                "description": "End of the range as a string, passed verbatim to Loki: an \
+                                RFC3339 timestamp or a unix epoch as Loki reads it. Bare \
+                                integers are refused — Loki parses them as nanoseconds."
+            },
             "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
             "direction": { "enum": ["forward", "backward"] }
         }
@@ -493,6 +546,19 @@ pub(super) async fn tool_describe(
                     .map(|connection| Value::String(connection.label.clone()))
                     .collect(),
             );
+            // And the honest `required`: with several connections configured the resolver
+            // refuses a target-less call, so the schema says so; a sole connection needs no
+            // choice and the argument stays omittable (S-064).
+            if description.connections.len() > 1 {
+                let required = &mut input_schema["required"];
+                if required.is_null() {
+                    *required = Value::Array(Vec::new());
+                }
+                required
+                    .as_array_mut()
+                    .expect("every toolset schema states required as an array")
+                    .push(Value::String("target".to_owned()));
+            }
             (
                 serde_json::to_value(description.effect).expect("closed effect vocabulary"),
                 serde_json::to_value(description.approval).expect("closed approval vocabulary"),
