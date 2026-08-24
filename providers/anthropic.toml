@@ -21,14 +21,14 @@ service = "models"
 path = "specs/anthropic/models-2023-06-01.openapi.yaml"
 upstream_version = "2023-06-01"
 fetched_at = "2026-08-13T00:00:00Z"
-sha256 = "38e054bae8e051a58493b6978bcab5a64b15c0544588218fa789646d01b431df"
+sha256 = "6935825362718e79a8a6f1bd1a3dcb8adf897759e6050004fbbb8c68cb73ec3e"
 
 [[spec]]
 service = "admin"
 path = "specs/anthropic/admin-2023-06-01.openapi.yaml"
 upstream_version = "2023-06-01"
 fetched_at = "2026-08-13T00:00:00Z"
-sha256 = "8280d48e48dd33a3c5f9d899dbc03d4154e23928c4aa9b304ceceda3791ad718"
+sha256 = "3458dbfb0c31150dbd6a601abb90f4b814bc5f122bdb717f0f8f05c2b0e37e21"
 
 [[auth]]
 name = "anthropic.api_key"

@@ -35,7 +35,7 @@ path = "specs/argocd/http-api-v3.5.1.openapi.yaml"
 source_url = "https://github.com/argoproj/argo-cd/blob/v3.5.1/assets/swagger.json"
 upstream_version = "v3.5.1"
 fetched_at = "2026-08-20T00:00:00Z"
-sha256 = "48dd67c27f3ba022e8cc8da1c4893f1b4f29b0596c8c412df34bf70701eb2487"
+sha256 = "40e89ee14ee598c816358d92d0682e92b4723701da664ebaae1c4988fe37303d"
 
 [[auth]]
 name = "argocd.api_token"

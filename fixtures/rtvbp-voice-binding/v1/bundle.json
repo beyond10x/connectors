@@ -3,11 +3,11 @@
   "version": "v1",
   "stability": "alpha",
   "files": [
-    {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
-    {"path":"fixtures/rtvbp-voice-binding/v1/README.md","bytes":1098,"sha256":"3ce7d1a28fbe7dd422f6e4f6ca453efc20442ff97a565011db497aadce989929"},
-    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.schema.json","bytes":4307,"sha256":"6feb5cf3c4b339578f5472962cc67001bbcf4ae25208786944fe07320868ca4d"},
-    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.json","bytes":2143,"sha256":"d97a2d77f0d9c2d7b3a6c73b2d98f2a642f26fbbdc234c063545d6582d84bb24"},
-    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.schema.json","bytes":667,"sha256":"5cc8f030184c103528c7295d7aabbc3e6ad48b35c683b73ebdb44c3fb280a401"},
-    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.json","bytes":1072,"sha256":"e3a2f0dc514dae5651646bf193a016232cc62c813bffd5d1ec588190bc67d2e4"}
+    {"path":"contracts/artifact-bundle.schema.json","bytes":1013,"sha256":"5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/README.md","bytes":1080,"sha256":"dd7f2eae19c2d22e0c169d667cedca908cf60c6a1ba57c9b3ae647e131948c14"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.schema.json","bytes":4288,"sha256":"d647d3f643d8eab8a4918cdfc5bd880760fe13c88cdcfe91e54c4b8e6dc40d2d"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/manifest.json","bytes":2125,"sha256":"3e3bc06f6e2a738fc630bb5f656be112bf1f5b6af2f88bcb074b58e63b4c89cc"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.schema.json","bytes":666,"sha256":"9cb4ec460cf8d510256ac8abab87a8b32dd6a5aa8c393e63d77839e2460cb4f0"},
+    {"path":"fixtures/rtvbp-voice-binding/v1/vectors.json","bytes":1036,"sha256":"c4e438d8e2c59a51fb16dc261cb304704122f3cd5e026b0d24499328e0ccdd3c"}
   ]
 }
