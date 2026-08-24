@@ -37,6 +37,7 @@ use service::{
 
 mod admission;
 mod connect;
+mod docs;
 mod enforcement;
 mod mcp;
 mod principal;
@@ -249,6 +250,7 @@ pub fn router(
         .route("/livez", get(liveness))
         .route("/readyz", get(readiness))
         .route("/healthz", get(readiness))
+        .route("/openapi.json", get(docs::openapi))
         .route(
             "/operations",
             post(operation).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
@@ -817,6 +819,7 @@ mod tests {
     use tower::ServiceExt as _;
 
     mod contract_validation;
+    mod docs;
     mod enforcement;
     mod mcp;
     mod mcp_monitoring;
