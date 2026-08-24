@@ -1,0 +1,165 @@
+# PostgreSQL server — a repository-authored native-driver Provider, in the mold of the b10x
+# native members (`sip_v1`, `audio_v1`, `cdp_v1`). There is no vendor HTTP API behind this
+# surface: the external system is a PostgreSQL server spoken to over its own frontend/backend
+# protocol (https://www.postgresql.org/docs/17/protocol.html) by the closed built-in `sql_v1`
+# driver.
+#
+# The surface is read-only by construction, not by database grant. The driver refuses any
+# statement that does not parse as a single SELECT-class read
+# (https://www.postgresql.org/docs/17/sql-select.html) before opening a connection, so a write
+# never reaches a server even when the Connection's database account would have allowed it.
+# PostgreSQL has no SHOW DATABASES or DESCRIBE statement; the inventory operations below read the
+# standard information_schema (https://www.postgresql.org/docs/17/information-schema.html)
+# instead. Mutations are a later, grant-gated story.
+#
+# No connection fact is caller-selectable. Host, port (5432 by default,
+# https://www.postgresql.org/docs/17/runtime-config-connection.html), database and user are
+# Connection-owned deployment facts, and the credential is a custody reference — a secret name
+# resolved through platform custody (the S-059 Kubernetes connection-secret descriptors, or
+# Vault), never a value in configuration, catalog, or a call.
+
+id = "postgresql"
+vendor = "PostgreSQL"
+
+# This is the permanent public Provider authority. Reverse-DNS of postgresql.org — the project's
+# canonical home (https://www.postgresql.org, documentation at
+# https://www.postgresql.org/docs/), community-owned with no corporate domain to outlive. The
+# `.server` leaf says the external system is the database server itself, not a hosted vendor API.
+# It must never be repointed.
+authority = "org.postgresql.server"
+
+# The current catalog IR requires a non-empty provider base URL even when every operation uses a
+# native request form. `sql_v1` lowering emits no endpoint and never reads this origin at runtime;
+# this is the stable project origin, not a database host or an HTTP execution target.
+base_url = "https://www.postgresql.org"
+description = "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory"
+verify = "postgresql-schemas-list"
+
+[[services]]
+name = "default"
+tags = ["database"]
+audiences = ["developer", "data-analyst"]
+
+# The bounded arbitrary read. `medium` rather than `low`: a free-form SELECT can traverse anything
+# the Connection's database account can see, which is a data-exposure claim no fixed inventory
+# operation makes — when unsure, claim higher. Repeating a read is safe, so it stays `idempotent`.
+[[operations]]
+service = "default"
+id = "postgresql-query"
+direction = "read"
+description = "Run one bounded read-only SQL statement (SELECT class, https://www.postgresql.org/docs/17/sql-select.html) against the PostgreSQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, a data-modifying CTE, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly"
+risk = "medium"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "sql_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+auth = []
+expose = true
+
+[[operations.params.body]]
+name = "statement"
+description = "Exactly one read statement — SELECT class. A write statement, a data-modifying CTE, a second statement after a `;`, or anything that does not parse as a read is refused before any connection is opened"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 8192 }
+
+[[operations.params.body]]
+name = "max_rows"
+description = "Optional row bound for this call. The effective bound is the smaller of this and the published 500-row cap: a caller can narrow the cap, never widen it"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 500 }
+
+[operations.response_schema]
+type = "object"
+required = ["columns", "rows", "rows_returned", "bytes_returned", "truncated"]
+properties = { columns = { type = "array", items = { type = "string" }, description = "Result column names, in wire order" }, rows = { type = "array", description = "Returned rows; every cell is the server's text rendering and null is an SQL NULL", items = { type = "array", items = { type = ["string", "null"] } } }, rows_returned = { type = "integer", description = "How many rows were returned" }, bytes_returned = { type = "integer", description = "Counted cell bytes across the returned rows" }, truncated = { type = "boolean", description = "Whether the result stopped before the statement's full result set" }, truncation_cause = { type = "string", enum = ["row_cap", "byte_cap"], description = "Why the page stopped early; absent when truncated is false" } }
+
+# The inventory reads are fixed information_schema projections
+# (https://www.postgresql.org/docs/17/information-schema.html): no caller text reaches the server
+# as statement material, so they carry `low` where the free-form query carries `medium`.
+[[operations]]
+service = "default"
+id = "postgresql-schemas-list"
+direction = "read"
+description = "List the schemas of the PostgreSQL database this Connection resolves, from information_schema.schemata (https://www.postgresql.org/docs/17/infoschema-schemata.html), system schemas included"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "sql_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+auth = []
+expose = true
+
+[operations.response_schema]
+type = "object"
+required = ["schemas", "truncated"]
+properties = { schemas = { type = "array", items = { type = "string" }, description = "Schema names, sorted" }, truncated = { type = "boolean", description = "Whether the list stopped at the row cap" } }
+
+[[operations]]
+service = "default"
+id = "postgresql-tables-list"
+direction = "read"
+description = "List the tables and views of one schema in the PostgreSQL database this Connection resolves, from information_schema.tables (https://www.postgresql.org/docs/17/infoschema-tables.html)"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "sql_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+auth = []
+expose = true
+
+[[operations.params.body]]
+name = "schema"
+description = "The schema whose tables to list. PostgreSQL identifiers are at most 63 bytes (https://www.postgresql.org/docs/17/sql-syntax-lexical.html)"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 63 }
+
+[operations.response_schema]
+type = "object"
+required = ["schema", "tables", "truncated"]
+properties = { schema = { type = "string", description = "The schema that was listed" }, tables = { type = "array", items = { type = "string" }, description = "Table and view names in that schema, sorted" }, truncated = { type = "boolean", description = "Whether the list stopped at the row cap" } }
+
+[[operations]]
+service = "default"
+id = "postgresql-table-describe"
+direction = "read"
+description = "Describe one table's columns — name, data type, nullability, position — in the PostgreSQL database this Connection resolves, from information_schema.columns (https://www.postgresql.org/docs/17/infoschema-columns.html). Structure only: no default expressions, comments, or row estimates"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+semantic_effects = ["read"]
+interaction_shape = "unary"
+protocol_driver = "sql_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["private_network"]
+auth = []
+expose = true
+
+[[operations.params.body]]
+name = "schema"
+description = "The schema holding the table"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 63 }
+
+[[operations.params.body]]
+name = "table"
+description = "The table to describe"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 63 }
+
+[operations.response_schema]
+type = "object"
+required = ["schema", "table", "columns", "truncated"]
+properties = { schema = { type = "string" }, table = { type = "string" }, columns = { type = "array", description = "The table's columns in ordinal order", items = { type = "object", required = ["name", "data_type", "nullable", "ordinal"], properties = { name = { type = "string" }, data_type = { type = "string", description = "The server's own data-type word" }, nullable = { type = "boolean" }, ordinal = { type = "integer", description = "The column's 1-based position" } } } }, truncated = { type = "boolean", description = "Whether the column list stopped at the row cap" } }

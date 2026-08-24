@@ -335,6 +335,7 @@ enum DocProtocolOperation<'a> {
     SipV1 { request: DocSipRequest },
     AudioV1 { request: DocAudioRequest },
     CdpV1 { request: DocCdpRequest },
+    SqlV1 { request: DocSqlRequest },
 }
 
 /// The admitted SIP request carries no HTTP-shaped data. Call arguments remain in the operation's
@@ -353,6 +354,12 @@ struct DocAudioRequest {}
 /// deployment-owned facts resolved only after grant admission.
 #[derive(Serialize)]
 struct DocCdpRequest {}
+
+/// The admitted SQL request carries no HTTP-shaped data either. The statement and its bounds are
+/// ordinary declared parameters, and every connection fact — engine, host, port, database,
+/// credential reference — is deployment-owned and resolved only after grant admission.
+#[derive(Serialize)]
+struct DocSqlRequest {}
 
 /// **The HTTP request template** — the data equivalent of the emitted Flux body.
 #[derive(Serialize)]
@@ -1119,6 +1126,11 @@ fn request_template<'a>(
                 request: DocCdpRequest {},
             });
         }
+        OperationRequest::SqlV1 => {
+            return Ok(DocProtocolOperation::SqlV1 {
+                request: DocSqlRequest {},
+            });
+        }
     };
     let set = &operation.params;
     let url = format!("{{base}}{}", path_template(operation, path, pins)?);
@@ -1644,7 +1656,10 @@ fn endpoint_slots(
 
     if matches!(
         operation.request,
-        OperationRequest::SipV1 | OperationRequest::AudioV1 | OperationRequest::CdpV1
+        OperationRequest::SipV1
+            | OperationRequest::AudioV1
+            | OperationRequest::CdpV1
+            | OperationRequest::SqlV1
     ) {
         return Ok(slots);
     }
@@ -1906,7 +1921,7 @@ pub fn schema() -> &'static Value {
                         "repeatability_condition": { "type": "string" },
                         "semantic_effects": { "type": "array", "items": { "type": "string" } },
                         "interaction_shape": { "enum": ["unary", "stream", "subscription", "leased_session", "session_establishment"] },
-                        "protocol_driver": { "enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1"] },
+                        "protocol_driver": { "enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1", "sql_v1"] },
                         "placement_requirement": { "enum": ["connectors_deployment", "substrate_workload", "federated_satellite"] },
                         "implementation_form": { "enum": ["built_in"] },
                         "required_capabilities": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["public_network", "private_network", "unix_socket", "file_secret", "process", "container", "device"] } },
@@ -1951,6 +1966,10 @@ pub fn schema() -> &'static Value {
                         {
                             "if": { "properties": { "protocol_driver": { "const": "cdp_v1" } } },
                             "then": { "properties": { "request": { "$ref": "#/$defs/cdp_request" } } }
+                        },
+                        {
+                            "if": { "properties": { "protocol_driver": { "const": "sql_v1" } } },
+                            "then": { "properties": { "request": { "$ref": "#/$defs/sql_request" } } }
                         }
                     ],
                     "additionalProperties": false
@@ -2010,6 +2029,11 @@ pub fn schema() -> &'static Value {
                 },
                 "cdp_request": {
                     "description": "Browser driver request marker. HTTP-shaped request facts are structurally impossible: the browser's own traffic belongs to the driver, and no executable, profile directory or artifact directory is nameable here.",
+                    "type": "object",
+                    "maxProperties": 0
+                },
+                "sql_request": {
+                    "description": "SQL driver request marker. HTTP-shaped request facts are structurally impossible, and no host, port, database, user or credential value is nameable here.",
                     "type": "object",
                     "maxProperties": 0
                 },

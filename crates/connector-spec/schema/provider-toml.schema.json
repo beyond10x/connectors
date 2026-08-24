@@ -1085,7 +1085,7 @@
     },
 
     "protocolDriver": {
-      "enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1"]
+      "enum": ["http_v1", "sip_v1", "audio_v1", "cdp_v1", "sql_v1"]
     },
 
     "placementRequirement": {

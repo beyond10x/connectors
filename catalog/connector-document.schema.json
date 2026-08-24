@@ -783,6 +783,22 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "protocol_driver": {
+                "const": "sql_v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "request": {
+                "$ref": "#/$defs/sql_request"
+              }
+            }
+          }
         }
       ],
       "properties": {
@@ -899,7 +915,8 @@
             "http_v1",
             "sip_v1",
             "audio_v1",
-            "cdp_v1"
+            "cdp_v1",
+            "sql_v1"
           ]
         },
         "rate_limit": {
@@ -1294,6 +1311,11 @@
     },
     "sip_request": {
       "description": "SIP driver request marker. HTTP-shaped request facts are structurally impossible.",
+      "maxProperties": 0,
+      "type": "object"
+    },
+    "sql_request": {
+      "description": "SQL driver request marker. HTTP-shaped request facts are structurally impossible, and no host, port, database, user or credential value is nameable here.",
       "maxProperties": 0,
       "type": "object"
     },

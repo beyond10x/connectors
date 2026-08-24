@@ -271,3 +271,43 @@ upstream = "https://github.com/PipedreamHQ/pipedream — components/github/actio
 refresh = "manual"
 pins = "docs/research/vendor/provenance.toml"
 consumers = ["docs/research/catalog-precedents.md", "docs/research/vendor/pipedream-github-create-issue.mjs"]
+
+[[source]]
+id = "mysql-authored-provider"
+kind = "native-driver-provider"
+origin = "repository-authored"
+upstream = "https://dev.mysql.com/doc/refman/8.4/en/"
+references = [
+  "https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/select.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/show.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/describe.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/connecting.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/identifier-length.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/information-schema.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html",
+  "https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html",
+]
+refresh = "authored-review"
+consumers = ["providers/mysql.toml", "catalog/mysql.catalog.json", "crates/driver-sql/"]
+note = "Repository-authored native-driver Provider: four read-only sql_v1 operations (bounded query plus information_schema inventory) with no vendor spec byte stream behind them. Every statement-class, protocol, port, identifier-bound and information_schema fact in the provider file cites its official MySQL 8.4 reference inline; review is against those references."
+
+[[source]]
+id = "postgresql-authored-provider"
+kind = "native-driver-provider"
+origin = "repository-authored"
+upstream = "https://www.postgresql.org/docs/17/"
+references = [
+  "https://www.postgresql.org/docs/17/protocol.html",
+  "https://www.postgresql.org/docs/17/sql-select.html",
+  "https://www.postgresql.org/docs/17/runtime-config-connection.html",
+  "https://www.postgresql.org/docs/17/sql-syntax-lexical.html",
+  "https://www.postgresql.org/docs/17/information-schema.html",
+  "https://www.postgresql.org/docs/17/infoschema-schemata.html",
+  "https://www.postgresql.org/docs/17/infoschema-tables.html",
+  "https://www.postgresql.org/docs/17/infoschema-columns.html",
+]
+refresh = "authored-review"
+consumers = ["providers/postgresql.toml", "catalog/postgresql.catalog.json", "crates/driver-sql/"]
+note = "Repository-authored native-driver Provider: four read-only sql_v1 operations (bounded query plus information_schema inventory) with no vendor spec byte stream behind them. Every statement-class, protocol, port, identifier-bound and information_schema fact in the provider file cites its official PostgreSQL 17 reference inline; review is against those references."

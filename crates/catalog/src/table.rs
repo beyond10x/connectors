@@ -1061,6 +1061,7 @@ fn protocol_driver(operation: &str, word: &str) -> ProtocolDriver {
         "sip_v1" => ProtocolDriver::SipV1,
         "audio_v1" => ProtocolDriver::AudioV1,
         "cdp_v1" => ProtocolDriver::CdpV1,
+        "sql_v1" => ProtocolDriver::SqlV1,
         other => panic!("operation `{operation}` declares unknown protocol driver `{other}`"),
     }
 }

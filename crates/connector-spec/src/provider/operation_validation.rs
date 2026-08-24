@@ -157,6 +157,30 @@ pub(super) fn validate_operations(connector: &Connector, problems: &mut Vec<Stri
                     ));
                 }
             }
+            OperationRequest::SqlV1 => {
+                // A database answers one bounded request and returns: no direct-byte session is
+                // established and nothing is leased across calls — the driver may pool
+                // connections, but that is an implementation fact below this seam, not a
+                // lifecycle a caller can observe. Admitting `sql_v1` under any other shape would
+                // promise a lifecycle the driver does not implement.
+                if operation.interaction_shape != InteractionShape::Unary {
+                    problems.push(format!(
+                        "operation {id:?} selects `sql_v1` with interaction shape {:?}; SQL v1 is \
+                         admitted only as `unary`",
+                        operation.interaction_shape
+                    ));
+                }
+                if !operation.params.path.is_empty()
+                    || !operation.params.query.is_empty()
+                    || !operation.params.header.is_empty()
+                    || !operation.params.const_headers.is_empty()
+                {
+                    problems.push(format!(
+                        "operation {id:?} selects `sql_v1` but declares HTTP path, query, or \
+                         header parameters; database inputs must use the driver payload"
+                    ));
+                }
+            }
         }
 
         for param in operation.params.iter() {

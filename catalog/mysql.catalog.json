@@ -1,0 +1,399 @@
+{
+  "$schema": "https://github.com/b10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "authority": "com.mysql.server",
+  "connector": "mysql",
+  "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
+  "generator": "connectors 0.1.0",
+  "operations": [
+    {
+      "auth": [],
+      "contract": {
+        "description": "Run one bounded read-only SQL statement (SELECT, SHOW, or DESCRIBE class, https://dev.mysql.com/doc/refman/8.4/en/select.html) against the MySQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+        "input_schema": {
+          "properties": {
+            "max_rows": {
+              "type": "number"
+            },
+            "statement": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "statement"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Run one bounded read-only SQL statement (SELECT, SHOW, or DESCRIBE class, https://dev.mysql.com/doc/refman/8.4/en/select.html) against the MySQL database this Connection resolves. Anything else — INSERT, UPDATE, DDL, multiple statements — is refused before any connection is opened. Results stop at the row and byte caps and say so honestly",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-query",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "Exactly one read statement — SELECT, SHOW, or DESCRIBE class. A write statement, a second statement after a `;`, or anything that does not parse as a read is refused before any connection is opened",
+          "name": "statement",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "statement"
+        },
+        {
+          "description": "Optional row bound for this call. The effective bound is the smaller of this and the published 500-row cap: a caller can narrow the cap, never widen it",
+          "name": "max_rows",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "max_rows"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "bytes_returned": {
+            "description": "Counted cell bytes across the returned rows",
+            "type": "integer"
+          },
+          "columns": {
+            "description": "Result column names, in wire order",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "Returned rows; every cell is the server's text rendering and null is an SQL NULL",
+            "items": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "rows_returned": {
+            "description": "How many rows were returned",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "Whether the result stopped before the statement's full result set",
+            "type": "boolean"
+          },
+          "truncation_cause": {
+            "description": "Why the page stopped early; absent when truncated is false",
+            "enum": [
+              "row_cap",
+              "byte_cap"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "rows_returned",
+          "bytes_returned",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "medium",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the schemas (databases) of the MySQL server this Connection resolves, from INFORMATION_SCHEMA.SCHEMATA (https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html), system schemas included",
+        "input_schema": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the schemas (databases) of the MySQL server this Connection resolves, from INFORMATION_SCHEMA.SCHEMATA (https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html), system schemas included",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-schemas-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schemas": {
+            "description": "Schema names, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schemas",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "List the tables and views of one schema on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.TABLES (https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html)",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "List the tables and views of one schema on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.TABLES (https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html)",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-tables-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema (database) whose tables to list. MySQL identifiers are at most 64 characters (https://dev.mysql.com/doc/refman/8.4/en/identifier-length.html)",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "schema": {
+            "description": "The schema that was listed",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Table and view names in that schema, sorted",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether the list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "tables",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    },
+    {
+      "auth": [],
+      "contract": {
+        "description": "Describe one table's columns — name, data type, nullability, position — on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.COLUMNS (https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html). Structure only: no default expressions, comments, or row estimates",
+        "input_schema": {
+          "properties": {
+            "schema": {
+              "type": "string"
+            },
+            "table": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema",
+            "table"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "no-credential-required",
+      "description": "Describe one table's columns — name, data type, nullability, position — on the MySQL server this Connection resolves, from INFORMATION_SCHEMA.COLUMNS (https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html). Structure only: no default expressions, comments, or row estimates",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "expose": true,
+      "id": "mysql-table-describe",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The schema (database) holding the table",
+          "name": "schema",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "schema"
+        },
+        {
+          "description": "The table to describe",
+          "name": "table",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "table"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "sql_v1",
+      "request": {},
+      "required_capabilities": [
+        "private_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "columns": {
+            "description": "The table's columns in ordinal order",
+            "items": {
+              "properties": {
+                "data_type": {
+                  "description": "The server's own data-type word",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "nullable": {
+                  "type": "boolean"
+                },
+                "ordinal": {
+                  "description": "The column's 1-based position",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "data_type",
+                "nullable",
+                "ordinal"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "truncated": {
+            "description": "Whether the column list stopped at the row cap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "table",
+          "columns",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [
+        "read"
+      ],
+      "service": "default"
+    }
+  ],
+  "schema_version": 2,
+  "services": [
+    {
+      "audiences": [
+        "developer",
+        "data-analyst"
+      ],
+      "base_url": "https://www.mysql.com",
+      "name": "default",
+      "tags": [
+        "database"
+      ]
+    }
+  ],
+  "vendor": "MySQL",
+  "verify": "mysql-schemas-list"
+}
