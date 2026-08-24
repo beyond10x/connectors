@@ -3,10 +3,10 @@
   "version": "v0alpha1",
   "stability": "alpha",
   "files": [
-    {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
-    {"path":"contracts/connector-event/v0alpha1/README.md","bytes":953,"sha256":"6a2e40a563cf107df2ed1b5cf16588ec96a63bd9513160cc2441d9dfb2344aba"},
-    {"path":"contracts/connector-event/v0alpha1/connector-event.schema.json","bytes":3564,"sha256":"46a034213f781b2ee46545f3be42e338e3135d5b821faabcfe0c51a7b72ef725"},
-    {"path":"contracts/connector-event/v0alpha1/vectors.schema.json","bytes":709,"sha256":"73e927368484d13056bccdddd26d3de20cef6e9ea26278613c4688529b304bdd"},
-    {"path":"contracts/connector-event/v0alpha1/vectors.json","bytes":2285,"sha256":"7c5b0e8aa4b5aab964a12cf94a0ecca3eaf61fc29591b5945521635ebc7ceefa"}
+    {"path":"contracts/artifact-bundle.schema.json","bytes":1013,"sha256":"5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"},
+    {"path":"contracts/connector-event/v0alpha1/README.md","bytes":947,"sha256":"62e79c84798448c48be68b4556bdd069069b59b3f47ee2db1b43bd36b26b8edb"},
+    {"path":"contracts/connector-event/v0alpha1/connector-event.schema.json","bytes":3545,"sha256":"b50da1d9f6cc287aa8d220f5b4f617f722cdec6fdd2b7be252bcba2f5e1de110"},
+    {"path":"contracts/connector-event/v0alpha1/vectors.schema.json","bytes":702,"sha256":"583439d255934ed6af3b5905e6e4152de1a521840d96d3c0ad5229d20dd332a3"},
+    {"path":"contracts/connector-event/v0alpha1/vectors.json","bytes":2255,"sha256":"9c501a63f1df969ef1d201028369ceec9a6a7502127c7b7d93b7858cbd32e9a6"}
   ]
 }

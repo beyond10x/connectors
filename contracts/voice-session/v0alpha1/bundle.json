@@ -3,10 +3,10 @@
   "version": "v0alpha1",
   "stability": "alpha",
   "files": [
-    {"path":"contracts/artifact-bundle.schema.json","bytes":1020,"sha256":"4e639fab16637903e63476684ddb1d9a041a33c83e72ea05767e429fe4e5b3f4"},
-    {"path":"contracts/voice-session/v0alpha1/README.md","bytes":1347,"sha256":"8137896485306afe05deb1726b5f62717dc642c95d5fa7246ed7be082032e9c1"},
-    {"path":"contracts/voice-session/v0alpha1/voice-session.schema.json","bytes":4795,"sha256":"c242c37e86538dcdd8a1bcb6735055c432e4c7305cb81068df6c566a0ab1fd59"},
-    {"path":"contracts/voice-session/v0alpha1/vectors.schema.json","bytes":793,"sha256":"9f9199de52be66e039ddf08badfc174aad527aea8e877b0bb54d9225ef9c1ea8"},
+    {"path":"contracts/artifact-bundle.schema.json","bytes":1013,"sha256":"5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"},
+    {"path":"contracts/voice-session/v0alpha1/README.md","bytes":1341,"sha256":"57f426965bbedffce7ee408df3cbccc248cd8aff5e3f7891230fb0d630e6be89"},
+    {"path":"contracts/voice-session/v0alpha1/voice-session.schema.json","bytes":4782,"sha256":"6e87f6a8d5620f0cf0f917c6f9b66537f955d2260fd0e27f1fe66c896ef1d48c"},
+    {"path":"contracts/voice-session/v0alpha1/vectors.schema.json","bytes":792,"sha256":"14dbf7b971282e21a15353add86c46f0038e1c0fcc532e9519304d71e9ff2f9e"},
     {"path":"contracts/voice-session/v0alpha1/vectors.json","bytes":1153,"sha256":"5a1b5e201f7919bd528646d97fc3c44bba11142f59781e29f04edc6999237614"}
   ]
 }

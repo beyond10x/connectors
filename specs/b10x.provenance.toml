@@ -3,7 +3,7 @@ origin = "repository-authored"
 authored_at = "2026-08-16"
 reviewed_at = "2026-08-16"
 provider_path = "providers/b10x.toml"
-provider_sha256 = "f66f6dc6aaa83f3c36c822cbcdf1b0301ed16df257e2339f0735cf6b29a63c00"
+provider_sha256 = "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9"
 coverage = "exact-shipped-native-and-module-operation-event-capability-surface"
 purpose = "Authoritative repository-owned source for B10x native Connector members and explicitly selected Work, Ontology, Planner, Workspaces, and Colab module operations and events. Native speech and browser operations remain behind their closed drivers. Module contracts are vendored byte-for-byte and reached only through deployment-owned private origins; module persistence stays behind the owner runtime."
 references = [
@@ -35,7 +35,7 @@ service = "knowledge"
 owner_repository = "https://github.com/beyond10x/ontology"
 owner_path = "contracts/ontology/v0alpha1/openapi.json"
 vendored_path = "specs/b10x/ontology-v0alpha1.openapi.json"
-sha256 = "812e88b884dd5314dbb70dcf44ad4e310b8148e3912b7dd7358242be81b9608e"
+sha256 = "252aa9681b91e2f98102589e60056aa12ded5f2a5877cd4e4342cf4854390cf3"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -43,7 +43,7 @@ service = "tasks"
 owner_repository = "https://github.com/beyond10x/work"
 owner_path = "contracts/work/v0alpha1/openapi.json"
 vendored_path = "specs/b10x/work-v0alpha1.openapi.json"
-sha256 = "2de66e427e4092acf5508adc66825b7130dd78ecf14482a08d0dd7ee79f55450"
+sha256 = "74d6f9f18dd16b67034db9e61fc924ca720cb4149c3f6beea16652ae80a3e304"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -54,7 +54,7 @@ owner_path = "model/modules/modules/ontology/contracts/ontology/v0alpha2/openapi
 owner_manifest_path = "model/modules/modules/ontology/contracts/ontology/v0alpha2/manifest.json"
 owner_manifest_sha256 = "f91dab52ccbbc9795e9a8009713ba2c5737e93a59f13667eca0db5e0b92dd8ea"
 vendored_path = "specs/b10x/ontology-v0alpha2.openapi.json"
-sha256 = "4af3c2be3eef57911e1a7e37b6f9fa8c39f3589098e553c4133a8a37558ca93a"
+sha256 = "a30a80b126d449405a81a4e7e9c0352a290b1bf7f1aea05cb116c25a7e782c76"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -65,7 +65,7 @@ owner_path = "model/modules/modules/work/contracts/work/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/work/contracts/work/v1/module.json"
 owner_manifest_sha256 = "6e76b0838d2563e1e9e0c844194f3dcbadcaebd10ad4d30d0ffaed30e3eb584d"
 vendored_path = "specs/b10x/work-v1.openapi.json"
-sha256 = "6993b9ce5614dac5dd1a4f9e58121826fdc4bd7fca056012393381a70fe749bd"
+sha256 = "abc231bd409a8511f6080da1d74e931440934a3df9fad76ec13f5ef4cb056547"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -76,7 +76,7 @@ owner_path = "model/modules/modules/work/contracts/work/v1/asyncapi.yaml"
 owner_manifest_path = "model/modules/modules/work/contracts/work/v1/module.json"
 owner_manifest_sha256 = "6e76b0838d2563e1e9e0c844194f3dcbadcaebd10ad4d30d0ffaed30e3eb584d"
 vendored_path = "specs/b10x/work-v1.asyncapi.yaml"
-sha256 = "350cf11b9bb3131d2435c25e218abf3c23bc991908040e800824e94fdebde7a7"
+sha256 = "39c2180f3681f14d4aed854e4415440b4ef257547d348ed9c8890796345aedb0"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -87,7 +87,7 @@ owner_path = "model/modules/modules/planner/contracts/planner/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 owner_manifest_sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
 vendored_path = "specs/b10x/planner-v1.openapi.json"
-sha256 = "3e5093746690243865c898d20f4ac66e283b50c0ff018a019f4df6a4f61937f4"
+sha256 = "d65603c9ddcee94cd559e4ae4f1796fbff50bc1f29ba84101836050c421291fb"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -98,7 +98,7 @@ owner_path = "model/modules/modules/planner/contracts/planner/v1/asyncapi.yaml"
 owner_manifest_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 owner_manifest_sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
 vendored_path = "specs/b10x/planner-v1.asyncapi.yaml"
-sha256 = "bc0a5c090a4a4dbe2dbedcf771882fc49c53b470902ff99e74c76061e5c75ffe"
+sha256 = "6741dad97fb4c5a53ed2b2e48a7c53f699638644fb75c64346ff7b60b0d419fc"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -107,7 +107,7 @@ kind = "module-manifest"
 owner_repository = "https://github.com/beyond10x/b10x"
 owner_path = "model/modules/modules/planner/contracts/planner/v1/module.json"
 vendored_path = "specs/b10x/planner-v1.module.json"
-sha256 = "888b23bb3b04ab82c073e96076ff17b59d1c656b981aea20d4f086f19ad85490"
+sha256 = "d70b4ac815d2aec5d2423c9d761e8d3058d739689744c99c033b88e9437b7dce"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -118,7 +118,7 @@ owner_path = "model/modules/modules/workspaces/contracts/workspaces/v2/openapi.j
 owner_manifest_path = "model/modules/modules/workspaces/contracts/workspaces/v2/module.json"
 owner_manifest_sha256 = "11e7bdc6de9c2c6733216a7b68cef41649bc551e8e4f79373505fd46db28a2e9"
 vendored_path = "specs/b10x/workspaces-v2.openapi.json"
-sha256 = "d210b8966f29686e72c3b154a8d927b51b57a86b22a14d49d44c0e90bf720a97"
+sha256 = "d9d240d0e25ad181488264a88b52f27b2ce4234fc332410306e66f0652440694"
 vendoring = "exact-bytes"
 
 [[spec]]
@@ -129,5 +129,5 @@ owner_path = "model/modules/modules/colab/contracts/colab/v1/openapi.json"
 owner_manifest_path = "model/modules/modules/colab/contracts/colab/v1/module.json"
 owner_manifest_sha256 = "46207ef571063a806f4c60ff4b43a848392013c9b0828233ce90f0696e69c143"
 vendored_path = "specs/b10x/colab-v1.openapi.json"
-sha256 = "ba0e1e1f17bbddf9dbd905754f8dd868f8b35c724a3e8ce864743b720157c6e5"
+sha256 = "bad5ba7a973913a4cad26cf4fea4c5cdc5d01df86b7538e0061d0f68f2b18b80"
 vendoring = "exact-bytes"

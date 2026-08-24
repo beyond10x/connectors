@@ -11,7 +11,7 @@ verify = "prometheus-query-range"
 path = "specs/prometheus/http-api-2026-08-15.openapi.yaml"
 upstream_version = "Prometheus HTTP API"
 fetched_at = "2026-08-15T00:00:00Z"
-sha256 = "f045ee79177b03bb75f5881a6613f194e9afa8eb723a762cd9c5f767b8b85c44"
+sha256 = "c952784e8401beed71d6967197d78905ef1f6e3116e422c1951ab2d39d7572e6"
 
 [[services]]
 name = "default"

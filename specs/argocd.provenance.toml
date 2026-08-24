@@ -34,7 +34,7 @@ path = "specs/argocd/http-api-v3.5.1.openapi.yaml"
 origin = "vendor-derived"
 derived_from = "specs/argocd/swagger-v3.5.1.json"
 reviewed_at = "2026-08-20"
-sha256 = "48dd67c27f3ba022e8cc8da1c4893f1b4f29b0596c8c412df34bf70701eb2487"
+sha256 = "40e89ee14ee598c816358d92d0682e92b4723701da664ebaae1c4988fe37303d"
 coverage = "exact-shipped-surface"
 purpose = "OpenAPI 3 projection of the eleven Argo CD operations selected by providers/argocd.toml. Response schemas are bounded to the fields B10x promises, because the upstream Application definition is the whole custom resource. The bearer security scheme is stated from Argo CD's official API documentation, which is the one fact the Swagger source cannot corroborate: it declares no securityDefinitions at all."
 

@@ -23,7 +23,7 @@ verify = "grafana-datasources-list"
 path = "specs/grafana/http-api-2026-08-14.openapi.yaml"
 upstream_version = "Grafana 12+ HTTP API"
 fetched_at = "2026-08-14T00:00:00Z"
-sha256 = "f177be5b01888799fbc5aa6a7b6195958f2da0082c2f5823a23f2368524422c5"
+sha256 = "14c46194403f8831e0e80562fedb28685a3d803f980d9da9a230b9f0e0d35c35"
 
 [[auth]]
 name = "grafana.service_account_token"
