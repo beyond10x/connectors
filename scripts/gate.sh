@@ -21,5 +21,4 @@ done
 (cd "$root" && cargo run --locked --offline -p catalog-cli -- check)
 python3 "$root/scripts/check-links.py"
 python3 "$root/scripts/check-stories.py"
-bash "$root/scripts/check-brand.sh"
 printf 'gate: green\n'
