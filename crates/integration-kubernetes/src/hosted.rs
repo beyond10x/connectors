@@ -43,6 +43,10 @@ mod datasource;
 
 const CONNECTION: &str = "connection:kubernetes:in-cluster";
 
+/// The one-page bound on a group's ProviderConfig list (S-062). The live groups carry a
+/// handful; a list that still truncates at this bound is refused rather than joined half-read.
+const PROVIDER_CONFIG_LIMIT: u16 = 500;
+
 #[derive(Debug, thiserror::Error)]
 pub enum KubernetesBackendError {
     #[error("Kubernetes Integration tenant or namespace policy is invalid")]
@@ -622,19 +626,15 @@ impl DeploymentReader for InClusterReader {
 
     async fn list_databases(
         &self,
-        namespace: &str,
         engine: DatabaseEngine,
         limit: u16,
         cursor: Option<&str>,
     ) -> Result<DatabaseList, DatasourceError> {
-        let mut endpoint = self.api_url(&[
-            "apis",
-            engine.group(),
-            DATABASE_CRD_VERSION,
-            "namespaces",
-            namespace,
-            "databases",
-        ])?;
+        // The Database CRDs are CLUSTER-scoped (S-062): the collection lives directly under the
+        // group version, never under a namespace path — that path answers 404 for every
+        // namespace, which is exactly the silent-empty-inventory bug this replaces.
+        let mut endpoint =
+            self.api_url(&["apis", engine.group(), DATABASE_CRD_VERSION, "databases"])?;
         {
             let mut query = endpoint.query_pairs_mut();
             query.append_pair("limit", &limit.to_string());
@@ -643,11 +643,13 @@ impl DeploymentReader for InClusterReader {
             }
         }
         let list: KubernetesList<CrossplaneDatabase> = match self.get_json(endpoint).await {
-            // A cluster without the Crossplane provider serves no such group, and the API
-            // answers the namespaced list with 404. That is an empty inventory, not a failure:
-            // a deployment without Crossplane simply discovers nothing. (A 403 stays the
-            // `not_granted` refusal `get_json` maps it to.)
+            // The collection answered 404. Whether that is an empty inventory (no Crossplane
+            // provider on this cluster) or a wrong read path is decided by the group's own
+            // discovery document — never assumed benign again. (A 403 stays the `not_granted`
+            // refusal `get_json` maps it to.)
             Err(error) if error.code == DatasourceErrorCode::NotFound => {
+                let discovery = self.group_discovery(engine).await?;
+                absent_collection_is_empty(engine.group(), "databases", discovery.as_ref())?;
                 return Ok(DatabaseList {
                     items: Vec::new(),
                     next_cursor: None,
@@ -664,7 +666,6 @@ impl DeploymentReader for InClusterReader {
 
     async fn database_detail(
         &self,
-        namespace: &str,
         engine: DatabaseEngine,
         name: &str,
     ) -> Result<CrossplaneDatabase, DatasourceError> {
@@ -672,8 +673,6 @@ impl DeploymentReader for InClusterReader {
             "apis",
             engine.group(),
             DATABASE_CRD_VERSION,
-            "namespaces",
-            namespace,
             "databases",
             name,
         ])?;
@@ -684,12 +683,44 @@ impl DeploymentReader for InClusterReader {
                 error
             }
         })?;
-        if database.metadata.namespace != namespace || database.metadata.name != name {
+        if database.metadata.name != name {
             return Err(datasource_unavailable(
                 "Kubernetes returned a different database resource",
             ));
         }
         Ok(database)
+    }
+
+    async fn provider_configs(
+        &self,
+        engine: DatabaseEngine,
+    ) -> Result<Vec<CrossplaneProviderConfig>, DatasourceError> {
+        let mut endpoint = self.api_url(&[
+            "apis",
+            engine.group(),
+            DATABASE_CRD_VERSION,
+            "providerconfigs",
+        ])?;
+        // One bounded page: a group carries a handful of ProviderConfigs by design. Refusing a
+        // truncated list beats joining against half of one — databases bound to a dropped
+        // config would silently vanish from every binding.
+        endpoint
+            .query_pairs_mut()
+            .append_pair("limit", &PROVIDER_CONFIG_LIMIT.to_string());
+        let list: KubernetesList<CrossplaneProviderConfig> = match self.get_json(endpoint).await {
+            Err(error) if error.code == DatasourceErrorCode::NotFound => {
+                let discovery = self.group_discovery(engine).await?;
+                absent_collection_is_empty(engine.group(), "providerconfigs", discovery.as_ref())?;
+                return Ok(Vec::new());
+            }
+            result => result?,
+        };
+        if !list.metadata.continue_token.is_empty() {
+            return Err(datasource_unavailable(
+                "Kubernetes has more ProviderConfigs than discovery can join",
+            ));
+        }
+        Ok(list.items)
     }
 
     async fn pod_logs(
@@ -874,6 +905,20 @@ impl DeploymentReader for InClusterReader {
 }
 
 impl InClusterReader {
+    /// The group-version discovery document (`/apis/{group}/{version}`), or `None` when the
+    /// group itself is not served — the signal `absent_collection_is_empty` folds into "empty
+    /// inventory" or "wrong read path".
+    async fn group_discovery(
+        &self,
+        engine: DatabaseEngine,
+    ) -> Result<Option<KubernetesApiResourceList>, DatasourceError> {
+        let endpoint = self.api_url(&["apis", engine.group(), DATABASE_CRD_VERSION])?;
+        match self.get_json(endpoint).await {
+            Err(error) if error.code == DatasourceErrorCode::NotFound => Ok(None),
+            result => result.map(Some),
+        }
+    }
+
     fn api_url(&self, segments: &[&str]) -> Result<Url, DatasourceError> {
         let mut endpoint = self.base.clone();
         endpoint

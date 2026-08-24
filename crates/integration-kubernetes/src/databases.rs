@@ -1,21 +1,31 @@
-//! The Kubernetes database-endpoint discovery projection (S-059, design 15).
+//! The Kubernetes database-endpoint discovery projection (S-059, S-062, design 15).
 //!
-//! The admitted namespace carries the deployment's database inventory as Crossplane provider-sql
-//! managed resources — `databases.mysql.sql.crossplane.io` and
-//! `databases.postgresql.sql.crossplane.io` — and this module is the host-mode-neutral half of
-//! reading them: the wire types, the projection into `DatabaseEndpoint` descriptors, the JSON
-//! Schemas, the projection digest, the description lease, the binding refs and the merged
-//! two-engine listing. Like `crate::workloads`, admission stays with the placement:
-//! `DeploymentReader` is the one seam, and the hosted receiver decides who may read which
-//! namespace before `read_database_endpoints` runs.
+//! The deployment's database inventory is Crossplane provider-sql managed resources —
+//! `databases.mysql.sql.crossplane.io` and `databases.postgresql.sql.crossplane.io` — and both
+//! CRDs are CLUSTER-scoped: a Database carries no namespace of its own, and its spec declares no
+//! endpoint facts at all, only the deletion policy and a `providerConfigRef`. The connection
+//! facts live behind that referenced (equally cluster-scoped) ProviderConfig, whose
+//! `credentials.connectionSecretRef` names the server connection Secret and the namespace it
+//! lives in. This module is the host-mode-neutral half of reading that surface: the wire types,
+//! the join from a Database to its ProviderConfig's secret reference, the projection into
+//! `DatabaseEndpoint` descriptors, the JSON Schemas, the projection digest, the description
+//! lease, the binding refs and the merged two-engine listing. Like `crate::workloads`, admission
+//! stays with the placement: `DeploymentReader` is the one seam, and the hosted receiver decides
+//! who may read which namespace before `read_database_endpoints` runs.
+//!
+//! The namespace gate over a cluster-scoped inventory is the connection secret's namespace: a
+//! binding is one admitted namespace, and it lists exactly the Databases whose ProviderConfig
+//! keeps its connection Secret there. A Database whose secret lives elsewhere — or whose
+//! `providerConfigRef` resolves to nothing — associates with no binding and is excluded, not
+//! erred (see the S-062 story notes for the decision).
 //!
 //! Discovery publishes requirements and references, never secret bytes (design 15). A descriptor
 //! names the engine (derived from the API group, never read from the resource body), the
-//! resource, whatever endpoint facts the resource itself declares (`spec.forProvider`) or
-//! observes (`status.atProvider`), the `writeConnectionSecretToRef` NAME, and readiness. Where
-//! the resource carries no host, port or database name — provider-sql's resources carry none;
-//! those facts live in the connection Secret — the descriptor says `null` honestly rather than
-//! guessing, and nothing in this module ever touches a Secret endpoint.
+//! resource, the ProviderConfig it binds, the connection Secret by NAME and namespace, and
+//! readiness. No code path in this crate ever reads a Secret value — endpoint resolution stays
+//! with the SQL driver's credential custody at connect time.
+
+use std::collections::BTreeMap;
 
 use protocol::datasource::{
     AccessMode, Completeness, DatasourceBinding, DatasourceDescription, DatasourceError,
@@ -30,16 +40,16 @@ use service::PrincipalContext;
 
 use crate::workloads::{
     datasource_not_found, datasource_unavailable, now_unix_ms, valid_dns_label, CursorStore,
-    DeploymentReader, KubernetesCondition, KubernetesMetadata,
+    DeploymentReader, KubernetesCondition,
 };
 
 pub(crate) const DATABASES_DATASOURCE: &str = "kubernetes.databases";
 
-/// The served version of the Crossplane provider-sql Database CRDs
-/// (`databases.mysql.sql.crossplane.io`, `databases.postgresql.sql.crossplane.io`).
-/// crossplane-contrib/provider-sql serves `v1alpha1` for both groups, and that is what the
-/// target cluster runs today; if the cluster moves to a newer served version, this constant
-/// follows it in one place.
+/// The served version of the Crossplane provider-sql CRDs — the Database collections
+/// (`databases.mysql.sql.crossplane.io`, `databases.postgresql.sql.crossplane.io`) and the
+/// ProviderConfigs living in the same groups. crossplane-contrib/provider-sql serves `v1alpha1`
+/// for both groups, and that is what the target cluster runs today; if the cluster moves to a
+/// newer served version, this constant follows it in one place.
 pub(crate) const DATABASE_CRD_VERSION: &str = "v1alpha1";
 
 /// The two discovered engines, in listing order: pages walk MySQL first, then PostgreSQL, so a
@@ -85,43 +95,46 @@ impl DatabaseEngine {
     }
 }
 
-/// One Crossplane Database managed resource, as the cluster serves it. Only the fields the
-/// projection may publish are read; annotations, labels, provider plumbing and anything
-/// credential-shaped never deserialize at all.
+/// One Crossplane Database managed resource, as the cluster serves it: cluster-scoped, so its
+/// metadata carries no namespace. Only the fields the projection may publish are read;
+/// annotations, labels, provider plumbing and anything credential-shaped never deserialize at
+/// all.
 #[derive(Deserialize)]
 pub(crate) struct CrossplaneDatabase {
-    pub(crate) metadata: KubernetesMetadata,
+    pub(crate) metadata: KubernetesClusterMetadata,
     #[serde(default)]
     pub(crate) spec: CrossplaneDatabaseSpec,
     #[serde(default)]
     pub(crate) status: CrossplaneDatabaseStatus,
 }
 
+/// Cluster-scoped resource metadata: the name is the identity, and there is no namespace to
+/// read. `crate::workloads::KubernetesMetadata` requires one and would refuse the real
+/// resources for lacking it — the exact wrong-shape failure S-062 fixes.
+#[derive(Deserialize)]
+pub(crate) struct KubernetesClusterMetadata {
+    pub(crate) name: String,
+}
+
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CrossplaneDatabaseSpec {
+    /// The ProviderConfig this resource binds. The live resources always carry it (the CRD
+    /// schema defaults it); a resource without one binds no ProviderConfig, resolves no secret
+    /// reference, and therefore associates with no namespace.
     #[serde(default)]
-    pub(crate) for_provider: CrossplaneEndpointFields,
-    #[serde(default)]
-    pub(crate) write_connection_secret_to_ref: Option<CrossplaneSecretRef>,
+    pub(crate) provider_config_ref: Option<CrossplaneProviderConfigRef>,
 }
 
-/// The optional endpoint facts a managed resource may declare (`spec.forProvider`) or observe
-/// (`status.atProvider`). provider-sql's Database resources carry none of them — the connection
-/// facts live in the connection Secret — and the descriptor then says `null` honestly.
-#[derive(Default, Deserialize)]
-pub(crate) struct CrossplaneEndpointFields {
-    #[serde(default)]
-    pub(crate) host: Option<String>,
-    #[serde(default)]
-    pub(crate) port: Option<u16>,
-    #[serde(default)]
-    pub(crate) database: Option<String>,
+#[derive(Deserialize)]
+pub(crate) struct CrossplaneProviderConfigRef {
+    pub(crate) name: String,
 }
 
-/// A connection-secret reference: names only, never bytes. The platform's custody (S-058)
-/// resolves it; discovery must not, and no code path in this crate reads a Secret.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A connection-secret reference as the cluster declares it: names only, never bytes. The
+/// platform's custody (S-058) resolves it; discovery must not, and no code path in this crate
+/// reads a Secret.
+#[derive(Debug, Clone, Deserialize)]
 pub(crate) struct CrossplaneSecretRef {
     pub(crate) name: String,
     #[serde(default)]
@@ -129,33 +142,106 @@ pub(crate) struct CrossplaneSecretRef {
 }
 
 #[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct CrossplaneDatabaseStatus {
     #[serde(default)]
-    pub(crate) at_provider: CrossplaneEndpointFields,
-    #[serde(default)]
     pub(crate) conditions: Vec<KubernetesCondition>,
+}
+
+/// One Crossplane ProviderConfig, as the cluster serves it: cluster-scoped, and the only fact
+/// discovery may read is which Secret its credentials come from — the reference, never the
+/// acquisition mechanics (`source`) and never the bytes.
+#[derive(Deserialize)]
+pub(crate) struct CrossplaneProviderConfig {
+    pub(crate) metadata: KubernetesClusterMetadata,
+    #[serde(default)]
+    pub(crate) spec: CrossplaneProviderConfigSpec,
+}
+
+#[derive(Default, Deserialize)]
+pub(crate) struct CrossplaneProviderConfigSpec {
+    #[serde(default)]
+    pub(crate) credentials: CrossplaneProviderCredentials,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CrossplaneProviderCredentials {
+    #[serde(default)]
+    pub(crate) connection_secret_ref: Option<CrossplaneSecretRef>,
 }
 
 /// One engine's page of Database resources, as the reader fetched it.
 pub(crate) struct DatabaseList {
     pub(crate) items: Vec<CrossplaneDatabase>,
     /// The provider's own `continue` token for this engine's list; `None` when the engine is
-    /// exhausted — or when its CRD is absent, which discovery treats as an empty inventory.
+    /// exhausted — or when its API group is absent from the cluster, which discovery treats as
+    /// an empty inventory.
     pub(crate) next_cursor: Option<String>,
 }
 
-/// The published endpoint descriptor: what S-058's connections consume. Optional fields
-/// serialize as `null` rather than disappearing, so an absent fact is stated, not implied.
+/// One API group-version discovery document (`/apis/{group}/{version}`), reduced to the fact
+/// discovery needs: which collections the group serves.
+#[derive(Default, Deserialize)]
+pub(crate) struct KubernetesApiResourceList {
+    #[serde(default)]
+    pub(crate) resources: Vec<KubernetesApiResource>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct KubernetesApiResource {
+    pub(crate) name: String,
+}
+
+/// Decides what a 404 on one of the group's collection lists means, from the group's own
+/// discovery document (`None` when the group itself is not served): `Ok` says the inventory is
+/// genuinely empty, `Err` refuses to pretend.
+///
+/// A cluster without the Crossplane provider serves no such group at all — an empty inventory,
+/// not a failure. But when the group IS served and its discovery document lists the collection,
+/// a 404 can only mean the read path is wrong: the namespaced-path bug S-062 fixes shipped
+/// silently as "0 records" precisely because every 404 was assumed benign.
+pub(crate) fn absent_collection_is_empty(
+    group: &str,
+    collection: &str,
+    discovery: Option<&KubernetesApiResourceList>,
+) -> Result<(), DatasourceError> {
+    let served = discovery.is_some_and(|document| {
+        document
+            .resources
+            .iter()
+            .any(|resource| resource.name == collection)
+    });
+    if served {
+        return Err(DatasourceError::new(
+            DatasourceErrorCode::Unavailable,
+            format!(
+                "Kubernetes serves the {group} API group and lists `{collection}`, yet answered its cluster-scoped list with 404; this is a wrong read path, not an empty inventory"
+            ),
+            true,
+        ));
+    }
+    Ok(())
+}
+
+/// The published endpoint descriptor: what S-058's connections consume. Every field is present:
+/// a descriptor exists only where the resource associates with the read namespace, and a
+/// resource whose facts cannot be resolved is excluded rather than published with guesses.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct DatabaseEndpoint {
     pub(crate) engine: String,
     pub(crate) name: String,
-    pub(crate) host: Option<String>,
-    pub(crate) port: Option<u16>,
-    pub(crate) database: Option<String>,
-    pub(crate) secret_ref: Option<CrossplaneSecretRef>,
+    /// The cluster-scoped ProviderConfig the resource binds — its NAME, never its contents.
+    pub(crate) provider_config: String,
+    pub(crate) secret_ref: DatabaseSecretRef,
     pub(crate) ready: bool,
+}
+
+/// The published connection-secret reference: name and namespace, both required — the
+/// namespace IS the binding association, so a descriptor without one cannot exist.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct DatabaseSecretRef {
+    pub(crate) name: String,
+    pub(crate) namespace: String,
 }
 
 #[derive(Deserialize)]
@@ -165,29 +251,53 @@ pub(crate) struct DatabaseEndpointKey {
     pub(crate) name: String,
 }
 
-/// Projects one managed resource into its endpoint descriptor. Observed state
-/// (`status.atProvider`) wins over declared intent (`spec.forProvider`) where both carry a
-/// fact; `ready` is the Crossplane `Ready` condition and nothing subtler.
+/// The ProviderConfig join map for one engine group: config name → its connection-secret
+/// reference. A config without a secret reference resolves nothing and is dropped here, so a
+/// Database binding it stays unassociated.
+pub(crate) fn provider_config_secrets(
+    configs: Vec<CrossplaneProviderConfig>,
+) -> BTreeMap<String, CrossplaneSecretRef> {
+    configs
+        .into_iter()
+        .filter_map(|config| {
+            let secret = config.spec.credentials.connection_secret_ref?;
+            Some((config.metadata.name, secret))
+        })
+        .collect()
+}
+
+/// Projects one managed resource into its endpoint descriptor, or `None` when it does not
+/// associate with the namespace being read. The association is the referenced ProviderConfig's
+/// connection-secret namespace: a resource whose reference dangles, or whose secret lives in
+/// another namespace, belongs to no binding rather than to a guessed one. `ready` is the
+/// Crossplane `Ready` condition and nothing subtler.
 pub(crate) fn project_database_endpoint(
     engine: DatabaseEngine,
     database: CrossplaneDatabase,
-) -> DatabaseEndpoint {
+    provider_configs: &BTreeMap<String, CrossplaneSecretRef>,
+    namespace: &str,
+) -> Option<DatabaseEndpoint> {
+    let provider_config = database.spec.provider_config_ref?.name;
+    let secret = provider_configs.get(&provider_config)?;
+    let secret_namespace = secret.namespace.as_deref()?;
+    if secret_namespace != namespace {
+        return None;
+    }
     let ready = database
         .status
         .conditions
         .iter()
         .any(|condition| condition.kind == "Ready" && condition.status == "True");
-    let observed = database.status.at_provider;
-    let declared = database.spec.for_provider;
-    DatabaseEndpoint {
+    Some(DatabaseEndpoint {
         engine: engine.as_str().to_owned(),
         name: database.metadata.name,
-        host: observed.host.or(declared.host),
-        port: observed.port.or(declared.port),
-        database: observed.database.or(declared.database),
-        secret_ref: database.spec.write_connection_secret_to_ref,
+        provider_config,
+        secret_ref: DatabaseSecretRef {
+            name: secret.name.clone(),
+            namespace: secret_namespace.to_owned(),
+        },
         ready,
-    }
+    })
 }
 
 pub(crate) fn databases_summary() -> DatasourceSummary {
@@ -217,20 +327,18 @@ pub(crate) fn database_endpoint_schema() -> serde_json::Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["engine", "name", "host", "port", "database", "secret_ref", "ready"],
+        "required": ["engine", "name", "provider_config", "secret_ref", "ready"],
         "properties": {
             "engine": {"enum": ["mysql", "postgresql"]},
             "name": {"type": "string"},
-            "host": {"type": ["string", "null"]},
-            "port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535},
-            "database": {"type": ["string", "null"]},
+            "provider_config": {"type": "string", "minLength": 1},
             "secret_ref": {
-                "type": ["object", "null"],
+                "type": "object",
                 "additionalProperties": false,
                 "required": ["name", "namespace"],
                 "properties": {
-                    "name": {"type": "string"},
-                    "namespace": {"type": ["string", "null"]}
+                    "name": {"type": "string", "minLength": 1},
+                    "namespace": {"type": "string", "minLength": 1}
                 }
             },
             "ready": {"type": "boolean"}
@@ -242,11 +350,14 @@ pub(crate) fn databases_projection_sha256() -> String {
     let declaration = json!({
         "protocol": "b10x.value-projection.v1",
         "datasource_ref": DATABASES_DATASOURCE,
-        "version": 1,
+        // Version 2 (S-062): the descriptor follows the real cluster-scoped resources — the
+        // ProviderConfig name and its connection-secret reference replace the host/port/database
+        // facts the resources never declared.
+        "version": 2,
         "key_schema": database_key_schema(),
         "compact_schema": database_endpoint_schema(),
         "detail_schema": database_endpoint_schema(),
-        "excluded": ["secret_values", "credentials", "annotations", "labels", "provider_config", "raw_objects"]
+        "excluded": ["secret_values", "credentials", "annotations", "labels", "deletion_policy", "raw_objects"]
     });
     hex::encode(Sha256::digest(
         serde_json::to_vec(&declaration).expect("static projection declaration"),
@@ -256,7 +367,7 @@ pub(crate) fn databases_projection_sha256() -> String {
 pub(crate) fn databases_description(context: &PrincipalContext) -> DatasourceDescription {
     DatasourceDescription {
         summary: databases_summary(),
-        description: "Live, namespace-scoped database endpoint descriptors discovered from the Crossplane databases.{mysql,postgresql}.sql.crossplane.io managed resources: engine, name, whatever endpoint facts the resource declares or observes, the connection-secret reference by name, and readiness. Secret values are never read and never returned.".to_owned(),
+        description: "Live database endpoint descriptors discovered from the cluster-scoped Crossplane databases.{mysql,postgresql}.sql.crossplane.io managed resources: engine, name, the ProviderConfig each resource binds, that config's connection-secret reference (name and namespace), and readiness. A binding lists the resources whose connection secret lives in its admitted namespace. Secret values are never read and never returned.".to_owned(),
         key_schema: database_key_schema(),
         compact_schema: database_endpoint_schema(),
         detail_schema: database_endpoint_schema(),
@@ -356,14 +467,18 @@ pub(crate) async fn read_database_endpoints(
             loop {
                 let remaining = usize::from(limit).saturating_sub(endpoints.len());
                 let page_limit = u16::try_from(remaining).expect("remaining is bounded by limit");
+                // The join surface first: one bounded ProviderConfig read per engine touched,
+                // so every database on the page resolves against the same snapshot. The list
+                // itself is cluster-scoped; the namespace gate is the projection's association
+                // filter, not a list path segment.
+                let provider_configs =
+                    provider_config_secrets(reader.provider_configs(engine).await?);
                 let list = reader
-                    .list_databases(namespace, engine, page_limit, engine_cursor.as_deref())
+                    .list_databases(engine, page_limit, engine_cursor.as_deref())
                     .await?;
-                endpoints.extend(
-                    list.items
-                        .into_iter()
-                        .map(|database| project_database_endpoint(engine, database)),
-                );
+                endpoints.extend(list.items.into_iter().filter_map(|database| {
+                    project_database_endpoint(engine, database, &provider_configs, namespace)
+                }));
                 if let Some(token) = list.next_cursor {
                     merged_cursor = Some(encode_database_cursor(engine, &token));
                     break;
@@ -418,8 +533,18 @@ pub(crate) async fn read_database_endpoints(
                     false,
                 ));
             }
-            let database = reader.database_detail(namespace, engine, &key.name).await?;
-            let endpoint = project_database_endpoint(engine, database);
+            let database = reader.database_detail(engine, &key.name).await?;
+            let provider_configs = provider_config_secrets(reader.provider_configs(engine).await?);
+            let Some(endpoint) =
+                project_database_endpoint(engine, database, &provider_configs, namespace)
+            else {
+                // The resource exists on the cluster, but not for this binding: its connection
+                // secret lives in another namespace (or nowhere resolvable), and this
+                // namespace's read must neither publish nor confirm it.
+                return Err(datasource_not_found(
+                    "Kubernetes database endpoint was not found",
+                ));
+            };
             let key = json!({"engine": endpoint.engine, "name": endpoint.name});
             let value = serde_json::to_value(endpoint).map_err(|_| {
                 datasource_unavailable("Kubernetes database endpoint could not be encoded")
