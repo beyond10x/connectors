@@ -59,6 +59,17 @@ pub(crate) const MAX_POD_LOG_BYTES: usize = 128 * 1024;
 pub(crate) const POD_LOG_ENVELOPE_HEADROOM: usize = 4 * 1024;
 pub(crate) const MAX_RELATED_RECORDS: usize = 50;
 pub(crate) const CURSOR_TTL: Duration = Duration::from_secs(300);
+/// Deployments asked of the Kubernetes API per upstream request while serving one list page.
+///
+/// The projection keeps ~10^2 bytes per object, but the raw object arrives whole — commonly
+/// 10–60 KiB of managedFields, annotations and pod template — so fetching a full protocol
+/// page of 25 in one request exceeds `MAX_KUBERNETES_RESPONSE_BYTES` on a busy namespace
+/// (the S-063 live refusal). Five raw objects fit the response bound with a wide margin.
+pub(crate) const UPSTREAM_PAGE_LIMIT: u16 = 5;
+/// Upstream requests one `list_workloads` call may spend before returning a short page with
+/// a cursor. The API server may legally answer any request with few items and a continue
+/// token, and an unbounded walk on someone else's pacing would be an unbounded read.
+pub(crate) const MAX_UPSTREAM_LIST_FETCHES: usize = 8;
 
 #[async_trait]
 pub(crate) trait DeploymentReader: Send + Sync {
@@ -168,20 +179,35 @@ pub(crate) struct DeploymentStatus {
     pub(crate) available_condition: bool,
 }
 
+/// The compact list record: discovery only, deliberately minimal (S-063).
+///
+/// A namespace listing answers "what is deployed and is it healthy" — name plus the smallest
+/// rollout summary — so a busy namespace lists whole without ballooning the envelope.
+/// Everything deeper (object identity, replica breakdowns, pods, warnings) is the detail
+/// record's job, reached by name through the get verb.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct WorkloadCompact {
-    pub(crate) namespace: String,
     pub(crate) name: String,
+    pub(crate) desired_replicas: i32,
+    pub(crate) ready_replicas: i32,
+    pub(crate) rollout_state: String,
+}
+
+/// The object-identity and replica-breakdown facts the compact record deliberately omits.
+///
+/// They stay in the detail record: `uid` and `resource_version` are what the restart
+/// operation's exact-object authority is built from, and a caller reaches them by naming one
+/// deployment rather than by listing a hundred.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct WorkloadMeta {
+    pub(crate) namespace: String,
     pub(crate) uid: String,
     pub(crate) resource_version: String,
     pub(crate) generation: i64,
     pub(crate) observed_generation: i64,
-    pub(crate) desired_replicas: i32,
     pub(crate) updated_replicas: i32,
-    pub(crate) ready_replicas: i32,
     pub(crate) available_replicas: i32,
     pub(crate) unavailable_replicas: i32,
-    pub(crate) rollout_state: String,
 }
 
 pub(crate) struct WorkloadList {
@@ -193,6 +219,8 @@ pub(crate) struct WorkloadList {
 pub(crate) struct WorkloadDetail {
     #[serde(flatten)]
     pub(crate) workload: WorkloadCompact,
+    #[serde(flatten)]
+    pub(crate) meta: WorkloadMeta,
     pub(crate) pods: Vec<PodSummary>,
     pub(crate) warnings: Vec<WarningSummary>,
     pub(crate) related_complete: bool,
@@ -456,7 +484,9 @@ pub(crate) fn project(deployment: KubernetesDeployment) -> DeploymentStatus {
     }
 }
 
-pub(crate) fn project_compact(deployment: KubernetesDeployment) -> WorkloadCompact {
+pub(crate) fn project_workload(
+    deployment: KubernetesDeployment,
+) -> (WorkloadCompact, WorkloadMeta) {
     let available = deployment
         .status
         .conditions
@@ -481,20 +511,28 @@ pub(crate) fn project_compact(deployment: KubernetesDeployment) -> WorkloadCompa
     } else {
         "degraded"
     };
-    WorkloadCompact {
-        namespace: deployment.metadata.namespace,
-        name: deployment.metadata.name,
-        uid: deployment.metadata.uid,
-        resource_version: deployment.metadata.resource_version,
-        generation: deployment.metadata.generation,
-        observed_generation: deployment.status.observed_generation,
-        desired_replicas: deployment.spec.replicas,
-        updated_replicas: deployment.status.updated_replicas,
-        ready_replicas: deployment.status.ready_replicas,
-        available_replicas: deployment.status.available_replicas,
-        unavailable_replicas: deployment.status.unavailable_replicas,
-        rollout_state: rollout_state.to_owned(),
-    }
+    (
+        WorkloadCompact {
+            name: deployment.metadata.name,
+            desired_replicas: deployment.spec.replicas,
+            ready_replicas: deployment.status.ready_replicas,
+            rollout_state: rollout_state.to_owned(),
+        },
+        WorkloadMeta {
+            namespace: deployment.metadata.namespace,
+            uid: deployment.metadata.uid,
+            resource_version: deployment.metadata.resource_version,
+            generation: deployment.metadata.generation,
+            observed_generation: deployment.status.observed_generation,
+            updated_replicas: deployment.status.updated_replicas,
+            available_replicas: deployment.status.available_replicas,
+            unavailable_replicas: deployment.status.unavailable_replicas,
+        },
+    )
+}
+
+pub(crate) fn project_compact(deployment: KubernetesDeployment) -> WorkloadCompact {
+    project_workload(deployment).0
 }
 
 pub(crate) fn project_pod(pod: KubernetesPod) -> PodSummary {
@@ -632,14 +670,11 @@ pub(crate) fn compact_schema() -> serde_json::Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["namespace", "name", "uid", "resource_version", "generation", "observed_generation", "desired_replicas", "updated_replicas", "ready_replicas", "available_replicas", "unavailable_replicas", "rollout_state"],
+        "required": ["name", "desired_replicas", "ready_replicas", "rollout_state"],
         "properties": {
-            "namespace": {"type": "string"}, "name": {"type": "string"},
-            "uid": {"type": "string"}, "resource_version": {"type": "string"},
-            "generation": {"type": "integer"}, "observed_generation": {"type": "integer"},
-            "desired_replicas": {"type": "integer"}, "updated_replicas": {"type": "integer"},
-            "ready_replicas": {"type": "integer"}, "available_replicas": {"type": "integer"},
-            "unavailable_replicas": {"type": "integer"},
+            "name": {"type": "string"},
+            "desired_replicas": {"type": "integer"},
+            "ready_replicas": {"type": "integer"},
             "rollout_state": {"enum": ["available", "progressing", "degraded"]}
         }
     })
@@ -652,11 +687,35 @@ pub(crate) fn detail_schema() -> serde_json::Value {
         .get_mut("required")
         .and_then(serde_json::Value::as_array_mut)
         .expect("static required schema")
-        .extend([json!("pods"), json!("warnings"), json!("related_complete")]);
+        .extend([
+            json!("namespace"),
+            json!("uid"),
+            json!("resource_version"),
+            json!("generation"),
+            json!("observed_generation"),
+            json!("updated_replicas"),
+            json!("available_replicas"),
+            json!("unavailable_replicas"),
+            json!("pods"),
+            json!("warnings"),
+            json!("related_complete"),
+        ]);
     let properties = object
         .get_mut("properties")
         .and_then(serde_json::Value::as_object_mut)
         .expect("static properties schema");
+    for (name, shape) in [
+        ("namespace", json!({"type": "string"})),
+        ("uid", json!({"type": "string"})),
+        ("resource_version", json!({"type": "string"})),
+        ("generation", json!({"type": "integer"})),
+        ("observed_generation", json!({"type": "integer"})),
+        ("updated_replicas", json!({"type": "integer"})),
+        ("available_replicas", json!({"type": "integer"})),
+        ("unavailable_replicas", json!({"type": "integer"})),
+    ] {
+        properties.insert(name.to_owned(), shape);
+    }
     properties.insert(
         "pods".to_owned(),
         json!({
@@ -720,7 +779,9 @@ pub(crate) fn datasource_projection_sha256() -> String {
     let declaration = json!({
         "protocol": "b10x.value-projection.v1",
         "datasource_ref": DATASOURCE,
-        "version": 1,
+        // Version 2 (S-063): the compact record slims to name plus the minimal rollout
+        // summary; object identity and replica breakdowns move wholly into the detail record.
+        "version": 2,
         "key_schema": workload_key_schema(),
         "compact_schema": compact_schema(),
         "detail_schema": detail_schema(),
