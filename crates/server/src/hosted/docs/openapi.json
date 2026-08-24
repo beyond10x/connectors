@@ -1,0 +1,4671 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "b10x Connectors hosted API",
+    "version": "v0alpha1",
+    "summary": "The identity-authenticated hosted transport for the Connector wire contracts.",
+    "description": "Five strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Deployments may mount the router under a base path; every path here is relative to that base."
+    }
+  ],
+  "paths": {
+    "/operations": {
+      "post": {
+        "operationId": "operationEnvelope",
+        "summary": "Search, describe, invoke, and control sessions over admitted Connector operations",
+        "description": "One strict connector-operation envelope per request; the closed method set is search, describe, invoke, session_status, session_terminate, session_reconcile, and session_signal. Frames above 524288 bytes are refused. Scopes: connectors.catalog.read admits search and describe; connectors.invoke admits invoke and every session method.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/operation.requestEnvelope"
+              },
+              "examples": {
+                "search": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "search",
+                      "params": {
+                        "query": "issues",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "describe": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-describe-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "describe",
+                      "params": {
+                        "operation_ref": "github.issues.get"
+                      }
+                    }
+                  }
+                },
+                "invoke": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-invoke-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "invoke",
+                      "params": {
+                        "operation_ref": "github.issues.get",
+                        "connection_ref": "connection:github:acme",
+                        "description_ref": "description:github.issues.get:42",
+                        "input": {
+                          "owner": "beyond10x",
+                          "repo": "connectors",
+                          "issue_number": 67
+                        }
+                      }
+                    }
+                  }
+                },
+                "invoke_with_approval": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-invoke-2",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "invoke",
+                      "params": {
+                        "operation_ref": "slack.chat.post-message",
+                        "connection_ref": "connection:slack:acme",
+                        "description_ref": "description:slack.chat.post-message:42",
+                        "input": {
+                          "channel": "C0000000000",
+                          "text": "deploy finished"
+                        },
+                        "approval_evidence_ref": "approval:evidence:7c1"
+                      }
+                    }
+                  }
+                },
+                "session_status": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-session-status-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "session_status",
+                      "params": {
+                        "execution_ref": "execution:sip:20"
+                      }
+                    }
+                  }
+                },
+                "session_terminate": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-session-terminate-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "session_terminate",
+                      "params": {
+                        "execution_ref": "execution:sip:20",
+                        "reason": "completed"
+                      }
+                    }
+                  }
+                },
+                "session_reconcile": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-session-reconcile-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "session_reconcile",
+                      "params": {
+                        "execution_ref": "execution:sip:20"
+                      }
+                    }
+                  }
+                },
+                "session_signal": {
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha1",
+                    "request_id": "req-op-session-signal-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "session_signal",
+                      "params": {
+                        "execution_ref": "execution:sip:20",
+                        "signal": {
+                          "kind": "dtmf",
+                          "digits": "1#"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decided envelope: a success result, or a refusal the backend or admission decided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-op-search-1",
+                      "status": "ok",
+                      "response": {
+                        "result": "search",
+                        "value": {
+                          "operations": [
+                            {
+                              "operation_ref": "prometheus-query-range",
+                              "title": "Query Prometheus range data",
+                              "effect": "read_only",
+                              "approval": "not_required",
+                              "connections": [
+                                {
+                                  "connection_ref": "connection:prometheus:infra",
+                                  "label": "Infrastructure metrics",
+                                  "provider": "prometheus",
+                                  "audiences": [
+                                    "sre"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "approval_required": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-op-invoke-1",
+                      "status": "error",
+                      "error": {
+                        "code": "approval_required",
+                        "message": "the operation demands approval evidence before it may dispatch",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "stale_authority": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-op-invoke-1",
+                      "status": "error",
+                      "error": {
+                        "code": "stale_authority",
+                        "message": "the description lease or authority snapshot is no longer current",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "result_too_large": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-op-invoke-1",
+                      "status": "error",
+                      "error": {
+                        "code": "result_too_large",
+                        "message": "operation response exceeds the admitted bound",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "not_found": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-op-invoke-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_found",
+                        "message": "the operation does not exist in the caller's admitted surface",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope failed frame validation before any authority lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-operation-invalid-1",
+                      "status": "error",
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "request is outside the admitted bounds",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "protocol": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-operation-protocol-1",
+                      "status": "error",
+                      "error": {
+                        "code": "protocol",
+                        "message": "protocol identity or framing is invalid",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No acceptable bearer access token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verified authority does not admit this request family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                },
+                "examples": {
+                  "not_granted": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-operation-refused-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_granted",
+                        "message": "the verified authority does not admit this request family",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority, catalog, or backend is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/operation.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/errorBody"
+                    }
+                  ]
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  },
+                  "unavailable": {
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha1",
+                      "request_id": "req-operation-unavailable-1",
+                      "status": "error",
+                      "error": {
+                        "code": "unavailable",
+                        "message": "a required authority is unavailable",
+                        "retriable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections": {
+      "post": {
+        "operationId": "connectionEnvelope",
+        "summary": "Discover, activate, materialize, and describe Connections; run credential-free Connect Sessions",
+        "description": "One strict connector-connection envelope per request; the closed method set is candidate_search, candidate_activate, search, describe, observation_search, materialize, connect_session_create, and connect_session_status. No frame can carry credential material. Frames above 65536 bytes are refused. Scopes: connectors.catalog.read admits the reads; connectors.connections.manage admits activation, materialization, and session creation; connectors.connections.self admits self-service session creation.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/connection.request_envelope"
+              },
+              "examples": {
+                "candidate_search": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-candidate-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "candidate_search",
+                      "params": {
+                        "integration_ref": "integration:gitlab",
+                        "query": "dev",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "candidate_activate": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-candidate-activate-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "candidate_activate",
+                      "params": {
+                        "candidate_ref": "candidate:gitlab:dev",
+                        "label": "GitLab (dev)"
+                      }
+                    }
+                  }
+                },
+                "search": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "search",
+                      "params": {
+                        "query": "slack",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "describe": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-describe-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "describe",
+                      "params": {
+                        "connection_ref": "connection:slack:acme"
+                      }
+                    }
+                  }
+                },
+                "observation_search": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-observation-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "observation_search",
+                      "params": {
+                        "source_connection_ref": "connection:grafana:infra",
+                        "query": "prometheus",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "materialize": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-materialize-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "materialize",
+                      "params": {
+                        "observation_ref": "observation:grafana:prom-infra"
+                      }
+                    }
+                  }
+                },
+                "connect_session_create": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-session-create-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "connect_session_create",
+                      "params": {
+                        "integration_ref": "integration:slack",
+                        "label": "Slack workspace",
+                        "auth_profile": "slack.org_user"
+                      }
+                    }
+                  }
+                },
+                "connect_session_status": {
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha1",
+                    "request_id": "req-conn-session-status-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "connect_session_status",
+                      "params": {
+                        "connect_session_ref": "connect-session:slack:9"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decided envelope: a success result, or a refusal the backend or admission decided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connection.response_envelope"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-conn-session-create-1",
+                      "status": "ok",
+                      "response": {
+                        "result": "connect_session_create",
+                        "value": {
+                          "connect_session_ref": "connect-session:slack:9",
+                          "integration_ref": "integration:slack",
+                          "state": "pending",
+                          "expires_at_unix_ms": 1787000000000,
+                          "completion_endpoint": "/connect-sessions/connect-session:slack:9"
+                        }
+                      }
+                    }
+                  },
+                  "conflict": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-conn-candidate-activate-1",
+                      "status": "error",
+                      "error": {
+                        "code": "conflict",
+                        "message": "the candidate is already activated",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope failed frame validation before any authority lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connection.response_envelope"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-connection-invalid-1",
+                      "status": "error",
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "request is outside the admitted bounds",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "protocol": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-connection-protocol-1",
+                      "status": "error",
+                      "error": {
+                        "code": "protocol",
+                        "message": "protocol identity or framing is invalid",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No acceptable bearer access token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verified authority does not admit this request family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connection.response_envelope"
+                },
+                "examples": {
+                  "not_granted": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-connection-refused-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_granted",
+                        "message": "the verified authority does not admit this request family",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority, catalog, or backend is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/connection.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/errorBody"
+                    }
+                  ]
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  },
+                  "unavailable": {
+                    "value": {
+                      "protocol": "b10x.connector-connection.v0alpha1",
+                      "request_id": "req-connection-unavailable-1",
+                      "status": "error",
+                      "error": {
+                        "code": "unavailable",
+                        "message": "a required authority is unavailable",
+                        "retriable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog": {
+      "post": {
+        "operationId": "catalogEnvelope",
+        "summary": "Read the credential-free provider catalog",
+        "description": "One strict connector-catalog envelope per request; the closed method set is search and describe. Catalog membership is descriptive, never invocation authority. Frames above 65536 bytes are refused. Scope: connectors.catalog.read.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/catalog.requestEnvelope"
+              },
+              "examples": {
+                "search": {
+                  "value": {
+                    "protocol": "b10x.connector-catalog.v0alpha1",
+                    "request_id": "req-cat-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "search",
+                      "params": {
+                        "query": "",
+                        "offset": 0,
+                        "limit": 25
+                      }
+                    }
+                  }
+                },
+                "describe": {
+                  "value": {
+                    "protocol": "b10x.connector-catalog.v0alpha1",
+                    "request_id": "req-cat-describe-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "describe",
+                      "params": {
+                        "provider_ref": "github"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decided envelope: a success result, or a refusal the backend or admission decided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/catalog.responseEnvelope"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-catalog.v0alpha1",
+                      "request_id": "req-cat-search-1",
+                      "status": "ok",
+                      "response": {
+                        "kind": "search",
+                        "providers": [
+                          {
+                            "provider_ref": "github",
+                            "authority": "com.github.api",
+                            "vendor": "GitHub",
+                            "description": "Source hosting, issues, and pull requests.",
+                            "audiences": [
+                              "developer"
+                            ],
+                            "services": [
+                              "issues"
+                            ],
+                            "operation_count": 42,
+                            "configurable": true,
+                            "setup_profiles": [
+                              {
+                                "auth_profile": "github.person",
+                                "actor": "person"
+                              }
+                            ]
+                          }
+                        ],
+                        "next_offset": 25
+                      }
+                    }
+                  },
+                  "not_found": {
+                    "value": {
+                      "protocol": "b10x.connector-catalog.v0alpha1",
+                      "request_id": "req-cat-describe-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_found",
+                        "message": "catalog provider was not found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope failed frame validation before any authority lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/catalog.responseEnvelope"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "protocol": "b10x.connector-catalog.v0alpha1",
+                      "request_id": "req-catalog-invalid-1",
+                      "status": "error",
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "request is outside the admitted bounds"
+                      }
+                    }
+                  },
+                  "protocol": {
+                    "value": {
+                      "protocol": "b10x.connector-catalog.v0alpha1",
+                      "request_id": "req-catalog-protocol-1",
+                      "status": "error",
+                      "error": {
+                        "code": "protocol",
+                        "message": "protocol identity or framing is invalid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No acceptable bearer access token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verified authority does not admit this request family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/catalog.responseEnvelope"
+                },
+                "examples": {
+                  "not_granted": {
+                    "value": {
+                      "protocol": "b10x.connector-catalog.v0alpha1",
+                      "request_id": "req-catalog-refused-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_granted",
+                        "message": "the verified authority does not admit this request family"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority, catalog, or backend is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/catalog.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/errorBody"
+                    }
+                  ]
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "post": {
+        "operationId": "eventEnvelope",
+        "summary": "Search event channels, receive durable data events, and replay one event",
+        "description": "One strict connector-event envelope per request; the closed method set is search, receive, and replay. Frames above 65536 bytes are refused. Scopes: connectors.events.read admits operator reads; connectors.events.self admits the self-service Slack subset.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/event.request_envelope"
+              },
+              "examples": {
+                "search": {
+                  "value": {
+                    "protocol": "b10x.connector-event.v0alpha1",
+                    "request_id": "req-ev-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "search",
+                      "params": {
+                        "query": "slack",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "receive": {
+                  "value": {
+                    "protocol": "b10x.connector-event.v0alpha1",
+                    "request_id": "req-ev-receive-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "receive",
+                      "params": {
+                        "channel_ref": "event-channel:slack:acme",
+                        "after": "17",
+                        "limit": 50,
+                        "wait_ms": 10000
+                      }
+                    }
+                  }
+                },
+                "replay": {
+                  "value": {
+                    "protocol": "b10x.connector-event.v0alpha1",
+                    "request_id": "req-ev-replay-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "replay",
+                      "params": {
+                        "event_ref": "event:slack:12345"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decided envelope: a success result, or a refusal the backend or admission decided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/event.response_envelope"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-ev-receive-1",
+                      "status": "ok",
+                      "response": {
+                        "result": "receive",
+                        "value": {
+                          "events": [
+                            {
+                              "event_ref": "event:slack:12345",
+                              "channel_ref": "event-channel:slack:acme",
+                              "connection_ref": "connection:slack:acme",
+                              "integration_ref": "integration:slack",
+                              "event_type": "message",
+                              "provenance": "native",
+                              "received_at_unix_ms": 1787000000000,
+                              "payload": {
+                                "channel": "C0000000000",
+                                "text": "hello"
+                              }
+                            }
+                          ],
+                          "next": "18"
+                        }
+                      }
+                    }
+                  },
+                  "not_found": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-ev-replay-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_found",
+                        "message": "the event is outside the retained window",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope failed frame validation before any authority lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/event.response_envelope"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-event-invalid-1",
+                      "status": "error",
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "request is outside the admitted bounds",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "protocol": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-event-protocol-1",
+                      "status": "error",
+                      "error": {
+                        "code": "protocol",
+                        "message": "protocol identity or framing is invalid",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No acceptable bearer access token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verified authority does not admit this request family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/event.response_envelope"
+                },
+                "examples": {
+                  "not_granted": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-event-refused-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_granted",
+                        "message": "the verified authority does not admit this request family",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority, catalog, or backend is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/event.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/errorBody"
+                    }
+                  ]
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  },
+                  "unavailable": {
+                    "value": {
+                      "protocol": "b10x.connector-event.v0alpha1",
+                      "request_id": "req-event-unavailable-1",
+                      "status": "error",
+                      "error": {
+                        "code": "unavailable",
+                        "message": "a required authority is unavailable",
+                        "retriable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasources": {
+      "post": {
+        "operationId": "datasourceEnvelope",
+        "summary": "Search, describe, and read admitted read-only datasources",
+        "description": "One strict connector-datasource envelope per request; the closed method set is search, describe, bindings, and read. Frames above 524288 bytes are refused. Scope: connectors.catalog.read.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/datasource.request_envelope"
+              },
+              "examples": {
+                "search": {
+                  "value": {
+                    "protocol": "b10x.connector-datasource.v0alpha1",
+                    "request_id": "req-ds-search-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "search",
+                      "params": {
+                        "query": "kubernetes",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "describe": {
+                  "value": {
+                    "protocol": "b10x.connector-datasource.v0alpha1",
+                    "request_id": "req-ds-describe-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "describe",
+                      "params": {
+                        "datasource_ref": "kubernetes.deployments"
+                      }
+                    }
+                  }
+                },
+                "bindings": {
+                  "value": {
+                    "protocol": "b10x.connector-datasource.v0alpha1",
+                    "request_id": "req-ds-bindings-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "bindings",
+                      "params": {
+                        "datasource_ref": "kubernetes.deployments",
+                        "query": "infra",
+                        "limit": 10
+                      }
+                    }
+                  }
+                },
+                "read_list": {
+                  "value": {
+                    "protocol": "b10x.connector-datasource.v0alpha1",
+                    "request_id": "req-ds-read-list-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "read",
+                      "params": {
+                        "datasource_ref": "kubernetes.deployments",
+                        "binding_ref": "binding:kubernetes:infra",
+                        "description_ref": "description:kubernetes.deployments:7",
+                        "read": {
+                          "verb": "list",
+                          "limit": 10
+                        }
+                      }
+                    }
+                  }
+                },
+                "read_get": {
+                  "value": {
+                    "protocol": "b10x.connector-datasource.v0alpha1",
+                    "request_id": "req-ds-read-get-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "method": "read",
+                      "params": {
+                        "datasource_ref": "kubernetes.deployments",
+                        "binding_ref": "binding:kubernetes:infra",
+                        "description_ref": "description:kubernetes.deployments:7",
+                        "read": {
+                          "verb": "get",
+                          "key": {
+                            "namespace": "infra",
+                            "name": "connectors"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decided envelope: a success result, or a refusal the backend or admission decided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/datasource.response_envelope"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-ds-read-list-1",
+                      "status": "ok",
+                      "response": {
+                        "result": "read",
+                        "value": {
+                          "datasource_ref": "kubernetes.deployments",
+                          "records": [
+                            {
+                              "key": {
+                                "namespace": "infra",
+                                "name": "connectors"
+                              },
+                              "view": "compact",
+                              "value": {
+                                "name": "connectors",
+                                "replicas": 2,
+                                "ready": 2
+                              }
+                            }
+                          ],
+                          "completeness": "complete",
+                          "observed_at_unix_ms": 1787000000000,
+                          "provenance": {
+                            "binding_ref": "binding:kubernetes:infra",
+                            "projection_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                            "connector_audit_ref": "audit:datasource:19"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "cursor_expired": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-ds-read-list-1",
+                      "status": "error",
+                      "error": {
+                        "code": "cursor_expired",
+                        "message": "the list cursor expired or belongs to another scope",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "result_too_large": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-ds-read-list-1",
+                      "status": "error",
+                      "error": {
+                        "code": "result_too_large",
+                        "message": "the read exceeded a declared bound",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "stale_authority": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-ds-read-list-1",
+                      "status": "error",
+                      "error": {
+                        "code": "stale_authority",
+                        "message": "the description lease or binding generation changed",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The envelope failed frame validation before any authority lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/datasource.response_envelope"
+                },
+                "examples": {
+                  "invalid_input": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-datasource-invalid-1",
+                      "status": "error",
+                      "error": {
+                        "code": "invalid_input",
+                        "message": "request is outside the admitted bounds",
+                        "retriable": false
+                      }
+                    }
+                  },
+                  "protocol": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-datasource-protocol-1",
+                      "status": "error",
+                      "error": {
+                        "code": "protocol",
+                        "message": "protocol identity or framing is invalid",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No acceptable bearer access token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The verified authority does not admit this request family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/datasource.response_envelope"
+                },
+                "examples": {
+                  "not_granted": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-datasource-refused-1",
+                      "status": "error",
+                      "error": {
+                        "code": "not_granted",
+                        "message": "the verified authority does not admit this request family",
+                        "retriable": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority, catalog, or backend is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/datasource.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/errorBody"
+                    }
+                  ]
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  },
+                  "unavailable": {
+                    "value": {
+                      "protocol": "b10x.connector-datasource.v0alpha1",
+                      "request_id": "req-datasource-unavailable-1",
+                      "status": "error",
+                      "error": {
+                        "code": "unavailable",
+                        "message": "a required authority is unavailable",
+                        "retriable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "summary": "Stateless MCP transport: single-message JSON-RPC 2.0",
+        "description": "Speaks MCP revisions 2025-03-26 and 2025-06-18 with no SSE stream, no session id, and no batching. The static toolset is exactly three meta-tools: tool_search, tool_describe, and tool_invoke; every call funnels through the same admission the envelope endpoints use, so this transport adds zero policy of its own.",
+        "security": [
+          {
+            "identityAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/mcp.request"
+              },
+              "examples": {
+                "initialize": {
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                      "protocolVersion": "2025-06-18",
+                      "capabilities": {},
+                      "clientInfo": {
+                        "name": "example-client",
+                        "version": "1.0.0"
+                      }
+                    }
+                  }
+                },
+                "tools_list": {
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/list"
+                  }
+                },
+                "tools_call": {
+                  "value": {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                      "name": "tool_search",
+                      "arguments": {
+                        "query": "kubernetes",
+                        "limit": 5
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One JSON-RPC response; tool-level refusals are execution results with isError true and the envelope protocol's own error code in structuredContent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/mcp.response"
+                },
+                "examples": {
+                  "initialize": {
+                    "value": {
+                      "jsonrpc": "2.0",
+                      "id": 1,
+                      "result": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {
+                          "tools": {
+                            "listChanged": false
+                          }
+                        },
+                        "serverInfo": {
+                          "name": "b10x-connectors",
+                          "version": "0.1.0"
+                        }
+                      }
+                    }
+                  },
+                  "tools_list": {
+                    "value": {
+                      "jsonrpc": "2.0",
+                      "id": 2,
+                      "result": {
+                        "tools": [
+                          {
+                            "name": "tool_search",
+                            "title": "Search the projected toolset"
+                          },
+                          {
+                            "name": "tool_describe",
+                            "title": "Describe one projected tool"
+                          },
+                          {
+                            "name": "tool_invoke",
+                            "title": "Invoke one projected tool"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "method_not_found": {
+                    "value": {
+                      "jsonrpc": "2.0",
+                      "id": 4,
+                      "error": {
+                        "code": -32601,
+                        "message": "method not found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "A notification or client-to-server response frame was acknowledged without a body."
+          },
+          "400": {
+            "description": "The frame is not one JSON-RPC 2.0 request object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/mcp.response"
+                },
+                "examples": {
+                  "parse_error": {
+                    "value": {
+                      "jsonrpc": "2.0",
+                      "id": null,
+                      "error": {
+                        "code": -32700,
+                        "message": "the frame is not JSON"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The bearer is verified once, before any JSON-RPC processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": "identity-access-token-required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The identity authority is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorBody"
+                },
+                "examples": {
+                  "identity_unavailable": {
+                    "value": {
+                      "error": "identity-unavailable"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/livez": {
+      "get": {
+        "operationId": "liveness",
+        "summary": "Process liveness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The process is alive.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "ok\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readiness",
+        "summary": "Readiness: catalog validity, identity authority, and backend",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Every readiness dependency answered.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "ok\n"
+              }
+            }
+          },
+          "503": {
+            "description": "A dependency is not ready; the body names it: catalog-invalid, identity-unavailable, or backend-unavailable.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "identity-unavailable\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "Readiness: catalog validity, identity authority, and backend",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Every readiness dependency answered.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "ok\n"
+              }
+            }
+          },
+          "503": {
+            "description": "A dependency is not ready; the body names it: catalog-invalid, identity-unavailable, or backend-unavailable.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "identity-unavailable\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "openapiDocument",
+        "summary": "This document",
+        "description": "Serves the committed OpenAPI 3.1 contract verbatim, unauthenticated, with a content-hash ETag. The document is immutable per build.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The complete machine-readable contract for this server.",
+            "headers": {
+              "ETag": {
+                "description": "Quoted lowercase hex SHA-256 of the exact served bytes.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[0-9a-f]{64}\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "This OpenAPI 3.1 document."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "identityAccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connect sessions), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
+      }
+    },
+    "schemas": {
+      "catalog.catalogRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "search"
+              },
+              "params": {
+                "$ref": "#/components/schemas/catalog.searchParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "describe"
+              },
+              "params": {
+                "$ref": "#/components/schemas/catalog.describeParams"
+              }
+            }
+          }
+        ]
+      },
+      "catalog.catalogResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/catalog.searchResult"
+          },
+          {
+            "$ref": "#/components/schemas/catalog.describeResult"
+          }
+        ]
+      },
+      "catalog.describeParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_ref"
+        ],
+        "properties": {
+          "provider_ref": {
+            "$ref": "#/components/schemas/catalog.reference256"
+          }
+        }
+      },
+      "catalog.describeResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "provider",
+          "operations"
+        ],
+        "properties": {
+          "kind": {
+            "const": "describe"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/catalog.providerSummary"
+          },
+          "operations": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "$ref": "#/components/schemas/catalog.operationSummary"
+            }
+          }
+        }
+      },
+      "catalog.error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "protocol",
+              "invalid_input",
+              "not_found",
+              "not_granted"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      },
+      "catalog.operationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "service",
+          "description",
+          "risk",
+          "exposed"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/catalog.reference256"
+          },
+          "service": {
+            "$ref": "#/components/schemas/catalog.reference128"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "risk": {
+            "$ref": "#/components/schemas/catalog.reference128"
+          },
+          "exposed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "catalog.ownerContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "agent_id",
+          "agent_revision",
+          "authority_snapshot_id",
+          "authority_snapshot_sha256"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/catalog.reference256"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/catalog.reference256"
+          },
+          "agent_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 18446744073709551615
+          },
+          "authority_snapshot_id": {
+            "$ref": "#/components/schemas/catalog.reference512"
+          },
+          "authority_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9A-Fa-f]{64}$"
+          }
+        }
+      },
+      "catalog.providerSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_ref",
+          "authority",
+          "vendor",
+          "description",
+          "audiences",
+          "services",
+          "operation_count",
+          "configurable"
+        ],
+        "properties": {
+          "provider_ref": {
+            "$ref": "#/components/schemas/catalog.reference256"
+          },
+          "authority": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/catalog.reference256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vendor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "audiences": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/catalog.reference128"
+            }
+          },
+          "services": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/catalog.reference128"
+            }
+          },
+          "operation_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "configurable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "catalog.reference128": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[!-~]+$"
+      },
+      "catalog.reference256": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[!-~]+$"
+      },
+      "catalog.reference512": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[!-~]+$"
+      },
+      "catalog.requestEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "context",
+          "request"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-catalog.v0alpha1"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/catalog.reference128"
+          },
+          "context": {
+            "$ref": "#/components/schemas/catalog.ownerContext"
+          },
+          "request": {
+            "$ref": "#/components/schemas/catalog.catalogRequest"
+          }
+        }
+      },
+      "catalog.responseEnvelope": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "protocol",
+              "request_id",
+              "status",
+              "response"
+            ],
+            "properties": {
+              "protocol": {
+                "const": "b10x.connector-catalog.v0alpha1"
+              },
+              "request_id": {
+                "$ref": "#/components/schemas/catalog.reference128"
+              },
+              "status": {
+                "const": "ok"
+              },
+              "response": {
+                "$ref": "#/components/schemas/catalog.catalogResult"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "protocol",
+              "request_id",
+              "status",
+              "error"
+            ],
+            "properties": {
+              "protocol": {
+                "const": "b10x.connector-catalog.v0alpha1"
+              },
+              "request_id": {
+                "$ref": "#/components/schemas/catalog.reference128"
+              },
+              "status": {
+                "const": "error"
+              },
+              "error": {
+                "$ref": "#/components/schemas/catalog.error"
+              }
+            }
+          }
+        ]
+      },
+      "catalog.searchParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "offset",
+          "limit"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          }
+        }
+      },
+      "catalog.searchResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "providers"
+        ],
+        "properties": {
+          "kind": {
+            "const": "search"
+          },
+          "providers": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/catalog.providerSummary"
+            }
+          },
+          "next_offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          }
+        }
+      },
+      "connection.channel_summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel_ref",
+          "binding_ref",
+          "state",
+          "events"
+        ],
+        "properties": {
+          "channel_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "binding_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "state": {
+            "enum": [
+              "starting",
+              "connected",
+              "reconnecting",
+              "stopped"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/connection.ref"
+            }
+          }
+        }
+      },
+      "connection.connect_session_status": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "connect_session_ref",
+          "integration_ref",
+          "state",
+          "expires_at_unix_ms"
+        ],
+        "properties": {
+          "connect_session_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "integration_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "completed",
+              "expired",
+              "failed"
+            ]
+          },
+          "expires_at_unix_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completion_endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "browser_completion_url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(http://127\\.0\\.0\\.1:[0-9]+/|https://[^/\\s]+/)[^\\s]*$"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          }
+        }
+      },
+      "connection.connection_candidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_ref",
+          "integration_ref",
+          "title",
+          "state",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "candidate_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "integration_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "detected",
+              "activated"
+            ]
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          }
+        }
+      },
+      "connection.connection_description": {
+        "type": "object",
+        "additionalProperties": false,
+        "dependentRequired": {
+          "scope": [
+            "actor"
+          ],
+          "actor": [
+            "scope"
+          ]
+        },
+        "required": [
+          "connection_ref",
+          "integration_ref",
+          "label",
+          "state",
+          "initiation",
+          "route",
+          "channels"
+        ],
+        "properties": {
+          "connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "integration_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "created",
+              "authorized",
+              "callable",
+              "degraded",
+              "revoked"
+            ]
+          },
+          "initiation": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "b10x",
+                "provider"
+              ]
+            }
+          },
+          "route": {
+            "$ref": "#/components/schemas/connection.connection_route"
+          },
+          "scope": {
+            "enum": [
+              "tenant",
+              "principal"
+            ]
+          },
+          "actor": {
+            "enum": [
+              "app",
+              "user"
+            ]
+          },
+          "auth_profile": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z0-9._-]+$"
+          },
+          "channels": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/connection.channel_summary"
+            }
+          }
+        }
+      },
+      "connection.connection_route": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "direct"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "parent_connection_ref",
+              "route_adapter"
+            ],
+            "properties": {
+              "kind": {
+                "const": "via_connection"
+              },
+              "parent_connection_ref": {
+                "$ref": "#/components/schemas/connection.ref"
+              },
+              "route_adapter": {
+                "enum": [
+                  "grafana_datasource_proxy_v1",
+                  "kubernetes_service_proxy_v1"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "connection.connection_summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "dependentRequired": {
+          "scope": [
+            "actor"
+          ],
+          "actor": [
+            "scope"
+          ]
+        },
+        "required": [
+          "connection_ref",
+          "integration_ref",
+          "label",
+          "state",
+          "initiation",
+          "route"
+        ],
+        "properties": {
+          "connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "integration_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "created",
+              "authorized",
+              "callable",
+              "degraded",
+              "revoked"
+            ]
+          },
+          "initiation": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "b10x",
+                "provider"
+              ]
+            }
+          },
+          "route": {
+            "$ref": "#/components/schemas/connection.connection_route"
+          },
+          "scope": {
+            "enum": [
+              "tenant",
+              "principal"
+            ]
+          },
+          "actor": {
+            "enum": [
+              "app",
+              "user"
+            ]
+          },
+          "auth_profile": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z0-9._-]+$"
+          }
+        }
+      },
+      "connection.discovery_observation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_ref",
+          "discovery_ref",
+          "source_connection_ref",
+          "observed_type",
+          "title",
+          "state",
+          "evidence_generation",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "observation_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "discovery_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "source_connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "observed_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "observed",
+              "unsupported",
+              "materialized",
+              "withdrawn"
+            ]
+          },
+          "evidence_generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "target_provider_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/connection.ref"
+          }
+        }
+      },
+      "connection.error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "retriable"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "unavailable",
+              "not_found",
+              "not_granted",
+              "invalid_input",
+              "stale_authority",
+              "conflict",
+              "protocol"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "retriable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "connection.owner": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "agent_id",
+          "agent_revision",
+          "authority_snapshot_id",
+          "authority_snapshot_sha256"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "agent_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "authority_snapshot_id": {
+            "$ref": "#/components/schemas/connection.ref"
+          },
+          "authority_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          }
+        }
+      },
+      "connection.ref": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[^\\s\\u0000-\\u001f\\u007f]+$"
+      },
+      "connection.request": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "candidate_search"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "integration_ref",
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "integration_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  },
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "candidate_activate"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "candidate_ref",
+                  "label"
+                ],
+                "properties": {
+                  "candidate_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "search"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "describe"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "connection_ref"
+                ],
+                "properties": {
+                  "connection_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "observation_search"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_connection_ref",
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "source_connection_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  },
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "materialize"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observation_ref"
+                ],
+                "properties": {
+                  "observation_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "connect_session_create"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "integration_ref",
+                  "label"
+                ],
+                "properties": {
+                  "integration_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "auth_profile": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[a-z0-9._-]+$"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "connect_session_status"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "connect_session_ref"
+                ],
+                "properties": {
+                  "connect_session_ref": {
+                    "$ref": "#/components/schemas/connection.ref"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "connection.request_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "context",
+          "request"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-connection.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "context": {
+            "$ref": "#/components/schemas/connection.owner"
+          },
+          "request": {
+            "$ref": "#/components/schemas/connection.request"
+          }
+        }
+      },
+      "connection.response_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "status"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-connection.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "response": {
+            "$ref": "#/components/schemas/connection.result"
+          },
+          "error": {
+            "$ref": "#/components/schemas/connection.error"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "response"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "not": {
+              "required": [
+                "response"
+              ]
+            }
+          }
+        ]
+      },
+      "connection.result": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "candidate_search"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "candidates"
+                ],
+                "properties": {
+                  "candidates": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "$ref": "#/components/schemas/connection.connection_candidate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "candidate_activate"
+              },
+              "value": {
+                "$ref": "#/components/schemas/connection.connection_description"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "search"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "connections"
+                ],
+                "properties": {
+                  "connections": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "$ref": "#/components/schemas/connection.connection_summary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "describe"
+              },
+              "value": {
+                "$ref": "#/components/schemas/connection.connection_description"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "observation_search"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observations"
+                ],
+                "properties": {
+                  "observations": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "$ref": "#/components/schemas/connection.discovery_observation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "materialize"
+              },
+              "value": {
+                "$ref": "#/components/schemas/connection.connection_description"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "enum": [
+                  "connect_session_create",
+                  "connect_session_status"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/connection.connect_session_status"
+              }
+            }
+          }
+        ]
+      },
+      "datasource.error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "retriable"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "unavailable",
+              "not_found",
+              "not_granted",
+              "invalid_input",
+              "stale_authority",
+              "cursor_expired",
+              "result_too_large",
+              "protocol"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "retriable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "datasource.owner": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "agent_id",
+          "agent_revision",
+          "authority_snapshot_id",
+          "authority_snapshot_sha256"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/datasource.ref"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/datasource.ref"
+          },
+          "agent_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "authority_snapshot_id": {
+            "$ref": "#/components/schemas/datasource.ref"
+          },
+          "authority_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "datasource.ref": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[^\\s\\u0000-\\u001f\\u007f]+$"
+      },
+      "datasource.request": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "search"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "describe"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "datasource_ref"
+                ],
+                "properties": {
+                  "datasource_ref": {
+                    "$ref": "#/components/schemas/datasource.ref"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "bindings"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "datasource_ref",
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "datasource_ref": {
+                    "$ref": "#/components/schemas/datasource.ref"
+                  },
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "read"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "datasource_ref",
+                  "binding_ref",
+                  "description_ref",
+                  "read"
+                ],
+                "properties": {
+                  "datasource_ref": {
+                    "$ref": "#/components/schemas/datasource.ref"
+                  },
+                  "binding_ref": {
+                    "$ref": "#/components/schemas/datasource.ref"
+                  },
+                  "description_ref": {
+                    "$ref": "#/components/schemas/datasource.ref"
+                  },
+                  "read": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "verb",
+                          "limit"
+                        ],
+                        "properties": {
+                          "verb": {
+                            "const": "list"
+                          },
+                          "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 25
+                          },
+                          "cursor": {
+                            "$ref": "#/components/schemas/datasource.ref"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "verb",
+                          "key"
+                        ],
+                        "properties": {
+                          "verb": {
+                            "const": "get"
+                          },
+                          "key": true
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "datasource.request_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "context",
+          "request"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-datasource.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "context": {
+            "$ref": "#/components/schemas/datasource.owner"
+          },
+          "request": {
+            "$ref": "#/components/schemas/datasource.request"
+          }
+        }
+      },
+      "datasource.response_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "status"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-datasource.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "response": {
+            "type": "object"
+          },
+          "error": {
+            "$ref": "#/components/schemas/datasource.error"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "response"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "not": {
+              "required": [
+                "response"
+              ]
+            }
+          }
+        ]
+      },
+      "errorBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "enum": [
+              "identity-access-token-required",
+              "identity-access-token-refused",
+              "identity-unavailable"
+            ]
+          }
+        },
+        "description": "Transport-level identity refusal, before any envelope processing."
+      },
+      "event.data_event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_ref",
+          "channel_ref",
+          "connection_ref",
+          "integration_ref",
+          "event_type",
+          "provenance",
+          "received_at_unix_ms",
+          "payload"
+        ],
+        "properties": {
+          "event_ref": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "channel_ref": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "integration_ref": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "provenance": {
+            "enum": [
+              "native",
+              "polled"
+            ]
+          },
+          "received_at_unix_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "payload": true
+        }
+      },
+      "event.error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "retriable"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "unavailable",
+              "not_found",
+              "not_granted",
+              "invalid_input",
+              "stale_authority",
+              "protocol"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "retriable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "event.owner": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "agent_id",
+          "agent_revision",
+          "authority_snapshot_id",
+          "authority_snapshot_sha256"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "agent_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "authority_snapshot_id": {
+            "$ref": "#/components/schemas/event.ref"
+          },
+          "authority_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          }
+        }
+      },
+      "event.ref": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[^\\s\\u0000-\\u001f\\u007f]+$"
+      },
+      "event.request": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "search"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "query",
+                  "limit"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "receive"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "channel_ref",
+                  "limit",
+                  "wait_ms"
+                ],
+                "properties": {
+                  "channel_ref": {
+                    "$ref": "#/components/schemas/event.ref"
+                  },
+                  "after": {
+                    "type": "string",
+                    "pattern": "^[0-9]+$",
+                    "maxLength": 128
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "wait_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30000
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "replay"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_ref"
+                ],
+                "properties": {
+                  "event_ref": {
+                    "$ref": "#/components/schemas/event.ref"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "event.request_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "context",
+          "request"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-event.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "context": {
+            "$ref": "#/components/schemas/event.owner"
+          },
+          "request": {
+            "$ref": "#/components/schemas/event.request"
+          }
+        }
+      },
+      "event.response_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "status"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-event.v0alpha1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "response": {
+            "type": "object"
+          },
+          "error": {
+            "$ref": "#/components/schemas/event.error"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "response"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "error"
+            ],
+            "not": {
+              "required": [
+                "response"
+              ]
+            }
+          }
+        ]
+      },
+      "mcp.request": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "jsonrpc",
+          "method"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "method": {
+            "type": "string",
+            "description": "Served methods: initialize, ping, tools/list, tools/call. notifications/* frames are acknowledged without a body. Anything else answers JSON-RPC -32601."
+          },
+          "params": {
+            "type": "object"
+          }
+        },
+        "description": "One single-message JSON-RPC 2.0 request. No SSE stream, no session id, no batching."
+      },
+      "mcp.response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "jsonrpc",
+          "id"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "const": "2.0"
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "description": "One JSON-RPC 2.0 response carrying exactly one of result or error."
+      },
+      "mcp.toolCallParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "tool_search",
+              "tool_describe",
+              "tool_invoke"
+            ],
+            "description": "The three meta-tools are the complete static toolset; projected tools are reached by name through tool_describe and tool_invoke."
+          },
+          "arguments": {
+            "type": "object"
+          }
+        }
+      },
+      "operation.approval": {
+        "enum": [
+          "not_required",
+          "required"
+        ]
+      },
+      "operation.channelSignal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "digits"
+        ],
+        "properties": {
+          "kind": {
+            "const": "dtmf"
+          },
+          "digits": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[0-9*#A-D]+$"
+          }
+        },
+        "description": "One signal sent into an established session, such as a DTMF keypress answering an IVR prompt."
+      },
+      "operation.connectionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "connection_ref",
+          "label",
+          "provider",
+          "audiences"
+        ],
+        "properties": {
+          "connection_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[!-~]+$"
+          },
+          "audiences": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[!-~]+$"
+            }
+          }
+        }
+      },
+      "operation.describeParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        }
+      },
+      "operation.description": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "title",
+          "description",
+          "input_schema",
+          "output_schema",
+          "effect",
+          "approval",
+          "connections",
+          "description_ref"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 16384
+          },
+          "input_schema": true,
+          "output_schema": true,
+          "effect": {
+            "$ref": "#/components/schemas/operation.effect"
+          },
+          "approval": {
+            "$ref": "#/components/schemas/operation.approval"
+          },
+          "connections": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/operation.connectionSummary"
+            }
+          },
+          "description_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "effect": {
+                  "enum": [
+                    "mutating",
+                    "destructive"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "approval": {
+                  "const": "required"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "operation.effect": {
+        "enum": [
+          "read_only",
+          "mutating",
+          "destructive"
+        ]
+      },
+      "operation.error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "retriable"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "unavailable",
+              "not_found",
+              "not_granted",
+              "invalid_input",
+              "stale_authority",
+              "approval_required",
+              "approval_denied",
+              "result_too_large",
+              "protocol",
+              "outcome_unknown"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "retriable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "operation.invocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "output",
+          "connector_audit_ref"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "output": true,
+          "connector_audit_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "execution_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        }
+      },
+      "operation.invokeParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "connection_ref",
+          "description_ref",
+          "input"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "description_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "input": true,
+          "approval_evidence_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        }
+      },
+      "operation.operationRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "search"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.searchParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "describe"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.describeParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "invoke"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.invokeParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "session_status"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.sessionParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "session_terminate"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.terminateParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "session_reconcile"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.sessionParams"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method",
+              "params"
+            ],
+            "properties": {
+              "method": {
+                "const": "session_signal"
+              },
+              "params": {
+                "$ref": "#/components/schemas/operation.signalParams"
+              }
+            }
+          }
+        ]
+      },
+      "operation.operationResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "search"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operations"
+                ],
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "maxItems": 25,
+                    "items": {
+                      "$ref": "#/components/schemas/operation.operationSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "describe"
+              },
+              "value": {
+                "$ref": "#/components/schemas/operation.description"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "const": "invoke"
+              },
+              "value": {
+                "$ref": "#/components/schemas/operation.invocation"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "value"
+            ],
+            "properties": {
+              "result": {
+                "enum": [
+                  "session_status",
+                  "session_terminate",
+                  "session_reconcile",
+                  "session_signal"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/operation.sessionStatus"
+              }
+            }
+          }
+        ]
+      },
+      "operation.operationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "title",
+          "effect",
+          "approval",
+          "connections"
+        ],
+        "properties": {
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "effect": {
+            "$ref": "#/components/schemas/operation.effect"
+          },
+          "approval": {
+            "$ref": "#/components/schemas/operation.approval"
+          },
+          "connections": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/operation.connectionSummary"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "effect": {
+                  "enum": [
+                    "mutating",
+                    "destructive"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "approval": {
+                  "const": "required"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "operation.ownerContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "agent_id",
+          "agent_revision",
+          "authority_snapshot_id",
+          "authority_snapshot_sha256"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/operation.shortReference"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/operation.shortReference"
+          },
+          "agent_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "authority_snapshot_id": {
+            "$ref": "#/components/schemas/operation.shortReference"
+          },
+          "authority_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "operation.reference": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[!-~]+$"
+      },
+      "operation.requestEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "request_id",
+          "context",
+          "request"
+        ],
+        "properties": {
+          "protocol": {
+            "const": "b10x.connector-operation.v0alpha1"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/operation.requestId"
+          },
+          "context": {
+            "$ref": "#/components/schemas/operation.ownerContext"
+          },
+          "request": {
+            "$ref": "#/components/schemas/operation.operationRequest"
+          }
+        }
+      },
+      "operation.requestId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[!-~]+$"
+      },
+      "operation.responseEnvelope": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "protocol",
+              "request_id",
+              "status",
+              "response"
+            ],
+            "properties": {
+              "protocol": {
+                "const": "b10x.connector-operation.v0alpha1"
+              },
+              "request_id": {
+                "$ref": "#/components/schemas/operation.requestId"
+              },
+              "status": {
+                "const": "ok"
+              },
+              "response": {
+                "$ref": "#/components/schemas/operation.operationResult"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "protocol",
+              "request_id",
+              "status",
+              "error"
+            ],
+            "properties": {
+              "protocol": {
+                "const": "b10x.connector-operation.v0alpha1"
+              },
+              "request_id": {
+                "$ref": "#/components/schemas/operation.requestId"
+              },
+              "status": {
+                "const": "error"
+              },
+              "error": {
+                "$ref": "#/components/schemas/operation.error"
+              }
+            }
+          }
+        ]
+      },
+      "operation.searchParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "limit"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
+        }
+      },
+      "operation.sessionParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execution_ref"
+        ],
+        "properties": {
+          "execution_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        }
+      },
+      "operation.sessionStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execution_ref",
+          "operation_ref",
+          "connection_ref",
+          "state",
+          "connector_audit_ref"
+        ],
+        "properties": {
+          "execution_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "operation_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "connection_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "state": {
+            "enum": [
+              "establishing",
+              "established",
+              "terminating",
+              "terminated",
+              "outcome_unknown"
+            ]
+          },
+          "termination": {
+            "enum": [
+              "completed",
+              "cancelled",
+              "revoked",
+              "lease_expired",
+              "remote_ended",
+              "failed",
+              "outcome_unknown"
+            ]
+          },
+          "connector_audit_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "establishing",
+                    "established",
+                    "terminating"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "termination"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "terminated"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "termination"
+              ],
+              "properties": {
+                "termination": {
+                  "enum": [
+                    "completed",
+                    "cancelled",
+                    "revoked",
+                    "lease_expired",
+                    "remote_ended",
+                    "failed"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "outcome_unknown"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "termination"
+              ],
+              "properties": {
+                "termination": {
+                  "const": "outcome_unknown"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "operation.shortReference": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[!-~]+$"
+      },
+      "operation.signalParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execution_ref",
+          "signal"
+        ],
+        "properties": {
+          "execution_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/operation.channelSignal"
+          }
+        }
+      },
+      "operation.terminateParams": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execution_ref",
+          "reason"
+        ],
+        "properties": {
+          "execution_ref": {
+            "$ref": "#/components/schemas/operation.reference"
+          },
+          "reason": {
+            "enum": [
+              "completed",
+              "cancelled",
+              "revoked"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
