@@ -2,7 +2,7 @@
 id: S-067
 title: "The server serves its own OpenAPI contract"
 pillar: Platform
-status: in-progress
+status: done
 epic: public-surface
 areas: [server, docs]
 ---
