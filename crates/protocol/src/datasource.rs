@@ -18,7 +18,7 @@ const MAX_SCHEMA_BYTES: usize = 64 * 1024;
 const MAX_KEY_BYTES: usize = 4 * 1024;
 
 /// One strict datasource request frame.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RequestEnvelope {
     /// Protocol identity.
@@ -32,7 +32,7 @@ pub struct RequestEnvelope {
 }
 
 /// Closed datasource method set.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(
     tag = "method",
     content = "params",
@@ -51,7 +51,7 @@ pub enum DatasourceRequest {
 }
 
 /// Bounded definition search.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SearchRequest {
     /// Human query matched by the owner.
@@ -61,7 +61,7 @@ pub struct SearchRequest {
 }
 
 /// Exact definition lookup.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeRequest {
     /// Stable datasource identity.
@@ -69,7 +69,7 @@ pub struct DescribeRequest {
 }
 
 /// Bounded binding search for a definition.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BindingSearchRequest {
     /// Stable datasource identity.
@@ -81,7 +81,7 @@ pub struct BindingSearchRequest {
 }
 
 /// One read tied to an exact definition, binding, and description generation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReadRequest {
     /// Stable datasource identity.
@@ -95,7 +95,7 @@ pub struct ReadRequest {
 }
 
 /// Read-only access verbs in the first datasource contract.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "verb", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DatasourceRead {
     /// Return compact records in owner order.
@@ -114,7 +114,7 @@ pub enum DatasourceRead {
 }
 
 /// Datasource execution posture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AccessMode {
     /// Every read observes the owner live; no local index is implied.
@@ -122,7 +122,7 @@ pub enum AccessMode {
 }
 
 /// Supported read verb.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadVerb {
     /// Bounded compact listing.
@@ -132,7 +132,7 @@ pub enum ReadVerb {
 }
 
 /// Small discovery projection for one datasource definition.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceSummary {
     /// Stable datasource identity.
@@ -146,7 +146,7 @@ pub struct DatasourceSummary {
 }
 
 /// Complete schema and projection declaration for one datasource.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceDescription {
     /// Discovery summary.
@@ -168,7 +168,7 @@ pub struct DatasourceDescription {
 }
 
 /// One definition bound to an exact Connector Connection and owner scope.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceBinding {
     /// Stable definition identity.
@@ -191,7 +191,7 @@ pub struct DatasourceBinding {
 }
 
 /// Compact or detailed record view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordView {
     /// List/search projection.
@@ -201,7 +201,7 @@ pub enum RecordView {
 }
 
 /// One normalized datasource record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceRecord {
     /// Owner-declared stable lookup key.
@@ -213,7 +213,7 @@ pub struct DatasourceRecord {
 }
 
 /// Whether owner bounds omitted related data from this page.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Completeness {
     /// All related values admitted by the read were returned.
@@ -223,7 +223,7 @@ pub enum Completeness {
 }
 
 /// Provenance retained after provider envelopes are removed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceProvenance {
     /// Exact binding used for the read.
@@ -235,7 +235,7 @@ pub struct DatasourceProvenance {
 }
 
 /// Standard bounded datasource read result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasourcePage {
     /// Datasource identity.
@@ -254,7 +254,7 @@ pub struct DatasourcePage {
 }
 
 /// Successful datasource response.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(
     tag = "result",
     content = "value",
@@ -279,7 +279,7 @@ pub enum DatasourceResult {
 }
 
 /// Closed datasource failure vocabulary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DatasourceErrorCode {
     /// Owner or provider is unavailable.
@@ -301,7 +301,7 @@ pub enum DatasourceErrorCode {
 }
 
 /// Typed datasource failure with safe diagnostics.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema)]
 #[error("{code:?}: {message}")]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceError {
@@ -326,7 +326,7 @@ impl DatasourceError {
 }
 
 /// Response success/failure discriminator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     /// Successful response.
@@ -336,7 +336,7 @@ pub enum ResponseStatus {
 }
 
 /// One strict datasource response frame.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResponseEnvelope {
     /// Protocol identity.

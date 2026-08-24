@@ -17,7 +17,7 @@ pub const MAX_RESPONSE_BYTES: usize = 512 * 1024;
 pub const MAX_PROVIDER_RESULTS: u16 = 64;
 
 /// One authenticated catalog request.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RequestEnvelope {
     /// Exact protocol identity.
@@ -31,7 +31,7 @@ pub struct RequestEnvelope {
 }
 
 /// Closed catalog reads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(
     tag = "method",
     content = "params",
@@ -46,7 +46,7 @@ pub enum CatalogRequest {
 }
 
 /// One bounded provider page request.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SearchRequest {
     /// Case-insensitive text matched against id, vendor and description.
@@ -58,7 +58,7 @@ pub struct SearchRequest {
 }
 
 /// Exact provider lookup.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeRequest {
     /// Stable catalog provider id.
@@ -66,7 +66,7 @@ pub struct DescribeRequest {
 }
 
 /// One catalog provider summary. No field can carry a configured value or credential.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderSummary {
     /// Stable catalog id.
@@ -95,7 +95,7 @@ pub struct ProviderSummary {
 }
 
 /// One credential-acquisition flow a person may start for themselves.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetupProfileSummary {
     /// Stable auth-profile id, exactly as `ConnectSessionCreateRequest.auth_profile` accepts it.
@@ -105,7 +105,7 @@ pub struct SetupProfileSummary {
 }
 
 /// Whose access a completed setup flow yields.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SetupProfileActor {
     /// The signed-in person themselves. Reads are bounded by what they can already see.
@@ -115,7 +115,7 @@ pub enum SetupProfileActor {
 }
 
 /// One operation in a provider's descriptive catalog index.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CatalogOperationSummary {
     /// Stable operation id.
@@ -131,7 +131,7 @@ pub struct CatalogOperationSummary {
 }
 
 /// Complete descriptive provider projection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderDescription {
     /// Provider summary.
@@ -141,7 +141,7 @@ pub struct ProviderDescription {
 }
 
 /// Successful catalog result.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CatalogResult {
     /// One stable search page.
@@ -157,7 +157,7 @@ pub enum CatalogResult {
 }
 
 /// Closed response status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     /// A result is present.
@@ -167,7 +167,7 @@ pub enum ResponseStatus {
 }
 
 /// One owner-safe catalog refusal.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CatalogError {
     /// Stable refusal code.
@@ -177,7 +177,7 @@ pub struct CatalogError {
 }
 
 /// One catalog response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResponseEnvelope {
     /// Exact protocol identity.

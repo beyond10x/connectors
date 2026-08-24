@@ -1,6 +1,7 @@
 //! Drift tests for the committed OpenAPI contract served at `/openapi.json` (S-067).
 //!
-//! The document is an authored artifact, not a projection, so these tests are what keep it
+//! The served document's envelope schemas are generated from the `protocol` payload structs;
+//! the skeleton (paths, examples, MCP, error body) is authored, so these tests are what keep it
 //! honest: every embedded request example must be accepted by the exact protocol type the
 //! route deserializes with, every refusal example must name a code the protocol's closed
 //! error vocabulary actually contains, and every documented route must exist in the real
@@ -18,7 +19,9 @@ use sha2::Digest as _;
 use super::*;
 
 /// The exact bytes `docs.rs` embeds and the route serves verbatim.
-const DOC: &str = include_str!("../docs/openapi.json");
+fn doc_json() -> &'static str {
+    crate::hosted::docs::document_json()
+}
 
 /// The five envelope endpoints and how many distinct request examples each must carry —
 /// one per method in the closed set, so a method the document forgets fails here.
@@ -40,7 +43,7 @@ fn test_router() -> Router {
 }
 
 fn document() -> Value {
-    serde_json::from_str(DOC).expect("the committed OpenAPI document is JSON")
+    serde_json::from_str(doc_json()).expect("the committed OpenAPI document is JSON")
 }
 
 /// Every named example under one media-type `examples` object, as `(name, value)` pairs.
@@ -137,7 +140,7 @@ async fn openapi_json_is_served_verbatim_with_a_content_hash_etag() {
         .expect("bounded body");
     assert_eq!(
         body.as_ref(),
-        DOC.as_bytes(),
+        doc_json().as_bytes(),
         "the served document is the committed artifact, byte for byte"
     );
     let digest = sha2::Sha256::digest(body.as_ref());
@@ -210,25 +213,18 @@ fn every_documented_refusal_example_names_a_real_error_code() {
                         let error =
                             serde_json::from_value::<protocol::catalog::CatalogError>(error)
                                 .unwrap_or_else(|error| refused(error.to_string()));
-                        // The catalog code is an open string on the wire; the hosted route
-                        // produces exactly these four, and the document's enum must agree.
-                        let documented = doc["components"]["schemas"]["catalog.error"]
-                            ["properties"]["code"]["enum"]
-                            .as_array()
-                            .expect("the document closes the catalog error codes")
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .collect::<BTreeSet<_>>();
-                        assert_eq!(
-                            documented,
-                            BTreeSet::from([
-                                "protocol",
-                                "invalid_input",
-                                "not_found",
-                                "not_granted"
-                            ]),
-                            "the documented catalog codes are the ones the hosted route produces"
+                        // The catalog code is an open string on the wire (the generated
+                        // schema says so); the hosted route produces exactly these four,
+                        // and the documented refusal examples must agree.
+                        assert!(
+                            doc["components"]["schemas"]["catalog.responseEnvelope"]
+                                .pointer("/properties/code/enum")
+                                .is_none(),
+                            "the generated catalog schema keeps the wire-open code"
                         );
+                        let documented = ["protocol", "invalid_input", "not_found", "not_granted"]
+                            .into_iter()
+                            .collect::<BTreeSet<_>>();
                         documented.contains(error.code.as_str())
                             || refused(format!("`{}` is outside the documented enum", error.code))
                     }
@@ -578,30 +574,24 @@ async fn the_docs_page_links_the_contract_and_renders_its_version() {
 async fn the_docs_page_refusal_table_carries_every_documented_code() {
     let doc = document();
     let page = docs_page().await;
-    let schemas = doc["components"]["schemas"]
-        .as_object()
-        .expect("the document declares schemas");
-    let mut families = 0usize;
-    for (name, schema) in schemas {
-        let Some(codes) = schema
-            .pointer("/properties/code/enum")
-            .and_then(Value::as_array)
-        else {
-            continue;
-        };
-        families += 1;
+    // The closed vocabularies surface as generated enums inside the response
+    // envelopes; the catalog code is wire-open, so its row carries the four codes
+    // the documented refusal examples name. Same extraction the page renderer uses.
+    let rows = crate::hosted::docs::refusal_rows_for_tests(&doc);
+    assert_eq!(
+        rows.len(),
+        5,
+        "the refusal table stays one row per envelope endpoint"
+    );
+    for (family, codes) in rows {
+        assert!(!codes.is_empty(), "`{family}` documents at least one code");
         for code in codes {
-            let code = code.as_str().expect("a documented code is a string");
             assert!(
                 page.contains(&format!("<code>{code}</code>")),
-                "the refusal table misses `{code}` from `{name}`"
+                "the refusal table misses `{code}` from `{family}`"
             );
         }
     }
-    assert_eq!(
-        families, 5,
-        "the closed error vocabularies stay one per envelope endpoint"
-    );
 }
 
 #[tokio::test]
