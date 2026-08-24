@@ -4,7 +4,7 @@ mod tests {
 
     use super::*;
     use connector_secrets::{MemoryStore, StoreError};
-    use monitoring_model::PROMETHEUS_QUERY_RANGE;
+    use monitoring_model::{GRAFANA_DASHBOARDS_LIST, PROMETHEUS_QUERY_RANGE};
     use protocol::connection::ConnectSessionState;
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
     use tokio::net::UnixStream;
@@ -61,7 +61,14 @@ mod tests {
             _connection_ref: &str,
             request: Request,
         ) -> Result<Value, MonitoringError> {
-            let output = if request.url.contains("/api/datasources")
+            let output = if request.url.contains("/apis/dashboard.grafana.app/") {
+                serde_json::json!({
+                    "items": [
+                        {"metadata": {"name": "abc123"}, "spec": {"title": "CPU", "tags": ["infra"]}}
+                    ],
+                    "metadata": {}
+                })
+            } else if request.url.contains("/api/datasources")
                 && !request.url.contains("/proxy/")
             {
                 serde_json::json!([
@@ -263,6 +270,165 @@ alertmanager = "grant:alertmanager"
             ConnectionState::Degraded
         );
         assert!(backend.inner.materialize(&observation_ref).is_err());
+    }
+
+    /// S-064: the required-only input the document publishes — `namespace` alone, no cursor,
+    /// no limit — passes validation, plans HttpV1, and dispatches to the parent Grafana. The
+    /// dispatch reaching the executor is the proof the wired operation document is
+    /// HttpV1-dispatchable, so an `unavailable` answered live can only come from the HTTP
+    /// exchange itself, never from the toolset or document wiring.
+    #[tokio::test]
+    async fn dashboards_list_dispatches_the_documents_required_only_input_over_http() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let executor = Arc::new(FakeExecutor::default());
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let backend = MonitoringBackend::with_executor(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            credential_ref.clone(),
+            Arc::clone(&executor),
+        );
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        });
+        store
+            .put(&credential_ref, &Secret::new("SENTINEL-NOT-A-REAL-SECRET"))
+            .await
+            .unwrap();
+
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+        let result = backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
+                    connection_ref: "connection:grafana:test".to_owned(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({"namespace": "default"}),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Invoke(invocation) = result else {
+            panic!("expected invocation")
+        };
+        assert_eq!(invocation.output["dashboards"][0]["uid"], "abc123");
+
+        let requests = lock(&executor.requests);
+        let request = requests.last().unwrap();
+        // The omitted optional parameters travel nowhere: no `limit=`, no `continue=`.
+        assert_eq!(
+            request.url,
+            "https://grafana.example/apis/dashboard.grafana.app/v1/namespaces/default/dashboards"
+        );
+    }
+
+    /// S-064: integer epoch seconds ride the mediated Prometheus route end to end — the
+    /// resolver renders them into the query string exactly as the vendor API reads them.
+    #[tokio::test]
+    async fn prometheus_range_accepts_integer_epoch_seconds_on_the_mediated_route() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let executor = Arc::new(FakeExecutor::default());
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let store = Arc::new(MemoryStore::new());
+        let credential_store: Arc<dyn SecretStore> = store.clone();
+        let backend = MonitoringBackend::with_executor(
+            owner.clone(),
+            policy(),
+            root.path(),
+            credential_store,
+            credential_ref.clone(),
+            Arc::clone(&executor),
+        );
+        let parent = ParentConnection {
+            connection_ref: "connection:grafana:test".to_owned(),
+            label: "Infrastructure Grafana".to_owned(),
+        };
+        let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
+        let output = backend
+            .inner
+            .execute_direct(
+                &owner,
+                &parent,
+                &token,
+                operation_document(GRAFANA_DATASOURCES_LIST).unwrap(),
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        backend
+            .inner
+            .reconcile_observations(&parent.connection_ref, &output)
+            .unwrap();
+        lock(&backend.inner.state).parent = Some(parent);
+        store.put(&credential_ref, &token).await.unwrap();
+        let observations = backend.inner.search_observations("", 64);
+        let prometheus = observations
+            .iter()
+            .find(|observation| observation.observed_type == "prometheus")
+            .unwrap();
+        let child = backend
+            .inner
+            .materialize(&prometheus.observation_ref)
+            .unwrap();
+
+        let described = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = described else {
+            panic!("expected description")
+        };
+        backend
+            .handle(
+                &owner,
+                OperationRequest::Invoke(InvokeRequest {
+                    operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
+                    connection_ref: child.summary.connection_ref.clone(),
+                    description_ref: description.description_ref,
+                    input: serde_json::json!({
+                        "query": "up",
+                        "start": 1_756_000_000_u64,
+                        "end": 1_756_003_600_u64,
+                        "step": 60
+                    }),
+                    approval_evidence_ref: None,
+                }),
+            )
+            .await
+            .unwrap();
+
+        let requests = lock(&executor.requests);
+        let query = requests.last().unwrap();
+        assert!(query.url.contains("start=1756000000"), "{}", query.url);
+        assert!(query.url.contains("end=1756003600"), "{}", query.url);
+        assert!(query.url.contains("step=60"), "{}", query.url);
     }
 
     #[tokio::test]

@@ -191,46 +191,86 @@ pub fn validate_input(operation: &str, input: &Value) -> Result<(), OperationErr
         return Err(invalid());
     }
     let object = input.as_object().ok_or_else(invalid)?;
-    let expected = operation_document(operation)
-        .ok_or_else(not_found)?
+    let document = operation_document(operation).ok_or_else(not_found)?;
+    // The document is the contract (S-064): nothing undeclared enters, every parameter it
+    // marks required arrives, and one it marks omittable may simply be left out. The former
+    // exact-key-set check silently required every optional parameter — a cursor a caller had
+    // to invent as `""` — and refused inputs the document itself admits.
+    let declared = document
         .caller_parameters()
         .into_iter()
         .collect::<BTreeSet<_>>();
-    if object.len() != expected.len() || object.keys().any(|key| !expected.contains(key.as_str())) {
+    if object.keys().any(|key| !declared.contains(key.as_str())) {
         return Err(invalid());
     }
-    let string = |name: &str, maximum: usize| {
-        object
-            .get(name)
-            .and_then(Value::as_str)
-            .is_some_and(|value| {
-                !value.is_empty() && value.len() <= maximum && !value.contains('\0')
-            })
+    let omittable = document.caller_omittable_parameters();
+    if declared
+        .iter()
+        .any(|name| !omittable.contains(*name) && !object.contains_key(*name))
+    {
+        return Err(invalid());
+    }
+    // A required parameter is present by the check above; an omittable one passes only while
+    // absent or valid — absence and `null` are not the same spelling here, deliberately, so a
+    // caller who sends `null` learns the contract instead of silently dropping a field.
+    let string = |name: &str, maximum: usize| match object.get(name) {
+        None => true,
+        Some(value) => value.as_str().is_some_and(|value| {
+            !value.is_empty() && value.len() <= maximum && !value.contains('\0')
+        }),
+    };
+    // A Prometheus range bound, as the vendor API reads it: `rfc3339 | unix_timestamp` for
+    // `start`/`end` and `duration | float` for `step` — so unsigned integer epoch seconds
+    // (and integer seconds for `step`) are accepted beside the string spellings.
+    let epoch_or_string = |name: &str, maximum: usize| {
+        string(name, maximum) || object.get(name).and_then(Value::as_u64).is_some()
     };
     let valid = match operation {
         GRAFANA_DASHBOARDS_LIST => {
             string("namespace", 256)
-                && object
-                    .get("limit")
-                    .and_then(Value::as_u64)
-                    .is_some_and(|limit| (1..=1000).contains(&limit))
-                && object
-                    .get("continue")
-                    .and_then(Value::as_str)
-                    .is_some_and(|value| value.len() <= 4096 && !value.contains('\0'))
+                && object.get("limit").is_none_or(|limit| {
+                    limit
+                        .as_u64()
+                        .is_some_and(|limit| (1..=1000).contains(&limit))
+                })
+                && object.get("continue").is_none_or(|value| {
+                    value
+                        .as_str()
+                        .is_some_and(|value| value.len() <= 4096 && !value.contains('\0'))
+                })
         }
         GRAFANA_DASHBOARD_GET => string("namespace", 256) && string("uid", 256),
-        GRAFANA_DATASOURCES_LIST | ALERTMANAGER_ALERTS_LIST => object.is_empty(),
+        // Both declare no caller parameters, so the declared-key check above already refused
+        // anything but the empty object.
+        GRAFANA_DATASOURCES_LIST | ALERTMANAGER_ALERTS_LIST => true,
         PROMETHEUS_QUERY_RANGE => {
+            if !(epoch_or_string("start", 64)
+                && epoch_or_string("end", 64)
+                && (string("step", 64)
+                    || object
+                        .get("step")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|step| step >= 1)))
+            {
+                return Err(invalid_encoding(
+                    "prometheus start and end take unix epoch seconds (as integer or string) \
+                     or an RFC3339 string; step takes a PromQL duration string or integer \
+                     seconds",
+                ));
+            }
             string("query", 8 * 1024)
-                && string("start", 64)
-                && string("end", 64)
-                && string("step", 64)
         }
         LOKI_QUERY_RANGE => {
+            // Loki reads a bare integer as unix *nanoseconds*, so integer epoch seconds would
+            // silently query 1970 — the bounds stay strings and the refusal says so.
+            if !(string("start", 64) && string("end", 64)) {
+                return Err(invalid_encoding(
+                    "loki start and end are strings — an RFC3339 timestamp or a unix epoch \
+                     spelled as Loki reads it; bare integers are refused because Loki parses \
+                     them as nanoseconds",
+                ));
+            }
             string("query", 8 * 1024)
-                && string("start", 64)
-                && string("end", 64)
                 && object
                     .get("limit")
                     .and_then(Value::as_u64)
@@ -289,4 +329,95 @@ fn invalid() -> OperationError {
         "monitoring operation input is invalid",
         false,
     )
+}
+
+/// An `invalid_input` refusal that names the expected timestamp encoding (S-064) — the
+/// anonymous refusal left a caller guessing which of four fields was wrong and how.
+fn invalid_encoding(message: &str) -> OperationError {
+    OperationError::new(OperationErrorCode::InvalidInput, message, false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// S-064: the validator admits exactly the document's contract. `grafana-dashboards-list`
+    /// declares `namespace` required and `limit`/`continue` omittable, so the required-only
+    /// input passes and the full input still passes.
+    #[test]
+    fn the_validator_admits_the_documents_required_only_input() {
+        assert_eq!(
+            validate_input(GRAFANA_DASHBOARDS_LIST, &json!({"namespace": "default"})),
+            Ok(())
+        );
+        assert_eq!(
+            validate_input(
+                GRAFANA_DASHBOARDS_LIST,
+                &json!({"namespace": "default", "limit": 100, "continue": "abc"})
+            ),
+            Ok(())
+        );
+    }
+
+    /// What refusal enforced before stays refused: a missing required parameter, an
+    /// undeclared key, and a violated bound are each still `invalid_input`.
+    #[test]
+    fn the_validator_still_refuses_outside_the_documents_contract() {
+        for input in [
+            json!({}),
+            json!({"limit": 100, "continue": ""}),
+            json!({"namespace": "default", "page": 2}),
+            json!({"namespace": "default", "limit": 0}),
+        ] {
+            let refused = validate_input(GRAFANA_DASHBOARDS_LIST, &input).unwrap_err();
+            assert_eq!(refused.code, OperationErrorCode::InvalidInput, "{input}");
+        }
+    }
+
+    /// S-064: unix epoch seconds are the natural client encoding for a Prometheus range
+    /// query, and the vendor API takes them beside RFC3339 strings — so the validator does
+    /// too, for `start`, `end` and (as integer seconds) `step`.
+    #[test]
+    fn prometheus_timestamps_accept_integer_epoch_seconds_beside_strings() {
+        assert_eq!(
+            validate_input(
+                PROMETHEUS_QUERY_RANGE,
+                &json!({
+                    "query": "up",
+                    "start": 1_756_000_000_u64,
+                    "end": 1_756_003_600_u64,
+                    "step": 60
+                })
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            validate_input(
+                PROMETHEUS_QUERY_RANGE,
+                &json!({"query": "up", "start": "1756000000", "end": "now", "step": "60s"})
+            ),
+            Ok(())
+        );
+    }
+
+    /// Loki reads a bare integer as unix *nanoseconds*, so an integer epoch-seconds value
+    /// would silently query 1970. It stays refused — and the refusal names the expected
+    /// encoding instead of the old anonymous `invalid_input`.
+    #[test]
+    fn loki_timestamps_stay_strings_and_the_refusal_names_the_encoding() {
+        let refused = validate_input(
+            LOKI_QUERY_RANGE,
+            &json!({
+                "query": "{app=\"web\"}",
+                "start": 1_756_000_000_u64,
+                "end": "now",
+                "limit": 100,
+                "direction": "backward"
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(refused.code, OperationErrorCode::InvalidInput);
+        assert!(refused.message.contains("RFC3339"), "{}", refused.message);
+    }
 }
