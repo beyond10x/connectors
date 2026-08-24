@@ -5,7 +5,7 @@ set -euo pipefail
 config_root="${XDG_CONFIG_HOME:-${HOME}/.config}/b10x"
 config="${B10X_BOT_CONFIG:-${config_root}/b10x-bot.json}"
 key="${B10X_BOT_KEY:-${config_root}/b10x-bot.private-key.pem}"
-org="${B10X_BOT_ORG:-b10x}"
+org="${B10X_BOT_ORG:-beyond10x}"
 
 script_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 python3 "${script_root}/check-bot-files.py" "$config" "$key"
