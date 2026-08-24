@@ -28,23 +28,15 @@ mod tests {
 
         async fn list_workloads(
             &self,
-            namespace: &str,
+            _namespace: &str,
             _limit: u16,
             _cursor: Option<&str>,
         ) -> Result<WorkloadList, DatasourceError> {
             Ok(WorkloadList {
                 workloads: vec![WorkloadCompact {
-                    namespace: namespace.to_owned(),
                     name: "backend".to_owned(),
-                    uid: "uid-backend".to_owned(),
-                    resource_version: "42".to_owned(),
-                    generation: 3,
-                    observed_generation: 3,
                     desired_replicas: 2,
-                    updated_replicas: 2,
                     ready_replicas: 2,
-                    available_replicas: 2,
-                    unavailable_replicas: 0,
                     rollout_state: "available".to_owned(),
                 }],
                 next_cursor: None,
@@ -62,6 +54,16 @@ mod tests {
                     .await?
                     .workloads
                     .remove(0),
+                meta: WorkloadMeta {
+                    namespace: namespace.to_owned(),
+                    uid: "uid-backend".to_owned(),
+                    resource_version: "42".to_owned(),
+                    generation: 3,
+                    observed_generation: 3,
+                    updated_replicas: 2,
+                    available_replicas: 2,
+                    unavailable_replicas: 0,
+                },
                 pods: vec![PodSummary {
                     name: format!("{name}-abc"),
                     phase: "Running".to_owned(),

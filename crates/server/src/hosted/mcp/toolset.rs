@@ -17,6 +17,7 @@ use protocol::datasource::{
     DatasourceErrorCode, DatasourcePage, DatasourceRead, DatasourceRequest, DatasourceResult,
     DescribeRequest as DatasourceDescribeRequest, ReadRequest,
     RequestEnvelope as DatasourceRequestEnvelope, ResponseEnvelope as DatasourceResponseEnvelope,
+    MAX_RESULTS,
 };
 use protocol::operation::{
     ApprovalPosture, DescribeRequest, InvokeRequest, OperationDescription, OperationError,
@@ -101,7 +102,10 @@ const TOOLSET: &[McpTool] = &[
     McpTool {
         name: "k8s_deployment_list",
         title: "List deployments in a namespace",
-        description: "List deployment rollout summaries in one admitted Kubernetes namespace.",
+        description: "List every deployment in one admitted Kubernetes namespace as minimal \
+                      rollout summaries: name, desired and ready replicas, rollout state. The \
+                      whole namespace comes back in one call, cut at 500 records with \
+                      truncated: true; read one deployment's depth with k8s_deployment_status.",
         requires: Requirement::WorkloadsBinding,
         target: Target::DatasourceList,
         input_schema: deployment_list_schema,
@@ -212,15 +216,15 @@ fn no_args_schema() -> Value {
     json!({ "type": "object", "additionalProperties": false, "properties": {} })
 }
 
+// Deliberately no paging surface (S-063): the records are minimal, the whole namespace fits,
+// and the seam's pages and cursors are the tool's implementation detail, not its contract.
 fn deployment_list_schema() -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
         "required": ["namespace"],
         "properties": {
-            "namespace": { "type": "string", "minLength": 1 },
-            "limit": { "type": "integer", "minimum": 1, "maximum": 25 },
-            "cursor": { "type": "string", "minLength": 1 }
+            "namespace": { "type": "string", "minLength": 1 }
         }
     })
 }
@@ -266,9 +270,16 @@ fn pod_logs_schema() -> Value {
 
 /// The one argument the toolset adds to every monitoring entry: which configured Connection
 /// the invoke rides. `tool_describe` narrows it to an enum of the caller's own described
-/// connection labels; it may be omitted only while exactly one Connection is configured.
+/// connection labels — and lists it in `required` while several are configured, because the
+/// resolver refuses a target-less call then; it may be omitted only while exactly one
+/// Connection is configured.
 fn target_property() -> Value {
-    json!({ "type": "string", "minLength": 1 })
+    json!({
+        "type": "string",
+        "minLength": 1,
+        "description": "Which configured target Connection to ride, by label. Required while \
+                        several targets are configured; omittable only while exactly one is."
+    })
 }
 
 fn target_only_schema() -> Value {
@@ -279,20 +290,35 @@ fn target_only_schema() -> Value {
     })
 }
 
-// The monitoring argument shapes below mirror `monitoring-model`'s published input contract
-// exactly — every caller parameter present, with its validated bounds — so a schema-valid
+// The monitoring argument shapes below mirror each operation's canonical document exactly —
+// every caller parameter present with its validated bounds, and `required` listing only what
+// the document (and therefore `monitoring-model`'s validator) requires — so a schema-valid
 // call is an input-valid invocation and nothing is defaulted on the caller's behalf.
+// `tool_describe` then adds the caller-moment truth: the `target` enum, and `target` in
+// `required` while several connections are configured.
 
 fn grafana_dashboards_list_schema() -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["namespace", "limit", "continue"],
+        "required": ["namespace"],
         "properties": {
             "target": target_property(),
-            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
-            "continue": { "type": "string", "maxLength": 4096 }
+            "namespace": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Grafana organization namespace. For the default organization \
+                                this is `default`."
+            },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": 1000,
+                "description": "Maximum number of dashboards to return in this page."
+            },
+            "continue": {
+                "type": "string", "maxLength": 4096,
+                "description": "Opaque continuation token returned by an earlier page. Omit \
+                                it for the first page."
+            }
         }
     })
 }
@@ -304,8 +330,17 @@ fn grafana_dashboard_get_schema() -> Value {
         "required": ["namespace", "uid"],
         "properties": {
             "target": target_property(),
-            "namespace": { "type": "string", "minLength": 1, "maxLength": 256 },
-            "uid": { "type": "string", "minLength": 1, "maxLength": 256 }
+            "namespace": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Grafana organization namespace. For the default organization \
+                                this is `default`."
+            },
+            "uid": {
+                "type": "string", "minLength": 1, "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._-]+$",
+                "description": "Dashboard UID, as returned by grafana_dashboards_list."
+            }
         }
     })
 }
@@ -318,9 +353,21 @@ fn prometheus_query_range_schema() -> Value {
         "properties": {
             "target": target_property(),
             "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
-            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "step": { "type": "string", "minLength": 1, "maxLength": 64 }
+            "start": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64,
+                "description": "Start of the range: unix epoch seconds (integer or string) \
+                                or an RFC3339 timestamp."
+            },
+            "end": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64,
+                "description": "End of the range: unix epoch seconds (integer or string) or \
+                                an RFC3339 timestamp."
+            },
+            "step": {
+                "type": ["string", "integer"], "minLength": 1, "maxLength": 64, "minimum": 1,
+                "description": "Resolution step: a PromQL duration string such as `60s`, or \
+                                integer seconds."
+            }
         }
     })
 }
@@ -333,8 +380,18 @@ fn loki_query_range_schema() -> Value {
         "properties": {
             "target": target_property(),
             "query": { "type": "string", "minLength": 1, "maxLength": 8192 },
-            "start": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "end": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "start": {
+                "type": "string", "minLength": 1, "maxLength": 64,
+                "description": "Start of the range as a string, passed verbatim to Loki: an \
+                                RFC3339 timestamp or a unix epoch as Loki reads it. Bare \
+                                integers are refused — Loki parses them as nanoseconds."
+            },
+            "end": {
+                "type": "string", "minLength": 1, "maxLength": 64,
+                "description": "End of the range as a string, passed verbatim to Loki: an \
+                                RFC3339 timestamp or a unix epoch as Loki reads it. Bare \
+                                integers are refused — Loki parses them as nanoseconds."
+            },
             "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
             "direction": { "enum": ["forward", "backward"] }
         }
@@ -493,6 +550,19 @@ pub(super) async fn tool_describe(
                     .map(|connection| Value::String(connection.label.clone()))
                     .collect(),
             );
+            // And the honest `required`: with several connections configured the resolver
+            // refuses a target-less call, so the schema says so; a sole connection needs no
+            // choice and the argument stays omittable (S-064).
+            if description.connections.len() > 1 {
+                let required = &mut input_schema["required"];
+                if required.is_null() {
+                    *required = Value::Array(Vec::new());
+                }
+                required
+                    .as_array_mut()
+                    .expect("every toolset schema states required as an array")
+                    .push(Value::String("target".to_owned()));
+            }
             (
                 serde_json::to_value(description.effect).expect("closed effect vocabulary"),
                 serde_json::to_value(description.approval).expect("closed approval vocabulary"),
@@ -522,11 +592,10 @@ pub(super) async fn tool_describe(
                 json!({
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["deployments", "completeness"],
+                    "required": ["deployments", "truncated"],
                     "properties": {
                         "deployments": { "type": "array", "items": description.compact_schema },
-                        "next_cursor": { "type": "string" },
-                        "completeness": { "enum": ["complete", "partial"] }
+                        "truncated": { "type": "boolean" }
                     }
                 }),
             )
@@ -777,13 +846,21 @@ async fn list_namespaces(
 #[serde(deny_unknown_fields)]
 struct DeploymentListArgs {
     namespace: String,
-    #[serde(default)]
-    limit: Option<u16>,
-    #[serde(default)]
-    cursor: Option<String>,
 }
 
-/// `k8s_deployment_list`: one bounded compact read through the namespace's binding.
+/// Records one deployment listing may aggregate before it is cut with `truncated: true`. The
+/// minimal record is ~10^2 bytes, so 500 keep the doubled MCP payload (text block plus
+/// `structuredContent`) around 200 KiB — inside the transport's accepted worst case — while a
+/// pathological namespace is never walked without bound.
+const MAX_DEPLOYMENT_LIST_RECORDS: usize = 500;
+/// Seam pages one listing may spend. Twice what the record cap implies at full pages, because
+/// the seam may legally answer short pages; running out of pages also cuts with
+/// `truncated: true`.
+const MAX_DEPLOYMENT_LIST_PAGES: usize = 40;
+
+/// `k8s_deployment_list`: the whole namespace as minimal compact records (S-063). The seam's
+/// bounded pages and opaque cursors are walked here, server-side — the caller sees no paging
+/// surface, only the aggregated listing and an explicit truncation marker when a cap cut it.
 async fn list_deployments(
     state: &HostedState,
     principal: &HostedPrincipal,
@@ -794,43 +871,46 @@ async fn list_deployments(
         Ok(args) => args,
         Err(refused) => return refused,
     };
-    let limit = args.limit.unwrap_or(25);
-    if !(1..=25).contains(&limit) {
-        return invalid_args("limit must be between 1 and 25".to_owned());
-    }
     let binding = match namespace_binding(state, principal, request_id, &args.namespace).await {
         Ok(binding) => binding,
         Err(refused) => return refused,
     };
-    let page = match workloads_read(
-        state,
-        principal,
-        request_id,
-        &binding,
-        DatasourceRead::List {
-            limit,
-            cursor: args.cursor,
-        },
-    )
-    .await
-    {
-        Ok(page) => page,
-        Err(refused) => return refused,
+    let mut deployments: Vec<Value> = Vec::new();
+    let mut cursor: Option<String> = None;
+    let mut pages = 0_usize;
+    let truncated = loop {
+        let page = match workloads_read(
+            state,
+            principal,
+            request_id,
+            &binding,
+            DatasourceRead::List {
+                limit: MAX_RESULTS,
+                cursor: cursor.take(),
+            },
+        )
+        .await
+        {
+            Ok(page) => page,
+            Err(refused) => return refused,
+        };
+        pages += 1;
+        deployments.extend(page.records.into_iter().map(|record| record.value));
+        match page.next_cursor {
+            None => break false,
+            Some(_)
+                if deployments.len() >= MAX_DEPLOYMENT_LIST_RECORDS
+                    || pages >= MAX_DEPLOYMENT_LIST_PAGES =>
+            {
+                break true
+            }
+            Some(next) => cursor = Some(next),
+        }
     };
-    let deployments: Vec<Value> = page
-        .records
-        .into_iter()
-        .map(|record| record.value)
-        .collect();
-    let mut listed = json!({
+    success(&json!({
         "deployments": deployments,
-        "completeness": serde_json::to_value(page.completeness)
-            .expect("closed completeness vocabulary"),
-    });
-    if let Some(cursor) = page.next_cursor {
-        listed["next_cursor"] = Value::String(cursor);
-    }
-    success(&listed)
+        "truncated": truncated,
+    }))
 }
 
 #[derive(Deserialize)]
