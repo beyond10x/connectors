@@ -6,8 +6,8 @@ COPY . .
 # cached artifact built later than a newer archive can otherwise look fresh to Cargo even when its
 # source bytes changed. Refresh only workspace inputs (never the mounted target tree) before Cargo's
 # freshness check so the image attests the code from SOURCE_SHA, not a stale local crate artifact.
-RUN --mount=type=cache,id=b10x-cargo-registry,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=b10x-cargo-git,target=/usr/local/cargo/git \
+RUN --mount=type=cache,id=b10x-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=b10x-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=b10x-connectors-target,target=/src/crates/connectors-cli/target,sharing=locked \
     find crates -path '*/target' -prune -o -type f -exec touch {} + && \
     cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked --release && \
