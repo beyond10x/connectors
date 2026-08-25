@@ -9,7 +9,12 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
-## Unreleased
+## 0.2.1 — 2026-08-25
+
+No product change: `crates/`, `providers/`, `specs/` and `catalog/` are byte-identical to `0.2.0`
+apart from the `generator` string every artifact carries. This release is CI, tooling and the
+security baseline. The version moved anyway because the version *is* the artifact identity — there
+is no way to ship a `generator` that says `0.2.1` without cutting one.
 
 ### Added
 
@@ -37,7 +42,23 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
   that would drift.
 - `scripts/check-local-identity-refused.sh` now holds the release workflow to the same rule it
   already held the Dockerfile to: no Cargo feature is selected for a build that ships. The image was
-  the only such build when that guard was written; a tag now attaches archives for five targets.
+  the only such build when that guard was written; a tag now attaches archives for four targets.
+- **History was rewritten** to remove a former brand from commit authorship, messages, paths and
+  blobs across all 254 commits, and again to remove a named individual's work address from the one
+  commit that carried it. Verified both times by the rewritten `HEAD` tree being byte-identical to
+  the original — every substitution had to be a no-op there, and was. Every clone predating
+  `2026-08-25` is incompatible and must be re-cloned.
+- `.gitleaksignore` regenerated twice as a consequence: a fingerprint names a commit, so a rewrite
+  invalidates every entry whose commit it touched. All 87 findings were reclassified from scratch
+  rather than carried over by count. `scripts/check-secrets.sh` had been failing since `4520cf47`
+  and now exits 0.
+- `scripts/vendor-babelforce-specs.sh` no longer writes out the address it exists to scrub. The
+  script already declined to name two AWS account ids for that reason; the rule now applies to a
+  person's name too.
+- AGENTS.md gains what this cycle taught: that the gate does not fit on one machine, that an offline
+  check still needs a populated registry, what a version cut actually rewrites, why the published
+  targets are Unix only, and how to rewrite history and rebaseline the secret scan without
+  measuring it circularly.
 
 ## 0.2.0 — 2026-08-25
 

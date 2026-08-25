@@ -6,20 +6,20 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "4f3ab260373987d66294510c139a888819c9b459e92ab75282fa199f045405b7"
+sha256 = "2930be3a65822ff6b2311b075b6d9477ef18f5d59abdb176f650b6d7eefdf705"
 
 [[provider]]
 id = "airtable"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "be9421f8ea60be77952d4d1a2587636d1328fccc3dd86dd48292c0d2a2771d4c"
 ir_sha256 = "5f2374b87646f8ac4579df789c27d22c5b7f7877bd07b5ed9305d9a0269262a8"
 
 [provider.artifacts]
-"catalog/airtable.catalog.json" = "85b6073c8de10bd0ca230ed3f9aa88872c19ba7393c3367c0d9903dd6342d788"
+"catalog/airtable.catalog.json" = "3ae4b156512ba0e96903689f805eff759e4c141c20f250c8138a72b273d4e060"
 
 [[provider]]
 id = "alertmanager"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://github.com/prometheus/alertmanager/blob/v0.31.0/api/v2/openapi.yaml"
 upstream_version = "0.31.0"
 spec_sha256 = "0fac1b1f2f114187c5688793df7b494707560fbd8eb676bf34cbaaa0ff11a749"
@@ -33,20 +33,20 @@ upstream_version = "0.31.0"
 sha256 = "0fac1b1f2f114187c5688793df7b494707560fbd8eb676bf34cbaaa0ff11a749"
 
 [provider.artifacts]
-"catalog/alertmanager.catalog.json" = "96f016ae30a202c0e50c7ab1c90bcabbb06e443fde359c5a065bc9074390edac"
+"catalog/alertmanager.catalog.json" = "5d8e0f4a9a18ef15c45fca59acefdced6dfa86c2db9788e264138eeb34dce9a4"
 
 [[provider]]
 id = "algolia"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "c18e5a55835d814e5e4210e8d90ebaf14b50129e6034190cea698b16438f31a8"
 ir_sha256 = "870da3accccdb6cbc72dd0100b3e611cafd631c72fcb4eb1a5331a5113f0d9cc"
 
 [provider.artifacts]
-"catalog/algolia.catalog.json" = "0fdec25823a5c34120591d88f4168171ee24ca72b38108a996c93c19c35ee72d"
+"catalog/algolia.catalog.json" = "3a24a2b5195acd0c3bd99a9131e9ca64a91686e7c402de471c1a6df246619bc2"
 
 [[provider]]
 id = "anthropic"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "b1620d7d689cf3e0ebdac000e8f41bc088f27a2c60dffeb7a07c93799567caba"
 ir_sha256 = "05a5a2dfc247c1829a064de696ecb1c95891f3ba4fb212aa540bcaa5a1ec71b2"
 
@@ -63,11 +63,11 @@ upstream_version = "2023-06-01"
 sha256 = "3458dbfb0c31150dbd6a601abb90f4b814bc5f122bdb717f0f8f05c2b0e37e21"
 
 [provider.artifacts]
-"catalog/anthropic.catalog.json" = "e92aba4bbec5a7987bec3b64292e035cc800e9f1569d8e24e98cca08e815a2c6"
+"catalog/anthropic.catalog.json" = "629144e190cede8e32a6a33534c39f67aebd3dfc79d9ab518aa6f20a88d99637"
 
 [[provider]]
 id = "argocd"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://github.com/argoproj/argo-cd/blob/v3.5.1/assets/swagger.json"
 upstream_version = "v3.5.1"
 spec_sha256 = "40e89ee14ee598c816358d92d0682e92b4723701da664ebaae1c4988fe37303d"
@@ -81,20 +81,20 @@ upstream_version = "v3.5.1"
 sha256 = "40e89ee14ee598c816358d92d0682e92b4723701da664ebaae1c4988fe37303d"
 
 [provider.artifacts]
-"catalog/argocd.catalog.json" = "dbff94cb59d582f8ae941c51482e4457c398233a7c5f84dd2c408a976b79b256"
+"catalog/argocd.catalog.json" = "f5982639ed8911000686382da8972726b55d361f62969551dff8f4a058989315"
 
 [[provider]]
 id = "asana"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "ef9cf99b50dc5cc0654b2314455dcb61cf4f812921b5e6ebe09fcc0368367b38"
 ir_sha256 = "21af0bddb2ee8cedb5393870e297554f71c4ee673e5a987eb295005360b3bd1e"
 
 [provider.artifacts]
-"catalog/asana.catalog.json" = "d9b3f28d41d734c04ffc1e7d797979b1ae6de94b4483eeaa581d8313151d4ad7"
+"catalog/asana.catalog.json" = "ee323deb008807ddac4ed9cc34099a96fd068726a69f12cbd3f2697f59437317"
 
 [[provider]]
 id = "asterisk"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://github.com/asterisk/asterisk/tree/f0e408a7b0d829c85bf15fa4b487870a50cb3000/rest-api"
 upstream_version = "22.10.1"
 spec_sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
@@ -108,11 +108,11 @@ upstream_version = "22.10.1"
 sha256 = "7ea540678f8f9930d5582161c7cb0dc1cbf09674c2bc5b5466f94c854210f53e"
 
 [provider.artifacts]
-"catalog/asterisk.catalog.json" = "45b8795c2442c692117b312ca35c2574f8f17f988cb1ff9eb75d9cadd97e49c3"
+"catalog/asterisk.catalog.json" = "2594d9d08c0a5eade8bd3f9777ceb9b46101d87f19000e44a4e784fc7d66f8e3"
 
 [[provider]]
 id = "b10x"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9"
 ir_sha256 = "6122c1095395f786e3e399548445d361b07728084c5859b722746214a4c13c03"
 
@@ -159,11 +159,11 @@ upstream_version = "planner module v1 at b10x/modules 719a8a321ee9828332b002f4b7
 sha256 = "6741dad97fb4c5a53ed2b2e48a7c53f699638644fb75c64346ff7b60b0d419fc"
 
 [provider.artifacts]
-"catalog/b10x.catalog.json" = "b0794c9fe335ca1473bba3b6e9588a34fde3295abbdfc5bf712d4bf3c49974d7"
+"catalog/b10x.catalog.json" = "708b9f1a1b5402748d3f8de5ac25b1729e21e3778c1865f031e68987c24731c0"
 
 [[provider]]
 id = "babelforce"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "beac91fc41d4f541c2853a1b10f757d5156a1300840250241d0c75772a8efd9d"
 ir_sha256 = "04f6f7abd00afd21b41a1bd9c3f42443d9e7f13c511c5eecbc9b0ad9a0fa107c"
 
@@ -192,146 +192,146 @@ upstream_version = "3.63.10"
 sha256 = "031327359000bd70d6b2ab012868971cc834812e5f61f5157531e7cb5daa4d85"
 
 [provider.artifacts]
-"catalog/babelforce.catalog.json" = "64da1888bf173e584d69b49642a2319a5e63fa475d94c812714366acfa81bbff"
+"catalog/babelforce.catalog.json" = "b5c95bbeaa21dcb702c535c9276cfa8ead188ff8e807dcebf4a9813ee569e248"
 
 [[provider]]
 id = "bitbucket"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "39b18f7e55ca78a912993ef7220891c9aee63d18c13460639978107e9ca6ed44"
 ir_sha256 = "ba3f94ed5fe5d3562d6958e69675a248750323c37acca708bc36b58e45cb5de8"
 
 [provider.artifacts]
-"catalog/bitbucket.catalog.json" = "591f6493cc75c0b82cb0a66a6edbcdb2ca4ae155233a32746ef70da02525f454"
+"catalog/bitbucket.catalog.json" = "9f4c80df44f1f43ec05ee6e332009b7a2a479ea5fec54ce1ba710202dff93ae6"
 
 [[provider]]
 id = "box"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "1537304fa3c0e9597e527dcaa9a7c46b699307918d14d27ba999a7bcc50333ad"
 ir_sha256 = "39dfbd08f3aa229e26f2dd21be5670e7fbb23bddc9d3c220c994badebb589b13"
 
 [provider.artifacts]
-"catalog/box.catalog.json" = "42facbc2b964e87756b3666e2c914345b45fd1787c9be44afa7783facb70bcea"
+"catalog/box.catalog.json" = "90aa05c5f40b3a666eea78ece8f6eacc51d1c3fbdaeffb2dc89b4dde1ed91c85"
 
 [[provider]]
 id = "calendly"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "3b66cdb86f218ff60d61b25d49039c882ebc2e0592107b5eb0e6d2cbbf1390e2"
 ir_sha256 = "cd852640b0ca764c90325440a2889e2a179ea4472686ba194d989e022177ebd2"
 
 [provider.artifacts]
-"catalog/calendly.catalog.json" = "0aa7d0bdd4e7ad384c4f54c32e836eba3a5037d5e9d3e4ec98ef3b9ad7d2415b"
+"catalog/calendly.catalog.json" = "d7169f3cfed641b4370a345e830750fde48712018f570b0aebab121efbc784c9"
 
 [[provider]]
 id = "clickup"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "335681cd335e7ccafd26060afc665245460a21fc05754f71c850c7551f7edd78"
 ir_sha256 = "f1c8af389f85347d521f52732753b4450e1edacbad14f10c2e2bb1d5132e5471"
 
 [provider.artifacts]
-"catalog/clickup.catalog.json" = "ff6c067c6d15c8f1c6514e74e259457597abd8d20f59ad7f9b29b1c4e62e556b"
+"catalog/clickup.catalog.json" = "135bb0c9270817e12e2bbdc7e84d24a2429beaeca378e67f7ba19b86cd15244b"
 
 [[provider]]
 id = "cloudflare"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "11e77a64a05c8248253073349aff3ca4aa3b63203d1f04a9401192c770915f0f"
 ir_sha256 = "5ec8959f98f8d96a333885e8b13966652059949c6aa23a7b06d25e6fc07d6ddd"
 
 [provider.artifacts]
-"catalog/cloudflare.catalog.json" = "047cfc624130d87ef6b61f46641fd92cc0174dd0a262de030ceb14da7a045080"
+"catalog/cloudflare.catalog.json" = "486cbc5302957e7d091834fa5d99af400b9a4f8a7a7ba984a51c4c0f6714e0f4"
 
 [[provider]]
 id = "confluence"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "f140f430c8c20fdf15cbcdd2af6396648e923fb9763af6cf57abc153f572ace3"
 ir_sha256 = "83701fe1a6494075bbe6debaa859cf21204a5bce3957095abfb0fa8b33a2dd0e"
 
 [provider.artifacts]
-"catalog/confluence.catalog.json" = "c1bf637b4172dab9b030347c3ec9aa28c22db91e0ac8732d2722906ec982056c"
+"catalog/confluence.catalog.json" = "8862476eb1ee8d05fe5886d382407264f71d49b0025d5c2cd1448b1b65ccd8e8"
 
 [[provider]]
 id = "contentful"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "240055e8bf27bdb3c597940ff04ff6007b4981f33f45fb462f2e2b23d38a8206"
 ir_sha256 = "20e6370c75a10fdf3ff12cd5fcb1558785a76e9bd99f853dabb547a80e0c8f7b"
 
 [provider.artifacts]
-"catalog/contentful.catalog.json" = "79185af8ba014d7d4467901216138fff361a24f804fc54d3bc5bca48a84913be"
+"catalog/contentful.catalog.json" = "b6a4ee8001b3f205929a0346080eed6140efabf19a2cee4d5f9ad7d51607b78a"
 
 [[provider]]
 id = "datadog"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "699352ff97763967bd5829aab97ccb08c29c21a5bcbcbacf84563be173705e87"
 ir_sha256 = "c70d27d3431340a653ae6726e1dc9785f577c7ed8bf73ae6b9bb42d3cf344588"
 
 [provider.artifacts]
-"catalog/datadog.catalog.json" = "1c44c0333f2693cf08279a3bf77f2acb8632274007327b90e5c21cf52c81a51c"
+"catalog/datadog.catalog.json" = "c323d9c39a98d1138662f62ce3be07e35912d47ea8eb76325491a0ce2a3311e0"
 
 [[provider]]
 id = "discord"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "aec1988eddb888472b61731581422b7ade9f389560971e91fca4804eeb1548a6"
 ir_sha256 = "6ca3ac2c298a10befd62bb5dd9df3007fedb0c70f7e81dc8e28e1c633e40f53e"
 
 [provider.artifacts]
-"catalog/discord.catalog.json" = "0d513d0443112828f98a88659a3a73aea20ef6c9b6bb91c533cce2e0673778f4"
+"catalog/discord.catalog.json" = "7f9bf765cae14eacc749f956eb8310adc90b6d22568547b0be2de63342d6bbb4"
 
 [[provider]]
 id = "docusign"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "6feeea7396151c7a7ae9b8c6feb317691ad6debc5ea999e19f0f7db1390dcac6"
 ir_sha256 = "1a0f8670417f32e4b2cb127f99ae47984da9a8271e150f6048f79ee447797784"
 
 [provider.artifacts]
-"catalog/docusign.catalog.json" = "0c80f698c4ebaa4c35dce963740da361784e705777d423c48ee35125015f5da7"
+"catalog/docusign.catalog.json" = "b48f5cf7bc483ea975e54823e6b447a19324008c53dfd8f5da39473e1e345524"
 
 [[provider]]
 id = "dropbox"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "e42e082740df42bd44458a787c7737034e9329dca47845fbddb781289b46c207"
 ir_sha256 = "177099c3c8d5fc0cf01d5b3571038f7ebdda04b9a0f1bc56b06419ff0b454cff"
 
 [provider.artifacts]
-"catalog/dropbox.catalog.json" = "6922962a24ab22b01f70aa78b1c501fe117e6bd3d2330067324726f770697727"
+"catalog/dropbox.catalog.json" = "65dc46e426497b7265befaab0d01439594ab8fc5f1efdb7cbd6aeff06d4a9182"
 
 [[provider]]
 id = "figma"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "201247152d530ccccf974f66988278138a1010e2e7655e9fc5c197cc59a4851e"
 ir_sha256 = "e8892d40e1f666549f73ddeb7f220840bea07639377206acb11bd9ace0554e85"
 
 [provider.artifacts]
-"catalog/figma.catalog.json" = "4bb2087cdb3813e2d18b6533c4e9d3c7bafe30c80eabb9218a3c63b0ec098032"
+"catalog/figma.catalog.json" = "a558604ad504a79481c27247515af49e5cdd0a22ae227d473e128c4412b2863d"
 
 [[provider]]
 id = "fly"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "6388740dd20f48e62fd193f848b1be751932a0e6a9cda1c2871b125311b60b05"
 ir_sha256 = "e8b9c0c3bc86083860c13c80c3e1049c613cfa5833eacb649c5e31b64924dbca"
 
 [provider.artifacts]
-"catalog/fly.catalog.json" = "c54ddd0501af486228fc244432e00ed3d500d4a0c476ba8d17eaf874caede2ec"
+"catalog/fly.catalog.json" = "868765ca912d0edb89d9b796f474e12a4187db8a9f0b3e68b79bde8199833843"
 
 [[provider]]
 id = "freshdesk"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "4aa89c55f9d7b63c7a49263d0ed6049150ade78416723502c9c38e9e71111d97"
 ir_sha256 = "610f83106133614d56a5445eafcdbfbf14ec8c03e7bf47469c5f2df6b3aca4d4"
 
 [provider.artifacts]
-"catalog/freshdesk.catalog.json" = "a84c464aa704f81e975aa95aa7c312be7950ee2a2f7b38558ffebf817bf00f0b"
+"catalog/freshdesk.catalog.json" = "3ac7a0973156b477217d4f85245f40f8c58d886674a5fc9d8179c596906d8f94"
 
 [[provider]]
 id = "front"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "6b77f14415cbe6a1fedd775092368fba3f9c27dfb18c26299adc7048e662e41c"
 ir_sha256 = "3ab0e9a0d4d66c469e7b07e8d41070c22ddbcaf7308a15b8c6daa57e2b7d580d"
 
 [provider.artifacts]
-"catalog/front.catalog.json" = "d435792277770018c35949c1f35342d698db8336f62e704109f53a77780e4b49"
+"catalog/front.catalog.json" = "886918e818768fcd02d6912d0e53e507cd3c9c31cf2d87a05e5bf430eaff7e92"
 
 [[provider]]
 id = "github"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://raw.githubusercontent.com/github/rest-api-description/5e28810649ba41b5483753ba74f976f83856a504/descriptions/api.github.com/api.github.com.2022-11-28.json"
 upstream_version = "1.1.4"
 spec_sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
@@ -346,29 +346,29 @@ upstream_version = "1.1.4"
 sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 
 [provider.artifacts]
-"catalog/github.catalog.json" = "58ced4a3b0ec3475c2221a86d1da195801aa9e4c683484b71ecb99f085728ff7"
+"catalog/github.catalog.json" = "f99fee4af6c02ac36777a174c253419c2283b29617ea2f67a32ce0e89a6ba6ea"
 
 [[provider]]
 id = "gitlab"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "f93211f68204181bd5b5419001fd207773902a829175166ad7fd7c0ad6eaff2b"
 ir_sha256 = "78a00a4e43a9079ac540ec93f0cc46107ca422d657a8f2ba2e045ed933815cd6"
 
 [provider.artifacts]
-"catalog/gitlab.catalog.json" = "ea239513d0b88853ffd3b59e07521c0e4f467eadcb314175e0c202f12b8a5d54"
+"catalog/gitlab.catalog.json" = "22e83314169234c3e2fee09565caf9b9aa45b49e8036d22297002e8ef869a262"
 
 [[provider]]
 id = "google"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "0177a0c4548f9e6b6670d89f0914ae10669bfb2ad570d208405f71b2b79f192f"
 ir_sha256 = "e27b75931e47c8876a1a8dcc7fa0cd636762afd82d4ce747dd91cc20287bd746"
 
 [provider.artifacts]
-"catalog/google.catalog.json" = "b7655a88cd79c0fc0e79cdc8572f1b5b5800a2d16d30e116fa1233f339e54c30"
+"catalog/google.catalog.json" = "b892734c430490b42834c1349bda76ee69cee7266331e362a18859e3104d650d"
 
 [[provider]]
 id = "grafana"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 upstream_version = "Grafana 12+ HTTP API"
 spec_sha256 = "14c46194403f8831e0e80562fedb28685a3d803f980d9da9a230b9f0e0d35c35"
 toml_sha256 = "53f015eaea5e5ac71e6a6f31afd2866971d43bea863021bf989eaf426f020a0a"
@@ -380,56 +380,56 @@ upstream_version = "Grafana 12+ HTTP API"
 sha256 = "14c46194403f8831e0e80562fedb28685a3d803f980d9da9a230b9f0e0d35c35"
 
 [provider.artifacts]
-"catalog/grafana.catalog.json" = "bbb18053935dfc4ac70d3dbecf955f444c6f10d39dc983a3ae96b187ada3c9a5"
+"catalog/grafana.catalog.json" = "634f66ee82a050027163126e4ed968ecc3cfcd9f3b3b83cc791cb2471be4aa8e"
 
 [[provider]]
 id = "hubspot"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "17ef962bc8812a7beebd4f58a88e6e452526c7d2f87daca228939915649ca985"
 ir_sha256 = "375e63a99f482644f7ce01cfcfb1fa60bf343068c9f0933d9f01098d149f5800"
 
 [provider.artifacts]
-"catalog/hubspot.catalog.json" = "48ef20c38f75771fec5b3eaa1da9bc1254e5e536601424e927e5d5f085779c77"
+"catalog/hubspot.catalog.json" = "2927c02e30562e89a72d2eee31973b19a58c57ad69e6e2e447011fa6946bfaff"
 
 [[provider]]
 id = "intercom"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "58e81abf84e47c99241638309ba41400bb9ba8a230ae74fd5ba554f615041ae4"
 ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 
 [provider.artifacts]
-"catalog/intercom.catalog.json" = "a2ef9bc917b5503c9025af044ccbf3d8df26bd96477ec474a3cdd05d854c5dc6"
+"catalog/intercom.catalog.json" = "ff21bb4b152ad2cc9b60b4e83de1f8e892fcaf577d8c5601d0e7883503276981"
 
 [[provider]]
 id = "jira"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "3ac215b109702decc43df8ec9a54e3926c293bca4da87e9f42562706769912ea"
 ir_sha256 = "4fa0eb82914254ef01cd7525f01634b6575634509f5e018991b6a75223dafd09"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "ec0e054264ee6700674acbf4f9a2ca685730269ea0f0470d9589c6acc28e6d82"
+"catalog/jira.catalog.json" = "12f6077a727b7b5bb3932ff31421dc93b64f7c03f4bd7e2abbcf33d9f7a130ee"
 
 [[provider]]
 id = "klaviyo"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "aa87df9a2613508dbda305dd89d5d2fb3007b939b963fc9960b1520affb8f64f"
 ir_sha256 = "e4e84b4a13c495d56f5d7252c2a7c8f9358778d91fb47bad98d963bd105dfc93"
 
 [provider.artifacts]
-"catalog/klaviyo.catalog.json" = "2bbbbe08bc43969474f02e4bfd84a3883c5c675cba13e4f36a3393ffc9e6ca0a"
+"catalog/klaviyo.catalog.json" = "d0988b210eb47857723bff8395f8947943335bcf2d491aa59b0bde807588eea5"
 
 [[provider]]
 id = "launchdarkly"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "79c1ee59d69a8345725e47d7f549666f97256358655d4c1430268326798c0044"
 ir_sha256 = "a02bbce6d5e33efe6dafda974bfaa07d6330f4f5d31a75e4334faf2e239e7aaa"
 
 [provider.artifacts]
-"catalog/launchdarkly.catalog.json" = "d77739e82d2ab1198a17ab52781b01bad9f2ce89c83eec95566c0013d17b552a"
+"catalog/launchdarkly.catalog.json" = "103b7ead6a79a82b048202f312639ac71f5c6bb329cbd3e060127e3b44172bf4"
 
 [[provider]]
 id = "loki"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 upstream_version = "Loki HTTP API"
 spec_sha256 = "77e769512509c9b6d8d21c08a6d576bbafbde0e4cbfde8da33abc196bfc49ee7"
 toml_sha256 = "7a936f77da06bd6e1aede789fec008754c52b69b957a5d5dc1cfe5bbc7b9e10e"
@@ -441,20 +441,20 @@ upstream_version = "Loki HTTP API"
 sha256 = "77e769512509c9b6d8d21c08a6d576bbafbde0e4cbfde8da33abc196bfc49ee7"
 
 [provider.artifacts]
-"catalog/loki.catalog.json" = "22eb74f7d39726625295937b2d6471f54933327486257e61ea6771e3db2b2dab"
+"catalog/loki.catalog.json" = "6d9ce3a78d0fd1f197c3e49ac46674db52a30c8cede21e619c7cfdb40c0dfaf4"
 
 [[provider]]
 id = "mailchimp"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "181f84562364f68fb2f23ed7f1126e8828ea2bac1219ef2d412fcaa7beb8e7bf"
 ir_sha256 = "cbb82558f71cb76a6744b4aa88ccae489e1873cdb8254596efb876e9abb64495"
 
 [provider.artifacts]
-"catalog/mailchimp.catalog.json" = "ce034809fbc7df88a6ae2c4b5880a04da519ee6a4aaba138fd1fae9580497741"
+"catalog/mailchimp.catalog.json" = "5756d7264d1a9eaf0ca0782cd5268ca7edeae9b57b308541dadc206049d3ad9a"
 
 [[provider]]
 id = "microsoft_graph"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "f19790320d5221dc341bf5b6bd5a710a86e67c78f5e90fb1b4c6aa8718dfd5f0"
 ir_sha256 = "fff4efdb7e8b5bfe5ac0177c312fa086d84269fbd8115c6b3aa2cf77692baa34"
 
@@ -473,56 +473,56 @@ upstream_version = "v1.0"
 sha256 = "d3cf91ee72c4f23f7b1a80b5d7796462bef5ea448dd268d328233b8f0479f57a"
 
 [provider.artifacts]
-"catalog/microsoft_graph.catalog.json" = "11e5e1ef6f95d942a42f15197ec2fb2afdb2136653f5310e70a9ef19b8fcc789"
+"catalog/microsoft_graph.catalog.json" = "da7820b971d3c653a888c523c2de2af32eac04f04d687e0f8403cd55eecb342d"
 
 [[provider]]
 id = "miro"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "ba07988ccfe9d826887336d652a9b3a2f101352074e9d4e439d4fab120e227ce"
 ir_sha256 = "c9ce71d5c074d9c7566a6c6966b61249dcb51b9f23475a49e2d7f46e82371a7a"
 
 [provider.artifacts]
-"catalog/miro.catalog.json" = "9001cb71906379e25a6b979fa80aba29ae687b18246e61f843970cf7d395fee7"
+"catalog/miro.catalog.json" = "207861f7956cd00c8fc8c9183b93d989f3cf1ce6732910b81b4da89bd6d1905a"
 
 [[provider]]
 id = "mysql"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "82947b48e58ff4a6ee05b2304aaee92a463d4f29a4d753fff04755138d5fbb6e"
 ir_sha256 = "05c63da11fbd585ee8880425ceade40ba8a403f9938a0dfed83576f4e5c779a8"
 
 [provider.artifacts]
-"catalog/mysql.catalog.json" = "c32be05bafdda46e08d2b90b5a0ed39e0ecc2ca54ec7bd105855d784189d175b"
+"catalog/mysql.catalog.json" = "6a0a9310cf9af54866514c06c8541cff95968ded3da9cefac7e31cf7613df9a9"
 
 [[provider]]
 id = "newrelic"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "66e510be2326246dfdc1939bb99bef48aad6ecc9cba0a77cc6aa91145ce83c6f"
 ir_sha256 = "6cd7e7ca6a1306d03dc0b2b9cf4f68013f37f094f6917423745a7bfce26d82cc"
 
 [provider.artifacts]
-"catalog/newrelic.catalog.json" = "319f3bfd95c58884459fc9a0d0073762b0bf30bbebbb7d064786a7f721467cf3"
+"catalog/newrelic.catalog.json" = "6dd233dea453495cd04e93f384f7311be35856bdfd3f6a6ee6af176b251d585d"
 
 [[provider]]
 id = "notion"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "0296a15427d1505ea64a26a1b8d689fbd26dc3016436c2c3b703cb7d6cb66e4a"
 ir_sha256 = "c5d2d58f5bac0b6adda94005f9556440f6398ebd57cea726a5b26778db59ad93"
 
 [provider.artifacts]
-"catalog/notion.catalog.json" = "cfa0d84e69ae8cd72686f68f77ce5f203204a9af4d9d10bd6bdb655bb3fc7ca2"
+"catalog/notion.catalog.json" = "7239219f713ca7bfc0516b0a082c6917ba7b3cadbdf9abd6937068fa247b62b7"
 
 [[provider]]
 id = "okta"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "d358e5156bbf4c65ce74292ec1e4a9476d8de31de4321f79f9dedeb63923a59f"
 ir_sha256 = "031460a3a061e9b974eb605ff4d29af9b123345900eca4962f2f07a7760acd17"
 
 [provider.artifacts]
-"catalog/okta.catalog.json" = "b2deb1774cdf0cd6afe76c57094896742682409f465e8f39dc78a27269d7bc93"
+"catalog/okta.catalog.json" = "f30ec9bdf7cdba33857b365dea99bdd744c76fdb1bcae70820413155e82201fc"
 
 [[provider]]
 id = "openai"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://raw.githubusercontent.com/openai/openai-openapi/117ce5680e4269f6656a4fd70d28f9755630d938/openapi.json"
 upstream_version = "2.3.0"
 spec_sha256 = "bf253f99bca25941f6b7a5ce0c4a0634b89677502067bfbadb82727690c596a6"
@@ -536,47 +536,47 @@ upstream_version = "2.3.0"
 sha256 = "bf253f99bca25941f6b7a5ce0c4a0634b89677502067bfbadb82727690c596a6"
 
 [provider.artifacts]
-"catalog/openai.catalog.json" = "970c8f9e6be23af55235425b631ff817652b81fd8c8eab6347505fe779220298"
+"catalog/openai.catalog.json" = "4af7a2cbb13dbd0fced4dfcc7692affc2c5e1221978f62502b21b71d8faf6000"
 
 [[provider]]
 id = "openrouter"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "c9be3bbc14d6454200495367925b783cdda2ce9e6ab5d859a083912c8520403d"
 ir_sha256 = "33be4bb5d8ddc9e0c5a2339f341a79be6d9ffc104a5a83222d90bbd68f42a98d"
 
 [provider.artifacts]
-"catalog/openrouter.catalog.json" = "f9e1c1b4b88d4f7cd3f27d605eee9e9b25515d792455280469fe857c5f568999"
+"catalog/openrouter.catalog.json" = "21781a38f408d272ac97b0c7082bb5935e79eac6a7e7f703ad4bad5c2acc81c1"
 
 [[provider]]
 id = "pagerduty"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "9d0244b872fce79e0192d84eb30702098a57abd9d33791e314aba77206d9c5b2"
 ir_sha256 = "8951126c52675a8061dc226ea9ee94859c60454db0ed17a169ecd9821d145153"
 
 [provider.artifacts]
-"catalog/pagerduty.catalog.json" = "88ac2b2d7e4f71413a627295aa35d0e72afffe8be8dbb6b779c160bfa38df32b"
+"catalog/pagerduty.catalog.json" = "3cc3ee9f75e35e4b46b46e8029f2680ecbb31323de54ffd3bbaf26794f2ebbd0"
 
 [[provider]]
 id = "postgresql"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "8d93a12a1240813d26a3680d67e236568f1634a2e5b1a850a81d4aa0fd225c3a"
 ir_sha256 = "d555f0d383addf3ed49c8097efc9c79c5203b89b993dd615865dc1a0d840946e"
 
 [provider.artifacts]
-"catalog/postgresql.catalog.json" = "3ea39fdfdb04fc244c6babad3d1bd1f869fc4074b62d824a48e18bf3afea1c7c"
+"catalog/postgresql.catalog.json" = "8f12350c7cda08c957c8651385c9ad587898b257d172d022c2e683bae258f17e"
 
 [[provider]]
 id = "postmark"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "a4a2fff3654497edc64cae4e61f81103d65be55e6e57caf038e416319f4c4ec2"
 ir_sha256 = "23f1262a764a5debfb40386b8dd6fe97f0789756fed075acfd71761617e4766f"
 
 [provider.artifacts]
-"catalog/postmark.catalog.json" = "f710cb3c17d9c0d81eab47bd3e6a3be844ae1218864183b9a04a9fadd45b2021"
+"catalog/postmark.catalog.json" = "46d96beb0c2c786b2c6536adbfaffee864510aa164f1a4c86c337ce99d0dbad8"
 
 [[provider]]
 id = "prometheus"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 upstream_version = "Prometheus HTTP API"
 spec_sha256 = "c952784e8401beed71d6967197d78905ef1f6e3116e422c1951ab2d39d7572e6"
 toml_sha256 = "b7226d3ca618d6625e5a4b1ca091ea2ccd3468a355bda50573828481b2e91909"
@@ -588,20 +588,20 @@ upstream_version = "Prometheus HTTP API"
 sha256 = "c952784e8401beed71d6967197d78905ef1f6e3116e422c1951ab2d39d7572e6"
 
 [provider.artifacts]
-"catalog/prometheus.catalog.json" = "9e0326bbdea435fdd864e0d43dfd2268035d56c14cfa72a7e48950fb2533a99a"
+"catalog/prometheus.catalog.json" = "b356f55ae98a0d033fc3ce2c88da8e9f3bcbc32b48a036634f0d34d96be9f5a1"
 
 [[provider]]
 id = "resend"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "18f3e50bfdbfd80cf47387074a946bfae20830bdfc5893a968ed74ca1f7b3ce8"
 ir_sha256 = "fed86be4013d0d6e73c79c214157b774fc5e8c4598d3d3289895eb382f67b5df"
 
 [provider.artifacts]
-"catalog/resend.catalog.json" = "40c03258eeb5c9477f1e88a67a53fc8e78feb631074d5679f2bdedbe59d70ed6"
+"catalog/resend.catalog.json" = "8ec7b70cb8ca74dd2f7313280f11798c73fd016a1224b2806cfaa48c1e50e09a"
 
 [[provider]]
 id = "runpod"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://api.runpod.io/v2/openapi.json"
 upstream_version = "2.0.0"
 spec_sha256 = "e9d5cd72cc53d8f8ea66f8e63f2c78cb4520104b614c99cdeacd7c93833789fd"
@@ -615,47 +615,47 @@ upstream_version = "2.0.0"
 sha256 = "e9d5cd72cc53d8f8ea66f8e63f2c78cb4520104b614c99cdeacd7c93833789fd"
 
 [provider.artifacts]
-"catalog/runpod.catalog.json" = "21a80f96f2eaa285f77db7d21c727d86180e77bee172250e47d555eeafa39465"
+"catalog/runpod.catalog.json" = "2f983b271ecd4a0655860e4e0aa182126763528d6ce93992692cd706c788905d"
 
 [[provider]]
 id = "salesforce"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "e5cd92edc9992e48cb1859ee5edb3676c68d1a34a32dc476378076c0bde7597d"
 ir_sha256 = "87011dc7c8bb21d1597d671a89c5c73fbdc106c96f48252a535d9e45a1420ab9"
 
 [provider.artifacts]
-"catalog/salesforce.catalog.json" = "9e20c5634ece4045b9f9f674f2e3c91b8a36d367f7f1b01971f3b1c3a9e96e0b"
+"catalog/salesforce.catalog.json" = "4f6489cd7b487f84879203f8693432302d92861a59cdd55f8b39aeee0aa67a53"
 
 [[provider]]
 id = "sendgrid"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "47b609063b65c112b2d8f716d90f2cf71c3e7e919692555bd69f0ac251875a68"
 ir_sha256 = "22b7ef52ad480b68fbf888887569162cbdc86e95382f01ccae089c584ba9122b"
 
 [provider.artifacts]
-"catalog/sendgrid.catalog.json" = "61cee9ed852b9971f4e7e6363d04bcbcd683419844bf0d7c75363b0808fa4f11"
+"catalog/sendgrid.catalog.json" = "bd1a81c01e0e17846ac7d2a67147dc08d3b5c7dc5e96a4f80c34d36d2f2ca437"
 
 [[provider]]
 id = "sentry"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "28bd73df199c973a4ae13856a6c47936f2562fb27701e3d85ef14b08b2983ea9"
 ir_sha256 = "b4aab482416c394dad21749405d28dbb5e675a67ce439efa14d6d196caf2c9c5"
 
 [provider.artifacts]
-"catalog/sentry.catalog.json" = "ba34d3fa901c673a82e8efd7bb911122211cd0c91a4804dd49150eb6ba4173d7"
+"catalog/sentry.catalog.json" = "5dd93885627b94f82e8e31fee36eb7956df7a3e32698ab6c0dc2bbb9713301ae"
 
 [[provider]]
 id = "shopify"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "d8ac7af000ecece8d00e643dc8e480c0ce4fdf8766750e4f29d7c6e18db09726"
 ir_sha256 = "f3c4aa8d851678564f424fdbdbfa47559f7a4a79a340ff02a6d491e3f0fd2478"
 
 [provider.artifacts]
-"catalog/shopify.catalog.json" = "09d4f552999f381fe5b2e355552e3e84dc204edeb34321d2ac4b612d2e956861"
+"catalog/shopify.catalog.json" = "1a330c1964ab9eb0fcdd1a10caf0af1a5e9cf139689e7cea2d16d274297e42b3"
 
 [[provider]]
 id = "slack"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "d5785e6fcb2ad9432e7ccd47edc667b3b5a105e5a94dcb7656fd7507db90dddb"
 ir_sha256 = "15348fba2fa6f3ac516e4dfe7cdb8aef12d85ae35005b25256cd5db1c11652f8"
 
@@ -680,20 +680,20 @@ upstream_version = "2026-08-15"
 sha256 = "43e1b4ecf8ea8393fa8d759bdad4629a29042299ce69d85384169c970f031e69"
 
 [provider.artifacts]
-"catalog/slack.catalog.json" = "7656fa80aad9f183f4be017936c8b0c66d5011f1e3b5b8332dda08ebcd0b6073"
+"catalog/slack.catalog.json" = "d5af81c99383ac89933ad375b19563d14b6339c1993a701c2635b60352fb5499"
 
 [[provider]]
 id = "statuspage"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "24d08024850f7d04554cf23dda88ef1b31d883614772488c290130f311f17975"
 ir_sha256 = "4674a9b5c38d84ebeca9953a12eec28fc12317738b6ff430c02cce85983ea1d3"
 
 [provider.artifacts]
-"catalog/statuspage.catalog.json" = "00bd5c5a9a76c28fe123e1ace379296f8591296aeda4da4019e1de9ec73eb421"
+"catalog/statuspage.catalog.json" = "9df124a6eadff6366f77bd30e8afb487a72b18ed01bb162038feceebd354b57d"
 
 [[provider]]
 id = "stripe"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://raw.githubusercontent.com/stripe/openapi/8da624f9b4f65178eb2e2c2b6fc80162a6c0dceb/latest/openapi.spec3.json"
 upstream_version = "2026-07-29.dahlia"
 spec_sha256 = "3b3d858f1a02a2ac0116cc10a296a7d374fe7c9d8b4a68a5419712e0bb3fbf41"
@@ -707,29 +707,29 @@ upstream_version = "2026-07-29.dahlia"
 sha256 = "3b3d858f1a02a2ac0116cc10a296a7d374fe7c9d8b4a68a5419712e0bb3fbf41"
 
 [provider.artifacts]
-"catalog/stripe.catalog.json" = "8449b9dc9e6e3ba2f5fb511a03274302b6a0c7ca9186ccbcd14a31de754a36ab"
+"catalog/stripe.catalog.json" = "6c8c18b51fe471c53021c2959e7a7794c32905e14860c4757a4b278ef2124f35"
 
 [[provider]]
 id = "supabase"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "5e6430c9d9bb22b699e9a9e9efd4ece191c6c36a171d3173d73b1d436fb03d7f"
 ir_sha256 = "f2ab5c32535c375f77fc50eea1de0fe8a89f47de0eb87f26aaa2eb5784df1c6c"
 
 [provider.artifacts]
-"catalog/supabase.catalog.json" = "77773ba57709b9caaff76c8fa4357911ae4261d36dddb1bf9c180a1a6a103b52"
+"catalog/supabase.catalog.json" = "d851ea6ba4e54c0b1ebf07c53a776165bf8e98da14aa96690248a8d02d0fd813"
 
 [[provider]]
 id = "trello"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "a336500567fdfe8428550197aed8a64a4c73d6a3c15bbf9c8b90371420ff978b"
 ir_sha256 = "ef6f489a8b262cf5d535534567d41186367f349218b0e0f6fd4c30a1bf03b3d5"
 
 [provider.artifacts]
-"catalog/trello.catalog.json" = "c51019e80035f8ffeca75bbe5b43a59ec93be458b86c190ff7563948b65e139d"
+"catalog/trello.catalog.json" = "e892baf1c575b695cdf10bc9e3948df3db0d64eb09e906fc895b6d2c8c7aa394"
 
 [[provider]]
 id = "twilio"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 source_url = "https://raw.githubusercontent.com/twilio/twilio-oai/97418cf0e4d6cf35b02333dd624090a8c62fa25d/spec/json/twilio_api_v2010.json"
 upstream_version = "1.0.0"
 spec_sha256 = "2ab609f9daeddae92f339c6c8d646dae9058f8f11baa53fab12e98fd3f37700d"
@@ -743,38 +743,38 @@ upstream_version = "1.0.0"
 sha256 = "2ab609f9daeddae92f339c6c8d646dae9058f8f11baa53fab12e98fd3f37700d"
 
 [provider.artifacts]
-"catalog/twilio.catalog.json" = "37e87933088909893f9379e0694306f006659bdc014e21a830935eaf88378250"
+"catalog/twilio.catalog.json" = "f9c96c817d8f5b3657beb89f6e4a7d7581088335b99a289c19e1bfb5b5e50f7f"
 
 [[provider]]
 id = "typeform"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "a7a1847831762c6cdcfd82a445a4f922cd709c40f2d34c1477f06e091e01b104"
 ir_sha256 = "c4d1bb66ac6e76e27c98d558df2910c51a18226803fdcd02715a5f5975710758"
 
 [provider.artifacts]
-"catalog/typeform.catalog.json" = "3784569bf5eec79016920047a1b526f0faeaf352454db4fe54ff5d67e02ea30b"
+"catalog/typeform.catalog.json" = "5534b5fc943b0bdfa89d394abc9fe5c214d62dcbccf177f178fbfb6f5696a7a1"
 
 [[provider]]
 id = "vercel"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "51698f29ba7dd7689b3fc4af0ea3fa5a3a1e1a1af1b39e24328e8689f93be1e8"
 ir_sha256 = "528c7334b3c9677f3d3f0aca75dd95d66d076efc87219bca367bf30045735315"
 
 [provider.artifacts]
-"catalog/vercel.catalog.json" = "d347426d6844eb7e901ee44e3bd5f2b07aafdd190f8cd71fdcedd58c45640c05"
+"catalog/vercel.catalog.json" = "8e9080027c489405b61803c869bd4e9b3a50460433cd315636c24182d789a993"
 
 [[provider]]
 id = "webflow"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "cedce787730e1383b50f75f390c8315aea690a5cc465741dc1e4186b8af34c1b"
 ir_sha256 = "aef62bbf76b724d9507279ee9a298e9b7c654612a6170a421be3bb3f41476bb1"
 
 [provider.artifacts]
-"catalog/webflow.catalog.json" = "8cfc467bf3e82d8ccd26bda1620e07bb345c1f1df2b52104999dac4061d36d12"
+"catalog/webflow.catalog.json" = "0f853a5d13ea893f049cbc56edc75277d93e98e0617f7fc0f36e5e75bb28e1bb"
 
 [[provider]]
 id = "zendesk"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "f6051085374cbd566efd7dac0f8898f3f9c0238345640c7457e2ec6ae6ea0868"
 ir_sha256 = "aa1569c223a7c89433e5fd243bf3afab1e578ad92436ad9d2ce4785cfe3d1fce"
 
@@ -800,13 +800,13 @@ upstream_version = "17.12.1"
 sha256 = "cde5a1f4d54038bb4d52df965f0eb7824c2074be2a5a36835dfc20c82f121da6"
 
 [provider.artifacts]
-"catalog/zendesk.catalog.json" = "02830a52653e895061a0d3a4722f80eb5f4f256cfda075f59e4604e99d180163"
+"catalog/zendesk.catalog.json" = "61086c6bc545e53789018cf5f3546c5a379ec5c8e4c0398f49c91ca5dbc7f96f"
 
 [[provider]]
 id = "zoom"
-generator = "connectors 0.2.0"
+generator = "connectors 0.2.1"
 toml_sha256 = "8651659af68181afae1f27cc686c446d2429ec47c5caeaa1bfd751dc275780bd"
 ir_sha256 = "7cf5866afd584a8b7c67ac5820e9884627235fe780278dc8fef6906f1fb90642"
 
 [provider.artifacts]
-"catalog/zoom.catalog.json" = "64ae8dee65b40d82d11815e576683164d02839a0bda842ad57640e49cbe2dbd3"
+"catalog/zoom.catalog.json" = "2186567a3a630f8a2e6d1f8092fe66316bdaec173f6c1d5bd190f63beee26c3e"
