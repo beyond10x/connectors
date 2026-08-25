@@ -15,6 +15,7 @@ async-trait = "0.1"
 base64 = "0.22"
 catalog = { version = "0.1.0", path = "../catalog" }
 connect-session-transport = { version = "0.1.0", path = "../connect-session-transport" }
+connector-oauth = { version = "0.1.0", path = "../connector-oauth" }
 connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
 connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
 connectors-config = { version = "0.1.0", path = "../connectors-config" }

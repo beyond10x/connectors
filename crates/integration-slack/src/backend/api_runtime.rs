@@ -1,5 +1,6 @@
 use super::*;
 
+use connector_oauth::Pending;
 use connector_secrets::StoreError;
 
 impl SlackInner {
@@ -48,7 +49,10 @@ impl SlackInner {
         error: Option<&str>,
     ) -> Result<(), SlackError> {
         self.expire_hosted_sessions();
-        let pending = lock(&self.oauth_states)
+        let Pending {
+            payload: pending,
+            expires_at_unix_ms,
+        } = lock(&self.oauth_states)
             .remove(state)
             .ok_or_else(|| SlackError::new("oauth-state"))?;
         let session_ref = pending.session_ref.clone();
@@ -56,7 +60,7 @@ impl SlackInner {
             if pending.owner.profile != SlackConnectionProfile::OrgUser
                 || error.is_some()
                 || code.is_none()
-                || now_ms().is_none_or(|now| now >= pending.expires_at_unix_ms)
+                || now_ms().is_none_or(|now| now >= expires_at_unix_ms)
             {
                 return Err(SlackError::new("oauth-refused"));
             }

@@ -156,14 +156,18 @@ impl SlackInner {
                     },
                 );
                 if let Some(state) = oauth_state {
-                    lock(&self.oauth_states).insert(
-                        state,
-                        OAuthPending {
-                            session_ref: session_ref.clone(),
-                            owner: session_owner.clone(),
+                    let now = now_ms().ok_or_else(connection_unavailable)?;
+                    lock(&self.oauth_states)
+                        .insert(
+                            state,
+                            OAuthPending {
+                                session_ref: session_ref.clone(),
+                                owner: session_owner.clone(),
+                            },
                             expires_at_unix_ms,
-                        },
-                    );
+                            now,
+                        )
+                        .map_err(|_| connection_unavailable())?;
                 }
                 status
             }
@@ -199,7 +203,7 @@ impl SlackInner {
             let _ = sessions.finish(&session_ref, ConnectSessionTerminal::Expired);
             session_owners.remove(&session_ref);
         }
-        lock(&self.oauth_states).retain(|_, pending| now < pending.expires_at_unix_ms);
+        lock(&self.oauth_states).expire(now);
     }
 
     pub(super) async fn serve_completion(
