@@ -348,7 +348,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "cbc"
@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "connect-session-transport"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "connector-secrets",
@@ -490,14 +490,14 @@ dependencies = [
 
 [[package]]
 name = "connector-address"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "connector-oauth"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "getrandom 0.3.4",
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "connector-resolve"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -538,14 +538,14 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "connectors-config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "connector-address",
  "domain",
@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -911,14 +911,14 @@ dependencies = [
 
 [[package]]
 name = "driver-audio"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "domain",
 ]
 
 [[package]]
 name = "driver-cdp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "domain",
@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "driver-sip"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "driver-speech"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "domain",
  "driver-audio",
@@ -1568,7 +1568,7 @@ dependencies = [
 
 [[package]]
 name = "hosted-state"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "connector-state",
  "domain",
@@ -1578,7 +1578,7 @@ dependencies = [
 
 [[package]]
 name = "hosted-vault"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "connector-secrets",
@@ -1811,7 +1811,7 @@ dependencies = [
 
 [[package]]
 name = "identity-http"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "hex",
@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "integration-catalog"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "catalog",
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "integration-gitlab"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "catalog",
@@ -1918,7 +1918,7 @@ dependencies = [
 
 [[package]]
 name = "integration-jira"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "integration-kubernetes"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "connector-resolve",
@@ -1972,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "integration-monitoring"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "catalog",
@@ -1999,7 +1999,7 @@ dependencies = [
 
 [[package]]
 name = "integration-platform"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "integration-sip"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "catalog",
@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "integration-slack"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2567,7 +2567,7 @@ dependencies = [
 
 [[package]]
 name = "monitoring-model"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "catalog",
  "connector-resolve",
@@ -3055,7 +3055,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "domain",
  "schemars",
@@ -3433,7 +3433,7 @@ dependencies = [
 
 [[package]]
 name = "rtvbp-voice-endpoint"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "domain",
@@ -3792,7 +3792,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -4115,7 +4115,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "state-sqlite"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "connector-state",
  "domain",
@@ -4792,7 +4792,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voice-local-audio"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "domain",
  "thiserror 2.0.20",
@@ -4801,7 +4801,7 @@ dependencies = [
 
 [[package]]
 name = "voice-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "domain",

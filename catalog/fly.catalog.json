@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Fly.io Machines: discover regions and inspect, create, start, stop, restart or delete Machines",
-  "generator": "connectors 0.1.0",
+  "generator": "connectors 0.2.0",
   "operations": [
     {
       "auth": [

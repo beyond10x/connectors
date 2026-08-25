@@ -2,7 +2,7 @@
 name = "integration-monitoring"
 description = "Grafana, Prometheus, Loki, and Alertmanager Connector Integration adapter."
 edition = "2021"
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -12,21 +12,21 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
-catalog = { version = "0.1.0", path = "../catalog" }
-connector-resolve = { version = "0.1.0", path = "../connector-resolve" }
-connector-secrets = { version = "0.1.0", path = "../connector-secrets" }
-connect-session-transport = { version = "0.1.0", path = "../connect-session-transport" }
-connectors-config = { version = "0.1.0", path = "../connectors-config" }
-domain = { version = "0.1.0", path = "../domain" }
+catalog = { version = "0.2.0", path = "../catalog" }
+connector-resolve = { version = "0.2.0", path = "../connector-resolve" }
+connector-secrets = { version = "0.2.0", path = "../connector-secrets" }
+connect-session-transport = { version = "0.2.0", path = "../connect-session-transport" }
+connectors-config = { version = "0.2.0", path = "../connectors-config" }
+domain = { version = "0.2.0", path = "../domain" }
 getrandom = "0.3"
 hex = "0.4"
-connector-state = { version = "0.1.0", path = "../connector-state" }
-monitoring-model = { version = "0.1.0", path = "../monitoring-model" }
-protocol = { version = "0.1.0", path = "../protocol" }
+connector-state = { version = "0.2.0", path = "../connector-state" }
+monitoring-model = { version = "0.2.0", path = "../monitoring-model" }
+protocol = { version = "0.2.0", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.1.0", path = "../service" }
+service = { version = "0.2.0", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "sync", "time"] }

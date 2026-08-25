@@ -242,7 +242,7 @@ pub struct LockPack {
 pub struct LockEntry {
     /// The provider id — [`Connector::id`], which is also the artifact file stem.
     pub id: String,
-    /// The generator that produced the artifacts, e.g. `connectors 0.1.0`.
+    /// The generator that produced the artifacts, e.g. `connectors 0.2.0`.
     ///
     /// Recorded per provider rather than once per file: a regeneration that touches one provider
     /// must be able to say so, and a stale row is then visible next to a fresh one instead of being
