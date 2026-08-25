@@ -100,6 +100,12 @@ will spawn children as each milestone is designed.
 | [S-066](S-066-the-transport-refusal-names-its-class.md) | The transport refusal names its class | done | Platform | integrations |
 | [S-067](S-067-the-server-serves-its-own-openapi-contract.md) | The server serves its own OpenAPI contract | done | Platform | server, docs |
 | [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | done | Platform | server, docs |
+| [S-069](S-069-one-oauth-implementation-not-three.md) | One OAuth implementation, not three | in-progress (1) | Platform | service, integration-gitlab, integration-jira, integration-slack |
+| [S-070](S-070-a-provider-can-hold-a-credential-it-cannot-spend.md) | A provider can hold a credential it cannot spend | ready (2) | Catalog | connector-spec, catalog-build |
+| [S-071](S-071-claude-code-joins-the-catalog.md) | Claude Code joins the catalog as a custody-only provider | backlog | Catalog | providers, catalog-build |
+| [S-072](S-072-the-anthropic-api-key-arrives-through-a-connect-session.md) | The Anthropic API key arrives through a Connect Session | backlog | Catalog | providers, service |
+| [S-073](S-073-the-hosted-posture-connects-a-catalogued-provider.md) | The hosted posture connects a catalogued provider | backlog | Platform | connectors-runtime, service, server, hosted-vault |
+| [S-074](S-074-the-cli-drives-a-hosted-connection.md) | The CLI drives a hosted connection | backlog | Clients | connectors-cli, connectors-console, connectors-client |
 
 ## Epics in this seed
 
@@ -121,6 +127,8 @@ will spawn children as each milestone is designed.
 | `endpoint-plane` | S-058, S-059, S-060, S-061, S-062, S-064, S-065, S-066 | The zero-configuration endpoint plane: databases discovered from the cluster, the fleet Grafana, and a login-and-go client surface, all through the admission seam. |
 | `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
+| `oauth-consolidation` | S-069 | One OAuth implementation instead of three hand-rolled copies: a shared crate extracted from the only PKCE implementation, with GitLab, Jira and Slack migrated onto it behaviour-preserving. Prerequisite for any further browser-flow connector, and where S-013's loopback callback validation will live. |
+| `subscription-custody` | S-070, S-071, S-072, S-073, S-074 | Custody without use, per [design 16](../design/16-subscription-credential-custody.md): a declaration kind for a credential connectors holds but cannot spend, the `claude-code` provider that uses it, the Anthropic API key arriving by Connect Session, the hosted posture finally connecting a catalogued provider at all, and the CLI driving the same flow. |
 
 ## Known gaps in this backlog
 
