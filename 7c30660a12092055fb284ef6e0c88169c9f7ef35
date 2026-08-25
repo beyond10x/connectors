@@ -1,0 +1,8 @@
+Correction: besides the S-066 story rescope this commit describes, a
+commit -a here also swept in the previously uncommitted brand-sweep
+work that had been sitting in the checkout: AGENTS.md/VISION/design
+docs drop the daemonloom monorepo provenance links, all 27 Cargo.toml
+repository/homepage fields move to github.com/beyond10x/connectors,
+and check-brand.sh documents the tightened rule. That work is wanted
+(the de-branding direction) and verified (brand check clean); it
+should have been its own commit with its own message.
