@@ -2,7 +2,7 @@
 name = "hosted-state"
 description = "Bounded PostgreSQL state cells for hosted Connector runtimes."
 edition = "2021"
-version = "0.2.0"
+version = "0.2.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -11,11 +11,11 @@ publish = false
 workspace = "../connectors-runtime"
 
 [dependencies]
-connector-state = { version = "0.2.0", path = "../connector-state" }
+connector-state = { version = "0.2.1", path = "../connector-state" }
 postgres = "0.19"
 thiserror = "2"
 
 [dev-dependencies]
 # The grant-evaluation exercise (`domain::grant_conformance`): the same Grant records evaluated
 # through this backend must produce the same admissions and neutral refusals as every other.
-domain = { version = "0.2.0", path = "../domain" }
+domain = { version = "0.2.1", path = "../domain" }
