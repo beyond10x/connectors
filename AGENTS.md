@@ -207,6 +207,125 @@ The agent instruction is therefore short:
 4. One commit: `catalog: refresh <vendor> spec`, body summarizing the catalog diff, via
    `as-bot.sh`.
 
+### The gate does not fit on one machine
+
+Eleven workspaces, none sharing a `target/` directory, need about **39 GB** between them —
+`connectors-runtime` alone is 11 GB. A hosted CI runner starts with roughly 14 GB, so the gate is
+sharded one workspace per runner. `scripts/gate.sh` takes three flags for that:
+
+```text
+bash scripts/gate.sh                      # everything, unchanged — what you run locally
+bash scripts/gate.sh --list-workspaces    # the list, one per line, for a CI matrix
+bash scripts/gate.sh --workspace <path>   # one workspace's locked tests
+bash scripts/gate.sh --final              # catalog lock verifier + documentation checks
+```
+
+**CI reads the workspace list from this script and never keeps its own copy.** A second list in a
+workflow file is a list that drifts from the one anybody actually runs, silently and in both
+directions.
+
+### An offline check still needs the registry populated
+
+Three checks run offline on purpose: `engine_free` and `msrv_fence` shell out to
+`cargo metadata --offline`, and `gate.sh --final` runs `catalog-cli -- check --offline`. The
+no-network fence is the point of all three.
+
+Offline does not mean the registry may be empty; it means nothing may be downloaded once the work
+starts. On a cold machine, run `cargo fetch --locked` first. Without `--target` it populates the
+registry for **every** target, which is exactly the graph those checks then walk — a Linux
+`cargo test` never downloads a Windows-only crate, and `cargo metadata` wants the whole graph.
+This is invisible on a developer machine whose registry was filled long ago.
+
+### Read the gate's own exit status
+
+Never pipe a gate through `tail` or `head` when you care whether it passed: the pipeline reports
+the exit status of `tail`. Redirect to a file and read `$?`.
+
+### After changing any dependency, refresh the nested lockfiles
+
+The satellite workspaces carry their own `Cargo.lock`. Adding, removing or repointing a dependency
+leaves them stale, and `--locked` then fails with *"cannot update the lock file … because --locked
+was passed"*. Run `cargo metadata --offline` once in each workspace `--list-workspaces` names.
+
+## Releases
+
+**The version is an artifact identity, not a label.** `[workspace.package] version` is what
+`catalog-build` writes into every catalog document's `generator` field, into every
+`connectors.lock` row, and into the wire User-Agent. Cutting a version therefore rewrites all 67
+catalog artifacts and the lockfile; that diff is the intended consequence, not churn. The bump
+itself touches 184 pins across 27 manifests — every internal dependency is path-pinned to the exact
+version — so bump them together and re-run `catalog build`.
+
+Cutting a release is pushing a `v*` tag. `.github/workflows/release.yml` then runs, in order: the
+tag against the committed version and the CHANGELOG against the same version; the sharded gate, the
+history-wide secret scan and the `local-identity` refusal; a `--locked --release` build per target;
+and a GitHub release carrying the archives, `SHA256SUMS`, and notes read from the CHANGELOG section
+for that version. A tag that disagrees with the committed version is refused before anything builds.
+
+- **The published targets are Unix only**: x86_64 and aarch64 Linux, x86_64 and aarch64 macOS.
+  `connectors` does not compile for Windows and that is a design position rather than a gap —
+  `connectors-config` opens files with `O_NOFOLLOW` and compares the effective uid to the owner,
+  `connector-secrets` binds custody to Unix file modes, and the personal posture serves on a Unix
+  socket. Supporting Windows means deciding what owner-bound credential custody is in terms of
+  Windows ACLs. Do not add the target back without that decision.
+- **A retired runner label queues forever rather than failing.** `macos-13` is retired; Intel macOS
+  labels carry an `-intel` suffix and exist only for the two most recent versions. A release that
+  silently never publishes is a worse failure than a red one, so check the label before adding a
+  target.
+- **No build that ships selects a Cargo feature.** `scripts/check-local-identity-refused.sh` holds
+  both the Dockerfile and the release workflow to that, because both produce shipped binaries. It
+  greps those two files, so a comment mentioning the flag name trips it — describe the flag instead
+  of writing it.
+- CI creates releases with `GITHUB_TOKEN` and `contents: write`. The bot App's private key stays
+  out of CI: the rule above is about a workflow that creates or pushes a **commit**, and this one
+  does neither.
+
+## Rewriting history, and the secret baseline that depends on it
+
+Both were done on 2026-08-25. Neither is routine; both have a failure mode that looks like success.
+
+### Rewriting
+
+Bundle everything first — `git bundle create <path> --all`, outside the repository — and keep the
+bundle **off** the remote. Archiving the pre-rewrite lineage as a branch republishes exactly what
+the rewrite removed.
+
+Verify with the strongest check available: **if `HEAD` already contained none of what you are
+removing, the rewritten `HEAD` tree must be byte-identical.** Compare `rev-parse main^{tree}` before
+and after. Anything else means the rewrite changed live content, and a diff of files will not tell
+you as clearly as one hash.
+
+Then check the removal itself over every ref, not just `HEAD`: authorship, committer, commit
+messages, paths ever used, and every blob (`rev-list --objects --all` piped through
+`cat-file --batch-check`). A path that only ever existed in a deleted branch is still published.
+
+`--force-with-lease` takes the **remote's** current SHA, not yours. Passing your local head rejects
+the push with *"stale info"*, and if a tag push follows in the same script the remote is left
+briefly inconsistent.
+
+Force-pushing does not remove the old objects from GitHub: they stay fetchable by SHA until it
+garbage-collects. Before a repository goes public, ask GitHub Support to run one, or push to a fresh
+repository.
+
+### The secret baseline
+
+`.gitleaksignore` names exact `<commit>:<path>:<rule>:<line>` fingerprints, reviewed in
+[`docs/security/secret-scan-baseline.md`](docs/security/secret-scan-baseline.md). Never widen it to
+a rule or path allowlist: that survives a rewrite by also surviving a real secret landing in the
+same file.
+
+**Regenerate from a scan run with `.gitleaksignore` removed.** Scanning with it in place and asking
+which entries still match is circular — findings it suppresses are absent from the report, so a
+class that is merely hidden reads as resolved. That happened here and put a wrong baseline in a
+commit.
+
+A rewrite invalidates every fingerprint whose commit it *touched*, and only those. Rewriting all of
+history invalidates all of them; editing one late commit leaves the early ones valid and breaks the
+rest. Partial invalidation is the confusing case — expect it.
+
+`check-secrets.sh` is not part of `scripts/gate.sh`. It runs in CI and it is the reason a red secret
+gate went unnoticed for four commits. Run it before a release.
+
 ## Boundaries
 
 - The catalog, platform family (`domain`, `protocol`, `service`, `server`), hosted runtime and
@@ -218,6 +337,16 @@ The agent instruction is therefore short:
   `crates/catalog-build/tests/main/engine_free.rs` asserts it three ways.
 - **Argv is parsed with clap's derive API.** Hand-rolled argument parsing is banned, for every
   binary now and later.
+- **A `custody_only` provider holds a credential and describes no request surface at all** — see
+  [design 16](docs/design/16-subscription-credential-custody.md). Every key that could describe an
+  outbound request is refused by name in `CUSTODY_ONLY_REFUSED_KEYS`; `[[channels]]` is on that list
+  because a channel binding carries its own `auth` and `connector-resolve` places those credentials
+  onto the composed URL and headers. Adding a declaration field that can reach a request means
+  adding it there too, or the kind's one guarantee stops being true.
+- **Ask the declared key, not the assembled value.** `#[serde(default)]` makes `base_url = ""`
+  indistinguishable from no `base_url` once parsed, so a check written against the loaded struct
+  accepts what an author plainly wrote. Where presence is what matters, read the TOML keys —
+  `implicit_service_members` and `validate_custody_only` both do.
 - **Provider testing is one consolidated file**, `crates/catalog-build/tests/main/catalog_invariants.rs`,
   which iterates the whole catalogue. Do not add a per-provider test file: a rule about connectors
   is stated once and parameterised, so the next connector is covered the moment it exists. The
