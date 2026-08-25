@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use connector_oauth::{PendingStates, DEFAULT_PENDING_CAPACITY};
 use connector_secrets::{PreparedSecretStore, Secret};
 use connector_state::StateStore;
 use connectors_config::{HostedJiraConfig, InitiationConfig, JiraSharedAuth};
@@ -98,7 +99,7 @@ pub(super) struct JiraInner {
     pub(super) sessions: Mutex<ConnectSessionLifecycle>,
     pub(super) session_owners: Mutex<BTreeMap<String, SessionOwner>>,
     pub(super) hosted_sessions: Mutex<BTreeMap<String, HostedSession>>,
-    pub(super) oauth_states: Mutex<BTreeMap<String, OAuthPending>>,
+    pub(super) oauth_states: Mutex<PendingStates<OAuthPending>>,
     pub(super) completion_lock: tokio::sync::Mutex<()>,
     pub(super) refresh_lock: tokio::sync::Mutex<()>,
     pub(super) service_token: tokio::sync::Mutex<Option<CachedServiceToken>>,
@@ -124,7 +125,6 @@ pub(super) struct HostedSession {
 pub(super) struct OAuthPending {
     pub(super) session_ref: String,
     pub(super) owner: SessionOwner,
-    pub(super) expires_at_unix_ms: u64,
 }
 
 pub(super) struct CachedServiceToken {
@@ -241,7 +241,7 @@ impl JiraBackend {
             ),
             session_owners: Mutex::new(BTreeMap::new()),
             hosted_sessions: Mutex::new(BTreeMap::new()),
-            oauth_states: Mutex::new(BTreeMap::new()),
+            oauth_states: Mutex::new(PendingStates::new(DEFAULT_PENDING_CAPACITY)),
             completion_lock: tokio::sync::Mutex::new(()),
             refresh_lock: tokio::sync::Mutex::new(()),
             service_token: tokio::sync::Mutex::new(None),
@@ -372,7 +372,7 @@ impl ConnectorBackend for JiraBackend {
     }
 
     fn owns_hosted_oauth_state(&self, integration_ref: &str, state: &str) -> bool {
-        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_key(state)
+        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_any(state)
     }
 
     async fn complete_hosted_oauth(
