@@ -1,18 +1,17 @@
 # Exact historical findings reviewed in docs/security/secret-scan-baseline.md.
 # Fingerprint scoping ensures new findings, even under the same rule or path, still fail.
 #
-# Regenerated 2026-08-25 after the history rewrites, from a scan run with this file removed —
-# scanning with it in place and then asking which entries still match is circular, and hid a
-# whole class once. A fingerprint is `<commit>:<path>:<rule>:<line>`, so a rewrite invalidates
-# every entry whose commit it touched, and only those. That is the cost of scoping to a commit,
-# and it is the right cost — a rule or path allowlist would survive a rewrite by also surviving
-# a real secret landing in the same file.
+# Regenerate from a scan run with this file REMOVED. Scanning with it in place and asking which
+# entries still match is circular: findings it suppresses are absent from the report, so a class
+# that is merely hidden reads as resolved. A fingerprint is `<commit>:<path>:<rule>:<line>`, so a
+# rewrite invalidates every entry whose commit it touched, and a version cut adds a fresh set for
+# the commit that rewrote the lock.
 
 # Artifact-digest adjacency in the generated lock.
 # Each is a deterministic SHA-256 of a committed `catalog/<provider>.catalog.json` on a line whose
 # key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters
 # matches a vendor-token rule. Verified by recomputation: `sha256sum` of each named file equals
-# the flagged value.
+# the flagged value. A version cut rewrites every row, so each cut adds a fresh set.
 3323be72e48e0fe65c40915a314a48094904a5a3:connectors.lock:bitbucket-client-secret:105
 3323be72e48e0fe65c40915a314a48094904a5a3:connectors.lock:discord-api-token:177
 3323be72e48e0fe65c40915a314a48094904a5a3:connectors.lock:new-relic-user-api-id:363
@@ -35,6 +34,10 @@
 665709d5a4df5afd96061af3b786000a2afbc471:connectors.lock:discord-api-token:246
 665709d5a4df5afd96061af3b786000a2afbc471:connectors.lock:new-relic-user-api-id:464
 665709d5a4df5afd96061af3b786000a2afbc471:connectors.lock:sentry-access-token:579
+ab5aa6447a6a1ed7c93fc89379d649ad23fb1cc3:connectors.lock:bitbucket-client-secret:204
+ab5aa6447a6a1ed7c93fc89379d649ad23fb1cc3:connectors.lock:discord-api-token:276
+ab5aa6447a6a1ed7c93fc89379d649ad23fb1cc3:connectors.lock:new-relic-user-api-id:503
+ab5aa6447a6a1ed7c93fc89379d649ad23fb1cc3:connectors.lock:sentry-access-token:645
 bf41b457677ca8011435874c4797bdcbb6665d36:connectors.lock:bitbucket-client-secret:204
 bf41b457677ca8011435874c4797bdcbb6665d36:connectors.lock:discord-api-token:276
 bf41b457677ca8011435874c4797bdcbb6665d36:connectors.lock:new-relic-user-api-id:503

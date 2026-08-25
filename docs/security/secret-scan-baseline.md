@@ -1,6 +1,6 @@
 # Historical secret-scan baseline
 
-Gitleaks 8.30.1 reports 87 findings represented by 86 exact fingerprints in the repository's
+Gitleaks 8.30.1 reports 91 findings represented by 90 exact fingerprints in the repository's
 history. The current tree carries no credential material.
 
 **Regenerated 2026-08-25 after the history rewrites.** Regenerate from a scan run with
@@ -27,7 +27,7 @@ sentinel; none is runtime credential material issued to b10x.
 | Imported Zendesk OpenAPI descriptions at `82f6a80a2741` | 2 | Documentation examples, absent from the current descriptions. |
 | Connector specification conformance fixture at `c78434fe6a31` | 1 | Deliberate non-live test sentinel, absent from the current fixture. |
 | Browser completion rejection fixture at `93672c5e9d` | 1 | Deliberate opaque capability-shaped URL used only to prove malformed fragment refusal; not an issued credential. |
-| `connectors.lock` across every commit that rebuilt it | 72 | Deterministic SHA-256 artifact digests on a line whose key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters matches a vendor-token rule. Verified by recomputation: `sha256sum catalog/<provider>.catalog.json` equals each flagged value. |
+| `connectors.lock` across every commit that rebuilt it | 76 | Deterministic SHA-256 artifact digests on a line whose key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters matches a vendor-token rule. Verified by recomputation: `sha256sum catalog/<provider>.catalog.json` equals each flagged value. |
 
 Regenerating `connectors.lock` moves its line numbers, so a rebuild produces new fingerprints for
 the same reviewed material rather than reusing the old ones. They accumulate per commit. That is
