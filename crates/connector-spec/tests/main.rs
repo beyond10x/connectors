@@ -40,6 +40,9 @@ mod credential_paths;
 mod credential_response;
 #[path = "main/credential_subject.rs"]
 mod credential_subject;
+
+#[path = "main/custody_only.rs"]
+mod custody_only;
 #[path = "main/determinism.rs"]
 mod determinism;
 #[path = "main/discovery.rs"]

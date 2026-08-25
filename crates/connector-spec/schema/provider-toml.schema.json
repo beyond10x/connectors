@@ -9,7 +9,27 @@
       "type": "object",
       "title": "The provider file",
       "additionalProperties": false,
-      "required": ["id", "base_url"],
+      "required": ["id"],
+      "allOf": [
+        {
+          "$comment": "A custody-only provider holds a credential another component spends. It describes no request surface, so every key that would describe one is refused rather than ignored — an author who wrote `base_url` believed this provider would call something, and dropping that silently leaves the belief in the file. `auth` becomes mandatory: a custody-only provider that holds nothing has no reason to exist. The loader states each refusal by name; this is the second net, not the first.",
+          "if": {
+            "properties": { "custody_only": { "const": true } },
+            "required": ["custody_only"]
+          },
+          "then": {
+            "required": ["auth"],
+            "properties": {
+              "base_url": false,
+              "spec": false,
+              "operations": false,
+              "services": false,
+              "verify": false
+            }
+          },
+          "else": { "required": ["base_url"] }
+        }
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -79,6 +99,10 @@
           "type": "array",
           "description": "What a human must supply before any of the above can run — the surface a settings page renders. Every other part of this file models how a credential reaches the wire; this models how it gets there in the first place.",
           "items": { "$ref": "#/$defs/configField" }
+        },
+        "custody_only": {
+          "type": "boolean",
+          "description": "This provider holds a credential and describes no request surface at all. The escape from the rule that a declaration must describe operations or describe nothing — and the case where that is the point, because the credential's use belongs to another component while its address, store, rotation and revocation belong here. Setting it refuses `base_url`, `spec`, `operations`, `services` and `verify`, and makes `auth` mandatory."
         },
         "verify": {
           "type": "string",

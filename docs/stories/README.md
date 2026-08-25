@@ -101,7 +101,7 @@ will spawn children as each milestone is designed.
 | [S-067](S-067-the-server-serves-its-own-openapi-contract.md) | The server serves its own OpenAPI contract | done | Platform | server, docs |
 | [S-068](S-068-a-public-documentation-page-renders-the-contract.md) | A public documentation page renders the contract | done | Platform | server, docs |
 | [S-069](S-069-one-oauth-implementation-not-three.md) | One OAuth implementation, not three | in-progress (1) | Platform | service, integration-gitlab, integration-jira, integration-slack |
-| [S-070](S-070-a-provider-can-hold-a-credential-it-cannot-spend.md) | A provider can hold a credential it cannot spend | ready (2) | Catalog | connector-spec, catalog-build |
+| [S-070](S-070-a-provider-can-hold-a-credential-it-cannot-spend.md) | A provider can hold a credential it cannot spend | done | Catalog | connector-spec, catalog-build |
 | [S-071](S-071-claude-code-joins-the-catalog.md) | Claude Code joins the catalog as a custody-only provider | backlog | Catalog | providers, catalog-build |
 | [S-072](S-072-the-anthropic-api-key-arrives-through-a-connect-session.md) | The Anthropic API key arrives through a Connect Session | backlog | Catalog | providers, service |
 | [S-073](S-073-the-hosted-posture-connects-a-catalogued-provider.md) | The hosted posture connects a catalogued provider | backlog | Platform | connectors-runtime, service, server, hosted-vault |

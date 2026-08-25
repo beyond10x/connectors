@@ -162,6 +162,7 @@ fn bare(provenance: Provenance) -> Connector {
         config: Vec::new(),
         verify: None,
         graphs: Vec::new(),
+        custody_only: false,
         provenance,
     }
 }

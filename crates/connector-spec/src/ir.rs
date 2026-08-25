@@ -1312,6 +1312,11 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// `skip_serializing_if` for [`HashDomain`], whose fields are references into the connector.
+fn is_false_ref(value: &&bool) -> bool {
+    !**value
+}
+
 /// **The shortest stated condition that counts as one**, in characters after trimming.
 ///
 /// Not a measure of truth — nothing here can check whether a vendor really deduplicates — but a
@@ -2095,6 +2100,22 @@ pub struct Connector {
     /// so nothing could use them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verify: Option<String>,
+    /// This provider holds a credential and describes no request surface at all.
+    ///
+    /// The escape from a rule every other provider obeys: a declaration must describe operations,
+    /// or it describes nothing. A custody-only provider is the case where that is exactly the
+    /// point — the credential's *use* belongs to another component, and what belongs here is its
+    /// address, its store, its rotation and its revocation. Anthropic's Claude Code subscription
+    /// token is the first: platform ADR 0014 keeps harness credentials spendable only by the
+    /// harness adapter, and ADR 0032 gives connectors custody of vendor credentials, so the
+    /// credential needs an owner here and no way to be spent from here.
+    ///
+    /// Setting it turns five ordinary permissions into refusals — `[spec]`, `[[operations]]`,
+    /// `[[service]]`, `base_url` and `verify` are all rejected — and makes `[[auth]]` mandatory.
+    /// Each is a refusal rather than a silent allowance so the kind cannot carry a half-declared
+    /// ordinary provider past review. See `provider/validation.rs`.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub custody_only: bool,
     /// Where this connector came from.
     #[serde(default, skip_serializing_if = "provenance_is_empty")]
     pub provenance: Provenance,
@@ -2651,6 +2672,12 @@ struct HashDomain<'a> {
     services: &'a [Service],
     vendor: &'a str,
     base_url: &'a str,
+    /// In the domain. It is not presentation: it decides whether this provider may describe a
+    /// request surface at all, so two files differing only here are two different connectors.
+    /// Skipped when false, so every provider that predates the kind hashes to what it hashed
+    /// before and `connectors.lock` does not churn for 64 providers nobody edited.
+    #[serde(skip_serializing_if = "is_false_ref")]
+    custody_only: &'a bool,
     description: &'a str,
     auth: &'a [AuthMethod],
     default_auth: &'a [AuthRequirement],
@@ -2706,6 +2733,7 @@ impl<'a> HashDomain<'a> {
             config,
             verify,
             graphs,
+            custody_only,
             provenance,
         } = connector;
 
@@ -2729,6 +2757,7 @@ impl<'a> HashDomain<'a> {
             config,
             verify,
             graphs,
+            custody_only,
         }
     }
 }

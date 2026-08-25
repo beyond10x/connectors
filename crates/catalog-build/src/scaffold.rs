@@ -1677,6 +1677,9 @@ impl Plan {
             graphs: Vec::new(),
             provenance: connector_spec::Provenance::default(),
             verify: None,
+            // Scaffolding reads vendor documents, so there is always a surface. Custody-only is
+            // hand-authored.
+            custody_only: false,
         }
     }
 }

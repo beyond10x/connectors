@@ -28,10 +28,13 @@ const CLI_TOTAL_LINE_LIMIT: usize = 856;
 const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     (
         "crates/connector-spec/src/ir.rs",
-        2_734,
+        2_763,
         "legacy compiler IR pending declaration-family extraction; +14 for the closed `audio_v1` \
          driver and its request variant, +16 for the closed `cdp_v1` driver and its request \
-         variant, +17 for the closed `sql_v1` driver and its request variant",
+         variant, +17 for the closed `sql_v1` driver and its request variant, +29 on 2026-08-25 \
+         for S-070's `custody_only`: the field, its hash-domain entry on both the struct and the \
+         destructuring tripwire, a `skip_serializing_if` helper for a reference field, and the \
+         paragraph each carries stating what the kind refuses and why it is in the domain",
     ),
     (
         "crates/connector-secrets/src/file.rs",
@@ -74,15 +77,21 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/scaffold.rs",
-        2_170,
-        "scaffold workflow pending command-stage extraction",
+        2_173,
+        "scaffold workflow pending command-stage extraction. Raised 2170 -> 2173 on 2026-08-25 for \
+         S-070: `Connector` gained `custody_only`, and the scaffolded identity must state it \
+         because the struct is exhaustively initialized here. Three lines, one of them the field \
+         and two a comment saying why a scaffolded connector is never custody-only. Packaging, not \
+         behaviour",
     ),
     (
         "crates/catalog-build/src/site.rs",
-        1_754,
+        1_755,
         "site projection pending model and renderer split; the growth past 1,718 is in-flight site \
          work, plus 2 lines for the closed `audio_v1` protocol entry, 4 for the closed `cdp_v1` \
-         one, and 3 for the closed `sql_v1` one",
+         one, 3 for the closed `sql_v1` one, and 1 raised on 2026-08-25 for S-070: `Connector` \
+         gained `custody_only` and this file initializes the struct exhaustively, which is the \
+         tripwire working as designed",
     ),
 ];
 
