@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Sentry error tracking: read an issue and its latest event, triage an issue, read a project",
-  "generator": "connectors 0.1.0",
+  "generator": "connectors 0.2.0",
   "operations": [
     {
       "auth": [

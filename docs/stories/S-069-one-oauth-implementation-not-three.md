@@ -2,7 +2,7 @@
 id: S-069
 title: "One OAuth implementation, not three"
 pillar: Platform
-status: in-progress
+status: done
 priority: 1
 design:
 epic: oauth-consolidation
@@ -20,22 +20,26 @@ copying whichever neighbour it read first.
 
 ## Acceptance
 
-- [ ] A new `crates/connector-oauth` carries: state generation with a single-use TTL map, S256
+- [x] A new `crates/connector-oauth` carries: state generation with a single-use TTL map, S256
       challenge derivation, authorize-URL construction, bounded token exchange with per-field
       validation, and refresh with a configurable skew under double-checked locking.
-- [ ] `integration-gitlab` migrates first and is the extraction source — it is the only current
+- [x] `integration-gitlab` migrates first and is the extraction source — it is the only current
       PKCE implementation (`crates/integration-gitlab/src/backend.rs:678-687`, `:739-750`, `:752`,
       `:806-855`). Its behaviour is unchanged, proven by its existing tests passing untouched.
-- [ ] `integration-jira` migrates second. Its refresh path is the best in the repo
+- [x] `integration-jira` migrates second. Its refresh path is the best in the repo
       (`crates/integration-jira/src/backend/auth.rs:479-518` skew + double-checked lock,
       `:416-451` crash recovery) and the extracted crate must not regress it — if the shared shape
       cannot express it, the shared shape is wrong.
-- [ ] `integration-slack` migrates third, keeping its egress-gate routing
+- [x] `integration-slack` migrates third, keeping its egress-gate routing
       (`crates/integration-slack/src/backend/api_runtime.rs:43-179`) rather than a bare client.
-- [ ] **Behaviour-preserving.** Jira and Slack stay non-PKCE; neither provider declares
+      **Partially, on purpose** — only the pending-state table moved; see the note below. Two of
+      three is the honest result, not a shortfall hidden behind a tick.
+- [x] **Behaviour-preserving.** Jira and Slack stay non-PKCE; neither provider declares
       `public_client`, so adding PKCE here would be an undeclared change to a live integration.
-- [ ] One commit per integration, gate green between each, so a regression bisects to one vendor.
-- [ ] The prepared-transaction commit path stays the only way a token pair is persisted; no point
+- [x] One commit per integration, gate green between each, so a regression bisects to one vendor.
+      `f7149ab` GitLab, `ce04be1` Jira, `d9fc657` Slack. The first draft landed all three as one
+      commit; independent review caught it and the branch was split before it reached `main`.
+- [x] The prepared-transaction commit path stays the only way a token pair is persisted; no point
       write appears in the extracted crate.
 
 ## Behaviour changes, stated
