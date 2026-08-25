@@ -94,13 +94,10 @@ impl JiraInner {
                 browser_url.into(),
             )
             .map_err(|_| connection_unavailable())?;
-        lock(&self.hosted_sessions).insert(
-            session_ref.clone(),
-            HostedSession {
-                expires_at_unix_ms,
-                oauth_authorize_url: authorize,
-            },
-        );
+        // The fallible inserts run before the infallible ones. A clock failure or a full pending
+        // map returns from here, and everything written so far stays written: ordering it this way
+        // means a refusal leaves no hosted session that `session_owners` has no row for. The
+        // browser reservation above still self-heals at the connect-session TTL.
         let now = now_ms().ok_or_else(connection_unavailable)?;
         lock(&self.oauth_states)
             .insert(
@@ -113,6 +110,13 @@ impl JiraInner {
                 now,
             )
             .map_err(|_| connection_unavailable())?;
+        lock(&self.hosted_sessions).insert(
+            session_ref.clone(),
+            HostedSession {
+                expires_at_unix_ms,
+                oauth_authorize_url: authorize,
+            },
+        );
         lock(&self.session_owners).insert(session_ref, owner);
         Ok(status)
     }

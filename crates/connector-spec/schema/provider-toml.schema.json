@@ -20,11 +20,19 @@
           "then": {
             "required": ["auth"],
             "properties": {
+              "auth": { "minItems": 1 },
               "base_url": false,
               "spec": false,
               "operations": false,
               "services": false,
-              "verify": false
+              "verify": false,
+              "channels": false,
+              "events": false,
+              "discoveries": false,
+              "graphs": false,
+              "patch": false,
+              "const_headers": false,
+              "default_auth": false
             }
           },
           "else": { "required": ["base_url"] }
@@ -261,7 +269,7 @@
           "description": "The generic RFC 6455 handshake. Valid only for socket transport; absence leaves an explicitly vendor-specific transport such as Slack Socket Mode."
         },
         "auth": {
-          "$ref": "#/$defs/authRequirements",
+          "$ref": "#/$defs/authRequirement",
           "description": "Credential-name alternatives the host resolves inside Connector custody to establish or supervise this channel. Distinct from socket `connect.auth`: a vendor-specific transport may authenticate a ticket-minting call before it has a WebSocket URL."
         },
         "events": {

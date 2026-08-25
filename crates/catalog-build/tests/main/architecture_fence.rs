@@ -28,13 +28,16 @@ const CLI_TOTAL_LINE_LIMIT: usize = 856;
 const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     (
         "crates/connector-spec/src/ir.rs",
-        2_763,
+        2_766,
         "legacy compiler IR pending declaration-family extraction; +14 for the closed `audio_v1` \
          driver and its request variant, +16 for the closed `cdp_v1` driver and its request \
          variant, +17 for the closed `sql_v1` driver and its request variant, +29 on 2026-08-25 \
          for S-070's `custody_only`: the field, its hash-domain entry on both the struct and the \
          destructuring tripwire, a `skip_serializing_if` helper for a reference field, and the \
-         paragraph each carries stating what the kind refuses and why it is in the domain",
+         paragraph each carries stating what the kind refuses and why it is in the domain, +3 \
+         after independent review to attribute the ruling to ADR 0056 rather than to an \
+         amendment of ADR 0014, and to state that the refusal reads the declared TOML key rather \
+         than the assembled value",
     ),
     (
         "crates/connector-secrets/src/file.rs",
@@ -70,10 +73,13 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
     ),
     (
         "crates/catalog-build/src/document.rs",
-        2_592,
+        2_333,
         "canonical lowering pending section-oriented extraction; +27 for the closed `audio_v1` \
          driver's request marker and schema branch, +21 for the closed `cdp_v1` driver's, +24 \
-         for the closed `sql_v1` driver's",
+         for the closed `sql_v1` driver's. Lowered 2592 -> 2333 on 2026-08-25 for S-070: the \
+         document gained `custody_only` and the two schema branches that make the flag a \
+         property of the document rather than a claim about it, and the test module moved to \
+         `document_tests.rs` so the fence measures lowering code rather than its tests",
     ),
     (
         "crates/catalog-build/src/scaffold.rs",

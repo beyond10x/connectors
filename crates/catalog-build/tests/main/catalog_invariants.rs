@@ -1918,3 +1918,80 @@ fn production_lines(text: &str) -> Vec<(usize, &str)> {
     }
     lines
 }
+
+/// **A custody-only provider publishes nothing that could spend its credential** — S-070.
+///
+/// Parameterised over the committed tree, so the provider that arrives in S-071 is covered the
+/// moment it exists rather than when somebody remembers. The loader already refuses each of these
+/// keys by name; this asserts the *published* document agrees, because the catalog is what a
+/// consumer reads and a loader-time refusal it cannot see is a claim rather than a property.
+///
+/// Both directions. A custody-only document carries no surface; an ordinary document carries at
+/// least one service, so the exemption cannot spread by accident to a provider that merely forgot
+/// to declare one.
+#[test]
+fn a_custody_only_provider_publishes_no_surface_and_every_other_provider_does() {
+    let (workspace, plan) = full_plan();
+    let documents = documents(&workspace, &plan);
+    let mut custody = Vec::new();
+
+    for (provider, document) in &documents {
+        let empty = |key: &str| {
+            document
+                .get(key)
+                .map(|value| value.as_array().expect("an array").is_empty())
+                .unwrap_or(true)
+        };
+
+        if document.get("custody_only").is_none() {
+            assert!(
+                !empty("services"),
+                "`{provider}` publishes no service and does not declare `custody_only`; a \
+                 provider with no surface either states the kind or is a lowering bug"
+            );
+            continue;
+        }
+
+        custody.push(provider.clone());
+        assert_eq!(
+            document["custody_only"],
+            json!(true),
+            "`{provider}` may only spell the flag as `true`; it is skipped when false"
+        );
+        for key in [
+            "services",
+            "operations",
+            "events",
+            "channels",
+            "discoveries",
+        ] {
+            assert!(
+                empty(key),
+                "`{provider}` is custody-only but publishes `{key}`, so something in connectors \
+                 could spend the credential"
+            );
+        }
+        assert!(
+            document.get("verify").is_none(),
+            "`{provider}` is custody-only but publishes a verification probe, which is a request"
+        );
+        assert!(
+            !empty("auth"),
+            "`{provider}` is custody-only and holds nothing, so it has no reason to exist"
+        );
+        for method in document["auth"].as_array().expect("auth") {
+            assert!(
+                method.get("oauth2").is_none(),
+                "`{provider}`'s credential declares `oauth2`, which says the host runs the token \
+                 grants — a request"
+            );
+        }
+    }
+
+    // Recorded rather than asserted non-empty: the kind is empty until S-071 lands `claude-code`,
+    // and a test that demanded a member would have to be edited to admit the first one.
+    assert!(
+        custody.len() <= documents.len(),
+        "custody-only providers in the committed tree: {custody:?}"
+    );
+}

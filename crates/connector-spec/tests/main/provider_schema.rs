@@ -346,11 +346,78 @@ fn the_schema_states_the_custody_only_conditional() {
         serde_json::json!(["auth"]),
         "a custody-only provider that holds nothing has no reason to exist"
     );
-    for refused in ["base_url", "spec", "operations", "services", "verify"] {
+    // The list is the security property, so the test enumerates it rather than sampling it. Every
+    // entry is a way a declaration could describe an outbound request; `channels` is the one that
+    // would otherwise have been missed, because a channel binding carries its own `auth` and
+    // `connector-resolve` places those resolved credentials onto the composed URL and headers.
+    for refused in [
+        "base_url",
+        "spec",
+        "operations",
+        "services",
+        "verify",
+        "channels",
+        "events",
+        "discoveries",
+        "graphs",
+        "patch",
+        "const_headers",
+        "default_auth",
+    ] {
         assert_eq!(
             conditional["then"]["properties"][refused],
             Value::Bool(false),
             "`{refused}` describes a request surface and must be refused, not ignored"
         );
+    }
+    assert_eq!(
+        conditional["then"]["properties"]["auth"]["minItems"],
+        serde_json::json!(1),
+        "`required: [auth]` alone admits `auth = []`, which holds nothing"
+    );
+}
+
+/// Every `$ref` names a `$defs` entry that exists.
+///
+/// Written because one did not. `authRequirements` was referenced where `authRequirement` is
+/// defined, which makes the whole document fail to compile as a schema — so every rule *downstream*
+/// of that `$ref` validated nothing at all, silently, for as long as it was there. A schema whose
+/// refusals are load-bearing has to be checked for being a schema first.
+#[test]
+fn every_ref_resolves_to_a_declared_def() {
+    let schema: Value = serde_json::from_str(PROVIDER_TOML_JSON_SCHEMA).expect("the schema parses");
+    let declared: BTreeSet<String> = schema["$defs"]
+        .as_object()
+        .expect("`$defs` is an object")
+        .keys()
+        .cloned()
+        .collect();
+
+    let mut referenced = BTreeSet::new();
+    collect_refs(&schema, &mut referenced);
+    assert!(!referenced.is_empty(), "the schema uses `$ref`");
+
+    let dangling: Vec<&String> = referenced.difference(&declared).collect();
+    assert!(
+        dangling.is_empty(),
+        "these `$ref`s name no `$defs` entry, so the schema does not compile: {dangling:?}"
+    );
+}
+
+fn collect_refs(value: &Value, into: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                if key == "$ref" {
+                    if let Some(name) = child.as_str().and_then(|r| r.strip_prefix("#/$defs/")) {
+                        into.insert(name.to_owned());
+                    }
+                } else {
+                    collect_refs(child, into);
+                }
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|item| collect_refs(item, into)),
+        _ => {}
     }
 }

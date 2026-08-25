@@ -3,8 +3,15 @@
 # The endpoint and schema facts are compiled from the two B10x-authored OpenAPI documents
 # below. Anthropic does not publish those machine-readable bytes; their provenance records exact
 # official references and repository ownership. This connector deliberately carries no Claude Code,
-# consumer-subscription, or undocumented Console OAuth acquisition. Harness credentials stay with
-# the harness adapter boundary; connector credentials authenticate the documented API surfaces only.
+# consumer-subscription, or undocumented Console OAuth acquisition: its credentials authenticate
+# the documented API surfaces only.
+#
+# A harness credential is still spent only by its harness adapter — platform ADR 0014's use rule,
+# which ADR 0056 leaves untouched. What ADR 0056 changed is *custody*: a pasted subscription
+# credential may be held under a distinct provider authority that can describe no request at all.
+# That is a separate provider, `claude-code` / `com.anthropic.claude-code`, and nothing about it
+# reaches this file. Keeping the two apart is why this one's auth list is pinned by
+# `catalog_invariants.rs`.
 
 id = "anthropic"
 vendor = "Anthropic"

@@ -115,8 +115,15 @@ impl<T> PendingStates<T> {
 
     /// Whether `state` is present and still live, without redeeming it.
     ///
-    /// This is what a backend answers `owns_hosted_oauth_state` with: the dispatcher asks before
-    /// routing a callback, and exactly one backend must claim it.
+    /// **Not** what a backend answers `owns_hosted_oauth_state` with — use
+    /// [`contains_any`](PendingStates::contains_any) for that. Answering ownership with this
+    /// method is a regression that has already been made once: an expired callback stops being
+    /// claimed, the dispatcher finds no owner, and the browser is told the callback is unknown
+    /// (`NotFound`) rather than that it expired (`Refused`). Ownership is about *which* backend
+    /// handles the callback; expiry is judged in the completion.
+    ///
+    /// This is for a caller that wants the liveness answer for its own reasons — a status
+    /// projection, a metric — and never for routing.
     #[must_use]
     pub fn contains(&self, state: &str, now_unix_ms: u64) -> bool {
         self.entries

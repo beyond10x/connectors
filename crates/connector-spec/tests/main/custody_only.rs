@@ -3,13 +3,15 @@
 //! Every other declaration describes a request surface, and the loader refuses one that describes
 //! neither `[spec]` nor `[[operations]]`. `custody_only` is the escape, for the case where that
 //! refusal is wrong: a credential whose *use* belongs to another component still needs an owner
-//! for its address, its store, its rotation and its revocation. Platform ADR 0014's 2026-08-25
-//! amendment admits exactly that, and design 16 states the terms.
+//! for its address, its store, its rotation and its revocation. Platform ADR 0056 admits exactly
+//! that, partially superseding ADR 0014 for custody, and design 16 states the terms.
 //!
-//! The kind is defined by what it refuses. Each of `[spec]`, `[[operations]]`, `[[service]]`,
-//! `base_url` and `verify` is rejected rather than ignored, so the flag cannot carry a
-//! half-declared ordinary provider past review, and `[[auth]]` is mandatory, because a
-//! custody-only provider that holds nothing has no reason to exist.
+//! The kind is defined by what it refuses, so these tests enumerate the refusal set rather than
+//! sampling it. Every key that could describe an outbound request is rejected **by presence**, not
+//! by emptiness: `#[serde(default)]` makes `base_url = ""` and `operations = []` indistinguishable
+//! from absent once parsed, and an author who wrote either believed this provider would call
+//! something. `[[auth]]` is mandatory, because a custody-only provider that holds nothing has no
+//! reason to exist.
 //!
 //! A synthetic fixture throughout: the shipped `claude-code` provider is S-071's write set, and
 //! the rule under test is the loader's.
@@ -76,7 +78,7 @@ fn every_key_that_would_describe_a_request_surface_is_refused_by_name() {
             "[spec]\npath = \"specs/acme/api.openapi.yaml\"\nsha256 = \"0000000000000000000000000000000000000000000000000000000000000000\"",
         ),
         (
-            "`[[service]]`",
+            "`[[services]]`",
             "",
             "[[services]]\nname = \"api\"\ndescription = \"A surface.\"",
         ),
@@ -98,6 +100,30 @@ placement_requirement = "connectors_deployment"
 implementation_form = "built_in"
 required_capabilities = ["public_network"]"#,
         ),
+        (
+            "`[[channels]]`",
+            "",
+            "[[channels]]\nname = \"acme-stream\"\ntransport = \"socket\"\n\n[channels.connect]\npath = \"/ws\"\n\n[[channels.connect.auth]]\ncredentials = [\"acme.subscription_token\"]",
+        ),
+        (
+            "`[[events]]`",
+            "",
+            "[[events]]\nname = \"acme-thing-changed\"\ndescription = \"Something changed.\"",
+        ),
+        ("`[patch]`", "", "[[patch.operations]]\nselect = \"ping\""),
+        ("`const_headers`", "const_headers = { \"x-acme\" = \"1\" }", ""),
+        (
+            "`default_auth`",
+            "default_auth = [{ credentials = [\"acme.subscription_token\"] }]",
+            "",
+        ),
+        // Present but blank. `#[serde(default)]` erases the difference after parsing, so a check
+        // written against the assembled value accepts all four of these — which is why the check
+        // is written against the declared key instead.
+        ("`base_url`", "base_url = \"\"", ""),
+        ("`base_url`", "base_url = \"\\t \"", ""),
+        ("`[[operations]]`", "operations = []", ""),
+        ("`[[services]]`", "services = []", ""),
     ] {
         let message = refusal(&custody_provider(head, tail));
         assert!(
@@ -190,5 +216,71 @@ fn the_flag_is_in_the_hash_domain_but_costs_absent_declarations_nothing() {
         !encoded.contains("custody_only"),
         "a false flag must not appear in the canonical bytes, or `connectors.lock` churns for 64 \
          providers nobody edited"
+    );
+}
+
+/// A channel binding is the refusal that was almost missed, so it gets its own test.
+///
+/// `[[channels]]` carries its own `auth`, and `connector-resolve`'s channel composition places
+/// those resolved credentials onto the composed URL and headers. A custody-only provider that could
+/// declare one could spend the very credential this kind exists to make unspendable — the security
+/// property would have been false while every other refusal held.
+#[test]
+fn a_channel_binding_cannot_carry_the_credential_out() {
+    let message = refusal(&custody_provider(
+        "",
+        "[[channels]]\nname = \"acme-stream\"\ntransport = \"socket\"\n\n[channels.connect]\npath = \"/ws\"\n\n[[channels.connect.auth]]\ncredentials = [\"acme.subscription_token\"]",
+    ));
+    assert!(
+        message.contains("`[[channels]]`") && message.contains("composed URL and headers"),
+        "the refusal must say why a channel binding is a request; got: {message}"
+    );
+}
+
+/// `oauth2` on the credential says the host runs the token grants, which is a request.
+///
+/// Refused on the credential rather than on a top-level key, because this one is spelled inside
+/// `[[auth]]` — the block a custody-only provider is *required* to have.
+#[test]
+fn a_credential_that_asks_the_host_to_run_grants_is_refused() {
+    let source = r#"
+id = "acme-custody"
+vendor = "Acme"
+authority = "com.acme.custody"
+description = "A fixture whose credential asks for a token grant."
+custody_only = true
+
+[[auth]]
+name = "acme.subscription_token"
+scheme = "bearer"
+subject = "user"
+description = "A token another component spends."
+
+[auth.oauth2]
+authorize_path = "/oauth/authorize"
+token_path = "/oauth/token"
+grants = ["authorization_code", "refresh_token"]
+public_client = true
+"#;
+    let message = refusal(source);
+    assert!(
+        message.contains("acme.subscription_token") && message.contains("`oauth2`"),
+        "the refusal must name the credential and the key; got: {message}"
+    );
+}
+
+/// `auth = []` is not the same as no `[[auth]]`, and both hold nothing.
+#[test]
+fn an_empty_auth_array_holds_nothing_too() {
+    let source = r#"
+id = "acme-custody"
+vendor = "Acme"
+description = "A fixture that declares the block and leaves it empty."
+custody_only = true
+auth = []
+"#;
+    assert!(
+        refusal(source).contains("no `[[auth]]`"),
+        "an empty array is a provider that holds nothing, spelled differently"
     );
 }

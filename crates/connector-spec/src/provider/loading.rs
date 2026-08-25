@@ -195,7 +195,7 @@ fn load_inner(
         operation.semantic_effects.sort_unstable();
     }
 
-    problems.extend(validate(&loaded, &provider_headers, &inline));
+    problems.extend(validate(&loaded, source, &provider_headers, &inline));
     if !problems.is_empty() {
         return Err(crate::Error::InvalidProvider {
             name: name.to_owned(),
