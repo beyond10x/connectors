@@ -25,6 +25,11 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ### Changed
 
+- `scripts/gate.sh` gains `--list-workspaces`, `--workspace <path>` and `--final`. No argument still
+  runs everything, unchanged. The flags exist so CI can shard the gate one workspace per runner: the
+  eleven workspaces do not share a `target/` directory and need about 39 GB between them, which no
+  hosted runner has. CI reads the workspace list from this script rather than keeping a second copy
+  that would drift.
 - `scripts/check-local-identity-refused.sh` now holds the release workflow to the same rule it
   already held the Dockerfile to: no Cargo feature is selected for a build that ships. The image was
   the only such build when that guard was written; a tag now attaches archives for five targets.
