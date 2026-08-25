@@ -88,6 +88,12 @@ jobs:
           rustup default stable
           rustc --version
 
+      # `gate.sh --final` runs `catalog check` with `--offline`, deliberately: the catalog verifier
+      # must prove it reads only committed bytes. Offline still needs the registry populated, and a
+      # runner's is empty.
+      - name: Populate the registry
+        run: cargo fetch --locked
+
       - name: Catalog lock verifier and documentation checks
         run: bash scripts/gate.sh --final
 
