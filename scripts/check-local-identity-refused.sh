@@ -15,8 +15,9 @@
 #      that combination.
 #   2. No manifest turns `debug-assertions` back on for the release profile, which is the one way
 #      rule 1 could be defeated without editing the refusal itself.
-#   3. The image build passes no `--features` at all and builds `--release`, so the shipped binary
-#      is the default feature set even before rule 1 applies.
+#   3. Every build that produces a shipped binary passes no `--features` at all and builds
+#      `--release`, so what ships is the default feature set even before rule 1 applies. There are
+#      two such builds: the image, and the release workflow that attaches CLI archives to a tag.
 #
 # The runtime half of the guard — a feature build refusing to serve anything but a loopback
 # listener resolving a loopback Identity — is asserted by `identity-http`'s own unit tests and by
@@ -60,4 +61,20 @@ if ! grep -q 'cargo build --manifest-path crates/connectors-cli/Cargo.toml --loc
   refuse 'Dockerfile no longer builds the product binary with --release; rule 1 no longer covers the image'
 fi
 
-printf 'local-identity is refused by the release profile and absent from the image build\n'
+# 3b. Same rule for the release workflow, which is the other place a shipped binary is produced.
+# The image was the only one when this guard was written; a tag now attaches CLI archives for five
+# targets, and a `--features local-identity` slipped into that matrix would ship the plaintext
+# Identity path to anyone who downloads one.
+workflow=.github/workflows/release.yml
+if [ -f "$workflow" ]; then
+  if grep -n -- '--features' "$workflow"; then
+    refuse "$workflow selects a Cargo feature; released archives must build the default set"
+  fi
+  if ! grep -q 'cargo build --manifest-path "\$CLI_MANIFEST" --locked --release' "$workflow"; then
+    refuse "$workflow no longer builds the product binary with --locked --release; rule 1 no longer covers the archives"
+  fi
+else
+  refuse "$workflow is missing; the released archives are built by something this guard cannot see"
+fi
+
+printf 'local-identity is refused by the release profile and absent from the image and archive builds\n'

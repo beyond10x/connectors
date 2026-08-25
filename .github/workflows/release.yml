@@ -1,0 +1,239 @@
+# Cutting a tag ships the CLI.
+#
+# The tag is the trigger because in this repository the version *is* the artifact identity:
+# `[workspace.package] version` is what `catalog-build` writes into every catalog document's
+# `generator` field, into every `connectors.lock` row, and into the wire User-Agent. A tag that
+# disagreed with the committed version would ship binaries whose self-reported identity is wrong and
+# whose lock rows nobody could reproduce, so `gate` refuses that before anything is built.
+#
+# `GITHUB_TOKEN` is enough here. AGENTS.md requires b10x-bot authorship for a workflow that
+# *creates or pushes a commit*; this one creates a release and uploads assets, and never writes to a
+# branch. That keeps the App private key out of CI, where it has no business being.
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  # Build every target without publishing anything, so the matrix can be proved before a tag
+  # depends on it. The `release` job is skipped unless the run is a tag push.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # The product manifest. A nested workspace, so every cargo invocation names it explicitly.
+  CLI_MANIFEST: crates/connectors-cli/Cargo.toml
+
+jobs:
+  gate:
+    name: pre-release gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `check-secrets.sh` scans complete history; a shallow clone would report a clean tree
+          # by seeing almost none of it.
+          fetch-depth: 0
+
+      - name: The tag agrees with the committed version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          committed=$(sed -n '/^\[workspace\.package\]/,/^\[/p' Cargo.toml \
+            | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)
+          printf 'tag=%s committed=%s\n' "$tag" "$committed"
+          if [ "$tag" != "$committed" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match [workspace.package] version ${committed}." \
+                 "The version is the artifact identity written into every catalog document's generator," \
+                 "so a disagreement ships binaries that misreport themselves." >&2
+            exit 1
+          fi
+
+      - name: The CHANGELOG has an entry for this version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          grep -qE "^## ${version}( |$)" CHANGELOG.md || {
+            echo "::error::CHANGELOG.md has no '## ${version}' section. The release notes are read from it." >&2
+            exit 1
+          }
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustc --version
+
+      - name: Repository gate
+        run: bash scripts/gate.sh
+
+      - name: Secret scan over complete history
+        run: bash scripts/check-secrets.sh
+
+      - name: The release profile still refuses local-identity
+        run: bash scripts/check-local-identity-refused.sh
+
+  build:
+    name: ${{ matrix.target }}
+    needs: gate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One target failing must not hide whether the others build.
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+          rustc --version
+
+      # `aws-lc-sys` assembles its own crypto and needs an assembler MSVC does not provide. cmake
+      # and a C toolchain are already on every runner; NASM is the one gap, and without it the
+      # Windows leg fails inside a build script rather than anywhere obvious.
+      - name: NASM (aws-lc-sys, Windows only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nasm --no-progress -y
+          "$env:ProgramFiles\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # Default feature set, deliberately: no Cargo feature is selected here. The `local-identity`
+      # exception must reach no shipped binary, and `scripts/check-local-identity-refused.sh`
+      # asserts this line stays that way — the same rule it already holds the Dockerfile to, and
+      # the reason that guard greps this file at all.
+      - name: Build
+        shell: bash
+        run: cargo build --manifest-path "$CLI_MANIFEST" --locked --release --target ${{ matrix.target }}
+
+      - name: Smoke-test the binary it just built
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="crates/connectors-cli/target/${{ matrix.target }}/release/connectors"
+          if [ "${{ runner.os }}" = "Windows" ]; then bin="${bin}.exe"; fi
+          # Every leg is native, so the runner can execute what it just built. `--version` is the
+          # one assertion worth making here: it prints `[workspace.package] version`, which is the
+          # same string the tag was checked against, so a mismatch between what was tagged and what
+          # was linked shows up before the asset is uploaded rather than after someone installs it.
+          "$bin" --version
+          "$bin" --help > /dev/null
+          if [ "${{ github.event_name }}" = "push" ]; then
+            printed=$("$bin" --version | awk '{print $NF}')
+            if [ "$printed" != "${GITHUB_REF_NAME#v}" ]; then
+              echo "::error::the built binary reports ${printed}, the tag says ${GITHUB_REF_NAME#v}" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            name="connectors-dev-${{ matrix.target }}"
+          else
+            name="connectors-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          fi
+          mkdir -p "dist/$name"
+          src="crates/connectors-cli/target/${{ matrix.target }}/release/connectors"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "${src}.exe" "dist/$name/connectors.exe"
+          else
+            cp "$src" "dist/$name/connectors"
+          fi
+          # No LICENSE-MIT / LICENSE-APACHE file exists in the tree yet, though the manifests
+          # declare `MIT OR Apache-2.0`. When they land, add them here.
+          cp README.md CHANGELOG.md "dist/$name/"
+          cd dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a -tzip "${name}.zip" "$name" > /dev/null
+          else
+            tar -czf "${name}.tar.gz" "$name"
+          fi
+          ls -l
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*.${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: publish
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          # Named explicitly rather than `*`, so a re-run cannot hash a previous SHA256SUMS.
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      # The curated section, not a commit list. CHANGELOG.md is where the reasoning already lives;
+      # `--generate-notes` appends the commit range underneath it.
+      - name: Notes from the CHANGELOG
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::no CHANGELOG section for ${version}" >&2; exit 1; }
+          cat notes.md
+
+      # Idempotent on purpose: a re-run after a failed upload must finish the release rather than
+      # refuse because it already exists.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "connectors ${GITHUB_REF_NAME#v}" \
+              --notes-file notes.md \
+              --generate-notes
+          fi
