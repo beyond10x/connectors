@@ -70,6 +70,16 @@ jobs:
           rustup default stable
           rustc --version
 
+      # `engine_free` and `msrv_fence` shell out to `cargo metadata --offline` on purpose — the
+      # no-network fence is the point of both. On a cold runner that fails on the first
+      # platform-specific crate it cannot find, `anstyle-wincon` being the one it reached first,
+      # because a Linux `cargo test` never downloads a Windows-only dependency. `cargo fetch`
+      # without `--target` populates the registry for *every* target, which is exactly the graph
+      # those two tests then walk offline. Fetching is not weakening the fence: the fence asserts
+      # the build makes no request, and this runs before the build.
+      - name: Populate the registry for every target
+        run: cargo fetch --locked
+
       - name: Repository gate
         run: bash scripts/gate.sh
 
@@ -82,6 +92,9 @@ jobs:
   build:
     name: ${{ matrix.target }}
     needs: gate
+    # A tag must not build unless the gate is green. A manual dispatch builds regardless, because
+    # it exists to answer "do the five targets still compile" and a gate failure would hide that.
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.gate.result == 'success') }}
     runs-on: ${{ matrix.runner }}
     strategy:
       # One target failing must not hide whether the others build.
