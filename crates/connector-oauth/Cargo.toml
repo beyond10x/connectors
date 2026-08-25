@@ -1,0 +1,22 @@
+[package]
+name = "connector-oauth"
+description = "The authorization-code OAuth mechanics an Integration needs, with no transport: PKCE, single-use state, token-response validation, refresh timing."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+# No transport, and no clock. Three Integrations dial three different ways — GitLab and Jira hold
+# their own `reqwest`, Slack routes every call through the egress gate — so a crate that owned the
+# HTTP would have to abstract all three, and would drag a client into everything that links it.
+# Every function here takes the bytes or the instant it needs as an argument.
+base64.workspace = true
+getrandom = "0.3"
+sha2.workspace = true
+thiserror.workspace = true
+url.workspace = true
+zeroize.workspace = true

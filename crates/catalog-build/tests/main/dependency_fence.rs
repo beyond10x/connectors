@@ -93,6 +93,12 @@ fn the_build_path_does_not_depend_on_the_secret_store() {
 ///
 /// **Being in this list is a classification, not a fence.**
 const HOST_LIBRARIES: &[&str] = &[
+    // The authorization-code OAuth mechanics, shared by the Integrations that run a browser flow.
+    // It is here rather than in `NETWORK_CRATES` because it owns no transport at all: the three
+    // callers dial three different ways — two hold their own client, Slack routes through the
+    // egress gate — so this crate produces what goes into a request and judges what comes out of
+    // one, and never performs it. It reads no clock either; every instant is an argument.
+    "connector-oauth",
     // The plan-deriving core: it reads the canonical document and returns a request plan, and it
     // opens no socket — no HTTP client, no DNS resolver, no transport at all. The egress seam that
     // will carry one lives in the platform family. It is not in `COMPILER_CRATES` because nothing

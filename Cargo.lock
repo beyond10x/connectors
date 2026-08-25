@@ -354,6 +354,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "connector-oauth"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "getrandom 0.3.4",
+ "sha2",
+ "thiserror",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "connector-resolve"
 version = "0.1.0"
 dependencies = [
