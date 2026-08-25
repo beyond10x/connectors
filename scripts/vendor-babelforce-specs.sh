@@ -16,10 +16,14 @@
 #      every hex digit zeroed.
 #   2. **Email addresses.** Any address that is not on the short `publishable_addresses` allowlist —
 #      so a new one in a future pull comes out by default. This class is **not** credentials, and that
-#      is exactly why it needs stating: `redacted@example.com` is a named individual's work
-#      address and `trautomations@…​.iam.gserviceaccount.com` is an internal GCP service-account
-#      identity. Neither is a secret; both are things a public repository must not carry, and
-#      repository history makes either expensive to undo once pushed.
+#      is exactly why it needs stating: one of the two is a named individual's work address at the
+#      vendor, the other an internal GCP service-account identity. Neither is a secret; both are
+#      things a public repository must not carry, and repository history makes either expensive to
+#      undo once pushed.
+#
+#      **Neither literal is written down here.** Naming the address in the script that removes it
+#      would publish exactly what the scrub exists to withhold — the same reasoning the marker list
+#      below already applies to the two AWS account ids, and it applies no less to a person's name.
 #   3. **Telephone numbers.** Any phone-keyed value that is not one of the constructed
 #      `+49 30 0000 00xx` numbers the call examples are written against.
 #
@@ -130,9 +134,10 @@ markers='gitlab|nexus|\.dkr\.ecr|amazonaws\.com|latest\.dev|rc\.dev|preproductio
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# Escape a literal for use inside an ERE pattern. Not optional: `redacted@example.com` contains a
-# `+`, which is a repetition operator, so an unescaped literal would match `willtest@…`, `willtttest@…`
-# and never the address itself — a substitution that silently does nothing.
+# Escape a literal for use inside an ERE pattern. Not optional: one of the addresses scrubbed here
+# carries a `+` in its local part, which is a repetition operator, so an unescaped literal of the
+# shape `user+tag@example.com` would match `usertag@…`, `usertttag@…` and never the address itself —
+# a substitution that silently does nothing.
 ere_escape() {
     printf '%s' "$1" | sed -E 's/[][()|.*+?^$\\{}]/\\&/g'
 }
