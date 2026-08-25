@@ -7,6 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::state::GitlabState;
 use async_trait::async_trait;
 use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use connector_oauth::{
+    AuthorizeParams, Pending, PendingStates, Pkce, ScopePolicy, ScopeSeparator, TokenPolicy,
+    TokenResponse, DEFAULT_PENDING_CAPACITY,
+};
 use connector_secrets::{
     CredentialRef, CredentialScope, Layout, PreparedSecretStore, Secret, SecretBatch,
     SecretProposalDigest, SecretTransactionGeneration, SecretTransactionId, SecretTransactionState,
@@ -107,7 +111,7 @@ pub(crate) struct GitlabInner {
     sessions: Mutex<ConnectSessionLifecycle>,
     session_owners: Mutex<BTreeMap<String, SessionOwner>>,
     hosted_sessions: Mutex<BTreeMap<String, HostedSession>>,
-    oauth_states: Mutex<BTreeMap<String, OAuthPending>>,
+    oauth_states: Mutex<PendingStates<OAuthPending>>,
     completion_lock: tokio::sync::Mutex<()>,
     refresh_lock: tokio::sync::Mutex<()>,
     http: reqwest::Client,
@@ -155,7 +159,6 @@ struct OAuthPending {
     session_ref: String,
     owner: SessionOwner,
     verifier: Zeroizing<String>,
-    expires_at_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -298,7 +301,7 @@ impl GitlabBackend {
             ),
             session_owners: Mutex::new(BTreeMap::new()),
             hosted_sessions: Mutex::new(BTreeMap::new()),
-            oauth_states: Mutex::new(BTreeMap::new()),
+            oauth_states: Mutex::new(PendingStates::new(DEFAULT_PENDING_CAPACITY)),
             completion_lock: tokio::sync::Mutex::new(()),
             refresh_lock: tokio::sync::Mutex::new(()),
             http,
@@ -468,7 +471,7 @@ impl ConnectorBackend for GitlabBackend {
     }
 
     fn owns_hosted_oauth_state(&self, integration_ref: &str, state: &str) -> bool {
-        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_key(state)
+        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_any(state)
     }
 
     async fn complete_hosted_oauth(
@@ -677,12 +680,11 @@ impl GitlabInner {
         };
         let (oauth_state, oauth_authorize_url) = if profile == GitlabProfile::OAuthUser {
             let state = random_token(32).map_err(|_| connection_unavailable())?;
-            let verifier = Zeroizing::new(random_token(48).map_err(|_| connection_unavailable())?);
-            let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+            let pkce = Pkce::generate().map_err(|_| connection_unavailable())?;
             let authorize = self
-                .oauth_authorize_url(&state, &challenge)
+                .oauth_authorize_url(&state, pkce.challenge())
                 .map_err(|_| connection_unavailable())?;
-            (Some((state, verifier)), Some(authorize))
+            (Some((state, pkce.into_verifier())), Some(authorize))
         } else {
             (None, None)
         };
@@ -705,15 +707,19 @@ impl GitlabInner {
             },
         );
         if let Some((state, verifier)) = oauth_state {
-            lock(&self.oauth_states).insert(
-                state,
-                OAuthPending {
-                    session_ref: session_ref.clone(),
-                    owner: session_owner.clone(),
-                    verifier,
+            let now = now_ms().ok_or_else(connection_unavailable)?;
+            lock(&self.oauth_states)
+                .insert(
+                    state,
+                    OAuthPending {
+                        session_ref: session_ref.clone(),
+                        owner: session_owner.clone(),
+                        verifier,
+                    },
                     expires_at_unix_ms,
-                },
-            );
+                    now,
+                )
+                .map_err(|_| connection_unavailable())?;
         }
         lock(&self.session_owners).insert(session_ref, session_owner);
         Ok(status)
@@ -733,21 +739,23 @@ impl GitlabInner {
             lock(&self.session_owners).remove(&session_ref);
             let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Expired);
         }
-        lock(&self.oauth_states).retain(|_, pending| now < pending.expires_at_unix_ms);
+        lock(&self.oauth_states).expire(now);
     }
 
     fn oauth_authorize_url(&self, state: &str, challenge: &str) -> Result<String, GitlabError> {
-        let mut url = self.origin.clone();
-        url.set_path("/oauth/authorize");
-        url.query_pairs_mut()
-            .append_pair("client_id", &self.policy.oauth_client_id)
-            .append_pair("redirect_uri", &self.policy.oauth_redirect_uri)
-            .append_pair("response_type", "code")
-            .append_pair("scope", "api")
-            .append_pair("state", state)
-            .append_pair("code_challenge", challenge)
-            .append_pair("code_challenge_method", "S256");
-        Ok(url.into())
+        connector_oauth::authorize_url(
+            &self.origin,
+            "/oauth/authorize",
+            &AuthorizeParams {
+                client_id: &self.policy.oauth_client_id,
+                redirect_uri: &self.policy.oauth_redirect_uri,
+                scope: "api",
+                state,
+                code_challenge: Some(challenge),
+                extra: &[],
+            },
+        )
+        .map_err(|error| GitlabError::new(error.code()))
     }
 
     async fn complete_oauth(
@@ -757,13 +765,14 @@ impl GitlabInner {
         error: Option<&str>,
     ) -> Result<(), HostedCompletionError> {
         self.expire_sessions();
-        let pending = lock(&self.oauth_states)
+        let Pending {
+            payload: pending,
+            expires_at_unix_ms,
+        } = lock(&self.oauth_states)
             .remove(state)
             .ok_or(HostedCompletionError::NotFound)?;
         lock(&self.hosted_sessions).remove(&pending.session_ref);
-        if error.is_some()
-            || code.is_none()
-            || now_ms().is_none_or(|now| now >= pending.expires_at_unix_ms)
+        if error.is_some() || code.is_none() || now_ms().is_none_or(|now| now >= expires_at_unix_ms)
         {
             let _ =
                 lock(&self.sessions).finish(&pending.session_ref, ConnectSessionTerminal::Failed);
@@ -839,20 +848,13 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("oauth-exchange"))?;
         drop(client_secret);
         let value: OAuthTokenResponse = decode_response(response, 64 * 1024).await?;
-        if value.token_type != "Bearer"
-            || value.access_token.is_empty()
-            || value.access_token.len() > 4_096
-            || value.refresh_token.is_empty()
-            || value.refresh_token.len() > 4_096
-            || !parse_scopes(&value.scope).contains(&"api".to_owned())
-            || value.expires_in == 0
-            || value.created_at == 0
-        {
-            return Err(GitlabError::new("oauth-exchange"));
-        }
+        let token = connector_oauth::validate(token_response(value), &EXCHANGE_POLICY)
+            .map_err(|_| GitlabError::new("oauth-exchange"))?;
         Ok(CredentialValues {
-            access_token: Secret::new(value.access_token),
-            refresh_token: Some(Secret::new(value.refresh_token)),
+            access_token: Secret::new(token.access_token.to_string()),
+            refresh_token: token
+                .refresh_token
+                .map(|refresh| Secret::new(refresh.to_string())),
         })
     }
 
@@ -1393,14 +1395,9 @@ impl GitlabInner {
         drop(client_secret);
         drop(refresh_token);
         let exchanged: OAuthTokenResponse = decode_response(response, 64 * 1024).await?;
-        if exchanged.token_type != "Bearer"
-            || exchanged.access_token.is_empty()
-            || exchanged.refresh_token.is_empty()
-            || !parse_scopes(&exchanged.scope).contains(&"api".to_owned())
-        {
-            return Err(GitlabError::new("oauth-refresh"));
-        }
-        let access = Secret::new(exchanged.access_token);
+        let refreshed = connector_oauth::validate(token_response(exchanged), &REFRESH_POLICY)
+            .map_err(|_| GitlabError::new("oauth-refresh"))?;
+        let access = Secret::new(refreshed.access_token.to_string());
         let info: OAuthTokenInfo = self
             .provider_json("/oauth/token/info", &access, &[])
             .await?;
@@ -1433,7 +1430,9 @@ impl GitlabInner {
             updated,
             CredentialValues {
                 access_token: access,
-                refresh_token: Some(Secret::new(exchanged.refresh_token)),
+                refresh_token: refreshed
+                    .refresh_token
+                    .map(|refresh| Secret::new(refresh.to_string())),
             },
         )
         .await
@@ -2464,18 +2463,48 @@ fn email_sha256(value: &str) -> String {
     hex::encode(Sha256::digest(normalize_email(value).as_bytes()))
 }
 
-fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
-    let mut scopes = scopes
-        .into_iter()
-        .filter(|scope| matches!(scope.as_str(), "read_api" | "api"))
-        .collect::<Vec<_>>();
-    scopes.sort();
-    scopes.dedup();
-    scopes
+/// The scopes this connector records as held. A token granted more is stored as this subset,
+/// because the stored list is what later authorization reads.
+const RETAINED_SCOPES: &[&str] = &["read_api", "api"];
+
+const SCOPE_POLICY: ScopePolicy<'static> = ScopePolicy {
+    separator: ScopeSeparator::Whitespace,
+    retain: Some(RETAINED_SCOPES),
+};
+
+/// The exchange response carries the full set of facts and every one of them is required.
+const EXCHANGE_POLICY: TokenPolicy<'static> = TokenPolicy {
+    expect_token_type: "Bearer",
+    require_refresh_token: true,
+    required_scopes: &["api"],
+    scopes: SCOPE_POLICY,
+    require_created_at: true,
+    require_expires_in: true,
+    max_secret_len: 4_096,
+};
+
+/// The refresh response is judged more loosely, and deliberately: this path recomputes expiry
+/// from the separate `/oauth/token/info` call rather than from the response, so `created_at` and
+/// `expires_in` here are fields the connector never reads.
+const REFRESH_POLICY: TokenPolicy<'static> = TokenPolicy {
+    require_created_at: false,
+    require_expires_in: false,
+    ..EXCHANGE_POLICY
+};
+
+fn token_response(value: OAuthTokenResponse) -> TokenResponse {
+    TokenResponse {
+        access_token: value.access_token,
+        refresh_token: Some(value.refresh_token),
+        expires_in: value.expires_in,
+        created_at: Some(value.created_at),
+        scope: value.scope,
+        token_type: value.token_type,
+    }
 }
 
-fn parse_scopes(value: &str) -> Vec<String> {
-    canonical_scopes(value.split_whitespace().map(str::to_owned).collect())
+fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
+    connector_oauth::parse_scopes(&scopes.join(" "), &SCOPE_POLICY)
 }
 
 fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> bool {
@@ -2787,75 +2816,4 @@ fn datasource_cursor_expired() -> DatasourceError {
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn origins_are_exact_https_only() {
-        assert!(parse_origin("https://gitlab.example.test").is_ok());
-        for invalid in [
-            "http://gitlab.example.test",
-            "https://user@gitlab.example.test",
-            "https://gitlab.example.test:8443",
-            "https://gitlab.example.test/group",
-        ] {
-            assert!(parse_origin(invalid).is_err(), "{invalid}");
-        }
-    }
-
-    #[test]
-    fn profiles_are_closed_and_self_service() {
-        assert_eq!(
-            GitlabProfile::parse(Some(PROFILE_OAUTH)),
-            Some(GitlabProfile::OAuthUser)
-        );
-        assert_eq!(
-            GitlabProfile::parse(Some(PROFILE_PAT)),
-            Some(GitlabProfile::PersonalToken)
-        );
-        assert_eq!(GitlabProfile::parse(Some("gitlab.bot")), None);
-    }
-
-    #[test]
-    fn datasource_projection_drops_sensitive_and_unknown_fields() {
-        let projected = project_record(
-            "gitlab.users",
-            DatasourceRecordView::Compact,
-            &serde_json::json!({
-                "id": 7,
-                "username": "dev",
-                "name": "Developer",
-                "state": "active",
-                "bot": false,
-                "email": "sentinel@example.test",
-                "private_profile": false,
-                "identities": [{"extern_uid":"SENTINEL"}]
-            }),
-        )
-        .unwrap();
-        assert!(projected.get("email").is_none());
-        assert!(projected.get("identities").is_none());
-        assert!(projected.get("private_profile").is_none());
-    }
-
-    #[test]
-    fn datasource_cursors_are_bound_to_connection_and_project() {
-        let cursor = datasource_cursor("gitlab.issues", "connection:gitlab:a", Some(42), 2);
-        assert_eq!(
-            parse_datasource_cursor(&cursor, "gitlab.issues", "connection:gitlab:a", Some(42)),
-            Ok(2)
-        );
-        assert!(
-            parse_datasource_cursor(&cursor, "gitlab.issues", "connection:gitlab:a", Some(43))
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn pat_shape_rejects_whitespace_and_oversize_values() {
-        assert!(parse_pat(b"glpat-example-token").is_ok());
-        assert!(parse_pat(b"glpat bad").is_err());
-        assert!(parse_pat(&vec![b'x'; 4_097]).is_err());
-    }
-}
+include!("backend_tests.rs");
