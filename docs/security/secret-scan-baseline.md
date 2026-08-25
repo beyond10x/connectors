@@ -3,7 +3,14 @@
 Gitleaks 8.30.1 reports 87 findings represented by 86 exact fingerprints in the repository's
 history. The current tree carries no credential material.
 
-**Regenerated 2026-08-25 after the history rewrite.** A fingerprint is
+**Regenerated 2026-08-25 after the history rewrites.** Regenerate from a scan run with
+`.gitleaksignore` **removed**. Scanning with it in place and then asking which of its entries still
+match is circular: the suppressed findings are absent from the report, so a whole class can look
+resolved when it is only hidden. That happened once here and cost a wrong count.
+
+A rewrite invalidates every fingerprint whose commit it touched, and only those — so a rewrite that
+edits one late commit leaves early fingerprints valid and breaks the rest, which is more confusing
+than all-or-nothing. A fingerprint is
 `<commit>:<path>:<rule>:<line>`, so rewriting history invalidates every one of them at once — the
 same bytes at the same lines, under new commit ids. Every finding was reclassified from scratch
 rather than carried over by count: five classes, each named below, none of them credential material.
