@@ -897,6 +897,8 @@ pub(super) struct ProviderFile {
     pub(super) services: Vec<Service>,
     #[serde(default)]
     pub(super) vendor: String,
+    /// Required, except for a `custody_only` provider, which is refused if it states one.
+    #[serde(default)]
     pub(super) base_url: String,
     #[serde(default)]
     pub(super) description: String,
@@ -918,6 +920,8 @@ pub(super) struct ProviderFile {
     pub(super) config: Vec<ConfigField>,
     #[serde(default)]
     pub(super) verify: Option<String>,
+    #[serde(default)]
+    pub(super) custody_only: bool,
     #[serde(default)]
     pub(super) graphs: Vec<Graph>,
     /// `[spec]` **or** `[[spec]]` — C-410.

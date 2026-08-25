@@ -139,7 +139,10 @@ fn the_schema_marks_the_mandatory_keys_required() {
     };
 
     let cases: [(&str, &[&str]); 8] = [
-        ("provider", &["id", "base_url"]),
+        // `base_url` moved out of the unconditional list with S-070: a `custody_only` provider
+        // describes no request surface, so it is refused one. The conditional that replaced it is
+        // asserted by `the_schema_states_the_custody_only_conditional` below.
+        ("provider", &["id"]),
         // No default for `scheme`: how a secret reaches the wire is not decided by silence.
         ("authMethod", &["name", "scheme"]),
         // No default for direction, the driver discriminator, or policy fields. Driver-specific
@@ -313,4 +316,41 @@ kind = { operation = { operation = "acme-thing-list" } }
         connector.graphs[0].expose,
         "a flow saying nothing about `expose` must load as exposed"
     );
+}
+
+/// **The schema states the custody-only conditional, not just the loader.**
+///
+/// `base_url` left `$defs.provider.required` when S-070 landed. If nothing replaced it, an
+/// ordinary provider could omit a base URL and the schema would say nothing — the loader would
+/// still refuse, but the schema is what an editor and a reviewer read first.
+#[test]
+fn the_schema_states_the_custody_only_conditional() {
+    let schema: Value = serde_json::from_str(PROVIDER_TOML_JSON_SCHEMA).expect("the schema parses");
+    let conditional = schema["$defs"]["provider"]["allOf"]
+        .as_array()
+        .and_then(|all| all.first())
+        .expect("`$defs.provider.allOf` carries the custody-only conditional");
+
+    assert_eq!(
+        conditional["if"]["properties"]["custody_only"]["const"],
+        Value::Bool(true),
+        "the conditional must key on `custody_only` being set"
+    );
+    assert_eq!(
+        conditional["else"]["required"],
+        serde_json::json!(["base_url"]),
+        "every provider that did not opt in still owes a `base_url`"
+    );
+    assert_eq!(
+        conditional["then"]["required"],
+        serde_json::json!(["auth"]),
+        "a custody-only provider that holds nothing has no reason to exist"
+    );
+    for refused in ["base_url", "spec", "operations", "services", "verify"] {
+        assert_eq!(
+            conditional["then"]["properties"][refused],
+            Value::Bool(false),
+            "`{refused}` describes a request surface and must be refused, not ignored"
+        );
+    }
 }

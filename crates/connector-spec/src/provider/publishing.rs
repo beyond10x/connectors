@@ -1110,6 +1110,7 @@ pub(super) fn assemble(
             config: file.config,
             verify: file.verify,
             graphs: file.graphs,
+            custody_only: file.custody_only,
             provenance,
         },
         specs,

@@ -455,6 +455,7 @@ mod tests {
             config: Vec::new(),
             verify: None,
             graphs: Vec::new(),
+            custody_only: false,
             provenance: Default::default(),
         }
     }

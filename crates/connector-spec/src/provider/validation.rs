@@ -15,7 +15,7 @@ pub(super) fn validate(
     if connector.id.trim().is_empty() {
         problems.push("`id` must not be empty — it names the generated `<id>.flux`".to_owned());
     }
-    if connector.base_url.trim().is_empty() {
+    if !connector.custody_only && connector.base_url.trim().is_empty() {
         problems.push(
             "`base_url` must not be empty. It is stated explicitly even when a spec is present: \
              the babelforce document declares staging as `servers[0]`, so a positional default \
@@ -23,11 +23,12 @@ pub(super) fn validate(
                 .to_owned(),
         );
     }
+    validate_custody_only(loaded, &mut problems);
 
     // The two messages below are pinned verbatim by `tests/golden/nothing-to-generate.error` and
     // `tests/golden/patch-without-spec.error`, and they are about the *absence* of any `[spec]` —
     // which C-410 did not change. A file with no spec block has none in either spelling.
-    if loaded.specs.is_empty() && connector.operations.is_empty() {
+    if !connector.custody_only && loaded.specs.is_empty() && connector.operations.is_empty() {
         problems.push(
             "declares neither `[spec]` nor any `[[operations]]`, so it describes no operations at \
              all. Write the operations inline for a hand-authored connector, or point `[spec]` at \
@@ -76,6 +77,65 @@ pub(super) fn validate(
 /// document supplies — and it names the emitted `<provider>-<service>.flux`. Letting a `service` key
 /// conjure one would make a typo a silently-emitted extra module rather than a refusal, which is the
 /// rule [`validate_member_service`] already keeps for every other member kind.
+/// **A custody-only provider declares a credential and nothing else.**
+///
+/// Every entry is a refusal rather than a silent allowance. The kind exists so that a credential
+/// whose *use* belongs to another component can still have an owner, an address and a lifecycle
+/// here; the moment it could also describe a request, "connectors cannot spend this" would be a
+/// claim in a comment instead of a property of the declaration.
+///
+/// `base_url` is refused rather than ignored for the same reason the others are: an author who
+/// wrote one believed this provider would call something, and silently dropping it would leave
+/// that belief in the file for the next reader to act on.
+fn validate_custody_only(loaded: &LoadedProvider, problems: &mut Vec<String>) {
+    let connector = &loaded.connector;
+    if !connector.custody_only {
+        return;
+    }
+    for (present, key, why) in [
+        (
+            !loaded.specs.is_empty(),
+            "`[spec]`",
+            "a spec describes a request surface",
+        ),
+        (
+            !connector.operations.is_empty(),
+            "`[[operations]]`",
+            "an operation is a request this provider could make",
+        ),
+        (
+            !connector.services.is_empty(),
+            "`[[service]]`",
+            "a service exists to carry operations",
+        ),
+        (
+            !connector.base_url.trim().is_empty(),
+            "`base_url`",
+            "there is no request to build a URL for",
+        ),
+        (
+            connector.verify.is_some(),
+            "`verify`",
+            "a verification probe is a request",
+        ),
+    ] {
+        if present {
+            problems.push(format!(
+                "`custody_only` provider declares {key}, but {why}. A custody-only provider holds \
+                 a credential another component spends; remove {key}, or remove `custody_only` \
+                 and declare the surface properly"
+            ));
+        }
+    }
+    if connector.auth.is_empty() {
+        problems.push(
+            "`custody_only` provider declares no `[[auth]]`, so it holds nothing and has no \
+             reason to exist"
+                .to_owned(),
+        );
+    }
+}
+
 fn validate_specs(loaded: &LoadedProvider, problems: &mut Vec<String>) {
     let many = loaded.specs.len() > 1;
     let available = loaded.connector.service_names();

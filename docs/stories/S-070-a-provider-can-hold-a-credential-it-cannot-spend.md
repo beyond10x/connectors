@@ -2,8 +2,8 @@
 id: S-070
 title: "A provider can hold a credential it cannot spend"
 pillar: Catalog
-status: ready
-priority: 2
+status: done
+priority:
 design: ../design/16-subscription-credential-custody.md
 epic: subscription-custody
 areas: [connector-spec, catalog-build]
@@ -37,7 +37,18 @@ without any path by which connectors could spend it.
       passes. The site projection renders the provider without pretending it has operations.
 
 ## Progress
-- (not started)
+
+- 2026-08-25 — landed. `custody_only` is on `Connector` and `ProviderFile`, `base_url` became
+  optional at the serde layer, and `validate_custody_only` refuses `[spec]`, `[[operations]]`,
+  `[[service]]`, `base_url` and `verify` by name while requiring `[[auth]]`.
+- In the hash domain, `skip_serializing_if` when false: `catalog diff` reports 68 artifacts up to
+  date over 64 providers, so no provider that predates the kind moved.
+- The exhaustive `Connector` destructuring in `HashDomain::of` forced the domain decision at
+  compile time, as designed. Three module-size waivers rose by the lines the field cost
+  (`ir.rs` +29, `scaffold.rs` +3, `site.rs` +1), each with a dated reason.
+- 5 tests in `connector-spec/tests/main/custody_only.rs`; the two golden key-list snapshots picked
+  up the new key. `nothing-to-generate.error` is unchanged, which is the proof the pre-existing
+  refusal still applies to every provider that did not opt in.
 
 ## Notes
 

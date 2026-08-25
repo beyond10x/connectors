@@ -129,6 +129,7 @@ fn babelforce() -> Connector {
         config: Vec::new(),
         verify: None,
         graphs: Vec::new(),
+        custody_only: false,
         provenance: Provenance::default(),
     }
 }

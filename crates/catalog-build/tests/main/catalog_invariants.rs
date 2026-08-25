@@ -160,10 +160,7 @@ fn sip_catalog_surface_is_the_bounded_platform_dial_member() {
         0,
         "Asterisk is only a configurable SIP peer, never the native capability owner"
     );
-    assert_eq!(
-        documents(&workspace, &plan)["b10x"]["authority"],
-        "io.b10x"
-    );
+    assert_eq!(documents(&workspace, &plan)["b10x"]["authority"], "io.b10x");
     assert_eq!(operation["id"], "sip-dial");
     assert_eq!(operation["interaction_shape"], "session_establishment");
     assert_eq!(operation["risk"], "high");
