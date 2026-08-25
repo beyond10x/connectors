@@ -20,6 +20,7 @@ members = [
     "crates/catalog-reader",
     "crates/catalog",
     "crates/connector-resolve",
+    "crates/connector-oauth",
     "crates/connector-secrets",
     "crates/connector-state",
     "crates/connectors-client",
@@ -91,6 +92,7 @@ connector-spec = { version = "0.1.0", path = "crates/connector-spec" }
 catalog-reader = { version = "0.1.0", path = "crates/catalog-reader" }
 catalog = { version = "0.1.0", path = "crates/catalog" }
 connector-resolve = { version = "0.1.0", path = "crates/connector-resolve" }
+connector-oauth = { version = "0.1.0", path = "crates/connector-oauth" }
 connector-secrets = { version = "0.1.0", path = "crates/connector-secrets" }
 connector-state = { version = "0.1.0", path = "crates/connector-state" }
 connectors-client = { version = "0.1.0", path = "crates/connectors-client" }
