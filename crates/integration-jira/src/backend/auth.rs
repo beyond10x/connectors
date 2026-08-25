@@ -1,5 +1,8 @@
 //! Atlassian OAuth, service credential resolution, and recoverable delegated credential commits.
 
+use connector_oauth::{
+    AuthorizeParams, Pending, ScopePolicy, ScopeSeparator, TokenPolicy, TokenResponse,
+};
 use connector_secrets::{
     CredentialRef, CredentialScope, Layout, SecretBatch, SecretProposalDigest,
     SecretTransactionGeneration, SecretTransactionId, SecretTransactionState, TenantLayout,
@@ -98,14 +101,18 @@ impl JiraInner {
                 oauth_authorize_url: authorize,
             },
         );
-        lock(&self.oauth_states).insert(
-            state,
-            OAuthPending {
-                session_ref: session_ref.clone(),
-                owner: owner.clone(),
+        let now = now_ms().ok_or_else(connection_unavailable)?;
+        lock(&self.oauth_states)
+            .insert(
+                state,
+                OAuthPending {
+                    session_ref: session_ref.clone(),
+                    owner: owner.clone(),
+                },
                 expires_at_unix_ms,
-            },
-        );
+                now,
+            )
+            .map_err(|_| connection_unavailable())?;
         lock(&self.session_owners).insert(session_ref, owner);
         Ok(status)
     }
@@ -124,21 +131,28 @@ impl JiraInner {
             lock(&self.session_owners).remove(&session_ref);
             let _ = lock(&self.sessions).finish(&session_ref, ConnectSessionTerminal::Expired);
         }
-        lock(&self.oauth_states).retain(|_, pending| now < pending.expires_at_unix_ms);
+        lock(&self.oauth_states).expire(now);
     }
 
     fn oauth_authorize_url(&self, state: &str) -> Result<String, JiraError> {
-        let mut url = url::Url::parse("https://auth.atlassian.com/authorize")
+        let origin = url::Url::parse("https://auth.atlassian.com")
             .map_err(|_| JiraError::new("oauth-origin"))?;
-        url.query_pairs_mut()
-            .append_pair("audience", "api.atlassian.com")
-            .append_pair("client_id", &self.policy.user_oauth_client_id)
-            .append_pair("scope", &USER_SCOPES.join(" "))
-            .append_pair("redirect_uri", &self.policy.oauth_redirect_uri)
-            .append_pair("state", state)
-            .append_pair("response_type", "code")
-            .append_pair("prompt", "consent");
-        Ok(url.into())
+        // Atlassian is a confidential client: it authenticates the exchange with a secret and the
+        // provider declares no `public_client`, so no PKCE challenge is sent. `audience` and
+        // `prompt` are Atlassian's own additions to the authorization request.
+        connector_oauth::authorize_url(
+            &origin,
+            "/authorize",
+            &AuthorizeParams {
+                client_id: &self.policy.user_oauth_client_id,
+                redirect_uri: &self.policy.oauth_redirect_uri,
+                scope: &USER_SCOPES.join(" "),
+                state,
+                code_challenge: None,
+                extra: &[("audience", "api.atlassian.com"), ("prompt", "consent")],
+            },
+        )
+        .map_err(|error| JiraError::new(error.code()))
     }
 
     pub(super) async fn complete_oauth(
@@ -148,13 +162,14 @@ impl JiraInner {
         error: Option<&str>,
     ) -> Result<(), HostedCompletionError> {
         self.expire_sessions();
-        let pending = lock(&self.oauth_states)
+        let Pending {
+            payload: pending,
+            expires_at_unix_ms,
+        } = lock(&self.oauth_states)
             .remove(state)
             .ok_or(HostedCompletionError::NotFound)?;
         lock(&self.hosted_sessions).remove(&pending.session_ref);
-        if error.is_some()
-            || code.is_none()
-            || now_ms().is_none_or(|now| now >= pending.expires_at_unix_ms)
+        if error.is_some() || code.is_none() || now_ms().is_none_or(|now| now >= expires_at_unix_ms)
         {
             let _ =
                 lock(&self.sessions).finish(&pending.session_ref, ConnectSessionTerminal::Failed);
@@ -457,10 +472,11 @@ impl JiraInner {
         if connection.grant_ref != self.policy.user_grant_ref {
             return Err(JiraError::new("connection-grant"));
         }
-        if now_ms().is_none_or(|now| {
-            connection.expires_at_unix_ms
-                <= now.saturating_add(self.policy.refresh_skew_seconds.saturating_mul(1_000))
-        }) {
+        if connector_oauth::refresh_due(
+            connection.expires_at_unix_ms,
+            now_ms(),
+            self.policy.refresh_skew_seconds,
+        ) {
             self.refresh_user_oauth(&connection.connection_ref).await?;
         }
         let current = lock(&self.metadata)
@@ -489,10 +505,13 @@ impl JiraInner {
             })
             .cloned()
             .ok_or_else(|| JiraError::new("connection-state"))?;
-        if now_ms().is_some_and(|now| {
-            connection.expires_at_unix_ms
-                > now.saturating_add(self.policy.refresh_skew_seconds.saturating_mul(1_000))
-        }) {
+        // The second half of the double-check: a caller queued behind a refresh that already
+        // happened must not perform a second one.
+        if !connector_oauth::refresh_due(
+            connection.expires_at_unix_ms,
+            now_ms(),
+            self.policy.refresh_skew_seconds,
+        ) {
             return Ok(());
         }
         let refresh = self
@@ -607,19 +626,26 @@ impl JiraInner {
                         .map_err(|_| JiraError::new("service-oauth"))?;
                     drop(secret);
                     let value: OAuthTokenResponse = decode_response(response, 64 * 1024).await?;
-                    let scopes = parse_scopes(&value.scope);
-                    if value.token_type != "Bearer"
-                        || value.access_token.is_empty()
-                        || value.access_token.len() > 4_096
-                        || value.expires_in == 0
-                        || !scopes.iter().any(|scope| scope == "read:jira-work")
-                    {
-                        return Err(JiraError::new("service-oauth-evidence"));
-                    }
+                    let validated = connector_oauth::validate(
+                        TokenResponse {
+                            access_token: value.access_token,
+                            refresh_token: value.refresh_token,
+                            expires_in: value.expires_in,
+                            created_at: None,
+                            scope: value.scope,
+                            token_type: value.token_type,
+                        },
+                        &SERVICE_POLICY,
+                    )
+                    .map_err(|_| JiraError::new("service-oauth-evidence"))?;
                     let expires_at_unix_ms = now_ms()
-                        .and_then(|now| now.checked_add(value.expires_in.saturating_mul(1_000)))
-                        .ok_or_else(|| JiraError::new("clock"))?;
-                    let token = Secret::new(value.access_token);
+                        .ok_or_else(|| JiraError::new("clock"))
+                        .and_then(|now| {
+                            validated
+                                .expires_at_unix_ms(now)
+                                .map_err(|_| JiraError::new("clock"))
+                        })?;
+                    let token = Secret::new(validated.access_token.to_string());
                     let returned = Secret::new(token.expose_secret());
                     *self.service_token.lock().await = Some(CachedServiceToken {
                         token,
@@ -646,29 +672,77 @@ impl JiraInner {
     }
 }
 
+/// Atlassian returns whatever it granted; nothing is filtered out, so the stored list is the
+/// grant as issued.
+pub(super) const SCOPE_POLICY: ScopePolicy<'static> = ScopePolicy {
+    separator: ScopeSeparator::Whitespace,
+    retain: None,
+};
+
+/// The exchange response, which must carry a refresh token.
+///
+/// `created_at` is absent from Atlassian's response and `expires_in` is the only lifetime signal
+/// this connector gets, so it is required while `created_at` is not.
+pub(super) const EXCHANGE_POLICY: TokenPolicy<'static> = TokenPolicy {
+    expect_token_type: "Bearer",
+    require_refresh_token: true,
+    required_scopes: &["read:jira-work", "write:jira-work"],
+    scopes: SCOPE_POLICY,
+    require_created_at: false,
+    require_expires_in: true,
+    max_secret_len: 4_096,
+};
+
+/// The refresh response, which may rotate only the access token.
+pub(super) const REFRESH_POLICY: TokenPolicy<'static> = TokenPolicy {
+    require_refresh_token: false,
+    ..EXCHANGE_POLICY
+};
+
+/// The `client_credentials` service token: no refresh token exists for this grant, and the fixed
+/// organization credential is read-only, so only the read scope is required.
+pub(super) const SERVICE_POLICY: TokenPolicy<'static> = TokenPolicy {
+    require_refresh_token: false,
+    required_scopes: &["read:jira-work"],
+    ..EXCHANGE_POLICY
+};
+
 fn credentials_from_token(
     value: OAuthTokenResponse,
     require_refresh: bool,
 ) -> Result<CredentialValues, JiraError> {
-    let scopes = parse_scopes(&value.scope);
-    let refresh = value.refresh_token.unwrap_or_default();
-    if value.token_type != "Bearer"
-        || value.access_token.is_empty()
-        || value.access_token.len() > 4_096
-        || value.expires_in == 0
-        || require_refresh && (refresh.is_empty() || refresh.len() > 4_096)
-        || !["read:jira-work", "write:jira-work"]
-            .iter()
-            .all(|required| scopes.iter().any(|scope| scope == required))
-    {
-        return Err(JiraError::new("oauth-exchange"));
-    }
+    let policy = if require_refresh {
+        &EXCHANGE_POLICY
+    } else {
+        &REFRESH_POLICY
+    };
+    let token = connector_oauth::validate(
+        TokenResponse {
+            access_token: value.access_token,
+            refresh_token: value.refresh_token,
+            expires_in: value.expires_in,
+            created_at: None,
+            scope: value.scope,
+            token_type: value.token_type,
+        },
+        policy,
+    )
+    .map_err(|_| JiraError::new("oauth-exchange"))?;
     let expires_at_unix_ms = now_ms()
-        .and_then(|now| now.checked_add(value.expires_in.saturating_mul(1_000)))
-        .ok_or_else(|| JiraError::new("clock"))?;
+        .ok_or_else(|| JiraError::new("clock"))
+        .and_then(|now| {
+            token
+                .expires_at_unix_ms(now)
+                .map_err(|_| JiraError::new("clock"))
+        })?;
     Ok(CredentialValues {
-        access_token: Secret::new(value.access_token),
-        refresh_token: Secret::new(refresh),
+        access_token: Secret::new(token.access_token.to_string()),
+        refresh_token: Secret::new(
+            token
+                .refresh_token
+                .map(|refresh| refresh.to_string())
+                .unwrap_or_default(),
+        ),
         expires_at_unix_ms,
     })
 }
@@ -715,14 +789,12 @@ pub(super) async fn decode_value_response(
     }
 }
 
-fn canonical_scopes(mut scopes: Vec<String>) -> Vec<String> {
-    scopes.sort();
-    scopes.dedup();
-    scopes
+fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
+    parse_scopes(&scopes.join(" "))
 }
 
 fn parse_scopes(value: &str) -> Vec<String> {
-    canonical_scopes(value.split_whitespace().map(str::to_owned).collect())
+    connector_oauth::parse_scopes(value, &SCOPE_POLICY)
 }
 
 fn normalize_email(value: &str) -> String {
@@ -777,6 +849,81 @@ mod tests {
         assert_eq!(
             parse_scopes("write:jira-work read:jira-work read:jira-work"),
             vec!["read:jira-work", "write:jira-work"]
+        );
+    }
+
+    // The three below characterise the token judgement that moved to `connector-oauth`. Jira had
+    // one OAuth test before this — the scope canonicalisation above — so nothing here was covered.
+
+    fn response() -> TokenResponse {
+        TokenResponse {
+            access_token: "SENTINEL-NOT-A-REAL-SECRET".to_owned(),
+            refresh_token: Some("SENTINEL-NOT-A-REAL-REFRESH".to_owned()),
+            expires_in: 3_600,
+            created_at: None,
+            scope: "read:jira-work write:jira-work offline_access".to_owned(),
+            token_type: "Bearer".to_owned(),
+        }
+    }
+
+    #[test]
+    fn the_exchange_policy_refuses_everything_the_inline_condition_refused() {
+        type Break = fn(&mut TokenResponse);
+        let cases: &[(&str, Break)] = &[
+            ("token_type", |r| r.token_type = "MAC".to_owned()),
+            ("empty access", |r| r.access_token = String::new()),
+            ("oversize access", |r| r.access_token = "a".repeat(4_097)),
+            ("zero expires_in", |r| r.expires_in = 0),
+            ("no refresh", |r| r.refresh_token = None),
+            ("empty refresh", |r| r.refresh_token = Some(String::new())),
+            ("oversize refresh", |r| {
+                r.refresh_token = Some("a".repeat(4_097));
+            }),
+            ("read scope only", |r| r.scope = "read:jira-work".to_owned()),
+            ("write scope only", |r| {
+                r.scope = "write:jira-work".to_owned()
+            }),
+        ];
+        for (name, break_it) in cases {
+            let mut value = response();
+            break_it(&mut value);
+            assert!(
+                connector_oauth::validate(value, &EXCHANGE_POLICY).is_err(),
+                "{name} must refuse"
+            );
+        }
+        assert!(connector_oauth::validate(response(), &EXCHANGE_POLICY).is_ok());
+    }
+
+    #[test]
+    fn the_refresh_policy_allows_a_response_that_rotates_only_the_access_token() {
+        let mut value = response();
+        value.refresh_token = None;
+        assert!(connector_oauth::validate(value, &REFRESH_POLICY).is_ok());
+
+        let mut value = response();
+        value.scope = "read:jira-work".to_owned();
+        assert!(
+            connector_oauth::validate(value, &REFRESH_POLICY).is_err(),
+            "a refresh that comes back with a narrower grant is still refused"
+        );
+    }
+
+    #[test]
+    fn the_service_policy_needs_only_the_read_scope_and_no_refresh_token() {
+        let mut value = response();
+        value.refresh_token = None;
+        value.scope = "read:jira-work".to_owned();
+        assert!(
+            connector_oauth::validate(value, &SERVICE_POLICY).is_ok(),
+            "the client_credentials grant issues no refresh token and is read-only"
+        );
+
+        let mut value = response();
+        value.scope = "write:jira-work".to_owned();
+        assert!(
+            connector_oauth::validate(value, &SERVICE_POLICY).is_err(),
+            "the read scope is still required"
         );
     }
 }
