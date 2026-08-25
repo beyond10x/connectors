@@ -47,7 +47,7 @@ ir_sha256 = "870da3accccdb6cbc72dd0100b3e611cafd631c72fcb4eb1a5331a5113f0d9cc"
 [[provider]]
 id = "anthropic"
 generator = "connectors 0.1.0"
-toml_sha256 = "0cbbfb3778bbfd06f5796653e8e7a2c3cafd5ee941662164f33f8b64db5c852d"
+toml_sha256 = "b1620d7d689cf3e0ebdac000e8f41bc088f27a2c60dffeb7a07c93799567caba"
 ir_sha256 = "05a5a2dfc247c1829a064de696ecb1c95891f3ba4fb212aa540bcaa5a1ec71b2"
 
 [[provider.specs]]

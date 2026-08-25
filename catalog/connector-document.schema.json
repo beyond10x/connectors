@@ -1358,6 +1358,43 @@
   "$id": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "A custody-only provider publishes no service and no operation; every other provider publishes at least one service. The two branches are what makes `custody_only` a property of the document rather than a claim about it.",
+      "else": {
+        "properties": {
+          "services": {
+            "minItems": 1
+          }
+        }
+      },
+      "if": {
+        "required": [
+          "custody_only"
+        ]
+      },
+      "then": {
+        "properties": {
+          "channels": {
+            "maxItems": 0
+          },
+          "discoveries": {
+            "maxItems": 0
+          },
+          "events": {
+            "maxItems": 0
+          },
+          "operations": {
+            "maxItems": 0
+          },
+          "services": {
+            "maxItems": 0
+          },
+          "verify": false
+        }
+      }
+    }
+  ],
   "description": "One canonical, deterministic catalog document per provider (Decision 0022, C-536): the complete published connector surface, including an explicit request template per operation. The template vocabulary is closed and total — literal values, `{var}` interpolation over caller parameters and endpoint slots, and `$param` splices — and the oauth2 object deliberately has no field for a registration value: the client identifier and secret are per-deployment, published only as operator-level configuration requirements through the `binds` grammar.",
   "properties": {
     "$schema": {
@@ -1388,6 +1425,9 @@
     "connector": {
       "minLength": 1,
       "type": "string"
+    },
+    "custody_only": {
+      "const": true
     },
     "default_auth": {
       "$ref": "#/$defs/requirements"
@@ -1427,7 +1467,6 @@
       "items": {
         "$ref": "#/$defs/service"
       },
-      "minItems": 1,
       "type": "array"
     },
     "vendor": {

@@ -103,6 +103,13 @@ pub fn authorize_url(
         return Err(OauthError::AuthorizeUrl);
     }
     url.set_path(path);
+    // The authorize URL is built, not appended to. An origin carrying its own query or fragment
+    // would otherwise contribute `?tenant=acme` before `client_id` and keep `#frag` after `state`,
+    // which is a different request than the one this function claims to construct. Neither shipped
+    // caller can reach it today — GitLab validates its origin query- and fragment-free, Jira's is a
+    // constant — but S-013's loopback callback inherits this builder.
+    url.set_query(None);
+    url.set_fragment(None);
     {
         let mut query = url.query_pairs_mut();
         query
@@ -242,5 +249,38 @@ mod tests {
             ),
             Err(OauthError::AuthorizeUrl)
         );
+    }
+
+    /// The builder owns the whole URL, not just the part it appends.
+    ///
+    /// An origin that already carries a query or a fragment must not leak either into the
+    /// authorize request: `?tenant=acme` ahead of `client_id` and a trailing `#frag` make a
+    /// different request than the one the parameters describe.
+    #[test]
+    fn an_origin_carrying_a_query_or_fragment_contributes_neither() {
+        let origin = Url::parse("https://idp.example.test/base?tenant=acme#frag").expect("origin");
+        let url = authorize_url(
+            &origin,
+            "/oauth/authorize",
+            &AuthorizeParams {
+                client_id: "client",
+                redirect_uri: "https://app.example.test/callback",
+                scope: "api",
+                state: "state-value",
+                code_challenge: None,
+                extra: &[],
+            },
+        )
+        .expect("the authorize URL builds");
+
+        assert!(
+            !url.contains("tenant"),
+            "the origin's query is not ours: {url}"
+        );
+        assert!(
+            !url.contains('#'),
+            "the origin's fragment is not ours: {url}"
+        );
+        assert!(url.starts_with("https://idp.example.test/oauth/authorize?client_id=client&"));
     }
 }

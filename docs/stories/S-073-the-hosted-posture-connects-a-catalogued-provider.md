@@ -26,11 +26,11 @@ already reaches on a laptop.
       per provider.
 - [ ] Per-user addressing: one fresh `instance_id` per Connection, keyed to the owner's subject,
       addressed by `CredentialRef::for_instance(tenant, authority, instance_id, service, leaf)` —
-      the Jira shape at `crates/integration-jira/src/backend/auth.rs:433-447`.
+      the Jira shape at `crates/integration-jira/src/backend/auth.rs:452-465`.
 - [ ] The address is produced by `integration_catalog::credential_address`
       (`crates/integration-catalog/src/lib.rs:798-818`) and by nothing else. A second copy of the
       addressing rule is what made `auth status` report every named instance as not-connected
-      (`crates/connectors-console/src/enrol.rs:227`).
+      (`crates/connectors-console/src/enrol.rs:70-72`).
 - [ ] `connect_session_access` returns `SelfService` for catalogued paste credentials: any admitted
       person connects their own credential without an operator.
 - [ ] `setup_profiles` advertises the available flows so a UI can render them without hardcoding a

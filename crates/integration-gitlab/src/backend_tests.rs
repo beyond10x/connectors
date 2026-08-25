@@ -154,4 +154,36 @@ mod tests {
             );
         }
     }
+
+    /// The adapter carries every field across, and marks the two GitLab always sends as present.
+    ///
+    /// The four policy tests above construct a `TokenResponse` directly, which skips the one place
+    /// a field could be dropped on the way in. `refresh_token` and `created_at` are `Option` on the
+    /// shared type and mandatory on GitLab's, and `EXCHANGE_POLICY` refuses `None` for both — so an
+    /// adapter that lost either would turn a good exchange into `oauth-exchange` at runtime and
+    /// nothing here would have said so.
+    #[test]
+    fn the_adapter_carries_every_field_gitlab_sends() {
+        let carried = token_response(OAuthTokenResponse {
+            access_token: "SENTINEL-NOT-A-REAL-SECRET-access".to_owned(),
+            refresh_token: "SENTINEL-NOT-A-REAL-SECRET-refresh".to_owned(),
+            expires_in: 7_200,
+            created_at: 1_724_500_000,
+            scope: "api read_api".to_owned(),
+            token_type: "Bearer".to_owned(),
+        });
+
+        assert_eq!(carried.access_token, "SENTINEL-NOT-A-REAL-SECRET-access");
+        assert_eq!(
+            carried.refresh_token.as_deref(),
+            Some("SENTINEL-NOT-A-REAL-SECRET-refresh")
+        );
+        assert_eq!(carried.expires_in, 7_200);
+        assert_eq!(carried.created_at, Some(1_724_500_000));
+        assert_eq!(carried.scope, "api read_api");
+        assert_eq!(carried.token_type, "Bearer");
+
+        connector_oauth::validate(carried, &EXCHANGE_POLICY)
+            .expect("what the adapter produces is what the exchange policy accepts");
+    }
 }

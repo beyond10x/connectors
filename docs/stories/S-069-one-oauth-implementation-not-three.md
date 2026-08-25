@@ -27,8 +27,8 @@ copying whichever neighbour it read first.
       PKCE implementation (`crates/integration-gitlab/src/backend.rs:678-687`, `:739-750`, `:752`,
       `:806-855`). Its behaviour is unchanged, proven by its existing tests passing untouched.
 - [ ] `integration-jira` migrates second. Its refresh path is the best in the repo
-      (`crates/integration-jira/src/backend/auth.rs:453-536` skew + double-checked lock,
-      `:397-432` crash recovery) and the extracted crate must not regress it — if the shared shape
+      (`crates/integration-jira/src/backend/auth.rs:479-518` skew + double-checked lock,
+      `:416-451` crash recovery) and the extracted crate must not regress it — if the shared shape
       cannot express it, the shared shape is wrong.
 - [ ] `integration-slack` migrates third, keeping its egress-gate routing
       (`crates/integration-slack/src/backend/api_runtime.rs:43-179`) rather than a bare client.
@@ -37,6 +37,49 @@ copying whichever neighbour it read first.
 - [ ] One commit per integration, gate green between each, so a regression bisects to one vendor.
 - [ ] The prepared-transaction commit path stays the only way a token pair is persisted; no point
       write appears in the extracted crate.
+
+## Behaviour changes, stated
+
+The Acceptance says behaviour-preserving. These four are the exceptions, each deliberate and none
+observed against a live vendor. Recorded here rather than left for a reader to discover:
+
+1. **GitLab's token bound tightened.** Access and refresh secrets over 4096 bytes are now refused
+   by `EXCHANGE_POLICY`/`REFRESH_POLICY`; the inline code had no such bound. A differential run of
+   the old inline conditions against the new policies over 15,500 combinations found exactly these
+   360 rows and no others.
+2. **Jira's authorize-URL parameter order changed** — `audience, client_id, scope, redirect_uri,
+   state, response_type, prompt` became `client_id, redirect_uri, response_type, scope, state,
+   audience, prompt`. Key set, values and percent-encoding are byte-identical; only the order
+   moved, and order is not significant in a query string. GitLab's authorize URL is byte-identical.
+3. **`canonical_scopes` changed from per-element filtering to join-and-resplit.** An array element
+   that itself contains whitespace — `["api sudo"]` — was dropped entirely before and now
+   contributes `api`. Neither GitLab nor Atlassian returns such an element; the new reading is the
+   more defensible one, and it is stated rather than assumed.
+4. **The pending-state table is now bounded** at `DEFAULT_PENDING_CAPACITY` (1024) in all three.
+   It was unbounded, and every connect session inserts one. Expired entries are swept before the
+   bound is consulted, so only a genuine flood reaches it. See *Known gap*.
+5. **`authorize_url` now clears the origin's query and fragment.** Previously the shared builder
+   appended to whatever the origin carried. Unreachable from either shipped caller — GitLab
+   validates its origin query- and fragment-free, Jira's is a constant — but S-013's loopback
+   callback inherits this builder, so it was fixed rather than documented.
+
+`owns_hosted_oauth_state` deliberately still ignores expiry (`contains_any`). Making it
+expiry-aware turned an expired callback from `Refused` into `NotFound`, because the dispatcher then
+found no claimant — caught during the migration, reverted, and now pinned by the doc comment on
+`PendingStates::contains`, which previously repeated `contains_any`'s claim and would have re-sold
+the same mistake to the next reader.
+
+**Slack is migrated only partially, on purpose.** `PendingStates` replaced its state map; its
+authorize URL (which omits `response_type`), its `xoxp-`-prefix token judgement with a 2048-byte
+bound, and its per-scope charset parser stay as they are. Forcing them through `TokenPolicy` would
+either change a live request or make the policy unreadable.
+
+## Known gap
+
+`DEFAULT_PENDING_CAPACITY` (1024) is a **shared denial surface**. 1024 concurrently-live pendings
+within `connect_session_ttl_seconds` makes every further connect session for that integration
+return `connection_unavailable`, process-wide across tenants. Entries self-expire, so it cannot
+wedge permanently. Stated because the bound is declared in this story and its failure mode was not.
 
 ## Progress
 
@@ -78,17 +121,6 @@ configuration soup:
 
 Two of three is the honest result. A `TokenPolicy` stretched to cover Slack would have been a
 shared type no caller could read.
-
-### Behaviour changes, stated
-
-- **The pending-state table is now bounded** at `DEFAULT_PENDING_CAPACITY` (1024) in all three. It
-  was unbounded, and every connect session inserts one. Expired entries are swept before the bound
-  is consulted, so only a genuine flood reaches it.
-- **GitLab's refresh response is now length-bounded** at 4096, as its exchange response already
-  was. Previously unbounded; a GitLab token is ~88 characters, so this is unreachable in practice.
-- `owns_hosted_oauth_state` deliberately still ignores expiry (`contains_any`). Making it
-  expiry-aware turned an expired callback from `Refused` into `NotFound`, because the dispatcher
-  then found no claimant — caught during the migration and reverted.
 
 - Measured 2026-08-25: there is no shared OAuth module, no `crates/oauth-*`, no helper. A fourth
   connector needing a browser flow means a fourth copy.

@@ -155,6 +155,11 @@ impl SlackInner {
                         oauth_authorize_url,
                     },
                 );
+                // Fallible after infallible here, unlike GitLab and Jira: the `hosted_sessions`
+                // insert is inside the match arm and its inputs are moved into it, so hoisting the
+                // pending insert above would need the arm restructured. A refusal leaves a hosted
+                // session with no `session_owners` row, which `expire_hosted_sessions` clears at
+                // the connect-session TTL.
                 if let Some(state) = oauth_state {
                     let now = now_ms().ok_or_else(connection_unavailable)?;
                     lock(&self.oauth_states)

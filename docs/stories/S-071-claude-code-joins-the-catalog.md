@@ -22,8 +22,10 @@ path, without connectors ever being able to spend it.
 - [ ] `providers/claude-code.toml` declares `id = "claude-code"`,
       `authority = "com.anthropic.claude-code"`, `custody_only = true`, and exactly one credential
       with `entry = "connect_session"`.
-- [ ] The authority is chosen as permanent — it leads every credential path this provider will ever
-      own and is never repointed (AGENTS.md, adding a connector, step 3).
+- [ ] The authority `com.anthropic.claude-code` differs from `anthropic`'s `com.anthropic.api`, and
+      a catalogue invariant asserts no two providers share an authority — the authority leads every
+      credential path this provider will ever own and is never repointed (AGENTS.md, adding a
+      connector, step 3).
 - [ ] The declaration carries **no** `client_id`, no secret, no credential-shaped example, and no
       reference to `claude.ai/oauth` or `platform.claude.com/v1/oauth`. We do not drive the vendor's
       OAuth; `claude setup-token` does, on the person's own machine.
@@ -42,7 +44,8 @@ path, without connectors ever being able to spend it.
 
 - Blocked on [S-070](S-070-a-provider-can-hold-a-credential-it-cannot-spend.md): the declaration
   kind does not exist yet.
-- Authority for admitting this at all: platform ADR 0014's 2026-08-25 amendment, which separates
+- Authority for admitting this at all: platform ADR 0056 (2026-08-25), which partially supersedes
+  ADR 0014 for custody and separates
   custody from use. Use stays with the harness adapter; this story is custody only.
 - Vendor constraint, measured 2026-08-25 and the reason the shape is paste-only: Anthropic operates
   no third-party OAuth client registration, and since January 2026 refuses a subscription token

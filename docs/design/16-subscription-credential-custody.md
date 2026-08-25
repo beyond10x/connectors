@@ -43,15 +43,17 @@ So the two verbs separate:
   it. This is connectors' owned responsibility under platform ADR 0032, and nothing in the harness
   is built for it: harness has no multi-tenant store, no HTTP surface, and one operator.
 - **Use** — placing the value on an outbound request. This stays with the harness adapter, per
-  platform ADR 0014.
+  platform ADR 0014, whose use rule ADR 0056 leaves untouched.
 
-Splitting them is what lets the credential be held here without contradicting either ADR. It is
-also the reason the amendment to ADR 0014 is narrow: it admits custody, and restates that use is
-unchanged.
+Splitting them is what platform ADR 0056 decides. It does not claim ADR 0014 always meant this:
+the accepted custody map (`platform/architecture/architecture/credential-custody.md`) carries
+`Harness credential | the harness` as its own row, distinct from the Connectors-owned
+`Vendor/API credential` row, so the boundary genuinely moved and ADR 0056 says so. What ADR 0056
+admits is narrow — custody only, with use restated as unchanged.
 
 ## The schema consequence
 
-A custody-only provider cannot be expressed today. `crates/connector-spec/src/provider/validation.rs:30`
+A custody-only provider cannot be expressed today. `crates/connector-spec/src/provider/validation.rs:31`
 refuses a declaration carrying neither `[spec]` nor `[[operations]]`:
 
 > declares neither `[spec]` nor any `[[operations]]`, so it describes no operations at all.
@@ -72,20 +74,36 @@ The change is therefore a declared kind, not a workaround:
 custody_only = true
 ```
 
-A provider that sets it declares a credential and nothing else. The loader's obligations invert:
+A provider that sets it declares a credential and nothing else. The loader's obligations invert,
+and the refusal is asked of the **declared key**, not of the assembled value — `#[serde(default)]`
+makes `base_url = ""` and `operations = []` indistinguishable from absent once parsed, and an
+author who wrote either believed this provider would call something:
 
 | Field | Ordinary provider | `custody_only` provider |
 |---|---|---|
 | `[spec]` / `[[operations]]` | one is required | **both refused** |
 | `base_url` | required, non-empty | **refused** — there is no request to build |
-| `[[service]]` | as declared | **refused** — a service exists to carry operations |
+| `[[services]]` | as declared | **refused** — a service exists to carry operations |
 | `verify` | optional | **refused** — verification is a request |
+| `[[channels]]` | as declared | **refused** — a channel binding carries its own `auth`, and `connector-resolve` places those resolved credentials onto the composed URL and headers |
+| `[[events]]` | as declared | **refused** — an event source is a subscription this provider would open |
+| `[[discoveries]]`, `[[graphs]]`, `[patch]` | as declared | **refused** — each names or builds on operations |
+| `const_headers`, `default_auth` | as declared | **refused** — both exist to ride a request |
+| `auth.oauth2` | as declared | **refused** — it says the host runs the token grants |
 | `[[auth]]` | as declared | **required**, at least one |
+| `[[config]]`, `api_version` | as declared | **allowed** — a config field is how the connect UI labels and binds the credential; `api_version` reaches no request |
+
+`[[channels]]` is the entry that matters most and was the one missed first. Every other refusal
+could hold while a channel binding quietly resolved the credential onto an outbound socket — the
+security property would have been false in exactly the way a comment cannot catch.
 
 Every one of those is a refusal rather than a silent allowance, so the kind cannot be used to
-smuggle a half-declared ordinary provider past review. The invariant belongs in the one
-consolidated file, `crates/catalog-build/tests/main/catalog_invariants.rs`, parameterised over
-every provider that sets the flag — AGENTS.md bans a per-provider test file.
+smuggle a half-declared ordinary provider past review. The catalog **publishes** the flag rather
+than merely enforcing it at load time: a consumer must be able to tell a provider that *happens* to
+have no operations from one whose declaration forbids ever having any, and only the second is safe
+to hand a credential whose use belongs elsewhere. The document schema states both branches, and
+`crates/catalog-build/tests/main/catalog_invariants.rs` asserts them over the committed tree,
+parameterised over every provider that sets the flag — AGENTS.md bans a per-provider test file.
 
 ## The two providers
 
@@ -109,8 +127,10 @@ have required weakening a test someone wrote deliberately, twice.
 
 ## Why not the subscription OAuth shape
 
-`OAuth2Spec::public_client` and `OAuth2Spec::token_endpoint` exist in the IR and no shipped
-provider uses them. `crates/connector-spec/tests/main/oauth_token_endpoint.rs:1-13` records why
+`OAuth2Spec::public_client` (`crates/connector-spec/src/auth.rs:342`) and
+`OAuth2Spec::token_endpoint` (`auth.rs:292`) are declared and no shipped provider uses them. Do
+not confuse the latter with `auth.workarounds.token_endpoint` (`auth.rs:477`), a different field
+that `providers/babelforce.toml:328-352` does declare. `crates/connector-spec/tests/main/oauth_token_endpoint.rs:1-13` records why
 they were added: *"Anthropic's subscription flow authorizes on `claude.ai` and redeems its token on
 `platform.claude.com`, which one endpoint cannot express."* The declaration surface for this flow
 was built and the acquisition authority was withheld on purpose.
@@ -127,7 +147,7 @@ Custody is ordinary custody; nothing here earns an exception.
 
 - Per-user storage is `CredentialRef::for_instance(tenant, authority, instance_id, service, leaf)`,
   addressed through `integration_catalog::credential_address` and no second copy of that rule —
-  `connectors-console/src/enrol.rs:227` records what the second copy cost last time.
+  `connectors-console/src/enrol.rs:70-72` records what the second copy cost last time.
 - Values commit through a prepared transaction with crash recovery, never a point write.
 - Non-credential response fields land in Connection metadata, never the credential store
   (design 01 § open questions, the `token_response_metadata` invariant).
@@ -143,6 +163,9 @@ Custody is ordinary custody; nothing here earns an exception.
 2. **Rotation.** A `claude setup-token` token is a one-year credential with no refresh. Presence is
    reportable; expiry is not, without spending it. Whether the platform warns on age, and on what
    basis, is deferred to the story that gives it a consumer.
-3. **Who reads it.** The harness adapter is the intended and only reader. The mechanism that binds
-   that — a reader allowlist on the authority, or convention plus review — is not settled here and
-   blocks nothing in this document.
+3. **Who reads it — unresolved, and it blocks spending the credential.** Platform ADR 0032
+   forbids any API that can "read back, export, list, echo, or relay a credential value", and
+   ADR 0056 accepts no read path. So this custody is write-and-hold: a value can be placed and
+   reported present, and nothing in the accepted architecture can retrieve it. A harness adapter
+   reading it needs its own RFC/ADR. Nothing in this document depends on that being settled;
+   everything a *consumer* would do does.

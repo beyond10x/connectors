@@ -6,7 +6,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::state::GitlabState;
 use async_trait::async_trait;
-use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use connector_oauth::{
     AuthorizeParams, Pending, PendingStates, Pkce, ScopePolicy, ScopeSeparator, TokenPolicy,
     TokenResponse, DEFAULT_PENDING_CAPACITY,
@@ -697,15 +696,10 @@ impl GitlabInner {
         let status = lock(&self.sessions)
             .reserve_browser(session_ref.clone(), label, expires_at_unix_ms, url.into())
             .map_err(connect_session_error)?;
-        lock(&self.hosted_sessions).insert(
-            session_ref.clone(),
-            HostedSession {
-                capability_sha256: Sha256::digest(capability.as_bytes()).into(),
-                expires_at_unix_ms,
-                profile,
-                oauth_authorize_url,
-            },
-        );
+        // The fallible inserts run before the infallible ones. A clock failure or a full pending
+        // map returns from here, and everything written so far stays written: ordering it this way
+        // means a refusal leaves no hosted session that `session_owners` has no row for. The
+        // browser reservation above still self-heals at the connect-session TTL.
         if let Some((state, verifier)) = oauth_state {
             let now = now_ms().ok_or_else(connection_unavailable)?;
             lock(&self.oauth_states)
@@ -721,6 +715,15 @@ impl GitlabInner {
                 )
                 .map_err(|_| connection_unavailable())?;
         }
+        lock(&self.hosted_sessions).insert(
+            session_ref.clone(),
+            HostedSession {
+                capability_sha256: Sha256::digest(capability.as_bytes()).into(),
+                expires_at_unix_ms,
+                profile,
+                oauth_authorize_url,
+            },
+        );
         lock(&self.session_owners).insert(session_ref, session_owner);
         Ok(status)
     }
@@ -2616,9 +2619,11 @@ fn same_origin(expected: &url::Url, actual: &url::Url) -> bool {
 }
 
 fn random_token(bytes: usize) -> Result<String, GitlabError> {
-    let mut value = vec![0_u8; bytes];
-    getrandom::fill(&mut value).map_err(|_| GitlabError::new("randomness"))?;
-    Ok(URL_SAFE_NO_PAD.encode(value))
+    // Delegated rather than duplicated. This crate is where `connector-oauth` was extracted from,
+    // so a second local copy of the one thing that generates unguessable values is the shape the
+    // extraction existed to remove. The error text is unchanged: `OauthError::Randomness.code()`
+    // is `"randomness"`.
+    connector_oauth::random_token(bytes).map_err(|error| GitlabError::new(error.code()))
 }
 
 fn random_uuid() -> Result<String, GitlabError> {

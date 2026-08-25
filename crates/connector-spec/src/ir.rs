@@ -2106,14 +2106,17 @@ pub struct Connector {
     /// or it describes nothing. A custody-only provider is the case where that is exactly the
     /// point — the credential's *use* belongs to another component, and what belongs here is its
     /// address, its store, its rotation and its revocation. Anthropic's Claude Code subscription
-    /// token is the first: platform ADR 0014 keeps harness credentials spendable only by the
-    /// harness adapter, and ADR 0032 gives connectors custody of vendor credentials, so the
-    /// credential needs an owner here and no way to be spent from here.
+    /// token is the first. Platform ADR 0056 decides this, partially superseding ADR 0014 for
+    /// custody: ADR 0014's rule that harness credentials remain in the harness was a rule about
+    /// custody as well as about use, and ADR 0056 says so rather than reinterpreting it. Use is
+    /// unchanged — the credential is spent by its harness adapter and by nothing else.
     ///
-    /// Setting it turns five ordinary permissions into refusals — `[spec]`, `[[operations]]`,
-    /// `[[service]]`, `base_url` and `verify` are all rejected — and makes `[[auth]]` mandatory.
-    /// Each is a refusal rather than a silent allowance so the kind cannot carry a half-declared
-    /// ordinary provider past review. See `provider/validation.rs`.
+    /// Setting it turns every key that could describe an outbound request into a refusal — the
+    /// list is `CUSTODY_ONLY_REFUSED_KEYS` in `provider/validation.rs` — and makes `[[auth]]`
+    /// mandatory. Each is a refusal rather than a silent allowance so the kind cannot carry a
+    /// half-declared ordinary provider past review, and the refusal is asked of the declared TOML
+    /// key rather than of the assembled value, because `#[serde(default)]` erases the difference
+    /// between `base_url = ""` and no `base_url` at all.
     #[serde(default, skip_serializing_if = "is_false")]
     pub custody_only: bool,
     /// Where this connector came from.
