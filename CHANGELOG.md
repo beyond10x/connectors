@@ -15,9 +15,14 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 - **`.github/workflows/release.yml`** — the first CI in this repository. Pushing a `v*` tag runs the
   full repository gate, the history-wide secret scan and the `local-identity` release refusal, then
-  builds `connectors` for five targets (x86_64 and aarch64 Linux, x86_64 and aarch64 macOS, x86_64
-  Windows) and publishes a GitHub release with the archives, a `SHA256SUMS` file, and the notes read
-  from this file's section for that version.
+  builds `connectors` for four targets (x86_64 and aarch64 Linux, x86_64 and aarch64 macOS) and
+  publishes a GitHub release with the archives, a `SHA256SUMS` file, and the notes read from this
+  file's section for that version.
+- **No Windows target, and the reason is recorded.** `connectors` does not compile for
+  `x86_64-pc-windows-msvc`: `connectors-config` opens files with `O_NOFOLLOW` and compares the
+  effective uid to the owner, `connector-secrets` binds custody to Unix file modes, and the personal
+  posture serves on a Unix socket. Supporting Windows means deciding what owner-bound credential
+  custody means in terms of ACLs, which is an architecture question rather than a build flag.
 - The tag and `[workspace.package] version` must agree, and each built binary must report the tagged
   version from `--version`, or the run fails before an asset is uploaded. The version is the artifact
   identity written into every catalog document's `generator`, so a disagreement would ship binaries

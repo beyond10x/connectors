@@ -160,19 +160,20 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-            archive: tar.gz
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
-            archive: tar.gz
           - target: x86_64-apple-darwin
             runner: macos-13
-            archive: tar.gz
           - target: aarch64-apple-darwin
             runner: macos-latest
-            archive: tar.gz
-          - target: x86_64-pc-windows-msvc
-            runner: windows-latest
-            archive: zip
+          # No Windows target. `connectors` does not compile for `x86_64-pc-windows-msvc` and that
+          # is a design position, not an oversight: `connectors-config` opens files with
+          # `O_NOFOLLOW` and checks the effective uid against the owner, `connector-secrets` binds
+          # custody to Unix file modes, and the personal posture serves on a Unix socket. Windows
+          # support means deciding what owner-bound custody is in terms of ACLs, which is an
+          # architecture question and not a build flag. Proved rather than assumed: run
+          # 32834904655 installed NASM, resolved the whole graph, and failed in `connectors-config`
+          # with four errors — `std::os::unix`, `rustix::fs`, `rustix::process`, `custom_flags`.
 
     steps:
       - uses: actions/checkout@v7
@@ -184,16 +185,6 @@ jobs:
           rustup default stable
           rustup target add ${{ matrix.target }}
           rustc --version
-
-      # `aws-lc-sys` assembles its own crypto and needs an assembler MSVC does not provide. cmake
-      # and a C toolchain are already on every runner; NASM is the one gap, and without it the
-      # Windows leg fails inside a build script rather than anywhere obvious.
-      - name: NASM (aws-lc-sys, Windows only)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install nasm --no-progress -y
-          "$env:ProgramFiles\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       # Default feature set, deliberately: no Cargo feature is selected here. The `local-identity`
       # exception must reach no shipped binary, and `scripts/check-local-identity-refused.sh`
@@ -208,7 +199,6 @@ jobs:
         run: |
           set -euo pipefail
           bin="crates/connectors-cli/target/${{ matrix.target }}/release/connectors"
-          if [ "${{ runner.os }}" = "Windows" ]; then bin="${bin}.exe"; fi
           # Every leg is native, so the runner can execute what it just built. `--version` is the
           # one assertion worth making here: it prints `[workspace.package] version`, which is the
           # same string the tag was checked against, so a mismatch between what was tagged and what
@@ -233,27 +223,18 @@ jobs:
             name="connectors-${GITHUB_REF_NAME}-${{ matrix.target }}"
           fi
           mkdir -p "dist/$name"
-          src="crates/connectors-cli/target/${{ matrix.target }}/release/connectors"
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "${src}.exe" "dist/$name/connectors.exe"
-          else
-            cp "$src" "dist/$name/connectors"
-          fi
+          cp "crates/connectors-cli/target/${{ matrix.target }}/release/connectors" "dist/$name/"
           # No LICENSE-MIT / LICENSE-APACHE file exists in the tree yet, though the manifests
           # declare `MIT OR Apache-2.0`. When they land, add them here.
           cp README.md CHANGELOG.md "dist/$name/"
           cd dist
-          if [ "${{ matrix.archive }}" = "zip" ]; then
-            7z a -tzip "${name}.zip" "$name" > /dev/null
-          else
-            tar -czf "${name}.tar.gz" "$name"
-          fi
+          tar -czf "${name}.tar.gz" "$name"
           ls -l
 
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
-          path: dist/*.${{ matrix.archive }}
+          path: dist/*.tar.gz
           if-no-files-found: error
 
   release:
@@ -274,7 +255,7 @@ jobs:
         run: |
           set -euo pipefail
           # Named explicitly rather than `*`, so a re-run cannot hash a previous SHA256SUMS.
-          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+          sha256sum ./*.tar.gz > SHA256SUMS
           cat SHA256SUMS
 
       # The curated section, not a commit list. CHANGELOG.md is where the reasoning already lives;
