@@ -16,6 +16,7 @@ use base64::Engine as _;
 use connect_session_transport::{
     remove_endpoint, BoundCompletionEndpoint, CompletionTransportError,
 };
+use connector_oauth::{PendingStates, DEFAULT_PENDING_CAPACITY};
 use connector_secrets::{
     CredentialRef, CredentialScope, Layout, PreparedSecretStore, Secret, SecretBatch,
     SecretProposalDigest, SecretTransactionGeneration, SecretTransactionId, SecretTransactionState,
@@ -142,7 +143,7 @@ struct SlackInner {
     sessions: Mutex<ConnectSessionLifecycle>,
     session_owners: Mutex<BTreeMap<String, SessionOwner>>,
     hosted_sessions: Mutex<BTreeMap<String, HostedSession>>,
-    oauth_states: Mutex<BTreeMap<String, OAuthPending>>,
+    oauth_states: Mutex<PendingStates<OAuthPending>>,
     hosted_completion_lock: tokio::sync::Mutex<()>,
     event_store: Arc<EventStore>,
     audit: AuditJournal,
@@ -183,7 +184,6 @@ struct SessionOwner {
 struct OAuthPending {
     session_ref: String,
     owner: SessionOwner,
-    expires_at_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -516,7 +516,7 @@ impl SlackBackend {
             ),
             session_owners: Mutex::new(BTreeMap::new()),
             hosted_sessions: Mutex::new(BTreeMap::new()),
-            oauth_states: Mutex::new(BTreeMap::new()),
+            oauth_states: Mutex::new(PendingStates::new(DEFAULT_PENDING_CAPACITY)),
             hosted_completion_lock: tokio::sync::Mutex::new(()),
             event_store,
             audit: AuditJournal::new(state_root.join("slack-operation-audit.jsonl"), hosted_state),
@@ -810,7 +810,7 @@ impl ConnectorBackend for SlackBackend {
     }
 
     fn owns_hosted_oauth_state(&self, integration_ref: &str, state: &str) -> bool {
-        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_key(state)
+        integration_ref == INTEGRATION_REF && lock(&self.inner.oauth_states).contains_any(state)
     }
 
     async fn complete_hosted_oauth(
