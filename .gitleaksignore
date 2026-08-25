@@ -75,3 +75,28 @@ ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:n
 ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:sentry-access-token:579
 64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:discord-api-token:276
 64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:new-relic-user-api-id:494
+
+# Artifact-digest adjacency in the generated lock, reviewed 2026-08-25.
+# Each is a deterministic SHA-256 of a committed `catalog/<provider>.catalog.json`, sitting on a
+# line whose key names the vendor — so `bitbucket`/`discord`/`newrelic`/`sentry` next to 64 hex
+# characters matches a vendor-token rule. Verified by recomputation: `sha256sum` of each named
+# file equals the flagged value. Regenerating the lock moves the line numbers, which is why
+# these accumulate per commit rather than replacing one another.
+181c144775f87ac38ffa93023f786beec4021671:connectors.lock:bitbucket-client-secret:204
+181c144775f87ac38ffa93023f786beec4021671:connectors.lock:discord-api-token:276
+181c144775f87ac38ffa93023f786beec4021671:connectors.lock:new-relic-user-api-id:503
+181c144775f87ac38ffa93023f786beec4021671:connectors.lock:sentry-access-token:645
+4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:bitbucket-client-secret:135
+4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:discord-api-token:246
+4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:new-relic-user-api-id:464
+4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:sentry-access-token:579
+b56d12b5086f5bea979a3bb1ddcffb3565d03ba6:connectors.lock:discord-api-token:276
+b56d12b5086f5bea979a3bb1ddcffb3565d03ba6:connectors.lock:new-relic-user-api-id:494
+cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:bitbucket-client-secret:135
+cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:discord-api-token:246
+cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:new-relic-user-api-id:464
+cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:sentry-access-token:579
+fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:bitbucket-client-secret:204
+fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:discord-api-token:276
+fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:new-relic-user-api-id:503
+fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:sentry-access-token:645
