@@ -1,102 +1,117 @@
 # Exact historical findings reviewed in docs/security/secret-scan-baseline.md.
 # Fingerprint scoping ensures new findings, even under the same rule or path, still fail.
+#
+# Regenerated 2026-08-25 after the history rewrite. A fingerprint is
+# `<commit>:<path>:<rule>:<line>`, so rewriting history invalidates every one of them at once:
+# the findings are the same bytes at the same lines, under new commit ids. That is the cost of
+# scoping to a commit, and it is the right cost — the alternative is a rule or path allowlist,
+# which would survive a rewrite by also surviving a real secret landing in the same file.
 
-4559896166106b9110bbdd290d83b50cf689274c:connectors.lock:bitbucket-client-secret:135
-4559896166106b9110bbdd290d83b50cf689274c:connectors.lock:new-relic-user-api-id:425
-4559896166106b9110bbdd290d83b50cf689274c:connectors.lock:sentry-access-token:540
-748b50dad534175cf722033516df92a9ec7f2188:connectors.lock:bitbucket-client-secret:117
-748b50dad534175cf722033516df92a9ec7f2188:connectors.lock:discord-api-token:189
-748b50dad534175cf722033516df92a9ec7f2188:connectors.lock:new-relic-user-api-id:375
-748b50dad534175cf722033516df92a9ec7f2188:connectors.lock:sentry-access-token:474
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:bitbucket-client-secret:644
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:bitbucket-client-secret:645
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:bitbucket-client-secret:646
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:bitbucket-client-secret:652
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:bitbucket-client-secret:654
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:786
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:787
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:788
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:790
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:791
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:792
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:793
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:794
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:discord-api-token:795
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:1450
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:323
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:344
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:358
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:389
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:416
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:428
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:459
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:460
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:505
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:530
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:531
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:548
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:554
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:564
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:565
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:591
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:generic-api-key:60
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:new-relic-user-api-id:1168
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:new-relic-user-api-id:1169
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:new-relic-user-api-id:1170
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:new-relic-user-api-id:1177
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1348
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1349
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1350
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1352
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1353
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1354
-82f6a80a27411a9263546af21f5ba577182383dc:connectors.lock:sentry-access-token:1355
-82f6a80a27411a9263546af21f5ba577182383dc:specs/zendesk/messaging-2026-08-02.openapi.yaml:generic-api-key:1694
-82f6a80a27411a9263546af21f5ba577182383dc:specs/zendesk/ticketing-2026-08-02.openapi.yaml:generic-api-key:45472
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:jwt:11585
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:jwt:12183
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:jwt:14740
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:jwt:23887
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:jwt:23914
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:private-key:21698
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:private-key:598
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:private-key:9914
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:private-key:9915
-a0873885d0b157ca233f490985c964571bd0a8ec:docs/research/vendor/nango-providers.yaml:stripe-access-token:5003
-c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:bitbucket-client-secret:105
-c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:discord-api-token:177
-c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:new-relic-user-api-id:363
-c585c1ccb3ac2e651929ead38c25a3fc68095d95:connectors.lock:sentry-access-token:462
-c78434fe6a310e3d3759e24e1715280bc49a2d37:crates/connector-spec/tests/main/verification_conformance.rs:generic-api-key:711
-93672c5e9d73ac4834fe38b03dec721ae9104b60:crates/protocol/src/connection.rs:generic-api-key:738
-ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:bitbucket-client-secret:135
-ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:discord-api-token:246
-ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:new-relic-user-api-id:464
-ba0cc3a74d3c6c2e5724c895995ec0b5f6d18128:foundation/connectors/connectors.lock:sentry-access-token:579
-64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:discord-api-token:276
-64c2edeaec24edf4d1181c6d4741d16fa67d125a:foundation/connectors/connectors.lock:new-relic-user-api-id:494
+# Artifact-digest adjacency in the generated lock.
+# Each is a deterministic SHA-256 of a committed `catalog/<provider>.catalog.json` on a line whose
+# key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters
+# matches a vendor-token rule. Verified by recomputation: `sha256sum` of each named file equals
+# the flagged value.
+09706faa218fe62bcd6aef550271e8d94affa120:connectors.lock:discord-api-token:276
+09706faa218fe62bcd6aef550271e8d94affa120:connectors.lock:new-relic-user-api-id:494
+12cf87ae6587585050b1b3cd05e6bc230cc92073:connectors.lock:bitbucket-client-secret:135
+12cf87ae6587585050b1b3cd05e6bc230cc92073:connectors.lock:discord-api-token:246
+12cf87ae6587585050b1b3cd05e6bc230cc92073:connectors.lock:new-relic-user-api-id:464
+12cf87ae6587585050b1b3cd05e6bc230cc92073:connectors.lock:sentry-access-token:579
+2ebc332cabd847e334af72b1dce04cfb5ab48083:connectors.lock:bitbucket-client-secret:135
+2ebc332cabd847e334af72b1dce04cfb5ab48083:connectors.lock:new-relic-user-api-id:425
+2ebc332cabd847e334af72b1dce04cfb5ab48083:connectors.lock:sentry-access-token:540
+3836f7b125ec9f4b6dfb889e031029f3981c3587:connectors.lock:bitbucket-client-secret:135
+3836f7b125ec9f4b6dfb889e031029f3981c3587:connectors.lock:discord-api-token:246
+3836f7b125ec9f4b6dfb889e031029f3981c3587:connectors.lock:new-relic-user-api-id:464
+3836f7b125ec9f4b6dfb889e031029f3981c3587:connectors.lock:sentry-access-token:579
+39521ff19eac3bd03ee466dae01e2b6894265459:connectors.lock:bitbucket-client-secret:204
+39521ff19eac3bd03ee466dae01e2b6894265459:connectors.lock:discord-api-token:276
+39521ff19eac3bd03ee466dae01e2b6894265459:connectors.lock:new-relic-user-api-id:503
+39521ff19eac3bd03ee466dae01e2b6894265459:connectors.lock:sentry-access-token:645
+5a52435ebbd903b41931e9ff70045bb2a509b029:connectors.lock:bitbucket-client-secret:105
+5a52435ebbd903b41931e9ff70045bb2a509b029:connectors.lock:discord-api-token:177
+5a52435ebbd903b41931e9ff70045bb2a509b029:connectors.lock:new-relic-user-api-id:363
+5a52435ebbd903b41931e9ff70045bb2a509b029:connectors.lock:sentry-access-token:462
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:bitbucket-client-secret:644
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:bitbucket-client-secret:645
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:bitbucket-client-secret:646
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:bitbucket-client-secret:652
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:bitbucket-client-secret:654
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:786
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:787
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:788
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:790
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:791
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:792
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:793
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:794
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:discord-api-token:795
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:1450
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:323
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:344
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:358
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:389
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:416
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:428
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:459
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:460
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:505
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:530
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:531
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:548
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:554
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:564
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:565
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:591
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:generic-api-key:60
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:new-relic-user-api-id:1168
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:new-relic-user-api-id:1169
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:new-relic-user-api-id:1170
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:new-relic-user-api-id:1177
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1348
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1349
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1350
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1352
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1353
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1354
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:connectors.lock:sentry-access-token:1355
+c1d9f3449eeb02757698ec9d98eb7d6178b2384c:connectors.lock:bitbucket-client-secret:117
+c1d9f3449eeb02757698ec9d98eb7d6178b2384c:connectors.lock:discord-api-token:189
+c1d9f3449eeb02757698ec9d98eb7d6178b2384c:connectors.lock:new-relic-user-api-id:375
+c1d9f3449eeb02757698ec9d98eb7d6178b2384c:connectors.lock:sentry-access-token:474
+d3d03bbebdc9fb0d2db750617544ccc5d7d04a90:connectors.lock:bitbucket-client-secret:204
+d3d03bbebdc9fb0d2db750617544ccc5d7d04a90:connectors.lock:discord-api-token:276
+d3d03bbebdc9fb0d2db750617544ccc5d7d04a90:connectors.lock:new-relic-user-api-id:503
+d3d03bbebdc9fb0d2db750617544ccc5d7d04a90:connectors.lock:sentry-access-token:645
 
-# Artifact-digest adjacency in the generated lock, reviewed 2026-08-25.
-# Each is a deterministic SHA-256 of a committed `catalog/<provider>.catalog.json`, sitting on a
-# line whose key names the vendor — so `bitbucket`/`discord`/`newrelic`/`sentry` next to 64 hex
-# characters matches a vendor-token rule. Verified by recomputation: `sha256sum` of each named
-# file equals the flagged value. Regenerating the lock moves the line numbers, which is why
-# these accumulate per commit rather than replacing one another.
-181c144775f87ac38ffa93023f786beec4021671:connectors.lock:bitbucket-client-secret:204
-181c144775f87ac38ffa93023f786beec4021671:connectors.lock:discord-api-token:276
-181c144775f87ac38ffa93023f786beec4021671:connectors.lock:new-relic-user-api-id:503
-181c144775f87ac38ffa93023f786beec4021671:connectors.lock:sentry-access-token:645
-4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:bitbucket-client-secret:135
-4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:discord-api-token:246
-4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:new-relic-user-api-id:464
-4520cf47f7c6220f58ba1fc43cee229f50f8f14c:connectors.lock:sentry-access-token:579
-b56d12b5086f5bea979a3bb1ddcffb3565d03ba6:connectors.lock:discord-api-token:276
-b56d12b5086f5bea979a3bb1ddcffb3565d03ba6:connectors.lock:new-relic-user-api-id:494
-cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:bitbucket-client-secret:135
-cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:discord-api-token:246
-cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:new-relic-user-api-id:464
-cc6c7d97d559799a20e01e07d315f7c7bc7761d4:connectors.lock:sentry-access-token:579
-fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:bitbucket-client-secret:204
-fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:discord-api-token:276
-fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:new-relic-user-api-id:503
-fe6233da32d6e3111afc153ec3d07badb01bc45e:connectors.lock:sentry-access-token:645
+# A test fixture, not a value.
+# `"a".repeat(64)` standing in for a digest in a constructed test connection.
+672091c44fe7fbafca08fcc175bce3671e7f70fd:crates/protocol/src/connection.rs:generic-api-key:738
+
+# Slack's own published example signing secret.
+# The `8f742231...yyyzzz85a5` value from Slack's request-verification documentation, used to
+# prove the HMAC conformance vector reproduces. `yyyzzz` is the giveaway that it is a
+# placeholder; it authenticates nothing.
+4f488083ff4b02718b6e355f8eb319092bac2ebe:crates/connector-spec/tests/main/verification_conformance.rs:generic-api-key:711
+
+# Vendor documentation examples in a vendored Zendesk document.
+# An example `key` and an example `authenticity_token` in the published descriptions.
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:specs/zendesk/messaging-2026-08-02.openapi.yaml:generic-api-key:1694
+b9b10fd88ab3da535c9b244d0be070da5f1c88b9:specs/zendesk/ticketing-2026-08-02.openapi.yaml:generic-api-key:45472
+
+# Upstream schema placeholders in a vendored third-party catalogue.
+# NangoHQ's `providers.yaml`, vendored for analysis under its own provenance record. The
+# `private-key` hits are truncated documentation examples of the form
+# `-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----`; the `jwt` and
+# `stripe-access-token` hits are the same kind of example value.
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:jwt:11585
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:jwt:12183
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:jwt:14740
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:jwt:23887
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:jwt:23914
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:21698
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:598
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:9914
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:9915
+d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:stripe-access-token:5003

@@ -1,7 +1,14 @@
 # Historical secret-scan baseline
 
-Gitleaks 8.30.1 reports 91 findings represented by 90 exact fingerprints in the repository's
-history. The current tree carries no credential material. Review classified the historical material
+Gitleaks 8.30.1 reports 87 findings represented by 86 exact fingerprints in the repository's
+history. The current tree carries no credential material.
+
+**Regenerated 2026-08-25 after the history rewrite.** A fingerprint is
+`<commit>:<path>:<rule>:<line>`, so rewriting history invalidates every one of them at once — the
+same bytes at the same lines, under new commit ids. Every finding was reclassified from scratch
+rather than carried over by count: five classes, each named below, none of them credential material.
+That is the cost of scoping to a commit, and it is the right cost. A rule or path allowlist would
+have survived the rewrite by also surviving a real secret landing in the same file. Review classified the historical material
 as imported examples, generated connector descriptors, vendored research, or a conformance-test
 sentinel; none is runtime credential material issued to b10x.
 
@@ -13,7 +20,7 @@ sentinel; none is runtime credential material issued to b10x.
 | Imported Zendesk OpenAPI descriptions at `82f6a80a2741` | 2 | Documentation examples, absent from the current descriptions. |
 | Connector specification conformance fixture at `c78434fe6a31` | 1 | Deliberate non-live test sentinel, absent from the current fixture. |
 | Browser completion rejection fixture at `93672c5e9d` | 1 | Deliberate opaque capability-shaped URL used only to prove malformed fragment refusal; not an issued credential. |
-| `connectors.lock` across commits `4520cf47f7c6`, `cc6c7d97d559`, `b56d12b5086f`, `fe6233da32d6`, and `181c144775f8` | 18 | Deterministic SHA-256 artifact digests on a line whose key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters matches a vendor-token rule. Verified by recomputation: `sha256sum catalog/<provider>.catalog.json` equals each flagged value. |
+| `connectors.lock` across every commit that rebuilt it | 72 | Deterministic SHA-256 artifact digests on a line whose key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters matches a vendor-token rule. Verified by recomputation: `sha256sum catalog/<provider>.catalog.json` equals each flagged value. |
 
 Regenerating `connectors.lock` moves its line numbers, so a rebuild produces new fingerprints for
 the same reviewed material rather than reusing the old ones. They accumulate per commit. That is
