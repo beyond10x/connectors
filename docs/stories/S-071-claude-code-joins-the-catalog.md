@@ -1,0 +1,54 @@
+---
+id: S-071
+title: "Claude Code joins the catalog as a custody-only provider"
+pillar: Catalog
+status: backlog
+priority:
+design: ../design/16-subscription-credential-custody.md
+epic: subscription-custody
+areas: [providers, catalog-build]
+note: "New provider id claude-code, authority com.anthropic.claude-code, custody_only. The credential is a claude setup-token output pasted into a Connect Session. Blocked on S-070; the authority is permanent once chosen."
+---
+
+# Claude Code joins the catalog as a custody-only provider
+
+## Goal
+
+Give a person's Claude Code subscription credential an owner, a per-user address and a revocation
+path, without connectors ever being able to spend it.
+
+## Acceptance
+
+- [ ] `providers/claude-code.toml` declares `id = "claude-code"`,
+      `authority = "com.anthropic.claude-code"`, `custody_only = true`, and exactly one credential
+      with `entry = "connect_session"`.
+- [ ] The authority is chosen as permanent — it leads every credential path this provider will ever
+      own and is never repointed (AGENTS.md, adding a connector, step 3).
+- [ ] The declaration carries **no** `client_id`, no secret, no credential-shaped example, and no
+      reference to `claude.ai/oauth` or `platform.claude.com/v1/oauth`. We do not drive the vendor's
+      OAuth; `claude setup-token` does, on the person's own machine.
+- [ ] `providers/anthropic.toml` is untouched. Its invariant at
+      `crates/catalog-build/tests/main/catalog_invariants.rs:1226` — auth exactly
+      `["anthropic.api_key", "anthropic.admin_key"]`, no Claude Code authority in the API connector
+      — still passes unmodified. A separate id is what keeps that assertion honest.
+- [ ] A parameterised invariant asserts `claude-code` exposes zero operations and zero services, so
+      nothing in connectors can spend the credential.
+- [ ] Build and commit as one unit: `catalog build` → `catalog diff` clean twice → `catalog check`.
+
+## Progress
+- (not started)
+
+## Notes
+
+- Blocked on [S-070](S-070-a-provider-can-hold-a-credential-it-cannot-spend.md): the declaration
+  kind does not exist yet.
+- Authority for admitting this at all: platform ADR 0014's 2026-08-25 amendment, which separates
+  custody from use. Use stays with the harness adapter; this story is custody only.
+- Vendor constraint, measured 2026-08-25 and the reason the shape is paste-only: Anthropic operates
+  no third-party OAuth client registration, and since January 2026 refuses a subscription token
+  presented outside Claude Code and Claude.ai with `This credential is only authorized for use with
+  Claude Code and cannot be used for other API requests`. A redirect-based acquisition would be
+  both unregisterable and refused.
+- `OAuth2Spec::public_client` and `OAuth2Spec::token_endpoint` stay unused. They exist for this
+  vendor's flow (`crates/connector-spec/tests/main/oauth_token_endpoint.rs:1-13`) and the
+  acquisition authority was withheld on purpose; design 16 reaffirms that.
