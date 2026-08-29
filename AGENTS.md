@@ -4,6 +4,17 @@ Orientation for agents (and humans) working in this repository.
 **github.com/beyond10x/connectors is the canonical home of Connectors.** The Zwirn product consumes
 this repository as a pinned git dependency; the dependency never runs the other way.
 
+## Serves
+
+The objectives of the collection this repository moves, by id from `atlas/ROADMAP.md` — the only
+cross-repository roadmap, and the page that says what each id means and which evidence closes it:
+
+- **O1 — governed reach.** Reach into the outside world only through a catalogued operation, a bound credential and an explicit grant.
+- **O5 — the generic agent platform.** The catalogue a platform tenant configures connectors from.
+
+A change here that moves none of these is a question for the operator, not a task.
+`atlas/scripts/check-map.sh` fails a repository whose `AGENTS.md` names no objective.
+
 ## Status
 
 Pre-v1 implementation phase: the catalog, platform service, hosted integrations, and product
