@@ -3,6 +3,9 @@
 Orientation for agents (and humans) working in this repository.
 **github.com/beyond10x/connectors is the canonical home of Connectors.** The Zwirn product consumes
 this repository as a pinned git dependency; the dependency never runs the other way.
+Org-wide rules — the naming convention, the language rule (anything that runs is Rust, not Python),
+the former-brand rule (atlas ADR 0001) and the rule that renaming anything another repo verifies is a
+coordinated migration with an ADR — live in `atlas/AGENTS.md` and are not restated here.
 
 ## Serves
 
