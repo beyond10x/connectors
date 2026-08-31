@@ -106,6 +106,7 @@ will spawn children as each milestone is designed.
 | [S-072](S-072-the-anthropic-api-key-arrives-through-a-connect-session.md) | The Anthropic API key arrives through a Connect Session | backlog | Catalog | providers, service |
 | [S-073](S-073-the-hosted-posture-connects-a-catalogued-provider.md) | The hosted posture connects a catalogued provider | backlog | Platform | connectors-runtime, service, server, hosted-vault |
 | [S-074](S-074-the-cli-drives-a-hosted-connection.md) | The CLI drives a hosted connection | backlog | Clients | connectors-cli, connectors-console, connectors-client |
+| [S-075](S-075-deployment-catalogs-are-external-packs.md) | Deployment catalogs are external immutable packs | backlog | Catalog | catalog-reader, catalog-build, connectors-config, deployment |
 
 ## Epics in this seed
 
@@ -129,6 +130,7 @@ will spawn children as each milestone is designed.
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 | `oauth-consolidation` | S-069 | One OAuth implementation instead of three hand-rolled copies: a shared crate extracted from the only PKCE implementation, with GitLab, Jira and Slack migrated onto it behaviour-preserving. Prerequisite for any further browser-flow connector, and where S-013's loopback callback validation will live. |
 | `subscription-custody` | S-070, S-071, S-072, S-073, S-074 | Custody without use, per [design 16](../design/16-subscription-credential-custody.md): a declaration kind for a credential connectors holds but cannot spend, the `claude-code` provider that uses it, the Anthropic API key arriving by Connect Session, the hosted posture finally connecting a catalogued provider at all, and the CLI driving the same flow. |
+| `deployment-packs` | S-075 | Digest-pinned external catalog packs remove deployment-specific provider material from generic source and images without weakening catalog provenance, identity or admission. |
 
 ## Known gaps in this backlog
 
