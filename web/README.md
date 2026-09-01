@@ -42,7 +42,7 @@ the component does not claim that a broken site is mechanically gated.
 | `explorer.md` | The provider & operation explorer. |
 | `operations/[operation].md` | One pre-rendered page per operation, enumerated from the catalogue. |
 | `data/` | The catalogue's types, the questions the explorer asks of it, and the build-time loader. |
-| `public/` | Served verbatim at the site root. Holds generated catalogue/specs and the Pages CNAME. |
+| `public/` | Served verbatim by local preview builds. Holds generated catalogue/specs and shared brand assets. It must not claim a custom domain. |
 | `test/` | The explorer's contract with the catalogue, over the built site. |
 
 ## Public content boundary
@@ -58,18 +58,16 @@ remove the references; no byte-identity check is claimed today.
 
 ## Two things to keep right
 
-**The base path.** `.vitepress/config.mts` sets `base: '/flux-connectors/'`, because that is where
-GitHub actually serves the site.
+**No standalone Pages authority.** Public Connectors documentation is collected by the unified
+Website and served at `https://beyond10x.github.io/docs/connectors/`; the repository Pages URL is
+an Atlas-generated redirect facade. This dormant VitePress explorer is still useful as a local
+prototype, but it does not own a deployer or custom domain. `public/CNAME` is therefore forbidden.
 
-`public/CNAME` names `flux.codewandler.org`, and the base was once set to `'/'` on the strength of
-it. That shipped an unstyled site: a committed CNAME is a *request* for a custom domain, not evidence
-one is serving, and GitHub never accepted it — the Pages API still reports `"cname": null`, so every
-bundled asset resolved a level too high and 404'd.
-
-Flip the base to `'/'` **only** once `gh api repos/beyond10x/connectors/pages --jq .cname`
-reports the domain — not when the CNAME file lands, which is what went wrong.
-`test/explorer.test.mjs` asserts the built HTML's own asset URLs sit under the deployed base, and was
-verified to fail when the base is wrong.
+`.vitepress/config.mts` retains its legacy project prefix only as a deterministic build fixture
+until the explorer is either retired or integrated as a declared Website surface. Do not infer a
+live URL from that value, and do not add a Pages workflow here. A future public explorer must first
+be declared in `b10x.docs.yaml`, source-locked by Website, and covered by the unified publication
+gate.
 
 **No hand-written catalogue data.** Everything the site says about providers and connector
 operations must come from generated files, not from markdown or a `.vue` component. A
