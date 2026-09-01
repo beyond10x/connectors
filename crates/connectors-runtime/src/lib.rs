@@ -5,6 +5,7 @@
 mod claims;
 mod composition;
 mod registry;
+mod service_bundle;
 
 pub use claims::{ClaimError, EventReplyClaims};
 pub use composition::{
@@ -15,3 +16,6 @@ pub use connectors_config::{ConfigError, PersonalConfig};
 /// Re-exported so the CLI can describe an acquisition without depending on the adapter directly.
 pub use integration_catalog::argocd;
 pub use registry::BackendRegistry;
+pub use service_bundle::{
+    DeployedService, ServiceBundle, ServiceBundleBuilder, ServiceBundleError,
+};

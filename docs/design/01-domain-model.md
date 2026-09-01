@@ -433,8 +433,10 @@ vocabulary, outcome, principal, request id, retention window.
   proxy is deferred behind S-030 and never substitutes for a reviewed operation.
 - **Leases / long-running operation scopes** — designed in the predecessor, never used in anger;
   reintroduce only against a real consumer.
-- **Catalog composition/overlays** — shaped for (source identity in locks and audit from day
-  one), not built.
+- **Signed catalog-source composition/overlays** — shaped for (source identity in locks and audit
+  from day one), not built. This is distinct from the runtime's generated-service bundle seam:
+  that seam composes reviewed manifests and deployment bindings into `ConnectorBackend` instances,
+  but does not merge or mint canonical catalog packs.
 
 ## Open questions
 
