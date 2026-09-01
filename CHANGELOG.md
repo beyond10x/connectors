@@ -9,6 +9,15 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.3.1 — 2026-09-01
+
+### Fixed
+
+- Teach the complete-history secret scan to distinguish the exact generated catalog-lock
+  SHA-256 line shape from credentials, without allowlisting other content in the lock file.
+- Admit plain HTTP only for loopback and fully qualified Kubernetes service DNS, so in-cluster
+  callers do not route credential custody through an ingress; remote origins remain HTTPS-only.
+
 ## 0.3.0 — 2026-09-01
 
 ### Added
