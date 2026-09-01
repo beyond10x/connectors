@@ -8,7 +8,6 @@
 //! and it never persists a credential.
 
 use std::fs;
-use std::io;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -21,192 +20,25 @@ use tokio::net::UnixStream;
 use url::Url;
 use zeroize::Zeroizing;
 
+mod model;
+
+pub use model::{
+    CandidateActivationOutcome, ClientError, MaterializationOutcome, PendingConnection,
+    RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
+};
+use model::{
+    CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,
+    RedeemSubscriptionLeaseRequest, RedeemedSubscriptionResponse, SubscriptionLeaseResponse,
+};
+
 const COMPLETION_RESPONSE_BYTES: usize = 1024;
 const IDENTITY_BEARER_BYTES: usize = 512;
 const SUBSCRIPTION_RESPONSE_BYTES: usize = 20 * 1024;
-
-/// A transport, framing, or protocol validation failure.
-#[derive(Debug, thiserror::Error)]
-pub enum ClientError {
-    /// The caller supplied a request that violates its protocol contract.
-    #[error("Connector request was invalid: {0}")]
-    InvalidRequest(String),
-    /// The peer returned an invalid, uncorrelated, empty, or oversized response.
-    #[error("Connector returned an invalid response")]
-    InvalidResponse,
-    /// The configured hosted API base is not one explicit HTTPS or internal-cluster URL.
-    #[error("hosted Connector base must be one explicit HTTPS or internal-cluster URL")]
-    InvalidHostedBase,
-    /// The supplied Identity bearer cannot be represented by the bounded hosted binding.
-    #[error("hosted Connector Identity bearer is invalid")]
-    InvalidIdentityBearer,
-    /// The hosted Connector refused the presented Identity authority.
-    #[error("hosted Connector Identity authority was refused")]
-    HostedNotGranted,
-    /// The hosted Connector understood and refused a bounded subscription request. Only the HTTP
-    /// status crosses this client boundary; the response body may contain provider diagnostics.
-    #[error("hosted Connector refused the subscription request with status {0}")]
-    SubscriptionRefused(u16),
-    /// The hosted Connector was unavailable or returned a non-contract HTTP result.
-    #[error("hosted Connector is unavailable")]
-    HostedUnavailable,
-    /// A response carrying a credential or capability omitted the mandatory cache refusal.
-    #[error("hosted Connector returned a cacheable credential response")]
-    CacheableCredentialResponse,
-    /// The Connect Session endpoint is not the expected owner-only Unix socket.
-    #[error(
-        "the Connect Session completion endpoint is not an owner-only socket under this state root"
-    )]
-    UnsafeCompletionEndpoint,
-    /// The Connector rejected the submitted Connect Session credential.
-    #[error("the Connector refused the submitted credential")]
-    CompletionRefused,
-    /// The Connector returned a typed Connection-domain refusal.
-    #[error("the Connector refused the connection request: {0}")]
-    ConnectionRefused(String),
-    /// A local transport operation failed.
-    #[error("local Connector transport failed: {0}")]
-    Io(#[from] io::Error),
-    /// A frame could not be encoded or decoded.
-    #[error("Connector protocol JSON was malformed: {0}")]
-    Json(#[from] serde_json::Error),
-}
 
 /// Client for the owner-permissioned personal-local Unix-socket binding.
 #[derive(Debug, Clone)]
 pub struct LocalClient {
     socket: PathBuf,
-}
-
-/// Value-free result of beginning a Connector-owned credential acquisition session.
-pub struct PendingConnection {
-    pub session_ref: String,
-    pub completion_endpoint: PathBuf,
-}
-
-/// Result of a generic candidate-selection and activation workflow.
-pub enum CandidateActivationOutcome {
-    SelectionRequired(Vec<connection::ConnectionCandidateSummary>),
-    Connected {
-        connection: connection::ConnectionDescription,
-        observations: Vec<connection::DiscoveryObservationSummary>,
-    },
-}
-
-/// Value-free result of materializing the recognized observations admitted by the Connector.
-pub struct MaterializationOutcome {
-    pub connections: Vec<connection::ConnectionSummary>,
-    pub unsupported: usize,
-    pub not_granted: usize,
-}
-
-/// Presence-only state for a user-bound subscription credential.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct SubscriptionStatus {
-    pub provider: String,
-    pub connected: bool,
-}
-
-/// Non-secret browser authorization details for a pending Claude subscription connection.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct SubscriptionOAuthStart {
-    pub authorization_url: String,
-    pub flow_id: String,
-    pub expires_at: u64,
-}
-
-/// A short-lived, finite-use capability bound to one Harness attempt. Diagnostics never reveal
-/// the bearer value.
-pub struct SubscriptionLease {
-    pub lease_id: String,
-    token: Zeroizing<String>,
-    pub expires_at: u64,
-}
-
-impl SubscriptionLease {
-    #[must_use]
-    pub fn expose_at_redemption_boundary(&self) -> &str {
-        self.token.as_str()
-    }
-}
-
-impl std::fmt::Debug for SubscriptionLease {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("SubscriptionLease")
-            .field("lease_id", &self.lease_id)
-            .field("token", &"[REDACTED]")
-            .field("expires_at", &self.expires_at)
-            .finish()
-    }
-}
-
-/// One provider credential returned at the exact Harness bearer boundary. Its allocation is wiped
-/// on drop and its diagnostics are redacted.
-pub struct RedeemedSubscription {
-    credential: Zeroizing<String>,
-    pub kind: String,
-}
-
-impl RedeemedSubscription {
-    #[must_use]
-    pub fn expose_at_provider_boundary(&self) -> &str {
-        self.credential.as_str()
-    }
-}
-
-impl std::fmt::Debug for RedeemedSubscription {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("RedeemedSubscription")
-            .field("credential", &"[REDACTED]")
-            .field("kind", &self.kind)
-            .finish()
-    }
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct ConnectSubscriptionRequest<'a> {
-    credential: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct CompleteSubscriptionOAuthRequest<'a> {
-    flow_id: &'a str,
-    code: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct CreateSubscriptionLeaseRequest<'a> {
-    attempt_id: &'a str,
-    ttl_seconds: u64,
-    maximum_uses: u16,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SubscriptionLeaseResponse {
-    lease_id: String,
-    lease_token: String,
-    expires_at: u64,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct RedeemSubscriptionLeaseRequest<'a> {
-    attempt_id: &'a str,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RedeemedSubscriptionResponse {
-    credential: String,
-    kind: String,
 }
 
 impl LocalClient {
