@@ -9,6 +9,21 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.4.0 — 2026-09-01
+
+### Added
+
+- Add a projected-Kubernetes-token remote adapter for the shared Secrets service, including
+  metadata-only enumeration and atomic put-only prepared generations.
+- Preserve the verified owner subject when subscription credentials are created or refreshed.
+- Add an idempotent, scope-bounded Vault-to-Secrets migration utility which keeps all secret bytes
+  in memory and never deletes or mutates the source.
+
+### Changed
+
+- Hosted credential-bearing integrations select exactly one complete `[secrets]` or `[vault]`
+  backend. Provider exchange, refresh, and upstream revocation remain in Connectors.
+
 ## 0.3.3 — 2026-09-01
 
 ### Fixed

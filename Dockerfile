@@ -11,12 +11,15 @@ RUN --mount=type=cache,id=b10x-cargo-registry,target=/usr/local/cargo/registry,s
     --mount=type=cache,id=b10x-connectors-target,target=/src/crates/connectors-cli/target,sharing=locked \
     find crates -path '*/target' -prune -o -type f -exec touch {} + && \
     cargo build --manifest-path crates/connectors-cli/Cargo.toml --locked --release && \
-    install -D /src/crates/connectors-cli/target/release/connectors /out/connectors
+    cargo build --manifest-path crates/connectors-runtime/Cargo.toml --locked --release -p hosted-secrets --bin connectors-secrets-migrate && \
+    install -D /src/crates/connectors-cli/target/release/connectors /out/connectors && \
+    install -D /src/crates/connectors-runtime/target/release/connectors-secrets-migrate /out/connectors-secrets-migrate
 
 FROM gcr.io/distroless/cc-debian12:nonroot@sha256:adcd20c7b4c988b73cbfbddb26d2eee574571e6d7c9ffea29b3821e0690efb77
 ARG SOURCE_SHA=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_SHA
 COPY --from=builder /out/connectors /usr/local/bin/connectors
+COPY --from=builder /out/connectors-secrets-migrate /usr/local/bin/connectors-secrets-migrate
 VOLUME ["/var/lib/b10x-connectors"]
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/connectors"]

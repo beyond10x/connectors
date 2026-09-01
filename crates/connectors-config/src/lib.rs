@@ -10,7 +10,7 @@ pub use hosted::{
     HostedAuthorityConfig, HostedGitlabConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig,
     HostedIdentityConfig, HostedJiraConfig, HostedKubernetesConfig, HostedListenerConfig,
     HostedServerConfig, HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig,
-    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig, JiraSharedAuth,
+    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig, HostedSecretsConfig, JiraSharedAuth,
     KubernetesNamespaceAccessConfig,
 };
 pub use personal::{

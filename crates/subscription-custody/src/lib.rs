@@ -194,6 +194,7 @@ impl std::fmt::Debug for LeaseCapability {
 struct Lease {
     token_sha256: [u8; 32],
     credential_ref: CredentialRef,
+    owner_subject: String,
     attempt_id: String,
     expires_at: u64,
     remaining_uses: u16,
@@ -273,7 +274,7 @@ impl SubscriptionCustody {
         let reference = credential_ref(tenant_id, subject)?;
         let mut leases = self.leases.lock().await;
         self.store
-            .put(&reference, &Secret::new(credential.as_str()))
+            .put_owned(&reference, subject, &Secret::new(credential.as_str()))
             .await
             .map_err(|_| CustodyError::Unavailable)?;
         leases.retain(|_, lease| lease.credential_ref != reference);
@@ -383,7 +384,7 @@ impl SubscriptionCustody {
         }
         let mut leases = self.leases.lock().await;
         self.store
-            .put(&reference, &Secret::new(serialized.as_str()))
+            .put_owned(&reference, subject, &Secret::new(serialized.as_str()))
             .await
             .map_err(|_| CustodyError::Unavailable)?;
         leases.retain(|_, lease| lease.credential_ref != reference);
@@ -450,6 +451,7 @@ impl SubscriptionCustody {
             Lease {
                 token_sha256: Sha256::digest(token.as_bytes()).into(),
                 credential_ref: reference,
+                owner_subject: subject.to_owned(),
                 attempt_id: attempt_id.to_owned(),
                 expires_at,
                 remaining_uses: maximum_uses,
@@ -471,7 +473,7 @@ impl SubscriptionCustody {
     ) -> Result<Secret, CustodyError> {
         validate_attempt(attempt_id)?;
         let mut leases = self.leases.lock().await;
-        let reference = {
+        let (reference, owner_subject) = {
             let lease = leases.get_mut(lease_id).ok_or(CustodyError::LeaseRefused)?;
             let candidate: [u8; 32] = Sha256::digest(lease_token.as_bytes()).into();
             if !constant_time_equal(&lease.token_sha256, &candidate)
@@ -482,7 +484,7 @@ impl SubscriptionCustody {
                 return Err(CustodyError::LeaseRefused);
             }
             lease.remaining_uses -= 1;
-            lease.credential_ref.clone()
+            (lease.credential_ref.clone(), lease.owner_subject.clone())
         };
         let stored = self
             .store
@@ -521,7 +523,11 @@ impl SubscriptionCustody {
             serde_json::to_string(&refreshed).map_err(|_| CustodyError::Unavailable)?,
         );
         self.store
-            .put(&reference, &Secret::new(serialized.as_str()))
+            .put_owned(
+                &reference,
+                &owner_subject,
+                &Secret::new(serialized.as_str()),
+            )
             .await
             .map_err(|_| CustodyError::Unavailable)?;
         Ok(Secret::new(&refreshed.access_token))

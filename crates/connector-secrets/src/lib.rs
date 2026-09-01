@@ -175,6 +175,16 @@ pub trait SecretStore: Send + Sync {
     /// produce.
     async fn put(&self, reference: &CredentialRef, secret: &Secret) -> Result<(), StoreError>;
 
+    /// Write while preserving the verified person who owns this credential.
+    async fn put_owned(
+        &self,
+        reference: &CredentialRef,
+        _owner_subject: &str,
+        secret: &Secret,
+    ) -> Result<(), StoreError> {
+        self.put(reference, secret).await
+    }
+
     /// Remove whatever is stored at `reference`.
     ///
     /// **Idempotent**: deleting an address that holds nothing is `Ok(())`, not

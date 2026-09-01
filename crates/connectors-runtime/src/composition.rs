@@ -10,6 +10,7 @@ use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStor
 use connector_state::StateStore;
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_state::PostgresState;
+use hosted_secrets::HostedSecretsStore;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use subscription_custody::SubscriptionCustody;
 use identity_http::IdentityHttpVerifier;
@@ -454,7 +455,18 @@ impl HostedRuntime {
             env::var("CONNECTORS_DATABASE_URL").ok(),
             env::var("CONNECTORS_SQLITE").ok(),
         )?;
-        let credential_stores = if config.vault.enabled {
+        let credential_stores = if config.secrets.enabled {
+            let store = Arc::new(HostedSecretsStore::new(&config.secrets).map_err(|_| RuntimeError::CredentialStore)?);
+            store.ready().await.map_err(|_| RuntimeError::CredentialStore)?;
+            let secret_store: Arc<dyn SecretStore> = store;
+            let prepared = PreparedVaultStore::open_shared(
+                secret_store.clone(),
+                hosted_state.clone(),
+                "secrets.prepared-transactions",
+            ).map_err(|_| RuntimeError::CredentialStore)?;
+            prepared.initialize().await.map_err(|_| RuntimeError::CredentialStore)?;
+            HostedCredentialStores { values: Some(secret_store), prepared: Some(Arc::new(prepared)) }
+        } else if config.vault.enabled {
             let store = HostedVaultStore::new(&config.vault)?;
             store.initialize().await?;
             let store = Arc::new(store);
