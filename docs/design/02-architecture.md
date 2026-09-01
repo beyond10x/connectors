@@ -15,7 +15,7 @@ later and cite this.
 
 ## 1. Repository layout
 
-```
+```text
 providers/            reviewed projection overlays/recipes (TOML; transitional declarations in M1)
 specs/                official or repository-authored API specs + provenance sidecars
 catalog/              canonical documents (compiled) + connector-document.schema.json
@@ -263,7 +263,7 @@ process. PostgreSQL adoption does not itself claim SaaS isolation, HA, or restor
 
 ## 5. The one invocation path
 
-```
+```text
 presented authority ─▶ personal-local auth OR Identity verifier
       ─▶ admitted principal (tenant inside; exact Connectors audience scopes)
       ─▶ connector Grant admission (proof types; deny>allow>predicate)

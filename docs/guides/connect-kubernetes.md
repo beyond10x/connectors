@@ -7,14 +7,14 @@ merged kubeconfig privately.
 
 Start the Connector daemon as usual. The normal Zwirn flow first lists detected contexts:
 
-```console
+```bash
 zwirn connect kubernetes
 ```
 
 This step is passive. It does not contact a cluster and cannot execute an auth helper. If more than
 one context exists, choose the exact one:
 
-```console
+```bash
 zwirn connect kubernetes --context dev-cluster
 ```
 
@@ -26,7 +26,7 @@ bindings.
 
 Then select exactly one supported Service:
 
-```console
+```bash
 zwirn connect kubernetes --context dev-cluster --service monitoring/prometheus
 ```
 

@@ -16,7 +16,7 @@ they cite it.
 Every platform in the researched category converges on the same three-layer shape, and it maps
 exactly onto our postures:
 
-```
+```text
 CATALOG  (shared text, versioned, signed)      Provider — the template
    │  enabled + configured by a deployment
 DEPLOYMENT (one posture: personal/org/saas)    Integration — the tenant-configured provider
@@ -195,7 +195,7 @@ grant may name a destination).
 An authorized instance of an integration: stable id, human **label**, scope
 (`tenant`-shared or `principal`-owned), connection config values, and a lifecycle:
 
-```
+```text
 created ──authorize──▶ authorized ──verify──▶ callable
                             ▲                    │ credential expiry / revocation upstream
                             └── reauthorize ── degraded ──revoke──▶ revoked
