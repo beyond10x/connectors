@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated catalog lock artifact SHA-256 lines are content identities, not credentials."
+condition = "AND"
+regexTarget = "line"
+paths = ['''^connectors\.lock$''']
+regexes = ['''^\s*"catalog/[a-z0-9-]+\.catalog\.json"\s*=\s*"[0-9a-f]{64}"\s*$''']

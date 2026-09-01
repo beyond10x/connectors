@@ -33,8 +33,8 @@ pub enum ClientError {
     /// The peer returned an invalid, uncorrelated, empty, or oversized response.
     #[error("Connector returned an invalid response")]
     InvalidResponse,
-    /// The configured hosted API base is not one explicit HTTPS base URL.
-    #[error("hosted Connector base must be one explicit HTTPS URL")]
+    /// The configured hosted API base is not one explicit HTTPS or internal-cluster URL.
+    #[error("hosted Connector base must be one explicit HTTPS or internal-cluster URL")]
     InvalidHostedBase,
     /// The supplied Identity bearer cannot be represented by the bounded hosted binding.
     #[error("hosted Connector Identity bearer is invalid")]
@@ -552,7 +552,7 @@ impl LocalClient {
     }
 }
 
-/// Client for the Identity-authenticated hosted HTTPS binding.
+/// Client for the Identity-authenticated hosted HTTP binding.
 #[derive(Clone)]
 pub struct HostedClient {
     http: reqwest::Client,
@@ -569,12 +569,17 @@ impl HostedClient {
     /// `https://connectors.example/api/connectors/v1`.
     pub fn new(base: &str) -> Result<Self, ClientError> {
         let base = validated_hosted_base(base)?;
-        let http = reqwest::Client::builder()
-            .https_only(true)
+        let builder = reqwest::Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(35))
+            .timeout(Duration::from_secs(35));
+        let builder = if base.scheme() == "https" {
+            builder.https_only(true)
+        } else {
+            builder
+        };
+        let http = builder
             .build()
             .map_err(|_| ClientError::HostedUnavailable)?;
         Ok(Self::from_parts(base, http))
@@ -1002,7 +1007,11 @@ fn validate_event_response(
 
 fn validated_hosted_base(base: &str) -> Result<Url, ClientError> {
     let base = Url::parse(base).map_err(|_| ClientError::InvalidHostedBase)?;
-    if base.scheme() != "https"
+    let internal_http = base.scheme() == "http"
+        && base.host_str().is_some_and(|host| {
+            host == "127.0.0.1" || host == "localhost" || host.ends_with(".svc.cluster.local")
+        });
+    if !(base.scheme() == "https" || internal_http)
         || base.host_str().is_none()
         || !base.username().is_empty()
         || base.password().is_some()
@@ -1152,8 +1161,15 @@ mod tests {
     }
 
     #[test]
-    fn hosted_client_requires_one_explicit_https_base() {
+    fn hosted_client_requires_https_except_on_loopback_or_internal_cluster_dns() {
         assert!(HostedClient::new("https://connectors.example/api/connectors/v1").is_ok());
+        assert!(HostedClient::new("http://127.0.0.1:8091/api/connectors/v1").is_ok());
+        assert!(
+            HostedClient::new(
+                "http://connectors.devcenter.svc.cluster.local:8091/api/connectors/v1"
+            )
+            .is_ok()
+        );
         assert!(matches!(
             HostedClient::new("http://connectors.example/api/connectors/v1"),
             Err(ClientError::InvalidHostedBase)
