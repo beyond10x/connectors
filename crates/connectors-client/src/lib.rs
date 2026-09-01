@@ -13,7 +13,8 @@ use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _}
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use protocol::{connection, event, operation};
+use protocol::{connection, event};
+pub use protocol::{datasource, operation};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
@@ -580,6 +581,7 @@ pub struct HostedClient {
     operations: Url,
     connections: Url,
     events: Url,
+    datasources: Url,
     subscription_credential: Url,
     subscription_leases: Url,
     subscription_oauth_start: Url,
@@ -695,6 +697,36 @@ impl HostedClient {
             )
             .await?;
         validate_event_response(response, &request_id)
+    }
+
+    /// Sends one hosted, read-only datasource request with an ephemeral Identity bearer.
+    pub async fn datasource(
+        &self,
+        bearer: &str,
+        context: &operation::OwnerContext,
+        request: datasource::DatasourceRequest,
+    ) -> Result<datasource::ResponseEnvelope, ClientError> {
+        require_bearer(bearer)?;
+        let request_id = request_id();
+        let envelope = datasource::RequestEnvelope {
+            protocol: datasource::CONTRACT.to_owned(),
+            request_id: request_id.clone(),
+            context: context.clone(),
+            request,
+        };
+        envelope
+            .validate()
+            .map_err(|error| ClientError::InvalidRequest(error.to_string()))?;
+        let response = self
+            .exchange(
+                &self.datasources,
+                bearer,
+                &envelope,
+                datasource::MAX_FRAME_BYTES,
+                datasource::MAX_RESULT_BYTES,
+            )
+            .await?;
+        validate_datasource_response(response, &request_id)
     }
 
     /// Reports whether the authenticated person has connected a Claude Code subscription. The
@@ -851,6 +883,7 @@ impl HostedClient {
             operations: endpoint(&base, "operations"),
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),
+            datasources: endpoint(&base, "datasources"),
             subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
             subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),
             subscription_oauth_start: endpoint(
@@ -1075,6 +1108,16 @@ fn validate_event_response(
     Ok(response)
 }
 
+fn validate_datasource_response(
+    response: datasource::ResponseEnvelope,
+    request_id: &str,
+) -> Result<datasource::ResponseEnvelope, ClientError> {
+    if response.request_id != request_id || response.validate().is_err() {
+        return Err(ClientError::InvalidResponse);
+    }
+    Ok(response)
+}
+
 fn validated_hosted_base(base: &str) -> Result<Url, ClientError> {
     let base = Url::parse(base).map_err(|_| ClientError::InvalidHostedBase)?;
     let internal_http = base.scheme() == "http"
@@ -1293,6 +1336,54 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status, ResponseStatus::Ok);
+        serving.abort();
+    }
+
+    #[tokio::test]
+    async fn hosted_client_posts_and_validates_a_datasource_frame() {
+        async fn datasource_handler(
+            State(expected): State<OwnerContext>,
+            headers: HeaderMap,
+            body: Bytes,
+        ) -> Bytes {
+            assert_eq!(
+                headers.get(reqwest::header::AUTHORIZATION).unwrap(),
+                "Bearer session-1"
+            );
+            let request: datasource::RequestEnvelope = serde_json::from_slice(&body).unwrap();
+            request.validate().unwrap();
+            assert_eq!(request.context, expected);
+            Bytes::from(
+                serde_json::to_vec(&datasource::ResponseEnvelope::success(
+                    request.request_id,
+                    datasource::DatasourceResult::Search {
+                        definitions: Vec::new(),
+                    },
+                ))
+                .unwrap(),
+            )
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/api/connectors/v1/datasources", post(datasource_handler))
+            .with_state(context());
+        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
+        let client = HostedClient::from_parts(base, reqwest::Client::new());
+        let response = client
+            .datasource(
+                "session-1",
+                &context(),
+                datasource::DatasourceRequest::Search(datasource::SearchRequest {
+                    query: "gitlab".to_owned(),
+                    limit: 1,
+                }),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status, datasource::ResponseStatus::Ok);
         serving.abort();
     }
 
