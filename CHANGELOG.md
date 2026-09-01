@@ -9,6 +9,20 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.3.3 — 2026-09-01
+
+### Fixed
+
+- Complete Claude subscription OAuth from the provider's exact manual-callback value: split its
+  `authorization_code#state` form, verify the returned state against the pending browser flow, and
+  exchange only the authorization-code component. Missing, mismatched, or multiply delimited state
+  is refused before any token-endpoint request.
+
+### Security
+
+- Keep the correction wholly inside Connectors. Identity remains provider- and relying-party-
+  agnostic, while Connectors continues to own provider state, PKCE material, and token custody.
+
 ## 0.3.2 — 2026-09-01
 
 ### Added

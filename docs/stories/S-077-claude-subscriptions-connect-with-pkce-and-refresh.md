@@ -22,7 +22,8 @@ provider token in Connector-owned custody.
 - [x] A bounded, expiring, single-use start operation creates server-held PKCE state and returns
       only an authorization URL plus an opaque flow id.
 - [x] Completion is bound to the verified tenant and subject, consumes the pending flow before the
-      provider exchange, and stores neither code nor verifier after the attempt.
+      provider exchange, verifies the state returned in the provider's `code#state` manual result,
+      exchanges only the code component, and stores neither code nor verifier after the attempt.
 - [x] The provider exchange uses the exact public-client authorization-code JSON contract and
       validates bounded access, refresh, expiry, and inference-scope fields before custody.
 - [x] Custody stores a versioned refresh-capable record, returns presence only, and exports only a
@@ -47,3 +48,7 @@ only the authenticated BFF that invokes them.
 - 2026-09-01 — implemented in `subscription-custody`, hosted server, `connectors-client`, runtime,
   and embedded OpenAPI. Unit and HTTP tests cover one-use completion, refresh-token rotation,
   current-token lease redemption, route authorization, and route/schema consistency.
+- 2026-09-01 — live Devcenter verification exposed that the provider's manual callback returns a
+  combined `code#state` value. Completion now splits that exact wire value, refuses missing or
+  mismatched returned state before any provider exchange, and sends only the authorization code to
+  the token endpoint. The provider-specific correction remains entirely in Connectors.

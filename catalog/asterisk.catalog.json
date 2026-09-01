@@ -9238,7 +9238,7 @@
       "wire_value": "CallClaimed"
     }
   ],
-  "generator": "connectors 0.3.2",
+  "generator": "connectors 0.3.3",
   "operations": [
     {
       "auth": [
