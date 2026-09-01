@@ -145,3 +145,9 @@ receiver-owned admission remains independent.
 `/livez` reports process liveness. `/readyz` and the compatibility `/healthz` route perform a
 bounded Identity readiness request and return `503` while opaque-token authority cannot be
 resolved.
+
+<!-- b10x-docs:start -->
+## Documentation
+
+[Connectors documentation](https://beyond10x.github.io/docs/connectors/) · [Start](https://beyond10x.github.io/) · [Ecosystem](https://beyond10x.github.io/ecosystem/) · [Impact](https://beyond10x.github.io/changes/) · [Releases](https://beyond10x.github.io/releases/)
+<!-- b10x-docs:end -->
