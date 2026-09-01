@@ -1,0 +1,15 @@
+schema: b10x-change/v1
+id: connectors/public-surface-2026-09-01
+repository: connectors
+publishedAt: 2026-09-01T12:00:00Z
+title: Connectors joins the public ecosystem surface
+summary: Connectors now exposes its catalog, architecture, adoption guides, dependencies, and current maturity through the shared b10x documentation contract.
+kind: capability
+impact: significant
+source:
+  url: https://github.com/beyond10x/connectors
+journeys: [build-agents, operate-services]
+affectedSurfaces: [connectors/docs]
+relations:
+  - {target: surface:identity/docs, kind: depends-on, label: Resolves Identity authority}
+  - {target: surface:agent-platform/docs, kind: integrates-with, label: Supplies governed operations to Agent Platform}

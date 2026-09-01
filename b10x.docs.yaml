@@ -1,0 +1,34 @@
+schema: b10x-docs/v2
+repository:
+  id: connectors
+  url: https://github.com/beyond10x/connectors
+surfaces:
+  - id: docs
+    name: Connectors
+    summary: Public contracts, guides, catalog, and service architecture for governed external operations, credentials, grants, invocation, and events.
+    kind: documentation
+    canonicalUrl: https://github.com/beyond10x/connectors#readme
+    maturity: development
+    availability: published
+    discoverability: public
+    audiences: [evaluator, adopter, developer, operator]
+    journeys: [build-agents, operate-services]
+    capabilities: [connector-catalog, governed-invocation, credential-custody, event-delivery]
+    sections:
+      - {label: Architecture, url: https://github.com/beyond10x/connectors/blob/main/docs/design/02-architecture.md, kind: docs}
+      - {label: Connect Slack, url: https://github.com/beyond10x/connectors/blob/main/docs/guides/connect-slack.md, kind: quickstart}
+      - {label: Connect GitLab, url: https://github.com/beyond10x/connectors/blob/main/docs/guides/connect-gitlab.md, kind: guide}
+      - {label: Source, url: https://github.com/beyond10x/connectors, kind: source}
+    relationships:
+      - {target: identity/docs, kind: uses, label: Resolves tenant and principal authority}
+      - {target: agent-platform/docs, kind: supports, label: Supplies governed operations to agents}
+      - {target: eventlog/docs, kind: uses, label: Stores durable Connector-owned state as events}
+    adoption:
+      label: Connect Slack locally
+      url: https://github.com/beyond10x/connectors/blob/main/docs/guides/connect-slack.md
+      mode: source-build
+      estimatedMinutes: 20
+      prerequisites: [Rust toolchain, Slack application credentials]
+      outcome: Configure a local Connector deployment and establish a governed Slack connection.
+    accent: "#52d6c7"
+    shell: {integration: portable, revision: 73aefe1ca268cc853ed38fb23478454496462a03}

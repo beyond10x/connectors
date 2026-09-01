@@ -361,18 +361,16 @@ it is not routed through ordinary gap recovery.
 7. **MSRV** — resolver v3 plus the predecessor's msrv fence (declared-vs-tested gap named, not
    implied).
 
-## 8. Releases and automation identity
+## 8. Releases and automation
 
 Pre-v1 there are no release artifacts; the repo is the product. When releases start: a Linux
 server/CLI binary, the pack as both embedded default and standalone asset, and a signed release
 manifest under a single-owner trust bootstrap (the 0011 pattern), with the update channel
 arriving when flux's managed personal posture needs it — not before.
 
-Automation (catalog rebuild commits, lock bumps, release cuts) authenticates as an
-**org-owned GitHub App** (`b10x-bot`) minting short-lived installation tokens — never a
-personal account, never a long-lived PAT. In-workflow commits may alternatively use the Actions
-`GITHUB_TOKEN` only for read-only workflow operations. Every automated commit and push uses
-`b10x-bot[bot]`. Human pushes stay human.
+Organization delivery identity and credentials are centrally managed outside component source.
+This repository carries the release workflow and verification contract, but no token-minting or
+credential-path machinery.
 
 ## 9. Build order
 

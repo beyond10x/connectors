@@ -47,52 +47,13 @@ main agent definition under `.agents/agents/`; trigger it when Timo says substra
 
 ## Commits
 
-- This repository is private. Its visibility must not change without Timo's explicit approval.
+- This repository is public. Public-source privacy and release-delivery policy are governed from
+  Atlas; component source must not carry organization credential machinery.
 - Lowercase `area: summary` titles (`docs:`, `research:`, `scripts:`, `chore:`), body with
   bullet points. Write messages via `git commit -F -` with a quoted heredoc, never `-m` with
   backticks.
-- Never commit key material. `.gitignore` blocks `*.pem`/`*.key`; the bot's private key and App
-  configuration live in the user's XDG config directory, outside every working tree, mode 0600.
-
-## Automation identity: b10x-bot
-
-**Anything not typed by Timo commits and pushes as the bot — including agent sessions and CI.**
-Only Timo at the keyboard pushes as a human. The bot is the org-owned GitHub App
-**b10x-bot** (permissions: contents, workflows, metadata — nothing more). No PATs, machine
-accounts, or long-lived source-control credentials.
-
-For agents that means: work normally, but commit via `scripts/as-bot.sh commit …` and push via
-`scripts/as-bot.sh push …` — never plain `git commit`/`git push`.
-
-The scripts read `b10x-bot.json` and `b10x-bot.private-key.pem` from the external
-B10x XDG config directory; `B10X_BOT_*` environment variables override those defaults.
-
-Three paved paths, in order of everyday-ness:
-
-1. **Git as the bot** — any git command, authored as `b10x-bot[bot]`, authenticated with a
-   fresh 1-hour installation token (ssh remotes are rewritten to https for the push; the token
-   travels via env + credential helper, never argv):
-
-   ```bash
-   scripts/as-bot.sh commit -m "chore: bump catalog lock"
-   scripts/as-bot.sh push origin main
-   ```
-
-2. **gh CLI as the bot** — per-invocation override; the human keyring login stays untouched:
-
-   ```bash
-   scripts/bot-gh.sh pr create ...
-   scripts/bot-gh.sh api ...
-   ```
-
-3. **API-created commits** (GraphQL `createCommitOnBranch`) — only when the GitHub "Verified"
-   badge matters: GitHub signs commits it creates itself. Routine automation does not need this.
-
-`scripts/bot-token.sh` is the primitive under all three: app JWT → installation lookup → 1-hour
-token on stdout. Diagnostics go to stderr; the token is the only stdout line.
-
-GitHub Actions that only read or test may use `GITHUB_TOKEN`. A workflow that creates or pushes a
-commit must authenticate and author it as `b10x-bot[bot]`.
+- Never commit key material. `.gitignore` blocks `*.pem`/`*.key`; delivery credentials and
+  bot-authenticated remote operations are supplied by Atlas-owned tooling outside this repository.
 
 ## Adding a connector
 
@@ -164,7 +125,7 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    tests prove selected operations exist; S-021 owns the missing reverse check that an allowlist
    entry cannot outlive the gap it explains.
    Commit the provider file **and** its generated artifacts together:
-   `catalog: add <provider> connector`, via `as-bot.sh` if you're an agent.
+   `catalog: add <provider> connector`.
 
 Checklist: identity chosen as permanent · spec origin + provenance explicit ·
 selects split by damage class · risk/idempotency/effects by judgment, not guessed · no auth-flow
@@ -219,7 +180,7 @@ The agent instruction is therefore short:
    judgment calls apply); vanished operations are acknowledged, not silently dropped — coverage
    holds in both directions.
 4. One commit: `catalog: refresh <vendor> spec`, body summarizing the catalog diff, via
-   `as-bot.sh`.
+   the organization delivery path.
 
 ### The gate does not fit on one machine
 
