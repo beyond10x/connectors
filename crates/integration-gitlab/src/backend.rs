@@ -61,7 +61,7 @@ const MAX_AUDIT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_CONNECT_SESSIONS: usize = 32;
 const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
 const VALUE_PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
-const GITLAB_OPERATIONS: [&str; 9] = [
+const GITLAB_OPERATIONS: [&str; 11] = [
     "gitlab-user-get",
     "gitlab-group-list",
     "gitlab-project-list",
@@ -71,6 +71,8 @@ const GITLAB_OPERATIONS: [&str; 9] = [
     "gitlab-merge-request-list",
     "gitlab-pipeline-get",
     "gitlab-branch-list",
+    "gitlab-repository-tree-list",
+    "gitlab-repository-file-get",
 ];
 const GITLAB_DATASOURCES: [&str; 6] = [
     "gitlab.users",

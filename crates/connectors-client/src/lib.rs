@@ -8,204 +8,37 @@
 //! and it never persists a credential.
 
 use std::fs;
-use std::io;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use protocol::{connection, event, operation};
+use protocol::{connection, event};
+pub use protocol::{datasource, operation};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
 use url::Url;
 use zeroize::Zeroizing;
 
+mod model;
+
+pub use model::{
+    CandidateActivationOutcome, ClientError, MaterializationOutcome, PendingConnection,
+    RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
+};
+use model::{
+    CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,
+    RedeemSubscriptionLeaseRequest, RedeemedSubscriptionResponse, SubscriptionLeaseResponse,
+};
+
 const COMPLETION_RESPONSE_BYTES: usize = 1024;
 const IDENTITY_BEARER_BYTES: usize = 512;
 const SUBSCRIPTION_RESPONSE_BYTES: usize = 20 * 1024;
-
-/// A transport, framing, or protocol validation failure.
-#[derive(Debug, thiserror::Error)]
-pub enum ClientError {
-    /// The caller supplied a request that violates its protocol contract.
-    #[error("Connector request was invalid: {0}")]
-    InvalidRequest(String),
-    /// The peer returned an invalid, uncorrelated, empty, or oversized response.
-    #[error("Connector returned an invalid response")]
-    InvalidResponse,
-    /// The configured hosted API base is not one explicit HTTPS or internal-cluster URL.
-    #[error("hosted Connector base must be one explicit HTTPS or internal-cluster URL")]
-    InvalidHostedBase,
-    /// The supplied Identity bearer cannot be represented by the bounded hosted binding.
-    #[error("hosted Connector Identity bearer is invalid")]
-    InvalidIdentityBearer,
-    /// The hosted Connector refused the presented Identity authority.
-    #[error("hosted Connector Identity authority was refused")]
-    HostedNotGranted,
-    /// The hosted Connector understood and refused a bounded subscription request. Only the HTTP
-    /// status crosses this client boundary; the response body may contain provider diagnostics.
-    #[error("hosted Connector refused the subscription request with status {0}")]
-    SubscriptionRefused(u16),
-    /// The hosted Connector was unavailable or returned a non-contract HTTP result.
-    #[error("hosted Connector is unavailable")]
-    HostedUnavailable,
-    /// A response carrying a credential or capability omitted the mandatory cache refusal.
-    #[error("hosted Connector returned a cacheable credential response")]
-    CacheableCredentialResponse,
-    /// The Connect Session endpoint is not the expected owner-only Unix socket.
-    #[error(
-        "the Connect Session completion endpoint is not an owner-only socket under this state root"
-    )]
-    UnsafeCompletionEndpoint,
-    /// The Connector rejected the submitted Connect Session credential.
-    #[error("the Connector refused the submitted credential")]
-    CompletionRefused,
-    /// The Connector returned a typed Connection-domain refusal.
-    #[error("the Connector refused the connection request: {0}")]
-    ConnectionRefused(String),
-    /// A local transport operation failed.
-    #[error("local Connector transport failed: {0}")]
-    Io(#[from] io::Error),
-    /// A frame could not be encoded or decoded.
-    #[error("Connector protocol JSON was malformed: {0}")]
-    Json(#[from] serde_json::Error),
-}
 
 /// Client for the owner-permissioned personal-local Unix-socket binding.
 #[derive(Debug, Clone)]
 pub struct LocalClient {
     socket: PathBuf,
-}
-
-/// Value-free result of beginning a Connector-owned credential acquisition session.
-pub struct PendingConnection {
-    pub session_ref: String,
-    pub completion_endpoint: PathBuf,
-}
-
-/// Result of a generic candidate-selection and activation workflow.
-pub enum CandidateActivationOutcome {
-    SelectionRequired(Vec<connection::ConnectionCandidateSummary>),
-    Connected {
-        connection: connection::ConnectionDescription,
-        observations: Vec<connection::DiscoveryObservationSummary>,
-    },
-}
-
-/// Value-free result of materializing the recognized observations admitted by the Connector.
-pub struct MaterializationOutcome {
-    pub connections: Vec<connection::ConnectionSummary>,
-    pub unsupported: usize,
-    pub not_granted: usize,
-}
-
-/// Presence-only state for a user-bound subscription credential.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct SubscriptionStatus {
-    pub provider: String,
-    pub connected: bool,
-}
-
-/// Non-secret browser authorization details for a pending Claude subscription connection.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct SubscriptionOAuthStart {
-    pub authorization_url: String,
-    pub flow_id: String,
-    pub expires_at: u64,
-}
-
-/// A short-lived, finite-use capability bound to one Harness attempt. Diagnostics never reveal
-/// the bearer value.
-pub struct SubscriptionLease {
-    pub lease_id: String,
-    token: Zeroizing<String>,
-    pub expires_at: u64,
-}
-
-impl SubscriptionLease {
-    #[must_use]
-    pub fn expose_at_redemption_boundary(&self) -> &str {
-        self.token.as_str()
-    }
-}
-
-impl std::fmt::Debug for SubscriptionLease {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("SubscriptionLease")
-            .field("lease_id", &self.lease_id)
-            .field("token", &"[REDACTED]")
-            .field("expires_at", &self.expires_at)
-            .finish()
-    }
-}
-
-/// One provider credential returned at the exact Harness bearer boundary. Its allocation is wiped
-/// on drop and its diagnostics are redacted.
-pub struct RedeemedSubscription {
-    credential: Zeroizing<String>,
-    pub kind: String,
-}
-
-impl RedeemedSubscription {
-    #[must_use]
-    pub fn expose_at_provider_boundary(&self) -> &str {
-        self.credential.as_str()
-    }
-}
-
-impl std::fmt::Debug for RedeemedSubscription {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("RedeemedSubscription")
-            .field("credential", &"[REDACTED]")
-            .field("kind", &self.kind)
-            .finish()
-    }
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct ConnectSubscriptionRequest<'a> {
-    credential: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct CompleteSubscriptionOAuthRequest<'a> {
-    flow_id: &'a str,
-    code: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct CreateSubscriptionLeaseRequest<'a> {
-    attempt_id: &'a str,
-    ttl_seconds: u64,
-    maximum_uses: u16,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SubscriptionLeaseResponse {
-    lease_id: String,
-    lease_token: String,
-    expires_at: u64,
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct RedeemSubscriptionLeaseRequest<'a> {
-    attempt_id: &'a str,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RedeemedSubscriptionResponse {
-    credential: String,
-    kind: String,
 }
 
 impl LocalClient {
@@ -580,6 +413,7 @@ pub struct HostedClient {
     operations: Url,
     connections: Url,
     events: Url,
+    datasources: Url,
     subscription_credential: Url,
     subscription_leases: Url,
     subscription_oauth_start: Url,
@@ -695,6 +529,36 @@ impl HostedClient {
             )
             .await?;
         validate_event_response(response, &request_id)
+    }
+
+    /// Sends one hosted, read-only datasource request with an ephemeral Identity bearer.
+    pub async fn datasource(
+        &self,
+        bearer: &str,
+        context: &operation::OwnerContext,
+        request: datasource::DatasourceRequest,
+    ) -> Result<datasource::ResponseEnvelope, ClientError> {
+        require_bearer(bearer)?;
+        let request_id = request_id();
+        let envelope = datasource::RequestEnvelope {
+            protocol: datasource::CONTRACT.to_owned(),
+            request_id: request_id.clone(),
+            context: context.clone(),
+            request,
+        };
+        envelope
+            .validate()
+            .map_err(|error| ClientError::InvalidRequest(error.to_string()))?;
+        let response = self
+            .exchange(
+                &self.datasources,
+                bearer,
+                &envelope,
+                datasource::MAX_FRAME_BYTES,
+                datasource::MAX_RESULT_BYTES,
+            )
+            .await?;
+        validate_datasource_response(response, &request_id)
     }
 
     /// Reports whether the authenticated person has connected a Claude Code subscription. The
@@ -851,6 +715,7 @@ impl HostedClient {
             operations: endpoint(&base, "operations"),
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),
+            datasources: endpoint(&base, "datasources"),
             subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
             subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),
             subscription_oauth_start: endpoint(
@@ -1075,6 +940,16 @@ fn validate_event_response(
     Ok(response)
 }
 
+fn validate_datasource_response(
+    response: datasource::ResponseEnvelope,
+    request_id: &str,
+) -> Result<datasource::ResponseEnvelope, ClientError> {
+    if response.request_id != request_id || response.validate().is_err() {
+        return Err(ClientError::InvalidResponse);
+    }
+    Ok(response)
+}
+
 fn validated_hosted_base(base: &str) -> Result<Url, ClientError> {
     let base = Url::parse(base).map_err(|_| ClientError::InvalidHostedBase)?;
     let internal_http = base.scheme() == "http"
@@ -1293,6 +1168,54 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status, ResponseStatus::Ok);
+        serving.abort();
+    }
+
+    #[tokio::test]
+    async fn hosted_client_posts_and_validates_a_datasource_frame() {
+        async fn datasource_handler(
+            State(expected): State<OwnerContext>,
+            headers: HeaderMap,
+            body: Bytes,
+        ) -> Bytes {
+            assert_eq!(
+                headers.get(reqwest::header::AUTHORIZATION).unwrap(),
+                "Bearer session-1"
+            );
+            let request: datasource::RequestEnvelope = serde_json::from_slice(&body).unwrap();
+            request.validate().unwrap();
+            assert_eq!(request.context, expected);
+            Bytes::from(
+                serde_json::to_vec(&datasource::ResponseEnvelope::success(
+                    request.request_id,
+                    datasource::DatasourceResult::Search {
+                        definitions: Vec::new(),
+                    },
+                ))
+                .unwrap(),
+            )
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/api/connectors/v1/datasources", post(datasource_handler))
+            .with_state(context());
+        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
+        let client = HostedClient::from_parts(base, reqwest::Client::new());
+        let response = client
+            .datasource(
+                "session-1",
+                &context(),
+                datasource::DatasourceRequest::Search(datasource::SearchRequest {
+                    query: "gitlab".to_owned(),
+                    limit: 1,
+                }),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status, datasource::ResponseStatus::Ok);
         serving.abort();
     }
 
