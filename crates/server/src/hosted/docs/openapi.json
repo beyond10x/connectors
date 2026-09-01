@@ -65,7 +65,7 @@
       "post": {
         "operationId": "completeClaudeCodeSubscriptionOAuth",
         "summary": "Complete a pending Claude Code subscription connection",
-        "description": "Consumes the one-use provider code and server-held PKCE verifier, then stores a refresh-capable credential in Connector custody. Requires connectors.connections.self.",
+        "description": "Consumes the provider's one-use code#state manual result, verifies its state against the server-held browser flow, and uses the server-held PKCE verifier to store a refresh-capable credential in Connector custody. Requires connectors.connections.self.",
         "security": [{"identityAccessToken": []}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/completeSubscriptionOAuth"}}}},
         "responses": {
@@ -1988,7 +1988,7 @@
         "required": ["flow_id", "code"],
         "properties": {
           "flow_id": {"type": "string", "minLength": 16, "maxLength": 512},
-          "code": {"type": "string", "minLength": 1, "maxLength": 8192, "writeOnly": true}
+          "code": {"type": "string", "minLength": 3, "maxLength": 8192, "pattern": "^[^#\\s]+#[^#\\s]+$", "description": "The complete one-use code#state value shown by the provider's manual callback. Connectors verifies the returned state before exchanging the code component.", "writeOnly": true}
         }
       },
       "createSubscriptionLease": {

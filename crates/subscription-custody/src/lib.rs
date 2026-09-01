@@ -331,18 +331,19 @@ impl SubscriptionCustody {
         })
     }
 
-    /// Completes one pending authorization, validates the provider response, and replaces custody.
+    /// Completes one pending authorization from the provider's `code#state` manual result,
+    /// validates its flow binding and token response, and replaces custody.
     pub async fn complete_oauth(
         &self,
         tenant_id: &str,
         subject: &str,
         flow_id: &str,
-        code: &str,
+        code_and_state: &str,
     ) -> Result<(), CustodyError> {
         if !valid_public_value(flow_id, 512)
-            || code.is_empty()
-            || code.len() > 8 * 1024
-            || code.chars().any(char::is_whitespace)
+            || code_and_state.is_empty()
+            || code_and_state.len() > 8 * 1024
+            || code_and_state.chars().any(char::is_whitespace)
         {
             return Err(CustodyError::OauthRefused);
         }
@@ -357,8 +358,21 @@ impl SubscriptionCustody {
         if pending.tenant_id != tenant_id || pending.subject != subject {
             return Err(CustodyError::OauthRefused);
         }
+        // Claude's manual callback renders one opaque value as `authorization_code#state`.
+        // Treat the returned state as part of the provider response: bind it to this pending
+        // browser flow, then send only the authorization-code component to the token endpoint.
+        let (authorization_code, returned_state) = code_and_state
+            .split_once('#')
+            .ok_or(CustodyError::OauthRefused)?;
+        if authorization_code.is_empty()
+            || returned_state.is_empty()
+            || returned_state.contains('#')
+            || returned_state != pending.state
+        {
+            return Err(CustodyError::OauthRefused);
+        }
         let response = oauth
-            .exchange_code(code, &pending.verifier, &pending.state)
+            .exchange_code(authorization_code, &pending.verifier, &pending.state)
             .await?;
         let record = oauth_record(response, None, now_millis()?)?;
         let reference = credential_ref(tenant_id, subject)?;
@@ -947,23 +961,14 @@ mod tests {
         assert_eq!(query.get("code").unwrap(), "true");
         assert_eq!(query.get("code_challenge_method").unwrap(), "S256");
         assert!(!query.contains_key("code_verifier"));
+        let returned_code = format!("one-use-provider-code#{}", query.get("state").unwrap());
 
         custody
-            .complete_oauth(
-                "tenant-one",
-                "human-alice",
-                &start.flow_id,
-                "one-use-provider-code",
-            )
+            .complete_oauth("tenant-one", "human-alice", &start.flow_id, &returned_code)
             .await
             .unwrap();
         assert!(custody
-            .complete_oauth(
-                "tenant-one",
-                "human-alice",
-                &start.flow_id,
-                "one-use-provider-code",
-            )
+            .complete_oauth("tenant-one", "human-alice", &start.flow_id, &returned_code,)
             .await
             .is_err());
         assert!(custody
@@ -991,5 +996,63 @@ mod tests {
             .unwrap();
         assert_eq!(redeemed.expose_secret(), "synthetic-access-token-two");
         assert_eq!(exchanges.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn pkce_completion_refuses_a_missing_or_mismatched_returned_state_before_exchange() {
+        let exchanges = Arc::new(AtomicUsize::new(0));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_exchanges = exchanges.clone();
+        tokio::spawn(async move {
+            axum::serve(
+                listener,
+                Router::new()
+                    .route("/token", post(oauth_token))
+                    .with_state(server_exchanges),
+            )
+            .await
+            .unwrap();
+        });
+        let origin = format!("http://127.0.0.1:{}", address.port());
+        let config = ClaudeOAuthConfig::new(
+            "public-client",
+            &format!("{origin}/authorize"),
+            &format!("{origin}/token"),
+            &format!("{origin}/callback"),
+            "user:profile user:inference",
+        )
+        .unwrap();
+        let custody =
+            SubscriptionCustody::with_claude_oauth(Arc::new(MemoryStore::new()), config).unwrap();
+
+        let missing_state = custody
+            .start_oauth("tenant-one", "human-alice")
+            .await
+            .unwrap();
+        assert!(custody
+            .complete_oauth(
+                "tenant-one",
+                "human-alice",
+                &missing_state.flow_id,
+                "one-use-provider-code",
+            )
+            .await
+            .is_err());
+
+        let mismatched_state = custody
+            .start_oauth("tenant-one", "human-alice")
+            .await
+            .unwrap();
+        assert!(custody
+            .complete_oauth(
+                "tenant-one",
+                "human-alice",
+                &mismatched_state.flow_id,
+                "one-use-provider-code#wrong-state",
+            )
+            .await
+            .is_err());
+        assert_eq!(exchanges.load(Ordering::SeqCst), 0);
     }
 }

@@ -73,7 +73,7 @@ exclude = [
 edition = "2021"
 # The predecessor differential has passed and its 0.26 line is retired. `0.1.0` is the first
 # beyond10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
-version = "0.3.2"
+version = "0.3.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -88,21 +88,21 @@ publish = false
 schemars = "1"
 # Internal crates. Path-local names: the package name, the library name and the workspace key are
 # the same word, so there is no `package = "…"` alias to keep in step with anything.
-connector-address = { version = "0.3.2", path = "crates/connector-address" }
-connector-spec = { version = "0.3.2", path = "crates/connector-spec" }
-catalog-reader = { version = "0.3.2", path = "crates/catalog-reader" }
-catalog = { version = "0.3.2", path = "crates/catalog" }
-connector-resolve = { version = "0.3.2", path = "crates/connector-resolve" }
-connector-oauth = { version = "0.3.2", path = "crates/connector-oauth" }
-connector-secrets = { version = "0.3.2", path = "crates/connector-secrets" }
-connector-state = { version = "0.3.2", path = "crates/connector-state" }
-connectors-client = { version = "0.3.2", path = "crates/connectors-client" }
-subscription-custody = { version = "0.3.2", path = "crates/subscription-custody" }
-catalog-build = { version = "0.3.2", path = "crates/catalog-build" }
-domain = { version = "0.3.2", path = "crates/domain" }
-protocol = { version = "0.3.2", path = "crates/protocol" }
-service = { version = "0.3.2", path = "crates/service" }
-server = { version = "0.3.2", path = "crates/server" }
+connector-address = { version = "0.3.3", path = "crates/connector-address" }
+connector-spec = { version = "0.3.3", path = "crates/connector-spec" }
+catalog-reader = { version = "0.3.3", path = "crates/catalog-reader" }
+catalog = { version = "0.3.3", path = "crates/catalog" }
+connector-resolve = { version = "0.3.3", path = "crates/connector-resolve" }
+connector-oauth = { version = "0.3.3", path = "crates/connector-oauth" }
+connector-secrets = { version = "0.3.3", path = "crates/connector-secrets" }
+connector-state = { version = "0.3.3", path = "crates/connector-state" }
+connectors-client = { version = "0.3.3", path = "crates/connectors-client" }
+subscription-custody = { version = "0.3.3", path = "crates/subscription-custody" }
+catalog-build = { version = "0.3.3", path = "crates/catalog-build" }
+domain = { version = "0.3.3", path = "crates/domain" }
+protocol = { version = "0.3.3", path = "crates/protocol" }
+service = { version = "0.3.3", path = "crates/service" }
+server = { version = "0.3.3", path = "crates/server" }
 
 # Shared third-party.
 anyhow = "1"

@@ -748,7 +748,8 @@ impl HostedClient {
         .await
     }
 
-    /// Completes one pending PKCE flow. The one-use provider code is wiped on drop.
+    /// Completes one pending PKCE flow. The provider's complete `code#state` manual result is
+    /// wiped on drop; Connectors validates the state and exchanges only the code component.
     pub async fn complete_claude_code_subscription_oauth(
         &self,
         identity_bearer: &str,

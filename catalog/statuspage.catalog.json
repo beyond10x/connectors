@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Atlassian Statuspage: read a status page's components and incidents, and open or update a publicly visible incident on it",
-  "generator": "connectors 0.3.2",
+  "generator": "connectors 0.3.3",
   "operations": [
     {
       "auth": [
