@@ -770,6 +770,100 @@ description = "The project's branches"
 items = { type = "object", required = ["name", "commit"], properties = { name = { type = "string" }, merged = { type = "boolean", description = "Whether this branch has been merged into the project's default branch" }, protected = { type = "boolean" }, default = { type = "boolean", description = "Whether this is the project's default branch" }, developers_can_push = { type = "boolean" }, developers_can_merge = { type = "boolean" }, can_push = { type = "boolean", description = "Whether the authenticated token's user can push to this branch" }, web_url = { type = "string", format = "uri" }, commit = { type = "object", description = "The branch tip: `{id, short_id, title, author_name, authored_date, message}`" } } }
 
 # ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-repository-tree-list"
+method = "GET"
+direction = "read"
+path = "/projects/{project_id}/repository/tree"
+description = "List one bounded page of a project's repository tree at an exact commit"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.query]]
+name = "ref"
+description = "An exact commit SHA returned by the branch API"
+required = true
+schema = { type = "string", pattern = "^[0-9a-fA-F]{40,64}$" }
+
+[[operations.params.query]]
+name = "path"
+description = "A repository-relative directory path; absent means the repository root"
+required = false
+schema = { type = "string", maxLength = 1024, pattern = "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00]*$" }
+
+[[operations.params.query]]
+name = "page"
+description = "1-based page number"
+required = false
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.query]]
+name = "per_page"
+description = "Results per page, at most 100"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[operations.response_schema]
+type = "array"
+description = "Repository entries at the exact requested commit"
+items = { type = "object", required = ["id", "name", "type", "path", "mode"], properties = { id = { type = "string", description = "Object id" }, name = { type = "string" }, type = { type = "string", enum = ["blob", "tree"] }, path = { type = "string" }, mode = { type = "string" } } }
+
+# ---------------------------------------------------------------------------------------------
+
+[[operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-repository-file-get"
+method = "GET"
+direction = "read"
+path = "/projects/{project_id}/repository/files/{file_path}"
+description = "Read one repository file at an exact commit; content remains base64 encoded and bounded by the Connector result limit"
+risk = "low"
+idempotency = "idempotent"
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.path]]
+name = "file_path"
+description = "The repository-relative file path encoded as one URI path segment; slashes are `%2F`"
+required = true
+schema = { type = "string", maxLength = 3072, pattern = "^(?!%2[fF]|%2[eE]%2[eE](?:%2[fF]|$))(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$" }
+
+[[operations.params.query]]
+name = "ref"
+description = "An exact commit SHA returned by the branch API"
+required = true
+schema = { type = "string", pattern = "^[0-9a-fA-F]{40,64}$" }
+
+[operations.response_schema]
+type = "object"
+required = ["file_name", "file_path", "size", "encoding", "content", "content_sha256", "ref", "blob_id", "commit_id", "last_commit_id"]
+properties = { file_name = { type = "string" }, file_path = { type = "string" }, size = { type = "integer", minimum = 0 }, encoding = { type = "string", enum = ["base64"] }, content = { type = "string", description = "Base64-encoded file bytes" }, content_sha256 = { type = "string" }, ref = { type = "string" }, blob_id = { type = "string" }, commit_id = { type = "string" }, last_commit_id = { type = "string" }, execute_filemode = { type = "boolean" } }
+
+# ---------------------------------------------------------------------------------------------
 # Configuration — what a human supplies before any of the above runs
 #
 # The origin and one operator-owned OAuth application registration are configuration. User and
