@@ -48,6 +48,33 @@
         }
       }
     },
+    "/subscription-credentials/claude-code/oauth/start": {
+      "post": {
+        "operationId": "startClaudeCodeSubscriptionOAuth",
+        "summary": "Start a Claude Code subscription PKCE connection",
+        "description": "Creates bounded single-use server-side PKCE state and returns only the provider authorization URL plus an opaque flow id. Requires connectors.connections.self.",
+        "security": [{"identityAccessToken": []}],
+        "responses": {
+          "200": {"description": "Non-cacheable browser authorization details.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionOAuthStart"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "503": {"description": "OAuth state custody is unavailable.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/subscription-credentials/claude-code/oauth/complete": {
+      "post": {
+        "operationId": "completeClaudeCodeSubscriptionOAuth",
+        "summary": "Complete a pending Claude Code subscription connection",
+        "description": "Consumes the one-use provider code and server-held PKCE verifier, then stores a refresh-capable credential in Connector custody. Requires connectors.connections.self.",
+        "security": [{"identityAccessToken": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/completeSubscriptionOAuth"}}}},
+        "responses": {
+          "200": {"description": "The subscription is connected.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionStatus"}}}},
+          "400": {"description": "The pending flow, code, or provider response was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
     "/subscription-credentials/claude-code/leases": {
       "post": {
         "operationId": "createClaudeCodeSubscriptionLease",
@@ -1944,6 +1971,25 @@
         "additionalProperties": false,
         "required": ["credential"],
         "properties": {"credential": {"type": "string", "minLength": 16, "maxLength": 16384, "writeOnly": true}}
+      },
+      "subscriptionOAuthStart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorization_url", "flow_id", "expires_at"],
+        "properties": {
+          "authorization_url": {"type": "string", "format": "uri"},
+          "flow_id": {"type": "string", "minLength": 16, "maxLength": 512},
+          "expires_at": {"type": "integer", "minimum": 0, "description": "Unix epoch seconds."}
+        }
+      },
+      "completeSubscriptionOAuth": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["flow_id", "code"],
+        "properties": {
+          "flow_id": {"type": "string", "minLength": 16, "maxLength": 512},
+          "code": {"type": "string", "minLength": 1, "maxLength": 8192, "writeOnly": true}
+        }
       },
       "createSubscriptionLease": {
         "type": "object",

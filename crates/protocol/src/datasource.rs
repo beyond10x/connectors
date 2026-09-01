@@ -122,7 +122,9 @@ pub enum AccessMode {
 }
 
 /// Supported read verb.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadVerb {
     /// Bounded compact listing.
@@ -301,7 +303,9 @@ pub enum DatasourceErrorCode {
 }
 
 /// Typed datasource failure with safe diagnostics.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema,
+)]
 #[error("{code:?}: {message}")]
 #[serde(deny_unknown_fields)]
 pub struct DatasourceError {

@@ -121,7 +121,9 @@ pub enum EventErrorCode {
     Protocol,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error, schemars::JsonSchema,
+)]
 #[error("{code:?}: {message}")]
 #[serde(deny_unknown_fields)]
 pub struct EventError {

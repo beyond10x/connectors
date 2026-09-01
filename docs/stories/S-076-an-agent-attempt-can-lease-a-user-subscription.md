@@ -46,4 +46,6 @@ durable credential into Agent Platform, Devcenter, configuration, logs, or an ag
 - This resolves design 16's last open boundary. It does not make the custody-only provider
   callable: catalog discovery and invocation still see zero services and zero operations.
 - Setup tokens do not refresh. A user replaces the connected value explicitly; every existing
-  lease is revoked before the new generation can be redeemed.
+  lease is revoked before the new generation can be redeemed. This describes the 0.3.0 seam;
+  [S-077](S-077-claude-subscriptions-connect-with-pkce-and-refresh.md) adds refresh-capable OAuth
+  custody without changing the attempt-lease contract.

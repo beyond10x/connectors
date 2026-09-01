@@ -47,6 +47,8 @@
         "/healthz",
         "/openapi.json",
         "/subscription-credentials/claude-code",
+        "/subscription-credentials/claude-code/oauth/start",
+        "/subscription-credentials/claude-code/oauth/complete",
         "/subscription-credentials/claude-code/leases",
         "/subscription-leases/{lease_id}/redeem"
       ],
