@@ -974,8 +974,9 @@ pub struct Provider {
     /// multi-service connector has no single base URL, and the predecessor's answer here was the
     /// connector-level default from its TOML — a value the canonical document does not carry and
     /// which, for contentful and google, names a host some of their operations never reach. This
-    /// field is kept because it is exactly right for the 51 single-surface connectors and because
-    /// it is what a one-line summary wants; it is not the value to build a request from.
+    /// field is kept because it is exactly right for ordinary single-surface connectors and because
+    /// it is what a one-line summary wants; it is not the value to build a request from. It is empty
+    /// only for a custody-only provider, which declares no callable surface by construction.
     pub base_url: &'static str,
     /// Every credential the connector declares, in declaration order and keyed by
     /// [`Credential::name`] — the vocabulary [`Operation::credentials`] references by name.

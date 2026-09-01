@@ -2,7 +2,7 @@
 name = "integration-gitlab"
 description = "GitLab delegated-user Connector Integration adapter."
 edition = "2021"
-version = "0.2.1"
+version = "0.3.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -12,21 +12,21 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
-catalog = { version = "0.2.1", path = "../catalog" }
-connector-oauth = { version = "0.2.1", path = "../connector-oauth" }
-connector-resolve = { version = "0.2.1", path = "../connector-resolve" }
-connector-secrets = { version = "0.2.1", path = "../connector-secrets" }
-connectors-config = { version = "0.2.1", path = "../connectors-config" }
+catalog = { version = "0.3.0", path = "../catalog" }
+connector-oauth = { version = "0.3.0", path = "../connector-oauth" }
+connector-resolve = { version = "0.3.0", path = "../connector-resolve" }
+connector-secrets = { version = "0.3.0", path = "../connector-secrets" }
+connectors-config = { version = "0.3.0", path = "../connectors-config" }
 getrandom = "0.3"
 hex = "0.4"
-connector-state = { version = "0.2.1", path = "../connector-state" }
+connector-state = { version = "0.3.0", path = "../connector-state" }
 jsonschema = { version = "0.33", default-features = false }
-protocol = { version = "0.2.1", path = "../protocol" }
+protocol = { version = "0.3.0", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.2.1", path = "../service" }
+service = { version = "0.3.0", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["sync"] }
@@ -34,4 +34,4 @@ url = "2"
 zeroize = "1"
 
 [dev-dependencies]
-connector-secrets = { version = "0.2.1", path = "../connector-secrets" }
+connector-secrets = { version = "0.3.0", path = "../connector-secrets" }

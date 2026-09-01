@@ -48,13 +48,13 @@ struct VerificationResponse {
     jti: String,
     act: Actor,
     scope: String,
-    dl_principal_kind: String,
-    dl_tenant: String,
+    principal_kind: String,
+    tenant_id: String,
     #[serde(default)]
     email: Option<String>,
     groups: Vec<String>,
     #[serde(default)]
-    dl_deployment: Option<String>,
+    deployment_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -173,7 +173,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
         let groups = validate_groups(&admitted.groups).ok_or(IdentityVerificationError::Refused)?;
         if admitted.iss != self.expected_issuer
             || admitted.aud != CONNECTORS_AUDIENCE
-            || admitted.dl_tenant != self.expected_tenant
+            || admitted.tenant_id != self.expected_tenant
             || admitted.iat > admitted.nbf
             || admitted.nbf > admitted.exp
             || admitted.exp.saturating_sub(admitted.iat) > 300
@@ -181,7 +181,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
             || admitted.nbf > now.saturating_add(30)
             || admitted.exp <= now.saturating_sub(30)
             || !matches!(
-                admitted.dl_principal_kind.as_str(),
+                admitted.principal_kind.as_str(),
                 "human" | "service" | "deployment"
             )
             || !valid_ref(&admitted.sub, 512)
@@ -194,7 +194,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
                     || email.split('@').count() != 2
             })
             || admitted
-                .dl_deployment
+                .deployment_id
                 .as_deref()
                 .is_some_and(|deployment| !valid_ref(deployment, 512))
         {
@@ -203,7 +203,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
         let authority_snapshot_sha256 = hex::encode(sha2::Sha256::digest(&bytes));
         Ok(HostedPrincipal {
             issuer: admitted.iss,
-            tenant_id: admitted.dl_tenant,
+            tenant_id: admitted.tenant_id,
             subject: admitted.sub,
             actor_subject: admitted.act.sub,
             email: admitted.email,
@@ -211,7 +211,7 @@ impl IdentityVerifier for IdentityHttpVerifier {
             scopes,
             groups,
             authority_snapshot_sha256,
-            deployment_id: admitted.dl_deployment,
+            deployment_id: admitted.deployment_id,
         })
     }
 }
@@ -234,7 +234,9 @@ fn validate_groups(value: &[String]) -> Option<BTreeSet<String>> {
 }
 
 fn valid_access_token(value: &str) -> bool {
-    value.strip_prefix("dl_access_v1_").is_some_and(|token| {
+    value
+        .strip_prefix("identity_access_v1_")
+        .is_some_and(|token| {
         token.len() == 43
             && token
                 .bytes()
@@ -243,12 +245,13 @@ fn valid_access_token(value: &str) -> bool {
 }
 
 fn validate_scopes(value: &str) -> Option<BTreeSet<String>> {
-    const ALLOWED: [&str; 11] = [
+    const ALLOWED: [&str; 12] = [
         "connectors.audit.read",
         "connectors.catalog.read",
         "connectors.channels.manage",
         "connectors.connections.manage",
         "connectors.connections.self",
+        "connectors.credentials.lease",
         "connectors.deliveries.manage",
         "connectors.events.read",
         "connectors.events.self",
@@ -303,10 +306,10 @@ mod tests {
         )
         .is_ok());
         assert!(valid_access_token(&format!(
-            "dl_access_v1_{}",
+            "identity_access_v1_{}",
             "a".repeat(43)
         )));
-        assert!(!valid_access_token("dl_access_v1_short"));
+        assert!(!valid_access_token("identity_access_v1_short"));
     }
 
     /// The deployed posture, asserted in every build including the one that carries the loopback

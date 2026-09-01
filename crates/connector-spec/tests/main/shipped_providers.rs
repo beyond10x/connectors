@@ -74,10 +74,17 @@ fn every_shipped_provider_loads() {
              `<id>.flux`",
             loaded.connector.id
         );
-        assert!(
-            !loaded.connector.operations.is_empty(),
-            "providers/{name}.toml declares no operations, so it compiles to an empty module"
-        );
+        if loaded.connector.custody_only {
+            assert!(
+                loaded.connector.operations.is_empty() && loaded.connector.services.is_empty(),
+                "providers/{name}.toml is custody-only but publishes a callable surface"
+            );
+        } else {
+            assert!(
+                !loaded.connector.operations.is_empty(),
+                "providers/{name}.toml declares no operations, so it compiles to an empty module"
+            );
+        }
     }
 }
 

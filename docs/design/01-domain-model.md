@@ -318,7 +318,7 @@ Connectors audience-scope vocabulary is:
 Identity carries these exact audience-owner strings after its own exchange; it does not define or
 interpret their connector meaning. They admit route families only. Connectors still resolves its
 own Connection and Grant and applies the fine-grained operation/effect/risk decision. An
-Identity-carried `dl_connection` or `dl_grant` value, if present for correlation, is never proof that
+An Identity-carried `connection_id` or `grant_id` value, if present for correlation, is never proof that
 the referenced Connectors record exists or grants an operation.
 
 ### Invocation

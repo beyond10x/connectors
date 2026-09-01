@@ -13,6 +13,69 @@
     }
   ],
   "paths": {
+    "/subscription-credentials/claude-code": {
+      "get": {
+        "operationId": "claudeCodeSubscriptionStatus",
+        "summary": "Report whether the current person has connected a Claude Code subscription",
+        "description": "Returns presence only. The stored credential is never listed or exported. Requires connectors.connections.self.",
+        "security": [{"identityAccessToken": []}],
+        "responses": {
+          "200": {"description": "Current connection presence.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionStatus"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "404": {"description": "Subscription custody is disabled in this deployment."}
+        }
+      },
+      "put": {
+        "operationId": "connectClaudeCodeSubscription",
+        "summary": "Replace the current person's Claude Code subscription credential",
+        "description": "The value crosses this one request boundary and is committed only to the Connector-owned SecretStore. It is never logged or returned. Requires connectors.connections.self.",
+        "security": [{"identityAccessToken": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/connectSubscription"}}}},
+        "responses": {
+          "200": {"description": "The credential is now connected.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionStatus"}}}},
+          "400": {"description": "The bounded credential shape was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "disconnectClaudeCodeSubscription",
+        "summary": "Delete the current person's Claude Code subscription credential and revoke its leases",
+        "description": "Requires connectors.connections.self.",
+        "security": [{"identityAccessToken": []}],
+        "responses": {
+          "200": {"description": "The credential is disconnected.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionStatus"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/subscription-credentials/claude-code/leases": {
+      "post": {
+        "operationId": "createClaudeCodeSubscriptionLease",
+        "summary": "Create an attempt-bounded lease over the current person's credential",
+        "description": "Returns a short-lived capability, never the provider credential. The capability is bound to one exact Harness attempt, a lifetime no longer than one hour, and a finite use count. Requires connectors.credentials.lease.",
+        "security": [{"identityAccessToken": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/createSubscriptionLease"}}}},
+        "responses": {
+          "200": {"description": "A non-cacheable attempt capability.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/subscriptionLease"}}}},
+          "401": {"description": "Identity authority or lease policy was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "409": {"description": "The person has no connected subscription credential.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/subscription-leases/{lease_id}/redeem": {
+      "post": {
+        "operationId": "redeemClaudeCodeSubscriptionLease",
+        "summary": "Redeem one bounded use directly into a Harness provider adapter",
+        "description": "This internal credential boundary requires the lease capability as Bearer authentication and the exact bound attempt id. It consumes one use and returns a non-cacheable OAuth bearer value. It does not accept an Identity token.",
+        "parameters": [{"name": "lease_id", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 256}}],
+        "security": [{"subscriptionLease": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/redeemSubscriptionLease"}}}},
+        "responses": {
+          "200": {"description": "The current provider credential for immediate use; never persist it.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/redeemedSubscription"}}}},
+          "401": {"description": "The capability, attempt binding, lifetime, or use count was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
     "/operations": {
       "post": {
         "operationId": "operationEnvelope",
@@ -1861,10 +1924,62 @@
       "identityAccessToken": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connect sessions), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
+        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connections and subscription custody), connectors.credentials.lease (attempt-bounded provider credential leases), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
+      },
+      "subscriptionLease": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Short-lived, finite-use, attempt-bound capability issued by the subscription lease endpoint. It is not an Identity token and must never be persisted."
       }
     },
     "schemas": {
+      "subscriptionStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "connected"],
+        "properties": {"provider": {"const": "claude-code"}, "connected": {"type": "boolean"}}
+      },
+      "connectSubscription": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["credential"],
+        "properties": {"credential": {"type": "string", "minLength": 16, "maxLength": 16384, "writeOnly": true}}
+      },
+      "createSubscriptionLease": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt_id"],
+        "properties": {
+          "attempt_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "ttl_seconds": {"type": "integer", "minimum": 1, "maximum": 3600, "default": 900},
+          "maximum_uses": {"type": "integer", "minimum": 1, "maximum": 1024, "default": 32}
+        }
+      },
+      "subscriptionLease": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lease_id", "lease_token", "expires_at"],
+        "properties": {
+          "lease_id": {"type": "string"},
+          "lease_token": {"type": "string", "format": "password", "x-sensitive": true},
+          "expires_at": {"type": "integer", "minimum": 0, "description": "Unix epoch seconds."}
+        }
+      },
+      "redeemSubscriptionLease": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt_id"],
+        "properties": {"attempt_id": {"type": "string", "minLength": 1, "maxLength": 256}}
+      },
+      "redeemedSubscription": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["credential", "kind"],
+        "properties": {
+          "credential": {"type": "string", "format": "password", "x-sensitive": true, "description": "Use immediately as the provider OAuth bearer and discard."},
+          "kind": {"const": "oauth"}
+        }
+      },
       "mcp.request": {
         "type": "object",
         "additionalProperties": false,
@@ -1953,7 +2068,14 @@
             "enum": [
               "identity-access-token-required",
               "identity-access-token-refused",
-              "identity-unavailable"
+              "identity-unavailable",
+              "identity-scope-refused",
+              "subscription-custody-disabled",
+              "subscription-request-invalid",
+              "subscription-not-connected",
+              "subscription-lease-required",
+              "subscription-lease-refused",
+              "subscription-custody-unavailable"
             ]
           }
         },

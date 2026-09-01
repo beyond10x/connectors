@@ -10,10 +10,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
 
-pub const AUTHORITY_TYPE: &str = "dl-session+jwt";
+pub const AUTHORITY_TYPE: &str = "b10x-connectors-session+jwt";
 pub const DPOP_TYPE: &str = "dpop+jwt";
 /// Authorization scheme used only on the brokered WebSocket upgrade.
-pub const AUTHORIZATION_SCHEME: &str = "DLSession";
+pub const AUTHORIZATION_SCHEME: &str = "ConnectorsSession";
 /// Header carrying the proof-of-possession compact JWS.
 pub const DPOP_HEADER: &str = "dpop";
 pub const MAX_AUTHORITY_LIFETIME_SECONDS: u64 = 60;
@@ -60,16 +60,16 @@ pub struct SessionAuthorityClaims {
     pub exp: u64,
     pub jti: String,
     pub cnf: Confirmation,
-    pub dl_org: String,
-    pub dl_deployment: String,
-    pub dl_connection: String,
-    pub dl_grant: String,
-    pub dl_resource: String,
-    pub dl_operation: String,
-    pub dl_channel_kind: String,
-    pub dl_protocol: String,
-    pub dl_endpoint: String,
-    pub dl_session_lease_exp: u64,
+    pub organization_id: String,
+    pub deployment_id: String,
+    pub connection_id: String,
+    pub grant_id: String,
+    pub resource_id: String,
+    pub operation_id: String,
+    pub channel_kind: String,
+    pub protocol: String,
+    pub endpoint: String,
+    pub session_lease_expires_at: u64,
 }
 
 /// Authority returned to the connecting endpoint after brokerage.
@@ -278,16 +278,16 @@ impl AuthorityIssuer {
             cnf: Confirmation {
                 jkt: request.proof_thumbprint,
             },
-            dl_org: request.organization,
-            dl_deployment: request.deployment,
-            dl_connection: request.connection,
-            dl_grant: request.grant,
-            dl_resource: request.resource,
-            dl_operation: request.operation,
-            dl_channel_kind: request.channel_kind,
-            dl_protocol: request.protocol,
-            dl_endpoint: request.endpoint,
-            dl_session_lease_exp: request.lease_expires_at,
+            organization_id: request.organization,
+            deployment_id: request.deployment,
+            connection_id: request.connection,
+            grant_id: request.grant,
+            resource_id: request.resource,
+            operation_id: request.operation,
+            channel_kind: request.channel_kind,
+            protocol: request.protocol,
+            endpoint: request.endpoint,
+            session_lease_expires_at: request.lease_expires_at,
         };
         let compact = sign_compact(&header, &claims, &self.signing_key)?;
         Ok(IssuedAuthority {
@@ -496,7 +496,7 @@ impl<'a> AuthorityRedeemer<'a> {
         }
         if self
             .revocations
-            .is_revoked(&claims.iss, &header.kid, &claims.dl_deployment)
+            .is_revoked(&claims.iss, &header.kid, &claims.deployment_id)
         {
             return Err(AuthorityError::Revoked);
         }
@@ -510,10 +510,10 @@ impl<'a> AuthorityRedeemer<'a> {
         {
             return Err(AuthorityError::InvalidLifetime);
         }
-        if claims.dl_session_lease_exp < claims.exp {
+        if claims.session_lease_expires_at < claims.exp {
             return Err(AuthorityError::InvalidLease);
         }
-        if now > claims.dl_session_lease_exp {
+        if now > claims.session_lease_expires_at {
             return Err(AuthorityError::LeaseExpired);
         }
         if now.saturating_add(CLOCK_SKEW_SECONDS) < claims.nbf {
@@ -527,19 +527,19 @@ impl<'a> AuthorityRedeemer<'a> {
         check_binding("audience", &claims.aud, &expected.audience)?;
         check_binding("subject", &claims.sub, &expected.subject)?;
         check_binding("actor", &claims.act, &expected.actor)?;
-        check_binding("organization", &claims.dl_org, &expected.organization)?;
-        check_binding("deployment", &claims.dl_deployment, &expected.deployment)?;
-        check_binding("connection", &claims.dl_connection, &expected.connection)?;
-        check_binding("grant", &claims.dl_grant, &expected.grant)?;
-        check_binding("resource", &claims.dl_resource, &expected.resource)?;
-        check_binding("operation", &claims.dl_operation, &expected.operation)?;
         check_binding(
-            "channel_kind",
-            &claims.dl_channel_kind,
-            &expected.channel_kind,
+            "organization",
+            &claims.organization_id,
+            &expected.organization,
         )?;
-        check_binding("protocol", &claims.dl_protocol, &expected.protocol)?;
-        check_binding("endpoint", &claims.dl_endpoint, &expected.endpoint)?;
+        check_binding("deployment", &claims.deployment_id, &expected.deployment)?;
+        check_binding("connection", &claims.connection_id, &expected.connection)?;
+        check_binding("grant", &claims.grant_id, &expected.grant)?;
+        check_binding("resource", &claims.resource_id, &expected.resource)?;
+        check_binding("operation", &claims.operation_id, &expected.operation)?;
+        check_binding("channel_kind", &claims.channel_kind, &expected.channel_kind)?;
+        check_binding("protocol", &claims.protocol, &expected.protocol)?;
+        check_binding("endpoint", &claims.endpoint, &expected.endpoint)?;
 
         let (dpop_header, dpop): (DpopHeader, DpopClaims) =
             decode_compact(request.dpop.expose_secret())?;

@@ -9,6 +9,41 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.3.0 — 2026-09-01
+
+### Added
+
+- **Claude Code subscription custody.** The `claude-code` catalog provider is explicitly
+  `custody_only`: it owns one user-bound setup token but publishes no callable service or
+  operation. Hosted deployments opt in with `[claude_code] enabled = true`, which requires the
+  configured Vault store.
+- **Attempt-bounded credential leases.** A new custody component stores the provider credential at
+  a tenant/subject-derived address and issues cryptorandom capabilities bound to one exact Harness
+  attempt, an expiry no longer than one hour, and a finite use count. Restart revokes every live
+  lease; disconnect and credential replacement revoke every lease over the previous value.
+- **Typed hosted client and OpenAPI surface.** Presence, connect, disconnect, lease, and redemption
+  have bounded client methods and documented HTTP contracts. Credential-bearing responses are
+  required to carry `no-store` and `no-cache`; capability and credential diagnostics are redacted
+  and their allocations are cleared on drop.
+
+### Changed
+
+- **Breaking pre-deployment wire correction.** Identity authority fields now use the neutral
+  `tenant_id`, `principal_kind`, and `deployment_id` vocabulary and accept only the
+  `identity_access_v1_` opaque credential format introduced by Identity 0.3.0. The Connector
+  session authority likewise uses product-neutral claim names and the
+  `b10x-connectors-session+jwt` media type. Compatibility with the inherited former-product
+  vocabulary is intentionally not retained.
+- A custody-only catalog document now projects an empty summary base URL instead of panicking; it
+  still cannot compose a request because it has no service or operation.
+
+### Security
+
+- Creating a provider lease requires the new least-privilege
+  `connectors.credentials.lease` Identity scope. Connecting and disconnecting remain self-service
+  under `connectors.connections.self`; redemption accepts only the attempt capability and exact
+  attempt id, never an Identity session.
+
 ## 0.2.1 — 2026-08-25
 
 No product change: `crates/`, `providers/`, `specs/` and `catalog/` are byte-identical to `0.2.0`

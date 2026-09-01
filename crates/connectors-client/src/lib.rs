@@ -18,9 +18,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
 use url::Url;
+use zeroize::Zeroizing;
 
 const COMPLETION_RESPONSE_BYTES: usize = 1024;
 const IDENTITY_BEARER_BYTES: usize = 512;
+const SUBSCRIPTION_RESPONSE_BYTES: usize = 20 * 1024;
 
 /// A transport, framing, or protocol validation failure.
 #[derive(Debug, thiserror::Error)]
@@ -43,6 +45,9 @@ pub enum ClientError {
     /// The hosted Connector was unavailable or returned a non-contract HTTP result.
     #[error("hosted Connector is unavailable")]
     HostedUnavailable,
+    /// A response carrying a credential or capability omitted the mandatory cache refusal.
+    #[error("hosted Connector returned a cacheable credential response")]
+    CacheableCredentialResponse,
     /// The Connect Session endpoint is not the expected owner-only Unix socket.
     #[error(
         "the Connect Session completion endpoint is not an owner-only socket under this state root"
@@ -88,6 +93,99 @@ pub struct MaterializationOutcome {
     pub connections: Vec<connection::ConnectionSummary>,
     pub unsupported: usize,
     pub not_granted: usize,
+}
+
+/// Presence-only state for a user-bound subscription credential.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SubscriptionStatus {
+    pub provider: String,
+    pub connected: bool,
+}
+
+/// A short-lived, finite-use capability bound to one Harness attempt. Diagnostics never reveal
+/// the bearer value.
+pub struct SubscriptionLease {
+    pub lease_id: String,
+    token: Zeroizing<String>,
+    pub expires_at: u64,
+}
+
+impl SubscriptionLease {
+    #[must_use]
+    pub fn expose_at_redemption_boundary(&self) -> &str {
+        self.token.as_str()
+    }
+}
+
+impl std::fmt::Debug for SubscriptionLease {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SubscriptionLease")
+            .field("lease_id", &self.lease_id)
+            .field("token", &"[REDACTED]")
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+
+/// One provider credential returned at the exact Harness bearer boundary. Its allocation is wiped
+/// on drop and its diagnostics are redacted.
+pub struct RedeemedSubscription {
+    credential: Zeroizing<String>,
+    pub kind: String,
+}
+
+impl RedeemedSubscription {
+    #[must_use]
+    pub fn expose_at_provider_boundary(&self) -> &str {
+        self.credential.as_str()
+    }
+}
+
+impl std::fmt::Debug for RedeemedSubscription {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RedeemedSubscription")
+            .field("credential", &"[REDACTED]")
+            .field("kind", &self.kind)
+            .finish()
+    }
+}
+
+#[derive(Serialize)]
+#[serde(deny_unknown_fields)]
+struct ConnectSubscriptionRequest<'a> {
+    credential: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(deny_unknown_fields)]
+struct CreateSubscriptionLeaseRequest<'a> {
+    attempt_id: &'a str,
+    ttl_seconds: u64,
+    maximum_uses: u16,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SubscriptionLeaseResponse {
+    lease_id: String,
+    lease_token: String,
+    expires_at: u64,
+}
+
+#[derive(Serialize)]
+#[serde(deny_unknown_fields)]
+struct RedeemSubscriptionLeaseRequest<'a> {
+    attempt_id: &'a str,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RedeemedSubscriptionResponse {
+    credential: String,
+    kind: String,
 }
 
 impl LocalClient {
@@ -458,9 +556,12 @@ impl LocalClient {
 #[derive(Clone)]
 pub struct HostedClient {
     http: reqwest::Client,
+    base: Url,
     operations: Url,
     connections: Url,
     events: Url,
+    subscription_credential: Url,
+    subscription_leases: Url,
 }
 
 impl HostedClient {
@@ -569,13 +670,187 @@ impl HostedClient {
         validate_event_response(response, &request_id)
     }
 
+    /// Reports whether the authenticated person has connected a Claude Code subscription. The
+    /// answer contains no credential material.
+    pub async fn claude_code_subscription_status(
+        &self,
+        identity_bearer: &str,
+    ) -> Result<SubscriptionStatus, ClientError> {
+        require_bearer(identity_bearer)?;
+        self.subscription_exchange(
+            reqwest::Method::GET,
+            self.subscription_credential.clone(),
+            identity_bearer,
+            None,
+        )
+        .await
+    }
+
+    /// Replaces the authenticated person's Claude Code subscription credential. The value is
+    /// consumed by this request and is never retained by the client.
+    pub async fn connect_claude_code_subscription(
+        &self,
+        identity_bearer: &str,
+        credential: Zeroizing<String>,
+    ) -> Result<SubscriptionStatus, ClientError> {
+        require_bearer(identity_bearer)?;
+        let body = serde_json::to_vec(&ConnectSubscriptionRequest {
+            credential: credential.as_str(),
+        })?;
+        self.subscription_exchange(
+            reqwest::Method::PUT,
+            self.subscription_credential.clone(),
+            identity_bearer,
+            Some(body),
+        )
+        .await
+    }
+
+    /// Deletes the authenticated person's Claude Code subscription credential and revokes every
+    /// live in-process lease over it.
+    pub async fn disconnect_claude_code_subscription(
+        &self,
+        identity_bearer: &str,
+    ) -> Result<SubscriptionStatus, ClientError> {
+        require_bearer(identity_bearer)?;
+        self.subscription_exchange(
+            reqwest::Method::DELETE,
+            self.subscription_credential.clone(),
+            identity_bearer,
+            None,
+        )
+        .await
+    }
+
+    /// Creates one finite-use credential capability bound to an exact Harness attempt.
+    pub async fn lease_claude_code_subscription(
+        &self,
+        identity_bearer: &str,
+        attempt_id: &str,
+        ttl: Duration,
+        maximum_uses: u16,
+    ) -> Result<SubscriptionLease, ClientError> {
+        require_bearer(identity_bearer)?;
+        let body = serde_json::to_vec(&CreateSubscriptionLeaseRequest {
+            attempt_id,
+            ttl_seconds: ttl.as_secs(),
+            maximum_uses,
+        })?;
+        let response: SubscriptionLeaseResponse = self
+            .subscription_exchange(
+                reqwest::Method::POST,
+                self.subscription_leases.clone(),
+                identity_bearer,
+                Some(body),
+            )
+            .await?;
+        Ok(SubscriptionLease {
+            lease_id: response.lease_id,
+            token: Zeroizing::new(response.lease_token),
+            expires_at: response.expires_at,
+        })
+    }
+
+    /// Consumes one use of an attempt capability and returns the provider credential directly to
+    /// the caller's provider adapter. The returned allocation is wiped on drop.
+    pub async fn redeem_claude_code_subscription(
+        &self,
+        lease: &SubscriptionLease,
+        attempt_id: &str,
+    ) -> Result<RedeemedSubscription, ClientError> {
+        require_lease_id(&lease.lease_id)?;
+        let endpoint = endpoint(
+            &self.base,
+            &format!("subscription-leases/{}/redeem", lease.lease_id),
+        );
+        let body = serde_json::to_vec(&RedeemSubscriptionLeaseRequest { attempt_id })?;
+        let response: RedeemedSubscriptionResponse = self
+            .subscription_exchange(
+                reqwest::Method::POST,
+                endpoint,
+                lease.expose_at_redemption_boundary(),
+                Some(body),
+            )
+            .await?;
+        if response.kind != "oauth" {
+            return Err(ClientError::InvalidResponse);
+        }
+        Ok(RedeemedSubscription {
+            credential: Zeroizing::new(response.credential),
+            kind: response.kind,
+        })
+    }
+
     fn from_parts(base: Url, http: reqwest::Client) -> Self {
         Self {
+            base: base.clone(),
             operations: endpoint(&base, "operations"),
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),
+            subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
+            subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),
             http,
         }
+    }
+
+    async fn subscription_exchange<R: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        endpoint: Url,
+        bearer: &str,
+        body: Option<Vec<u8>>,
+    ) -> Result<R, ClientError> {
+        require_bearer(bearer)?;
+        let mut request = self.http.request(method, endpoint).bearer_auth(bearer);
+        if let Some(body) = body {
+            if body.len() > SUBSCRIPTION_RESPONSE_BYTES {
+                return Err(ClientError::InvalidRequest(
+                    "subscription request exceeds the protocol bound".to_owned(),
+                ));
+            }
+            request = request
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(body);
+        }
+        let mut response = request
+            .send()
+            .await
+            .map_err(|_| ClientError::HostedUnavailable)?;
+        match response.status() {
+            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
+                return Err(ClientError::HostedNotGranted);
+            }
+            status if !status.is_success() => return Err(ClientError::HostedUnavailable),
+            _ => {}
+        }
+        if response.headers().get(reqwest::header::CACHE_CONTROL)
+            != Some(&reqwest::header::HeaderValue::from_static("no-store"))
+            || response.headers().get(reqwest::header::PRAGMA)
+                != Some(&reqwest::header::HeaderValue::from_static("no-cache"))
+        {
+            return Err(ClientError::CacheableCredentialResponse);
+        }
+        if response
+            .content_length()
+            .is_some_and(|length| length > SUBSCRIPTION_RESPONSE_BYTES as u64)
+        {
+            return Err(ClientError::InvalidResponse);
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| ClientError::HostedUnavailable)?
+        {
+            if bytes.len() + chunk.len() > SUBSCRIPTION_RESPONSE_BYTES {
+                return Err(ClientError::InvalidResponse);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        if bytes.is_empty() {
+            return Err(ClientError::InvalidResponse);
+        }
+        Ok(serde_json::from_slice(&bytes)?)
     }
 
     async fn exchange<T: Serialize, R: DeserializeOwned>(
@@ -759,6 +1034,18 @@ fn require_bearer(bearer: &str) -> Result<(), ClientError> {
     Ok(())
 }
 
+fn require_lease_id(lease_id: &str) -> Result<(), ClientError> {
+    if lease_id.is_empty()
+        || lease_id.len() > 256
+        || !lease_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(ClientError::InvalidResponse);
+    }
+    Ok(())
+}
+
 fn request_id() -> String {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -769,10 +1056,11 @@ fn request_id() -> String {
 #[cfg(test)]
 mod tests {
     use axum::body::Bytes;
-    use axum::extract::State;
+    use axum::extract::{Path as AxumPath, State};
     use axum::http::HeaderMap;
-    use axum::routing::post;
-    use axum::Router;
+    use axum::response::IntoResponse as _;
+    use axum::routing::{get, post};
+    use axum::{Json, Router};
     use protocol::operation::{
         OperationRequest, OperationResult, OwnerContext, ResponseEnvelope, ResponseStatus,
         SearchRequest,
@@ -921,6 +1209,113 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status, ResponseStatus::Ok);
+        serving.abort();
+    }
+
+    #[tokio::test]
+    async fn hosted_subscription_client_redacts_and_redeems_one_attempt_capability() {
+        async fn lease(headers: HeaderMap, body: Bytes) -> axum::response::Response {
+            assert_eq!(
+                headers[reqwest::header::AUTHORIZATION],
+                "Bearer identity-access"
+            );
+            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(request["attempt_id"], "attempt-one");
+            (
+                [
+                    (reqwest::header::CACHE_CONTROL, "no-store"),
+                    (reqwest::header::PRAGMA, "no-cache"),
+                ],
+                Json(serde_json::json!({
+                    "lease_id": "lease-one",
+                    "lease_token": "lease-capability-value",
+                    "expires_at": 4_000_000_000_u64
+                })),
+            )
+                .into_response()
+        }
+
+        async fn redeem(
+            AxumPath(lease_id): AxumPath<String>,
+            headers: HeaderMap,
+            body: Bytes,
+        ) -> axum::response::Response {
+            assert_eq!(lease_id, "lease-one");
+            assert_eq!(
+                headers[reqwest::header::AUTHORIZATION],
+                "Bearer lease-capability-value"
+            );
+            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(request["attempt_id"], "attempt-one");
+            (
+                [
+                    (reqwest::header::CACHE_CONTROL, "no-store"),
+                    (reqwest::header::PRAGMA, "no-cache"),
+                ],
+                Json(serde_json::json!({
+                    "credential": "synthetic-provider-credential",
+                    "kind": "oauth"
+                })),
+            )
+                .into_response()
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route(
+                "/api/connectors/v1/subscription-credentials/claude-code/leases",
+                post(lease),
+            )
+            .route(
+                "/api/connectors/v1/subscription-leases/{lease_id}/redeem",
+                post(redeem),
+            );
+        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
+        let client = HostedClient::from_parts(base, reqwest::Client::new());
+        let lease = client
+            .lease_claude_code_subscription(
+                "identity-access",
+                "attempt-one",
+                Duration::from_secs(60),
+                1,
+            )
+            .await
+            .unwrap();
+        assert!(!format!("{lease:?}").contains("capability-value"));
+        let redeemed = client
+            .redeem_claude_code_subscription(&lease, "attempt-one")
+            .await
+            .unwrap();
+        assert_eq!(
+            redeemed.expose_at_provider_boundary(),
+            "synthetic-provider-credential"
+        );
+        assert!(!format!("{redeemed:?}").contains("synthetic-provider"));
+        serving.abort();
+    }
+
+    #[tokio::test]
+    async fn hosted_subscription_client_refuses_a_cacheable_credential_boundary() {
+        async fn status() -> Json<serde_json::Value> {
+            Json(serde_json::json!({"provider":"claude-code","connected":false}))
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new().route(
+            "/api/connectors/v1/subscription-credentials/claude-code",
+            get(status),
+        );
+        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
+        let client = HostedClient::from_parts(base, reqwest::Client::new());
+        assert!(matches!(
+            client
+                .claude_code_subscription_status("identity-access")
+                .await,
+            Err(ClientError::CacheableCredentialResponse)
+        ));
         serving.abort();
     }
 }
