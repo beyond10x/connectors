@@ -2,7 +2,7 @@
 name = "driver-speech"
 description = "Local speech synthesis and recognition: transformations over PCM, never a device."
 edition = "2021"
-version = "0.2.1"
+version = "0.3.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,12 +14,12 @@ resolver = "3"
 members = ["."]
 
 [dependencies]
-domain = { version = "0.2.1", path = "../domain" }
-driver-audio = { version = "0.2.1", path = "../driver-audio" }
-protocol = { version = "0.2.1", path = "../protocol" }
+domain = { version = "0.3.0", path = "../domain" }
+driver-audio = { version = "0.3.0", path = "../driver-audio" }
+protocol = { version = "0.3.0", path = "../protocol" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.2.1", path = "../service" }
+service = { version = "0.3.0", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 

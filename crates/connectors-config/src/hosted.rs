@@ -33,6 +33,8 @@ pub struct HostedServerConfig {
     pub grafana: HostedGrafanaConfig,
     #[serde(default)]
     pub vault: HostedVaultConfig,
+    #[serde(default)]
+    pub claude_code: HostedClaudeCodeConfig,
     pub sip: HostedSipConfig,
     #[serde(default)]
     pub slack: Option<HostedSlackConfig>,
@@ -51,6 +53,15 @@ pub struct HostedServerConfig {
 pub struct HostedEgressConfig {
     #[serde(default)]
     pub policy: HostedEgressPolicy,
+}
+
+/// Enables Connector-owned custody for a person's Claude Code subscription credential. The
+/// credential value is never configuration; enabling this requires the hosted Vault store.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedClaudeCodeConfig {
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -446,7 +457,8 @@ impl HostedServerConfig {
                 && (60..=900).contains(&jira.connect_session_ttl_seconds)
                 && (60..=900).contains(&jira.refresh_skew_seconds)
         });
-        let vault_required = self.sip.credentials.is_some()
+        let vault_required = self.claude_code.enabled
+            || self.sip.credentials.is_some()
             || self.slack.is_some()
             || self.gitlab.is_some()
             || self.jira.is_some()
@@ -1011,6 +1023,44 @@ password_credential = "sip_password"
         inconsistent.vault.token_file = None;
         inconsistent.sip.credentials = None;
         inconsistent.validate().unwrap();
+    }
+
+    #[test]
+    fn claude_code_custody_is_explicit_and_requires_the_hosted_secret_store() {
+        let enabled: HostedServerConfig = toml::from_str(
+            r#"
+tenant_id = "tenant-dev"
+[server]
+listen = "0.0.0.0:8080"
+[identity]
+origin = "https://identity.example.test"
+[storage]
+state_root = "/var/lib/b10x-connectors"
+[kubernetes]
+enabled = false
+[vault]
+enabled = true
+address = "https://vault.example.test"
+mount = "b10x-connectors"
+role = "connectors"
+token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+ca_file = "/etc/vault/ca.crt"
+[claude_code]
+enabled = true
+[sip]
+enabled = false
+"#,
+        )
+        .unwrap();
+        enabled.validate().unwrap();
+
+        let mut without_custody = enabled.clone();
+        without_custody.vault.enabled = false;
+        assert!(without_custody.validate().is_err());
+
+        let mut disabled = enabled;
+        disabled.claude_code.enabled = false;
+        assert!(disabled.validate().is_err(), "unused Vault configuration is refused");
     }
 
     #[test]

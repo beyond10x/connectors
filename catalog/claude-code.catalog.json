@@ -1,0 +1,38 @@
+{
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "auth": [
+    {
+      "description": "A user-bound Claude Code setup token stored for attempt-bounded Harness use",
+      "entry": "connect_session",
+      "name": "claude-code.subscription_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "user"
+    }
+  ],
+  "authority": "com.anthropic.claude-code",
+  "config": [
+    {
+      "approval": "none",
+      "binds": "credential.claude-code.subscription_token",
+      "docs_url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+      "format": "token",
+      "help": "Run `claude setup-token` on your own machine, then paste the resulting token here.",
+      "label": "Setup token",
+      "level": "connection",
+      "name": "subscription_token",
+      "required": true,
+      "secret": true,
+      "service": "default"
+    }
+  ],
+  "connector": "claude-code",
+  "custody_only": true,
+  "description": "Claude Code subscription credential custody for user-bound Harness runs",
+  "generator": "connectors 0.3.0",
+  "operations": [],
+  "schema_version": 2,
+  "services": [],
+  "vendor": "Anthropic"
+}

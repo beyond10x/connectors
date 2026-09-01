@@ -109,6 +109,8 @@ fn leak_pairs(values: BTreeMap<String, String>) -> &'static [Pair] {
 struct RawDocument {
     connector: String,
     #[serde(default)]
+    custody_only: bool,
+    #[serde(default)]
     vendor: String,
     #[serde(default)]
     description: String,
@@ -394,7 +396,8 @@ fn build(id: &str, text: &str) -> &'static Provider {
         .map(|service| (service.name.as_str(), service.base_url.as_str()))
         .collect();
     // The connector-level base URL: the reserved single-surface service when there is one,
-    // otherwise the first declared service. A document always declares at least one service.
+    // otherwise the first declared service. A custody-only document deliberately has no service
+    // and therefore projects an empty summary URL; it cannot be used to compose a request.
     let base_url = base_urls
         .get(Service::DEFAULT)
         .copied()
@@ -403,7 +406,13 @@ fn build(id: &str, text: &str) -> &'static Provider {
                 .first()
                 .map(|service| service.base_url.as_str())
         })
-        .unwrap_or_else(|| panic!("`{id}`'s document declares no service, so it names no host"));
+        .unwrap_or_else(|| {
+            assert!(
+                raw.custody_only && raw.operations.is_empty(),
+                "`{id}`'s document declares no service, so it names no host"
+            );
+            ""
+        });
 
     let operations = raw
         .operations

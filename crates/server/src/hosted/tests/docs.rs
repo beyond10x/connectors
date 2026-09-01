@@ -34,11 +34,14 @@ const ENVELOPE_EXAMPLE_FLOORS: [(&str, usize); 5] = [
 ];
 
 fn test_router() -> Router {
-    router(
+    router_with_subscription_custody(
         Arc::new(Verifier),
         Arc::new(Backend),
         HostedAdmissionPolicy::new(["operator".to_owned()]),
         HostedAuthority::unbound(),
+        Some(Arc::new(SubscriptionCustody::new(Arc::new(
+            connector_secrets::MemoryStore::new(),
+        )))),
     )
 }
 
@@ -288,6 +291,15 @@ async fn every_documented_route_exists_in_the_real_router() {
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::AUTHORIZATION, "Bearer access")
                     .body(Body::from("{}"))
+                    .expect("request"),
+                "put" => Request::put(path)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::from("{}"))
+                    .expect("request"),
+                "delete" => Request::delete(path)
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::empty())
                     .expect("request"),
                 other => panic!("`{path}` documents unmapped method `{other}`"),
             };

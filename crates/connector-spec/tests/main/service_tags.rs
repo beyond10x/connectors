@@ -256,7 +256,9 @@ fn the_shipped_fleet_uses_several_distinct_tags() {
     let mut untagged: Vec<&str> = Vec::new();
     for connector in &fleet {
         let tags = connector.tags();
-        if tags.is_empty() {
+        // Tags classify callable services. A custody-only provider deliberately has none and is
+        // covered by the zero-surface invariant instead of being forced to invent a category.
+        if tags.is_empty() && !connector.custody_only {
             untagged.push(connector.id.as_str());
         }
         for tag in tags {
@@ -268,7 +270,8 @@ fn the_shipped_fleet_uses_several_distinct_tags() {
 
     assert!(
         untagged.is_empty(),
-        "every shipped provider must carry at least one tag, but these carry none: {untagged:?}"
+        "every shipped provider with a callable surface must carry at least one tag, but these \
+         carry none: {untagged:?}"
     );
     assert!(
         distinct.len() >= 10,

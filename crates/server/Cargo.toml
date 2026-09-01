@@ -25,11 +25,14 @@ serde.workspace = true
 schemars.workspace = true
 serde_json.workspace = true
 service.workspace = true
+subscription-custody.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.28", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 url = "2"
+zeroize.workspace = true
 
 [dev-dependencies]
+connector-secrets.workspace = true
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 tower = { version = "0.5", features = ["util"] }

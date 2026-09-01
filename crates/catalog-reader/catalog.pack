@@ -1,7 +1,7 @@
 connectors-catalog-pack 1
-digest sha256 d774e27791445e94175d76e9e531422960d000bb4003c7a25de721157a9fa336
+digest sha256 43fbb3371335d44b810f340b2452529aff7f8f8faa70a08bd4812d4f3670070d
 schema 2
-providers 64
+providers 65
 operations 997
 p airtable 0 18817
 p alertmanager 18817 2457
@@ -15,58 +15,59 @@ p babelforce 6074856 4020346
 p bitbucket 10095202 42637
 p box 10137839 19517
 p calendly 10157356 24240
-p clickup 10181596 29667
-p cloudflare 10211263 24175
-p confluence 10235438 38187
-p contentful 10273625 22107
-p datadog 10295732 12708
-p discord 10308440 35616
-p docusign 10344056 26649
-p dropbox 10370705 20924
-p figma 10391629 21866
-p fly 10413495 22599
-p freshdesk 10436094 57917
-p front 10494011 25585
-p github 10519596 292694
-p gitlab 10812290 87512
-p google 10899802 36899
-p grafana 10936701 17870
-p hubspot 10954571 20197
-p intercom 10974768 30439
-p jira 11005207 47184
-p klaviyo 11052391 38214
-p launchdarkly 11090605 24991
-p loki 11115596 5063
-p mailchimp 11120659 40726
-p microsoft_graph 11161385 1085587
-p miro 12246972 32570
-p mysql 12279542 12675
-p newrelic 12292217 29320
-p notion 12321537 18671
-p okta 12340208 22020
-p openai 12362228 1682668
-p openrouter 14044896 12922
-p pagerduty 14057818 37369
-p postgresql 14095187 12620
-p postmark 14107807 19875
-p prometheus 14127682 4878
-p resend 14132560 18616
-p runpod 14151176 557707
-p salesforce 14708883 19132
-p sendgrid 14728015 15592
-p sentry 14743607 27670
-p shopify 14771277 27374
-p slack 14798651 233504
-p statuspage 15032155 29630
-p stripe 15061785 70617
-p supabase 15132402 13417
-p trello 15145819 26186
-p twilio 15172005 71249
-p typeform 15243254 28707
-p vercel 15271961 17402
-p webflow 15289363 21934
-p zendesk 15311297 1146354
-p zoom 16457651 9408
+p claude-code 10181596 1243
+p clickup 10182839 29667
+p cloudflare 10212506 24175
+p confluence 10236681 38187
+p contentful 10274868 22107
+p datadog 10296975 12708
+p discord 10309683 35616
+p docusign 10345299 26649
+p dropbox 10371948 20924
+p figma 10392872 21866
+p fly 10414738 22599
+p freshdesk 10437337 57917
+p front 10495254 25585
+p github 10520839 292694
+p gitlab 10813533 87512
+p google 10901045 36899
+p grafana 10937944 17870
+p hubspot 10955814 20197
+p intercom 10976011 30439
+p jira 11006450 47184
+p klaviyo 11053634 38214
+p launchdarkly 11091848 24991
+p loki 11116839 5063
+p mailchimp 11121902 40726
+p microsoft_graph 11162628 1085587
+p miro 12248215 32570
+p mysql 12280785 12675
+p newrelic 12293460 29320
+p notion 12322780 18671
+p okta 12341451 22020
+p openai 12363471 1682668
+p openrouter 14046139 12922
+p pagerduty 14059061 37369
+p postgresql 14096430 12620
+p postmark 14109050 19875
+p prometheus 14128925 4878
+p resend 14133803 18616
+p runpod 14152419 557707
+p salesforce 14710126 19132
+p sendgrid 14729258 15592
+p sentry 14744850 27670
+p shopify 14772520 27374
+p slack 14799894 233504
+p statuspage 15033398 29630
+p stripe 15063028 70617
+p supabase 15133645 13417
+p trello 15147062 26186
+p twilio 15173248 71249
+p typeform 15244497 28707
+p vercel 15273204 17402
+p webflow 15290606 21934
+p zendesk 15312540 1146354
+p zoom 16458894 9408
 o airtable-record-create airtable default 5053 4705
 o airtable-record-delete airtable default 14739 3734
 o airtable-record-get airtable default 724 4323
@@ -611,203 +612,203 @@ o calendly-invitee-list calendly default 10175885 5476
 o calendly-scheduled-event-get calendly default 10171896 3983
 o calendly-scheduled-event-list calendly default 10166117 5773
 o calendly-user-me calendly default 10158611 2981
-o clickup-list-task-list clickup default 10189614 7190
-o clickup-space-folder-list clickup default 10185590 4018
-o clickup-task-create clickup default 10200202 5333
-o clickup-task-get clickup default 10196810 3386
-o clickup-task-update clickup default 10205541 5328
-o clickup-team-list clickup default 10183021 2563
-o cloudflare-cache-purge cloudflare default 10231421 3601
-o cloudflare-dns-record-create cloudflare default 10223048 5096
-o cloudflare-dns-record-delete cloudflare default 10228150 3265
-o cloudflare-dns-record-list cloudflare default 10218006 5036
-o cloudflare-zone-list cloudflare default 10213405 4595
+o clickup-list-task-list clickup default 10190857 7190
+o clickup-space-folder-list clickup default 10186833 4018
+o clickup-task-create clickup default 10201445 5333
+o clickup-task-get clickup default 10198053 3386
+o clickup-task-update clickup default 10206784 5328
+o clickup-team-list clickup default 10184264 2563
+o cloudflare-cache-purge cloudflare default 10232664 3601
+o cloudflare-dns-record-create cloudflare default 10224291 5096
+o cloudflare-dns-record-delete cloudflare default 10229393 3265
+o cloudflare-dns-record-list cloudflare default 10219249 5036
+o cloudflare-zone-list cloudflare default 10214648 4595
 o colab-room-create b10x collaboration 3056527 3004
 o colab-workspace-attach b10x collaboration 3060933 3727
 o colab-workspace-current-set b10x collaboration 3064666 2800
 o colab-workspace-detach b10x collaboration 3067472 2380
 o colab-workspace-list b10x collaboration 3059537 1390
-o confluence-comment-add confluence default 10267965 5334
-o confluence-page-create confluence default 10261535 6424
-o confluence-page-get confluence default 10254797 6732
-o confluence-space-get confluence default 10243772 3879
-o confluence-space-list confluence default 10238129 5637
-o confluence-space-pages confluence default 10247657 7134
-o contentful-asset-get contentful delivery 10284703 2703
-o contentful-entries-list contentful delivery 10281143 3554
-o contentful-entry-create contentful management 10287412 3916
-o contentful-entry-get contentful delivery 10278446 2691
-o contentful-entry-publish contentful management 10291334 3423
-o datadog-incident-get datadog default 10306685 1448
-o datadog-incident-list datadog default 10305663 1016
-o datadog-monitor-get datadog default 10301879 3778
-o datadog-monitor-list datadog default 10298126 3747
-o discord-channel-messages discord default 10329608 7148
-o discord-current-user discord default 10310817 3941
-o discord-guild-channels discord default 10324558 5044
-o discord-guild-get discord default 10318220 6332
-o discord-guild-list discord default 10314764 3450
-o discord-message-create discord default 10336762 6990
-o docusign-envelope-create-from-template docusign default 10361406 5619
-o docusign-envelope-get docusign default 10353618 3060
-o docusign-envelope-list docusign default 10349349 4263
-o docusign-envelope-recipients-get docusign default 10356684 4716
-o docusign-envelope-void docusign default 10367031 3339
-o docusign-verify docusign default 10346628 2715
-o dropbox-folder-create dropbox default 10385286 3041
-o dropbox-folder-list dropbox default 10374674 3329
-o dropbox-metadata-get dropbox default 10378009 4147
-o dropbox-search dropbox default 10382162 3118
-o dropbox-temporary-link-get dropbox default 10388333 3004
-o dropbox-user-me dropbox default 10372118 2550
-o figma-file-comments-list figma default 10409148 3989
-o figma-file-get figma default 10394977 4085
-o figma-file-nodes-get figma default 10399068 3603
-o figma-image-render-get figma default 10402677 3336
-o figma-project-files-list figma default 10406019 3123
-o figma-user-me figma default 10392940 2031
-o fly-machine-create fly machines 10423679 3091
-o fly-machine-delete fly machines 10433390 2332
-o fly-machine-events-list fly machines 10420923 2750
-o fly-machine-get fly machines 10418141 2776
-o fly-machine-restart fly machines 10431167 2217
-o fly-machine-start fly machines 10426776 2173
-o fly-machine-stop fly machines 10428955 2206
-o fly-machines-list fly machines 10415860 2275
-o fly-regions-list fly machines 10414199 1655
-o freshdesk-contact-create freshdesk default 10489171 4492
-o freshdesk-contact-get freshdesk default 10485118 4047
-o freshdesk-contact-list freshdesk default 10479205 5907
-o freshdesk-test freshdesk default 10437000 2303
-o freshdesk-ticket-create freshdesk default 10450341 12167
-o freshdesk-ticket-get freshdesk default 10445176 5159
-o freshdesk-ticket-list freshdesk default 10439309 5861
-o freshdesk-ticket-note-add freshdesk default 10473522 5677
-o freshdesk-ticket-update freshdesk default 10462514 11002
-o front-conversation-get front default 10502078 4065
-o front-conversation-list front default 10497714 4358
-o front-conversation-message-list front default 10506149 6091
-o front-conversation-reply front default 10512246 3848
-o front-conversation-tag-add front default 10516100 3216
-o front-verify front default 10495253 2455
-o github-commit-list github default 10724783 18328
-o github-issue-comment-add github default 10545458 4993
-o github-issue-create github default 10539021 6431
-o github-issue-get github default 10527610 5874
-o github-issue-list github default 10550457 94217
-o github-org-list github default 10756384 4138
-o github-org-repo-list github default 10760528 24996
-o github-pull-files-list github default 10644680 5382
-o github-pull-get github default 10533490 5525
-o github-repo-get github default 10523010 4594
-o github-user-get github default 10743117 13261
-o github-user-repo-list github default 10785530 26232
-o github-workflow-run-list github default 10650068 74709
-o gitlab-branch-list gitlab default 10893365 5824
-o gitlab-group-get gitlab default 10837925 4040
-o gitlab-group-list gitlab default 10831612 6307
-o gitlab-issue-create gitlab default 10867856 6540
-o gitlab-issue-get gitlab default 10861770 6080
-o gitlab-issue-list gitlab default 10854213 7551
-o gitlab-merge-request-get gitlab default 10881986 5285
-o gitlab-merge-request-list gitlab default 10874402 7578
-o gitlab-pipeline-get gitlab default 10887277 6082
-o gitlab-project-get gitlab default 10849964 4243
-o gitlab-project-list gitlab default 10841971 7987
-o gitlab-user-get gitlab default 10818763 4013
-o gitlab-user-get-by-id gitlab default 10827572 4034
-o gitlab-user-list gitlab default 10822782 4784
-o google-calendar-calendar-get google calendar 10926975 3684
-o google-calendar-event-get google calendar 10913532 6563
-o google-calendar-event-insert google calendar 10920101 6868
-o google-drive-file-get google drive 10930665 2298
-o google-drive-file-update google drive 10932969 2814
-o google-gmail-labels-list google gmail 10909463 4063
-o google-gmail-message-get google gmail 10900572 4995
-o google-gmail-message-send google gmail 10905573 3884
-o grafana-dashboard-get grafana default 10943970 3146
-o grafana-dashboards-list grafana default 10939519 4445
-o grafana-datasource-query grafana default 10949220 5033
-o grafana-datasources-list grafana default 10947122 2092
-o hubspot-company-get hubspot default 10967265 3550
-o hubspot-contact-create hubspot default 10959840 3927
-o hubspot-contact-get hubspot default 10955345 4489
-o hubspot-contact-update hubspot default 10963773 3486
-o hubspot-deal-get hubspot default 10970821 3622
-o intercom-contact-create intercom default 10982729 5231
-o intercom-contact-get intercom default 10976705 6018
-o intercom-contact-note-create intercom default 11000689 4274
-o intercom-conversation-get intercom default 10987966 6016
-o intercom-conversation-reply intercom default 10993988 6695
-o jira-issue-comment-add jira default 11027411 4711
-o jira-issue-comment-edit jira default 11044306 3664
-o jira-issue-comment-list jira default 11021456 5949
-o jira-issue-create jira default 11016406 5044
-o jira-issue-edit jira default 11041407 2893
-o jira-issue-get jira default 11011296 5104
-o jira-issue-link-add jira default 11047976 3704
-o jira-issue-transition jira default 11037873 3528
-o jira-issue-transitions-list jira default 11032128 5739
-o klaviyo-account-list klaviyo default 11054332 4885
-o klaviyo-event-create klaviyo default 11083602 6716
-o klaviyo-list-list klaviyo default 11079690 3906
-o klaviyo-profile-create klaviyo default 11070946 8738
-o klaviyo-profile-get klaviyo default 11065626 5314
-o klaviyo-profile-list klaviyo default 11059223 6397
+o confluence-comment-add confluence default 10269208 5334
+o confluence-page-create confluence default 10262778 6424
+o confluence-page-get confluence default 10256040 6732
+o confluence-space-get confluence default 10245015 3879
+o confluence-space-list confluence default 10239372 5637
+o confluence-space-pages confluence default 10248900 7134
+o contentful-asset-get contentful delivery 10285946 2703
+o contentful-entries-list contentful delivery 10282386 3554
+o contentful-entry-create contentful management 10288655 3916
+o contentful-entry-get contentful delivery 10279689 2691
+o contentful-entry-publish contentful management 10292577 3423
+o datadog-incident-get datadog default 10307928 1448
+o datadog-incident-list datadog default 10306906 1016
+o datadog-monitor-get datadog default 10303122 3778
+o datadog-monitor-list datadog default 10299369 3747
+o discord-channel-messages discord default 10330851 7148
+o discord-current-user discord default 10312060 3941
+o discord-guild-channels discord default 10325801 5044
+o discord-guild-get discord default 10319463 6332
+o discord-guild-list discord default 10316007 3450
+o discord-message-create discord default 10338005 6990
+o docusign-envelope-create-from-template docusign default 10362649 5619
+o docusign-envelope-get docusign default 10354861 3060
+o docusign-envelope-list docusign default 10350592 4263
+o docusign-envelope-recipients-get docusign default 10357927 4716
+o docusign-envelope-void docusign default 10368274 3339
+o docusign-verify docusign default 10347871 2715
+o dropbox-folder-create dropbox default 10386529 3041
+o dropbox-folder-list dropbox default 10375917 3329
+o dropbox-metadata-get dropbox default 10379252 4147
+o dropbox-search dropbox default 10383405 3118
+o dropbox-temporary-link-get dropbox default 10389576 3004
+o dropbox-user-me dropbox default 10373361 2550
+o figma-file-comments-list figma default 10410391 3989
+o figma-file-get figma default 10396220 4085
+o figma-file-nodes-get figma default 10400311 3603
+o figma-image-render-get figma default 10403920 3336
+o figma-project-files-list figma default 10407262 3123
+o figma-user-me figma default 10394183 2031
+o fly-machine-create fly machines 10424922 3091
+o fly-machine-delete fly machines 10434633 2332
+o fly-machine-events-list fly machines 10422166 2750
+o fly-machine-get fly machines 10419384 2776
+o fly-machine-restart fly machines 10432410 2217
+o fly-machine-start fly machines 10428019 2173
+o fly-machine-stop fly machines 10430198 2206
+o fly-machines-list fly machines 10417103 2275
+o fly-regions-list fly machines 10415442 1655
+o freshdesk-contact-create freshdesk default 10490414 4492
+o freshdesk-contact-get freshdesk default 10486361 4047
+o freshdesk-contact-list freshdesk default 10480448 5907
+o freshdesk-test freshdesk default 10438243 2303
+o freshdesk-ticket-create freshdesk default 10451584 12167
+o freshdesk-ticket-get freshdesk default 10446419 5159
+o freshdesk-ticket-list freshdesk default 10440552 5861
+o freshdesk-ticket-note-add freshdesk default 10474765 5677
+o freshdesk-ticket-update freshdesk default 10463757 11002
+o front-conversation-get front default 10503321 4065
+o front-conversation-list front default 10498957 4358
+o front-conversation-message-list front default 10507392 6091
+o front-conversation-reply front default 10513489 3848
+o front-conversation-tag-add front default 10517343 3216
+o front-verify front default 10496496 2455
+o github-commit-list github default 10726026 18328
+o github-issue-comment-add github default 10546701 4993
+o github-issue-create github default 10540264 6431
+o github-issue-get github default 10528853 5874
+o github-issue-list github default 10551700 94217
+o github-org-list github default 10757627 4138
+o github-org-repo-list github default 10761771 24996
+o github-pull-files-list github default 10645923 5382
+o github-pull-get github default 10534733 5525
+o github-repo-get github default 10524253 4594
+o github-user-get github default 10744360 13261
+o github-user-repo-list github default 10786773 26232
+o github-workflow-run-list github default 10651311 74709
+o gitlab-branch-list gitlab default 10894608 5824
+o gitlab-group-get gitlab default 10839168 4040
+o gitlab-group-list gitlab default 10832855 6307
+o gitlab-issue-create gitlab default 10869099 6540
+o gitlab-issue-get gitlab default 10863013 6080
+o gitlab-issue-list gitlab default 10855456 7551
+o gitlab-merge-request-get gitlab default 10883229 5285
+o gitlab-merge-request-list gitlab default 10875645 7578
+o gitlab-pipeline-get gitlab default 10888520 6082
+o gitlab-project-get gitlab default 10851207 4243
+o gitlab-project-list gitlab default 10843214 7987
+o gitlab-user-get gitlab default 10820006 4013
+o gitlab-user-get-by-id gitlab default 10828815 4034
+o gitlab-user-list gitlab default 10824025 4784
+o google-calendar-calendar-get google calendar 10928218 3684
+o google-calendar-event-get google calendar 10914775 6563
+o google-calendar-event-insert google calendar 10921344 6868
+o google-drive-file-get google drive 10931908 2298
+o google-drive-file-update google drive 10934212 2814
+o google-gmail-labels-list google gmail 10910706 4063
+o google-gmail-message-get google gmail 10901815 4995
+o google-gmail-message-send google gmail 10906816 3884
+o grafana-dashboard-get grafana default 10945213 3146
+o grafana-dashboards-list grafana default 10940762 4445
+o grafana-datasource-query grafana default 10950463 5033
+o grafana-datasources-list grafana default 10948365 2092
+o hubspot-company-get hubspot default 10968508 3550
+o hubspot-contact-create hubspot default 10961083 3927
+o hubspot-contact-get hubspot default 10956588 4489
+o hubspot-contact-update hubspot default 10965016 3486
+o hubspot-deal-get hubspot default 10972064 3622
+o intercom-contact-create intercom default 10983972 5231
+o intercom-contact-get intercom default 10977948 6018
+o intercom-contact-note-create intercom default 11001932 4274
+o intercom-conversation-get intercom default 10989209 6016
+o intercom-conversation-reply intercom default 10995231 6695
+o jira-issue-comment-add jira default 11028654 4711
+o jira-issue-comment-edit jira default 11045549 3664
+o jira-issue-comment-list jira default 11022699 5949
+o jira-issue-create jira default 11017649 5044
+o jira-issue-edit jira default 11042650 2893
+o jira-issue-get jira default 11012539 5104
+o jira-issue-link-add jira default 11049219 3704
+o jira-issue-transition jira default 11039116 3528
+o jira-issue-transitions-list jira default 11033371 5739
+o klaviyo-account-list klaviyo default 11055575 4885
+o klaviyo-event-create klaviyo default 11084845 6716
+o klaviyo-list-list klaviyo default 11080933 3906
+o klaviyo-profile-create klaviyo default 11072189 8738
+o klaviyo-profile-get klaviyo default 11066869 5314
+o klaviyo-profile-list klaviyo default 11060466 6397
 o knowledge-explain b10x knowledge 852445 3681
 o knowledge-query b10x knowledge 834266 18173
 o knowledge-snapshot b10x knowledge 856132 18432
-o launchdarkly-environment-list launchdarkly default 11095812 4284
-o launchdarkly-flag-get launchdarkly default 11105469 4079
-o launchdarkly-flag-list launchdarkly default 11100102 5361
-o launchdarkly-flag-toggle launchdarkly default 11109554 5711
-o launchdarkly-project-list launchdarkly default 11092158 3648
-o loki-query-range loki default 11116432 3881
-o mailchimp-audience-get mailchimp default 11129977 3936
-o mailchimp-audience-list mailchimp default 11125257 4714
-o mailchimp-audience-member-get mailchimp default 11140931 6149
-o mailchimp-audience-member-list mailchimp default 11133919 7006
-o mailchimp-audience-member-upsert mailchimp default 11147086 8966
-o mailchimp-campaign-list mailchimp default 11156058 4969
-o mailchimp-ping mailchimp default 11123187 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11188988 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 12078348 159887
-o microsoft_graph-calendar-event-create microsoft_graph calendar 11181711 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 11175165 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 12241925 3988
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12238241 3678
-o microsoft_graph-files-item-get microsoft_graph files 11192746 5482
-o microsoft_graph-files-item-update microsoft_graph files 11198234 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 11171852 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 11163139 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 11203025 875317
-o microsoft_graph-mail-message-reply microsoft_graph mail 11168741 3105
-o miro-board-item-get miro default 12261224 7877
-o miro-board-item-list miro default 12251224 9994
-o miro-board-list miro default 12248367 2851
-o miro-sticky-note-create miro default 12269107 3738
-o miro-sticky-note-delete miro default 12277228 1954
-o miro-sticky-note-update miro default 12272851 4371
-o mysql-query mysql default 12279930 4163
-o mysql-schemas-list mysql default 12284099 1737
-o mysql-table-describe mysql default 12288286 3628
-o mysql-tables-list mysql default 12285842 2438
-o newrelic-alert-policy-list newrelic default 12304054 3047
-o newrelic-alert-violation-list newrelic default 12307107 4217
-o newrelic-application-get newrelic default 12299888 4160
-o newrelic-application-list newrelic default 12295221 4661
-o newrelic-deployment-create newrelic default 12315026 6144
-o newrelic-deployment-list newrelic default 12311330 3690
-o notion-database-query notion default 12328498 3464
-o notion-page-create notion default 12335159 4755
-o notion-page-get notion default 12325144 3348
-o notion-search notion default 12331968 3185
-o notion-user-me notion default 12323108 2030
-o okta-group-list okta default 12351201 3793
-o okta-user-deactivate okta default 12358809 3076
-o okta-user-get okta default 12347466 3729
-o okta-user-group-list okta default 12355000 3803
-o okta-user-list okta default 12342516 4944
+o launchdarkly-environment-list launchdarkly default 11097055 4284
+o launchdarkly-flag-get launchdarkly default 11106712 4079
+o launchdarkly-flag-list launchdarkly default 11101345 5361
+o launchdarkly-flag-toggle launchdarkly default 11110797 5711
+o launchdarkly-project-list launchdarkly default 11093401 3648
+o loki-query-range loki default 11117675 3881
+o mailchimp-audience-get mailchimp default 11131220 3936
+o mailchimp-audience-list mailchimp default 11126500 4714
+o mailchimp-audience-member-get mailchimp default 11142174 6149
+o mailchimp-audience-member-list mailchimp default 11135162 7006
+o mailchimp-audience-member-upsert mailchimp default 11148329 8966
+o mailchimp-campaign-list mailchimp default 11157301 4969
+o mailchimp-ping mailchimp default 11124430 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11190231 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 12079591 159887
+o microsoft_graph-calendar-event-create microsoft_graph calendar 11182954 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 11176408 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 12243168 3988
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12239484 3678
+o microsoft_graph-files-item-get microsoft_graph files 11193989 5482
+o microsoft_graph-files-item-update microsoft_graph files 11199477 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 11173095 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 11164382 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 11204268 875317
+o microsoft_graph-mail-message-reply microsoft_graph mail 11169984 3105
+o miro-board-item-get miro default 12262467 7877
+o miro-board-item-list miro default 12252467 9994
+o miro-board-list miro default 12249610 2851
+o miro-sticky-note-create miro default 12270350 3738
+o miro-sticky-note-delete miro default 12278471 1954
+o miro-sticky-note-update miro default 12274094 4371
+o mysql-query mysql default 12281173 4163
+o mysql-schemas-list mysql default 12285342 1737
+o mysql-table-describe mysql default 12289529 3628
+o mysql-tables-list mysql default 12287085 2438
+o newrelic-alert-policy-list newrelic default 12305297 3047
+o newrelic-alert-violation-list newrelic default 12308350 4217
+o newrelic-application-get newrelic default 12301131 4160
+o newrelic-application-list newrelic default 12296464 4661
+o newrelic-deployment-create newrelic default 12316269 6144
+o newrelic-deployment-list newrelic default 12312573 3690
+o notion-database-query notion default 12329741 3464
+o notion-page-create notion default 12336402 4755
+o notion-page-get notion default 12326387 3348
+o notion-search notion default 12333211 3185
+o notion-user-me notion default 12324351 2030
+o okta-group-list okta default 12352444 3793
+o okta-user-deactivate okta default 12360052 3076
+o okta-user-get okta default 12348709 3729
+o okta-user-group-list okta default 12356243 3803
+o okta-user-list okta default 12343759 4944
 o ontology-branch-create b10x knowledge 878461 21208
 o ontology-branch-list b10x knowledge 874570 3885
 o ontology-branch-schema-extend b10x knowledge 899675 2727
@@ -820,24 +821,24 @@ o ontology-proposal-evaluate b10x knowledge 955060 6624
 o ontology-proposal-get b10x knowledge 948561 6493
 o ontology-proposal-promote b10x knowledge 963139 2095
 o ontology-schema-register b10x knowledge 965240 5429
-o openai-batch-list openai default 14031771 12873
-o openai-chat-completion openai default 12367191 5224
-o openai-embeddings-create openai default 12372421 4010
-o openai-file-list openai default 14026501 5264
-o openai-model-get openai default 12365081 2104
-o openai-models-list openai default 12362912 2163
-o openai-response-get openai default 12376437 1212702
-o openai-response-input-item-list openai default 13589145 437350
-o openrouter-chat-completion openrouter default 14049858 5888
-o openrouter-credits-get openrouter default 14055752 1808
-o openrouter-model-endpoints-list openrouter default 14047240 2612
-o openrouter-models-list openrouter default 14045597 1637
-o pagerduty-incident-acknowledge pagerduty default 14085063 5034
-o pagerduty-incident-get pagerduty default 14067895 5736
-o pagerduty-incident-list pagerduty default 14059399 8490
-o pagerduty-incident-resolve pagerduty default 14090103 4790
-o pagerduty-oncall-list pagerduty default 14079964 5093
-o pagerduty-service-list pagerduty default 14073637 6321
+o openai-batch-list openai default 14033014 12873
+o openai-chat-completion openai default 12368434 5224
+o openai-embeddings-create openai default 12373664 4010
+o openai-file-list openai default 14027744 5264
+o openai-model-get openai default 12366324 2104
+o openai-models-list openai default 12364155 2163
+o openai-response-get openai default 12377680 1212702
+o openai-response-input-item-list openai default 13590388 437350
+o openrouter-chat-completion openrouter default 14051101 5888
+o openrouter-credits-get openrouter default 14056995 1808
+o openrouter-model-endpoints-list openrouter default 14048483 2612
+o openrouter-models-list openrouter default 14046840 1637
+o pagerduty-incident-acknowledge pagerduty default 14086306 5034
+o pagerduty-incident-get pagerduty default 14069138 5736
+o pagerduty-incident-list pagerduty default 14060642 8490
+o pagerduty-incident-resolve pagerduty default 14091346 4790
+o pagerduty-oncall-list pagerduty default 14081207 5093
+o pagerduty-service-list pagerduty default 14074880 6321
 o planner-board-get b10x planning 1021716 199621
 o planner-decision-transition b10x planning 3074423 143410
 o planner-entity-create b10x planning 3217839 182491
@@ -863,150 +864,150 @@ o planner-sync-session-begin b10x planning 5239155 4648
 o planner-sync-session-confirm b10x planning 5655979 2461
 o planner-sync-session-preview b10x planning 5658446 415003
 o planner-sync-session-upload b10x planning 2960193 52735
-o postgresql-query postgresql default 14095590 4185
-o postgresql-schemas-list postgresql default 14099781 1694
-o postgresql-table-describe postgresql default 14103891 3598
-o postgresql-tables-list postgresql default 14101481 2404
-o postmark-bounce-get postmark server 14124021 3209
-o postmark-bounce-list postmark server 14119134 4881
-o postmark-deliverystats-get postmark server 14116520 2608
-o postmark-email-send postmark server 14109327 7187
-o prometheus-query-range prometheus default 14128534 3681
-o resend-domain-get resend default 14145773 5175
-o resend-domain-list resend default 14142448 3319
-o resend-email-get resend default 14137633 4809
-o resend-email-send resend default 14133404 4223
-o runpod-create-cluster runpod default 14395510 16834
-o runpod-create-delegation runpod default 14551084 3612
-o runpod-create-endpoint runpod default 14558956 37601
-o runpod-create-network-volume runpod default 14457864 5159
-o runpod-create-pod runpod default 14470853 38990
-o runpod-create-registry runpod default 14545058 3031
-o runpod-create-template runpod default 14672113 14411
-o runpod-delete-cluster runpod default 14428796 1331
-o runpod-delete-endpoint runpod default 14649577 1370
-o runpod-delete-network-volume runpod default 14469481 1366
-o runpod-delete-pod runpod default 14542187 1317
-o runpod-delete-registry runpod default 14557619 1331
-o runpod-delete-template runpod default 14707219 1288
-o runpod-get-cluster runpod default 14412350 7941
-o runpod-get-cpu-type runpod default 14295519 4889
-o runpod-get-data-center runpod default 14307436 5614
-o runpod-get-endpoint runpod default 14596563 19104
-o runpod-get-gpu-type runpod default 14282217 7894
-o runpod-get-network-volume runpod default 14463029 2554
-o runpod-get-pod runpod default 14205808 24874
-o runpod-get-registry runpod default 14556025 1588
-o runpod-get-ssh-keys runpod default 14313056 1402
-o runpod-get-template runpod default 14686530 7223
-o runpod-list-billing runpod default 14265060 17151
-o runpod-list-cluster-billing runpod default 14317477 12819
-o runpod-list-cluster-pods runpod default 14430133 27725
-o runpod-list-clusters runpod default 14386801 8703
-o runpod-list-cpu-types runpod default 14290117 5396
-o runpod-list-data-centers runpod default 14300414 7016
-o runpod-list-delegations runpod default 14548095 2983
-o runpod-list-endpoint-billing runpod default 14330302 9254
-o runpod-list-endpoint-releases runpod default 14650953 6107
-o runpod-list-endpoint-workers runpod default 14657066 7085
-o runpod-list-endpoints runpod default 14230688 21704
-o runpod-list-gpu-types runpod default 14255593 9461
-o runpod-list-network-volume-billing runpod default 14339562 12648
-o runpod-list-network-volumes runpod default 14252398 3189
-o runpod-list-pod-billing runpod default 14352216 12540
-o runpod-list-pods runpod default 14177276 28526
-o runpod-list-public-templates runpod default 14377976 8819
-o runpod-list-registries runpod default 14543510 1542
-o runpod-list-serverless-billing runpod default 14364762 13208
-o runpod-list-templates runpod default 14664157 7950
-o runpod-pod-action runpod default 14152016 25254
-o runpod-revoke-delegation runpod default 14554702 1317
-o runpod-update-cluster runpod default 14420297 8493
-o runpod-update-endpoint runpod default 14615673 33898
-o runpod-update-network-volume runpod default 14465589 3886
-o runpod-update-pod runpod default 14509849 32332
-o runpod-update-ssh-keys runpod default 14314464 3007
-o runpod-update-template runpod default 14693759 13454
-o salesforce-record-create salesforce default 14717062 3265
-o salesforce-record-get salesforce default 14713632 3424
-o salesforce-record-update salesforce default 14720333 2958
-o salesforce-sobject-describe salesforce default 14723297 4425
-o salesforce-whoami salesforce default 14710791 2835
-o sendgrid-email-validate sendgrid default 14739187 4121
-o sendgrid-suppression-bounce-list sendgrid default 14735830 3351
-o sendgrid-template-get sendgrid default 14733461 2363
-o sendgrid-template-list sendgrid default 14729366 4089
-o sentry-issue-event-latest sentry default 14764022 6935
-o sentry-issue-get sentry default 14744329 7008
-o sentry-issue-update sentry default 14751343 6365
-o sentry-project-get sentry default 14757714 6302
-o shopify-customer-get shopify default 14789669 5180
-o shopify-inventory-level-list shopify default 14794855 3461
-o shopify-order-get shopify default 14773158 6452
-o shopify-product-get shopify default 14779616 4772
-o shopify-product-update shopify default 14784394 5269
+o postgresql-query postgresql default 14096833 4185
+o postgresql-schemas-list postgresql default 14101024 1694
+o postgresql-table-describe postgresql default 14105134 3598
+o postgresql-tables-list postgresql default 14102724 2404
+o postmark-bounce-get postmark server 14125264 3209
+o postmark-bounce-list postmark server 14120377 4881
+o postmark-deliverystats-get postmark server 14117763 2608
+o postmark-email-send postmark server 14110570 7187
+o prometheus-query-range prometheus default 14129777 3681
+o resend-domain-get resend default 14147016 5175
+o resend-domain-list resend default 14143691 3319
+o resend-email-get resend default 14138876 4809
+o resend-email-send resend default 14134647 4223
+o runpod-create-cluster runpod default 14396753 16834
+o runpod-create-delegation runpod default 14552327 3612
+o runpod-create-endpoint runpod default 14560199 37601
+o runpod-create-network-volume runpod default 14459107 5159
+o runpod-create-pod runpod default 14472096 38990
+o runpod-create-registry runpod default 14546301 3031
+o runpod-create-template runpod default 14673356 14411
+o runpod-delete-cluster runpod default 14430039 1331
+o runpod-delete-endpoint runpod default 14650820 1370
+o runpod-delete-network-volume runpod default 14470724 1366
+o runpod-delete-pod runpod default 14543430 1317
+o runpod-delete-registry runpod default 14558862 1331
+o runpod-delete-template runpod default 14708462 1288
+o runpod-get-cluster runpod default 14413593 7941
+o runpod-get-cpu-type runpod default 14296762 4889
+o runpod-get-data-center runpod default 14308679 5614
+o runpod-get-endpoint runpod default 14597806 19104
+o runpod-get-gpu-type runpod default 14283460 7894
+o runpod-get-network-volume runpod default 14464272 2554
+o runpod-get-pod runpod default 14207051 24874
+o runpod-get-registry runpod default 14557268 1588
+o runpod-get-ssh-keys runpod default 14314299 1402
+o runpod-get-template runpod default 14687773 7223
+o runpod-list-billing runpod default 14266303 17151
+o runpod-list-cluster-billing runpod default 14318720 12819
+o runpod-list-cluster-pods runpod default 14431376 27725
+o runpod-list-clusters runpod default 14388044 8703
+o runpod-list-cpu-types runpod default 14291360 5396
+o runpod-list-data-centers runpod default 14301657 7016
+o runpod-list-delegations runpod default 14549338 2983
+o runpod-list-endpoint-billing runpod default 14331545 9254
+o runpod-list-endpoint-releases runpod default 14652196 6107
+o runpod-list-endpoint-workers runpod default 14658309 7085
+o runpod-list-endpoints runpod default 14231931 21704
+o runpod-list-gpu-types runpod default 14256836 9461
+o runpod-list-network-volume-billing runpod default 14340805 12648
+o runpod-list-network-volumes runpod default 14253641 3189
+o runpod-list-pod-billing runpod default 14353459 12540
+o runpod-list-pods runpod default 14178519 28526
+o runpod-list-public-templates runpod default 14379219 8819
+o runpod-list-registries runpod default 14544753 1542
+o runpod-list-serverless-billing runpod default 14366005 13208
+o runpod-list-templates runpod default 14665400 7950
+o runpod-pod-action runpod default 14153259 25254
+o runpod-revoke-delegation runpod default 14555945 1317
+o runpod-update-cluster runpod default 14421540 8493
+o runpod-update-endpoint runpod default 14616916 33898
+o runpod-update-network-volume runpod default 14466832 3886
+o runpod-update-pod runpod default 14511092 32332
+o runpod-update-ssh-keys runpod default 14315707 3007
+o runpod-update-template runpod default 14695002 13454
+o salesforce-record-create salesforce default 14718305 3265
+o salesforce-record-get salesforce default 14714875 3424
+o salesforce-record-update salesforce default 14721576 2958
+o salesforce-sobject-describe salesforce default 14724540 4425
+o salesforce-whoami salesforce default 14712034 2835
+o sendgrid-email-validate sendgrid default 14740430 4121
+o sendgrid-suppression-bounce-list sendgrid default 14737073 3351
+o sendgrid-template-get sendgrid default 14734704 2363
+o sendgrid-template-list sendgrid default 14730609 4089
+o sentry-issue-event-latest sentry default 14765265 6935
+o sentry-issue-get sentry default 14745572 7008
+o sentry-issue-update sentry default 14752586 6365
+o sentry-project-get sentry default 14758957 6302
+o shopify-customer-get shopify default 14790912 5180
+o shopify-inventory-level-list shopify default 14796098 3461
+o shopify-order-get shopify default 14774401 6452
+o shopify-product-get shopify default 14780859 4772
+o shopify-product-update shopify default 14785637 5269
 o sip-dial b10x default 809073 4029
-o slack-admin-app-requests-list slack admin 14954356 4440
-o slack-admin-conversations-search slack admin 14958802 63903
-o slack-admin-teams-list slack admin 15022711 3954
-o slack-admin-users-list slack admin 15026671 4408
-o slack-chat-post-message slack default 14810167 45332
-o slack-conversations-history slack default 14855505 49376
-o slack-reactions-add slack default 14948421 5929
-o slack-users-info slack default 14904887 43528
+o slack-admin-app-requests-list slack admin 14955599 4440
+o slack-admin-conversations-search slack admin 14960045 63903
+o slack-admin-teams-list slack admin 15023954 3954
+o slack-admin-users-list slack admin 15027914 4408
+o slack-chat-post-message slack default 14811410 45332
+o slack-conversations-history slack default 14856748 49376
+o slack-reactions-add slack default 14949664 5929
+o slack-users-info slack default 14906130 43528
 o speech-speak b10x default 813108 2907
 o speech-status b10x default 816021 2246
-o statuspage-component-list statuspage default 15057065 4304
-o statuspage-incident-create statuspage default 15043711 6655
-o statuspage-incident-get statuspage default 15039416 4289
-o statuspage-incident-list statuspage default 15034252 5158
-o statuspage-incident-update statuspage default 15050372 6687
-o stripe-balance-get stripe default 15069115 2591
-o stripe-billing-meter-list stripe default 15122950 9091
-o stripe-charge-get stripe default 15074792 3784
-o stripe-charge-refund-create stripe default 15093958 4638
-o stripe-country-spec-list stripe default 15098602 9134
-o stripe-customer-get stripe default 15071712 3074
-o stripe-event-list stripe default 15107742 9442
-o stripe-exchange-rate-list stripe default 15117190 5754
-o stripe-payment-intent-cancel stripe default 15090008 3944
-o stripe-payment-intent-capture stripe default 15085417 4585
-o stripe-payment-intent-get stripe default 15078582 3802
-o stripe-refund-get stripe default 15082390 3021
-o supabase-auth-settings supabase default 15142451 2955
-o supabase-rows-list supabase default 15139087 3358
-o supabase-schema-describe supabase default 15135147 3934
-o trello-board-get trello default 15152201 3619
-o trello-board-list trello default 15148373 3822
-o trello-board-lists trello default 15155826 1604
-o trello-card-archive trello default 15167257 4364
-o trello-card-create trello default 15162125 5126
-o trello-list-cards trello default 15157436 4683
-o twilio-account-get twilio default 15180427 2969
-o twilio-call-get twilio default 15203442 4476
-o twilio-call-list twilio default 15195589 7847
-o twilio-conference-list twilio default 15235230 7683
-o twilio-message-get twilio default 15190753 4830
-o twilio-message-list twilio default 15183402 7345
-o twilio-recording-get twilio default 15218605 8362
-o twilio-recording-list twilio default 15207924 10675
-o twilio-usage-record-list twilio default 15226973 8251
-o typeform-form-get typeform default 15252505 5108
-o typeform-form-list typeform default 15246902 5597
-o typeform-response-delete typeform default 15268681 3050
-o typeform-response-list typeform default 15257619 11056
-o typeform-user-me typeform default 15244623 2273
-o vercel-deployment-cancel vercel default 15286434 2663
-o vercel-deployment-get vercel default 15283473 2955
-o vercel-deployments-list vercel default 15278208 5259
-o vercel-project-get vercel default 15275239 2963
-o vercel-projects-list vercel default 15273761 1472
-o webflow-collection-get webflow default 15296746 4235
-o webflow-collection-item-get webflow default 15305072 3491
-o webflow-collection-item-list webflow default 15300987 4079
-o webflow-collection-list webflow default 15293665 3075
-o webflow-site-list webflow default 15290922 2737
-o webflow-site-publish webflow default 15308569 2360
+o statuspage-component-list statuspage default 15058308 4304
+o statuspage-incident-create statuspage default 15044954 6655
+o statuspage-incident-get statuspage default 15040659 4289
+o statuspage-incident-list statuspage default 15035495 5158
+o statuspage-incident-update statuspage default 15051615 6687
+o stripe-balance-get stripe default 15070358 2591
+o stripe-billing-meter-list stripe default 15124193 9091
+o stripe-charge-get stripe default 15076035 3784
+o stripe-charge-refund-create stripe default 15095201 4638
+o stripe-country-spec-list stripe default 15099845 9134
+o stripe-customer-get stripe default 15072955 3074
+o stripe-event-list stripe default 15108985 9442
+o stripe-exchange-rate-list stripe default 15118433 5754
+o stripe-payment-intent-cancel stripe default 15091251 3944
+o stripe-payment-intent-capture stripe default 15086660 4585
+o stripe-payment-intent-get stripe default 15079825 3802
+o stripe-refund-get stripe default 15083633 3021
+o supabase-auth-settings supabase default 15143694 2955
+o supabase-rows-list supabase default 15140330 3358
+o supabase-schema-describe supabase default 15136390 3934
+o trello-board-get trello default 15153444 3619
+o trello-board-list trello default 15149616 3822
+o trello-board-lists trello default 15157069 1604
+o trello-card-archive trello default 15168500 4364
+o trello-card-create trello default 15163368 5126
+o trello-list-cards trello default 15158679 4683
+o twilio-account-get twilio default 15181670 2969
+o twilio-call-get twilio default 15204685 4476
+o twilio-call-list twilio default 15196832 7847
+o twilio-conference-list twilio default 15236473 7683
+o twilio-message-get twilio default 15191996 4830
+o twilio-message-list twilio default 15184645 7345
+o twilio-recording-get twilio default 15219848 8362
+o twilio-recording-list twilio default 15209167 10675
+o twilio-usage-record-list twilio default 15228216 8251
+o typeform-form-get typeform default 15253748 5108
+o typeform-form-list typeform default 15248145 5597
+o typeform-response-delete typeform default 15269924 3050
+o typeform-response-list typeform default 15258862 11056
+o typeform-user-me typeform default 15245866 2273
+o vercel-deployment-cancel vercel default 15287677 2663
+o vercel-deployment-get vercel default 15284716 2955
+o vercel-deployments-list vercel default 15279451 5259
+o vercel-project-get vercel default 15276482 2963
+o vercel-projects-list vercel default 15275004 1472
+o webflow-collection-get webflow default 15297989 4235
+o webflow-collection-item-get webflow default 15306315 3491
+o webflow-collection-item-list webflow default 15302230 4079
+o webflow-collection-list webflow default 15294908 3075
+o webflow-site-list webflow default 15292165 2737
+o webflow-site-publish webflow default 15309812 2360
 o work-request-create b10x tasks 970675 6317
 o work-request-get b10x tasks 976998 4188
 o work-request-list b10x tasks 981192 8148
@@ -1027,44 +1028,44 @@ o workspaces-create b10x workspaces 3013972 4481
 o workspaces-delete b10x workspaces 3019812 2089
 o workspaces-get b10x workspaces 3018459 1347
 o workspaces-list b10x workspaces 3012934 1032
-o zendesk-custom-object-list zendesk default 15438000 5853
-o zendesk-custom-status-list zendesk default 15643044 5413
-o zendesk-group-list zendesk default 15614883 3756
-o zendesk-help-center-article-create zendesk help-center 15944708 9386
-o zendesk-help-center-article-get zendesk help-center 15923337 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 15936193 8509
-o zendesk-help-center-article-list zendesk help-center 15914846 8485
-o zendesk-help-center-category-list zendesk help-center 15906105 4211
-o zendesk-help-center-section-list zendesk help-center 15910322 4518
-o zendesk-help-center-translation-list zendesk help-center 15931185 5002
-o zendesk-incremental-organization-list zendesk default 15423802 8617
-o zendesk-incremental-ticket-event-list zendesk default 15432425 5569
-o zendesk-incremental-ticket-list zendesk default 15323121 74662
-o zendesk-incremental-user-list zendesk default 15397789 26007
-o zendesk-messaging-conversation-create zendesk messaging 15954100 10167
-o zendesk-messaging-conversation-get zendesk messaging 15964273 10469
-o zendesk-messaging-conversation-update zendesk messaging 15974748 11165
-o zendesk-messaging-message-create zendesk messaging 15992973 276191
-o zendesk-messaging-message-list zendesk messaging 16269170 158036
-o zendesk-messaging-participant-list zendesk messaging 15985919 7048
-o zendesk-messaging-user-create zendesk messaging 16427212 10089
-o zendesk-messaging-user-get zendesk messaging 16437307 9350
-o zendesk-messaging-user-update zendesk messaging 16446663 9961
-o zendesk-organization-show zendesk default 15608878 5999
-o zendesk-test zendesk default 15648463 23020
-o zendesk-ticket-audit-list zendesk default 15317305 5810
-o zendesk-ticket-comment-list zendesk default 15745227 19767
-o zendesk-ticket-field-list zendesk default 15618645 15042
-o zendesk-ticket-form-list zendesk default 15633693 9345
-o zendesk-ticket-recent-list zendesk default 15443859 71467
-o zendesk-ticket-search zendesk default 15671489 5013
-o zendesk-ticket-show zendesk default 15676508 68713
-o zendesk-ticket-update zendesk default 15765000 141099
-o zendesk-user-show zendesk default 15587376 21496
-o zendesk-view-ticket-list zendesk default 15515332 72038
-o zoom-meeting-delete zoom default 16458532 2358
-o zoom-user-get zoom default 16460896 5881
-payload 16467059
+o zendesk-custom-object-list zendesk default 15439243 5853
+o zendesk-custom-status-list zendesk default 15644287 5413
+o zendesk-group-list zendesk default 15616126 3756
+o zendesk-help-center-article-create zendesk help-center 15945951 9386
+o zendesk-help-center-article-get zendesk help-center 15924580 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 15937436 8509
+o zendesk-help-center-article-list zendesk help-center 15916089 8485
+o zendesk-help-center-category-list zendesk help-center 15907348 4211
+o zendesk-help-center-section-list zendesk help-center 15911565 4518
+o zendesk-help-center-translation-list zendesk help-center 15932428 5002
+o zendesk-incremental-organization-list zendesk default 15425045 8617
+o zendesk-incremental-ticket-event-list zendesk default 15433668 5569
+o zendesk-incremental-ticket-list zendesk default 15324364 74662
+o zendesk-incremental-user-list zendesk default 15399032 26007
+o zendesk-messaging-conversation-create zendesk messaging 15955343 10167
+o zendesk-messaging-conversation-get zendesk messaging 15965516 10469
+o zendesk-messaging-conversation-update zendesk messaging 15975991 11165
+o zendesk-messaging-message-create zendesk messaging 15994216 276191
+o zendesk-messaging-message-list zendesk messaging 16270413 158036
+o zendesk-messaging-participant-list zendesk messaging 15987162 7048
+o zendesk-messaging-user-create zendesk messaging 16428455 10089
+o zendesk-messaging-user-get zendesk messaging 16438550 9350
+o zendesk-messaging-user-update zendesk messaging 16447906 9961
+o zendesk-organization-show zendesk default 15610121 5999
+o zendesk-test zendesk default 15649706 23020
+o zendesk-ticket-audit-list zendesk default 15318548 5810
+o zendesk-ticket-comment-list zendesk default 15746470 19767
+o zendesk-ticket-field-list zendesk default 15619888 15042
+o zendesk-ticket-form-list zendesk default 15634936 9345
+o zendesk-ticket-recent-list zendesk default 15445102 71467
+o zendesk-ticket-search zendesk default 15672732 5013
+o zendesk-ticket-show zendesk default 15677751 68713
+o zendesk-ticket-update zendesk default 15766243 141099
+o zendesk-user-show zendesk default 15588619 21496
+o zendesk-view-ticket-list zendesk default 15516575 72038
+o zoom-meeting-delete zoom default 16459775 2358
+o zoom-user-get zoom default 16462139 5881
+payload 16468302
 {
   "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -1088,7 +1089,7 @@ payload 16467059
     ]
   ],
   "description": "Airtable records: read, create, update and delete a record in a base's table",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -1633,7 +1634,7 @@ payload 16467059
   ],
   "connector": "alertmanager",
   "description": "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -1758,7 +1759,7 @@ payload 16467059
     ]
   ],
   "description": "Algolia search: list an application's indices, search one, and read, save or delete a single record by its object id",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -2498,7 +2499,7 @@ payload 16467059
     ]
   ],
   "description": "Anthropic platform: the model catalogue and a curated read-only Admin API surface",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -3690,7 +3691,7 @@ payload 16467059
     ]
   ],
   "description": "Argo CD: inspect Applications, their live resources, drift and sync windows, and sync, roll back or terminate a deployment",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -6056,7 +6057,7 @@ payload 16467059
     ]
   ],
   "description": "Asana work management: read tasks and projects, create and update tasks, comment on a task",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -15777,7 +15778,7 @@ payload 16467059
       "wire_value": "CallClaimed"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -28066,7 +28067,7 @@ payload 16467059
       "service": "planning"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -165227,7 +165228,7 @@ payload 16467059
     ]
   ],
   "description": "Babelforce voice platform: agent availability, live and reported calls, and the session variables a flow reads and writes. The full manager-sdk surface — agents, calls, sessions, outbound, phonebook, reporting, task automation and scheduling — is catalogued and callable; the operations above are the ones a model drives directly",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -283557,7 +283558,7 @@ payload 16467059
     ]
   ],
   "description": "Bitbucket Cloud repositories and pull requests for one pinned workspace: list the workspace's repositories, read one, list and read its open pull requests, open a pull request, comment on one, and approve one",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -284760,7 +284761,7 @@ payload 16467059
     ]
   ],
   "description": "Box: browse folder contents, read file and folder metadata, create folders, and copy files",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -285385,7 +285386,7 @@ payload 16467059
     ]
   ],
   "description": "Calendly scheduling: read the authenticated user, event types, scheduled events and their invitees",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -286125,6 +286126,44 @@ payload 16467059
   "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
     {
+      "description": "A user-bound Claude Code setup token stored for attempt-bounded Harness use",
+      "entry": "connect_session",
+      "name": "claude-code.subscription_token",
+      "scheme": {
+        "kind": "bearer"
+      },
+      "subject": "user"
+    }
+  ],
+  "authority": "com.anthropic.claude-code",
+  "config": [
+    {
+      "approval": "none",
+      "binds": "credential.claude-code.subscription_token",
+      "docs_url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+      "format": "token",
+      "help": "Run `claude setup-token` on your own machine, then paste the resulting token here.",
+      "label": "Setup token",
+      "level": "connection",
+      "name": "subscription_token",
+      "required": true,
+      "secret": true,
+      "service": "default"
+    }
+  ],
+  "connector": "claude-code",
+  "custody_only": true,
+  "description": "Claude Code subscription credential custody for user-bound Harness runs",
+  "generator": "connectors 0.3.0",
+  "operations": [],
+  "schema_version": 2,
+  "services": [],
+  "vendor": "Anthropic"
+}
+{
+  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "auth": [
+    {
       "description": "ClickUp personal API token, sent as the raw value of the Authorization header with no scheme word. Grant access to the workspaces, spaces and lists the operations below need to read or write",
       "env": [
         "CLICKUP_TOKEN"
@@ -286160,7 +286199,7 @@ payload 16467059
     ]
   ],
   "description": "ClickUp: list workspaces and a space's folders, and read, list, create and update tasks in a list",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -287204,7 +287243,7 @@ payload 16467059
     ]
   ],
   "description": "Cloudflare zones and DNS: list zones, list and manage DNS records for a zone, and purge a zone's cache",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -287958,7 +287997,7 @@ payload 16467059
     ]
   ],
   "description": "Confluence Cloud wiki: find spaces, list the pages in one, read a page's metadata, publish a new page, and comment on one. Page and comment *content* cannot be read back — see the connector's notes",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -289000,7 +289039,7 @@ payload 16467059
     ]
   ],
   "description": "Contentful headless CMS: read published content from the Content Delivery API, and create and publish entries through the Content Management API — two different hosts and two different tokens for one vendor",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -289658,7 +289697,7 @@ payload 16467059
     ]
   ],
   "description": "Datadog monitoring: list and inspect monitors, list and inspect incidents. Authenticates every request with an API key and an Application key together",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -290047,7 +290086,7 @@ payload 16467059
     ]
   ],
   "description": "Discord bot API v10: read the bot's own identity, list the guilds it has joined, read one guild and its channels, read a channel's recent messages, and post a message. Every request authenticates as a bot — `Authorization: Bot <token>`, never `Bearer`, which is Discord's scheme word for a different credential with different reach. Every Discord id is a snowflake and is carried as a string, because a 64-bit id does not survive a JSON number. Discord rate-limits per route and answers 429 with a `Retry-After` header instead of queueing: honour it rather than retrying immediately",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -290996,7 +291035,7 @@ payload 16467059
     ]
   ],
   "description": "DocuSign eSignature REST API: list and read envelopes and their recipients, create an envelope from a template, and void one",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -291789,7 +291828,7 @@ payload 16467059
     ]
   ],
   "description": "Dropbox: browse folder contents, read file and folder metadata, search files, create folders, and get temporary download links",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -292399,7 +292438,7 @@ payload 16467059
     ]
   ],
   "description": "Figma REST API: read a file, specific nodes, rendered images, a project's files and a file's comments — a read-only design surface",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -293047,7 +293086,7 @@ payload 16467059
     ]
   ],
   "description": "Fly.io Machines: discover regions and inspect, create, start, stop, restart or delete Machines",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -293857,7 +293896,7 @@ payload 16467059
   ],
   "connector": "freshdesk",
   "description": "Freshdesk ticketing: list, read, create and update tickets and the contacts they belong to",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -296093,7 +296132,7 @@ payload 16467059
     ]
   ],
   "description": "Front shared inbox: read and reply to conversations, and tag them",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -296880,7 +296919,7 @@ payload 16467059
     ]
   ],
   "description": "GitHub REST API: discover the authenticated user, their organisations and reachable repositories; read repositories, commits, issues, pull requests and Actions workflow runs; and write issues and issue comments",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -306029,7 +306068,7 @@ payload 16467059
     }
   ],
   "description": "GitLab for people and automation identities: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -309428,7 +309467,7 @@ payload 16467059
     ]
   ],
   "description": "Google Workspace: read and send Gmail messages, read and create Calendar events, read and rename Drive files",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -310530,7 +310569,7 @@ payload 16467059
       "service": "default"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -311101,7 +311140,7 @@ payload 16467059
     ]
   ],
   "description": "HubSpot CRM: read contacts, companies and deals, and create and update contact records",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -311746,7 +311785,7 @@ payload 16467059
     ]
   ],
   "description": "Intercom contacts and conversations: read and create contacts, read a conversation, reply to it, and note it",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -312847,7 +312886,7 @@ payload 16467059
     }
   ],
   "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -314258,7 +314297,7 @@ payload 16467059
     ]
   ],
   "description": "Klaviyo marketing platform: read the account a key belongs to, read and create customer profiles, read lists, and post an event that can trigger a flow. Every request carries a dated API revision the vendor requires",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -315290,7 +315329,7 @@ payload 16467059
     ]
   ],
   "description": "LaunchDarkly feature management: read projects, environments and feature flags, and toggle a flag on or off in one environment",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -316082,7 +316121,7 @@ payload 16467059
   ],
   "connector": "loki",
   "description": "Query Loki logs with bounded native LogQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -316325,7 +316364,7 @@ payload 16467059
     ]
   ],
   "description": "Mailchimp Marketing API: check connectivity, read audiences and their contacts, add or update a contact, and list campaigns. Authenticates with a single API key sent as a bearer token, against a host whose datacentre label the operator supplies",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -317420,7 +317459,7 @@ payload 16467059
     ]
   ],
   "description": "Microsoft Graph: read and reply to Outlook mail, inspect Outlook settings, read and create Calendar events, and read and rename OneDrive files",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -327136,7 +327175,7 @@ payload 16467059
     ]
   ],
   "description": "Miro boards and board items: discover boards, read items of any type, and create, update and delete sticky notes",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -328213,7 +328252,7 @@ payload 16467059
   "authority": "com.mysql.server",
   "connector": "mysql",
   "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -328670,7 +328709,7 @@ payload 16467059
     ]
   ],
   "description": "New Relic APM and alerting over the REST v2 API: list the applications an account is monitoring and read one in detail, read the account's alert policies and its current violations, and list or record deployment markers against an application. The account's region host is configured once, not chosen per call",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -329443,7 +329482,7 @@ payload 16467059
     ]
   ],
   "description": "Notion workspace: read a page's properties, query a database, search shared content, and create a page",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -330013,7 +330052,7 @@ payload 16467059
     ]
   ],
   "description": "Okta identity management: read users and groups in an org, read a user's group memberships, and deactivate a user",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -330674,7 +330713,7 @@ payload 16467059
     ]
   ],
   "description": "OpenAI platform: inspect models, stored responses, files and batches, and create chat completions and embeddings",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -360305,7 +360344,7 @@ payload 16467059
     ]
   ],
   "description": "OpenRouter model router: list models and their endpoints, create chat completions, and read credit balance",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -360732,7 +360771,7 @@ payload 16467059
     ]
   ],
   "description": "PagerDuty incident response: read incidents, services and who is on call, and acknowledge or resolve an incident",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -361817,7 +361856,7 @@ payload 16467059
   "authority": "org.postgresql.server",
   "connector": "postgresql",
   "description": "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -362250,7 +362289,7 @@ payload 16467059
     ]
   ],
   "description": "Postmark transactional email: send a message, read delivery stats and bounces. Listing and inspecting servers is withheld — the Account API returns live Server Tokens in plaintext (C-430)",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -362907,7 +362946,7 @@ payload 16467059
   ],
   "connector": "prometheus",
   "description": "Query Prometheus metrics with bounded native PromQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [],
@@ -363113,7 +363152,7 @@ payload 16467059
     ]
   ],
   "description": "Resend transactional email: send a message, read what happened to it, and list or inspect the domains a key may send from",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -363705,7 +363744,7 @@ payload 16467059
     ]
   ],
   "description": "Runpod GPU cloud: inspect and manage pods, serverless endpoints, clusters, templates, network volumes and registry credentials, and read GPU/CPU catalog metadata, prices and billing history",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -377601,7 +377640,7 @@ payload 16467059
     ]
   ],
   "description": "Salesforce REST API: read the authenticated identity, read/create/update an SObject record, and describe an SObject's schema",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -378213,7 +378252,7 @@ payload 16467059
     ]
   ],
   "description": "SendGrid transactional email: read templates and bounce suppressions, validate an email address. Cannot send mail — see the header comment for why the send envelope is not expressible here",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -378725,7 +378764,7 @@ payload 16467059
     ]
   ],
   "description": "Sentry error tracking: read an issue and its latest event, triage an issue, read a project",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -379552,7 +379591,7 @@ payload 16467059
     ]
   ],
   "description": "Shopify Admin REST API: read orders, products, customers and inventory levels, and update a product",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -380710,7 +380749,7 @@ payload 16467059
       "wire_value": "message"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -386754,7 +386793,7 @@ payload 16467059
     ]
   ],
   "description": "Atlassian Statuspage: read a status page's components and incidents, and open or update a publicly visible incident on it",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -387786,7 +387825,7 @@ payload 16467059
       "service": "default"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -389555,7 +389594,7 @@ payload 16467059
     ]
   ],
   "description": "Supabase project data and configuration: describe the tables the API exposes, read a table's rows, and read which sign-in methods the project has enabled. Reads only, through the project's public anon key, so every row returned is bounded by the project's own row-level-security policies",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -389907,7 +389946,7 @@ payload 16467059
     ]
   ],
   "description": "Trello boards and cards: list the boards a token can see, read a board and its lists, read a list's cards, create a card, and archive one. Authenticates every request with an API key and a token together, both in the query string",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -390982,7 +391021,7 @@ payload 16467059
       "service": "default"
     }
   ],
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -392946,7 +392985,7 @@ payload 16467059
     ]
   ],
   "description": "Typeform: read the authenticated account, forms and their responses, and delete responses",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -393813,7 +393852,7 @@ payload 16467059
     ]
   ],
   "description": "Vercel: list and inspect projects and deployments, and cancel an in-progress deployment",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -394397,7 +394436,7 @@ payload 16467059
     ]
   ],
   "description": "Webflow sites and CMS: discover sites, read a collection's own field schema, read collection items of any tenant-defined shape, and publish a site live",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -395187,7 +395226,7 @@ payload 16467059
     ]
   ],
   "description": "Zendesk Support ticketing: search, read and update tickets and comments; inspect audits, incremental exports and custom-object definitions",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [
@@ -418859,7 +418898,7 @@ payload 16467059
     ]
   ],
   "description": "Zoom meeting administration: cancel a meeting, and read a user. Reading and creating a meeting are withheld — both return the host's ZAK token in `start_url` (C-430)",
-  "generator": "connectors 0.2.1",
+  "generator": "connectors 0.3.0",
   "operations": [
     {
       "auth": [

@@ -2,6 +2,12 @@
 
 Status: proposed 2026-08-25. Backs the `subscription-custody` epic (S-070..S-074), with the
 `oauth-consolidation` epic (S-069) as its prerequisite.
+
+Amended 2026-09-01 by [design 17](17-attempt-bounded-subscription-credential-leases.md): open
+question 3 is resolved narrowly. Connectors still exposes no general credential read, export, list,
+echo, or relay operation. It may mint a finite, expiring capability for one authenticated user's
+exact agent attempt; only that capability can redeem the value at the Harness provider boundary.
+Rotation, disconnect, process restart, expiry, attempt mismatch, or use exhaustion revokes it.
 Timo's goal, verbatim intent: a person signed in to the platform clicks **Connect Claude-Code**,
 completes the flow, and the resulting credential is persisted under *their* user, reachable from
 the web UI and the `connectors` CLI alike.
@@ -163,9 +169,8 @@ Custody is ordinary custody; nothing here earns an exception.
 2. **Rotation.** A `claude setup-token` token is a one-year credential with no refresh. Presence is
    reportable; expiry is not, without spending it. Whether the platform warns on age, and on what
    basis, is deferred to the story that gives it a consumer.
-3. **Who reads it — unresolved, and it blocks spending the credential.** Platform ADR 0032
+3. **Who reads it — resolved 2026-09-01 by design 17.** Platform ADR 0032
    forbids any API that can "read back, export, list, echo, or relay a credential value", and
-   ADR 0056 accepts no read path. So this custody is write-and-hold: a value can be placed and
-   reported present, and nothing in the accepted architecture can retrieve it. A harness adapter
-   reading it needs its own RFC/ADR. Nothing in this document depends on that being settled;
-   everything a *consumer* would do does.
+   ADR 0056 accepted no read path. The follow-up decision preserves that general prohibition and
+   admits only an attempt-bound lease redemption directly into a Harness bearer source. The
+   original write-and-hold posture remains the default when that hosted capability is disabled.

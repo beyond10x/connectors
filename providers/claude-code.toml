@@ -1,0 +1,29 @@
+# Custody-only subscription credential for a person's own Claude Code account.
+#
+# Connectors stores and revokes this value but exposes no operation, service, channel, event, or
+# verification request that could spend it. Acquisition is paste-only: the person runs the
+# vendor-owned `claude setup-token` flow on their machine and submits its result through a bounded
+# Connect Session. Harness is the only intended consumer, through a separately governed lease.
+
+id = "claude-code"
+vendor = "Anthropic"
+authority = "com.anthropic.claude-code"
+api_version = "v1"
+description = "Claude Code subscription credential custody for user-bound Harness runs"
+custody_only = true
+
+[[auth]]
+name = "claude-code.subscription_token"
+scheme = "bearer"
+entry = "connect_session"
+subject = "user"
+description = "A user-bound Claude Code setup token stored for attempt-bounded Harness use"
+
+[[config]]
+name = "subscription_token"
+label = "Setup token"
+help = "Run `claude setup-token` on your own machine, then paste the resulting token here."
+format = "token"
+secret = true
+docs_url = "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan"
+binds = "credential.claude-code.subscription_token"

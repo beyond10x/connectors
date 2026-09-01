@@ -51,10 +51,10 @@ pub async fn connect_authenticated<S>(
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
-    if authority.claims().dl_protocol != PROFILE {
+    if authority.claims().protocol != PROFILE {
         return Err(ConnectError::ProfileRefused);
     }
-    let endpoint = &authority.claims().dl_endpoint;
+    let endpoint = &authority.claims().endpoint;
     let proof = proof_key.proof("GET", endpoint, authority, now_epoch_seconds, proof_id)?;
     let mut request = endpoint
         .as_str()

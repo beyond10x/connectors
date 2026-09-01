@@ -247,7 +247,7 @@ async fn supervised_leaf_runs_real_sip_authenticated_rtvbp_and_one_terminal_resu
                     .unwrap()
                     .as_secs();
                 let redeemed = redeemer.redeem(&presentation, &expected, now).unwrap();
-                assert_eq!(redeemed.claims().dl_protocol, PROFILE);
+                assert_eq!(redeemed.claims().protocol, PROFILE);
                 response.headers_mut().insert(
                     header::SEC_WEBSOCKET_PROTOCOL,
                     HeaderValue::from_static(PROFILE),

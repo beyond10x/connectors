@@ -2,7 +2,7 @@
 id: S-071
 title: "Claude Code joins the catalog as a custody-only provider"
 pillar: Catalog
-status: backlog
+status: done
 priority:
 design: ../design/16-subscription-credential-custody.md
 epic: subscription-custody
@@ -19,26 +19,28 @@ path, without connectors ever being able to spend it.
 
 ## Acceptance
 
-- [ ] `providers/claude-code.toml` declares `id = "claude-code"`,
+- [x] `providers/claude-code.toml` declares `id = "claude-code"`,
       `authority = "com.anthropic.claude-code"`, `custody_only = true`, and exactly one credential
       with `entry = "connect_session"`.
-- [ ] The authority `com.anthropic.claude-code` differs from `anthropic`'s `com.anthropic.api`, and
+- [x] The authority `com.anthropic.claude-code` differs from `anthropic`'s `com.anthropic.api`, and
       a catalogue invariant asserts no two providers share an authority — the authority leads every
       credential path this provider will ever own and is never repointed (AGENTS.md, adding a
       connector, step 3).
-- [ ] The declaration carries **no** `client_id`, no secret, no credential-shaped example, and no
+- [x] The declaration carries **no** `client_id`, no secret, no credential-shaped example, and no
       reference to `claude.ai/oauth` or `platform.claude.com/v1/oauth`. We do not drive the vendor's
       OAuth; `claude setup-token` does, on the person's own machine.
-- [ ] `providers/anthropic.toml` is untouched. Its invariant at
+- [x] `providers/anthropic.toml` is untouched. Its invariant at
       `crates/catalog-build/tests/main/catalog_invariants.rs:1226` — auth exactly
       `["anthropic.api_key", "anthropic.admin_key"]`, no Claude Code authority in the API connector
       — still passes unmodified. A separate id is what keeps that assertion honest.
-- [ ] A parameterised invariant asserts `claude-code` exposes zero operations and zero services, so
+- [x] A parameterised invariant asserts `claude-code` exposes zero operations and zero services, so
       nothing in connectors can spend the credential.
-- [ ] Build and commit as one unit: `catalog build` → `catalog diff` clean twice → `catalog check`.
+- [x] Build and commit as one unit: `catalog build` → `catalog diff` clean twice → `catalog check`.
 
 ## Progress
-- (not started)
+- 2026-09-01 — `claude-code` now joins the generated catalog as a distinct custody-only provider.
+  The parameterized authority and zero-surface invariants cover it, and the Anthropic API provider
+  remains byte-for-byte untouched.
 
 ## Notes
 

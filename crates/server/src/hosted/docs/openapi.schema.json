@@ -45,7 +45,10 @@
         "/livez",
         "/readyz",
         "/healthz",
-        "/openapi.json"
+        "/openapi.json",
+        "/subscription-credentials/claude-code",
+        "/subscription-credentials/claude-code/leases",
+        "/subscription-leases/{lease_id}/redeem"
       ],
       "patternProperties": {
         "^/": {
@@ -54,7 +57,9 @@
           "minProperties": 1,
           "properties": {
             "get": { "$ref": "#/$defs/operation" },
-            "post": { "$ref": "#/$defs/operation" }
+            "post": { "$ref": "#/$defs/operation" },
+            "put": { "$ref": "#/$defs/operation" },
+            "delete": { "$ref": "#/$defs/operation" }
           }
         }
       }
@@ -67,9 +72,19 @@
         "securitySchemes": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["identityAccessToken"],
+          "required": ["identityAccessToken", "subscriptionLease"],
           "properties": {
             "identityAccessToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "scheme", "description"],
+              "properties": {
+                "type": { "const": "http" },
+                "scheme": { "const": "bearer" },
+                "description": { "type": "string", "minLength": 1 }
+              }
+            },
+            "subscriptionLease": {
               "type": "object",
               "additionalProperties": false,
               "required": ["type", "scheme", "description"],
@@ -98,6 +113,7 @@
         "summary": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "security": { "type": "array" },
+        "parameters": { "type": "array" },
         "requestBody": { "type": "object" },
         "responses": { "type": "object", "minProperties": 1 }
       }

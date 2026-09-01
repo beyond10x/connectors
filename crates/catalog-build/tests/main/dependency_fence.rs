@@ -109,6 +109,9 @@ const HOST_LIBRARIES: &[&str] = &[
     // crates outside this workspace, which is the whole point of the port being here and them
     // not being.
     "connector-state",
+    // Durable subscription custody plus an in-memory capability ledger. It owns no transport: the
+    // secret store is injected as a port and the HTTP boundary lives in `server`.
+    "subscription-custody",
     // Protocol-neutral proof types and their wire projection. They are shared by runtime
     // composition, but neither belongs to the catalogue compiler nor owns I/O.
     "domain",

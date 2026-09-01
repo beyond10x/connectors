@@ -11,6 +11,7 @@ use connector_state::StateStore;
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
+use subscription_custody::SubscriptionCustody;
 use identity_http::IdentityHttpVerifier;
 use integration_catalog::{CatalogBackend, CatalogIntegrationError};
 use integration_gitlab::GitlabBackend;
@@ -482,6 +483,18 @@ impl HostedRuntime {
             identity_origin,
             config.tenant_id.clone(),
         )?);
+        let claude_code_enabled = config.claude_code.enabled;
+        let subscription_custody = if claude_code_enabled {
+            Some(Arc::new(SubscriptionCustody::new(
+                credential_stores
+                    .values
+                    .as_ref()
+                    .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                    .clone(),
+            )))
+        } else {
+            None
+        };
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
         let kubernetes_namespace_access = config.kubernetes_namespace_access();
         let kubernetes_read_groups = kubernetes_namespace_access
@@ -690,8 +703,13 @@ impl HostedRuntime {
         // no terminal outcome, before anything can present a new one. A journal that cannot be
         // settled is damaged approval authority, and this placement refuses to serve on it.
         authority.recover()?;
-        let connector_router =
-            server::hosted::router(verifier, backend.clone(), admission, authority);
+        let connector_router = server::hosted::router_with_subscription_custody(
+            verifier,
+            backend.clone(),
+            admission,
+            authority,
+            subscription_custody,
+        );
         let application = if config.server.base_path == "/" {
             connector_router
         } else {
@@ -707,6 +725,7 @@ impl HostedRuntime {
             "kubernetes_enabled": config.kubernetes.enabled,
             "monitoring_enabled": monitoring_enabled,
             "vault_enabled": config.vault.enabled,
+            "claude_code_enabled": claude_code_enabled,
             "sip_enabled": config.sip.enabled,
             "sip_listen": config.sip.listen,
             "platform_enabled": platform_enabled,

@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
 };
+use subscription_custody::SubscriptionCustody;
 
 mod admission;
 mod connect;
@@ -41,6 +42,7 @@ mod docs;
 mod enforcement;
 mod mcp;
 mod principal;
+mod subscription;
 
 use admission::{
     dispatch_admitted, dispatch_admitted_signal, enforcement_refusal_response, redescribe,
@@ -232,6 +234,7 @@ struct HostedState {
     backend: Arc<dyn ConnectorBackend>,
     policy: HostedAdmissionPolicy,
     authority: HostedAuthority,
+    subscription_custody: Option<Arc<SubscriptionCustody>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -245,6 +248,18 @@ pub fn router(
     backend: Arc<dyn ConnectorBackend>,
     policy: HostedAdmissionPolicy,
     authority: HostedAuthority,
+) -> Router {
+    router_with_subscription_custody(verifier, backend, policy, authority, None)
+}
+
+/// Builds the hosted transport with optional Connector-owned subscription custody. Absence keeps
+/// every custody and lease route unreachable.
+pub fn router_with_subscription_custody(
+    verifier: Arc<dyn IdentityVerifier>,
+    backend: Arc<dyn ConnectorBackend>,
+    policy: HostedAdmissionPolicy,
+    authority: HostedAuthority,
+    subscription_custody: Option<Arc<SubscriptionCustody>>,
 ) -> Router {
     Router::new()
         .route("/livez", get(liveness))
@@ -286,11 +301,27 @@ pub fn router(
             "/oauth/{integration_ref}/callback",
             get(connect::oauth_callback),
         )
+        .route(
+            "/subscription-credentials/claude-code",
+            get(subscription::status)
+                .put(subscription::connect)
+                .delete(subscription::disconnect)
+                .layer(DefaultBodyLimit::max(20 * 1024)),
+        )
+        .route(
+            "/subscription-credentials/claude-code/leases",
+            post(subscription::create_lease).layer(DefaultBodyLimit::max(4 * 1024)),
+        )
+        .route(
+            "/subscription-leases/{lease_id}/redeem",
+            post(subscription::redeem_lease).layer(DefaultBodyLimit::max(4 * 1024)),
+        )
         .with_state(HostedState {
             verifier,
             backend,
             policy,
             authority,
+            subscription_custody,
         })
 }
 
@@ -805,7 +836,7 @@ mod tests {
     use std::convert::Infallible;
 
     use super::*;
-    use axum::body::{Body, Bytes};
+    use axum::body::{to_bytes, Body, Bytes};
     use axum::http::Request;
     use protocol::connection::{ConnectionRequest, ConnectionResult};
     use protocol::datasource::{
@@ -852,6 +883,8 @@ mod tests {
                 scopes: BTreeSet::from([
                     "connectors.catalog.read".to_owned(),
                     "connectors.connections.manage".to_owned(),
+                    "connectors.connections.self".to_owned(),
+                    "connectors.credentials.lease".to_owned(),
                     "connectors.invoke".to_owned(),
                     "connectors.events.read".to_owned(),
                 ]),
@@ -1142,6 +1175,111 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(app.oneshot(request).await.unwrap().status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn subscription_credential_stays_in_custody_and_only_an_exact_lease_redeems() {
+        const PROVIDER_CREDENTIAL: &str = "synthetic-provider-credential-never-log";
+        let custody = Arc::new(SubscriptionCustody::new(Arc::new(
+            connector_secrets::MemoryStore::new(),
+        )));
+        let app = router_with_subscription_custody(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
+            Some(custody),
+        );
+
+        let connected = app
+            .clone()
+            .oneshot(
+                Request::put("/subscription-credentials/claude-code")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::from(
+                        serde_json::json!({"credential": PROVIDER_CREDENTIAL}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(connected.status(), StatusCode::OK);
+        assert_eq!(connected.headers()[header::CACHE_CONTROL], "no-store");
+        let connected_body = to_bytes(connected.into_body(), 1024).await.unwrap();
+        assert!(!connected_body
+            .windows(PROVIDER_CREDENTIAL.len())
+            .any(|window| { window == PROVIDER_CREDENTIAL.as_bytes() }));
+
+        let leased = app
+            .clone()
+            .oneshot(
+                Request::post("/subscription-credentials/claude-code/leases")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::from(
+                        serde_json::json!({
+                            "attempt_id": "attempt-one",
+                            "ttl_seconds": 60,
+                            "maximum_uses": 1
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(leased.status(), StatusCode::OK);
+        assert_eq!(leased.headers()[header::CACHE_CONTROL], "no-store");
+        let lease: serde_json::Value =
+            serde_json::from_slice(&to_bytes(leased.into_body(), 4096).await.unwrap()).unwrap();
+        let lease_id = lease["lease_id"].as_str().unwrap();
+        let lease_token = lease["lease_token"].as_str().unwrap();
+        assert_ne!(lease_token, PROVIDER_CREDENTIAL);
+
+        let wrong_attempt = app
+            .clone()
+            .oneshot(
+                Request::post(format!("/subscription-leases/{lease_id}/redeem"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, format!("Bearer {lease_token}"))
+                    .body(Body::from(r#"{"attempt_id":"attempt-two"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(wrong_attempt.status(), StatusCode::UNAUTHORIZED);
+
+        let redeemed = app
+            .clone()
+            .oneshot(
+                Request::post(format!("/subscription-leases/{lease_id}/redeem"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, format!("Bearer {lease_token}"))
+                    .body(Body::from(r#"{"attempt_id":"attempt-one"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(redeemed.status(), StatusCode::OK);
+        assert_eq!(redeemed.headers()[header::CACHE_CONTROL], "no-store");
+        let redeemed: serde_json::Value =
+            serde_json::from_slice(&to_bytes(redeemed.into_body(), 20 * 1024).await.unwrap())
+                .unwrap();
+        assert_eq!(redeemed["credential"], PROVIDER_CREDENTIAL);
+        assert_eq!(redeemed["kind"], "oauth");
+
+        let spent = app
+            .oneshot(
+                Request::post(format!("/subscription-leases/{lease_id}/redeem"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, format!("Bearer {lease_token}"))
+                    .body(Body::from(r#"{"attempt_id":"attempt-one"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(spent.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

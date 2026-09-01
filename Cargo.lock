@@ -230,7 +230,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-build"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "catalog-reader",
@@ -252,7 +252,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-cli"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "catalog-build",
@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "serde_json",
  "sha2",
@@ -348,14 +348,14 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "connector-address"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connector-oauth"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "base64",
  "getrandom 0.3.4",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "connector-resolve"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "connector-spec"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "connector-address",
  "indexmap",
@@ -413,14 +413,14 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connectors-client"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "axum",
  "protocol",
@@ -432,6 +432,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
+ "zeroize",
 ]
 
 [[package]]
@@ -534,7 +535,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -802,6 +803,12 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "http"
@@ -1355,7 +1362,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "domain",
  "schemars",
@@ -1850,11 +1857,12 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
  "catalog",
+ "connector-secrets",
  "connector-state",
  "domain",
  "fs2",
@@ -1867,16 +1875,18 @@ dependencies = [
  "serde_json",
  "service",
  "sha2",
+ "subscription-custody",
  "thiserror",
  "tokio",
  "tokio-tungstenite",
  "tower",
  "url",
+ "zeroize",
 ]
 
 [[package]]
 name = "service"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -1991,6 +2001,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "subscription-custody"
+version = "0.3.0"
+dependencies = [
+ "connector-oauth",
+ "connector-secrets",
+ "hex",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]

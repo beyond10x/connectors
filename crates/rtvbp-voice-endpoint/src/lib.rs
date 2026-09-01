@@ -105,9 +105,9 @@ impl<T: TelephonySession + ?Sized> VoiceEndpoint<T> {
         issued: &IssuedAuthority,
     ) -> Result<Self, BindingError> {
         negotiate_profile(offered_profile)?;
-        if issued.claims().dl_protocol != PROFILE {
+        if issued.claims().protocol != PROFILE {
             return Err(BindingError::AuthorityProfileMismatch {
-                actual: issued.claims().dl_protocol.clone(),
+                actual: issued.claims().protocol.clone(),
             });
         }
         Ok(Self {
@@ -557,7 +557,7 @@ mod tests {
         .unwrap();
 
         let application = tokio::spawn(async move {
-            assert_eq!(redeemed.claims().dl_protocol, PROFILE);
+            assert_eq!(redeemed.claims().protocol, PROFILE);
             let envelope = rtvbp::envelope::v1classic::Envelope;
             let request = application_transport.control().recv().await.unwrap();
             let request = envelope.decode(&request.data).unwrap();

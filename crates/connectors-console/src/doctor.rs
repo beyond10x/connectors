@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn a_short_state_root_passes_both_budgets() {
-        let checks = check_socket_budget(std::path::Path::new("/home/x/.local/state/dl"));
+        let checks = check_socket_budget(std::path::Path::new("/home/x/.local/state/connectors"));
         assert!(checks.iter().all(|check| check.status == Status::Ok));
     }
 
