@@ -34,6 +34,8 @@ pub struct HostedServerConfig {
     #[serde(default)]
     pub vault: HostedVaultConfig,
     #[serde(default)]
+    pub secrets: HostedSecretsConfig,
+    #[serde(default)]
     pub claude_code: HostedClaudeCodeConfig,
     pub sip: HostedSipConfig,
     #[serde(default)]
@@ -316,6 +318,18 @@ impl Default for HostedVaultConfig {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedSecretsConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub origin: Option<String>,
+    #[serde(default)]
+    pub token_file: Option<PathBuf>,
+    #[serde(default)]
+    pub ca_file: Option<PathBuf>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum HostedServerConfigError {
     #[error("hosted Connector configuration could not be read")]
@@ -354,6 +368,10 @@ impl HostedServerConfig {
             && self.vault.role.is_none()
             && self.vault.token_file.is_none()
             && self.vault.ca_file.is_none();
+        let secrets_complete = self.secrets.origin.is_some() && self.secrets.token_file.is_some();
+        let secrets_empty = self.secrets.origin.is_none()
+            && self.secrets.token_file.is_none()
+            && self.secrets.ca_file.is_none();
         let slack_valid = self.slack.as_ref().is_none_or(|slack| {
             let origin = url::Url::parse(&slack.public_origin);
             origin.is_ok_and(|origin| {
@@ -510,7 +528,10 @@ impl HostedServerConfig {
             || !sip_credentials_valid
             || (self.vault.enabled && !vault_complete)
             || (!self.vault.enabled && !vault_empty)
-            || (self.vault.enabled != vault_required)
+            || (self.secrets.enabled && !secrets_complete)
+            || (!self.secrets.enabled && !secrets_empty)
+            || (self.vault.enabled && self.secrets.enabled)
+            || ((self.vault.enabled || self.secrets.enabled) != vault_required)
             || !valid_dns_label(&self.vault.mount, 63)
             || self
                 .platform
