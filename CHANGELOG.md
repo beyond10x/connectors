@@ -9,6 +9,15 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## Unreleased
+
+### Added
+
+- Add a generator-facing service factory contract and deterministic runtime bundle builder. A
+  registered factory remains inert until an explicit deployment overlay assigns permanent provider
+  identity and complete operation policy/resource bindings; provider and operation collisions,
+  incomplete overlays, and catalog/dispatch drift refuse composition.
+
 ## 0.4.0 — 2026-09-01
 
 ### Added
