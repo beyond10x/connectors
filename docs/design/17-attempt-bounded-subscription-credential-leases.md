@@ -53,3 +53,14 @@ are known. The authorization and lease machinery may become generic after a seco
 provider demonstrates the shared fields; the API must not pretend that all vendor credentials have
 the same lifecycle today. Durable or transferable leases, background service-agent credentials,
 refresh grants, and administrator export remain out of scope and refused.
+
+## 2026-09-01 amendment — refresh before redemption
+
+S-077 admits refresh grants inside Connector custody. This does not widen the lease: redemption
+still returns only a current access credential for its exact attempt and use. When the stored
+access credential enters its refresh skew, custody serializes refresh with redemption, validates
+the provider response, handles refresh-token rotation, replaces the same secret-store record, and
+returns the new access credential. Refresh tokens never cross the custody boundary.
+
+The earlier `setup token has no refresh flow` statement remains true for legacy pasted values; it
+no longer describes the preferred OAuth-backed record.

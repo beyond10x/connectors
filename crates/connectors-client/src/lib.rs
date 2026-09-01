@@ -42,6 +42,10 @@ pub enum ClientError {
     /// The hosted Connector refused the presented Identity authority.
     #[error("hosted Connector Identity authority was refused")]
     HostedNotGranted,
+    /// The hosted Connector understood and refused a bounded subscription request. Only the HTTP
+    /// status crosses this client boundary; the response body may contain provider diagnostics.
+    #[error("hosted Connector refused the subscription request with status {0}")]
+    SubscriptionRefused(u16),
     /// The hosted Connector was unavailable or returned a non-contract HTTP result.
     #[error("hosted Connector is unavailable")]
     HostedUnavailable,
@@ -103,6 +107,15 @@ pub struct SubscriptionStatus {
     pub connected: bool,
 }
 
+/// Non-secret browser authorization details for a pending Claude subscription connection.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SubscriptionOAuthStart {
+    pub authorization_url: String,
+    pub flow_id: String,
+    pub expires_at: u64,
+}
+
 /// A short-lived, finite-use capability bound to one Harness attempt. Diagnostics never reveal
 /// the bearer value.
 pub struct SubscriptionLease {
@@ -157,6 +170,13 @@ impl std::fmt::Debug for RedeemedSubscription {
 #[serde(deny_unknown_fields)]
 struct ConnectSubscriptionRequest<'a> {
     credential: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompleteSubscriptionOAuthRequest<'a> {
+    flow_id: &'a str,
+    code: &'a str,
 }
 
 #[derive(Serialize)]
@@ -562,6 +582,8 @@ pub struct HostedClient {
     events: Url,
     subscription_credential: Url,
     subscription_leases: Url,
+    subscription_oauth_start: Url,
+    subscription_oauth_complete: Url,
 }
 
 impl HostedClient {
@@ -711,6 +733,42 @@ impl HostedClient {
         .await
     }
 
+    /// Starts Claude's public-client PKCE flow without exposing the verifier to this client.
+    pub async fn start_claude_code_subscription_oauth(
+        &self,
+        identity_bearer: &str,
+    ) -> Result<SubscriptionOAuthStart, ClientError> {
+        require_bearer(identity_bearer)?;
+        self.subscription_exchange(
+            reqwest::Method::POST,
+            self.subscription_oauth_start.clone(),
+            identity_bearer,
+            None,
+        )
+        .await
+    }
+
+    /// Completes one pending PKCE flow. The one-use provider code is wiped on drop.
+    pub async fn complete_claude_code_subscription_oauth(
+        &self,
+        identity_bearer: &str,
+        flow_id: &str,
+        code: Zeroizing<String>,
+    ) -> Result<SubscriptionStatus, ClientError> {
+        require_bearer(identity_bearer)?;
+        let body = serde_json::to_vec(&CompleteSubscriptionOAuthRequest {
+            flow_id,
+            code: code.as_str(),
+        })?;
+        self.subscription_exchange(
+            reqwest::Method::POST,
+            self.subscription_oauth_complete.clone(),
+            identity_bearer,
+            Some(body),
+        )
+        .await
+    }
+
     /// Deletes the authenticated person's Claude Code subscription credential and revokes every
     /// live in-process lease over it.
     pub async fn disconnect_claude_code_subscription(
@@ -794,6 +852,14 @@ impl HostedClient {
             events: endpoint(&base, "events"),
             subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
             subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),
+            subscription_oauth_start: endpoint(
+                &base,
+                "subscription-credentials/claude-code/oauth/start",
+            ),
+            subscription_oauth_complete: endpoint(
+                &base,
+                "subscription-credentials/claude-code/oauth/complete",
+            ),
             http,
         }
     }
@@ -824,6 +890,9 @@ impl HostedClient {
         match response.status() {
             reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
                 return Err(ClientError::HostedNotGranted);
+            }
+            status if status.is_client_error() => {
+                return Err(ClientError::SubscriptionRefused(status.as_u16()));
             }
             status if !status.is_success() => return Err(ClientError::HostedUnavailable),
             _ => {}
@@ -1164,12 +1233,10 @@ mod tests {
     fn hosted_client_requires_https_except_on_loopback_or_internal_cluster_dns() {
         assert!(HostedClient::new("https://connectors.example/api/connectors/v1").is_ok());
         assert!(HostedClient::new("http://127.0.0.1:8091/api/connectors/v1").is_ok());
-        assert!(
-            HostedClient::new(
-                "http://connectors.devcenter.svc.cluster.local:8091/api/connectors/v1"
-            )
-            .is_ok()
-        );
+        assert!(HostedClient::new(
+            "http://connectors.devcenter.svc.cluster.local:8091/api/connectors/v1"
+        )
+        .is_ok());
         assert!(matches!(
             HostedClient::new("http://connectors.example/api/connectors/v1"),
             Err(ClientError::InvalidHostedBase)
@@ -1309,6 +1376,95 @@ mod tests {
             "synthetic-provider-credential"
         );
         assert!(!format!("{redeemed:?}").contains("synthetic-provider"));
+        serving.abort();
+    }
+
+    #[tokio::test]
+    async fn hosted_subscription_client_starts_and_completes_pkce_without_retaining_the_code() {
+        async fn start(headers: HeaderMap) -> axum::response::Response {
+            assert_eq!(
+                headers[reqwest::header::AUTHORIZATION],
+                "Bearer identity-access"
+            );
+            (
+                [
+                    (reqwest::header::CACHE_CONTROL, "no-store"),
+                    (reqwest::header::PRAGMA, "no-cache"),
+                ],
+                Json(serde_json::json!({
+                    "authorization_url":"https://provider.example/authorize?state=opaque",
+                    "flow_id":"opaque-flow-identifier",
+                    "expires_at":4_000_000_000_u64
+                })),
+            )
+                .into_response()
+        }
+
+        async fn complete(headers: HeaderMap, body: Bytes) -> axum::response::Response {
+            assert_eq!(
+                headers[reqwest::header::AUTHORIZATION],
+                "Bearer identity-access"
+            );
+            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(request["flow_id"], "opaque-flow-identifier");
+            if request["code"] == "refused-provider-code" {
+                return (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error":"must-not-cross-client"})),
+                )
+                    .into_response();
+            }
+            assert_eq!(request["code"], "one-use-provider-code");
+            (
+                [
+                    (reqwest::header::CACHE_CONTROL, "no-store"),
+                    (reqwest::header::PRAGMA, "no-cache"),
+                ],
+                Json(serde_json::json!({
+                    "provider":"claude-code",
+                    "connected":true
+                })),
+            )
+                .into_response()
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route(
+                "/api/connectors/v1/subscription-credentials/claude-code/oauth/start",
+                post(start),
+            )
+            .route(
+                "/api/connectors/v1/subscription-credentials/claude-code/oauth/complete",
+                post(complete),
+            );
+        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = HostedClient::new(&format!("http://{address}/api/connectors/v1")).unwrap();
+        let started = client
+            .start_claude_code_subscription_oauth("identity-access")
+            .await
+            .unwrap();
+        assert_eq!(started.flow_id, "opaque-flow-identifier");
+        let completed = client
+            .complete_claude_code_subscription_oauth(
+                "identity-access",
+                &started.flow_id,
+                Zeroizing::new("one-use-provider-code".to_owned()),
+            )
+            .await
+            .unwrap();
+        assert!(completed.connected);
+        assert!(matches!(
+            client
+                .complete_claude_code_subscription_oauth(
+                    "identity-access",
+                    &started.flow_id,
+                    Zeroizing::new("refused-provider-code".to_owned()),
+                )
+                .await,
+            Err(ClientError::SubscriptionRefused(400))
+        ));
         serving.abort();
     }
 

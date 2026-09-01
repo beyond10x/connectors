@@ -485,13 +485,16 @@ impl HostedRuntime {
         )?);
         let claude_code_enabled = config.claude_code.enabled;
         let subscription_custody = if claude_code_enabled {
-            Some(Arc::new(SubscriptionCustody::new(
+            Some(Arc::new(SubscriptionCustody::with_claude_oauth(
                 credential_stores
                     .values
                     .as_ref()
                     .ok_or(connectors_config::HostedServerConfigError::Invalid)?
                     .clone(),
-            )))
+                subscription_custody::ClaudeOAuthConfig::official()
+                    .map_err(|_| RuntimeError::CredentialStore)?,
+            )
+            .map_err(|_| RuntimeError::CredentialStore)?))
         } else {
             None
         };

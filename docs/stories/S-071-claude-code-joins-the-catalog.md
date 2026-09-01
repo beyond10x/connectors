@@ -41,6 +41,10 @@ path, without connectors ever being able to spend it.
 - 2026-09-01 — `claude-code` now joins the generated catalog as a distinct custody-only provider.
   The parameterized authority and zero-surface invariants cover it, and the Anthropic API provider
   remains byte-for-byte untouched.
+- 2026-09-01 — [S-077](S-077-claude-subscriptions-connect-with-pkce-and-refresh.md) supersedes the
+  original paste-only acquisition constraint after the installed provider client demonstrated a
+  public-client PKCE and refresh contract. The catalog remains custody-only and exposes no request
+  surface.
 
 ## Notes
 

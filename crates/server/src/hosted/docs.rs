@@ -37,8 +37,8 @@ const OPENAPI_SKELETON: &str = include_str!("docs/openapi.json");
 pub(in crate::hosted) fn document_json() -> &'static str {
     static DOCUMENT: OnceLock<String> = OnceLock::new();
     DOCUMENT.get_or_init(|| {
-        let mut document: Value = serde_json::from_str(OPENAPI_SKELETON)
-            .expect("the committed OpenAPI skeleton is JSON");
+        let mut document: Value =
+            serde_json::from_str(OPENAPI_SKELETON).expect("the committed OpenAPI skeleton is JSON");
         let schemas = document
             .pointer_mut("/components/schemas")
             .expect("the skeleton declares components.schemas");
@@ -53,28 +53,70 @@ pub(in crate::hosted) fn document_json() -> &'static str {
             Value::Object(std::mem::take(object))
         }
         let entries: [(&str, Value); 10] = [
-            ("operation.requestEnvelope", generated::<protocol::operation::RequestEnvelope>(&settings)),
-            ("operation.responseEnvelope", generated::<protocol::operation::ResponseEnvelope>(&settings)),
-            ("connection.request_envelope", generated::<protocol::connection::RequestEnvelope>(&settings)),
-            ("connection.response_envelope", generated::<protocol::connection::ResponseEnvelope>(&settings)),
-            ("catalog.requestEnvelope", generated::<protocol::catalog::RequestEnvelope>(&settings)),
-            ("catalog.responseEnvelope", generated::<protocol::catalog::ResponseEnvelope>(&settings)),
-            ("event.request_envelope", generated::<protocol::event::RequestEnvelope>(&settings)),
-            ("event.response_envelope", generated::<protocol::event::ResponseEnvelope>(&settings)),
-            ("datasource.request_envelope", generated::<protocol::datasource::RequestEnvelope>(&settings)),
-            ("datasource.response_envelope", generated::<protocol::datasource::ResponseEnvelope>(&settings)),
+            (
+                "operation.requestEnvelope",
+                generated::<protocol::operation::RequestEnvelope>(&settings),
+            ),
+            (
+                "operation.responseEnvelope",
+                generated::<protocol::operation::ResponseEnvelope>(&settings),
+            ),
+            (
+                "connection.request_envelope",
+                generated::<protocol::connection::RequestEnvelope>(&settings),
+            ),
+            (
+                "connection.response_envelope",
+                generated::<protocol::connection::ResponseEnvelope>(&settings),
+            ),
+            (
+                "catalog.requestEnvelope",
+                generated::<protocol::catalog::RequestEnvelope>(&settings),
+            ),
+            (
+                "catalog.responseEnvelope",
+                generated::<protocol::catalog::ResponseEnvelope>(&settings),
+            ),
+            (
+                "event.request_envelope",
+                generated::<protocol::event::RequestEnvelope>(&settings),
+            ),
+            (
+                "event.response_envelope",
+                generated::<protocol::event::ResponseEnvelope>(&settings),
+            ),
+            (
+                "datasource.request_envelope",
+                generated::<protocol::datasource::RequestEnvelope>(&settings),
+            ),
+            (
+                "datasource.response_envelope",
+                generated::<protocol::datasource::ResponseEnvelope>(&settings),
+            ),
         ];
         let contracts: [(&str, &str); 10] = [
             ("operation.requestEnvelope", protocol::operation::CONTRACT),
             ("operation.responseEnvelope", protocol::operation::CONTRACT),
-            ("connection.request_envelope", protocol::connection::CONTRACT),
-            ("connection.response_envelope", protocol::connection::CONTRACT),
+            (
+                "connection.request_envelope",
+                protocol::connection::CONTRACT,
+            ),
+            (
+                "connection.response_envelope",
+                protocol::connection::CONTRACT,
+            ),
             ("catalog.requestEnvelope", protocol::catalog::CONTRACT),
             ("catalog.responseEnvelope", protocol::catalog::CONTRACT),
             ("event.request_envelope", protocol::event::CONTRACT),
             ("event.response_envelope", protocol::event::CONTRACT),
-            ("datasource.request_envelope", protocol::datasource::CONTRACT),
-            ("datasource.response_envelope", protocol::datasource::CONTRACT),
+            (
+                "datasource.request_envelope",
+                protocol::datasource::CONTRACT,
+            ),
+            (
+                "datasource.response_envelope",
+                protocol::datasource::CONTRACT,
+            ),
         ];
         let table = schemas
             .as_object_mut()
@@ -334,7 +376,10 @@ fn refusal_rows(doc: &Value) -> Vec<(String, Vec<String>)> {
 /// Depth-first search for the generated error object's `code` enum inside an inlined
 /// envelope schema. The closed Rust error enums surface here; an open string does not.
 fn find_code_enum(schema: &Value) -> Option<Vec<String>> {
-    if let Some(codes) = schema.pointer("/properties/code/enum").and_then(Value::as_array) {
+    if let Some(codes) = schema
+        .pointer("/properties/code/enum")
+        .and_then(Value::as_array)
+    {
         return Some(
             codes
                 .iter()

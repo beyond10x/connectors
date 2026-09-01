@@ -301,21 +301,7 @@ pub fn router_with_subscription_custody(
             "/oauth/{integration_ref}/callback",
             get(connect::oauth_callback),
         )
-        .route(
-            "/subscription-credentials/claude-code",
-            get(subscription::status)
-                .put(subscription::connect)
-                .delete(subscription::disconnect)
-                .layer(DefaultBodyLimit::max(20 * 1024)),
-        )
-        .route(
-            "/subscription-credentials/claude-code/leases",
-            post(subscription::create_lease).layer(DefaultBodyLimit::max(4 * 1024)),
-        )
-        .route(
-            "/subscription-leases/{lease_id}/redeem",
-            post(subscription::redeem_lease).layer(DefaultBodyLimit::max(4 * 1024)),
-        )
+        .merge(subscription::routes())
         .with_state(HostedState {
             verifier,
             backend,
@@ -1280,6 +1266,44 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(spent.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn subscription_oauth_start_is_identity_scoped_bounded_and_non_cacheable() {
+        let custody = Arc::new(
+            SubscriptionCustody::with_claude_oauth(
+                Arc::new(connector_secrets::MemoryStore::new()),
+                subscription_custody::ClaudeOAuthConfig::official().unwrap(),
+            )
+            .unwrap(),
+        );
+        let app = router_with_subscription_custody(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::new(["operator".to_owned()]),
+            HostedAuthority::unbound(),
+            Some(custody),
+        );
+        let response = app
+            .oneshot(
+                Request::post("/subscription-credentials/claude-code/oauth/start")
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(response.headers()[header::PRAGMA], "no-cache");
+        let body: serde_json::Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 16 * 1024).await.unwrap())
+                .unwrap();
+        let authorization = body["authorization_url"].as_str().unwrap();
+        assert!(authorization.starts_with("https://claude.com/cai/oauth/authorize?"));
+        assert!(authorization.contains("code_challenge_method=S256"));
+        assert!(!authorization.contains("code_verifier"));
+        assert!(body["flow_id"].as_str().unwrap().len() >= 43);
     }
 
     #[tokio::test]

@@ -108,6 +108,7 @@ will spawn children as each milestone is designed.
 | [S-074](S-074-the-cli-drives-a-hosted-connection.md) | The CLI drives a hosted connection | backlog | Clients | connectors-cli, connectors-console, connectors-client |
 | [S-075](S-075-deployment-catalogs-are-external-packs.md) | Deployment catalogs are external immutable packs | backlog | Catalog | catalog-reader, catalog-build, connectors-config, deployment |
 | [S-076](S-076-an-agent-attempt-can-lease-a-user-subscription.md) | An agent attempt can lease a user's subscription | done | Platform | subscription-custody, server, connectors-client, connectors-runtime, identity-http |
+| [S-077](S-077-claude-subscriptions-connect-with-pkce-and-refresh.md) | Claude subscriptions connect with PKCE and refresh | done | Platform | subscription-custody, server, connectors-client, connectors-runtime |
 
 ## Epics in this seed
 
@@ -130,7 +131,7 @@ will spawn children as each milestone is designed.
 | `local-product` | S-035, S-036, S-041, S-042 | Turning the personal-local posture from a test harness for the hosted service into a program someone installs and uses alone: no deployment, no Identity, no PostgreSQL. |
 | `credential-production` | S-034 | Connector-owned production lifecycle, custody backends, satellite completion, leakage conformance, and release evidence under architecture ADR 0032's phase-8 gate. |
 | `oauth-consolidation` | S-069 | One OAuth implementation instead of three hand-rolled copies: a shared crate extracted from the only PKCE implementation, with GitLab, Jira and Slack migrated onto it behaviour-preserving. Prerequisite for any further browser-flow connector, and where S-013's loopback callback validation will live. |
-| `subscription-custody` | S-070, S-071, S-072, S-073, S-074, S-076 | Custody without catalog use, per [design 16](../design/16-subscription-credential-custody.md) and [design 17](../design/17-attempt-bounded-subscription-credential-leases.md): a custody-only declaration and provider, hosted connection surfaces, a CLI path, and a narrow attempt capability that reaches only the Harness bearer boundary. |
+| `subscription-custody` | S-070, S-071, S-072, S-073, S-074, S-076, S-077 | Custody without catalog use, per [design 16](../design/16-subscription-credential-custody.md) and [design 17](../design/17-attempt-bounded-subscription-credential-leases.md): a custody-only declaration and provider, hosted connection surfaces, public-client PKCE acquisition with refresh, a CLI path, and a narrow attempt capability that reaches only the Harness bearer boundary. |
 | `deployment-packs` | S-075 | Digest-pinned external catalog packs remove deployment-specific provider material from generic source and images without weakening catalog provenance, identity or admission. |
 
 ## Known gaps in this backlog

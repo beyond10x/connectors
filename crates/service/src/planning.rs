@@ -112,11 +112,9 @@ pub fn plan_operation(
                 connection: admission.connection().to_owned(),
             })
         }
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::SqlV1) => {
-            ProtocolPlan::SqlV1(SqlPlan {
-                connection: admission.connection().to_owned(),
-            })
-        }
+        (ConnectionRoute::Direct, ProtocolRequestTemplate::SqlV1) => ProtocolPlan::SqlV1(SqlPlan {
+            connection: admission.connection().to_owned(),
+        }),
         (
             ConnectionRoute::ViaConnection {
                 parent_connection,

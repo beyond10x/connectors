@@ -174,3 +174,17 @@ Custody is ordinary custody; nothing here earns an exception.
    ADR 0056 accepted no read path. The follow-up decision preserves that general prohibition and
    admits only an attempt-bound lease redemption directly into a Harness bearer source. The
    original write-and-hold posture remains the default when that hosted capability is disabled.
+
+## 2026-09-01 amendment — public-client acquisition
+
+S-077 supersedes the paste-only acquisition decision, not the custody-only catalog decision. The
+installed provider client demonstrated a working public-client authorization-code flow with PKCE,
+a fixed manual callback, and refresh credentials. Connectors may therefore drive that provider
+flow outside the catalog operation surface: server-held verifier and state are bounded,
+single-use, tenant/subject-bound, and expiring; completion stores a versioned refresh-capable
+record under the same permanent credential address.
+
+The provider declaration still carries no client id or OAuth request surface. Identity remains
+provider-agnostic, and the `claude-code` catalog entry remains unable to describe or invoke any
+request. The old setup-token write path may remain as compatibility input, but the product path is
+now PKCE and custody-managed refresh.

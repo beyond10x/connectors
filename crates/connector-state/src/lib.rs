@@ -190,11 +190,7 @@ mod tests {
 
     #[test]
     fn the_key_grammar_is_closed() {
-        for valid in [
-            "slack.connections",
-            "b10x:work-events",
-            "vault_journal-v1",
-        ] {
+        for valid in ["slack.connections", "b10x:work-events", "vault_journal-v1"] {
             assert!(validate_key(valid).is_ok(), "{valid}");
         }
         for invalid in ["", "Upper", "has space", "semi;colon", "sl/ash"] {

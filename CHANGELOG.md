@@ -9,6 +9,25 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.3.2 — 2026-09-01
+
+### Added
+
+- Add a bounded, single-use OAuth2 PKCE connection flow for Claude subscriptions. Connectors keeps
+  the verifier and provider tokens in custody; authenticated callers receive only the provider
+  authorization URL, an opaque flow id, presence, and attempt-bounded lease results.
+- Persist refresh-capable subscription records and refresh them before expiry during serialized
+  lease redemption, including refresh-token rotation. Existing manually supplied credentials
+  remain readable for compatibility.
+- Expose typed start and completion operations through the hosted API, Rust client, and embedded
+  OpenAPI document. Credential-bearing requests and responses are bounded and non-cacheable.
+
+### Security
+
+- Provider acquisition and token lifecycle remain wholly inside Connectors. Identity remains
+  provider- and service-agnostic, and neither authorization codes, PKCE verifiers, refresh tokens,
+  nor provider diagnostics are returned to callers or written to logs.
+
 ## 0.3.1 — 2026-09-01
 
 ### Fixed
