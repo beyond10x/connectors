@@ -137,9 +137,11 @@ fn summary<S: SetupProfileSource + ?Sized>(
     provider: &catalog::Provider,
     setup: &S,
 ) -> ProviderSummary {
-    // This is runtime setup availability, not merely the existence of declarative config fields.
-    // Only built-in integrations that own Connect Session dispatch may advertise it.
-    let configurable = matches!(provider.id, "gitlab" | "grafana" | "slack");
+    // Curated providers retain their specialized setup projection. Generic catalog-backed flows
+    // extend that set from the running receiver; they do not replace or hide the curated entries.
+    let setup_profiles = setup.setup_profiles(provider.id);
+    let configurable =
+        matches!(provider.id, "gitlab" | "grafana" | "slack") || !setup_profiles.is_empty();
     ProviderSummary {
         provider_ref: provider.id.to_owned(),
         authority: provider.authority.map(ToOwned::to_owned),
@@ -157,11 +159,7 @@ fn summary<S: SetupProfileSource + ?Sized>(
             .collect(),
         operation_count: u32::try_from(provider.operations.len()).unwrap_or(u32::MAX),
         configurable,
-        setup_profiles: if configurable {
-            setup.setup_profiles(provider.id)
-        } else {
-            Vec::new()
-        },
+        setup_profiles,
     }
 }
 

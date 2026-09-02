@@ -58,6 +58,8 @@ use sha2::{Digest as _, Sha256};
 
 mod config;
 pub use config::DeclaredConfig;
+mod hosted;
+pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
 
 /// Minting an Argo CD API token from an operator's password, so the `argocd` CLI is not a
 /// prerequisite for connecting Argo CD.
@@ -203,6 +205,54 @@ impl CatalogBackend {
                 import_credential(&entry.provider, path, &reference, secrets.as_ref()).await?;
             }
 
+            bindings.push(Binding {
+                provider,
+                connection_ref: connection_ref(&entry.provider, entry.instance()),
+                label: entry.label(),
+                grant_ref: entry.grant_ref.clone(),
+                initiation: match entry.initiation {
+                    InitiationConfig::Platform => InitiationPolicy::platform_only(),
+                    InitiationConfig::Provider => InitiationPolicy::provider_only(),
+                    InitiationConfig::Both => InitiationPolicy::bidirectional(),
+                },
+                config: DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
+                allow_writes: entry.allow_writes,
+                instance: match entry.instance.as_deref() {
+                    Some(name) => Some(instance_for(&entry.provider, name)?),
+                    None => None,
+                },
+            });
+        }
+        Ok(Self {
+            inner: Arc::new(Inner {
+                owner,
+                bindings,
+                secrets,
+                egress,
+                leases: Mutex::new(BTreeMap::new()),
+            }),
+        })
+    }
+
+    /// Bind already-stored catalog Connections without importing credential material.
+    ///
+    /// Hosted self-service uses this constructor after filtering durable connection rows to the
+    /// authenticated principal. Credential acquisition remains in [`HostedCatalogBackend`]; this
+    /// adapter only resolves and invokes the resulting, already-addressed values.
+    pub fn bind_stored(
+        owner: PrincipalContext,
+        configured: &[CatalogIntegrationConfig],
+        secrets: Arc<dyn SecretStore>,
+        egress: Arc<dyn EgressTransport>,
+    ) -> Result<Self, CatalogIntegrationError> {
+        let mut bindings = Vec::with_capacity(configured.len());
+        for entry in configured {
+            let provider = catalog::provider(catalog::ProviderKey::id(&entry.provider))
+                .ok_or_else(|| CatalogIntegrationError::UnknownProvider(entry.provider.clone()))?;
+            provider
+                .authority
+                .ok_or_else(|| CatalogIntegrationError::NoAuthority(entry.provider.clone()))?;
+            credential_leaf(provider, entry.credential.as_deref())?;
             bindings.push(Binding {
                 provider,
                 connection_ref: connection_ref(&entry.provider, entry.instance()),

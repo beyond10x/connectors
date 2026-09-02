@@ -40,7 +40,8 @@ sha256 = "3458dbfb0c31150dbd6a601abb90f4b814bc5f122bdb717f0f8f05c2b0e37e21"
 [[auth]]
 name = "anthropic.api_key"
 scheme = { header = { name = "x-api-key" } }
-env = ["ANTHROPIC_API_KEY"]
+entry = "connect_session"
+subject = "user"
 description = "Anthropic API key, sent as x-api-key"
 
 [[auth]]

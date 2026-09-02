@@ -3,15 +3,13 @@
   "auth": [
     {
       "description": "Anthropic API key, sent as x-api-key",
-      "env": [
-        "ANTHROPIC_API_KEY"
-      ],
+      "entry": "connect_session",
       "name": "anthropic.api_key",
       "scheme": {
         "kind": "header",
         "name": "x-api-key"
       },
-      "subject": "unstated"
+      "subject": "user"
     },
     {
       "description": "Anthropic Admin API key, sent as x-api-key and used only by Admin API operations",
@@ -62,7 +60,7 @@
     ]
   ],
   "description": "Anthropic platform: the model catalogue and a curated read-only Admin API surface",
-  "generator": "connectors 0.4.5",
+  "generator": "connectors 0.5.0",
   "operations": [
     {
       "auth": [

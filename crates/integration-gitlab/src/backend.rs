@@ -331,6 +331,7 @@ impl ConnectorBackend for GitlabBackend {
         match request {
             ConnectionRequest::ConnectSessionCreate(request) => {
                 request.integration_ref == INTEGRATION_REF
+                    && GitlabProfile::parse(request.auth_profile.as_deref()).is_some()
             }
             ConnectionRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).owns(&request.connect_session_ref)

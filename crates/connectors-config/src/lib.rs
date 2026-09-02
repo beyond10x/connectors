@@ -7,11 +7,11 @@ mod hosted;
 mod personal;
 
 pub use hosted::{
-    HostedAuthorityConfig, HostedGitlabConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig,
-    HostedIdentityConfig, HostedJiraConfig, HostedKubernetesConfig, HostedListenerConfig,
-    HostedSecretsConfig, HostedServerConfig, HostedServerConfigError, HostedSipConfig,
-    HostedSipCredentialConfig, HostedSlackConfig, HostedStorageConfig, HostedVaultConfig,
-    JiraSharedAuth, KubernetesNamespaceAccessConfig,
+    HostedAuthorityConfig, HostedCatalogConfig, HostedGitlabConfig, HostedGrafanaConfig,
+    HostedGrafanaTargetConfig, HostedIdentityConfig, HostedJiraConfig, HostedKubernetesConfig,
+    HostedListenerConfig, HostedSecretsConfig, HostedServerConfig, HostedServerConfigError,
+    HostedSipConfig, HostedSipCredentialConfig, HostedSlackConfig, HostedStorageConfig,
+    HostedVaultConfig, JiraSharedAuth, KubernetesNamespaceAccessConfig,
 };
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, CatalogIntegrationConfig,

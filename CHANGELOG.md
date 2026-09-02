@@ -11,6 +11,26 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.0 — 2026-09-03
+
+### Added
+
+- Compose the generic catalog adapter into hosted deployments, with per-principal Connect Sessions,
+  prepared credential transactions, crash recovery, exact public egress apertures, and catalog-
+  derived setup profiles.
+- Let a signed-in person connect an Anthropic API key through the generic flow and verify it with
+  the catalog-declared Models request before the Connection becomes callable.
+
+### Changed
+
+- Preserve curated GitLab, Slack, and Grafana setup as the authoritative experience while generic
+  catalog setup adds providers and credential profiles those integrations do not own.
+
+### Security
+
+- Bind every generic hosted Connection and credential address to its authenticated tenant and
+  subject. Two principals never see or resolve one another's stored provider credential.
+
 ## 0.4.5 — 2026-09-02
 
 ### Added
