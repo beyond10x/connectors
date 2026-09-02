@@ -69,7 +69,7 @@ use hosted_setup::{
 use state_file::{read_state, write_state};
 
 const INTEGRATION_REF: &str = "slack";
-const AUTHORITY: &str = "com.slack.api";
+pub(crate) const AUTHORITY: &str = "com.slack.api";
 const SERVICE: &str = "default";
 const APP_TOKEN_CREDENTIAL: &str = "app_token";
 const BOT_TOKEN_CREDENTIAL: &str = "bot_token";
@@ -102,7 +102,7 @@ const PROFILE_ORG_BOT: &str = "slack.org_bot";
 const ORG_BOT_CONNECTION: &str = "connection:slack:org-bot";
 const PROFILE_ORG_USER: &str = "slack.org_user";
 const PROFILE_COMPANION_BOT: &str = "slack.companion_bot";
-const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
+pub(crate) const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
 const OAUTH_REFRESH_TOKEN_CREDENTIAL: &str = "oauth_refresh_token";
 const USER_OAUTH_SCOPES: &str = "channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,users:read,users:read.email,chat:write,reactions:write";
 const SLACK_OPERATIONS: [&str; 4] = [
@@ -122,7 +122,7 @@ pub struct SlackError {
 }
 
 impl SlackError {
-    const fn new(code: &'static str) -> Self {
+    pub(crate) const fn new(code: &'static str) -> Self {
         Self { code }
     }
 }
