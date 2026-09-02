@@ -11,7 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use connectors_client::LocalClient;
+use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
     default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
     PersonalRuntime, RuntimeError,
@@ -45,6 +45,21 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Sign in through this hosted Connector deployment's Identity authority.
+    Login {
+        /// Exact hosted Connector API base.
+        base: String,
+        /// Print the authorization URL instead of opening the system browser.
+        #[arg(long)]
+        no_browser: bool,
+        /// Maximum time to wait for the loopback browser callback.
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
+    },
+    /// Remove the active hosted Connector login from local state and the OS keyring.
+    Logout,
+    /// Serve the active hosted Connector MCP endpoint over local stdio.
+    Mcp,
     /// Write a usable configuration for this machine, so nothing has to be authored by hand.
     Init {
         /// Where to write. Defaults below XDG_CONFIG_HOME.
@@ -332,6 +347,10 @@ enum MainError {
     Config(#[from] connectors_runtime::ConfigError),
     #[error(transparent)]
     Client(#[from] connectors_client::ClientError),
+    #[error(transparent)]
+    Identity(#[from] connectors_client::IdentityError),
+    #[error(transparent)]
+    Hosted(#[from] connectors_client::AuthenticatedHostedError),
     #[error("local Connector request failed: {0}")]
     Io(#[from] io::Error),
     #[error("local Connector response was malformed: {0}")]
@@ -353,6 +372,8 @@ enum MainError {
     /// `doctor` found something that cannot work. The detail is in the report it already printed.
     #[error("this installation has a problem `connectors doctor` named above")]
     Unhealthy,
+    #[error("`connectors mcp` owns stdout and cannot be combined with --output")]
+    McpOutput,
 }
 
 impl MainError {
@@ -367,6 +388,8 @@ impl MainError {
             Self::Runtime(_) => "runtime",
             Self::Config(_) | Self::Init(_) => "configuration",
             Self::Client(_) => "connector-unreachable",
+            Self::Identity(_) => "identity",
+            Self::Hosted(_) => "hosted-connector",
             Self::Io(_) => "io",
             Self::Json(_) => "malformed-response",
             Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
@@ -374,6 +397,7 @@ impl MainError {
             Self::Output(_) => "output",
             Self::Refused(refusal) => &refusal.code,
             Self::Unhealthy => "unhealthy",
+            Self::McpOutput => "invalid-argument",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",
             Self::Enrol(_) => "connect",
@@ -407,6 +431,45 @@ where
 async fn run(cli: Cli) -> Result<(), MainError> {
     let format = cli.output;
     match cli.command {
+        Command::Login {
+            base,
+            no_browser,
+            timeout_seconds,
+        } => {
+            let session = connectors_client::login(&LoginOptions {
+                connectors_base: base,
+                no_browser,
+                timeout: std::time::Duration::from_secs(timeout_seconds),
+            })
+            .await?;
+            output::emit(
+                format,
+                &serde_json::json!({
+                    "signed_in_as": session.display_identity(),
+                    "connectors_base": session.connectors_base,
+                    "identity_origin": session.identity_origin,
+                    "tenant_id": session.tenant_id,
+                }),
+            )?;
+            Ok(())
+        }
+        Command::Logout => {
+            let session = connectors_client::logout()?;
+            output::emit(
+                format,
+                &serde_json::json!({
+                    "logged_out": session.as_ref().map(|session| session.connectors_base.as_str())
+                }),
+            )?;
+            Ok(())
+        }
+        Command::Mcp => {
+            if format != Format::Text {
+                return Err(MainError::McpOutput);
+            }
+            connectors_client::run_mcp_bridge().await?;
+            Ok(())
+        }
         Command::Init {
             config,
             state_root,
@@ -633,6 +696,17 @@ async fn connection(format: Format, command: ConnectionCommand) -> Result<(), Ma
             }),
         ),
     };
+    if config_path.is_none() && state_root.is_none() {
+        match AuthenticatedHostedClient::active() {
+            Ok(client) => {
+                let response = client.connection(request).await?;
+                output::emit(format, &reduce_envelope!(response)?)?;
+                return Ok(());
+            }
+            Err(IdentityError::NoActiveLogin) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
@@ -682,6 +756,17 @@ async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
             EventRequest::Replay(ReplayRequest { event_ref: event }),
         ),
     };
+    if config_path.is_none() && state_root.is_none() {
+        match AuthenticatedHostedClient::active() {
+            Ok(client) => {
+                let response = client.event(request).await?;
+                output::emit(format, &reduce_envelope!(response)?)?;
+                return Ok(());
+            }
+            Err(IdentityError::NoActiveLogin) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
@@ -753,6 +838,17 @@ async fn operation(format: Format, command: OperationCommand) -> Result<(), Main
             )
         }
     };
+    if config_path.is_none() && state_root.is_none() {
+        match AuthenticatedHostedClient::active() {
+            Ok(client) => {
+                let response = client.operation(request).await?;
+                output::emit(format, &reduce_envelope!(response)?)?;
+                return Ok(());
+            }
+            Err(IdentityError::NoActiveLogin) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     validate_state_root(&state_root)?;
@@ -782,6 +878,8 @@ mod tests {
     fn normal_help_exposes_the_guided_flow_and_hides_acquisition_plumbing() {
         let root_help = Cli::command().render_long_help().to_string();
         assert!(root_help.contains("connect"));
+        assert!(root_help.contains("login"));
+        assert!(root_help.contains("mcp"));
         assert!(!root_help.contains("connect-complete"));
 
         let mut command = Cli::command();

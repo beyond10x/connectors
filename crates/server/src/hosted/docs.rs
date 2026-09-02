@@ -8,7 +8,8 @@
 //! (`hosted/tests/docs.rs`).
 //!
 //! `GET {base_path}/docs` renders that same document as one self-contained HTML page for a
-//! person: authentication, the envelope endpoints, MCP, datasources, and the refusal codes.
+//! person: client discovery, authentication, the envelope endpoints, MCP, datasources, and the
+//! refusal codes.
 //! Everything the page states — the version, the audience and scopes, every example, every
 //! refusal code — is extracted from the embedded document at first render, never repeated
 //! in this source, so the artifact stays the single source of truth. The page is static and

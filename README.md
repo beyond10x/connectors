@@ -137,20 +137,26 @@ Configuration, the Connector PostgreSQL database, logs, audit, Agent, and model-
 never store or return those values. Kubernetes Deployment status still needs no provider secret and uses its
 bounded ServiceAccount RBAC directly.
 
-A local Zwirn client can use the hosted placement after Identity login:
+A local Connectors client can select the hosted placement once and then use it without endpoint or
+token flags:
 
 ```bash
-zwirn connect hosted
-zwirn connect hosted --connection "Development cluster (read-only)"
+connectors login https://connectors.example.test/api/connectors/v1
+connectors operation search
+connectors connection list
+connectors mcp
+connectors logout
 ```
 
-Identity publishes the exact trusted HTTPS base during login; an optional `--url` must match it
-exactly before the keyring is opened. The client stores only that base, an account-binding digest,
-and opaque Connection refs. For each request it sends the keyring-backed login session only to
-Identity, exchanges it for a five-minute exact-scope access token, and sends only that access token
-to Connectors. Provider credentials remain Connector/Vault-owned and never enter Operation,
-Connection, or Event contracts. Selecting catalog metadata does not enable hosted invocation;
-receiver-owned admission remains independent.
+The Connectors deployment publishes an unauthenticated bootstrap document naming the neutral
+Identity origin and exact Connector audience it trusts. Browser login returns an opaque session
+which is stored only in the operating-system keyring; non-secret account and deployment selection
+is stored beneath XDG state. Each request exchanges the session only with Identity for the smallest
+required Connector scope, caches the five-minute access token in memory, and renews it before
+expiry. `connectors mcp` keeps stdout exclusively for MCP messages and never exposes either kind of
+credential to its caller. Passing an explicit local `--config` or `--state-root` continues to select
+the personal-local placement. Provider credentials remain Connector/Vault-owned and never enter
+Operation, Connection, Event, or MCP contracts; receiver-owned admission remains independent.
 
 `/livez` reports process liveness. `/readyz` and the compatibility `/healthz` route perform a
 bounded Identity readiness request and return `503` while opaque-token authority cannot be
