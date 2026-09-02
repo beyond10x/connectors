@@ -35,7 +35,7 @@ const ENVELOPE_EXAMPLE_FLOORS: [(&str, usize); 6] = [
 ];
 
 fn test_router() -> Router {
-    router_with_subscription_custody(
+    router_with_client_discovery(
         Arc::new(Verifier),
         Arc::new(Backend),
         HostedAdmissionPolicy::new(["operator".to_owned()]),
@@ -43,6 +43,7 @@ fn test_router() -> Router {
         Some(Arc::new(SubscriptionCustody::new(Arc::new(
             connector_secrets::MemoryStore::new(),
         )))),
+        ClientDiscovery::new(&url::Url::parse("https://identity.example.test/").unwrap()),
     )
 }
 

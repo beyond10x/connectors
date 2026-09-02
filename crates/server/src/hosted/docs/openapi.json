@@ -4,7 +4,7 @@
     "title": "b10x Connectors hosted API",
     "version": "v0alpha1",
     "summary": "The identity-authenticated hosted transport for the Connector wire contracts.",
-    "description": "Six strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
+    "description": "Six strict envelope endpoints (one closed connector-* wire contract each), public native-client discovery, a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
   },
   "servers": [
     {
@@ -13,6 +13,18 @@
     }
   ],
   "paths": {
+    "/.well-known/connectors-client": {
+      "get": {
+        "operationId": "connectorsClientDiscovery",
+        "summary": "Discover this deployment's neutral Identity authority",
+        "description": "Public native-client bootstrap metadata. The Connector deployment publishes the Identity origin it trusts; Identity remains relying-party neutral and does not publish a Connector URL.",
+        "security": [],
+        "responses": {
+          "200": {"description": "The exact Identity origin and Connector audience.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/clientDiscovery"}}}},
+          "503": {"description": "This router was embedded without native-client discovery.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
     "/subscription-credentials/claude-code": {
       "get": {
         "operationId": "claudeCodeSubscriptionStatus",
@@ -2023,6 +2035,16 @@
       }
     },
     "schemas": {
+      "clientDiscovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["protocol", "identity_origin", "identity_audience"],
+        "properties": {
+          "protocol": {"const": "b10x.connectors-client-discovery.v1"},
+          "identity_origin": {"type": "string", "format": "uri"},
+          "identity_audience": {"const": "urn:b10x:connectors"}
+        }
+      },
       "subscriptionStatus": {
         "type": "object",
         "additionalProperties": false,

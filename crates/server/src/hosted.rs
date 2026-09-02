@@ -5,24 +5,24 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
+use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
-use axum::routing::{get, post};
+#[cfg(test)]
 use axum::Router;
 use futures_util::StreamExt as _;
-use protocol::connection::MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES;
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, RequestEnvelope as DatasourceRequestEnvelope,
-    ResponseEnvelope as DatasourceResponseEnvelope, MAX_FRAME_BYTES as DATASOURCE_MAX_FRAME_BYTES,
+    ResponseEnvelope as DatasourceResponseEnvelope,
 };
 use protocol::event::{
     EventError, EventErrorCode, RequestEnvelope as EventRequestEnvelope,
-    ResponseEnvelope as EventResponseEnvelope, MAX_FRAME_BYTES as EVENT_MAX_FRAME_BYTES,
+    ResponseEnvelope as EventResponseEnvelope,
 };
+#[cfg(test)]
+use protocol::operation::MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES;
 use protocol::operation::{
     OperationError, OperationErrorCode, OperationRequest, RequestEnvelope, ResponseEnvelope,
-    MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use service::{ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
@@ -38,6 +38,7 @@ mod enforcement;
 mod health;
 mod mcp;
 mod principal;
+mod routing;
 mod subscription;
 
 use admission::{
@@ -49,9 +50,12 @@ pub use enforcement::{
     canonical_input_digest, issue_approval, HostedAuthority, RecoveryError, SIGNAL_AUDIT_STATE_KEY,
 };
 pub use principal::HostedPrincipal;
+use routing::MAX_COMPLETION_BYTES;
+pub use routing::{
+    router, router_with_client_discovery, router_with_subscription_custody, ClientDiscovery,
+};
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
-const MAX_COMPLETION_BYTES: usize = 8 * 1024;
 
 /// Receiver-owned admission policy for effect-bearing hosted Connector request families.
 #[derive(Debug, Clone, Default)]
@@ -247,85 +251,13 @@ struct HostedState {
     policy: HostedAdmissionPolicy,
     authority: HostedAuthority,
     subscription_custody: Option<Arc<SubscriptionCustody>>,
+    client_discovery: Option<ClientDiscovery>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ErrorBody {
     error: &'static str,
-}
-
-pub fn router(
-    verifier: Arc<dyn IdentityVerifier>,
-    backend: Arc<dyn ConnectorBackend>,
-    policy: HostedAdmissionPolicy,
-    authority: HostedAuthority,
-) -> Router {
-    router_with_subscription_custody(verifier, backend, policy, authority, None)
-}
-
-/// Builds the hosted transport with optional Connector-owned subscription custody. Absence keeps
-/// every custody and lease route unreachable.
-pub fn router_with_subscription_custody(
-    verifier: Arc<dyn IdentityVerifier>,
-    backend: Arc<dyn ConnectorBackend>,
-    policy: HostedAdmissionPolicy,
-    authority: HostedAuthority,
-    subscription_custody: Option<Arc<SubscriptionCustody>>,
-) -> Router {
-    Router::new()
-        .route("/livez", get(health::liveness))
-        .route("/readyz", get(health::readiness))
-        .route("/healthz", get(health::readiness))
-        .route("/openapi.json", get(docs::openapi))
-        .route("/docs", get(docs::page))
-        .route(
-            "/operations",
-            post(operation).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/approvals",
-            post(approval::issue).layer(DefaultBodyLimit::max(protocol::approval::MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/connections",
-            post(connection_route::handle).layer(DefaultBodyLimit::max(CONNECTION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/catalog",
-            post(catalog_route::handle)
-                .layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/events",
-            post(event).layer(DefaultBodyLimit::max(EVENT_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/datasources",
-            post(datasource).layer(DefaultBodyLimit::max(DATASOURCE_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/mcp",
-            post(mcp::handle).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/connect-sessions/{session_ref}",
-            get(connect::completion_page)
-                .post(connect::complete_session)
-                .layer(DefaultBodyLimit::max(MAX_COMPLETION_BYTES)),
-        )
-        .route(
-            "/oauth/{integration_ref}/callback",
-            get(connect::oauth_callback),
-        )
-        .merge(subscription::routes())
-        .with_state(HostedState {
-            verifier,
-            backend,
-            policy,
-            authority,
-            subscription_custody,
-        })
 }
 
 async fn operation(
@@ -702,6 +634,38 @@ mod tests {
     mod mcp;
     mod mcp_monitoring;
     mod signal;
+
+    #[tokio::test]
+    async fn production_router_publishes_client_discovery_without_authentication() {
+        let identity = url::Url::parse("https://identity.example.test/").unwrap();
+        let application = router_with_client_discovery(
+            Arc::new(Verifier),
+            Arc::new(Backend),
+            HostedAdmissionPolicy::default(),
+            HostedAuthority::unbound(),
+            None,
+            ClientDiscovery::new(&identity),
+        );
+        let response = application
+            .oneshot(
+                Request::get("/.well-known/connectors-client")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let discovered: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            discovered,
+            serde_json::json!({
+                "protocol": "b10x.connectors-client-discovery.v1",
+                "identity_origin": "https://identity.example.test",
+                "identity_audience": CONNECTORS_AUDIENCE,
+            })
+        );
+    }
 
     struct Verifier;
 

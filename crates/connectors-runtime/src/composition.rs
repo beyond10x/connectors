@@ -541,7 +541,7 @@ impl HostedRuntime {
             }
         };
         let verifier = Arc::new(IdentityHttpVerifier::new(
-            identity_origin,
+            identity_origin.clone(),
             config.tenant_id.clone(),
         )?);
         let claude_code_enabled = config.claude_code.enabled;
@@ -775,12 +775,14 @@ impl HostedRuntime {
         // no terminal outcome, before anything can present a new one. A journal that cannot be
         // settled is damaged approval authority, and this placement refuses to serve on it.
         authority.recover()?;
-        let connector_router = server::hosted::router_with_subscription_custody(
+        let client_discovery = server::hosted::ClientDiscovery::new(&identity_origin);
+        let connector_router = server::hosted::router_with_client_discovery(
             verifier,
             backend.clone(),
             admission,
             authority,
             subscription_custody,
+            client_discovery,
         );
         let application = if config.server.base_path == "/" {
             connector_router

@@ -126,6 +126,7 @@ sha2 = "0.10"
 fs2 = "0.4"
 hex = "0.4"
 getrandom = "0.3"
+keyring = "4.1.5"
 indexmap = { version = "2", features = ["serde"] }
 # YAML, for OpenAPI ingest: vendor specs are published as both JSON and YAML and the spec cache is
 # extension-agnostic. `serde_norway` rather than `serde_yaml`, which is unmaintained.
@@ -139,6 +140,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tokio = { version = "1", default-features = false }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 url = "2"
+identity-client = { git = "https://github.com/beyond10x/identity", rev = "bb3fdab4f5cfd64774a9df121d438e488431bbb8" }
 # Dependencies at opt-level 2 even in dev: the test suites' cost is parse-dominated (21 MB of
 # vendored specs through serde per whole-catalogue sweep), and debug-mode serde made one
 # conformance test alone take 200 s. Workspace members stay at opt-level 0 for fast incremental

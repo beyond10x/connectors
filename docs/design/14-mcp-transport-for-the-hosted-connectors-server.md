@@ -68,13 +68,20 @@ operator-only in practice.
 
 ## Deliberately deferred
 
-- `connectors mcp` stdio bridge with automatic login/refresh (S-056): does not fit the
-  thin-CLI fence without first growing a `connectors-client` module; the HTTP endpoint is
-  independently usable with a bearer.
 - Monitoring-backed tools in the toolset; local-placement pod logs; grant-seeding surface for
   effect-bearing MCP invocations.
+
+## Implemented amendment — native client bridge (2026-09-02)
+
+S-056 is no longer deferred. `connectors mcp` is a thin stdio front door over
+`connectors-client`: it forwards bounded newline-delimited MCP frames to the selected hosted
+`/mcp` endpoint, emits no non-protocol stdout, obtains catalog or invoke authority according to
+the exact request, and renews five-minute Identity access tokens before expiry. The opaque Identity
+session remains in the OS keyring and is sent only to Identity; neither it nor access tokens are
+exposed to the MCP client.
 
 ## Known costs
 
 MCP responses carry both a text block and `structuredContent` (~2x payload, worst case
-~512 KiB). Access tokens live 300 s; interactive clients see 401 after expiry until S-056.
+~512 KiB). Native interactive clients can use the stdio bridge for automatic refresh; direct HTTP
+clients remain responsible for renewing their own five-minute access token.
