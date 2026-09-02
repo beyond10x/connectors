@@ -5,10 +5,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
+use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Response};
-use axum::routing::{get, post};
 use axum::Router;
 use futures_util::StreamExt as _;
 use protocol::connection::MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES;
@@ -25,9 +24,10 @@ use protocol::operation::{
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
-use service::{ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
+use service::{AdminRegistry, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
 use subscription_custody::SubscriptionCustody;
 
+mod admin;
 mod admission;
 mod approval;
 mod catalog_route;
@@ -39,6 +39,8 @@ mod health;
 mod mcp;
 mod principal;
 mod subscription;
+
+pub use admin::router_with_admin;
 
 use admission::{
     dispatch_admitted, dispatch_admitted_signal, enforcement_refusal_response, redescribe,
@@ -233,6 +235,11 @@ pub enum IdentityVerificationError {
 pub trait IdentityVerifier: Send + Sync + 'static {
     async fn ready(&self) -> Result<(), IdentityVerificationError>;
 
+    /// Public origin whose CLI login discovery issues credentials accepted by this verifier.
+    fn login_origin(&self) -> Option<&str> {
+        None
+    }
+
     async fn verify(
         &self,
         credential: &str,
@@ -247,6 +254,7 @@ struct HostedState {
     policy: HostedAdmissionPolicy,
     authority: HostedAuthority,
     subscription_custody: Option<Arc<SubscriptionCustody>>,
+    admin: Option<Arc<AdminRegistry>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -273,59 +281,14 @@ pub fn router_with_subscription_custody(
     authority: HostedAuthority,
     subscription_custody: Option<Arc<SubscriptionCustody>>,
 ) -> Router {
-    Router::new()
-        .route("/livez", get(health::liveness))
-        .route("/readyz", get(health::readiness))
-        .route("/healthz", get(health::readiness))
-        .route("/openapi.json", get(docs::openapi))
-        .route("/docs", get(docs::page))
-        .route(
-            "/operations",
-            post(operation).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/approvals",
-            post(approval::issue).layer(DefaultBodyLimit::max(protocol::approval::MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/connections",
-            post(connection_route::handle).layer(DefaultBodyLimit::max(CONNECTION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/catalog",
-            post(catalog_route::handle)
-                .layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/events",
-            post(event).layer(DefaultBodyLimit::max(EVENT_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/datasources",
-            post(datasource).layer(DefaultBodyLimit::max(DATASOURCE_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/mcp",
-            post(mcp::handle).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
-        )
-        .route(
-            "/connect-sessions/{session_ref}",
-            get(connect::completion_page)
-                .post(connect::complete_session)
-                .layer(DefaultBodyLimit::max(MAX_COMPLETION_BYTES)),
-        )
-        .route(
-            "/oauth/{integration_ref}/callback",
-            get(connect::oauth_callback),
-        )
-        .merge(subscription::routes())
-        .with_state(HostedState {
-            verifier,
-            backend,
-            policy,
-            authority,
-            subscription_custody,
-        })
+    router_with_admin(
+        verifier,
+        backend,
+        policy,
+        authority,
+        subscription_custody,
+        None,
+    )
 }
 
 async fn operation(
@@ -696,6 +659,7 @@ mod tests {
     use service::PrincipalContext;
     use tower::ServiceExt as _;
 
+    mod admin_routes;
     mod contract_validation;
     mod docs;
     mod enforcement;
@@ -709,6 +673,10 @@ mod tests {
     impl IdentityVerifier for Verifier {
         async fn ready(&self) -> Result<(), IdentityVerificationError> {
             Ok(())
+        }
+
+        fn login_origin(&self) -> Option<&str> {
+            Some("https://identity.example.test")
         }
 
         async fn verify(
@@ -734,6 +702,7 @@ mod tests {
                     "connectors.credentials.lease".to_owned(),
                     "connectors.invoke".to_owned(),
                     "connectors.events.read".to_owned(),
+                    "connectors.integrations.manage".to_owned(),
                 ]),
                 groups: BTreeSet::from(["operator".to_owned()]),
                 authority_snapshot_sha256: "b".repeat(64),

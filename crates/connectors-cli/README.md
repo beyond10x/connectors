@@ -2,8 +2,8 @@
 
 This nested workspace builds a thin product frontend without feature-unifying the runtime closure
 into the deterministic catalog compiler. Reusable wire behavior lives in `connectors-client` and
-daemon assembly lives in `connectors-runtime`; this package owns clap parsing, hidden terminal
-input, and presentation only.
+daemon assembly lives in `connectors-runtime`; this package owns only top-level clap parsing and
+dispatch. Guided input and presentation live in `connectors-console`.
 
 ```text
 clean-room client
@@ -32,6 +32,24 @@ stale socket is removed only when it is an owner-owned Unix socket.
 
 The deployment file must be a real owner-owned file and cannot be writable by group or other. Its
 size and field set are bounded. It carries references and routes but no credential value.
+
+## Administer a hosted Integration
+
+Hosted GitLab, Slack, and Jira registrations are activated by value-free deployment configuration.
+Inspect their exact credential requirements, then supply a missing value directly to the running
+service:
+
+```sh
+connectors admin integrations status --endpoint https://connectors.example/api/connectors/v1
+connectors admin credentials set gitlab oauth_client_secret \
+  --endpoint https://connectors.example/api/connectors/v1 \
+  --secret-stdin
+```
+
+The CLI uses Identity browser PKCE by default and requests only the short-lived
+`connectors.integrations.manage` access token. Use `--no-browser` to print the URL, or provide an
+already-issued token through `--access-token-stdin` or an owner-only `--access-token-file`. Secret
+values are accepted only by hidden prompt, stdin, or an owner-only file; they are never argv.
 
 ## Connect a local Kubernetes Service
 

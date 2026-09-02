@@ -2,6 +2,7 @@
 
 //! Pure Connectors use cases.
 
+mod admin;
 mod audio;
 pub mod authority;
 mod browser;
@@ -14,6 +15,11 @@ mod runtime;
 mod sip;
 mod voice;
 
+pub use admin::{
+    AdminConfigurationField, AdminCredentialInput, AdminCredentialRequirement,
+    AdminCredentialStatus, AdminError, AdminIntegration, AdminIntegrationStatus, AdminRegistry,
+    AdminStatus, CredentialState,
+};
 pub use audio::{
     admit_audio_plan, admit_speech_speak, validate_audio_deployment_route, AdmittedAudioPlan,
     AudioAdmissionError, AudioDeploymentRoute, MAX_UTTERANCE, MAX_UTTERANCES_PER_CONNECTION,

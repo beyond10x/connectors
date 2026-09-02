@@ -733,23 +733,27 @@ dependencies = [
 name = "connectors-console"
 version = "0.4.1"
 dependencies = [
+ "base64 0.22.1",
  "catalog",
  "clap",
  "connector-address",
  "connector-secrets",
  "connectors-client",
  "connectors-config",
+ "getrandom 0.3.4",
  "hex",
  "integration-catalog",
  "protocol",
  "rpassword",
  "rustix",
+ "serde",
  "serde_json",
  "serde_norway",
  "sha2 0.10.9",
  "thiserror 2.0.20",
  "tokio",
  "toml",
+ "url",
  "zeroize",
 ]
 
@@ -4244,6 +4248,8 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "connector-resolve",
+ "connector-secrets",
+ "connector-state",
  "domain",
  "ed25519-dalek",
  "protocol",

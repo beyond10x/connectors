@@ -124,8 +124,8 @@ pub struct HostedGitlabConfig {
     pub refresh_skew_seconds: u64,
 }
 
-/// Value-free hosted Slack policy. Every credential still arrives through a Connect Session and
-/// is committed only by the configured SecretStore.
+/// Value-free hosted Slack policy. Operator registration credentials arrive through the admin API;
+/// principal-owned credentials arrive through Connect Sessions. All use the configured SecretStore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostedSlackConfig {
