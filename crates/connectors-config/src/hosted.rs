@@ -37,6 +37,8 @@ pub struct HostedServerConfig {
     pub secrets: HostedSecretsConfig,
     #[serde(default)]
     pub claude_code: HostedClaudeCodeConfig,
+    #[serde(default)]
+    pub catalog: HostedCatalogConfig,
     pub sip: HostedSipConfig,
     #[serde(default)]
     pub slack: Option<HostedSlackConfig>,
@@ -64,6 +66,38 @@ pub struct HostedEgressConfig {
 pub struct HostedClaudeCodeConfig {
     #[serde(default)]
     pub enabled: bool,
+}
+
+/// Generic, catalog-driven self-service connections.
+///
+/// The provider list is deployment policy, not a second catalog: every credential name, address,
+/// request template and destination still comes from the compiled Connector catalog. An empty
+/// list admits every catalog provider whose credential explicitly declares Connect Session entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedCatalogConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub public_origin: Option<String>,
+    #[serde(default)]
+    pub grant_ref: Option<String>,
+    #[serde(default)]
+    pub providers: Vec<String>,
+    #[serde(default = "default_connect_session_ttl_seconds")]
+    pub connect_session_ttl_seconds: u64,
+}
+
+impl Default for HostedCatalogConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            public_origin: None,
+            grant_ref: None,
+            providers: Vec::new(),
+            connect_session_ttl_seconds: default_connect_session_ttl_seconds(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -475,7 +509,40 @@ impl HostedServerConfig {
                 && (60..=900).contains(&jira.connect_session_ttl_seconds)
                 && (60..=900).contains(&jira.refresh_skew_seconds)
         });
+        let catalog_valid = if self.catalog.enabled {
+            let mut providers = self.catalog.providers.clone();
+            providers.sort();
+            providers.dedup();
+            self.catalog
+                .public_origin
+                .as_deref()
+                .and_then(|origin| url::Url::parse(origin).ok())
+                .is_some_and(|origin| {
+                    origin.scheme() == "https"
+                        && origin.host_str().is_some()
+                        && origin.username().is_empty()
+                        && origin.password().is_none()
+                        && origin.query().is_none()
+                        && origin.fragment().is_none()
+                        && origin.path() == self.server.base_path
+                })
+                && self
+                    .catalog
+                    .grant_ref
+                    .as_deref()
+                    .is_some_and(|value| valid_ref(value, 512))
+                && providers == self.catalog.providers
+                && providers.iter().all(|provider| valid_ref(provider, 128))
+                && (60..=900).contains(&self.catalog.connect_session_ttl_seconds)
+        } else {
+            self.catalog.public_origin.is_none()
+                && self.catalog.grant_ref.is_none()
+                && self.catalog.providers.is_empty()
+                && self.catalog.connect_session_ttl_seconds
+                    == default_connect_session_ttl_seconds()
+        };
         let vault_required = self.claude_code.enabled
+            || self.catalog.enabled
             || self.sip.credentials.is_some()
             || self.slack.is_some()
             || self.gitlab.is_some()
@@ -541,6 +608,7 @@ impl HostedServerConfig {
             || !slack_valid
             || !gitlab_valid
             || !jira_valid
+            || !catalog_valid
         {
             return Err(HostedServerConfigError::Invalid);
         }
@@ -551,7 +619,10 @@ impl HostedServerConfig {
             return Err(HostedServerConfigError::Invalid);
         }
         let supported_credential_egress =
-            self.slack.is_some() || self.gitlab.is_some() || self.grafana.enabled;
+            self.slack.is_some()
+                || self.gitlab.is_some()
+                || self.grafana.enabled
+                || self.catalog.enabled;
         let unsupported_credential_egress = self.sip.credentials.is_some() || self.jira.is_some();
         if unsupported_credential_egress
             || (supported_credential_egress

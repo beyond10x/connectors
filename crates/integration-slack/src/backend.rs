@@ -603,6 +603,7 @@ impl ConnectorBackend for SlackBackend {
         match request {
             ConnectionRequest::ConnectSessionCreate(request) => {
                 request.integration_ref == INTEGRATION_REF
+                    && request.auth_profile.as_deref().is_some_and(|profile| matches!(profile, PROFILE_ORG_USER | PROFILE_COMPANION_BOT))
             }
             ConnectionRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).owns(&request.connect_session_ref)

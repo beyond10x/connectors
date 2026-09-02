@@ -469,21 +469,20 @@ impl ConnectorBackend for BackendRegistry {
 
     /// Union the registered backends' self-service flows for one provider.
     ///
-    /// Two backends claiming the same auth profile for one provider is a composition fault, not a
-    /// choice to make here: the ambiguous profile is dropped so no product can offer a flow whose
-    /// owner is undetermined.
+    /// Composition registers curated backends before the generic catalog adapter. Keeping the
+    /// first exact profile makes the curated experience authoritative while allowing the generic
+    /// adapter to add every other declared profile. Dispatch still fails closed if two backends
+    /// claim the same create request; projection precedence never grants routing authority.
     fn setup_profiles(&self, provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
-        let mut published =
-            BTreeMap::<String, Option<protocol::catalog::SetupProfileSummary>>::new();
+        let mut published = BTreeMap::<String, protocol::catalog::SetupProfileSummary>::new();
         for backend in &self.backends {
             for profile in backend.setup_profiles(provider_ref) {
                 published
                     .entry(profile.auth_profile.clone())
-                    .and_modify(|existing| *existing = None)
-                    .or_insert(Some(profile));
+                    .or_insert(profile);
             }
         }
-        published.into_values().flatten().collect()
+        published.into_values().collect()
     }
 
     fn owns_event(&self, request: &EventRequest) -> bool {
