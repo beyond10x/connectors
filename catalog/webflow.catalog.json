@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Webflow sites and CMS: discover sites, read a collection's own field schema, read collection items of any tenant-defined shape, and publish a site live",
-  "generator": "connectors 0.4.2",
+  "generator": "connectors 0.4.3",
   "operations": [
     {
       "auth": [
