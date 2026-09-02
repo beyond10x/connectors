@@ -21,7 +21,7 @@
     ]
   ],
   "description": "HubSpot CRM: read contacts, companies and deals, and create and update contact records",
-  "generator": "connectors 0.4.1",
+  "generator": "connectors 0.4.2",
   "operations": [
     {
       "auth": [
