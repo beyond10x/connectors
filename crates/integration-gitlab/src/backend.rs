@@ -44,6 +44,7 @@ use service::{
 use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
 
+use crate::profiles::GitlabProfile;
 use crate::transport::{
     bearer_headers, decode_page_response, decode_response, decode_value_response, form_body,
     http_request,
@@ -53,8 +54,6 @@ pub(crate) const INTEGRATION_REF: &str = "gitlab";
 pub(crate) const AUTHORITY: &str = "com.gitlab.api";
 const SERVICE: &str = "default";
 pub(crate) const LOGIN_SERVICE: &str = "login";
-const PROFILE_OAUTH: &str = "gitlab.oauth_user";
-const PROFILE_PAT: &str = "gitlab.personal_token";
 const ACCESS_TOKEN_CREDENTIAL: &str = "access_token";
 const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
 pub(crate) const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
@@ -121,30 +120,6 @@ pub(crate) struct GitlabInner {
     completion_lock: tokio::sync::Mutex<()>,
     refresh_lock: tokio::sync::Mutex<()>,
     egress: Arc<dyn EgressTransport>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum GitlabProfile {
-    OAuthUser,
-    PersonalToken,
-}
-
-impl GitlabProfile {
-    fn parse(value: Option<&str>) -> Option<Self> {
-        match value {
-            Some(PROFILE_OAUTH) => Some(Self::OAuthUser),
-            Some(PROFILE_PAT) => Some(Self::PersonalToken),
-            _ => None,
-        }
-    }
-
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::OAuthUser => PROFILE_OAUTH,
-            Self::PersonalToken => PROFILE_PAT,
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -383,6 +358,10 @@ impl ConnectorBackend for GitlabBackend {
         } else {
             ConnectSessionAccess::Operator
         }
+    }
+
+    fn setup_profiles(&self, provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
+        crate::profiles::setup_profiles(provider_ref)
     }
 
     fn owns_datasource(&self, request: &DatasourceRequest) -> bool {

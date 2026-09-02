@@ -65,7 +65,7 @@ const READABLE_BODIES: [(&str, BodyEncoding); 2] = [
 
 /// The response media type an operation's shape is read from.
 ///
-/// Only JSON: a `response_schema` is what reaches `web/public/catalog.json` and a model's tool
+/// Only JSON: a `response_schema` is what reaches the canonical catalog document and a model's tool
 /// contract, and neither has anything to do with a media type nothing here parses.
 const RESPONSE_BODY: &str = "application/json";
 

@@ -93,7 +93,6 @@ pub fn verify(workspace: &Workspace) -> Result<Report> {
         workspace.document_schema_path(),
         workspace.pack_path(),
         workspace.lockfile_path(),
-        workspace.site_catalog_path(),
     ];
     generated.extend(
         providers
@@ -154,17 +153,10 @@ pub fn verify(workspace: &Workspace) -> Result<Report> {
 
     // The lockfile verifies itself structurally rather than by a self-referential hash: its parsed
     // rows have now been compared against both disk bytes and the freshly planned rows. Count it
-    // alongside the other committed generated artifacts. The ignored site projection is a build
-    // output, not reviewed repository state, and is therefore regenerated rather than "verified".
-    let artifacts = plan
-        .artifacts
-        .iter()
-        .filter(|planned| planned.path != workspace.site_catalog_path())
-        .count();
+    // alongside the other committed generated artifacts.
+    let artifacts = plan.artifacts.len();
     for planned in &plan.artifacts {
-        if planned.path == workspace.lockfile_path()
-            || planned.path == workspace.site_catalog_path()
-        {
+        if planned.path == workspace.lockfile_path() {
             continue;
         }
         let key = workspace.artifact_key(&planned.path);
@@ -725,18 +717,6 @@ required_capabilities = ["public_network"]
             "1 provider, 4 artifacts verified\n"
         );
         assert_eq!(before, snapshot(&fixture.root), "check wrote to the tree");
-
-        fs::remove_file(fixture.root.join("web/public/catalog.json"))
-            .expect("remove ignored site projection");
-        assert_eq!(
-            fixture
-                .check()
-                .expect("an absent ignored projection is clean"),
-            Report {
-                providers: 1,
-                artifacts: 4,
-            }
-        );
     }
 
     #[test]

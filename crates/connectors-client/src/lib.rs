@@ -12,7 +12,7 @@ use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _}
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub use protocol::{approval, datasource, operation};
+pub use protocol::{approval, catalog, datasource, operation};
 use protocol::{connection, event};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
@@ -21,6 +21,7 @@ use url::Url;
 use zeroize::Zeroizing;
 
 mod admin;
+mod hosted_catalog;
 mod identity;
 mod model;
 mod response;
@@ -424,6 +425,7 @@ impl LocalClient {
 pub struct HostedClient {
     http: reqwest::Client,
     base: Url,
+    catalog: Url,
     operations: Url,
     connections: Url,
     events: Url,
@@ -765,6 +767,7 @@ impl HostedClient {
     fn from_parts(base: Url, http: reqwest::Client) -> Self {
         Self {
             base: base.clone(),
+            catalog: endpoint(&base, "catalog"),
             operations: endpoint(&base, "operations"),
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),

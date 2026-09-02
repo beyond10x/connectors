@@ -173,8 +173,8 @@ fn the_handle_field_is_the_word_the_runtime_answers_with() {
 
 /// **Refusal 1 — the declared output still exposes the secret field.**
 ///
-/// The operation describes the vendor's wire body, and that description reaches
-/// `web/public/catalog.json`. A `response_schema` naming the very location the diversion takes the
+/// The operation describes the vendor's wire body, and that description reaches the canonical
+/// catalog document. A `response_schema` naming the very location the diversion takes the
 /// value out of is a published contract offering a caller the secret. Refused, and the refusal says
 /// what C-430 established, so nobody re-derives it: deleting the location is not the fix.
 #[test]

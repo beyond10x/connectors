@@ -43,21 +43,6 @@ pub const READER_DIR: &str = "crates/catalog-reader";
 /// The pack's file name inside the reader crate: `catalog.pack`.
 pub const PACK_FILE: &str = "catalog.pack";
 
-/// The public site's data directory (C-42), holding the generated `catalog.json`.
-///
-/// Outside `connectors/` deliberately: that directory holds what a user *installs* into
-/// `~/.flux/flows`, and a JSON document a website fetches is not that.
-///
-/// It is VitePress's `public/` directory (C-44), which is served verbatim at the site root — so the
-/// explorer fetches `/connectors/catalog.json` with no copy step and no build plumbing between
-/// the Rust pipeline and the Node one. A sibling directory at the repository root was the original
-/// choice; it meant two top-level directories for one website, and a copy step that could ship a
-/// stale document. This pipeline still owns the file; the site merely reads it.
-pub const SITE_DIR: &str = "web/public";
-
-/// The site's generated catalogue: `web/public/catalog.json`.
-pub const SITE_CATALOG: &str = "catalog.json";
-
 /// A repository root plus the layout convention applied to it.
 #[derive(Debug, Clone)]
 pub struct Workspace {
@@ -115,16 +100,6 @@ impl Workspace {
     /// run can write it honestly. See [`crate::pipeline::plan_selected`].
     pub fn pack_path(&self) -> PathBuf {
         self.root.join(READER_DIR).join(PACK_FILE)
-    }
-
-    /// `<root>/web/public/catalog.json` — the whole catalogue as one JSON document (C-42).
-    ///
-    /// One file for every provider, not one per provider: a website wants one fetch, and the
-    /// explorer's filters are queries across the whole catalogue. The cost is that it is not a
-    /// function of a `--provider` run, which is why [`crate::pipeline::plan`] emits it only for a
-    /// full build. See [`crate::site`].
-    pub fn site_catalog_path(&self) -> PathBuf {
-        self.root.join(SITE_DIR).join(SITE_CATALOG)
     }
 
     /// `<root>/connectors.lock` — the drift record for the whole catalogue (C-7, written by C-189).

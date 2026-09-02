@@ -6,8 +6,8 @@ status: in-progress
 priority: 6
 design:
 epic: post-m1
-areas: [ci, catalog-build, web]
-note: "The monorepo local gate covers governance, Rust, and catalogue checks; hosted CI, MSRV, web, and failing-first evidence remain before S-020 can close"
+areas: [ci, catalog-build]
+note: "The monorepo local gate covers governance, Rust, and catalogue checks; hosted CI, MSRV, and failing-first evidence remain before S-020 can close"
 ---
 
 # A CI gate exists, and it runs what the monorepo claims it runs
@@ -30,10 +30,8 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
   fence both shell out to it, and a partially-fetched registry has already broken it once
   (`zerocopy-derive`). A fence that fails for an environmental reason is indistinguishable, at the
   exit code, from one that found a breach.
-- **Two committed node tests already assert workflow properties** — `web/test/ci_gate.test.mjs`
-  (some workflow a pull request triggers builds the site and runs its suite, and the gate AGENTS.md
-  documents is the gate the workflow enforces) and `web/test/release_assets.test.mjs`. They remain
-  outside the landed gate until S-018 repairs the migrated site contract.
+- The dormant migrated web explorer and its ungated Node tests were retired under S-018. The hosted
+  catalog contract and DevCenter own the supported browsing path.
 
 ## Acceptance
 
@@ -52,11 +50,8 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
       the version that does — the fence's point is that the number is *true*, not that it is low —
       and `msrv_fence.rs`'s "there is no CI yet at all" paragraph is corrected to describe the
       coverage that now exists.
-- [ ] A web job runs `npm ci && npm run build && npm test` in `web/`, landing together with
-      [S-018](S-018-the-explorer-works-against-the-new-site-json.md) so it is green on arrival, and
-      `web/test/ci_gate.test.mjs`'s wiring assertions pass against the real workflow.
-- [x] AGENTS.md gains an explicit **gate** section naming the exact landed commands. A wiring test
-      for the future web arm remains with S-018; story-index and link checks are already mechanical.
+- [x] AGENTS.md gains an explicit **gate** section naming the exact landed commands; story-index and
+      link checks are already mechanical.
 - [x] Toolchains are pinned by version and third-party actions by full commit SHA (with the release
       tag in a comment); any in-workflow commit uses the
       Actions `GITHUB_TOKEN` (`github-actions[bot]`), never the app key and never a PAT
@@ -70,9 +65,9 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
   checks, locked prefetch, build, tests, clippy, format, catalogue rebuild, drift rejection, and
   S-003's independent offline lock/input/artifact verification. The monorepo migration retained
   those executable checks in the root local gate, not the old workflow file.
-- Still open by design: a hosted monorepo workflow, S-018's repaired web build/tests, and recorded
-  failing-first evidence for the other complete arms. Stable release remains gated by architecture
-  ADR 0020 while private forge enforcement is unavailable.
+- Still open by design: a hosted monorepo workflow and recorded failing-first evidence for the
+  complete arms. Stable release remains gated by architecture ADR 0020 while private forge
+  enforcement is unavailable.
 
 ## Notes
 
@@ -89,8 +84,6 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
 - Ordering: this arguably outranks the schema wave, because every "green" claim the other stories
   make is currently unverified — but it is ranked below them to avoid renumbering work already
   underway. If the coordinator disagrees, move it to 1; nothing in it depends on the wave.
-- Keep the workflow small and readable. Two committed tests already read this YAML with a hand-rolled
-  reader, so a clever generated workflow would break the thing that guards it.
+- Keep the workflow small and readable so its exact gate remains reviewable.
 - Out of scope, deliberately: release workflows. Architecture §8 says there are no release artifacts
-  pre-v1, so the tag/asset half — and `release_assets.test.mjs`'s fate — belongs to S-018's suite
-  triage and to the milestone that creates a release train.
+  pre-v1; release automation belongs to the milestone that creates a release train.

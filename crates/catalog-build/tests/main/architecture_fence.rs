@@ -96,15 +96,6 @@ const MODULE_LINE_WAIVERS: &[(&str, usize, &str)] = &[
          and two a comment saying why a scaffolded connector is never custody-only. Packaging, not \
          behaviour",
     ),
-    (
-        "crates/catalog-build/src/site.rs",
-        1_755,
-        "site projection pending model and renderer split; the growth past 1,718 is in-flight site \
-         work, plus 2 lines for the closed `audio_v1` protocol entry, 4 for the closed `cdp_v1` \
-         one, 3 for the closed `sql_v1` one, and 1 raised on 2026-08-25 for S-070: `Connector` \
-         gained `custody_only` and this file initializes the struct exhaustively, which is the \
-         tripwire working as designed",
-    ),
 ];
 
 #[test]

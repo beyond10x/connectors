@@ -22,7 +22,6 @@ use connector_spec::{LockEntry, Lockfile};
 use crate::artifact;
 use crate::discovery::{self, Provider};
 use crate::seam::{self, ProviderInputs};
-use crate::site::{self, ProviderEntry};
 use crate::workspace::Workspace;
 
 /// What writing a planned artifact would do to the tree.
@@ -191,7 +190,6 @@ fn plan_at_width(
     let workers = workers.unwrap_or_else(|| worker_count(providers.len()));
     let Merged {
         artifacts: per_provider,
-        entries,
         diagnostics,
         mut lockfile,
     } = merge(compile_all(
@@ -206,9 +204,8 @@ fn plan_at_width(
     // **The whole-catalogue artifacts.** Each covers every provider at once, so each is a function
     // of a **full** run only. A `--provider zendesk` build would have to drop the other sixteen to
     // write one honestly, so it leaves the committed documents alone instead — neither rewritten nor
-    // reported stale. `predecessor:docs/designs/catalog-json.md` records the rule for `catalog.json`; C-104
-    // brings `crates/catalog/src/generated.rs` under it, which is what makes a provider-scoped run's
-    // write set disjoint from another provider's and so lets provider stories run in parallel.
+    // reported stale. That is what makes a provider-scoped run's write set disjoint from another
+    // provider's and so lets provider stories run in parallel.
     if whole_catalogue {
         // The catalog pack (C-537): every canonical document, compiled into the one distributable
         // file `crates/catalog-reader` embeds. Whole-catalogue for the same reason the index is —
@@ -264,12 +261,6 @@ fn plan_at_width(
                 .context("cannot render connectors.lock")?,
             // One file at the repository root, always written by a full run. Its directory is the
             // repository, not an artifact root — see [`Ownership::Singleton`].
-            Ownership::Singleton,
-        )?);
-
-        artifacts.push(planned(
-            workspace.site_catalog_path(),
-            site::document(entries)?,
             Ownership::Singleton,
         )?);
     }
@@ -364,13 +355,10 @@ fn collect_files(dir: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-/// What compiling one provider yields: its own artifacts, and its contribution to the catalogue
-/// the whole run shares.
+/// What compiling one provider yields.
 struct Compiled {
     /// The files this provider alone owns.
     artifacts: Vec<PlannedArtifact>,
-    /// This provider's entry in `site/catalog.json`, which only a full run assembles (C-42).
-    site: ProviderEntry,
     /// What this provider's vendored document got wrong, if it has one (C-4).
     diagnostics: Vec<String>,
     /// This provider's `connectors.lock` row — `None` on a scoped run, which will not write the
@@ -382,10 +370,8 @@ struct Compiled {
 ///
 /// A named step rather than the tail of the loop that produced it, because the order is the
 /// contract. [`compile_all`] compiles the providers concurrently, so the order they *finish* in is
-/// a property of the machine and of nothing else; folding in that order would hand it straight to
-/// [`entries`](Self::entries) and [`diagnostics`](Self::diagnostics), neither of which is sorted
-/// afterwards by anything. Taking a `Vec<Compiled>` that is already in provider order and folding
-/// it in one direction is what keeps every output a function of the inputs alone.
+/// a property of the machine and of nothing else. Taking a `Vec<Compiled>` that is already in
+/// provider order and folding it in one direction keeps every output a function of the inputs.
 struct Merged {
     /// Every provider's own artifacts, concatenated in provider order.
     ///
@@ -393,12 +379,6 @@ struct Merged {
     /// but it decides which of two equal paths a stable sort keeps, and it is the order the pack
     /// is compiled from before that sort happens.
     artifacts: Vec<PlannedArtifact>,
-    /// One `catalog.json` entry per provider, in provider order.
-    ///
-    /// **This is the order the published document carries.** [`site::document`]
-    /// serialises the entries as it is handed them and sorts nothing, so a fold in completion order
-    /// would publish a provider array whose order was a property of the scheduler.
-    entries: Vec<ProviderEntry>,
     /// What the vendored documents got wrong, in provider order — the order `build` and `diff`
     /// print them in.
     diagnostics: Vec<String>,
@@ -413,12 +393,10 @@ struct Merged {
 ///
 /// Deliberately total and order-preserving: it decides nothing and sorts nothing, so the only thing
 /// that can make the output non-deterministic is being handed the results in a non-deterministic
-/// order — which is precisely what [`compile_all`] guarantees it is not, and what
-/// `tests::folding_in_completion_order_would_move_a_published_artifact` seeds the opposite of.
+/// order — which is precisely what [`compile_all`] guarantees it is not.
 fn merge(compiled: Vec<Compiled>) -> Merged {
     let mut merged = Merged {
         artifacts: Vec::new(),
-        entries: Vec::new(),
         diagnostics: Vec::new(),
         lockfile: Lockfile::new(),
     };
@@ -427,7 +405,6 @@ fn merge(compiled: Vec<Compiled>) -> Merged {
             merged.lockfile.insert(entry);
         }
         merged.artifacts.extend(provider.artifacts);
-        merged.entries.push(provider.site);
         merged.diagnostics.extend(provider.diagnostics);
     }
     merged
@@ -521,10 +498,6 @@ fn compile_all(
 }
 
 /// One provider's artifact, compiled and compared: the canonical document.
-///
-/// The site entry rides along rather than being recomputed: it needs the same `Connector`, and
-/// compiling twice is how a published document comes to describe an operation the canonical one no
-/// longer carries.
 fn compile(
     workspace: &Workspace,
     provider: &Provider,
@@ -540,14 +513,12 @@ fn compile(
     if let Some(selector) = service {
         connector = seam::select_service(&connector, selector).with_context(context)?;
     }
-    let site = site::provider_entry(&connector).with_context(context)?;
-
     // The canonical document is the **provider's** unit: one deterministic JSON file carrying every
     // service's operations. Narrowed to one service it would be *truncated* — the other service's
     // records silently dropped while their committed rows stayed on disk — which is a stale
     // catalogue that still validates, the worst available outcome. So a `--service` run plans no
-    // provider-unit artifact at all, exactly as a `--provider` run leaves `catalog.json` alone, and
-    // for the same reason: it is not a function of what the run compiled.
+    // provider-unit artifact at all, for the same reason: it is not a function of what the run
+    // compiled.
     let mut artifacts = Vec::new();
     if service.is_none() {
         artifacts.push(planned(
@@ -563,7 +534,6 @@ fn compile(
 
     Ok(Compiled {
         artifacts,
-        site,
         diagnostics,
         lock,
     })
@@ -580,10 +550,8 @@ fn compile(
 /// hash as correct, so a tree with a stale module would produce a lockfile agreeing with it — and
 /// `check` would call the drift clean.
 ///
-/// The whole-catalogue artifacts are deliberately absent: a [`LockEntry`] is one provider's row, and
-/// `catalog.json` belongs to no provider. They remain covered transitively — each is a function of
-/// the IR whose `ir_sha256` is recorded here — and directly by
-/// `crates/connector-cli/tests/catalog_artifacts.rs`.
+/// Whole-catalogue artifacts are deliberately absent: a [`LockEntry`] is one provider's row. They
+/// remain covered transitively — each is a function of the IR whose `ir_sha256` is recorded here.
 fn lock_entry(
     workspace: &Workspace,
     connector: &seam::Connector,
@@ -744,21 +712,6 @@ mod tests {
         out
     }
 
-    /// A seeded permutation of `items`, standing in for the order concurrent compiles finish in.
-    ///
-    /// Deterministic on purpose — a flaky proof that a determinism assertion has teeth would be
-    /// worth nothing — and a three-shift xorshift64 rather than a dependency.
-    fn seeded_shuffle<T>(mut items: Vec<T>) -> Vec<T> {
-        let mut state: u64 = 0xc544_c544_c544_c544;
-        for index in (1..items.len()).rev() {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            items.swap(index, (state % (index as u64 + 1)) as usize);
-        }
-        items
-    }
-
     /// The providers a determinism fixture uses, uneven on purpose — see [`definition`].
     const UNEVEN: &[(&str, usize)] = &[
         ("alpha", 12),
@@ -793,85 +746,6 @@ mod tests {
                 "compiling at width {width} produced a different plan from the sequential one"
             );
         }
-    }
-
-    /// "Output ordering stays defined by content, never by completion order."
-    ///
-    /// `web/public/catalog.json` is where that is load-bearing rather than incidental:
-    /// [`site::document`] serialises the entries in the order it is handed them and sorts
-    /// nothing, so the published provider array *is* the fold order. The plan's artifact list
-    /// cannot show this — it is sorted by path — which is why this reads inside the document.
-    #[test]
-    fn the_published_catalogue_lists_the_providers_in_provider_order() {
-        let fixture = Fixture::with("pipeline-order", UNEVEN);
-        let workspace = fixture.workspace();
-
-        let plan = plan_at_width(&workspace, None, None, Some(8)).expect("the plan compiles");
-        let published = plan
-            .artifacts
-            .iter()
-            .find(|artifact| artifact.path == workspace.site_catalog_path())
-            .expect("a whole-catalogue plan writes catalog.json");
-        let document: serde_json::Value =
-            serde_json::from_str(&published.contents).expect("catalog.json is JSON");
-        let ids: Vec<&str> = document["providers"]
-            .as_array()
-            .expect("catalog.json carries a provider array")
-            .iter()
-            .map(|provider| {
-                provider["id"]
-                    .as_str()
-                    .expect("every published provider carries an id")
-            })
-            .collect();
-
-        let expected: Vec<&str> = UNEVEN.iter().map(|(name, _)| *name).collect();
-        assert_eq!(
-            ids, expected,
-            "the published provider array follows the order the compiles finished in"
-        );
-    }
-
-    /// The seeded ordering hazard, kept as a test so the assertions above cannot quietly lose their
-    /// teeth.
-    ///
-    /// It folds one run's results in a seeded permutation — standing in for the order the providers
-    /// happened to finish in — and requires the output to move. If this ever stops holding, [`merge`]
-    /// has stopped being what orders the output, and
-    /// [`the_plan_is_identical_at_every_compile_width`] would be green on a build whose published
-    /// artifacts followed the scheduler.
-    #[test]
-    fn folding_in_completion_order_would_move_a_published_artifact() {
-        let fixture = Fixture::with("pipeline-hazard", UNEVEN);
-        let workspace = fixture.workspace();
-        let providers = discovery::discover(&workspace, None).expect("the fixture has providers");
-
-        let ordered = merge(
-            compile_all(&workspace, &providers, None, true, 1).expect("the providers compile"),
-        );
-        let shuffled = merge(seeded_shuffle(
-            compile_all(&workspace, &providers, None, true, 1).expect("the providers compile"),
-        ));
-
-        let paths = |merged: &Merged| {
-            merged
-                .artifacts
-                .iter()
-                .map(|artifact| artifact.path.clone())
-                .collect::<Vec<_>>()
-        };
-        assert_ne!(
-            paths(&ordered),
-            paths(&shuffled),
-            "the seeded permutation left the fold order alone, so it proves nothing"
-        );
-        assert_ne!(
-            site::document(ordered.entries).expect("the ordered document renders"),
-            site::document(shuffled.entries)
-                .expect("the shuffled document renders"),
-            "a completion-ordered fold produced the same catalog.json as a provider-ordered one, so \
-             the determinism assertions in this module cannot see a scheduling-ordered artifact"
-        );
     }
 
     /// "A refusal raised by one provider must surface identically regardless of scheduling", and

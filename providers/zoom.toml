@@ -81,7 +81,7 @@
 # **This file described the hazard accurately for five releases and returned the field anyway**, and
 # that is the mistake worth recording rather than quietly deleting. The two `response_schema`
 # entries carried `"HOST-PRIVILEGED. Embeds the host's ZAK token … Treat it as a credential"`, which
-# a reader of `web/public/catalog.json` did meet — but a warning in a tool contract is a warning to
+# a reader of the canonical catalog document did meet — but a warning in a tool contract is a warning to
 # whoever reads the contract, and the value still arrived in the response either way. Describing a
 # credential is not withholding it. C-79 had carried this exact `start_url` in its frontmatter since
 # it was filed.

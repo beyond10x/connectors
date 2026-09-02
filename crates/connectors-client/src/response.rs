@@ -1,8 +1,18 @@
 //! Correlation and closed-envelope validation for Connector client responses.
 
-use protocol::{connection, datasource, event, operation};
+use protocol::{catalog, connection, datasource, event, operation};
 
 use crate::ClientError;
+
+pub(crate) fn validate_catalog_response(
+    response: catalog::ResponseEnvelope,
+    request_id: &str,
+) -> Result<catalog::ResponseEnvelope, ClientError> {
+    if response.request_id != request_id || response.validate().is_err() {
+        return Err(ClientError::InvalidResponse);
+    }
+    Ok(response)
+}
 
 pub(crate) fn validate_operation_response(
     response: operation::ResponseEnvelope,

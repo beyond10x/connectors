@@ -11,8 +11,8 @@
 //! on the development machine is a **32 GB tmpfs shared by every concurrent agent**, and a pid plus
 //! a process-local counter does not separate two agents running the same binary. With the tmpfs
 //! exhausted, [`Fixture::write`]'s `fs::write` fails and takes `wiring`, `no_network`,
-//! `service_units` and `site_catalog` down together — output that reads exactly like a merge
-//! regression, and twice it was read as one.
+//! multiple suites down together — output that reads exactly like a merge regression, and twice it
+//! was read as one.
 //!
 //! So a fixture root is now derived from `current_exe()`, which follows `CARGO_TARGET_DIR`, under a
 //! name no other run repeats. The caller may deliberately place that whole target below `TMPDIR`;

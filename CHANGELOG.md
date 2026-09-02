@@ -11,6 +11,20 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.4.4 — 2026-09-02
+
+### Added
+
+- Add a typed, bounded hosted Catalog client with request correlation and closed-envelope
+  validation for product integrations.
+- Publish GitLab OAuth-user and personal-token setup profiles when the hosted GitLab backend is
+  available, so products can derive self-service controls from runtime capability.
+
+### Changed
+
+- Retire the dormant, unshipped VitePress explorer and its duplicate site projection. Hosted
+  Catalog protocol reads and product-owned interfaces are now the supported browsing path.
+
 ## 0.4.3 — 2026-09-02
 
 ### Added
