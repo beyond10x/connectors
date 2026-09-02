@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Typeform: read the authenticated account, forms and their responses, and delete responses",
-  "generator": "connectors 0.4.2",
+  "generator": "connectors 0.4.3",
   "operations": [
     {
       "auth": [
