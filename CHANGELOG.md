@@ -22,6 +22,15 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
   registered factory remains inert until an explicit deployment overlay assigns permanent provider
   identity and complete operation policy/resource bindings; provider and operation collisions,
   incomplete overlays, and catalog/dispatch drift refuse composition.
+- Activate generated service bundles as ordinary hosted backends with exact durable Grants,
+  explicit operation admission, and readiness reporting for every composed service.
+- Add bounded, single-use human approval evidence bound to the authenticated subject, exact
+  operation, Connection, description lease, canonical input, and a five-minute maximum lifetime.
+
+### Changed
+
+- Carry the optional realm only in receiver-verified principal context. It is absent from service
+  operation coordinates, and an absent realm remains distinct from the literal realm `default`.
 
 ## 0.4.0 — 2026-09-01
 

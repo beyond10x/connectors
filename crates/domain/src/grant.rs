@@ -208,6 +208,59 @@ impl GrantSet {
         let body = serde_json::to_vec(self).map_err(|_| StateError::Invalid)?;
         store.replace(&key, &body, GRANTS_CELL_BOUND)
     }
+
+    /// Merge one deployment-owned closed Grant set without erasing grants owned by other
+    /// compositions.
+    ///
+    /// Entries are owned by their exact `grant` reference. Re-applying identical deployment
+    /// input is a no-op; changing or removing an operation requires the caller to replace the
+    /// complete records it owns. This is the startup bootstrap seam until the CAS management
+    /// surface supersedes direct writes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateError::Invalid`] for malformed tenant or Grant input, and preserves backend
+    /// failures from the bound state store.
+    pub fn merge_managed(
+        store: &dyn StateStore,
+        tenant: &str,
+        managed: impl IntoIterator<Item = Grant>,
+    ) -> Result<Self, StateError> {
+        let managed = managed.into_iter().collect::<Vec<_>>();
+        for grant in &managed {
+            grant.validate()?;
+        }
+        let managed_refs = managed
+            .iter()
+            .map(|grant| grant.grant.clone())
+            .collect::<BTreeSet<_>>();
+        if managed_refs.len() != managed.len() {
+            return Err(StateError::Invalid);
+        }
+        let mut current = match load(store, tenant) {
+            Ok(current) => current,
+            Err(GrantRefusal::Refused) => Self {
+                revision: 0,
+                grants: Vec::new(),
+            },
+            Err(GrantRefusal::Unavailable) => return Err(StateError::Unavailable),
+        };
+        let mut next = current
+            .grants
+            .iter()
+            .filter(|grant| !managed_refs.contains(&grant.grant))
+            .cloned()
+            .chain(managed)
+            .collect::<Vec<_>>();
+        next.sort_by(|left, right| left.grant.cmp(&right.grant));
+        if current.grants == next {
+            return Ok(current);
+        }
+        current.revision = current.revision.saturating_add(1).max(1);
+        current.grants = next;
+        current.write(store, tenant)?;
+        Ok(current)
+    }
 }
 
 /// The state cell that holds one tenant's grants.
@@ -314,6 +367,28 @@ mod tests {
             .replace(&key, b"not a grant set", GRANTS_CELL_BOUND)
             .expect("seed");
         assert_eq!(load(&store, "tenant:acme"), Err(GrantRefusal::Unavailable));
+    }
+
+    #[test]
+    fn deployment_grants_merge_idempotently_without_erasing_other_owners() {
+        let store = MemoryState::new();
+        let existing = minimal("grant:existing");
+        GrantSet {
+            revision: 4,
+            grants: vec![existing.clone()],
+        }
+        .write(&store, "tenant:acme")
+        .unwrap();
+        let mut generated = minimal("grant:todo");
+        generated.provider = "todo".to_owned();
+        generated.connection = "connection:todo".to_owned();
+        generated.allow = BTreeSet::from(["todo.create_list".to_owned()]);
+
+        let first = GrantSet::merge_managed(&store, "tenant:acme", [generated.clone()]).unwrap();
+        assert_eq!(first.revision, 5);
+        assert_eq!(first.grants, vec![existing, generated.clone()]);
+        let replay = GrantSet::merge_managed(&store, "tenant:acme", [generated]).unwrap();
+        assert_eq!(replay, first);
     }
 
     #[test]

@@ -4,7 +4,7 @@
     "title": "b10x Connectors hosted API",
     "version": "v0alpha1",
     "summary": "The identity-authenticated hosted transport for the Connector wire contracts.",
-    "description": "Five strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
+    "description": "Six strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
   },
   "servers": [
     {
@@ -100,6 +100,69 @@
         "responses": {
           "200": {"description": "The current provider credential for immediate use; never persist it.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/redeemedSubscription"}}}},
           "401": {"description": "The capability, attempt binding, lifetime, or use count was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/approvals": {
+      "post": {
+        "operationId": "issueConnectorApproval",
+        "summary": "Issue one human-decided exact-input approval proof",
+        "description": "Requires connectors.approvals.issue on a non-delegated human Identity token. Connectors re-describes the operation and seals the exact operation, Connection, description lease, canonical input digest, subject, issuer, and finite lifetime into a one-time proof. Realm is authentication context and is never carried by this request.",
+        "security": [{"identityAccessToken": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/approval.requestEnvelope"},
+              "examples": {
+                "issue": {
+                  "value": {
+                    "protocol": "b10x.connector-approval.v1",
+                    "request_id": "req-approval-1",
+                    "context": {
+                      "tenant_id": "tenant-acme",
+                      "agent_id": "agent-support",
+                      "agent_revision": 3,
+                      "authority_snapshot_id": "authority-2026-08-24",
+                      "authority_snapshot_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    },
+                    "request": {
+                      "operation_ref": "todo.create_list",
+                      "connection_ref": "connection:todo",
+                      "description_ref": "description:todo-create-list",
+                      "input": {"title": "Ship the usage service"},
+                      "ttl_seconds": 120
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "A non-cacheable, one-time approval proof.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/approval.issuedApproval"},
+                "examples": {
+                  "success": {
+                    "value": {
+                      "protocol": "b10x.connector-approval.v1",
+                      "request_id": "req-approval-1",
+                      "approval_evidence_ref": "approval:54f41f6f63f4d57a58666d856a4023ae46862f7b7171dcc2bf4bd0f3b4dfbf17",
+                      "expires_at_seconds": 1788379200
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "The bounded approval request was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "403": {"description": "The verified human lacks approval authority.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/operation.responseEnvelope"}}}},
+          "409": {"description": "The operation, Connection, or description lease is stale.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/operation.responseEnvelope"}}}},
+          "503": {"description": "Identity or approval authority is unavailable.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
         }
       }
     },
@@ -1951,7 +2014,7 @@
       "identityAccessToken": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connections and subscription custody), connectors.credentials.lease (attempt-bounded provider credential leases), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
+        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.approvals.issue (human exact-input approval issuance), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connections and subscription custody), connectors.credentials.lease (attempt-bounded provider credential leases), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
       },
       "subscriptionLease": {
         "type": "http",

@@ -44,6 +44,7 @@ axum = { version = "0.8", features = ["json", "tokio"] }
 connector-secrets = { version = "0.4.0", path = "../connector-secrets" }
 connector-state = { version = "0.4.0", path = "../connector-state" }
 connectors-config = { version = "0.4.0", path = "../connectors-config" }
+domain = { version = "0.4.0", path = "../domain" }
 futures-util = "0.3"
 hosted-vault = { version = "0.4.0", path = "../hosted-vault" }
 hosted-secrets = { version = "0.4.0", path = "../hosted-secrets" }

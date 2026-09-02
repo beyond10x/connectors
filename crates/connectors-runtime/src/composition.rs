@@ -9,6 +9,7 @@ use std::sync::Arc;
 use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connector_state::StateStore;
 use connectors_config::{HostedServerConfig, PersonalConfig};
+use domain::GrantSet;
 use hosted_state::PostgresState;
 use hosted_secrets::HostedSecretsStore;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
@@ -31,7 +32,7 @@ use service::{ConnectorBackend, CredentialSet, EgressTransport};
 use state_sqlite::SqliteState;
 
 use crate::claims::EventReplyClaims;
-use crate::BackendRegistry;
+use crate::{BackendRegistry, ServiceBundle};
 
 /// Failure to validate or assemble a complete Connector runtime.
 #[derive(Debug, thiserror::Error)]
@@ -104,6 +105,8 @@ pub enum RuntimeError {
     ApprovalRecovery(#[from] server::hosted::RecoveryError),
     #[error(transparent)]
     HostedState(#[from] hosted_state::StateError),
+    #[error("generated-service Grants could not be merged into hosted authority state")]
+    ServiceGrantState,
     #[error(transparent)]
     HostedVault(#[from] hosted_vault::HostedVaultError),
     #[error(transparent)]
@@ -440,6 +443,25 @@ struct HostedCredentialStores {
 impl HostedRuntime {
     /// Build the hosted backend registry and bind its TCP listener.
     pub async fn bind(config_path: &Path) -> Result<Self, RuntimeError> {
+        Self::bind_inner(config_path, None).await
+    }
+
+    /// Build the hosted runtime with one already-validated generated-service bundle.
+    ///
+    /// Merely constructing a bundle is still inert. This explicit composition call activates its
+    /// backends, merges only its deployment-owned exact Grants, and admits its operations to reach
+    /// the ordinary Grant/approval evaluator.
+    pub async fn bind_with_service_bundle(
+        config_path: &Path,
+        bundle: ServiceBundle,
+    ) -> Result<Self, RuntimeError> {
+        Self::bind_inner(config_path, Some(bundle)).await
+    }
+
+    async fn bind_inner(
+        config_path: &Path,
+        bundle: Option<ServiceBundle>,
+    ) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
         let identity_origin = url::Url::parse(&config.identity.origin)
             .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
@@ -455,6 +477,20 @@ impl HostedRuntime {
             env::var("CONNECTORS_DATABASE_URL").ok(),
             env::var("CONNECTORS_SQLITE").ok(),
         )?;
+        let generated_operation_refs = bundle
+            .as_ref()
+            .map_or_else(BTreeSet::new, ServiceBundle::operation_refs);
+        let generated_service_refs = bundle.as_ref().map_or_else(Vec::new, |bundle| {
+            bundle
+                .services()
+                .iter()
+                .map(|service| service.manifest.service_ref.clone())
+                .collect::<Vec<_>>()
+        });
+        if let Some(bundle) = bundle.as_ref() {
+            GrantSet::merge_managed(&*hosted_state, &config.tenant_id, bundle.grants())
+                .map_err(|_| RuntimeError::ServiceGrantState)?;
+        }
         let credential_stores = if config.secrets.enabled {
             let store = Arc::new(HostedSecretsStore::new(&config.secrets).map_err(|_| RuntimeError::CredentialStore)?);
             store.ready().await.map_err(|_| RuntimeError::CredentialStore)?;
@@ -704,12 +740,16 @@ impl HostedRuntime {
                 .await?,
             ));
         }
+        if let Some(bundle) = bundle {
+            backends.extend(bundle.into_backends());
+        }
         let backend = Arc::new(BackendRegistry::new(backends));
         let listener = tokio::net::TcpListener::bind(config.server.listen).await?;
         let admission =
             server::hosted::HostedAdmissionPolicy::new(config.authority.operator_groups.clone())
                 .with_kubernetes_groups(kubernetes_read_groups, kubernetes_restart_groups)
-                .with_monitoring_groups(monitoring_read_groups);
+                .with_monitoring_groups(monitoring_read_groups)
+                .with_generated_service_operations(generated_operation_refs);
         // The enforcement authority binds the same store the hosted bookkeeping uses, and
         // accepts approval records from the deployment's one Identity issuer.
         let authority =
@@ -747,6 +787,7 @@ impl HostedRuntime {
             "slack_enabled": slack_enabled,
             "gitlab_enabled": gitlab_enabled,
             "jira_enabled": jira_enabled,
+            "generated_services": generated_service_refs,
         });
         Ok(Self {
             listener,

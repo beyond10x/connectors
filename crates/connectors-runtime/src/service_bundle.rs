@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use domain::Grant;
 use protocol::connection::{ConnectionError, ConnectionRequest, ConnectionResult};
 use protocol::datasource::{DatasourceError, DatasourceRequest, DatasourceResult};
 use protocol::event::{EventError, EventRequest, EventResult};
@@ -38,6 +39,10 @@ pub enum ServiceBundleError {
     ProviderIdentityCollision,
     #[error("a permanent provider authority was assigned more than once")]
     ProviderAuthorityCollision,
+    #[error("a permanent service Connection was assigned more than once")]
+    ConnectionIdentityCollision,
+    #[error("a deployment-owned Grant reference was assigned to more than one service")]
+    GrantIdentityCollision,
     #[error("a deployment operation policy or resource reference is invalid")]
     InvalidOperationDeployment,
     #[error("a deployment overlay does not name the manifest's exact operation set")]
@@ -130,6 +135,16 @@ impl ServiceBundleBuilder {
             if other.provider.authority == deployment.provider.authority {
                 return Err(ServiceBundleError::ProviderAuthorityCollision);
             }
+            if other.provider.connection_ref == deployment.provider.connection_ref {
+                return Err(ServiceBundleError::ConnectionIdentityCollision);
+            }
+            let other_grants = deployment_grant_refs(other);
+            if deployment_grant_refs(&deployment)
+                .iter()
+                .any(|reference| other_grants.contains(reference))
+            {
+                return Err(ServiceBundleError::GrantIdentityCollision);
+            }
         }
         self.deployments
             .insert(deployment.service_ref.clone(), deployment);
@@ -217,6 +232,14 @@ impl ServiceBundleBuilder {
     }
 }
 
+fn deployment_grant_refs(deployment: &ServiceDeployment) -> BTreeSet<&str> {
+    deployment
+        .operations
+        .values()
+        .flat_map(|operation| operation.grant_refs.iter().map(String::as_str))
+        .collect()
+}
+
 /// One bound service and the exact reviewed configuration that activated it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeployedService {
@@ -259,6 +282,50 @@ impl ServiceBundle {
     pub fn into_registry(self) -> BackendRegistry {
         BackendRegistry::new(self.into_backends())
     }
+
+    /// Exact operation Grants requested by reviewed service deployment overlays.
+    ///
+    /// Registration remains inert: these values exist only after every factory has bound and the
+    /// bundle has passed its collision and catalog/dispatch checks. The hosted composition decides
+    /// whether to merge them into its durable authority store.
+    #[must_use]
+    pub fn grants(&self) -> Vec<Grant> {
+        let mut grants = BTreeMap::<String, Grant>::new();
+        for service in &self.services {
+            for (operation_ref, deployment) in &service.deployment.operations {
+                for grant_ref in &deployment.grant_refs {
+                    let grant = grants.entry(grant_ref.clone()).or_insert_with(|| Grant {
+                        grant: grant_ref.clone(),
+                        provider: service.deployment.provider.provider_ref.clone(),
+                        connection: service.deployment.provider.connection_ref.clone(),
+                        selector: None,
+                        allow: BTreeSet::new(),
+                        deny: BTreeSet::new(),
+                        inbound_events: BTreeSet::new(),
+                    });
+                    if grant.provider != service.deployment.provider.provider_ref
+                        || grant.connection != service.deployment.provider.connection_ref
+                    {
+                        // This cannot happen after provider/Connection collision validation, but
+                        // retaining only the first closed Grant is safer than widening one record.
+                        continue;
+                    }
+                    grant.allow.insert(operation_ref.clone());
+                }
+            }
+        }
+        grants.into_values().collect()
+    }
+
+    /// Effect-bearing operation identities admitted to reach the ordinary Grant evaluator.
+    #[must_use]
+    pub fn operation_refs(&self) -> BTreeSet<String> {
+        self.services
+            .iter()
+            .flat_map(|service| service.manifest.operations.iter())
+            .map(|operation| operation.operation_ref.clone())
+            .collect()
+    }
 }
 
 fn normalize_manifest(
@@ -295,6 +362,7 @@ fn validate_deployment(
 ) -> Result<(), ServiceBundleError> {
     if !valid_provider_ref(&deployment.provider.provider_ref)
         || !valid_authority(&deployment.provider.authority)
+        || !valid_ref(&deployment.provider.connection_ref)
     {
         return Err(ServiceBundleError::InvalidProviderIdentity);
     }
@@ -722,7 +790,7 @@ mod tests {
                 "service".to_owned(),
                 "credential:devcenter-service".to_owned(),
             )]),
-            grant_refs: BTreeSet::from(["grant:devcenter-todo".to_owned()]),
+            grant_refs: BTreeSet::new(),
         }
     }
 
@@ -737,10 +805,17 @@ mod tests {
             provider: ProviderIdentity {
                 provider_ref: provider_ref.to_owned(),
                 authority: authority.to_owned(),
+                connection_ref: format!("connection:{provider_ref}"),
             },
             operations: operations
                 .iter()
-                .map(|(operation, expose)| ((*operation).to_owned(), operation_policy(*expose)))
+                .map(|(operation, expose)| {
+                    let mut policy = operation_policy(*expose);
+                    policy
+                        .grant_refs
+                        .insert(format!("grant:{provider_ref}"));
+                    ((*operation).to_owned(), policy)
+                })
                 .collect(),
         }
     }
@@ -844,6 +919,29 @@ mod tests {
         assert_eq!(operations[0].operation_ref, SECOND_OPERATION);
         assert_eq!(operations[0].effect, EffectClass::Mutating);
         assert_eq!(operations[0].approval, ApprovalPosture::Required);
+        assert_eq!(
+            first.grants(),
+            vec![
+                Grant {
+                    grant: "grant:provider:todo".to_owned(),
+                    provider: "provider:todo".to_owned(),
+                    connection: "connection:provider:todo".to_owned(),
+                    selector: None,
+                    allow: BTreeSet::from([FIRST_OPERATION.to_owned()]),
+                    deny: BTreeSet::new(),
+                    inbound_events: BTreeSet::new(),
+                },
+                Grant {
+                    grant: "grant:provider:usage".to_owned(),
+                    provider: "provider:usage".to_owned(),
+                    connection: "connection:provider:usage".to_owned(),
+                    selector: None,
+                    allow: BTreeSet::from([SECOND_OPERATION.to_owned()]),
+                    deny: BTreeSet::new(),
+                    inbound_events: BTreeSet::new(),
+                },
+            ]
+        );
     }
 
     #[test]
@@ -918,6 +1016,61 @@ mod tests {
                 ))
                 .err(),
             Some(ServiceBundleError::ProviderAuthorityCollision)
+        );
+
+        let mut connection_collision = ServiceBundleBuilder::new();
+        connection_collision
+            .register(SyntheticFactory::new("service:a", &[FIRST_OPERATION]))
+            .unwrap()
+            .register(SyntheticFactory::new("service:b", &[SECOND_OPERATION]))
+            .unwrap();
+        let first = deployment(
+            "service:a",
+            "provider:a",
+            "dev.b10x.a",
+            &[(FIRST_OPERATION, true)],
+        );
+        let mut second = deployment(
+            "service:b",
+            "provider:b",
+            "dev.b10x.b",
+            &[(SECOND_OPERATION, true)],
+        );
+        second.provider.connection_ref = first.provider.connection_ref.clone();
+        connection_collision.deploy(first).unwrap();
+        assert_eq!(
+            connection_collision.deploy(second).err(),
+            Some(ServiceBundleError::ConnectionIdentityCollision)
+        );
+
+        let mut grant_collision = ServiceBundleBuilder::new();
+        grant_collision
+            .register(SyntheticFactory::new("service:a", &[FIRST_OPERATION]))
+            .unwrap()
+            .register(SyntheticFactory::new("service:b", &[SECOND_OPERATION]))
+            .unwrap();
+        let first = deployment(
+            "service:a",
+            "provider:a",
+            "dev.b10x.a",
+            &[(FIRST_OPERATION, true)],
+        );
+        let mut second = deployment(
+            "service:b",
+            "provider:b",
+            "dev.b10x.b",
+            &[(SECOND_OPERATION, true)],
+        );
+        let shared = first.operations[FIRST_OPERATION].grant_refs.clone();
+        second
+            .operations
+            .get_mut(SECOND_OPERATION)
+            .unwrap()
+            .grant_refs = shared;
+        grant_collision.deploy(first).unwrap();
+        assert_eq!(
+            grant_collision.deploy(second).err(),
+            Some(ServiceBundleError::GrantIdentityCollision)
         );
     }
 

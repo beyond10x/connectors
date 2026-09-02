@@ -31,7 +31,7 @@ use sha2::Digest as _;
 /// use — the structs are the contract; the skeleton only says where they bind.
 const OPENAPI_SKELETON: &str = include_str!("docs/openapi.json");
 
-/// The served document: skeleton plus the ten envelope schemas generated from the
+/// The served document: skeleton plus the twelve envelope schemas generated from the
 /// exact `protocol` types the routes deserialize with, inlined so no name can
 /// collide across modules. Built once per process.
 pub(in crate::hosted) fn document_json() -> &'static str {
@@ -52,7 +52,15 @@ pub(in crate::hosted) fn document_json() -> &'static str {
             object.remove("$schema");
             Value::Object(std::mem::take(object))
         }
-        let entries: [(&str, Value); 10] = [
+        let entries: [(&str, Value); 12] = [
+            (
+                "approval.requestEnvelope",
+                generated::<protocol::approval::RequestEnvelope>(&settings),
+            ),
+            (
+                "approval.issuedApproval",
+                generated::<protocol::approval::IssuedApproval>(&settings),
+            ),
             (
                 "operation.requestEnvelope",
                 generated::<protocol::operation::RequestEnvelope>(&settings),
@@ -94,7 +102,9 @@ pub(in crate::hosted) fn document_json() -> &'static str {
                 generated::<protocol::datasource::ResponseEnvelope>(&settings),
             ),
         ];
-        let contracts: [(&str, &str); 10] = [
+        let contracts: [(&str, &str); 12] = [
+            ("approval.requestEnvelope", protocol::approval::CONTRACT),
+            ("approval.issuedApproval", protocol::approval::CONTRACT),
             ("operation.requestEnvelope", protocol::operation::CONTRACT),
             ("operation.responseEnvelope", protocol::operation::CONTRACT),
             (
@@ -138,10 +148,11 @@ pub(in crate::hosted) fn document_json() -> &'static str {
     })
 }
 
-/// The five envelope endpoints in reading order, each with the request and response
+/// The six envelope endpoints in reading order, each with the request and response
 /// example name the page leads with. Every name must exist in the document; a rename
 /// there panics the first render, which the drift tests exercise on every run.
-const ENVELOPE_SECTIONS: [(&str, &str, &str); 5] = [
+const ENVELOPE_SECTIONS: [(&str, &str, &str); 6] = [
+    ("/approvals", "issue", "success"),
     ("/operations", "search", "success"),
     ("/connections", "search", "success"),
     ("/catalog", "search", "success"),
@@ -281,7 +292,10 @@ fn example<'a>(doc: &'a Value, path: &str, kind: &str, name: &str) -> &'a Value 
     let operation = &doc["paths"][path]["post"];
     let container = match kind {
         "request" => &operation["requestBody"],
-        "response" => &operation["responses"]["200"],
+        "response" => operation["responses"]
+            .get("200")
+            .or_else(|| operation["responses"].get("201"))
+            .expect("an envelope endpoint documents a success response"),
         other => panic!("unknown example kind `{other}`"),
     };
     let value = &container["content"]["application/json"]["examples"][name]["value"];
