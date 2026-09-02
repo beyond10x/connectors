@@ -10,10 +10,9 @@ use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStor
 use connector_state::StateStore;
 use connectors_config::{HostedServerConfig, PersonalConfig};
 use domain::GrantSet;
-use hosted_state::PostgresState;
 use hosted_secrets::HostedSecretsStore;
+use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
-use subscription_custody::SubscriptionCustody;
 use identity_http::IdentityHttpVerifier;
 use integration_catalog::{CatalogBackend, CatalogIntegrationError};
 use integration_gitlab::GitlabBackend;
@@ -30,6 +29,7 @@ use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
 use service::{ConnectorBackend, CredentialSet, EgressTransport};
 use state_sqlite::SqliteState;
+use subscription_custody::SubscriptionCustody;
 
 use crate::claims::EventReplyClaims;
 use crate::{BackendRegistry, ServiceBundle};
@@ -492,16 +492,29 @@ impl HostedRuntime {
                 .map_err(|_| RuntimeError::ServiceGrantState)?;
         }
         let credential_stores = if config.secrets.enabled {
-            let store = Arc::new(HostedSecretsStore::new(&config.secrets).map_err(|_| RuntimeError::CredentialStore)?);
-            store.ready().await.map_err(|_| RuntimeError::CredentialStore)?;
+            let store = Arc::new(
+                HostedSecretsStore::new(&config.secrets)
+                    .map_err(|_| RuntimeError::CredentialStore)?,
+            );
+            store
+                .ready()
+                .await
+                .map_err(|_| RuntimeError::CredentialStore)?;
             let secret_store: Arc<dyn SecretStore> = store;
             let prepared = PreparedVaultStore::open_shared(
                 secret_store.clone(),
                 hosted_state.clone(),
                 "secrets.prepared-transactions",
-            ).map_err(|_| RuntimeError::CredentialStore)?;
-            prepared.initialize().await.map_err(|_| RuntimeError::CredentialStore)?;
-            HostedCredentialStores { values: Some(secret_store), prepared: Some(Arc::new(prepared)) }
+            )
+            .map_err(|_| RuntimeError::CredentialStore)?;
+            prepared
+                .initialize()
+                .await
+                .map_err(|_| RuntimeError::CredentialStore)?;
+            HostedCredentialStores {
+                values: Some(secret_store),
+                prepared: Some(Arc::new(prepared)),
+            }
         } else if config.vault.enabled {
             let store = HostedVaultStore::new(&config.vault)?;
             store.initialize().await?;
@@ -533,16 +546,18 @@ impl HostedRuntime {
         )?);
         let claude_code_enabled = config.claude_code.enabled;
         let subscription_custody = if claude_code_enabled {
-            Some(Arc::new(SubscriptionCustody::with_claude_oauth(
-                credential_stores
-                    .values
-                    .as_ref()
-                    .ok_or(connectors_config::HostedServerConfigError::Invalid)?
-                    .clone(),
-                subscription_custody::ClaudeOAuthConfig::official()
-                    .map_err(|_| RuntimeError::CredentialStore)?,
-            )
-            .map_err(|_| RuntimeError::CredentialStore)?))
+            Some(Arc::new(
+                SubscriptionCustody::with_claude_oauth(
+                    credential_stores
+                        .values
+                        .as_ref()
+                        .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                        .clone(),
+                    subscription_custody::ClaudeOAuthConfig::official()
+                        .map_err(|_| RuntimeError::CredentialStore)?,
+                )
+                .map_err(|_| RuntimeError::CredentialStore)?,
+            ))
         } else {
             None
         };
@@ -708,6 +723,7 @@ impl HostedRuntime {
         }
         let gitlab_enabled = config.gitlab.is_some();
         if let Some(gitlab) = config.gitlab {
+            let egress = gitlab_egress(&gitlab.origin)?;
             let store = credential_stores
                 .prepared
                 .as_ref()
@@ -719,6 +735,7 @@ impl HostedRuntime {
                     gitlab,
                     store,
                     hosted_state.clone(),
+                    egress,
                 )
                 .await?,
             ));
@@ -817,6 +834,11 @@ impl HostedRuntime {
 }
 
 fn monitoring_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
+    let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
+    Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
+}
+
+fn gitlab_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
     let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
     Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
 }

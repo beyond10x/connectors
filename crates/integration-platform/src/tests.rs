@@ -649,10 +649,7 @@ async fn work_owner_events_are_checkpointed_into_connector_sequence_space() {
     );
     let request = server.join().unwrap();
     assert!(request.starts_with("GET /api/work/v2/events?"));
-    assert!(temporary
-        .path()
-        .join("b10x-work-events.json")
-        .exists());
+    assert!(temporary.path().join("b10x-work-events.json").exists());
 }
 
 #[tokio::test]
@@ -687,10 +684,7 @@ async fn planner_owner_events_are_checkpointed_into_connector_sequence_space() {
     assert_eq!(events[0].event_ref, "event:b10x:planner:1");
     let request = server.join().unwrap();
     assert!(request.starts_with("GET /api/planner/v1/events?"));
-    assert!(temporary
-        .path()
-        .join("b10x-planner-events.json")
-        .exists());
+    assert!(temporary.path().join("b10x-planner-events.json").exists());
 }
 
 #[test]
@@ -841,10 +835,7 @@ async fn a_write_passes_no_local_approval_gate() {
     .await
     .unwrap_err();
     assert_eq!(carried.code, OperationErrorCode::InvalidInput);
-    assert!(!temporary
-        .path()
-        .join("b10x-operation-audit.jsonl")
-        .exists());
+    assert!(!temporary.path().join("b10x-operation-audit.jsonl").exists());
 }
 
 #[tokio::test]
@@ -924,8 +915,7 @@ async fn ontology_invocation_carries_request_bound_signed_authority() {
     let request = server.join().unwrap();
     assert!(request.starts_with("POST /v1/query HTTP/1.1\r\n"));
     assert!(request.contains("authorization: DLModule "));
-    let audit =
-        fs::read_to_string(temporary.path().join("b10x-operation-audit.jsonl")).unwrap();
+    let audit = fs::read_to_string(temporary.path().join("b10x-operation-audit.jsonl")).unwrap();
     assert!(!audit.contains("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
 }
 

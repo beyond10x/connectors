@@ -11,6 +11,8 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.4.1 — 2026-09-02
+
 ### Added
 
 - Add governed outbound MCP as a generated Connector service. A reviewed profile freezes the full
@@ -26,11 +28,19 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
   explicit operation admission, and readiness reporting for every composed service.
 - Add bounded, single-use human approval evidence bound to the authenticated subject, exact
   operation, Connection, description lease, canonical input, and a five-minute maximum lifetime.
+- Route hosted GitLab OAuth, PAT verification, project discovery, repository reads, and operation
+  dispatch through the exact-origin Connection-bound post-DNS transport.
 
 ### Changed
 
 - Carry the optional realm only in receiver-verified principal context. It is absent from service
   operation coordinates, and an absent realm remains distinct from the literal realm `default`.
+
+### Security
+
+- Refuse hosted GitLab unless `connection_bound_post_dns_v1` is declared, and include GitLab in the
+  exhaustive source fence that rejects raw HTTP clients, DNS resolution, and outbound sockets from
+  credential-bearing Integration adapters.
 
 ## 0.4.0 — 2026-09-01
 
