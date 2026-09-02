@@ -13,6 +13,18 @@ A personal access token is an explicit alternative for installations where OAuth
 Paste it only into the protected Connect Session. `read_api` enables the selected reads; `api` also
 enables writes. The harness, model, and client never receive the token.
 
+For a hosted deployment, an operator first creates one GitLab OAuth application whose callback is
+the configured `/oauth/gitlab/callback` URL. Its application ID is non-secret hosted configuration;
+its secret is supplied once to the running Connector:
+
+```console
+connectors admin credentials set gitlab oauth_client_secret --endpoint URL --secret-stdin
+```
+
+Every engineer then authenticates that same application as themselves. GitLab issues authority for
+the person completing consent; the shared application secret does not cause users to operate under
+the operator who registered the application.
+
 ## As automation
 
 Use a non-human GitLab identity for platform or babelforce automation. Select the narrowest kind:

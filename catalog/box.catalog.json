@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Box: browse folder contents, read file and folder metadata, create folders, and copy files",
-  "generator": "connectors 0.4.2",
+  "generator": "connectors 0.4.3",
   "operations": [
     {
       "auth": [

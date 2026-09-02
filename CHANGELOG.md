@@ -11,6 +11,19 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.4.3 — 2026-09-02
+
+### Added
+
+- Add `connectors admin` for Identity-protected hosted Integration readiness and credential writes,
+  with public authority discovery and typed status responses for GitLab, Slack, and Jira.
+
+### Security
+
+- Require the exact administrative audience, scope, and operator-group membership for credential
+  changes; accept secret input only through hidden prompts, standard input, or owner-only files,
+  and return and audit metadata without credential bytes.
+
 ## 0.4.2 — 2026-09-02
 
 ### Added

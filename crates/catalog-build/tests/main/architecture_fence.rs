@@ -24,7 +24,10 @@ const MODULE_LINE_LIMIT: usize = 1_500;
 // Raised 856 -> 960 on 2026-09-02: browser login, logout, the stdio MCP front door, and
 // hosted/local selection add only parser and dispatch declarations here; credential, HTTP,
 // refresh, and bridge behavior remains in `connectors-client`.
-const CLI_TOTAL_LINE_LIMIT: usize = 960;
+// Raised 960 -> 966 for hosted Integration administration. The six frontend lines are the Clap
+// command slot, typed error/exit classification, and one dispatch arm; login, secret input,
+// rendering, and HTTP behavior all live behind connectors-console/connectors-client.
+const CLI_TOTAL_LINE_LIMIT: usize = 966;
 
 /// Existing large catalog modules are named debts. The ceiling prevents a waiver from becoming
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.
