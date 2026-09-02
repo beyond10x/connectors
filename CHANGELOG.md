@@ -11,6 +11,14 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+### Added
+
+- Carry receiver-verified agent, attempt, delegation, Grant, and Grant-revision provenance in the
+  admitted principal context so delegated calls cannot collapse into an owner-only identity.
+- Add approval-gated GitLab operations for creating an `agentide/…` session branch, atomically
+  committing reviewed file actions, and creating or updating the session merge request. These
+  publication operations require `api` scope and stay out of the model-exposed tool inventory.
+
 ## 0.5.0 — 2026-09-03
 
 ### Added
