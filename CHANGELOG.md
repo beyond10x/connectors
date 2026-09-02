@@ -11,6 +11,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.1 — 2026-09-03
+
+### Fixed
+
+- Refresh every satellite workspace lockfile after the 0.5.0 dependency changes, so the release
+  gate and the local-identity refusal check remain reproducible under `--locked` on a clean runner.
+
 ## 0.5.0 — 2026-09-03
 
 ### Added

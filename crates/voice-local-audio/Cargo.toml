@@ -2,7 +2,7 @@
 name = "voice-local-audio"
 description = "Binds an admitted media session to this machine's speaker and microphone."
 edition = "2021"
-version = "0.5.0"
+version = "0.5.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,11 +14,11 @@ resolver = "3"
 members = ["."]
 
 [dependencies]
-domain = { version = "0.5.0", path = "../domain" }
+domain = { version = "0.5.1", path = "../domain" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["rt", "sync"] }
 
 [dev-dependencies]
 async-trait = "0.1"
-driver-audio = { version = "0.5.0", path = "../driver-audio" }
+driver-audio = { version = "0.5.1", path = "../driver-audio" }
 tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
