@@ -50,14 +50,14 @@ use crate::transport::{
 };
 
 pub(crate) const INTEGRATION_REF: &str = "gitlab";
-const AUTHORITY: &str = "com.gitlab.api";
+pub(crate) const AUTHORITY: &str = "com.gitlab.api";
 const SERVICE: &str = "default";
-const LOGIN_SERVICE: &str = "login";
+pub(crate) const LOGIN_SERVICE: &str = "login";
 const PROFILE_OAUTH: &str = "gitlab.oauth_user";
 const PROFILE_PAT: &str = "gitlab.personal_token";
 const ACCESS_TOKEN_CREDENTIAL: &str = "access_token";
 const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
-const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
+pub(crate) const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
 pub(crate) const STATE_KEY: &str = "gitlab.connections";
 const AUDIT_KEY: &str = "gitlab.audit";
 pub(crate) const STATE_VERSION: u8 = 1;

@@ -32,6 +32,7 @@
 //! guided flow is a conversation with the local Connector and the conversation is the behaviour
 //! being packaged.
 
+pub mod admin;
 pub mod auth;
 pub mod connect;
 pub mod doctor;

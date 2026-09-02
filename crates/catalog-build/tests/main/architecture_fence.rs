@@ -21,7 +21,10 @@ const MODULE_LINE_LIMIT: usize = 1_500;
 // console whether this provider issues its own credential, and one call that takes the packaged
 // acquisition from `connectors-runtime`. The fourteen lines that built the closure by hand went to
 // the composition root instead, which is precisely the move this cap's failure message asks for.
-const CLI_TOTAL_LINE_LIMIT: usize = 856;
+// Raised 856 -> 862 for hosted Integration administration. The six frontend lines are the Clap
+// command slot, typed error/exit classification, and one dispatch arm; login, secret input,
+// rendering, and HTTP behavior all live behind connectors-console/connectors-client.
+const CLI_TOTAL_LINE_LIMIT: usize = 862;
 
 /// Existing large catalog modules are named debts. The ceiling prevents a waiver from becoming
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.

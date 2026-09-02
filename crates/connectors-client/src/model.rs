@@ -22,6 +22,10 @@ pub enum ClientError {
     HostedNotGranted,
     #[error("hosted Connector refused the subscription request with status {0}")]
     SubscriptionRefused(u16),
+    #[error("hosted Connector refused the administrative request with status {0}")]
+    AdminRefused(u16),
+    #[error("Identity refused administrative login with status {0}")]
+    AdminAuthenticationRefused(u16),
     #[error("hosted Connector is unavailable")]
     HostedUnavailable,
     #[error("hosted Connector returned a cacheable credential response")]
@@ -38,6 +42,79 @@ pub enum ClientError {
     Io(#[from] io::Error),
     #[error("Connector protocol JSON was malformed: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+/// Public facts needed to obtain one short-lived administrative access token from Identity.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminAuthMetadata {
+    pub identity_origin: String,
+    pub audience: String,
+    pub scope: String,
+}
+
+/// Identity's public Authorization Code + PKCE discovery document.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminLoginMetadata {
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub token_endpoint: String,
+    pub access_token_endpoint: String,
+    pub cli_client_id: String,
+    pub response_types_supported: Vec<String>,
+    pub grant_types_supported: Vec<String>,
+    pub code_challenge_methods_supported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AdminCredentialState {
+    Present,
+    Missing,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminConfigurationField {
+    pub name: String,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminCredentialStatus {
+    pub name: String,
+    pub required: bool,
+    pub state: AdminCredentialState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminIntegrationStatus {
+    pub integration_ref: String,
+    pub active: bool,
+    pub configuration: Vec<AdminConfigurationField>,
+    pub credentials: Vec<AdminCredentialStatus>,
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminStatus {
+    pub integrations: Vec<AdminIntegrationStatus>,
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AdminCredentialWrite {
+    pub request_id: String,
+    pub integration_ref: String,
+    pub credential: String,
+    pub state: AdminCredentialState,
+    pub replaced: bool,
 }
 
 /// Value-free result of beginning a Connector-owned credential acquisition session.
@@ -127,6 +204,14 @@ impl std::fmt::Debug for RedeemedSubscription {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConnectSubscriptionRequest<'a> {
     pub credential: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdminCredentialRequest<'a> {
+    pub request_id: &'a str,
+    pub value: &'a str,
+    pub replace: bool,
 }
 
 #[derive(Serialize)]

@@ -29,7 +29,7 @@ use protocol::operation::{
 };
 
 use connectors_console::{
-    auth, connect, doctor, enrol, init, input, output, reduce_envelope, Format,
+    admin, auth, connect, doctor, enrol, init, input, output, reduce_envelope, Format,
 };
 
 #[derive(Debug, Parser)]
@@ -45,6 +45,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Operate an Identity-protected hosted Connectors instance.
+    Admin(admin::CommandOptions),
     /// Write a usable configuration for this machine, so nothing has to be authored by hand.
     Init {
         /// Where to write. Defaults below XDG_CONFIG_HOME.
@@ -343,6 +345,8 @@ enum MainError {
     #[error(transparent)]
     Auth(#[from] auth::AuthError),
     #[error(transparent)]
+    Admin(#[from] admin::AdminError),
+    #[error(transparent)]
     Enrol(#[from] enrol::EnrolError),
     #[error(transparent)]
     Refused(#[from] connectors_console::envelope::ReducedError),
@@ -376,6 +380,7 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",
+            Self::Admin(_) => "admin",
             Self::Enrol(_) => "connect",
         }
     }
@@ -407,6 +412,7 @@ where
 async fn run(cli: Cli) -> Result<(), MainError> {
     let format = cli.output;
     match cli.command {
+        Command::Admin(command) => admin::run(format, command).await.map_err(Into::into),
         Command::Init {
             config,
             state_root,

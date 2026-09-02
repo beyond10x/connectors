@@ -27,7 +27,7 @@ use integration_slack::SlackBackend;
 use serde_json::{json, Value};
 use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
-use service::{ConnectorBackend, CredentialSet, EgressTransport};
+use service::{AdminIntegration, AdminRegistry, ConnectorBackend, CredentialSet, EgressTransport};
 use state_sqlite::SqliteState;
 use subscription_custody::SubscriptionCustody;
 
@@ -109,6 +109,8 @@ pub enum RuntimeError {
     ServiceGrantState,
     #[error(transparent)]
     HostedVault(#[from] hosted_vault::HostedVaultError),
+    #[error("hosted Integration administration could not be composed")]
+    Admin,
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -562,6 +564,7 @@ impl HostedRuntime {
             None
         };
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
+        let mut admin_integrations = Vec::<AdminIntegration>::new();
         let kubernetes_namespace_access = config.kubernetes_namespace_access();
         let kubernetes_read_groups = kubernetes_namespace_access
             .iter()
@@ -701,6 +704,10 @@ impl HostedRuntime {
         }
         let slack_enabled = config.slack.is_some();
         if let Some(slack) = config.slack {
+            admin_integrations.push(
+                integration_slack::hosted_admin_integration(&config.tenant_id, &slack)
+                    .map_err(|_| RuntimeError::Admin)?,
+            );
             let public_origin = url::Url::parse(&slack.public_origin)
                 .map_err(|_| connectors_config::HostedServerConfigError::Invalid)?;
             let store = credential_stores
@@ -723,6 +730,10 @@ impl HostedRuntime {
         }
         let gitlab_enabled = config.gitlab.is_some();
         if let Some(gitlab) = config.gitlab {
+            admin_integrations.push(
+                integration_gitlab::hosted_admin_integration(&config.tenant_id, &gitlab)
+                    .map_err(|_| RuntimeError::Admin)?,
+            );
             let egress = gitlab_egress(&gitlab.origin)?;
             let store = credential_stores
                 .prepared
@@ -742,6 +753,10 @@ impl HostedRuntime {
         }
         let jira_enabled = config.jira.is_some();
         if let Some(jira) = config.jira {
+            admin_integrations.push(
+                integration_jira::hosted_admin_integration(&config.tenant_id, &jira)
+                    .map_err(|_| RuntimeError::Admin)?,
+            );
             let store = credential_stores
                 .prepared
                 .as_ref()
@@ -769,18 +784,35 @@ impl HostedRuntime {
                 .with_generated_service_operations(generated_operation_refs);
         // The enforcement authority binds the same store the hosted bookkeeping uses, and
         // accepts approval records from the deployment's one Identity issuer.
-        let authority =
-            server::hosted::HostedAuthority::bound(hosted_state, config.identity.origin.clone());
+        let authority = server::hosted::HostedAuthority::bound(
+            hosted_state.clone(),
+            config.identity.origin.clone(),
+        );
         // The S-045 crash-recovery scan settles every attempted approval presentation that has
         // no terminal outcome, before anything can present a new one. A journal that cannot be
         // settled is damaged approval authority, and this placement refuses to serve on it.
         authority.recover()?;
-        let connector_router = server::hosted::router_with_subscription_custody(
+        let admin = credential_stores
+            .values
+            .as_ref()
+            .map(|store| {
+                AdminRegistry::new(
+                    config.tenant_id.clone(),
+                    store.clone(),
+                    hosted_state,
+                    admin_integrations,
+                )
+                .map(Arc::new)
+                .map_err(|_| RuntimeError::Admin)
+            })
+            .transpose()?;
+        let connector_router = server::hosted::router_with_admin(
             verifier,
             backend.clone(),
             admission,
             authority,
             subscription_custody,
+            admin,
         );
         let application = if config.server.base_path == "/" {
             connector_router

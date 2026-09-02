@@ -1893,6 +1893,8 @@ dependencies = [
  "async-trait",
  "base64",
  "connector-resolve",
+ "connector-secrets",
+ "connector-state",
  "domain",
  "ed25519-dalek",
  "protocol",
@@ -1900,6 +1902,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tokio",
  "zeroize",
 ]
 
