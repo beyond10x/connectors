@@ -35,6 +35,7 @@ pub struct PrincipalIdentity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PrincipalContext {
     tenant_id: String,
+    realm: Option<String>,
     principal: PrincipalIdentity,
     authority_snapshot_id: String,
     authority_snapshot_sha256: String,
@@ -150,6 +151,7 @@ impl PrincipalContext {
         }
         Ok(Self {
             tenant_id,
+            realm: None,
             principal,
             authority_snapshot_id,
             authority_snapshot_sha256,
@@ -160,6 +162,21 @@ impl PrincipalContext {
             request_id: None,
             trace_id: None,
         })
+    }
+
+    /// Attach the exact optional realm supplied by the authentication adapter.
+    ///
+    /// This is deliberately not accepted from an operation envelope. An absent realm remains
+    /// distinct from a realm whose literal value is `default`.
+    pub fn with_verified_realm(
+        mut self,
+        realm: Option<String>,
+    ) -> Result<Self, PrincipalContextError> {
+        if realm.as_deref().is_some_and(|value| !valid_ref(value, 512)) {
+            return Err(PrincipalContextError);
+        }
+        self.realm = realm;
+        Ok(self)
     }
 
     /// Retain the authenticated request join carried by a hosted receiver. Local adapters do not
@@ -203,6 +220,12 @@ impl PrincipalContext {
     #[must_use]
     pub fn tenant_id(&self) -> &str {
         &self.tenant_id
+    }
+
+    /// Exact realm claim admitted by authentication, or absence.
+    #[must_use]
+    pub fn realm(&self) -> Option<&str> {
+        self.realm.as_deref()
     }
 
     #[must_use]
@@ -265,7 +288,7 @@ impl PrincipalContext {
     /// the verified token (the id IS the token id, the sha hashes the introspection
     /// envelope), so they rotate with every token and even differ between the
     /// catalog-scoped describe and the invoke-scoped call that follows it. What remains is
-    /// the authority that actually gates behavior: tenant, principal identity, and verified
+    /// the authority that actually gates behavior: tenant, exact optional realm, principal identity, and verified
     /// groups — a lease therefore survives token rotation and dies on a real authority
     /// change. Fields are length-framed so adjacent values cannot alias.
     #[must_use]
@@ -276,6 +299,7 @@ impl PrincipalContext {
             seed.extend_from_slice(part.as_bytes());
         };
         push(&self.tenant_id);
+        push(self.realm.as_deref().unwrap_or(""));
         push(&self.principal.subject);
         push(&self.principal.actor_subject);
         push(self.principal.email.as_deref().unwrap_or(""));
@@ -609,6 +633,27 @@ mod tests {
             first.stable_authority_seed(),
             second.stable_authority_seed()
         );
+    }
+
+    #[test]
+    fn the_stable_authority_seed_distinguishes_absent_and_literal_default_realms() {
+        let hosted = || {
+            PrincipalContext::hosted(
+                "tenant-test".to_owned(),
+                "person:owner".to_owned(),
+                "person:owner".to_owned(),
+                None,
+                "snapshot-test".to_owned(),
+                "a".repeat(64),
+            )
+            .unwrap()
+        };
+        let absent = hosted().stable_authority_seed();
+        let default = hosted()
+            .with_verified_realm(Some("default".to_owned()))
+            .unwrap()
+            .stable_authority_seed();
+        assert_ne!(absent, default);
     }
 
     #[test]

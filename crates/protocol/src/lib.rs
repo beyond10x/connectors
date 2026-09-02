@@ -3,6 +3,7 @@
 
 //! Strict versioned Connectors wire contracts.
 
+pub mod approval;
 pub mod audio;
 pub mod browser;
 pub mod catalog;

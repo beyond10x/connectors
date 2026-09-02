@@ -211,6 +211,17 @@ impl HostedAuthority {
             .map_err(|_| RecoveryError)
     }
 
+    /// Persist one externally decided approval in the same authority store redemption uses.
+    pub(super) fn issue(&self, record: &ApprovalRecord) -> Result<(), EnforcementRefusal> {
+        let Some(approvals) = &self.approvals else {
+            return Err(EnforcementRefusal::Unavailable);
+        };
+        issue_approval(&*approvals.store, record).map_err(|error| match error {
+            StateError::Invalid => EnforcementRefusal::NotAdmitted,
+            StateError::Unavailable | StateError::Capacity => EnforcementRefusal::Unavailable,
+        })
+    }
+
     /// Write the terminal outcome row for a dispatch this authority admitted.
     ///
     /// A journal that cannot take the row leaves the redemption spent; the startup recovery scan

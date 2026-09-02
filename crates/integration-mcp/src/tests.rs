@@ -157,6 +157,7 @@ fn deployment() -> ServiceDeployment {
         provider: ProviderIdentity {
             provider_ref: "provider:mcp:example".to_owned(),
             authority: "test.example.mcp".to_owned(),
+            connection_ref: "connection:mcp:example".to_owned(),
         },
         operations: BTreeMap::from([(
             OPERATION.to_owned(),
