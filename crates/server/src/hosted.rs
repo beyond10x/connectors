@@ -25,9 +25,10 @@ use protocol::operation::{
     OperationError, OperationErrorCode, OperationRequest, RequestEnvelope, ResponseEnvelope,
 };
 use serde::{Deserialize, Serialize};
-use service::{ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
+use service::{AdminRegistry, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
 use subscription_custody::SubscriptionCustody;
 
+mod admin;
 mod admission;
 mod approval;
 mod catalog_route;
@@ -52,7 +53,8 @@ pub use enforcement::{
 pub use principal::HostedPrincipal;
 use routing::MAX_COMPLETION_BYTES;
 pub use routing::{
-    router, router_with_client_discovery, router_with_subscription_custody, ClientDiscovery,
+    router, router_with_admin, router_with_client_discovery,
+    router_with_client_discovery_and_admin, router_with_subscription_custody, ClientDiscovery,
 };
 
 pub const CONNECTORS_AUDIENCE: &str = "urn:b10x:connectors";
@@ -237,6 +239,11 @@ pub enum IdentityVerificationError {
 pub trait IdentityVerifier: Send + Sync + 'static {
     async fn ready(&self) -> Result<(), IdentityVerificationError>;
 
+    /// Public origin whose CLI login discovery issues credentials accepted by this verifier.
+    fn login_origin(&self) -> Option<&str> {
+        None
+    }
+
     async fn verify(
         &self,
         credential: &str,
@@ -252,6 +259,7 @@ struct HostedState {
     authority: HostedAuthority,
     subscription_custody: Option<Arc<SubscriptionCustody>>,
     client_discovery: Option<ClientDiscovery>,
+    admin: Option<Arc<AdminRegistry>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -628,6 +636,7 @@ mod tests {
     use service::PrincipalContext;
     use tower::ServiceExt as _;
 
+    mod admin_routes;
     mod contract_validation;
     mod docs;
     mod enforcement;
@@ -675,6 +684,10 @@ mod tests {
             Ok(())
         }
 
+        fn login_origin(&self) -> Option<&str> {
+            Some("https://identity.example.test")
+        }
+
         async fn verify(
             &self,
             credential: &str,
@@ -698,6 +711,7 @@ mod tests {
                     "connectors.credentials.lease".to_owned(),
                     "connectors.invoke".to_owned(),
                     "connectors.events.read".to_owned(),
+                    "connectors.integrations.manage".to_owned(),
                 ]),
                 groups: BTreeSet::from(["operator".to_owned()]),
                 authority_snapshot_sha256: "b".repeat(64),

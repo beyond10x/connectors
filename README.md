@@ -117,6 +117,12 @@ allowed_events = ["app_mention"]
 connect_session_ttl_seconds = 300
 ```
 
+Activated GitLab, Slack, and Jira OAuth registrations keep client IDs and other non-secret policy
+in this configuration. Their client secrets are written once through the operator-only admin API,
+directly into the configured SecretStore. See
+[Administer hosted Integrations](docs/guides/administer-hosted-integrations.md); no provider secret
+needs to enter the public repository, deployment values, or CI.
+
 Kubernetes is enabled if and only if its namespace set is non-empty. SIP is enabled if and only if
 both `listen` and `deployment_config` are present; that deployment config uses the existing strict
 personal voice schema, and every SIP target must bind the configured listen address. See

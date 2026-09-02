@@ -46,7 +46,9 @@ For personal-local, the command currently collects only the app-level Socket Mod
 Zwirn presents three deliberately separate roles:
 
 - **Organization Slack** is deployment-owned and enabled from value-free policy. Its `xapp`,
-  `xoxb`, and OAuth client secret are provisioned externally into fixed Vault leaves. Its bot token
+  `xoxb`, and OAuth client secret remain in Connector custody. The hosted OAuth client secret is
+  supplied through `connectors admin credentials set slack oauth_client_secret`; runtime-issued
+  bot and app credentials use their dedicated Connect Sessions. Its bot token
   exposes normalized public-channel and user-directory reads to organization members, but the
   organization bot Connection admits no writes and no event channel.
 - **Connect my Slack account** starts Slack's user-centric OAuth flow. Connectors binds the one-use
