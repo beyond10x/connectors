@@ -32,6 +32,10 @@ workspaces=(
 test_workspace() {
   printf 'gate: [%s] cargo test --workspace --locked\n' "$1"
   (cd "$root/$1" && cargo test --workspace --locked)
+  if [ "$1" = crates/connectors-runtime ]; then
+    printf 'gate: [%s] cargo test --workspace --locked --no-default-features\n' "$1"
+    (cd "$root/$1" && cargo test --workspace --locked --no-default-features)
+  fi
 }
 
 final_checks() {
