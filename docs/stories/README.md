@@ -87,12 +87,12 @@ will spawn children as each milestone is designed.
 | [S-053](S-053-the-hosted-server-speaks-mcp-through-the-admission-seam.md) | The hosted server speaks MCP through the admission seam | done | Platform | server, testing |
 | [S-054](S-054-pod-logs-are-a-hosted-read-only-kubernetes-operation.md) | Pod logs are a hosted read-only Kubernetes operation | done | Platform | integrations, server |
 | [S-055](S-055-a-self-service-scope-subset-needs-no-operator.md) | A self-service scope subset needs no operator | done | Platform | identity |
-| [S-056](S-056-the-cli-bridges-mcp-over-stdio.md) | The CLI bridges MCP over stdio | backlog | Platform | config, integrations |
+| [S-056](S-056-the-cli-bridges-mcp-over-stdio.md) | The CLI bridges MCP over stdio | done | Platform | config, integrations |
 | [S-057](S-057-kubernetes-joins-the-catalog.md) | Kubernetes joins the catalog | backlog | Platform | integrations, catalog, server |
 | [S-058](S-058-mysql-and-postgresql-become-connectors.md) | MySQL and PostgreSQL become connectors | done | Platform | catalog, integrations, server |
 | [S-059](S-059-kubernetes-discovers-database-endpoints.md) | Kubernetes discovers database endpoints | done | Platform | integrations, server |
 | [S-060](S-060-monitoring-joins-the-mcp-toolset.md) | Monitoring joins the MCP toolset | done | Platform | server |
-| [S-061](S-061-a-logged-in-person-needs-no-configuration.md) | A logged-in person needs no configuration | backlog | Platform | config, integrations |
+| [S-061](S-061-a-logged-in-person-needs-no-configuration.md) | A logged-in person needs no configuration | done | Platform | config, integrations |
 | [S-062](S-062-discovery-reads-the-cluster-scoped-database-resources.md) | Discovery reads the cluster-scoped database resources | done | Platform | integrations, server |
 | [S-063](S-063-the-deployment-list-pages-instead-of-refusing.md) | The deployment list pages instead of refusing | done | Platform | integrations, server |
 | [S-064](S-064-monitoring-tool-schemas-tell-the-truth.md) | Monitoring tool schemas tell the truth | done | Platform | integrations, server |

@@ -3,9 +3,9 @@
 //! Typed, bounded clients and provider-neutral workflows for Connector control protocols.
 //!
 //! The raw clients own wire framing and response validation. Reusable helpers compose only generic
-//! protocol transitions such as candidate activation and Connect Session completion. This crate
-//! does not choose an owner context, Grant, operation, provider policy, or Identity credential,
-//! and it never persists a credential.
+//! protocol transitions such as candidate activation and Connect Session completion. The native
+//! hosted-client module owns browser login, OS-keyring session custody, exact-scope access-token
+//! renewal, and the local stdio MCP bridge; raw clients still receive credentials only at calls.
 
 use std::fs;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _};
@@ -20,8 +20,14 @@ use tokio::net::UnixStream;
 use url::Url;
 use zeroize::Zeroizing;
 
+mod identity;
 mod model;
+mod response;
 
+pub use identity::{
+    active_session_metadata, login, logout, run_mcp_bridge, AuthenticatedHostedClient,
+    AuthenticatedHostedError, IdentityError, LoginOptions, SessionMetadata,
+};
 pub use model::{
     CandidateActivationOutcome, ClientError, MaterializationOutcome, PendingConnection,
     RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
@@ -29,6 +35,10 @@ pub use model::{
 use model::{
     CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,
     RedeemSubscriptionLeaseRequest, RedeemedSubscriptionResponse, SubscriptionLeaseResponse,
+};
+use response::{
+    validate_connection_response, validate_datasource_response, validate_event_response,
+    validate_operation_response,
 };
 
 const COMPLETION_RESPONSE_BYTES: usize = 1024;
@@ -419,6 +429,7 @@ pub struct HostedClient {
     subscription_leases: Url,
     subscription_oauth_start: Url,
     subscription_oauth_complete: Url,
+    mcp: Url,
 }
 
 impl HostedClient {
@@ -763,8 +774,54 @@ impl HostedClient {
                 &base,
                 "subscription-credentials/claude-code/oauth/complete",
             ),
+            mcp: endpoint(&base, "mcp"),
             http,
         }
+    }
+
+    async fn mcp_exchange(
+        &self,
+        bearer: &str,
+        body: &[u8],
+    ) -> Result<Option<Vec<u8>>, ClientError> {
+        require_bearer(bearer)?;
+        if body.is_empty() || body.len() > operation::MAX_FRAME_BYTES {
+            return Err(ClientError::InvalidRequest(
+                "MCP frame exceeds the protocol bound".to_owned(),
+            ));
+        }
+        let mut response = self
+            .http
+            .post(self.mcp.clone())
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .bearer_auth(bearer)
+            .body(body.to_vec())
+            .send()
+            .await
+            .map_err(|_| ClientError::HostedUnavailable)?;
+        match response.status() {
+            reqwest::StatusCode::UNAUTHORIZED => return Err(ClientError::HostedAuthentication),
+            reqwest::StatusCode::FORBIDDEN => return Err(ClientError::HostedNotGranted),
+            reqwest::StatusCode::ACCEPTED => return Ok(None),
+            status if !status.is_success() => return Err(ClientError::HostedUnavailable),
+            _ => {}
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| ClientError::HostedUnavailable)?
+        {
+            if bytes.len() + chunk.len() > operation::MAX_RESULT_BYTES {
+                return Err(ClientError::InvalidResponse);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        if bytes.is_empty() {
+            return Err(ClientError::InvalidResponse);
+        }
+        serde_json::from_slice::<serde_json::Value>(&bytes)?;
+        Ok(Some(bytes))
     }
 
     async fn subscription_exchange<R: DeserializeOwned>(
@@ -811,9 +868,8 @@ impl HostedClient {
             .await
             .map_err(|_| ClientError::HostedUnavailable)?;
         match response.status() {
-            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
-                return Err(ClientError::HostedNotGranted);
-            }
+            reqwest::StatusCode::UNAUTHORIZED => return Err(ClientError::HostedAuthentication),
+            reqwest::StatusCode::FORBIDDEN => return Err(ClientError::HostedNotGranted),
             status if status.is_client_error() => {
                 return Err(ClientError::SubscriptionRefused(status.as_u16()));
             }
@@ -874,9 +930,8 @@ impl HostedClient {
             .await
             .map_err(|_| ClientError::HostedUnavailable)?;
         match response.status() {
-            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
-                return Err(ClientError::HostedNotGranted);
-            }
+            reqwest::StatusCode::UNAUTHORIZED => return Err(ClientError::HostedAuthentication),
+            reqwest::StatusCode::FORBIDDEN => return Err(ClientError::HostedNotGranted),
             status if !status.is_success() => return Err(ClientError::HostedUnavailable),
             _ => {}
         }
@@ -965,46 +1020,6 @@ impl CompletionEndpoint {
 #[serde(deny_unknown_fields)]
 struct CompletionAcknowledgement {
     accepted: bool,
-}
-
-fn validate_operation_response(
-    response: operation::ResponseEnvelope,
-    request_id: &str,
-) -> Result<operation::ResponseEnvelope, ClientError> {
-    if response.request_id != request_id || response.validate().is_err() {
-        return Err(ClientError::InvalidResponse);
-    }
-    Ok(response)
-}
-
-fn validate_connection_response(
-    response: connection::ResponseEnvelope,
-    request_id: &str,
-) -> Result<connection::ResponseEnvelope, ClientError> {
-    if response.request_id != request_id || response.validate().is_err() {
-        return Err(ClientError::InvalidResponse);
-    }
-    Ok(response)
-}
-
-fn validate_event_response(
-    response: event::ResponseEnvelope,
-    request_id: &str,
-) -> Result<event::ResponseEnvelope, ClientError> {
-    if response.request_id != request_id || response.validate().is_err() {
-        return Err(ClientError::InvalidResponse);
-    }
-    Ok(response)
-}
-
-fn validate_datasource_response(
-    response: datasource::ResponseEnvelope,
-    request_id: &str,
-) -> Result<datasource::ResponseEnvelope, ClientError> {
-    if response.request_id != request_id || response.validate().is_err() {
-        return Err(ClientError::InvalidResponse);
-    }
-    Ok(response)
 }
 
 fn validated_hosted_base(base: &str) -> Result<Url, ClientError> {

@@ -18,6 +18,8 @@ pub enum ClientError {
     InvalidHostedBase,
     #[error("hosted Connector Identity bearer is invalid")]
     InvalidIdentityBearer,
+    #[error("hosted Connector Identity authentication expired or was refused")]
+    HostedAuthentication,
     #[error("hosted Connector Identity authority was refused")]
     HostedNotGranted,
     #[error("hosted Connector refused the subscription request with status {0}")]

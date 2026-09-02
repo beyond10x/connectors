@@ -2,7 +2,7 @@
 id: S-061
 title: "A logged-in person needs no configuration"
 pillar: Platform
-status: backlog
+status: done
 design: ../design/15-a-zero-configuration-endpoint-plane.md
 epic: endpoint-plane
 areas: [config, integrations]
@@ -12,19 +12,18 @@ areas: [config, integrations]
 
 ## Goal
 
-Today a person needs curl and token plumbing to use the hosted plane. Give the local
-connectors CLI a zero-config hosted mode: `connectors login` drives the identity loopback
-flow (the login metadata already publishes the hosted endpoint), the session lands in the OS
-keyring, and every subsequent CLI command — and the stdio MCP bridge (S-056 folds in here) —
-exchanges it for short-lived scoped tokens transparently. The person types their Google
-password once and then uses discovered databases, Kubernetes, and monitoring through CLI or
-MCP with nothing configured locally.
+Today a person needs curl and token plumbing to use the hosted plane. Give the local Connectors
+CLI a zero-configuration hosted mode: `connectors login <connectors-base>` reads that deployment's
+public bootstrap document, drives the neutral Identity loopback flow, and places the opaque login
+session in the OS keyring. Subsequent hosted CLI requests and the stdio MCP bridge exchange that
+session for short-lived, exact-scope tokens transparently. Identity remains relying-party neutral:
+Connectors publishes the Identity origin it trusts, never the other way around.
 
 ## Acceptance
 
-- On a machine with no prior state: `connectors login <origin>` completes the browser flow,
-  and a following catalog/search/invoke command against the hosted deployment succeeds with
-  no flags beyond the origin (which discovery may also supply); tokens refresh across the
+- On a machine with no prior state: `connectors login <connectors-base>` completes the browser
+  flow, and a following catalog/search/invoke command against the selected hosted deployment
+  succeeds with no endpoint or token flags; tokens refresh across the
   300-second expiry without re-login, proven by an integration test with a fake identity.
 - The thin-CLI architecture fence stays green — the behaviour lands behind connectors-client
   per its prescription.
@@ -33,3 +32,8 @@ MCP with nothing configured locally.
 
 - 2026-08-24 — filed from design 15 (Timo: "users, when logged in with Google SSO via us,
   don't have to configure any of these things — they can just use it").
+- 2026-09-02 — implemented the Connectors-owned discovery document, browser Authorization Code +
+  S256 PKCE loopback, OS-keyring session custody, non-secret XDG selection state, minimal-scope
+  token caching and refresh, one authenticated retry, and automatic hosted selection for
+  Operation, Connection and Event commands. A fake Identity/Connectors integration proves login,
+  separate exact-scope tokens, cache reuse and refresh without re-login.

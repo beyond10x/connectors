@@ -11,6 +11,25 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+### Added
+
+- Add `connectors login`, `logout`, and `mcp`: the native CLI discovers a hosted Connectors
+  deployment's neutral Identity authority, completes browser Authorization Code + S256 PKCE login,
+  and bridges local stdio MCP to the hosted `/mcp` transport.
+- Automatically use the selected hosted deployment for Operation, Connection, and Event commands
+  when no explicit personal-local configuration or state root is supplied.
+
+### Changed
+
+- Cache five-minute Identity access tokens in memory by their exact Connector scope, renew them
+  inside a 30-second margin, and retry one hosted request with fresh authority after a 401.
+
+### Security
+
+- Keep the opaque Identity session only in the operating-system keyring and write only non-secret
+  account/deployment selection beneath XDG state. The stdio MCP peer sees neither the session nor
+  access tokens, and Connectors requests receive only the least-privilege token for that call.
+
 ## 0.4.1 — 2026-09-02
 
 ### Added

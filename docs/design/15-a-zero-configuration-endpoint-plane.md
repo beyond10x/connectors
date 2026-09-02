@@ -34,9 +34,20 @@ issues self-service scoped tokens without operator (S-055).
 3. **The projected surface (S-060, S-061).** The MCP toolset grows the monitoring tools
    (Grafana/Prometheus/Loki/Alertmanager — the infra-cluster Grafana through the dev-cluster
    connectors) and, once S-058/S-059 land, the discovered-database tools. The local connectors
-   CLI learns the zero-config hosted mode: `connectors login` drives the identity loopback
-   flow, discovery metadata already names the hosted endpoint, and every subsequent command
-   uses short-lived tokens transparently (S-056's stdio bridge folds into this).
+   CLI learns the zero-config hosted mode: `connectors login <connectors-base>` reads the public
+   discovery document served by that Connectors deployment, drives the neutral Identity loopback
+   flow, and every subsequent hosted command uses short-lived tokens transparently (S-056's stdio
+   bridge folds into this). This direction is deliberate: Connectors names its trusted Identity
+   origin and audience; Identity does not acquire relying-party-specific endpoint metadata.
+
+## Implemented amendment — native login and refresh (2026-09-02)
+
+The projected client surface is now complete for existing Operation, Connection and Event APIs and
+the inbound MCP transport. The CLI stores the opaque Identity session only in the OS keyring and
+keeps only non-secret deployment/account selection under XDG state. Requests exchange that session
+for the exact required Connector scope, reuse the access token in memory, renew within 30 seconds
+of its five-minute expiry, and retry once with fresh authority after an authentication refusal.
+Explicit local `--config` or `--state-root` flags continue to select the personal-local placement.
 
 ## Rules carried over
 
