@@ -7,7 +7,7 @@ instance, which writes it directly to the deployment's configured `SecretStore` 
 
 First inspect what the active configuration requires:
 
-```console
+```shell-session
 connectors admin integrations status \
   --endpoint https://connectors.example/api/connectors/v1
 ```
@@ -19,7 +19,7 @@ and access token in memory only.
 
 Then write one named requirement. For example, a GitLab OAuth application secret is supplied with:
 
-```console
+```shell-session
 connectors admin credentials set gitlab oauth_client_secret \
   --endpoint https://connectors.example/api/connectors/v1 \
   --secret-stdin

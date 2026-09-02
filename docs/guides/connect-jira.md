@@ -52,7 +52,7 @@ absent.
 
 An operator supplies only the selected fixed credentials through the hosted administrative API:
 
-```console
+```shell-session
 connectors admin credentials set jira oauth_client_secret --endpoint URL --secret-stdin
 connectors admin credentials set jira service_oauth_client_secret --endpoint URL --secret-stdin
 ```
