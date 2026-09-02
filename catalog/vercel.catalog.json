@@ -50,7 +50,7 @@
     ]
   ],
   "description": "Vercel: list and inspect projects and deployments, and cancel an in-progress deployment",
-  "generator": "connectors 0.5.0",
+  "generator": "connectors 0.5.2",
   "operations": [
     {
       "auth": [
