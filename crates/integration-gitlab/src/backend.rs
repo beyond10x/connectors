@@ -33,16 +33,21 @@ use protocol::operation::{
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
-use reqwest::redirect::Policy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use service::{
     BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectSessionLifecycle,
-    ConnectSessionTerminal, ConnectorBackend, HostedCompletionError, HostedCompletionPage,
-    HostedCompletionSubmission, PrincipalContext,
+    ConnectSessionTerminal, ConnectorBackend, EgressHttpRequest, EgressHttpResponse,
+    EgressTransport, HostedCompletionError, HostedCompletionPage, HostedCompletionSubmission,
+    PrincipalContext,
 };
 use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
+
+use crate::transport::{
+    bearer_headers, decode_page_response, decode_response, decode_value_response, form_body,
+    http_request,
+};
 
 pub(crate) const INTEGRATION_REF: &str = "gitlab";
 const AUTHORITY: &str = "com.gitlab.api";
@@ -115,7 +120,7 @@ pub(crate) struct GitlabInner {
     oauth_states: Mutex<PendingStates<OAuthPending>>,
     completion_lock: tokio::sync::Mutex<()>,
     refresh_lock: tokio::sync::Mutex<()>,
-    http: reqwest::Client,
+    egress: Arc<dyn EgressTransport>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -262,6 +267,7 @@ impl GitlabBackend {
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
         state_store: GitlabState,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, GitlabError> {
         let origin = parse_origin(&policy.origin)?;
         let public_origin = url::Url::parse(&policy.public_origin)
@@ -280,14 +286,6 @@ impl GitlabBackend {
         {
             return Err(GitlabError::new("connection-state"));
         }
-        let http = reqwest::Client::builder()
-            .redirect(Policy::none())
-            .no_proxy()
-            .connect_timeout(std::time::Duration::from_secs(10))
-            .timeout(std::time::Duration::from_secs(20))
-            .user_agent("b10x-connectors/0.1")
-            .build()
-            .map_err(|_| GitlabError::new("http-client"))?;
         let inner = Arc::new(GitlabInner {
             tenant_id,
             policy,
@@ -305,7 +303,7 @@ impl GitlabBackend {
             oauth_states: Mutex::new(PendingStates::new(DEFAULT_PENDING_CAPACITY)),
             completion_lock: tokio::sync::Mutex::new(()),
             refresh_lock: tokio::sync::Mutex::new(()),
-            http,
+            egress,
         });
         inner.recover_pending().await?;
         Ok(Self { inner })
@@ -454,7 +452,10 @@ impl ConnectorBackend for GitlabBackend {
             .ok_or(HostedCompletionError::NotFound)?;
         let token = parse_pat(submission.expose_secret())?;
         let outcome = async {
-            let evidence = self.inner.verify_pat(&token, &owner.email).await?;
+            let evidence = self
+                .inner
+                .verify_pat(session_ref, &token, &owner.email)
+                .await?;
             self.inner
                 .commit_connection(
                     session_ref,
@@ -786,10 +787,18 @@ impl GitlabInner {
         let _completion = self.completion_lock.lock().await;
         let outcome = async {
             let token = self
-                .exchange_oauth_code(code.expect("checked code"), &pending.verifier)
+                .exchange_oauth_code(
+                    &pending.session_ref,
+                    code.expect("checked code"),
+                    &pending.verifier,
+                )
                 .await?;
             let evidence = self
-                .verify_oauth(&token.access_token, &pending.owner.email)
+                .verify_oauth(
+                    &pending.session_ref,
+                    &token.access_token,
+                    &pending.owner.email,
+                )
                 .await?;
             self.commit_connection(&pending.session_ref, pending.owner, evidence, token)
                 .await
@@ -820,6 +829,7 @@ impl GitlabInner {
 
     async fn exchange_oauth_code(
         &self,
+        session_ref: &str,
         code: &str,
         verifier: &str,
     ) -> Result<CredentialValues, GitlabError> {
@@ -837,22 +847,33 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("oauth-config"))?;
         let mut token_url = self.origin.clone();
         token_url.set_path("/oauth/token");
+        let body = form_body(&[
+            ("client_id", self.policy.oauth_client_id.as_str()),
+            ("client_secret", client_secret.expose_secret()),
+            ("code", code),
+            ("grant_type", "authorization_code"),
+            ("redirect_uri", self.policy.oauth_redirect_uri.as_str()),
+            ("code_verifier", verifier),
+        ]);
         let response = self
-            .http
-            .post(token_url)
-            .form(&[
-                ("client_id", self.policy.oauth_client_id.as_str()),
-                ("client_secret", client_secret.expose_secret()),
-                ("code", code),
-                ("grant_type", "authorization_code"),
-                ("redirect_uri", self.policy.oauth_redirect_uri.as_str()),
-                ("code_verifier", verifier),
-            ])
-            .send()
+            .execute(
+                session_ref,
+                http_request(
+                    "POST",
+                    token_url,
+                    BTreeMap::from([(
+                        "content-type".to_owned(),
+                        "application/x-www-form-urlencoded".to_owned(),
+                    )]),
+                    Some(body),
+                ),
+                64 * 1024,
+                Vec::new(),
+            )
             .await
             .map_err(|_| GitlabError::new("oauth-exchange"))?;
         drop(client_secret);
-        let value: OAuthTokenResponse = decode_response(response, 64 * 1024).await?;
+        let value: OAuthTokenResponse = decode_response(response)?;
         let token = connector_oauth::validate(token_response(value), &EXCHANGE_POLICY)
             .map_err(|_| GitlabError::new("oauth-exchange"))?;
         Ok(CredentialValues {
@@ -865,11 +886,14 @@ impl GitlabInner {
 
     async fn verify_oauth(
         &self,
+        authority_ref: &str,
         token: &Secret,
         expected_email: &str,
     ) -> Result<VerifiedCredential, GitlabError> {
-        let info: OAuthTokenInfo = self.provider_json("/oauth/token/info", token, &[]).await?;
-        let user = self.current_user(token).await?;
+        let info: OAuthTokenInfo = self
+            .provider_json(authority_ref, "/oauth/token/info", token, &[])
+            .await?;
+        let user = self.current_user(authority_ref, token).await?;
         if info.resource_owner_id != user.id
             || info.expires_in_seconds == 0
             || info.created_at == 0
@@ -892,11 +916,17 @@ impl GitlabInner {
 
     async fn verify_pat(
         &self,
+        authority_ref: &str,
         token: &Secret,
         expected_email: &str,
     ) -> Result<VerifiedCredential, GitlabError> {
         let info: PersonalTokenInfo = self
-            .provider_json("/api/v4/personal_access_tokens/self", token, &[])
+            .provider_json(
+                authority_ref,
+                "/api/v4/personal_access_tokens/self",
+                token,
+                &[],
+            )
             .await?;
         if !info.active
             || info.revoked
@@ -908,7 +938,7 @@ impl GitlabInner {
         {
             return Err(GitlabError::new("pat-evidence"));
         }
-        let user = self.current_user(token).await?;
+        let user = self.current_user(authority_ref, token).await?;
         verify_user(&user, expected_email)?;
         Ok(VerifiedCredential {
             user,
@@ -917,8 +947,13 @@ impl GitlabInner {
         })
     }
 
-    async fn current_user(&self, token: &Secret) -> Result<GitlabUser, GitlabError> {
-        self.provider_json("/api/v4/user", token, &[]).await
+    async fn current_user(
+        &self,
+        authority_ref: &str,
+        token: &Secret,
+    ) -> Result<GitlabUser, GitlabError> {
+        self.provider_json(authority_ref, "/api/v4/user", token, &[])
+            .await
     }
 
     async fn commit_connection(
@@ -1252,15 +1287,6 @@ impl GitlabInner {
         if !same_origin(&self.origin, &target) || !target.path().starts_with("/api/v4/") {
             return Err(operation_not_granted());
         }
-        let method = reqwest::Method::from_bytes(plan.request.method.as_bytes())
-            .map_err(|_| operation_unavailable())?;
-        let mut outbound = self.http.request(method, target);
-        for (name, value) in plan.request.headers {
-            outbound = outbound.header(name, value);
-        }
-        if let Some(body) = plan.request.body {
-            outbound = outbound.body(body);
-        }
         let audit_ref = format!(
             "audit:gitlab:{}",
             random_uuid().map_err(|_| operation_unavailable())?
@@ -1273,17 +1299,25 @@ impl GitlabInner {
             "attempted",
         )
         .map_err(|_| operation_unavailable())?;
-        let response = outbound.send().await;
+        let response = self
+            .egress
+            .execute(
+                &request.connection_ref,
+                EgressHttpRequest {
+                    request: plan.request,
+                    maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
+                    response_headers: Vec::new(),
+                },
+            )
+            .await;
         let output = match response {
-            Ok(response) => decode_value_response(response, protocol::operation::MAX_RESULT_BYTES)
-                .await
-                .map_err(|_| {
-                    if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
-                        operation_unavailable()
-                    } else {
-                        operation_outcome_unknown(&request.operation_ref)
-                    }
-                }),
+            Ok(response) => decode_value_response(response).map_err(|_| {
+                if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
+                    operation_unavailable()
+                } else {
+                    operation_outcome_unknown(&request.operation_ref)
+                }
+            }),
             Err(_) => Err(
                 if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
                     operation_unavailable()
@@ -1384,29 +1418,40 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("oauth-config"))?;
         let mut token_url = self.origin.clone();
         token_url.set_path("/oauth/token");
+        let body = form_body(&[
+            ("client_id", self.policy.oauth_client_id.as_str()),
+            ("client_secret", client_secret.expose_secret()),
+            ("refresh_token", refresh_token.expose_secret()),
+            ("grant_type", "refresh_token"),
+            ("redirect_uri", self.policy.oauth_redirect_uri.as_str()),
+        ]);
         let response = self
-            .http
-            .post(token_url)
-            .form(&[
-                ("client_id", self.policy.oauth_client_id.as_str()),
-                ("client_secret", client_secret.expose_secret()),
-                ("refresh_token", refresh_token.expose_secret()),
-                ("grant_type", "refresh_token"),
-                ("redirect_uri", self.policy.oauth_redirect_uri.as_str()),
-            ])
-            .send()
+            .execute(
+                connection_ref,
+                http_request(
+                    "POST",
+                    token_url,
+                    BTreeMap::from([(
+                        "content-type".to_owned(),
+                        "application/x-www-form-urlencoded".to_owned(),
+                    )]),
+                    Some(body),
+                ),
+                64 * 1024,
+                Vec::new(),
+            )
             .await
             .map_err(|_| GitlabError::new("oauth-refresh"))?;
         drop(client_secret);
         drop(refresh_token);
-        let exchanged: OAuthTokenResponse = decode_response(response, 64 * 1024).await?;
+        let exchanged: OAuthTokenResponse = decode_response(response)?;
         let refreshed = connector_oauth::validate(token_response(exchanged), &REFRESH_POLICY)
             .map_err(|_| GitlabError::new("oauth-refresh"))?;
         let access = Secret::new(refreshed.access_token.to_string());
         let info: OAuthTokenInfo = self
-            .provider_json("/oauth/token/info", &access, &[])
+            .provider_json(connection_ref, "/oauth/token/info", &access, &[])
             .await?;
-        let user = self.current_user(&access).await?;
+        let user = self.current_user(connection_ref, &access).await?;
         if user.state != "active"
             || user.bot
             || info.resource_owner_id != connection.external_user_id
@@ -1467,20 +1512,43 @@ impl GitlabInner {
 
     async fn provider_json<T: for<'de> Deserialize<'de>>(
         &self,
+        authority_ref: &str,
         path: &str,
         token: &Secret,
         query: &[(String, String)],
     ) -> Result<T, GitlabError> {
-        let target = self.provider_url(path)?;
+        let mut target = self.provider_url(path)?;
+        target.query_pairs_mut().extend_pairs(query);
         let response = self
-            .http
-            .get(target)
-            .bearer_auth(token.expose_secret())
-            .query(query)
-            .send()
+            .execute(
+                authority_ref,
+                http_request("GET", target, bearer_headers(token), None),
+                MAX_PROVIDER_RESPONSE_BYTES,
+                Vec::new(),
+            )
             .await
             .map_err(|_| GitlabError::new("provider-unavailable"))?;
-        decode_response(response, MAX_PROVIDER_RESPONSE_BYTES).await
+        decode_response(response)
+    }
+
+    async fn execute(
+        &self,
+        authority_ref: &str,
+        request: connector_resolve::Request,
+        maximum_response_bytes: usize,
+        response_headers: Vec<String>,
+    ) -> Result<EgressHttpResponse, GitlabError> {
+        self.egress
+            .execute(
+                authority_ref,
+                EgressHttpRequest {
+                    request,
+                    maximum_response_bytes,
+                    response_headers,
+                },
+            )
+            .await
+            .map_err(|_| GitlabError::new("provider-unavailable"))
     }
 
     fn provider_url(&self, path: &str) -> Result<url::Url, GitlabError> {
@@ -1580,6 +1648,7 @@ impl GitlabInner {
                     .map_err(|_| datasource_unavailable())?;
                 let projects: Vec<Value> = self
                     .provider_json(
+                        &connection.connection_ref,
                         "/api/v4/projects",
                         &token,
                         &[
@@ -1718,19 +1787,21 @@ impl GitlabInner {
             "attempted",
         )
         .map_err(|_| datasource_unavailable())?;
+        let mut target = self
+            .provider_url(&plan.path)
+            .map_err(|_| datasource_unavailable())?;
+        target.query_pairs_mut().extend_pairs(&plan.query);
         let response = self
-            .http
-            .get(
-                self.provider_url(&plan.path)
-                    .map_err(|_| datasource_unavailable())?,
+            .execute(
+                &connection.connection_ref,
+                http_request("GET", target, bearer_headers(&token), None),
+                protocol::datasource::MAX_RESULT_BYTES,
+                vec!["x-next-page".to_owned()],
             )
-            .bearer_auth(token.expose_secret())
-            .query(&plan.query)
-            .send()
             .await;
         drop(token);
         let (payload, next_page) = match response {
-            Ok(response) => match decode_page_response(response).await {
+            Ok(response) => match decode_page_response(response) {
                 Ok(value) => value,
                 Err(_) => {
                     let _ = self.audit(
@@ -1815,6 +1886,7 @@ impl GitlabInner {
     ) -> Result<u64, DatasourceError> {
         let projects: Vec<Value> = self
             .provider_json(
+                &connection.connection_ref,
                 "/api/v4/projects",
                 token,
                 &[
@@ -2396,55 +2468,6 @@ fn parse_pat(bytes: &[u8]) -> Result<Secret, HostedCompletionError> {
     }
     let token = std::str::from_utf8(bytes).map_err(|_| HostedCompletionError::Invalid)?;
     Ok(Secret::new(token))
-}
-
-async fn decode_response<T: for<'de> Deserialize<'de>>(
-    response: reqwest::Response,
-    maximum: usize,
-) -> Result<T, GitlabError> {
-    let value = decode_value_response(response, maximum).await?;
-    serde_json::from_value(value).map_err(|_| GitlabError::new("provider-response"))
-}
-
-async fn decode_value_response(
-    mut response: reqwest::Response,
-    maximum: usize,
-) -> Result<Value, GitlabError> {
-    if !response.status().is_success()
-        || response
-            .content_length()
-            .is_some_and(|length| length > maximum as u64)
-    {
-        return Err(GitlabError::new("provider-refused"));
-    }
-    let mut bytes = Zeroizing::new(Vec::with_capacity(
-        response.content_length().unwrap_or(0).min(maximum as u64) as usize,
-    ));
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|_| GitlabError::new("provider-response"))?
-    {
-        if bytes.len().saturating_add(chunk.len()) > maximum {
-            return Err(GitlabError::new("provider-response-bound"));
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    serde_json::from_slice(&bytes).map_err(|_| GitlabError::new("provider-response"))
-}
-
-async fn decode_page_response(
-    response: reqwest::Response,
-) -> Result<(Value, Option<u64>), GitlabError> {
-    let next_page = response
-        .headers()
-        .get("x-next-page")
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.is_empty())
-        .and_then(|value| value.parse::<u64>().ok());
-    decode_value_response(response, protocol::datasource::MAX_RESULT_BYTES)
-        .await
-        .map(|value| (value, next_page))
 }
 
 fn verify_user(user: &GitlabUser, expected_email: &str) -> Result<(), GitlabError> {
