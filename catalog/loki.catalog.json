@@ -18,7 +18,7 @@
   ],
   "connector": "loki",
   "description": "Query Loki logs with bounded native LogQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.4.4",
+  "generator": "connectors 0.4.5",
   "operations": [
     {
       "auth": [],
