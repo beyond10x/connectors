@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Miro boards and board items: discover boards, read items of any type, and create, update and delete sticky notes",
-  "generator": "connectors 0.4.1",
+  "generator": "connectors 0.4.2",
   "operations": [
     {
       "auth": [
