@@ -20,6 +20,7 @@ use integration_jira::JiraBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
 use integration_monitoring::MonitoringBackend;
 use integration_platform::{PlatformBackend, PlatformIntegrationError};
+#[cfg(feature = "sip")]
 use integration_sip::{
     load_authority_issuer, RuntimeLauncher, SipLauncher, SipOperationBackend, StoredSipCredentials,
 };
@@ -27,7 +28,9 @@ use integration_slack::SlackBackend;
 use serde_json::{json, Value};
 use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
-use service::{AdminIntegration, AdminRegistry, ConnectorBackend, CredentialSet, EgressTransport};
+#[cfg(feature = "sip")]
+use service::CredentialSet;
+use service::{AdminIntegration, AdminRegistry, ConnectorBackend, EgressTransport};
 use state_sqlite::SqliteState;
 use subscription_custody::SubscriptionCustody;
 
@@ -48,7 +51,10 @@ pub enum RuntimeError {
     #[error(transparent)]
     HostedConfig(#[from] connectors_config::HostedServerConfigError),
     #[error(transparent)]
+    #[cfg(feature = "sip")]
     Voice(#[from] integration_sip::LaunchError),
+    #[error("SIP is configured but this embedding omitted the Connector SIP capability")]
+    SipCapabilityOmitted,
     #[error(transparent)]
     Operation(#[from] protocol::operation::OperationError),
     #[error(transparent)]
@@ -175,8 +181,14 @@ impl PersonalRuntime {
         let event_reply_claims =
             EventReplyClaims::open(claim_store).map_err(|_| RuntimeError::ReplyClaimJournal)?;
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
-        let mut verifying_key = None;
+        #[cfg(feature = "sip")]
+        let mut verifying_key: Option<String> = None;
+        #[cfg(not(feature = "sip"))]
+        let verifying_key: Option<String> = None;
+        #[cfg(feature = "sip")]
         let mut sip_dial_configured = false;
+        #[cfg(not(feature = "sip"))]
+        let sip_dial_configured = false;
         let mut slack_connections = None;
         let mut monitoring_connections = None;
         let mut kubernetes_candidates = None;
@@ -261,6 +273,11 @@ impl PersonalRuntime {
                 None
             };
 
+            #[cfg(not(feature = "sip"))]
+            if config.voice()?.is_some() {
+                return Err(RuntimeError::SipCapabilityOmitted);
+            }
+            #[cfg(feature = "sip")]
             if let Some(voice) = config.voice()? {
                 // Recorded from what was composed, not from the authority key. A raw SIP trunk has
                 // no authority -- that belongs to the application channel -- so deriving this from
@@ -590,6 +607,11 @@ impl HostedRuntime {
                 &config.kubernetes.ca_file,
             )?));
         }
+        #[cfg(not(feature = "sip"))]
+        if config.sip.enabled {
+            return Err(RuntimeError::SipCapabilityOmitted);
+        }
+        #[cfg(feature = "sip")]
         if config.sip.enabled {
             let deployment_config = config
                 .sip
@@ -832,7 +854,7 @@ impl HostedRuntime {
             "monitoring_enabled": monitoring_enabled,
             "vault_enabled": config.vault.enabled,
             "claude_code_enabled": claude_code_enabled,
-            "sip_enabled": config.sip.enabled,
+            "sip_enabled": cfg!(feature = "sip") && config.sip.enabled,
             "sip_listen": config.sip.listen,
             "platform_enabled": platform_enabled,
             "slack_enabled": slack_enabled,

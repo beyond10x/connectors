@@ -33,10 +33,15 @@ members = [
 ]
 
 [features]
+default = ["sip"]
 # Passes the loopback Identity exception through to the verifier adapter that owns it. Enabling it
 # in a release build is a compile error raised by `identity-http`; see that crate's
 # `src/local_identity.rs` for the three refusals this feature is held under.
 local-identity = ["identity-http/local-identity"]
+# Voice is an ordinary runtime capability, not a prerequisite for products that compose only
+# generated services or HTTP-backed Integrations. Existing Connector binaries keep it by default;
+# embedding products may omit it only when their strict configuration also leaves SIP disabled.
+sip = ["dep:integration-sip"]
 
 [dependencies]
 async-trait = "0.1"
@@ -57,7 +62,7 @@ integration-catalog = { version = "0.4.4", path = "../integration-catalog" }
 integration-platform = { version = "0.4.4", path = "../integration-platform" }
 integration-monitoring = { version = "0.4.4", path = "../integration-monitoring" }
 integration-mcp = { version = "0.4.4", path = "../integration-mcp" }
-integration-sip = { version = "0.4.4", path = "../integration-sip" }
+integration-sip = { version = "0.4.4", path = "../integration-sip", optional = true }
 integration-slack = { version = "0.4.4", path = "../integration-slack" }
 hex = "0.4"
 protocol = { version = "0.4.4", path = "../protocol" }

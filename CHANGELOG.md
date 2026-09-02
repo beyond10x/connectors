@@ -11,6 +11,12 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+### Added
+
+- Keep SIP in ordinary Connector binaries by default while allowing an embedding product whose
+  strict configuration disables SIP to omit the voice dependency graph. A SIP-enabled
+  configuration still fails closed when that capability was omitted.
+
 ## 0.4.4 — 2026-09-02
 
 ### Added
