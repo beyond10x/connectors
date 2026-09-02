@@ -215,7 +215,7 @@
       }
     }
   ],
-  "description": "GitLab for people and automation identities: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only",
+  "description": "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only",
   "generator": "connectors 0.5.0",
   "operations": [
     {
@@ -3108,6 +3108,555 @@
             "gitlab.oauth_token": [
               [
                 "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Create the approval-reviewed merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service and is not exposed as a general model tool",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "remove_source_branch": {
+              "type": "boolean"
+            },
+            "source_branch": {
+              "type": "string"
+            },
+            "target_branch": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "source_branch",
+            "target_branch",
+            "title",
+            "description"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create the approval-reviewed merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service and is not exposed as a general model tool",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-merge-request-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "description": "The session-owned source branch",
+          "name": "source_branch",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "pattern": "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+            "type": "string"
+          },
+          "symbol": "source_branch"
+        },
+        {
+          "description": "The reviewed target branch; publication never writes to this branch directly",
+          "name": "target_branch",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00 ]+$",
+            "type": "string"
+          },
+          "symbol": "target_branch"
+        },
+        {
+          "description": "The merge request title",
+          "name": "title",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "title"
+        },
+        {
+          "description": "The merge request description in Markdown",
+          "name": "description",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 1048576,
+            "type": "string"
+          },
+          "symbol": "description"
+        },
+        {
+          "description": "Whether GitLab should remove the session branch after merge",
+          "name": "remove_source_branch",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          },
+          "symbol": "remove_source_branch"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "description": {
+              "$param": "description"
+            },
+            "remove_source_branch": {
+              "$param": "remove_source_branch"
+            },
+            "source_branch": {
+              "$param": "source_branch"
+            },
+            "target_branch": {
+              "$param": "target_branch"
+            },
+            "title": {
+              "$param": "title"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/projects/{project_id}/merge_requests"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "iid": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "iid",
+          "project_id",
+          "title",
+          "state",
+          "source_branch",
+          "target_branch",
+          "sha",
+          "web_url"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Update the title and description of the existing merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service",
+        "input_schema": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "merge_request_iid": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "merge_request_iid",
+            "title",
+            "description"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Update the title and description of the existing merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-merge-request-update",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "description": "The project-scoped merge request number previously created for this session",
+          "name": "merge_request_iid",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "merge_request_iid"
+        },
+        {
+          "description": "The complete replacement title",
+          "name": "title",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "title"
+        },
+        {
+          "description": "The complete replacement description in Markdown",
+          "name": "description",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 1048576,
+            "type": "string"
+          },
+          "symbol": "description"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "description": {
+              "$param": "description"
+            },
+            "title": {
+              "$param": "title"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/projects/{project_id}/merge_requests/{merge_request_iid}"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "iid": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "iid",
+          "project_id",
+          "title",
+          "state",
+          "source_branch",
+          "target_branch",
+          "sha",
+          "web_url"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
               ],
               [
                 "read_api"
@@ -3561,6 +4110,544 @@
         "type": "array"
       },
       "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Create the unique branch assigned to an AgentIDE session at an exact source commit. This approval-gated operation is reserved for Workspace publication",
+        "input_schema": {
+          "properties": {
+            "branch": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "ref": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "branch",
+            "ref"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create the unique branch assigned to an AgentIDE session at an exact source commit. This approval-gated operation is reserved for Workspace publication",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-branch-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "description": "The session branch; arbitrary target branches are deliberately refused",
+          "name": "branch",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "pattern": "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+            "type": "string"
+          },
+          "symbol": "branch"
+        },
+        {
+          "description": "The exact source commit SHA from which the session was materialized",
+          "name": "ref",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "pattern": "^[0-9a-fA-F]{40}$",
+            "type": "string"
+          },
+          "symbol": "ref"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "POST",
+        "query": [
+          {
+            "name": "branch",
+            "value": {
+              "$param": "branch"
+            }
+          },
+          {
+            "name": "ref",
+            "value": {
+              "$param": "ref"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/repository/branches"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "can_push": {
+            "type": "boolean"
+          },
+          "commit": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "short_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "web_url": {
+                "format": "uri",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "default": {
+            "type": "boolean"
+          },
+          "merged": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "commit"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Atomically commit the exact reviewed file actions to the branch owned by an AgentIDE session. Per-file last_commit_id values carry GitLab's available stale-write guard; Workspace separately verifies the branch head and resulting parent",
+        "input_schema": {
+          "properties": {
+            "actions": {
+              "items": {},
+              "type": "array"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "commit_message": {
+              "type": "string"
+            },
+            "project_id": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_id",
+            "branch",
+            "commit_message",
+            "actions"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Atomically commit the exact reviewed file actions to the branch owned by an AgentIDE session. Per-file last_commit_id values carry GitLab's available stale-write guard; Workspace separately verifies the branch head and resulting parent",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-repository-commit-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The project's numeric GitLab id",
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "description": "The session-owned publication branch",
+          "name": "branch",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "pattern": "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+            "type": "string"
+          },
+          "symbol": "branch"
+        },
+        {
+          "description": "The reviewed commit message",
+          "name": "commit_message",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "commit_message"
+        },
+        {
+          "description": "The complete atomic change set. Content is text or base64 as declared on each action; callers must stay within the Connector request bound",
+          "name": "actions",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "create",
+                    "delete",
+                    "move",
+                    "update",
+                    "chmod"
+                  ],
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "encoding": {
+                  "enum": [
+                    "text",
+                    "base64"
+                  ],
+                  "type": "string"
+                },
+                "execute_filemode": {
+                  "type": "boolean"
+                },
+                "file_path": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00]+$",
+                  "type": "string"
+                },
+                "last_commit_id": {
+                  "pattern": "^[0-9a-fA-F]{40}$",
+                  "type": "string"
+                },
+                "previous_path": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action",
+                "file_path"
+              ],
+              "type": "object"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          },
+          "symbol": "actions"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "actions": {
+              "$param": "actions"
+            },
+            "branch": {
+              "$param": "branch"
+            },
+            "commit_message": {
+              "$param": "commit_message"
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/projects/{project_id}/repository/commits"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "author_email": {
+            "type": "string"
+          },
+          "author_name": {
+            "type": "string"
+          },
+          "authored_date": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "committed_date": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "committer_email": {
+            "type": "string"
+          },
+          "committer_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "parent_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "short_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "web_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "short_id",
+          "title",
+          "message",
+          "parent_ids",
+          "web_url"
+        ],
+        "type": "object"
+      },
+      "risk": "high",
       "semantic_effects": [],
       "service": "default"
     },

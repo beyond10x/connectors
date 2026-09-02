@@ -27,6 +27,71 @@ pub struct PrincipalIdentity {
     agent_revision: Option<NonZeroU64>,
 }
 
+/// Receiver-verified attempt and grant provenance for delegated agent execution.
+///
+/// There is no request deserializer or public field constructor. A trusted Connector authority
+/// adapter attaches this only after validating the delegated capability and current Grant set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DelegatedExecution {
+    agent_id: String,
+    attempt_id: String,
+    delegation_id: String,
+    grant_id: String,
+    grant_revision: u64,
+}
+
+impl DelegatedExecution {
+    /// Admit already-verified delegated execution coordinates.
+    pub fn after_verification(
+        agent_id: String,
+        attempt_id: String,
+        delegation_id: String,
+        grant_id: String,
+        grant_revision: u64,
+    ) -> Result<Self, PrincipalContextError> {
+        if !valid_ref(&agent_id, 512)
+            || !valid_ref(&attempt_id, 512)
+            || !valid_ref(&delegation_id, 512)
+            || !valid_ref(&grant_id, 512)
+            || grant_revision == 0
+        {
+            return Err(PrincipalContextError);
+        }
+        Ok(Self {
+            agent_id,
+            attempt_id,
+            delegation_id,
+            grant_id,
+            grant_revision,
+        })
+    }
+
+    #[must_use]
+    pub fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
+
+    #[must_use]
+    pub fn attempt_id(&self) -> &str {
+        &self.attempt_id
+    }
+
+    #[must_use]
+    pub fn delegation_id(&self) -> &str {
+        &self.delegation_id
+    }
+
+    #[must_use]
+    pub fn grant_id(&self) -> &str {
+        &self.grant_id
+    }
+
+    #[must_use]
+    pub const fn grant_revision(&self) -> u64 {
+        self.grant_revision
+    }
+}
+
 /// Receiver-admitted authority facts passed to Connector use cases.
 ///
 /// This is deliberately distinct from the caller-written wire [`OwnerContext`]. Transports must
@@ -45,6 +110,7 @@ pub struct PrincipalContext {
     deployment_id: Option<String>,
     request_id: Option<String>,
     trace_id: Option<String>,
+    execution: Option<DelegatedExecution>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -161,7 +227,22 @@ impl PrincipalContext {
             deployment_id: None,
             request_id: None,
             trace_id: None,
+            execution: None,
         })
+    }
+
+    /// Attach delegation facts validated by a Connector-owned capability receiver.
+    pub fn with_verified_execution(
+        mut self,
+        execution: DelegatedExecution,
+    ) -> Result<Self, PrincipalContextError> {
+        if self.principal.actor_subject == self.principal.subject
+            || self.principal.actor_subject != execution.agent_id
+        {
+            return Err(PrincipalContextError);
+        }
+        self.execution = Some(execution);
+        Ok(self)
     }
 
     /// Attach the exact optional realm supplied by the authentication adapter.
@@ -279,6 +360,12 @@ impl PrincipalContext {
         self.trace_id.as_deref()
     }
 
+    /// Receiver-verified delegated execution provenance, when this call represents an agent.
+    #[must_use]
+    pub const fn execution(&self) -> Option<&DelegatedExecution> {
+        self.execution.as_ref()
+    }
+
     /// The provenance-free authority identity for lease and cursor derivation.
     ///
     /// Serializing the whole context into a lease digest made every lease stale by
@@ -312,6 +399,13 @@ impl PrincipalContext {
         );
         for group in &self.verified_groups {
             push(group);
+        }
+        if let Some(execution) = &self.execution {
+            push(&execution.agent_id);
+            push(&execution.attempt_id);
+            push(&execution.delegation_id);
+            push(&execution.grant_id);
+            push(&execution.grant_revision.to_string());
         }
         seed
     }
@@ -680,6 +774,44 @@ mod tests {
         assert_eq!(admitted.actor_subject(), "service:caller");
         assert_eq!(admitted.email(), Some("owner@example.test"));
         assert_eq!(admitted.agent_revision(), None);
+        assert_eq!(admitted.execution(), None);
+    }
+
+    #[test]
+    fn delegated_execution_must_match_the_authenticated_actor() {
+        let hosted = PrincipalContext::hosted(
+            "tenant-test".to_owned(),
+            "person:owner".to_owned(),
+            "agent:worker".to_owned(),
+            None,
+            "token-test".to_owned(),
+            "b".repeat(64),
+        )
+        .unwrap();
+        let execution = DelegatedExecution::after_verification(
+            "agent:worker".to_owned(),
+            "attempt:one".to_owned(),
+            "delegation:one".to_owned(),
+            "grant:one".to_owned(),
+            7,
+        )
+        .unwrap();
+        let admitted = hosted.clone().with_verified_execution(execution).unwrap();
+        assert_eq!(admitted.execution().unwrap().attempt_id(), "attempt:one");
+        assert_ne!(
+            hosted.stable_authority_seed(),
+            admitted.stable_authority_seed()
+        );
+
+        let wrong = DelegatedExecution::after_verification(
+            "agent:other".to_owned(),
+            "attempt:one".to_owned(),
+            "delegation:one".to_owned(),
+            "grant:one".to_owned(),
+            7,
+        )
+        .unwrap();
+        assert!(hosted.with_verified_execution(wrong).is_err());
     }
 
     #[test]

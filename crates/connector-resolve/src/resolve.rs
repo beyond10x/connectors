@@ -428,6 +428,43 @@ mod tests {
     }
 
     #[test]
+    fn gitlab_publication_keeps_the_reviewed_actions_in_one_json_request() {
+        let provider = document::provider("gitlab").expect("the pack carries gitlab");
+        let operation = provider
+            .operation("gitlab-repository-commit-create")
+            .expect("the document carries publication");
+        assert!(!operation.expose);
+        let actions = json!([{
+            "action": "update",
+            "file_path": "src/lib.rs",
+            "content": "Ynl0ZXM=",
+            "encoding": "base64",
+            "last_commit_id": "a".repeat(40)
+        }]);
+        let request = build_request(
+            operation,
+            "https://gitlab.example.test/api/v4",
+            &json!({
+                "project_id": 42,
+                "branch": "agentide/session-123",
+                "commit_message": "Apply reviewed workspace changes",
+                "actions": actions
+            }),
+            &BTreeMap::new(),
+        )
+        .expect("the atomic request builds");
+
+        assert_eq!(request.method, "POST");
+        assert_eq!(
+            request.url,
+            "https://gitlab.example.test/api/v4/projects/42/repository/commits"
+        );
+        let body: Value =
+            serde_json::from_str(request.body.as_deref().expect("JSON body")).unwrap();
+        assert_eq!(body["actions"], actions);
+    }
+
+    #[test]
     fn an_optional_query_filter_may_simply_be_left_out() {
         // The defect this pins: `slack-conversations-history` declares five parameters and
         // requires one, and asking for a channel's history was refused with
