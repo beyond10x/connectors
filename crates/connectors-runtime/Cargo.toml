@@ -2,7 +2,7 @@
 name = "connectors-runtime"
 description = "Reusable Connectors daemon composition and explicit Integration dispatch."
 edition = "2021"
-version = "0.5.0"
+version = "0.5.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -46,33 +46,33 @@ sip = ["dep:integration-sip"]
 [dependencies]
 async-trait = "0.1"
 axum = { version = "0.8", features = ["json", "tokio"] }
-connector-secrets = { version = "0.5.0", path = "../connector-secrets" }
-connector-state = { version = "0.5.0", path = "../connector-state" }
-connectors-config = { version = "0.5.0", path = "../connectors-config" }
-domain = { version = "0.5.0", path = "../domain" }
+connector-secrets = { version = "0.5.2", path = "../connector-secrets" }
+connector-state = { version = "0.5.2", path = "../connector-state" }
+connectors-config = { version = "0.5.2", path = "../connectors-config" }
+domain = { version = "0.5.2", path = "../domain" }
 futures-util = "0.3"
-hosted-vault = { version = "0.5.0", path = "../hosted-vault" }
-hosted-secrets = { version = "0.5.0", path = "../hosted-secrets" }
-hosted-state = { version = "0.5.0", path = "../hosted-state" }
-identity-http = { version = "0.5.0", path = "../identity-http" }
-integration-kubernetes = { version = "0.5.0", path = "../integration-kubernetes" }
-integration-gitlab = { version = "0.5.0", path = "../integration-gitlab" }
-integration-jira = { version = "0.5.0", path = "../integration-jira" }
-integration-catalog = { version = "0.5.0", path = "../integration-catalog" }
-integration-platform = { version = "0.5.0", path = "../integration-platform" }
-integration-monitoring = { version = "0.5.0", path = "../integration-monitoring" }
-integration-mcp = { version = "0.5.0", path = "../integration-mcp" }
-integration-sip = { version = "0.5.0", path = "../integration-sip", optional = true }
-integration-slack = { version = "0.5.0", path = "../integration-slack" }
+hosted-vault = { version = "0.5.2", path = "../hosted-vault" }
+hosted-secrets = { version = "0.5.2", path = "../hosted-secrets" }
+hosted-state = { version = "0.5.2", path = "../hosted-state" }
+identity-http = { version = "0.5.2", path = "../identity-http" }
+integration-kubernetes = { version = "0.5.2", path = "../integration-kubernetes" }
+integration-gitlab = { version = "0.5.2", path = "../integration-gitlab" }
+integration-jira = { version = "0.5.2", path = "../integration-jira" }
+integration-catalog = { version = "0.5.2", path = "../integration-catalog" }
+integration-platform = { version = "0.5.2", path = "../integration-platform" }
+integration-monitoring = { version = "0.5.2", path = "../integration-monitoring" }
+integration-mcp = { version = "0.5.2", path = "../integration-mcp" }
+integration-sip = { version = "0.5.2", path = "../integration-sip", optional = true }
+integration-slack = { version = "0.5.2", path = "../integration-slack" }
 hex = "0.4"
-protocol = { version = "0.5.0", path = "../protocol" }
+protocol = { version = "0.5.2", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["process"] }
 serde_json = "1"
-server = { version = "0.5.0", path = "../server" }
-service = { version = "0.5.0", path = "../service" }
+server = { version = "0.5.2", path = "../server" }
+service = { version = "0.5.2", path = "../service" }
 sha2 = "0.10"
-state-sqlite = { version = "0.5.0", path = "../state-sqlite" }
-subscription-custody = { version = "0.5.0", path = "../subscription-custody" }
+state-sqlite = { version = "0.5.2", path = "../state-sqlite" }
+subscription-custody = { version = "0.5.2", path = "../subscription-custody" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["net", "time"] }
 url = "2"
