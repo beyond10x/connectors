@@ -11,6 +11,8 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.4.5 — 2026-09-02
+
 ### Added
 
 - Keep SIP in ordinary Connector binaries by default while allowing an embedding product whose

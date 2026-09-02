@@ -3,7 +3,7 @@
   "authority": "org.postgresql.server",
   "connector": "postgresql",
   "description": "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
-  "generator": "connectors 0.4.4",
+  "generator": "connectors 0.4.5",
   "operations": [
     {
       "auth": [],
