@@ -2,7 +2,7 @@
 name = "integration-sip"
 description = "SIP operation projection and isolated voice-runtime composition adapter."
 edition = "2021"
-version = "0.4.1"
+version = "0.4.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -12,31 +12,31 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
-catalog = { version = "0.4.1", path = "../catalog" }
-connector-secrets = { version = "0.4.1", path = "../connector-secrets" }
-connector-resolve = { version = "0.4.1", path = "../connector-resolve" }
-connectors-config = { version = "0.4.1", path = "../connectors-config" }
-domain = { version = "0.4.1", path = "../domain" }
-driver-audio = { version = "0.4.1", path = "../driver-audio" }
+catalog = { version = "0.4.2", path = "../catalog" }
+connector-secrets = { version = "0.4.2", path = "../connector-secrets" }
+connector-resolve = { version = "0.4.2", path = "../connector-resolve" }
+connectors-config = { version = "0.4.2", path = "../connectors-config" }
+domain = { version = "0.4.2", path = "../domain" }
+driver-audio = { version = "0.4.2", path = "../driver-audio" }
 ed25519-dalek = "2"
 getrandom = "0.3"
 hex = "0.4"
-connector-state = { version = "0.4.1", path = "../connector-state" }
-hosted-state = { version = "0.4.1", path = "../hosted-state" }
-protocol = { version = "0.4.1", path = "../protocol" }
+connector-state = { version = "0.4.2", path = "../connector-state" }
+hosted-state = { version = "0.4.2", path = "../hosted-state" }
+protocol = { version = "0.4.2", path = "../protocol" }
 rustls = "0.23"
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.4.1", path = "../service" }
+service = { version = "0.4.2", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "net", "rt", "sync", "time"] }
 tokio-rustls = "0.26"
-driver-sip = { version = "0.4.1", path = "../driver-sip" }
+driver-sip = { version = "0.4.2", path = "../driver-sip" }
 tokio-util = "0.7"
-voice-local-audio = { version = "0.4.1", path = "../voice-local-audio" }
-voice-runtime = { version = "0.4.1", path = "../voice-runtime" }
+voice-local-audio = { version = "0.4.2", path = "../voice-local-audio" }
+voice-runtime = { version = "0.4.2", path = "../voice-runtime" }
 webpki-roots = "1"
 
 [dev-dependencies]
