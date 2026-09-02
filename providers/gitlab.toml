@@ -84,7 +84,7 @@ api_version = "v4"
 # vendor's REST prefix after policy has selected either the reviewed default or an approved pin.
 base_url = "{origin}/api/v4"
 
-description = "GitLab for people and automation identities: discover reachable groups and projects; read, filter and create project issues, list merge requests, read a pipeline, and list a project's branches — every project addressed by its numeric id only"
+description = "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only"
 
 # One Connection chooses exactly one effective actor. OAuth and a personal access token carry a
 # person's authority; service-account, group, and project access tokens carry automation authority.
@@ -693,6 +693,124 @@ type = "object"
 required = ["id", "iid", "project_id", "title", "state"]
 properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, title = { type = "string" }, description = { type = "string" }, state = { type = "string" }, draft = { type = "boolean" }, source_branch = { type = "string" }, target_branch = { type = "string" }, sha = { type = "string" }, author = { type = "object" }, web_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" }, merged_at = { type = "string", format = "date-time" }, closed_at = { type = "string", format = "date-time" } }
 
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-merge-request-create"
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+method = "POST"
+direction = "write"
+path = "/projects/{project_id}/merge_requests"
+description = "Create the approval-reviewed merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service and is not exposed as a general model tool"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.body]]
+name = "source_branch"
+description = "The session-owned source branch"
+required = true
+schema = { type = "string", pattern = "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+
+[[operations.params.body]]
+name = "target_branch"
+description = "The reviewed target branch; publication never writes to this branch directly"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 255, pattern = "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00 ]+$" }
+
+[[operations.params.body]]
+name = "title"
+description = "The merge request title"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 255 }
+
+[[operations.params.body]]
+name = "description"
+description = "The merge request description in Markdown"
+required = true
+schema = { type = "string", maxLength = 1048576 }
+
+[[operations.params.body]]
+name = "remove_source_branch"
+description = "Whether GitLab should remove the session branch after merge"
+required = false
+schema = { type = "boolean" }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "iid", "project_id", "title", "state", "source_branch", "target_branch", "sha", "web_url"]
+properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, title = { type = "string" }, description = { type = "string" }, state = { type = "string" }, draft = { type = "boolean" }, source_branch = { type = "string" }, target_branch = { type = "string" }, sha = { type = "string" }, web_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-merge-request-update"
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+method = "PUT"
+direction = "write"
+path = "/projects/{project_id}/merge_requests/{merge_request_iid}"
+description = "Update the title and description of the existing merge request for an AgentIDE session branch. This operation is reserved for the Workspace publication service"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.path]]
+name = "merge_request_iid"
+description = "The project-scoped merge request number previously created for this session"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.body]]
+name = "title"
+description = "The complete replacement title"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 255 }
+
+[[operations.params.body]]
+name = "description"
+description = "The complete replacement description in Markdown"
+required = true
+schema = { type = "string", maxLength = 1048576 }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "iid", "project_id", "title", "state", "source_branch", "target_branch", "sha", "web_url"]
+properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, title = { type = "string" }, description = { type = "string" }, state = { type = "string" }, draft = { type = "boolean" }, source_branch = { type = "string" }, target_branch = { type = "string" }, sha = { type = "string" }, web_url = { type = "string", format = "uri" }, created_at = { type = "string", format = "date-time" }, updated_at = { type = "string", format = "date-time" } }
+
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
@@ -768,6 +886,106 @@ schema = { type = "integer", minimum = 1, maximum = 100 }
 type = "array"
 description = "The project's branches"
 items = { type = "object", required = ["name", "commit"], properties = { name = { type = "string" }, merged = { type = "boolean", description = "Whether this branch has been merged into the project's default branch" }, protected = { type = "boolean" }, default = { type = "boolean", description = "Whether this is the project's default branch" }, developers_can_push = { type = "boolean" }, developers_can_merge = { type = "boolean" }, can_push = { type = "boolean", description = "Whether the authenticated token's user can push to this branch" }, web_url = { type = "string", format = "uri" }, commit = { type = "object", description = "The branch tip: `{id, short_id, title, author_name, authored_date, message}`" } } }
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-branch-create"
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+method = "POST"
+direction = "write"
+path = "/projects/{project_id}/repository/branches"
+description = "Create the unique branch assigned to an AgentIDE session at an exact source commit. This approval-gated operation is reserved for Workspace publication"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.query]]
+name = "branch"
+description = "The session branch; arbitrary target branches are deliberately refused"
+required = true
+schema = { type = "string", pattern = "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+
+[[operations.params.query]]
+name = "ref"
+description = "The exact source commit SHA from which the session was materialized"
+required = true
+schema = { type = "string", pattern = "^[0-9a-fA-F]{40}$" }
+
+[operations.response_schema]
+type = "object"
+required = ["name", "commit"]
+properties = { name = { type = "string" }, merged = { type = "boolean" }, protected = { type = "boolean" }, default = { type = "boolean" }, can_push = { type = "boolean" }, web_url = { type = "string", format = "uri" }, commit = { type = "object", required = ["id"], properties = { id = { type = "string" }, short_id = { type = "string" }, title = { type = "string" }, message = { type = "string" }, web_url = { type = "string", format = "uri" } } } }
+
+[[operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "default"
+id = "gitlab-repository-commit-create"
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+method = "POST"
+direction = "write"
+path = "/projects/{project_id}/repository/commits"
+description = "Atomically commit the exact reviewed file actions to the branch owned by an AgentIDE session. Per-file last_commit_id values carry GitLab's available stale-write guard; Workspace separately verifies the branch head and resulting parent"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+
+[[operations.params.path]]
+name = "project_id"
+description = "The project's numeric GitLab id"
+required = true
+schema = { type = "integer", minimum = 1 }
+
+[[operations.params.body]]
+name = "branch"
+description = "The session-owned publication branch"
+required = true
+schema = { type = "string", pattern = "^agentide/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+
+[[operations.params.body]]
+name = "commit_message"
+description = "The reviewed commit message"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 65536 }
+
+[[operations.params.body]]
+name = "actions"
+description = "The complete atomic change set. Content is text or base64 as declared on each action; callers must stay within the Connector request bound"
+required = true
+schema = { type = "array", minItems = 1, maxItems = 1000, items = { type = "object", required = ["action", "file_path"], properties = { action = { type = "string", enum = ["create", "delete", "move", "update", "chmod"] }, file_path = { type = "string", minLength = 1, maxLength = 4096, pattern = "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00]+$" }, content = { type = "string" }, encoding = { type = "string", enum = ["text", "base64"] }, execute_filemode = { type = "boolean" }, last_commit_id = { type = "string", pattern = "^[0-9a-fA-F]{40}$" }, previous_path = { type = "string", minLength = 1, maxLength = 4096, pattern = "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\x00]+$" } } } }
+
+[operations.response_schema]
+type = "object"
+required = ["id", "short_id", "title", "message", "parent_ids", "web_url"]
+properties = { id = { type = "string" }, short_id = { type = "string" }, title = { type = "string" }, message = { type = "string" }, parent_ids = { type = "array", items = { type = "string" } }, author_name = { type = "string" }, author_email = { type = "string" }, authored_date = { type = "string", format = "date-time" }, committer_name = { type = "string" }, committer_email = { type = "string" }, committed_date = { type = "string", format = "date-time" }, web_url = { type = "string", format = "uri" } }
 
 # ---------------------------------------------------------------------------------------------
 

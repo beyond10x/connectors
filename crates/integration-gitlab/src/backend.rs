@@ -65,7 +65,7 @@ const MAX_AUDIT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_CONNECT_SESSIONS: usize = 32;
 const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
 const VALUE_PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
-const GITLAB_OPERATIONS: [&str; 11] = [
+const GITLAB_OPERATIONS: [&str; 15] = [
     "gitlab-user-get",
     "gitlab-group-list",
     "gitlab-project-list",
@@ -73,8 +73,12 @@ const GITLAB_OPERATIONS: [&str; 11] = [
     "gitlab-issue-get",
     "gitlab-issue-create",
     "gitlab-merge-request-list",
+    "gitlab-merge-request-create",
+    "gitlab-merge-request-update",
     "gitlab-pipeline-get",
     "gitlab-branch-list",
+    "gitlab-branch-create",
+    "gitlab-repository-commit-create",
     "gitlab-repository-tree-list",
     "gitlab-repository-file-get",
 ];
@@ -1139,11 +1143,14 @@ impl GitlabInner {
         GITLAB_OPERATIONS
             .iter()
             .filter_map(|operation_ref| {
+                let operation = connector_resolve::document::operation(operation_ref)?;
+                if !operation.expose {
+                    return None;
+                }
                 let connections = self.operation_connections(context, operation_ref);
                 if connections.is_empty() {
                     return None;
                 }
-                let operation = connector_resolve::document::operation(operation_ref)?;
                 let title = operation_ref.replace('-', " ");
                 (query.is_empty()
                     || operation_ref.contains(&query)
@@ -2517,7 +2524,7 @@ fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
 
 fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> bool {
     is_gitlab_operation(operation_ref)
-        && (operation_ref != "gitlab-issue-create"
+        && (!is_mutating_operation(operation_ref)
             || connection.scopes.iter().any(|scope| scope == "api"))
 }
 
@@ -2526,7 +2533,7 @@ fn is_gitlab_operation(value: &str) -> bool {
 }
 
 fn operation_effect(operation_ref: &str) -> EffectClass {
-    if operation_ref == "gitlab-issue-create" {
+    if is_mutating_operation(operation_ref) {
         EffectClass::Mutating
     } else {
         EffectClass::ReadOnly
@@ -2534,11 +2541,22 @@ fn operation_effect(operation_ref: &str) -> EffectClass {
 }
 
 fn operation_approval(operation_ref: &str) -> ApprovalPosture {
-    if operation_ref == "gitlab-issue-create" {
+    if is_mutating_operation(operation_ref) {
         ApprovalPosture::Required
     } else {
         ApprovalPosture::NotRequired
     }
+}
+
+fn is_mutating_operation(operation_ref: &str) -> bool {
+    matches!(
+        operation_ref,
+        "gitlab-issue-create"
+            | "gitlab-merge-request-create"
+            | "gitlab-merge-request-update"
+            | "gitlab-branch-create"
+            | "gitlab-repository-commit-create"
+    )
 }
 
 fn connection_summary(

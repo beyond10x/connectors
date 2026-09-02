@@ -412,7 +412,7 @@ fn gitlab_user_and_automation_connections_are_distinct_and_scope_gated() {
             let alternatives = requirement["scopes"][credential]
                 .as_array()
                 .expect("credential-local scopes");
-            if operation["id"] == "gitlab-issue-create" {
+            if operation["direction"] == "write" {
                 assert_eq!(alternatives, &[serde_json::json!(["api"])]);
             } else {
                 assert_eq!(
@@ -420,6 +420,22 @@ fn gitlab_user_and_automation_connections_are_distinct_and_scope_gated() {
                     &[serde_json::json!(["api"]), serde_json::json!(["read_api"]),]
                 );
             }
+        }
+    }
+
+    let publication = [
+        "gitlab-branch-create",
+        "gitlab-repository-commit-create",
+        "gitlab-merge-request-create",
+        "gitlab-merge-request-update",
+    ];
+    for operation in gitlab["operations"].as_array().expect("operations") {
+        let id = operation["id"].as_str().expect("operation id");
+        if publication.contains(&id) {
+            assert_eq!(operation["direction"], "write");
+            assert_eq!(operation["risk"], "high");
+            assert_eq!(operation["idempotency"], "non_idempotent");
+            assert_eq!(operation["expose"], false);
         }
     }
 }
