@@ -245,7 +245,8 @@ fn valid_access_token(value: &str) -> bool {
 }
 
 fn validate_scopes(value: &str) -> Option<BTreeSet<String>> {
-    const ALLOWED: [&str; 12] = [
+    const ALLOWED: [&str; 13] = [
+        "connectors.approvals.issue",
         "connectors.audit.read",
         "connectors.catalog.read",
         "connectors.channels.manage",
@@ -292,6 +293,14 @@ fn valid_ref(value: &str, maximum: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn approval_issuance_scope_is_admitted() {
+        assert_eq!(
+            validate_scopes("connectors.approvals.issue"),
+            Some(BTreeSet::from(["connectors.approvals.issue".to_owned()]))
+        );
+    }
 
     #[test]
     fn hosted_verifier_requires_https_origin_and_closed_access_token_shape() {
