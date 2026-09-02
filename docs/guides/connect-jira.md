@@ -50,16 +50,16 @@ the exact callback above. The recommended shared credential is an Atlassian serv
 explicit fallback for a service-account API token; in that mode `service_oauth_client_id` must be
 absent.
 
-An external secret provisioner writes only the selected fixed credentials to the `value` field of
-these Vault KV v2 leaves:
+An operator supplies only the selected fixed credentials through the hosted administrative API:
 
-```text
-b10x-connectors/tenants/<tenant>/com.atlassian.jira/login/service_oauth_client_secret
-b10x-connectors/tenants/<tenant>/com.atlassian.jira/login/service_api_token
-b10x-connectors/tenants/<tenant>/com.atlassian.jira/login/user_oauth_client_secret
+```console
+connectors admin credentials set jira oauth_client_secret --endpoint URL --secret-stdin
+connectors admin credentials set jira service_oauth_client_secret --endpoint URL --secret-stdin
 ```
 
-Provision either the service OAuth secret or the service API token, never both. The user OAuth app
+Use `service_api_token` instead of `service_oauth_client_secret` when that shared-auth mode is
+selected; `connectors admin integrations status --endpoint URL` reports the exact active
+requirements. Supply either the service OAuth secret or the service API token, never both. The user OAuth app
 secret is always required for delegated setup. Delegated access and rotating refresh tokens are
 stored under Connector-owned per-Connection instance paths and never reach Zwirn, Agent, Helm, or
 the provider catalog.

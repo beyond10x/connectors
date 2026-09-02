@@ -4175,6 +4175,8 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "connector-resolve",
+ "connector-secrets",
+ "connector-state",
  "domain",
  "ed25519-dalek",
  "protocol",
