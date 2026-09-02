@@ -71,6 +71,7 @@ surfaces:
       - docs/guides/*.md
       - docs/design/01-domain-model.md
       - docs/design/02-architecture.md
+      - docs/design/18-governed-outbound-mcp-services.md
     navigation:
       group: Services
       label: Connectors
