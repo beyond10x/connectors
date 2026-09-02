@@ -125,6 +125,7 @@ toml = "0.8"
 sha2 = "0.10"
 fs2 = "0.4"
 hex = "0.4"
+getrandom = "0.3"
 indexmap = { version = "2", features = ["serde"] }
 # YAML, for OpenAPI ingest: vendor specs are published as both JSON and YAML and the spec cache is
 # extension-agnostic. `serde_norway` rather than `serde_yaml`, which is unmaintained.

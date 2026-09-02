@@ -23,9 +23,10 @@ fn doc_json() -> &'static str {
     crate::hosted::docs::document_json()
 }
 
-/// The five envelope endpoints and how many distinct request examples each must carry —
+/// The six envelope endpoints and how many distinct request examples each must carry —
 /// one per method in the closed set, so a method the document forgets fails here.
-const ENVELOPE_EXAMPLE_FLOORS: [(&str, usize); 5] = [
+const ENVELOPE_EXAMPLE_FLOORS: [(&str, usize); 6] = [
+    ("/approvals", 1),
     ("/operations", 7),
     ("/connections", 8),
     ("/catalog", 2),
@@ -90,6 +91,10 @@ fn assert_request_example_accepted(path: &str, name: &str, value: Value) {
         panic!("`{path}` request example `{name}` is refused by the protocol {stage}: {error}")
     };
     match path {
+        "/approvals" => serde_json::from_value::<ApprovalRequestEnvelope>(value)
+            .unwrap_or_else(|error| refused("type", error.to_string()))
+            .validate()
+            .unwrap_or_else(|error| refused("validation", error.to_string())),
         "/operations" => serde_json::from_value::<RequestEnvelope>(value)
             .unwrap_or_else(|error| refused("type", error.to_string()))
             .validate()
@@ -165,10 +170,17 @@ fn every_documented_request_example_is_accepted_by_its_protocol_type() {
             .iter()
             .filter_map(|(_, value)| value["request"]["method"].as_str().map(str::to_owned))
             .collect();
-        assert!(
-            methods.len() >= floor,
-            "`{path}` documents an example for each of its {floor} methods, found {methods:?}"
-        );
+        if path == "/approvals" {
+            assert!(
+                examples.len() >= floor,
+                "`{path}` documents its issue request"
+            );
+        } else {
+            assert!(
+                methods.len() >= floor,
+                "`{path}` documents an example for each of its {floor} methods, found {methods:?}"
+            );
+        }
         for (name, value) in examples {
             assert_request_example_accepted(path, &name, value);
         }
@@ -328,6 +340,7 @@ fn the_document_pins_the_exact_wire_contract_identities_and_audience() {
     let doc = document();
     let schemas = &doc["components"]["schemas"];
     for (schema, contract) in [
+        ("approval.requestEnvelope", protocol::approval::CONTRACT),
         ("operation.requestEnvelope", protocol::operation::CONTRACT),
         (
             "connection.request_envelope",
@@ -428,7 +441,10 @@ fn documented_example(doc: &Value, path: &str, kind: &str, name: &str) -> Value 
     let operation = &doc["paths"][path]["post"];
     let container = match kind {
         "request" => &operation["requestBody"],
-        "response" => &operation["responses"]["200"],
+        "response" => operation["responses"]
+            .get("200")
+            .or_else(|| operation["responses"].get("201"))
+            .expect("an envelope endpoint documents a success response"),
         other => panic!("the page marks unknown example kind `{other}`"),
     };
     let value = container["content"]["application/json"]["examples"][name]["value"].clone();

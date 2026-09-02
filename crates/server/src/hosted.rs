@@ -11,13 +11,7 @@ use axum::response::{Html, IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use futures_util::StreamExt as _;
-use protocol::catalog::{
-    RequestEnvelope as CatalogRequestEnvelope, ResponseEnvelope as CatalogResponseEnvelope,
-};
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, RequestEnvelope as ConnectionRequestEnvelope,
-    ResponseEnvelope as ConnectionResponseEnvelope, MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES,
-};
+use protocol::connection::MAX_FRAME_BYTES as CONNECTION_MAX_FRAME_BYTES;
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, RequestEnvelope as DatasourceRequestEnvelope,
     ResponseEnvelope as DatasourceResponseEnvelope, MAX_FRAME_BYTES as DATASOURCE_MAX_FRAME_BYTES,
@@ -31,15 +25,17 @@ use protocol::operation::{
     MAX_FRAME_BYTES as OPERATION_MAX_FRAME_BYTES,
 };
 use serde::{Deserialize, Serialize};
-use service::{
-    ConnectSessionAccess, ConnectorBackend, HostedCompletionError, HostedCompletionSubmission,
-};
+use service::{ConnectorBackend, HostedCompletionError, HostedCompletionSubmission};
 use subscription_custody::SubscriptionCustody;
 
 mod admission;
+mod approval;
+mod catalog_route;
 mod connect;
+mod connection_route;
 mod docs;
 mod enforcement;
+mod health;
 mod mcp;
 mod principal;
 mod subscription;
@@ -64,6 +60,7 @@ pub struct HostedAdmissionPolicy {
     kubernetes_read_groups: BTreeSet<String>,
     kubernetes_restart_groups: BTreeSet<String>,
     monitoring_read_groups: BTreeSet<String>,
+    generated_service_operations: BTreeSet<String>,
 }
 
 impl HostedAdmissionPolicy {
@@ -74,6 +71,7 @@ impl HostedAdmissionPolicy {
             kubernetes_read_groups: BTreeSet::new(),
             kubernetes_restart_groups: BTreeSet::new(),
             monitoring_read_groups: BTreeSet::new(),
+            generated_service_operations: BTreeSet::new(),
         }
     }
 
@@ -98,6 +96,18 @@ impl HostedAdmissionPolicy {
         self
     }
 
+    /// Admit explicitly deployed generated-service operations to the ordinary Grant and approval
+    /// decision path. This is receiver reach, not authority: effectful calls still require their
+    /// durable exact-operation Grant and, when described, one-time approval.
+    #[must_use]
+    pub fn with_generated_service_operations(
+        mut self,
+        operations: impl IntoIterator<Item = String>,
+    ) -> Self {
+        self.generated_service_operations = operations.into_iter().collect();
+        self
+    }
+
     fn admits_operator(&self, principal: &HostedPrincipal) -> bool {
         !self.operator_groups.is_empty() && !self.operator_groups.is_disjoint(&principal.groups)
     }
@@ -108,6 +118,8 @@ impl HostedAdmissionPolicy {
         request: &protocol::operation::OperationRequest,
     ) -> bool {
         self.admits_operator(principal)
+            || matches!(request, protocol::operation::OperationRequest::Invoke(invoke)
+                if self.generated_service_operations.contains(&invoke.operation_ref))
             || tenant_member_module_read(request)
             || self.admits_kubernetes_operation(principal, request)
             || self.admits_monitoring_operation(principal, request)
@@ -262,9 +274,9 @@ pub fn router_with_subscription_custody(
     subscription_custody: Option<Arc<SubscriptionCustody>>,
 ) -> Router {
     Router::new()
-        .route("/livez", get(liveness))
-        .route("/readyz", get(readiness))
-        .route("/healthz", get(readiness))
+        .route("/livez", get(health::liveness))
+        .route("/readyz", get(health::readiness))
+        .route("/healthz", get(health::readiness))
         .route("/openapi.json", get(docs::openapi))
         .route("/docs", get(docs::page))
         .route(
@@ -272,12 +284,17 @@ pub fn router_with_subscription_custody(
             post(operation).layer(DefaultBodyLimit::max(OPERATION_MAX_FRAME_BYTES)),
         )
         .route(
+            "/approvals",
+            post(approval::issue).layer(DefaultBodyLimit::max(protocol::approval::MAX_FRAME_BYTES)),
+        )
+        .route(
             "/connections",
-            post(connection).layer(DefaultBodyLimit::max(CONNECTION_MAX_FRAME_BYTES)),
+            post(connection_route::handle).layer(DefaultBodyLimit::max(CONNECTION_MAX_FRAME_BYTES)),
         )
         .route(
             "/catalog",
-            post(catalog).layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
+            post(catalog_route::handle)
+                .layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),
         )
         .route(
             "/events",
@@ -309,160 +326,6 @@ pub fn router_with_subscription_custody(
             authority,
             subscription_custody,
         })
-}
-
-async fn connection(
-    State(state): State<HostedState>,
-    headers: HeaderMap,
-    Json(request): Json<ConnectionRequestEnvelope>,
-) -> Response {
-    if let Err(error) = request.validate() {
-        return connection_failure(&request.request_id, error, StatusCode::BAD_REQUEST);
-    }
-    let Some(credential) = bearer(&headers) else {
-        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
-    };
-    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
-        Ok(principal) => principal,
-        Err(IdentityVerificationError::Refused) => {
-            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
-        }
-        Err(IdentityVerificationError::Unavailable) => {
-            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
-        }
-    };
-    let self_service = matches!(
-        &request.request,
-        protocol::connection::ConnectionRequest::ConnectSessionCreate(request)
-            if state.backend.connect_session_access(request) == ConnectSessionAccess::SelfService
-    );
-    let required_scope = match &request.request {
-        protocol::connection::ConnectionRequest::CandidateSearch(_)
-        | protocol::connection::ConnectionRequest::Search(_)
-        | protocol::connection::ConnectionRequest::Describe(_)
-        | protocol::connection::ConnectionRequest::ObservationSearch(_)
-        | protocol::connection::ConnectionRequest::ConnectSessionStatus(_) => {
-            "connectors.catalog.read"
-        }
-        protocol::connection::ConnectionRequest::ConnectSessionCreate(_) if self_service => {
-            "connectors.connections.self"
-        }
-        protocol::connection::ConnectionRequest::CandidateActivate(_)
-        | protocol::connection::ConnectionRequest::Materialize(_)
-        | protocol::connection::ConnectionRequest::ConnectSessionCreate(_) => {
-            "connectors.connections.manage"
-        }
-    };
-    if principal.tenant_id != request.context.tenant_id || !principal.allows(required_scope) {
-        return connection_failure(
-            &request.request_id,
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
-                "the verified authority does not admit this Connector connection request family",
-                false,
-            ),
-            StatusCode::FORBIDDEN,
-        );
-    }
-    if matches!(
-        &request.request,
-        protocol::connection::ConnectionRequest::CandidateActivate(_)
-            | protocol::connection::ConnectionRequest::Materialize(_)
-            | protocol::connection::ConnectionRequest::ConnectSessionCreate(_)
-    ) && !self_service
-        && !state.policy.admits_operator(&principal)
-    {
-        return connection_failure(
-            &request.request_id,
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
-                "the Connector-owned management policy does not admit this principal",
-                false,
-            ),
-            StatusCode::FORBIDDEN,
-        );
-    }
-    let owner = match principal.principal_context(&request.request_id) {
-        Ok(owner) => owner,
-        Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
-    };
-    let response = match state
-        .backend
-        .handle_connection(&owner, request.request)
-        .await
-    {
-        Ok(result) => ConnectionResponseEnvelope::success(&request.request_id, result),
-        Err(error) => ConnectionResponseEnvelope::failure(&request.request_id, error),
-    };
-    Json(response).into_response()
-}
-
-async fn liveness() -> &'static str {
-    "ok\n"
-}
-
-async fn readiness(State(state): State<HostedState>) -> Response {
-    if crate::catalog_projection::ready().is_err() {
-        return (StatusCode::SERVICE_UNAVAILABLE, "catalog-invalid\n").into_response();
-    }
-    if state.verifier.ready().await.is_err() {
-        return (StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable\n").into_response();
-    }
-    match state.backend.ready().await {
-        Ok(()) => (StatusCode::OK, "ok\n").into_response(),
-        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, "backend-unavailable\n").into_response(),
-    }
-}
-
-async fn catalog(
-    State(state): State<HostedState>,
-    headers: HeaderMap,
-    Json(request): Json<CatalogRequestEnvelope>,
-) -> Response {
-    if let Err(error) = request.validate() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(CatalogResponseEnvelope::failure(&request.request_id, error)),
-        )
-            .into_response();
-    }
-    let Some(credential) = bearer(&headers) else {
-        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
-    };
-    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
-        Ok(principal) => principal,
-        Err(IdentityVerificationError::Refused) => {
-            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
-        }
-        Err(IdentityVerificationError::Unavailable) => {
-            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
-        }
-    };
-    if principal.tenant_id != request.context.tenant_id
-        || !principal.allows("connectors.catalog.read")
-    {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(CatalogResponseEnvelope::failure(
-                &request.request_id,
-                protocol::catalog::CatalogError {
-                    code: "not_granted".to_owned(),
-                    message: "the verified authority does not admit catalog reads".to_owned(),
-                },
-            )),
-        )
-            .into_response();
-    }
-    let request_id = request.request_id;
-    let response = match crate::catalog_projection::handle(request.request, &*state.backend) {
-        Ok(result) => CatalogResponseEnvelope::success(&request_id, result),
-        Err(error) => CatalogResponseEnvelope::failure(&request_id, error),
-    };
-    let response = match response.validate() {
-        Ok(()) => response,
-        Err(error) => CatalogResponseEnvelope::failure(request_id, error),
-    };
-    Json(response).into_response()
 }
 
 async fn operation(
@@ -793,14 +656,6 @@ fn operation_failure(request_id: &str, failure: OperationError, status: StatusCo
     (status, Json(ResponseEnvelope::failure(request_id, failure))).into_response()
 }
 
-fn connection_failure(request_id: &str, failure: ConnectionError, status: StatusCode) -> Response {
-    (
-        status,
-        Json(ConnectionResponseEnvelope::failure(request_id, failure)),
-    )
-        .into_response()
-}
-
 fn event_failure(request_id: &str, failure: EventError, status: StatusCode) -> Response {
     (
         status,
@@ -824,7 +679,12 @@ mod tests {
     use super::*;
     use axum::body::{to_bytes, Body, Bytes};
     use axum::http::Request;
-    use protocol::connection::{ConnectionRequest, ConnectionResult};
+    use protocol::approval::{IssuedApproval, RequestEnvelope as ApprovalRequestEnvelope};
+    use protocol::catalog::RequestEnvelope as CatalogRequestEnvelope;
+    use protocol::connection::{
+        ConnectionError, ConnectionRequest, ConnectionResult,
+        RequestEnvelope as ConnectionRequestEnvelope,
+    };
     use protocol::datasource::{
         DatasourceRequest, DatasourceResult, RequestEnvelope as DatasourceRequestEnvelope,
         SearchRequest as DatasourceSearchRequest,
@@ -867,6 +727,7 @@ mod tests {
                 actor_subject: "person:test".to_owned(),
                 token_id: "token-test".to_owned(),
                 scopes: BTreeSet::from([
+                    "connectors.approvals.issue".to_owned(),
                     "connectors.catalog.read".to_owned(),
                     "connectors.connections.manage".to_owned(),
                     "connectors.connections.self".to_owned(),
@@ -929,6 +790,70 @@ mod tests {
 
     struct UnavailableBackend;
 
+    const APPROVAL_OPERATION: &str = "todo.create_list";
+
+    struct ApprovalBackend;
+
+    #[async_trait]
+    impl ConnectorBackend for ApprovalBackend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            Ok(())
+        }
+
+        fn owns_operation(&self, request: &OperationRequest) -> bool {
+            match request {
+                OperationRequest::Describe(request) => request.operation_ref == APPROVAL_OPERATION,
+                OperationRequest::Invoke(request) => request.operation_ref == APPROVAL_OPERATION,
+                _ => false,
+            }
+        }
+
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            match request {
+                OperationRequest::Describe(request)
+                    if request.operation_ref == APPROVAL_OPERATION =>
+                {
+                    Ok(OperationResult::Describe(OperationDescription {
+                        operation_ref: request.operation_ref,
+                        title: "Create todo list".to_owned(),
+                        description: "Create one todo list".to_owned(),
+                        input_schema: serde_json::json!({"type": "object"}),
+                        output_schema: serde_json::json!({"type": "object"}),
+                        effect: EffectClass::Mutating,
+                        approval: ApprovalPosture::Required,
+                        connections: vec![protocol::operation::ConnectionSummary {
+                            connection_ref: "connection:todo".to_owned(),
+                            label: "Todo".to_owned(),
+                            provider: "provider:todo".to_owned(),
+                            audiences: Vec::new(),
+                            purpose: Some("Generated Todo service".to_owned()),
+                        }],
+                        description_ref: "description:todo-create-list".to_owned(),
+                    }))
+                }
+                OperationRequest::Invoke(request)
+                    if request.operation_ref == APPROVAL_OPERATION =>
+                {
+                    Ok(OperationResult::Invoke(InvocationResult {
+                        operation_ref: request.operation_ref,
+                        output: serde_json::json!({"accepted": true}),
+                        connector_audit_ref: "audit:todo-create-list".to_owned(),
+                        execution_ref: None,
+                    }))
+                }
+                _ => Err(OperationError::new(
+                    OperationErrorCode::NotFound,
+                    "synthetic approval operation not found",
+                    false,
+                )),
+            }
+        }
+    }
+
     #[async_trait]
     impl ConnectorBackend for UnavailableBackend {
         async fn ready(&self) -> Result<(), service::BackendReadinessError> {
@@ -980,6 +905,88 @@ mod tests {
             .header(header::AUTHORIZATION, "Bearer access")
             .body(Body::from(serde_json::to_vec(envelope).unwrap()))
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_human_issues_one_exact_input_approval_which_is_spent_once() {
+        let store = Arc::new(connector_state::MemoryState::new());
+        domain::GrantSet {
+            revision: 1,
+            grants: vec![domain::Grant {
+                grant: "grant:todo".to_owned(),
+                provider: "provider:todo".to_owned(),
+                connection: "connection:todo".to_owned(),
+                selector: None,
+                allow: BTreeSet::from([APPROVAL_OPERATION.to_owned()]),
+                deny: BTreeSet::new(),
+                inbound_events: BTreeSet::new(),
+            }],
+        }
+        .write(&*store, "tenant-dev")
+        .unwrap();
+        let authority = HostedAuthority::bound(
+            Arc::<connector_state::MemoryState>::clone(&store),
+            "https://identity.example.test",
+        );
+        let app = router(
+            Arc::new(Verifier),
+            Arc::new(ApprovalBackend),
+            HostedAdmissionPolicy::new(["operator".to_owned()])
+                .with_generated_service_operations([APPROVAL_OPERATION.to_owned()]),
+            authority,
+        );
+        let input = serde_json::json!({"title": "Ship it"});
+        let issue = ApprovalRequestEnvelope {
+            protocol: protocol::approval::CONTRACT.to_owned(),
+            request_id: "request-approval-1".to_owned(),
+            context: envelope("tenant-dev").context,
+            request: protocol::approval::IssueRequest {
+                operation_ref: APPROVAL_OPERATION.to_owned(),
+                connection_ref: "connection:todo".to_owned(),
+                description_ref: "description:todo-create-list".to_owned(),
+                input: input.clone(),
+                ttl_seconds: 120,
+            },
+        };
+        let response = app
+            .clone()
+            .oneshot(
+                Request::post("/approvals")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer access")
+                    .body(Body::from(serde_json::to_vec(&issue).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        let proof: IssuedApproval = serde_json::from_slice(
+            &to_bytes(response.into_body(), protocol::approval::MAX_RESPONSE_BYTES)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+
+        let invoke = || {
+            let mut envelope = envelope("tenant-dev");
+            envelope.request = OperationRequest::Invoke(InvokeRequest {
+                operation_ref: APPROVAL_OPERATION.to_owned(),
+                connection_ref: "connection:todo".to_owned(),
+                description_ref: "description:todo-create-list".to_owned(),
+                input: input.clone(),
+                approval_evidence_ref: Some(proof.approval_evidence_ref.clone()),
+            });
+            operation_http_request(&envelope)
+        };
+        assert_eq!(
+            app.clone().oneshot(invoke()).await.unwrap().status(),
+            StatusCode::OK
+        );
+        assert_eq!(
+            app.oneshot(invoke()).await.unwrap().status(),
+            StatusCode::FORBIDDEN
+        );
     }
 
     fn connection_envelope(tenant_id: &str) -> ConnectionRequestEnvelope {

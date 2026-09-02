@@ -12,8 +12,8 @@ use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _}
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub use protocol::{approval, datasource, operation};
 use protocol::{connection, event};
-pub use protocol::{datasource, operation};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
@@ -414,6 +414,7 @@ pub struct HostedClient {
     connections: Url,
     events: Url,
     datasources: Url,
+    approvals: Url,
     subscription_credential: Url,
     subscription_leases: Url,
     subscription_oauth_start: Url,
@@ -469,6 +470,41 @@ impl HostedClient {
             )
             .await?;
         validate_operation_response(response, &request_id)
+    }
+
+    /// Ask hosted Connectors to issue one human-approved, exact-input, one-time proof.
+    pub async fn issue_approval(
+        &self,
+        bearer: &str,
+        context: &operation::OwnerContext,
+        request: approval::IssueRequest,
+    ) -> Result<approval::IssuedApproval, ClientError> {
+        require_bearer(bearer)?;
+        let request_id = request_id();
+        let envelope = approval::RequestEnvelope {
+            protocol: approval::CONTRACT.to_owned(),
+            request_id: request_id.clone(),
+            context: context.clone(),
+            request,
+        };
+        envelope
+            .validate()
+            .map_err(|error| ClientError::InvalidRequest(error.to_string()))?;
+        let body = serde_json::to_vec(&envelope)?;
+        let issued: approval::IssuedApproval = self
+            .confidential_exchange(
+                reqwest::Method::POST,
+                self.approvals.clone(),
+                bearer,
+                Some(body),
+                approval::MAX_FRAME_BYTES,
+                approval::MAX_RESPONSE_BYTES,
+            )
+            .await?;
+        if !issued.validate(&request_id) {
+            return Err(ClientError::InvalidResponse);
+        }
+        Ok(issued)
     }
 
     /// Sends one hosted Connection request with an ephemeral Identity bearer.
@@ -716,6 +752,7 @@ impl HostedClient {
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),
             datasources: endpoint(&base, "datasources"),
+            approvals: endpoint(&base, "approvals"),
             subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
             subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),
             subscription_oauth_start: endpoint(
@@ -737,12 +774,32 @@ impl HostedClient {
         bearer: &str,
         body: Option<Vec<u8>>,
     ) -> Result<R, ClientError> {
+        self.confidential_exchange(
+            method,
+            endpoint,
+            bearer,
+            body,
+            SUBSCRIPTION_RESPONSE_BYTES,
+            SUBSCRIPTION_RESPONSE_BYTES,
+        )
+        .await
+    }
+
+    async fn confidential_exchange<R: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        endpoint: Url,
+        bearer: &str,
+        body: Option<Vec<u8>>,
+        request_bound: usize,
+        response_bound: usize,
+    ) -> Result<R, ClientError> {
         require_bearer(bearer)?;
         let mut request = self.http.request(method, endpoint).bearer_auth(bearer);
         if let Some(body) = body {
-            if body.len() > SUBSCRIPTION_RESPONSE_BYTES {
+            if body.len() > request_bound {
                 return Err(ClientError::InvalidRequest(
-                    "subscription request exceeds the protocol bound".to_owned(),
+                    "confidential request exceeds the protocol bound".to_owned(),
                 ));
             }
             request = request
@@ -772,7 +829,7 @@ impl HostedClient {
         }
         if response
             .content_length()
-            .is_some_and(|length| length > SUBSCRIPTION_RESPONSE_BYTES as u64)
+            .is_some_and(|length| length > response_bound as u64)
         {
             return Err(ClientError::InvalidResponse);
         }
@@ -782,7 +839,7 @@ impl HostedClient {
             .await
             .map_err(|_| ClientError::HostedUnavailable)?
         {
-            if bytes.len() + chunk.len() > SUBSCRIPTION_RESPONSE_BYTES {
+            if bytes.len() + chunk.len() > response_bound {
                 return Err(ClientError::InvalidResponse);
             }
             bytes.extend_from_slice(&chunk);
