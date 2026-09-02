@@ -11,6 +11,8 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.4.2 — 2026-09-02
+
 ### Added
 
 - Add `connectors login`, `logout`, and `mcp`: the native CLI discovers a hosted Connectors
@@ -23,6 +25,11 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 - Cache five-minute Identity access tokens in memory by their exact Connector scope, renew them
   inside a 30-second margin, and retry one hosted request with fresh authority after a 401.
+
+### Fixed
+
+- Admit the exact `connectors.approvals.issue` scope used by the hosted approval-issuance endpoint
+  through the closed Identity verifier vocabulary.
 
 ### Security
 

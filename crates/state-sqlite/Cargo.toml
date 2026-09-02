@@ -2,7 +2,7 @@
 name = "state-sqlite"
 description = "SQLite-backed Connector state cells: in-memory for tests, a file for a workstation."
 edition = "2021"
-version = "0.4.1"
+version = "0.4.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -13,7 +13,7 @@ publish = false
 workspace = "../connectors-runtime"
 
 [dependencies]
-connector-state = { version = "0.4.1", path = "../connector-state" }
+connector-state = { version = "0.4.2", path = "../connector-state" }
 # `bundled` so the build carries its own SQLite: the connectors image is distroless and has no
 # system libsqlite3. Same crate and version as `substrate` and `identity`.
 rusqlite = { version = "0.37", features = ["bundled"] }
@@ -23,6 +23,6 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 # evidence (S-045) both run against this backend: the same Grant records must produce the same
 # admissions and neutral refusals as every other backend, and real threads over real SQLite prove
 # the exactly-once claim across a reopened database file.
-domain = { version = "0.4.1", path = "../domain" }
+domain = { version = "0.4.2", path = "../domain" }
 serde_json = "1"
 tempfile = "3"
