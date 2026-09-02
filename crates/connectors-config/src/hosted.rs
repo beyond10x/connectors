@@ -550,9 +550,9 @@ impl HostedServerConfig {
         {
             return Err(HostedServerConfigError::Invalid);
         }
-        let supported_credential_egress = self.slack.is_some() || self.grafana.enabled;
-        let unsupported_credential_egress =
-            self.sip.credentials.is_some() || self.gitlab.is_some() || self.jira.is_some();
+        let supported_credential_egress =
+            self.slack.is_some() || self.gitlab.is_some() || self.grafana.enabled;
+        let unsupported_credential_egress = self.sip.credentials.is_some() || self.jira.is_some();
         if unsupported_credential_egress
             || (supported_credential_egress
                 && self.egress.policy != HostedEgressPolicy::ConnectionBoundPostDnsV1)
@@ -1081,7 +1081,10 @@ enabled = false
 
         let mut disabled = enabled;
         disabled.claude_code.enabled = false;
-        assert!(disabled.validate().is_err(), "unused Vault configuration is refused");
+        assert!(
+            disabled.validate().is_err(),
+            "unused Vault configuration is refused"
+        );
     }
 
     #[test]
@@ -1199,6 +1202,8 @@ base_path = "/api/connectors/v1"
 origin = "https://identity.example.test"
 [storage]
 state_root = "/var/lib/b10x-connectors"
+[egress]
+policy = "connection_bound_post_dns_v1"
 [kubernetes]
 enabled = false
 namespaces = []
@@ -1223,10 +1228,14 @@ refresh_skew_seconds = 300
 "#,
         )
         .unwrap();
+        assert!(config.validate().is_ok());
+
+        config.egress.policy = HostedEgressPolicy::Disabled;
         assert!(matches!(
             config.validate(),
             Err(HostedServerConfigError::CredentialEgressUnconfined)
         ));
+        config.egress.policy = HostedEgressPolicy::ConnectionBoundPostDnsV1;
 
         config.gitlab.as_mut().unwrap().oauth_redirect_uri =
             "https://attacker.example/api/connectors/v1/oauth/gitlab/callback".to_owned();

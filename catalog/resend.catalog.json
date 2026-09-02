@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Resend transactional email: send a message, read what happened to it, and list or inspect the domains a key may send from",
-  "generator": "connectors 0.4.0",
+  "generator": "connectors 0.4.1",
   "operations": [
     {
       "auth": [

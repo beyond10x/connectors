@@ -52,8 +52,8 @@ destination selection to a model.
   Slack HTTP/Socket Mode and the deployment-owned Grafana origin. It validates scheme/host/port
   before DNS, classifies the entire answer, pins sockets, disables redirects and ambient proxies,
   and is protected by a dependency/source census in the exhaustive gate. Hosted configuration
-  requires `connection_bound_post_dns_v1`; Cloud releases only Slack and Grafana and retains the
-  SIP/GitLab/Jira fences. The generic aperture document, posture matrix, destination-hash audit
+  requires `connection_bound_post_dns_v1`; Cloud releases Slack, GitLab, and Grafana and retains
+  the SIP/Jira fences. The generic aperture document, posture matrix, destination-hash audit
   evidence, delivery workers, and raw-proxy case remain open, so the story stays backlog.
 
 ## Notes

@@ -237,11 +237,11 @@ fn valid_access_token(value: &str) -> bool {
     value
         .strip_prefix("identity_access_v1_")
         .is_some_and(|token| {
-        token.len() == 43
-            && token
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-    })
+            token.len() == 43
+                && token
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        })
 }
 
 fn validate_scopes(value: &str) -> Option<BTreeSet<String>> {

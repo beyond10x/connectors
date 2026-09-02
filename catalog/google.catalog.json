@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Google Workspace: read and send Gmail messages, read and create Calendar events, read and rename Drive files",
-  "generator": "connectors 0.4.0",
+  "generator": "connectors 0.4.1",
   "operations": [
     {
       "auth": [
