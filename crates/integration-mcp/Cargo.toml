@@ -2,7 +2,7 @@
 name = "integration-mcp"
 description = "Governed outbound MCP service adapter for Connectors."
 edition = "2021"
-version = "0.5.0"
+version = "0.5.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,20 +14,20 @@ workspace = "../connectors-runtime"
 async-trait = "0.1"
 b10x-mcp-client = { version = "=0.1.1", git = "https://github.com/beyond10x/mcp", rev = "cb3b13a37dfef645ddfe916adc3cb40e82b7f620" }
 b10x-mcp-types = { version = "=0.1.1", git = "https://github.com/beyond10x/mcp", rev = "cb3b13a37dfef645ddfe916adc3cb40e82b7f620" }
-connector-address = { version = "0.5.0", path = "../connector-address" }
-connector-resolve = { version = "0.5.0", path = "../connector-resolve" }
-connector-secrets = { version = "0.5.0", path = "../connector-secrets" }
-domain = { version = "0.5.0", path = "../domain" }
+connector-address = { version = "0.5.1", path = "../connector-address" }
+connector-resolve = { version = "0.5.1", path = "../connector-resolve" }
+connector-secrets = { version = "0.5.1", path = "../connector-secrets" }
+domain = { version = "0.5.1", path = "../domain" }
 futures-util = "0.3"
 getrandom = "0.3"
 hex = "0.4"
 http = "1"
 jsonschema = { version = "0.49.2", default-features = false }
-protocol = { version = "0.5.0", path = "../protocol" }
+protocol = { version = "0.5.1", path = "../protocol" }
 rmcp = { version = "=3.2.0", default-features = false, features = ["client"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.5.0", path = "../service" }
+service = { version = "0.5.1", path = "../service" }
 sha2 = "0.10"
 sse-stream = "0.2.5"
 thiserror = "2"

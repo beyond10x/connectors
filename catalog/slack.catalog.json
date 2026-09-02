@@ -402,7 +402,7 @@
       "wire_value": "message"
     }
   ],
-  "generator": "connectors 0.5.0",
+  "generator": "connectors 0.5.1",
   "operations": [
     {
       "auth": [
