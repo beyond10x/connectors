@@ -168,8 +168,8 @@ const DATASOURCE_READ_EXAMPLES: [&str; 4] = ["describe", "bindings", "read_get",
 /// The unauthenticated health probes, summarized from the document.
 const HEALTH_PATHS: [&str; 3] = ["/livez", "/readyz", "/healthz"];
 
-/// Inline stylesheet: brand palette from `web/public/brand/` (violet→cyan on deep
-/// navy), no `url()`, no `@import` — the page must trigger zero external requests.
+/// Inline stylesheet using the product's violet-to-cyan palette on deep navy, with no `url()` and
+/// no `@import` — the page must trigger zero external requests.
 const STYLE: &str = "\
 :root{--bg:#0F1629;--panel:#151d33;--edge:#26304d;--ink:#e8ebf4;--muted:#9aa4c0;\
 --brand:#7C5CFF;--accent:#22D3EE}\

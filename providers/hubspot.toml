@@ -109,7 +109,7 @@
 #
 # HubSpot does publish per-portal request limits, and they differ by subscription tier and by app
 # type. `RateLimit` takes an exact `requests`/`per_seconds` pair, and the schema is published verbatim
-# to consumers in `web/public/catalog.json`, so a bound guessed from memory would be a wrong contract
+# to consumers in the canonical catalog document, so a bound guessed from memory would be a wrong contract
 # a model tries to satisfy — the same argument `providers/slack.toml` makes for its `limit` maximum,
 # in the direction of declaring nothing rather than declaring a number nobody verified. It is left out
 # until someone reads the current limits page and writes down which tier the number describes.

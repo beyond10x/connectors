@@ -4,6 +4,7 @@
 
 mod backend;
 mod open;
+mod profiles;
 mod state;
 mod transport;
 

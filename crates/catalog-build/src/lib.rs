@@ -12,12 +12,10 @@
 //!                         ├─► seam::load ─► Connector ─► document::render ─► catalog/<name>.catalog.json
 //! specs/<name>/<ver>.json ┘                                                  crates/catalog-reader/catalog.pack
 //!                                                                            connectors.lock
-//!                                                                            web/public/catalog.json
 //! ```
 //!
-//! One lowering, two projections. [`document`] renders the canonical per-provider document — the
-//! reviewed artifact — [`pack`] compiles every document into the one distributable file, and
-//! [`site`] projects the same IR into the public explorer's JSON. Nothing renders code.
+//! [`document`] renders the canonical per-provider document — the reviewed artifact — and [`pack`]
+//! compiles every document into the one distributable file. Nothing renders code.
 //!
 //! [`discovery`] finds the inputs, [`seam`] loads them, [`pipeline`] compares the result against
 //! the committed tree, and only then does [`artifact`] write. `diff` stops one step earlier and
@@ -61,9 +59,6 @@ pub mod pack;
 pub mod pipeline;
 pub mod scaffold;
 pub mod seam;
-pub mod site;
-pub mod status;
-pub mod surface;
 pub mod workspace;
 
 use std::io::Write;

@@ -18,15 +18,6 @@ path = "crates/connector-spec/schema/provider-toml.schema.json"
 path = "fixtures/substrate-wire-0.1.0-axis-projection.schema.json"
 
 [[schema]]
-path = "web/catalog.schema.json"
-
-[[schema]]
-path = "web/package.schema.json"
-
-[[schema]]
-path = "web/package-lock.schema.json"
-
-[[schema]]
 path = "contracts/voice-session/v0alpha1/voice-session.schema.json"
 
 [[schema]]
@@ -81,14 +72,6 @@ schema = "catalog/connector-document.schema.json"
 [[document]]
 path = "fixtures/substrate-wire-0.1.0-axis-projection.json"
 schema = "fixtures/substrate-wire-0.1.0-axis-projection.schema.json"
-
-[[document]]
-path = "web/package.json"
-schema = "web/package.schema.json"
-
-[[document]]
-path = "web/package-lock.json"
-schema = "web/package-lock.schema.json"
 
 [[document]]
 path = "contracts/voice-session/v0alpha1/vectors.json"
@@ -156,12 +139,6 @@ schema = "contracts/artifact-bundle.schema.json"
 [[document]]
 path = "crates/server/src/hosted/docs/openapi.json"
 schema = "crates/server/src/hosted/docs/openapi.schema.json"
-
-# Generated and intentionally git-ignored. `catalog build` validates the same bytes before writing;
-# the governance audit validates the file too whenever it exists in the working tree.
-[[generated]]
-path = "web/public/catalog.json"
-schema = "web/catalog.schema.json"
 
 [[syntax]]
 path = "specs/argocd/swagger-v3.5.1.json"

@@ -79,9 +79,8 @@ half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://git
   commands and stayed; the pack magic changed to `connectors-catalog-pack` because no released
   B10x reader contract existed to preserve. `SOURCES.toml`, `AGENTS.md`, root/provider
   comments and design/story prose retain predecessor citations as history.
-- The explorer's `/flux-connectors/` GitHub Pages base, its matching test, and its visual labels are
-  deliberately retained until S-018 repairs and republishes the explorer. Renaming those alone
-  would produce a broken deployment path and would exceed this artifact-identity story.
+- The explorer's `/flux-connectors/` GitHub Pages base, matching test, and visual labels were
+  deliberately retained here, then removed with the dormant explorer when S-018 closed.
 - The second build was a fixed point; `catalog diff`, `catalog check`, the whole-catalog invariants,
   reader checks and request identity assertions pass on the new hashes.
 

@@ -15,7 +15,7 @@ upstream = "git@github.com:codewandler/flux-connectors.git"
 commit = "3650a136b33660243579a9c923c521e18918fa67"
 retrieved = "2026-08-13"
 refresh = "manual"
-consumers = ["providers/", "specs/", "catalog/", "connectors.lock", "web/", "scripts/", "crates/connector-address/", "crates/connector-spec/", "crates/catalog-reader/", "crates/connector-resolve/", "crates/connector-secrets/", "crates/catalog/", "crates/catalog-build/"]
+consumers = ["providers/", "specs/", "catalog/", "connectors.lock", "scripts/", "crates/connector-address/", "crates/connector-spec/", "crates/catalog-reader/", "crates/connector-resolve/", "crates/connector-secrets/", "crates/catalog/", "crates/catalog-build/"]
 note = "one-time import at M1; left behind: connector-flux emitter (34.6k LOC), connector-pack, connectors-api, catalog generated tables (17k LOC) + ops/*.flux (835), connectors/* emitted modules+manifests (140), release/publish scripts, migration-check + core-catalogue verbs, per-provider test files (folded into one invariants file). crates/catalog rebuilt over the pack instead of trimmed; crates/catalog-cli is new (clap derive). Byte-differential passed: pack sha256 b9b21eac… identical to predecessor at this commit."
 
 [[source]]

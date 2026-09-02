@@ -45,7 +45,7 @@
 #    error rather than an operation quietly emitted into a `google-default.flux` nobody asked for.
 #
 # No `authority` is declared, and therefore no address renders — `gid` is `null` in
-# `web/public/catalog.json`, the state every other shipped provider is in. That is deliberate
+# its canonical catalog document, the state every other shipped provider is in. That is deliberate
 # restraint rather than an omission: C-37's contract is that an address, once published, is never
 # repointed, so choosing the reverse-DNS spelling of Google's authority is a permanent decision and it
 # is not this story's to make. The per-service `api_version` values below are what an address would be

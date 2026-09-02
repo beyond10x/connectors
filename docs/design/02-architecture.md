@@ -9,6 +9,19 @@ Private predecessor decisions are provenance only. Every rule this design carrie
 restated here or in an ADR/story so a reader never needs an unavailable record to know the
 current contract.
 
+## 2026-09-02 amendment: catalog browsing belongs to products
+
+The in-repository `web/` explorer and its generated `web/public/catalog.json` projection were never
+shipped and had remained incompatible with the M1 document shape. They are retired together. The
+hosted, authenticated Catalog protocol is now the sole interactive catalog source, and DevCenter is
+the first product UI that presents it. Canonical per-provider documents and `catalog.pack` remain
+the build artifacts; `catalog-build` no longer contains a site projection.
+
+This amendment supersedes the `web/` layout row, the site-projection responsibilities attributed to
+`catalog-build` below, the maintenance-tool mention of site projection, and open question 2. It does
+not turn catalog membership into invocation authority: products still use the Operation contract
+to discover effective callable capabilities.
+
 This document fixes the physical shape: repository layout, crate boundaries, storage, the one
 invocation path, the fence regime, and the build order. Wire schemas and endpoint lists come
 later and cite this.

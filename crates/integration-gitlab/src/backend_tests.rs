@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::profiles::{PROFILE_OAUTH, PROFILE_PAT};
 
     #[test]
     fn origins_are_exact_https_only() {
@@ -26,6 +27,16 @@ mod tests {
             Some(GitlabProfile::PersonalToken)
         );
         assert_eq!(GitlabProfile::parse(Some("gitlab.bot")), None);
+
+        let profiles = crate::profiles::setup_profiles(INTEGRATION_REF);
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[0].auth_profile, PROFILE_OAUTH);
+        assert_eq!(profiles[1].auth_profile, PROFILE_PAT);
+        assert!(profiles.iter().all(|profile| matches!(
+            profile.actor,
+            protocol::catalog::SetupProfileActor::Person
+        )));
+        assert!(crate::profiles::setup_profiles("jira").is_empty());
     }
 
     #[test]

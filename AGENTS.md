@@ -164,9 +164,7 @@ local schema, and the dedicated governance gate validates it with the pinned Dra
 implementation. Every JSON Schema declares and validates against that same meta-schema. Imported
 vendor specs are listed by exact path as `vendored-source`: the gate syntax-checks their bytes but
 does not pretend they conform to a b10x-owned schema. An unclassified JSON file, an unknown
-schema reference, malformed imported JSON, or an invalid owned document fails the gate. The ignored
-site projection is additionally validated against the embedded bytes of `web/catalog.schema.json`
-inside the generator before the write plan can receive it.
+schema reference, malformed imported JSON, or an invalid owned document fails the gate.
 
 The agent instruction is therefore short:
 

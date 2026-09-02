@@ -243,8 +243,8 @@ struct Tally {
 
 /// The measurement itself: every shipped operation, and how many declare a response shape.
 ///
-/// It reads `providers/*.toml` through the real loader rather than `web/public/catalog.json`, because
-/// the catalogue is a whole-catalogue artifact a scoped build deliberately leaves stale — measuring
+/// It reads `providers/*.toml` through the real loader rather than generated documents, because a
+/// scoped build can deliberately leave whole-catalogue artifacts stale — measuring
 /// there would report the last full build's figure and call it today's.
 fn coverage() -> Vec<Tally> {
     shipped()
