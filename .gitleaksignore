@@ -93,6 +93,9 @@ cbd733b46768e3eec00f5d0b39ccb9c4e19c272e:connectors.lock:sentry-access-token:135
 # `"a".repeat(64)` standing in for a digest in a constructed test connection.
 dee97a8cf139cbbf4a35258e67f662be97a27150:crates/protocol/src/connection.rs:generic-api-key:738
 
+# A UUID-shaped instance id in a hosted Secrets wire-reference round-trip test, not a credential.
+376c5f40db81b955e286af5521f8f95ed38e2754:crates/hosted-secrets/src/lib.rs:generic-api-key:149
+
 # Slack's own published example signing secret.
 # The `8f742231...yyyzzz85a5` value from Slack's request-verification documentation, used to prove
 # the HMAC conformance vector reproduces. `yyyzzz` is the giveaway that it is a placeholder.
