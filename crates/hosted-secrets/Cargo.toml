@@ -2,7 +2,7 @@
 name = "hosted-secrets"
 description = "Projected-token remote adapter for the shared Secrets service."
 edition = "2021"
-version = "0.5.0"
+version = "0.5.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,9 +14,9 @@ workspace = "../connectors-runtime"
 async-trait = "0.1"
 base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
-connector-secrets = { version = "0.5.0", path = "../connector-secrets" }
-connectors-config = { version = "0.5.0", path = "../connectors-config" }
-hosted-vault = { version = "0.5.0", path = "../hosted-vault" }
+connector-secrets = { version = "0.5.1", path = "../connector-secrets" }
+connectors-config = { version = "0.5.1", path = "../connectors-config" }
+hosted-vault = { version = "0.5.1", path = "../hosted-vault" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

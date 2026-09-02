@@ -37,7 +37,7 @@
     ]
   ],
   "description": "Postmark transactional email: send a message, read delivery stats and bounces. Listing and inspecting servers is withheld — the Account API returns live Server Tokens in plaintext (C-430)",
-  "generator": "connectors 0.5.0",
+  "generator": "connectors 0.5.1",
   "operations": [
     {
       "auth": [

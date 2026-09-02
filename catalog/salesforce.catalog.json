@@ -48,7 +48,7 @@
     ]
   ],
   "description": "Salesforce REST API: read the authenticated identity, read/create/update an SObject record, and describe an SObject's schema",
-  "generator": "connectors 0.5.0",
+  "generator": "connectors 0.5.1",
   "operations": [
     {
       "auth": [

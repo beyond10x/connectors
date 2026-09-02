@@ -2,7 +2,7 @@
 name = "hosted-vault"
 description = "Kubernetes-workload-authenticated Vault credential-store adapter."
 edition = "2021"
-version = "0.5.0"
+version = "0.5.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -12,9 +12,9 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
-connector-secrets = { version = "0.5.0", path = "../connector-secrets", features = ["vault"] }
-connectors-config = { version = "0.5.0", path = "../connectors-config" }
-connector-state = { version = "0.5.0", path = "../connector-state" }
+connector-secrets = { version = "0.5.1", path = "../connector-secrets", features = ["vault"] }
+connectors-config = { version = "0.5.1", path = "../connectors-config" }
+connector-state = { version = "0.5.1", path = "../connector-state" }
 futures-util = "0.3"
 hex = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
