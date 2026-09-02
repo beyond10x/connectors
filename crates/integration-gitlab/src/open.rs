@@ -10,6 +10,7 @@ use std::sync::Arc;
 use connector_secrets::PreparedSecretStore;
 use connector_state::StateStore;
 use connectors_config::HostedGitlabConfig;
+use service::EgressTransport;
 
 use crate::backend::{GitlabBackend, GitlabError};
 use crate::state::GitlabState;
@@ -26,12 +27,14 @@ impl GitlabBackend {
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
         state_store: Arc<dyn StateStore>,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, GitlabError> {
         Self::open_inner(
             tenant_id,
             policy,
             credential_store,
             GitlabState::Hosted(state_store),
+            egress,
         )
         .await
     }
@@ -48,6 +51,7 @@ impl GitlabBackend {
         policy: HostedGitlabConfig,
         credential_store: Arc<dyn PreparedSecretStore>,
         state_root: &std::path::Path,
+        egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, GitlabError> {
         Self::open_inner(
             tenant_id,
@@ -56,6 +60,7 @@ impl GitlabBackend {
             GitlabState::Local {
                 root: state_root.to_path_buf(),
             },
+            egress,
         )
         .await
     }

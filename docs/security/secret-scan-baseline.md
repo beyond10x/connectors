@@ -27,6 +27,7 @@ sentinel; none is runtime credential material issued to b10x.
 | Imported Zendesk OpenAPI descriptions at `82f6a80a2741` | 2 | Documentation examples, absent from the current descriptions. |
 | Connector specification conformance fixture at `c78434fe6a31` | 1 | Deliberate non-live test sentinel, absent from the current fixture. |
 | Browser completion rejection fixture at `93672c5e9d` | 1 | Deliberate opaque capability-shaped URL used only to prove malformed fragment refusal; not an issued credential. |
+| Hosted Secrets wire-reference fixture at `376c5f40db81b` | 1 | UUID-shaped instance id used only to prove serialization round-trips; not credential material. |
 | `connectors.lock` across every commit that rebuilt it | 76 | Deterministic SHA-256 artifact digests on a line whose key names the vendor, so `bitbucket`/`discord`/`newrelic`/`sentry` beside 64 hex characters matches a vendor-token rule. Verified by recomputation: `sha256sum catalog/<provider>.catalog.json` equals each flagged value. |
 
 Regenerating `connectors.lock` moves its line numbers, so a rebuild produces new fingerprints for

@@ -119,10 +119,7 @@ impl PlatformBackend {
             http_total_timeout: HTTP_TOTAL_TIMEOUT,
             catalog_sha256: format!("{:x}", Sha256::digest(DOCUMENT.as_bytes())),
             deployment_sha256,
-            audit: AuditJournal::new(
-                state_root.join("b10x-operation-audit.jsonl"),
-                hosted_state,
-            ),
+            audit: AuditJournal::new(state_root.join("b10x-operation-audit.jsonl"), hosted_state),
             work_events,
             planner_events,
             module_signer,

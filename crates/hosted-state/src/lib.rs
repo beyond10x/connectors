@@ -342,11 +342,7 @@ mod tests {
 
     #[test]
     fn state_keys_are_closed_and_bounded() {
-        for valid in [
-            "slack.connections",
-            "b10x:work-events",
-            "vault_journal-v1",
-        ] {
+        for valid in ["slack.connections", "b10x:work-events", "vault_journal-v1"] {
             assert_eq!(validate_key(valid), Ok(()));
         }
         for invalid in ["", "Slack", "../state", "with space", "state/value"] {

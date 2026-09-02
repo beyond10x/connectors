@@ -239,10 +239,7 @@ impl PlatformBackend {
         digest.update(b"\0");
         digest.update(self.deployment_sha256.as_bytes());
         let digest = digest.finalize();
-        format!(
-            "description:b10x:workspaces:{}",
-            hex::encode(&digest[..16])
-        )
+        format!("description:b10x:workspaces:{}", hex::encode(&digest[..16]))
     }
 
     fn workspace_datasource_binding(&self) -> DatasourceBinding {
@@ -267,10 +264,7 @@ impl PlatformBackend {
             "{WORKSPACES_DATASOURCE}\0{}\0{}\0binding-ref-v1",
             self.config.connection.connection_ref, self.deployment_sha256,
         ));
-        format!(
-            "binding:b10x:workspaces:{}",
-            hex::encode(&digest[..16])
-        )
+        format!("binding:b10x:workspaces:{}", hex::encode(&digest[..16]))
     }
 
     fn workspace_cursor(&self, context: &PrincipalContext, offset: usize) -> String {

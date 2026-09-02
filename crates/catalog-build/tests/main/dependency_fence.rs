@@ -421,6 +421,7 @@ fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
 fn released_http_integrations_cannot_bypass_connection_bound_egress() {
     let root = workspace_root();
     for integration in [
+        "integration-gitlab",
         "integration-mcp",
         "integration-monitoring",
         "integration-slack",
