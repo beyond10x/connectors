@@ -420,7 +420,11 @@ fn the_connectors_binary_is_an_isolated_locked_composition_leaf() {
 #[test]
 fn released_http_integrations_cannot_bypass_connection_bound_egress() {
     let root = workspace_root();
-    for integration in ["integration-monitoring", "integration-slack"] {
+    for integration in [
+        "integration-mcp",
+        "integration-monitoring",
+        "integration-slack",
+    ] {
         let directory = root.join("crates").join(integration);
         let manifest_path = directory.join("Cargo.toml");
         let manifest = std::fs::read_to_string(&manifest_path)
@@ -470,6 +474,41 @@ fn released_http_integrations_cannot_bypass_connection_bound_egress() {
         }),
         "server must remain the physical implementation of the Connection-bound egress port"
     );
+}
+
+/// Outbound MCP shares protocol machinery with Harness, but the exact revision and the injected
+/// HTTP boundary are part of Connectors' audited dependency closure. A floating branch could
+/// replace either underneath a locked build.
+#[test]
+fn outbound_mcp_foundation_is_exactly_pinned() {
+    const REVISION: &str = "cb3b13a37dfef645ddfe916adc3cb40e82b7f620";
+    let root = workspace_root();
+    let manifest_path = root.join("crates/integration-mcp/Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display()));
+    let document: toml::Value = manifest
+        .parse()
+        .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+    let dependencies = document
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("MCP Integration dependencies");
+    for package in ["b10x-mcp-client", "b10x-mcp-types"] {
+        let dependency = dependencies
+            .get(package)
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("{package} is a detailed dependency"));
+        assert_eq!(
+            dependency.get("rev").and_then(toml::Value::as_str),
+            Some(REVISION),
+            "{package} must pin the reviewed MCP foundation revision"
+        );
+        assert_eq!(
+            dependency.get("version").and_then(toml::Value::as_str),
+            Some("=0.1.1"),
+            "{package} must also pin the matching release identity"
+        );
+    }
 }
 
 /// sipx owns real sockets, so its closure and bind call stay in one explicitly isolated crate.

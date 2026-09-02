@@ -38,6 +38,16 @@ This component consolidates and succeeds `flux-connectors` and `flux-exchange`. 
 ingestion pipeline migrate here largely as-is; the platform is a fresh design informed by what
 those codebases proved and what they got wrong.
 
+## MCP directions
+
+Connectors has two deliberately different MCP roles. The hosted `/mcp` endpoint is an inbound
+transport onto already-governed Connector operations. Outbound MCP is a generated service adapter:
+a reviewable profile pins the complete remote tool snapshot, maps every tool to a local operation,
+and then joins the same deployment overlays, Grants, approvals, credential store, and
+Connection-bound egress as other Integration adapters. It does not read Harness's local MCP
+registry and never interprets server annotations as authority. See
+[design 18](docs/design/18-governed-outbound-mcp-services.md).
+
 ## Hosted server
 
 `connectors serve-hosted --config PATH` serves the provider-credential-free Operation, Connection,

@@ -171,6 +171,16 @@ whose feature set and artifact bytes must remain unchanged by runtime dependenci
 and module-size fences in `catalog-build` mechanically assert these boundaries, including the
 1,500-line module cap and every temporary named waiver.
 
+**2026-09-02 outbound-MCP amendment.** A remote MCP server is one more provider-shaped service,
+not a second runtime or admission path. `integration-mcp` consumes the shared, exactly pinned MCP
+client foundation through its injected Streamable HTTP boundary; every exchange still crosses
+`service::EgressTransport`, and every bearer is fetched through `SecretStore` for that exchange.
+The server's complete tool snapshot is immutable reviewed input. A local mapping owns operation
+identity, prose and effect, while the existing `ServiceDeployment` owns permanent provider
+identity, exposure, risk, approval, Grants and opaque endpoint/credential bindings. MCP annotations
+are retained in the snapshot but grant nothing. The detailed contract is
+[design 18](18-governed-outbound-mcp-services.md).
+
 ## 3. Postures are configuration, not builds
 
 One config document (`platform.toml`), fail-closed (unknown field = refusal by name):
