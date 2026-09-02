@@ -62,7 +62,7 @@
     ]
   ],
   "description": "Anthropic platform: the model catalogue and a curated read-only Admin API surface",
-  "generator": "connectors 0.4.3",
+  "generator": "connectors 0.4.4",
   "operations": [
     {
       "auth": [

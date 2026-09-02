@@ -1398,7 +1398,7 @@ pub struct Operation {
     ///   [`MIN_REPEATABILITY_CONDITION`] is refused: an escape hatch anyone can take without saying
     ///   anything is a deleted guard wearing the guard's clothes. What no compiler can check is
     ///   whether the sentence is *true* — that is what publishing it into
-    ///   `web/public/catalog.json`, beside the claim it licenses, is for.
+    ///   the canonical catalog document, beside the claim it licenses, is for.
     /// - **It is refused where it means nothing.** On an authored read there is no repeat
     ///   hazard to condition; and on an operation not declaring `Conditional` the prose asserts what
     ///   its own field denies, which is C-186's defect arriving backwards.

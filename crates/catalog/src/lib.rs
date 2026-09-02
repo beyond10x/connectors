@@ -114,7 +114,7 @@ impl Idempotency {
 ///
 /// # The vocabulary is C-206's
 ///
-/// The two named states are the two codes `web/public/catalog.json` already publishes for the same
+/// The two named states are the two codes the canonical catalog document publishes for the same
 /// distinction (`predecessor:docs/designs/catalog-json.md`), and [`as_str`](Self::as_str) returns those tokens
 /// character for character. A host restating them in words of its own is how two surfaces
 /// describing one fact come to disagree, so this crate restates nothing:

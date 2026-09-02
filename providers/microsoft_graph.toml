@@ -53,7 +53,7 @@
 # No `authority` is declared, for the same reason `providers/google.toml` gives: an address, once
 # published, is never repointed (C-37), so choosing microsoft_graph's reverse-DNS spelling is a
 # permanent decision this story does not get to make. `gid` is therefore `null` in
-# `web/public/catalog.json`, the state most of this fleet is in.
+# its canonical catalog document, the state most of this fleet is in.
 #
 # ---------------------------------------------------------------------------------------------
 # AUTH: BEARER, ALREADY MINTED — COORDINATING WITH C-88 RATHER THAN DUPLICATING IT.

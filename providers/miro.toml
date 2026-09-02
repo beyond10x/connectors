@@ -347,7 +347,7 @@ risk = "medium"
 # such: C-186's escape hatch landed, and this comment's own instruction — "the honest fix is C-186's
 # escape hatch, not yet landed" — is what it is being spent on. Authored writes refuse `idempotent`;
 # `repeatable_because` supports the honest `conditional` claim and is published beside it in
-# `web/public/catalog.json`.
+# the canonical catalog document.
 #
 # The description above was rewritten in the same change. It had grown an explanation of
 # `check_write_metadata` — a fact about this repository's compiler, in the one string that reaches a

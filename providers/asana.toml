@@ -37,7 +37,7 @@
 # emitted `$payload` if either half stops being true.
 #
 # The response envelope is recorded per operation in `response_schema`: `{"type": "object",
-# "required": ["data"], …}`, so a consumer reading `web/public/catalog.json` is told the payload is at
+# "required": ["data"], …}`, so a consumer reading the canonical catalog document is told the payload is at
 # `/data` instead of inferring it from an example. It cannot be *handled* — `http.request` returns one
 # flat string, so no emitted Flux can extract a pointer from it, the same seam
 # `connector-flux`'s `description()` records for error envelopes.

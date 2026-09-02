@@ -139,7 +139,7 @@ scheme = "bearer"
 #
 # An OpenRouter key is `sk-or-v1-` followed by a hex string. That prefix is named here, in a comment
 # that is not part of the IR, and **not** in the `description` below — a description is published to
-# the open web in `web/public/catalog.json`, and
+# the canonical catalog document, and
 # `crates/connector-cli/tests/shipped_providers_build.rs` asserts that no OpenRouter artifact carries
 # anything shaped like a key. Naming the prefix in a published string would cost that check its
 # uniformity for no gain: the environment variable's name and the scheme already say everything an

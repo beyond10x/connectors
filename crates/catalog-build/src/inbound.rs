@@ -1,16 +1,13 @@
-//! The one walk the manifest and the public catalogue share for a connector's **inbound** surface
-//! (C-83).
+//! The shared walk for a connector's canonical **inbound** surface (C-83).
 //!
 //! Events and channel bindings have been in the IR and in the hash domain since C-82 and reached no
 //! artifact at all, so a host had no way to read what a connector declares. Two backends publish
-//! them now — [`crate::seam`]'s `.connector.toml` and [`crate::site`]'s `catalog.json` — and the
-//! encodings differ deliberately: TOML has no `null`, so the manifest omits an absent key, while the
-//! published document holds every key always present.
+//! them now — [`crate::seam`]'s `.connector.toml` and [`crate::document`]'s canonical JSON — and
+//! the encodings differ deliberately: TOML has no `null`, so the manifest omits an absent key,
+//! while the canonical document holds every key always present.
 //!
 //! What must **not** differ is the judgement underneath, which is why it lives here rather than in
-//! either backend. `crates/connector-cli/src/catalog.rs` and `src/site.rs` already share the
-//! credential and host walks so that a site and a `cargo add` consumer cannot be told different
-//! things about one operation; this is the same rule applied to the other call direction.
+//! either backend.
 //!
 //! # The judgement: how loudly an ingress surface says it is unverified
 //!

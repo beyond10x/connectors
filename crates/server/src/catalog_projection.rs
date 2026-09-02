@@ -139,7 +139,7 @@ fn summary<S: SetupProfileSource + ?Sized>(
 ) -> ProviderSummary {
     // This is runtime setup availability, not merely the existence of declarative config fields.
     // Only built-in integrations that own Connect Session dispatch may advertise it.
-    let configurable = matches!(provider.id, "grafana" | "slack");
+    let configurable = matches!(provider.id, "gitlab" | "grafana" | "slack");
     ProviderSummary {
         provider_ref: provider.id.to_owned(),
         authority: provider.authority.map(ToOwned::to_owned),
@@ -200,7 +200,11 @@ mod tests {
 
         let gitlab = catalog::provider(catalog::ProviderKey::id("gitlab")).unwrap();
         assert!(!gitlab.config.is_empty());
-        assert!(!summary(gitlab, &NoSelfServiceSetup).configurable);
+        assert!(summary(gitlab, &NoSelfServiceSetup).configurable);
+
+        let jira = catalog::provider(catalog::ProviderKey::id("jira")).unwrap();
+        assert!(!jira.config.is_empty());
+        assert!(!summary(jira, &NoSelfServiceSetup).configurable);
 
         let CatalogResult::Describe(description) = handle(
             CatalogRequest::Describe(protocol::catalog::DescribeRequest {
@@ -249,12 +253,12 @@ mod tests {
 
         // A provider that publishes no setup form at all can never carry a profile, whatever a
         // backend claims: the wire contract refuses the pair.
-        let grafana_profile = summary(
-            catalog::provider(catalog::ProviderKey::id("gitlab")).unwrap(),
+        let jira_profile = summary(
+            catalog::provider(catalog::ProviderKey::id("jira")).unwrap(),
             &configured,
         );
-        assert!(!grafana_profile.configurable);
-        assert!(grafana_profile.setup_profiles.is_empty());
+        assert!(!jira_profile.configurable);
+        assert!(jira_profile.setup_profiles.is_empty());
     }
 
     #[test]

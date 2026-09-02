@@ -88,7 +88,7 @@
 # worker and process id, and a per-process sequence counter. Ids minted from about 2015 onward
 # already exceed **2^53**, which is the largest integer an IEEE-754 double represents exactly — and a
 # JSON number is a double in JavaScript, in Python's `json` by default for floats, and in most JSON
-# libraries a consumer of `web/public/catalog.json` might reach for.
+# libraries a consumer of the canonical catalog document might reach for.
 #
 # The failure is silent in the worst way. `1234567890123456789` parsed as a double comes back as
 # `1234567890123456800`: still nineteen digits, still a plausible snowflake, addressing a different

@@ -2,7 +2,7 @@
 name = "connectors-config"
 description = "Strict value-free personal and hosted Connector deployment configuration."
 edition = "2021"
-version = "0.4.3"
+version = "0.4.4"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -11,12 +11,12 @@ publish = false
 workspace = "../connectors-runtime"
 
 [dependencies]
-connector-address = { version = "0.4.3", path = "../connector-address" }
-domain = { version = "0.4.3", path = "../domain" }
-protocol = { version = "0.4.3", path = "../protocol" }
+connector-address = { version = "0.4.4", path = "../connector-address" }
+domain = { version = "0.4.4", path = "../domain" }
+protocol = { version = "0.4.4", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
-service = { version = "0.4.3", path = "../service" }
+service = { version = "0.4.4", path = "../service" }
 thiserror = "2"
 toml = "0.8"
 url = "2"

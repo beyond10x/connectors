@@ -556,16 +556,14 @@ fn substrate_axis_projection_is_pinned_total_and_non_mechanical() {
 /// **A rebuild over unchanged inputs writes nothing.**
 ///
 /// The reviewed-tree form of "equal inputs produce byte-identical artifacts": every committed
-/// artifact is exactly what the plan would write. The ignored site projection is deliberately
-/// regenerated for the web build and is not reviewed repository state. A single stale committed
-/// artifact fails here by name.
+/// artifact is exactly what the plan would write. A single stale committed artifact fails here by
+/// name.
 #[test]
 fn the_committed_tree_is_a_fixed_point_of_a_build() {
     let (workspace, plan) = full_plan();
 
     let stale: Vec<String> = plan
         .changes()
-        .filter(|artifact| artifact.path != workspace.site_catalog_path())
         .map(|artifact| {
             format!(
                 "  {} ({:?})",

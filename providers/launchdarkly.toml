@@ -54,7 +54,7 @@
 # change the outcome, but because the emitter refused `idempotent` on any `PATCH` under RFC 9110
 # §9.2.2, with only `PUT` and `DELETE` left alone. The comment said one thing and the field said the
 # other, and the field is what a host reads. `idempotent_because` now carries the vendor behaviour
-# that backs the claim, into `web/public/catalog.json` where a reviewer sees it beside the claim.
+# that backs the claim, into the canonical catalog document where a reviewer sees it beside the claim.
 #
 # ---------------------------------------------------------------------------------------------
 # EXCLUDED, deliberately, rather than guessed at:

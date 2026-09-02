@@ -1019,7 +1019,7 @@
       "service": "planning"
     }
   ],
-  "generator": "connectors 0.4.3",
+  "generator": "connectors 0.4.4",
   "operations": [
     {
       "auth": [],
