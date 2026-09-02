@@ -20,15 +20,19 @@ use tokio::net::UnixStream;
 use url::Url;
 use zeroize::Zeroizing;
 
+mod admin;
 mod identity;
 mod model;
 mod response;
 
+pub use admin::AdminIdentityClient;
 pub use identity::{
     active_session_metadata, login, logout, run_mcp_bridge, AuthenticatedHostedClient,
     AuthenticatedHostedError, IdentityError, LoginOptions, SessionMetadata,
 };
 pub use model::{
+    AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,
+    AdminCredentialWrite, AdminIntegrationStatus, AdminLoginMetadata, AdminStatus,
     CandidateActivationOutcome, ClientError, MaterializationOutcome, PendingConnection,
     RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
 };
@@ -430,6 +434,8 @@ pub struct HostedClient {
     subscription_oauth_start: Url,
     subscription_oauth_complete: Url,
     mcp: Url,
+    admin_auth_metadata: Url,
+    admin_integrations: Url,
 }
 
 impl HostedClient {
@@ -775,6 +781,8 @@ impl HostedClient {
                 "subscription-credentials/claude-code/oauth/complete",
             ),
             mcp: endpoint(&base, "mcp"),
+            admin_auth_metadata: endpoint(&base, "admin/auth-metadata"),
+            admin_integrations: endpoint(&base, "admin/integrations"),
             http,
         }
     }

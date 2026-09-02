@@ -127,6 +127,10 @@ impl IdentityVerifier for IdentityHttpVerifier {
         }
     }
 
+    fn login_origin(&self) -> Option<&str> {
+        Some(&self.expected_issuer)
+    }
+
     async fn verify(
         &self,
         credential: &str,

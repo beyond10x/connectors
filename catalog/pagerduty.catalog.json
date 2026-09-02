@@ -38,7 +38,7 @@
     ]
   ],
   "description": "PagerDuty incident response: read incidents, services and who is on call, and acknowledge or resolve an incident",
-  "generator": "connectors 0.4.2",
+  "generator": "connectors 0.4.3",
   "operations": [
     {
       "auth": [

@@ -8,12 +8,12 @@ use axum::response::{IntoResponse as _, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use serde::Serialize;
-use service::ConnectorBackend;
+use service::{AdminRegistry, ConnectorBackend};
 use subscription_custody::SubscriptionCustody;
 
 use super::{
-    approval, catalog_route, connect, connection_route, datasource, docs, error, event, health,
-    mcp, operation, HostedAdmissionPolicy, HostedAuthority, HostedState, IdentityVerifier,
+    admin, approval, catalog_route, connect, connection_route, datasource, docs, error, event,
+    health, mcp, operation, HostedAdmissionPolicy, HostedAuthority, HostedState, IdentityVerifier,
     CONNECTORS_AUDIENCE,
 };
 
@@ -68,6 +68,7 @@ pub fn router_with_subscription_custody(
         authority,
         subscription_custody,
         None,
+        None,
     )
 }
 
@@ -87,6 +88,48 @@ pub fn router_with_client_discovery(
         authority,
         subscription_custody,
         Some(client_discovery),
+        None,
+    )
+}
+
+/// Builds the hosted transport with optional operator Integration administration.
+pub fn router_with_admin(
+    verifier: Arc<dyn IdentityVerifier>,
+    backend: Arc<dyn ConnectorBackend>,
+    policy: HostedAdmissionPolicy,
+    authority: HostedAuthority,
+    subscription_custody: Option<Arc<SubscriptionCustody>>,
+    admin: Option<Arc<AdminRegistry>>,
+) -> Router {
+    router_inner(
+        verifier,
+        backend,
+        policy,
+        authority,
+        subscription_custody,
+        None,
+        admin,
+    )
+}
+
+/// Builds the production hosted transport with native-client discovery and administration.
+pub fn router_with_client_discovery_and_admin(
+    verifier: Arc<dyn IdentityVerifier>,
+    backend: Arc<dyn ConnectorBackend>,
+    policy: HostedAdmissionPolicy,
+    authority: HostedAuthority,
+    subscription_custody: Option<Arc<SubscriptionCustody>>,
+    client_discovery: ClientDiscovery,
+    admin: Option<Arc<AdminRegistry>>,
+) -> Router {
+    router_inner(
+        verifier,
+        backend,
+        policy,
+        authority,
+        subscription_custody,
+        Some(client_discovery),
+        admin,
     )
 }
 
@@ -97,6 +140,7 @@ fn router_inner(
     authority: HostedAuthority,
     subscription_custody: Option<Arc<SubscriptionCustody>>,
     client_discovery: Option<ClientDiscovery>,
+    admin: Option<Arc<AdminRegistry>>,
 ) -> Router {
     Router::new()
         .route("/livez", get(health::liveness))
@@ -149,6 +193,7 @@ fn router_inner(
             get(connect::oauth_callback),
         )
         .merge(super::subscription::routes())
+        .merge(admin::routes())
         .with_state(HostedState {
             verifier,
             backend,
@@ -156,6 +201,7 @@ fn router_inner(
             authority,
             subscription_custody,
             client_discovery,
+            admin,
         })
 }
 
