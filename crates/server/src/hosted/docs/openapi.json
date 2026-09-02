@@ -4,7 +4,7 @@
     "title": "b10x Connectors hosted API",
     "version": "v0alpha1",
     "summary": "The identity-authenticated hosted transport for the Connector wire contracts.",
-    "description": "Six strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
+    "description": "Six strict envelope endpoints (one closed connector-* wire contract each), a stateless MCP transport, explicit operator Integration administration, and health probes. Every envelope is validated with closed field sets: an unknown field anywhere in a request is refused. The protocol field of each envelope pins the exact wire-contract identity; a different value is a different contract. Request and response examples in this document are validated against the server's own protocol types by the repository test suite."
   },
   "servers": [
     {
@@ -13,6 +13,54 @@
     }
   ],
   "paths": {
+    "/admin/auth-metadata": {
+      "get": {
+        "operationId": "connectorAdminAuthMetadata",
+        "summary": "Discover the Identity authority for operator CLI login",
+        "description": "Returns only public, deployment-selected Identity login facts. The CLI uses these to request one short-lived token for the exact Connectors audience and administrative scope.",
+        "security": [],
+        "responses": {
+          "200": {"description": "Identity authority, audience, and scope.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/adminAuthMetadata"}}}},
+          "503": {"description": "Identity discovery is unavailable.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/admin/integrations": {
+      "get": {
+        "operationId": "connectorAdminIntegrationStatus",
+        "summary": "Report readiness of activated hosted Integrations",
+        "description": "Reports non-secret configuration validity and credential presence only. Requires connectors.integrations.manage and membership in a configured operator group.",
+        "security": [{"identityAccessToken": []}],
+        "responses": {
+          "200": {"description": "Non-cacheable Integration readiness.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/adminStatus"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "403": {"description": "Operator authority was not granted.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "503": {"description": "Administrative custody is unavailable.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
+    "/admin/integrations/{integration_ref}/credentials/{credential}": {
+      "put": {
+        "operationId": "connectorAdminCredentialSet",
+        "summary": "Write one required Integration credential into Connector custody",
+        "description": "The value crosses this request boundary once and is never returned or logged. Existing credentials require explicit replacement. Requires connectors.integrations.manage and membership in a configured operator group.",
+        "parameters": [
+          {"name": "integration_ref", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}},
+          {"name": "credential", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}}
+        ],
+        "security": [{"identityAccessToken": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/adminCredentialRequest"}}}},
+        "responses": {
+          "200": {"description": "Credential presence metadata only.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/adminCredentialWrite"}}}},
+          "401": {"description": "Identity authority was refused.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "403": {"description": "Operator authority was not granted.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "404": {"description": "The activated Integration or credential requirement does not exist.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "409": {"description": "The credential exists and replacement was not requested.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "422": {"description": "The bounded request or credential value is invalid.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}},
+          "503": {"description": "Administrative custody is unavailable.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/errorBody"}}}}
+        }
+      }
+    },
     "/subscription-credentials/claude-code": {
       "get": {
         "operationId": "claudeCodeSubscriptionStatus",
@@ -2014,7 +2062,7 @@
       "identityAccessToken": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.approvals.issue (human exact-input approval issuance), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connections and subscription custody), connectors.credentials.lease (attempt-bounded provider credential leases), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads)."
+        "description": "Identity-issued access token, verified on every request against the audience urn:b10x:connectors. Scopes: connectors.catalog.read (operation search/describe, catalog reads, datasource reads, connection reads), connectors.invoke (operation invocation and session control), connectors.approvals.issue (human exact-input approval issuance), connectors.connections.manage (connection activation, materialization, and session creation), connectors.connections.self (self-service connections and subscription custody), connectors.credentials.lease (attempt-bounded provider credential leases), connectors.events.read (operator event reads), connectors.events.self (self-service Slack event reads), connectors.integrations.manage (operator Integration administration)."
       },
       "subscriptionLease": {
         "type": "http",
@@ -2023,6 +2071,59 @@
       }
     },
     "schemas": {
+      "adminAuthMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["identity_origin", "audience", "scope"],
+        "properties": {
+          "identity_origin": {"type": "string", "format": "uri"},
+          "audience": {"const": "urn:b10x:connectors"},
+          "scope": {"const": "connectors.integrations.manage"}
+        }
+      },
+      "adminStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["integrations", "ready"],
+        "properties": {
+          "integrations": {"type": "array", "items": {"$ref": "#/components/schemas/adminIntegrationStatus"}},
+          "ready": {"type": "boolean"}
+        }
+      },
+      "adminIntegrationStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["integration_ref", "active", "configuration", "credentials", "ready"],
+        "properties": {
+          "integration_ref": {"type": "string"},
+          "active": {"const": true},
+          "configuration": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "state"], "properties": {"name": {"type": "string"}, "state": {"const": "valid"}}}},
+          "credentials": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "required", "state"], "properties": {"name": {"type": "string"}, "required": {"type": "boolean"}, "state": {"enum": ["present", "missing", "unavailable"]}}}},
+          "ready": {"type": "boolean"}
+        }
+      },
+      "adminCredentialRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request_id", "value"],
+        "properties": {
+          "request_id": {"type": "string", "minLength": 1, "maxLength": 512},
+          "value": {"type": "string", "minLength": 1, "maxLength": 8192, "writeOnly": true, "format": "password", "x-sensitive": true},
+          "replace": {"type": "boolean", "default": false}
+        }
+      },
+      "adminCredentialWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request_id", "integration_ref", "credential", "state", "replaced"],
+        "properties": {
+          "request_id": {"type": "string"},
+          "integration_ref": {"type": "string"},
+          "credential": {"type": "string"},
+          "state": {"const": "present"},
+          "replaced": {"type": "boolean"}
+        }
+      },
       "subscriptionStatus": {
         "type": "object",
         "additionalProperties": false,
@@ -2178,6 +2279,12 @@
               "identity-access-token-required",
               "identity-access-token-refused",
               "identity-unavailable",
+              "admin-unavailable",
+              "admin-not-granted",
+              "admin-request-invalid",
+              "admin-credential-invalid",
+              "admin-requirement-not-found",
+              "admin-credential-exists",
               "identity-scope-refused",
               "subscription-custody-disabled",
               "subscription-request-invalid",
