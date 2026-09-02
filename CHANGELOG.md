@@ -13,6 +13,11 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ### Added
 
+- Add governed outbound MCP as a generated Connector service. A reviewed profile freezes the full
+  remote tool snapshot and assigns local operation identity, prose, and effect; the ordinary
+  deployment overlay still owns exposure, risk, approval, grants, endpoint and credential
+  bindings. HTTP exchanges stay inside Connection-bound egress and fetch bearer material from the
+  Connector secret store per exchange.
 - Add a generator-facing service factory contract and deterministic runtime bundle builder. A
   registered factory remains inert until an explicit deployment overlay assigns permanent provider
   identity and complete operation policy/resource bindings; provider and operation collisions,

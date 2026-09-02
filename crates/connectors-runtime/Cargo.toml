@@ -25,6 +25,7 @@ members = [
     "../integration-catalog",
     "../integration-platform",
     "../integration-monitoring",
+    "../integration-mcp",
     "../integration-sip",
     "../integration-slack",
     "../monitoring-model",
@@ -54,6 +55,7 @@ integration-jira = { version = "0.4.0", path = "../integration-jira" }
 integration-catalog = { version = "0.4.0", path = "../integration-catalog" }
 integration-platform = { version = "0.4.0", path = "../integration-platform" }
 integration-monitoring = { version = "0.4.0", path = "../integration-monitoring" }
+integration-mcp = { version = "0.4.0", path = "../integration-mcp" }
 integration-sip = { version = "0.4.0", path = "../integration-sip" }
 integration-slack = { version = "0.4.0", path = "../integration-slack" }
 hex = "0.4"

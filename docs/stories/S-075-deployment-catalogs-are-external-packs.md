@@ -41,7 +41,11 @@ independently built, immutable catalog pack.
 
 ## Progress
 
-- (not started)
+- 2026-09-02: the generic service-factory seam now admits an immutable, fully reviewable outbound
+  MCP profile. It verifies the profile digest and exact live tool snapshot before a factory exists,
+  then requires the ordinary complete deployment overlay before activation. This establishes the
+  fail-closed dynamic-service join, but does **not** complete this story: hosted loading is not yet
+  by immutable OCI digest, and the remaining acceptance items stay open.
 
 ## Notes
 

@@ -15,6 +15,13 @@ pub use composition::{
 pub use connectors_config::{ConfigError, PersonalConfig};
 /// Re-exported so the CLI can describe an acquisition without depending on the adapter directly.
 pub use integration_catalog::argocd;
+/// Reviewed outbound MCP service profiles and the factory that binds them into a service bundle.
+pub mod mcp {
+    pub use integration_mcp::{
+        McpBearerBinding, McpIntegrationError, McpRuntimeBinding, McpServiceFactory,
+        McpServiceProfile, ReviewedOperation, ReviewedProvider, PROFILE_CONTRACT,
+    };
+}
 pub use registry::BackendRegistry;
 pub use service_bundle::{
     DeployedService, ServiceBundle, ServiceBundleBuilder, ServiceBundleError,
