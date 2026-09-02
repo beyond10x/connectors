@@ -811,9 +811,7 @@ mod tests {
                 .iter()
                 .map(|(operation, expose)| {
                     let mut policy = operation_policy(*expose);
-                    policy
-                        .grant_refs
-                        .insert(format!("grant:{provider_ref}"));
+                    policy.grant_refs.insert(format!("grant:{provider_ref}"));
                     ((*operation).to_owned(), policy)
                 })
                 .collect(),

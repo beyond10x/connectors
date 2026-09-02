@@ -9,9 +9,9 @@ mod personal;
 pub use hosted::{
     HostedAuthorityConfig, HostedGitlabConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig,
     HostedIdentityConfig, HostedJiraConfig, HostedKubernetesConfig, HostedListenerConfig,
-    HostedServerConfig, HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig,
-    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig, HostedSecretsConfig, JiraSharedAuth,
-    KubernetesNamespaceAccessConfig,
+    HostedSecretsConfig, HostedServerConfig, HostedServerConfigError, HostedSipConfig,
+    HostedSipCredentialConfig, HostedSlackConfig, HostedStorageConfig, HostedVaultConfig,
+    JiraSharedAuth, KubernetesNamespaceAccessConfig,
 };
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, CatalogIntegrationConfig,
