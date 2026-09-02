@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Airtable records: read, create, update and delete a record in a base's table",
-  "generator": "connectors 0.4.4",
+  "generator": "connectors 0.4.5",
   "operations": [
     {
       "auth": [
