@@ -14,7 +14,10 @@ use hosted_secrets::HostedSecretsStore;
 use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
-use integration_catalog::{CatalogBackend, CatalogIntegrationError};
+use integration_catalog::{
+    hosted_admitted_origins, CatalogBackend, CatalogIntegrationError, HostedCatalogBackend,
+    HostedCatalogError,
+};
 use integration_gitlab::GitlabBackend;
 use integration_jira::JiraBackend;
 use integration_kubernetes::{KubernetesLocalBackend, KubernetesStatusBackend};
@@ -75,6 +78,8 @@ pub enum RuntimeError {
     Platform(#[from] PlatformIntegrationError),
     #[error(transparent)]
     CatalogIntegration(#[from] CatalogIntegrationError),
+    #[error(transparent)]
+    HostedCatalog(#[from] HostedCatalogError),
     #[error(transparent)]
     Identity(#[from] identity_http::IdentityVerifierConfigError),
     #[error(transparent)]
@@ -482,6 +487,18 @@ impl HostedRuntime {
         bundle: Option<ServiceBundle>,
     ) -> Result<Self, RuntimeError> {
         let config = HostedServerConfig::read(config_path)?;
+        let catalog_policy = config.catalog.clone();
+        let catalog_enabled = catalog_policy.enabled;
+        let mut catalog_excluded_providers = BTreeSet::new();
+        if config.gitlab.is_some() {
+            catalog_excluded_providers.insert("gitlab".to_owned());
+        }
+        if config.slack.is_some() {
+            catalog_excluded_providers.insert("slack".to_owned());
+        }
+        if config.grafana.enabled {
+            catalog_excluded_providers.insert("grafana".to_owned());
+        }
         let identity_origin = url::Url::parse(&config.identity.origin)
             .map_err(|_| identity_http::IdentityVerifierConfigError::InvalidIdentityOrigin)?;
         // This binary carries the loopback Identity exception, which lets it resolve access tokens
@@ -794,6 +811,36 @@ impl HostedRuntime {
                 .await?,
             ));
         }
+        if catalog_enabled {
+            let values = credential_stores
+                .values
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            let prepared = credential_stores
+                .prepared
+                .as_ref()
+                .ok_or(connectors_config::HostedServerConfigError::Invalid)?
+                .clone();
+            let rules = hosted_admitted_origins(&catalog_policy)?
+                .into_iter()
+                .map(|origin| DestinationRule::exact_origin(&origin, AddressScope::Public))
+                .collect::<Result<Vec<_>, _>>()?;
+            let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+            backends.push(Arc::new(
+                HostedCatalogBackend::open(
+                    config.tenant_id.clone(),
+                    catalog_policy,
+                    catalog_excluded_providers,
+                    BTreeSet::new(),
+                    values,
+                    prepared,
+                    hosted_state.clone(),
+                    egress,
+                )
+                .await?,
+            ));
+        }
         if let Some(bundle) = bundle {
             backends.extend(bundle.into_backends());
         }
@@ -854,6 +901,7 @@ impl HostedRuntime {
             "monitoring_enabled": monitoring_enabled,
             "vault_enabled": config.vault.enabled,
             "claude_code_enabled": claude_code_enabled,
+            "catalog_enabled": catalog_enabled,
             "sip_enabled": cfg!(feature = "sip") && config.sip.enabled,
             "sip_listen": config.sip.listen,
             "platform_enabled": platform_enabled,
