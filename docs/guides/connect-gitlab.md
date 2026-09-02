@@ -17,7 +17,7 @@ For a hosted deployment, an operator first creates one GitLab OAuth application 
 the configured `/oauth/gitlab/callback` URL. Its application ID is non-secret hosted configuration;
 its secret is supplied once to the running Connector:
 
-```console
+```shell-session
 connectors admin credentials set gitlab oauth_client_secret --endpoint URL --secret-stdin
 ```
 
