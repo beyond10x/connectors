@@ -596,7 +596,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.5.5"
+version = "0.5.6"
 
 [[package]]
 name = "cbc"
@@ -823,14 +823,14 @@ dependencies = [
 
 [[package]]
 name = "connector-address"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "connector-oauth"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "connector-resolve"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -871,7 +871,7 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "thiserror 2.0.20",
 ]
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -1302,7 +1302,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -2332,7 +2332,7 @@ dependencies = [
 [[package]]
 name = "identity-client"
 version = "0.5.6"
-source = "git+https://github.com/beyond10x/identity?tag=0.5.6#e3231bc34eb65695ba0486e1bbe3a0f1ec5b2a23"
+source = "git+https://github.com/beyond10x/identity.git?tag=0.5.6#e3231bc34eb65695ba0486e1bbe3a0f1ec5b2a23"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -3740,7 +3740,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "domain",
  "schemars",
@@ -4634,7 +4634,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "async-trait",
  "axum",
@@ -4663,7 +4663,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -5041,7 +5041,7 @@ dependencies = [
 
 [[package]]
 name = "subscription-custody"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "connector-oauth",
  "connector-secrets",
