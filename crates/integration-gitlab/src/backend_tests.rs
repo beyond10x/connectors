@@ -2,6 +2,7 @@
 mod tests {
     use super::*;
     use crate::profiles::{PROFILE_OAUTH, PROFILE_PAT};
+    use crate::repository_file::valid_repository_file_path;
 
     #[test]
     fn origins_are_exact_https_only() {
