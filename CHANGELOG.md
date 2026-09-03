@@ -11,6 +11,19 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.7 — 2026-09-04
+
+### Added
+
+- `connectors completions <shell>` prints a completion script for bash, zsh, fish, elvish or
+  PowerShell, generated from the same clap command tree that parses the arguments.
+
+### Fixed
+
+- The release gate passes again. `d3707aa` took `integration-gitlab`'s backend past its size
+  waiver, which failed every release run from v0.5.3 to v0.5.6 before a binary was built; the
+  repository-file path helpers it added now live in their own module.
+
 ## 0.5.6 — 2026-09-03
 
 ### Fixed

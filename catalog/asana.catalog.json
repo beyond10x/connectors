@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Asana work management: read tasks and projects, create and update tasks, comment on a task",
-  "generator": "connectors 0.5.6",
+  "generator": "connectors 0.5.7",
   "operations": [
     {
       "auth": [

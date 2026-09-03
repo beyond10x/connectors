@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:cli-shell-completions
 kind: story
-status: active
+status: implemented
 title: The connectors CLI prints its own shell completion script
 summary: connectors completions <shell> emits a clap_complete script for bash, zsh, fish, elvish and PowerShell.
 scope:
@@ -18,7 +18,7 @@ scope:
   path: crates/connectors-cli/Cargo.toml
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
-revision: 4
+revision: 5
 ---
 ## Context
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:release-gate-gitlab-size-fence
 kind: story
-status: active
+status: implemented
 title: Release runs v0.5.3 to v0.5.6 fail the size fence on the GitLab backend
 summary: backend.rs is 2895 lines against a 2869-line waiver, and 28 manifests still say 0.5.3; every tag since v0.5.3 fails before building.
 scope:
@@ -10,7 +10,7 @@ scope:
   path: crates/catalog-build/tests/main/architecture_fence.rs
 - confidence: cited
   path: crates/integration-gitlab/src
-revision: 4
+revision: 5
 ---
 ## Context
 
