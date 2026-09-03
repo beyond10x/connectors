@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "71ef071bad1f6609c22c5dfc010bf8b3d41b717f0d7e4cd2e0915aa1098389e1"
+sha256 = "590707c57c4670c273a234d7e1f9d90dd9b6f265d5f334f6268a466b7278c0d6"
 
 [[provider]]
 id = "airtable"
@@ -360,11 +360,11 @@ sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 [[provider]]
 id = "gitlab"
 generator = "connectors 0.5.2"
-toml_sha256 = "d099aadaad93cb73a2264b2449125fcf307fd582ff9246c851fd871d72743a14"
-ir_sha256 = "0050958fd59ad5e92a8ca4879fcba39936e4ecd1913b4bbcd5a75a1172a9300e"
+toml_sha256 = "599f0e59cce58b3bc6337989ad910b0c0272f2e56c53b620b6a2b35f41ae6449"
+ir_sha256 = "8f296f62a418dfcb6e59b15f93f939063ed8f6060ce383b602084701571b0084"
 
 [provider.artifacts]
-"catalog/gitlab.catalog.json" = "24bb41131d56a6ed932575e97471b8ee9fb9acb46b45b54ebe850b47133cc2b9"
+"catalog/gitlab.catalog.json" = "8ac1ca546bb085ecee95597af28bb56b0d5d8d6b4b0d3202082501846ecc6e7b"
 
 [[provider]]
 id = "google"
