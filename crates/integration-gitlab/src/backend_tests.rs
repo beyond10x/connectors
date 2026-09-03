@@ -81,6 +81,52 @@ mod tests {
         assert!(parse_pat(&vec![b'x'; 4_097]).is_err());
     }
 
+    #[test]
+    fn repository_file_paths_are_encoded_as_one_gitlab_segment() {
+        let operation = connector_resolve::document::operation(REPOSITORY_FILE_GET).unwrap();
+        let credential = connector_resolve::auth::Assembled::new(
+            "gitlab.token",
+            "SENTINEL-NOT-A-REAL-SECRET".to_owned(),
+            catalog::Placement::Header {
+                name: "Authorization",
+                prefix: "Bearer ",
+            },
+        );
+        let plan = resolve_operation_plan(
+            operation,
+            "https://gitlab.example.test/api/v4",
+            &serde_json::json!({
+                "project_id": 813,
+                "file_path": "bootstrap/deployer-rbac.yaml",
+                "ref": "5a0d0ad26adaa0b4de31951edd68620db7045179"
+            }),
+            &[credential],
+        )
+        .unwrap();
+
+        assert_eq!(
+            plan.request.url,
+            "https://gitlab.example.test/api/v4/projects/813/repository/files/bootstrap%2Fdeployer-rbac.yaml?ref=5a0d0ad26adaa0b4de31951edd68620db7045179"
+        );
+        assert_eq!(plan.permission_subjects, vec![plan.request.url.clone()]);
+    }
+
+    #[test]
+    fn repository_file_paths_cannot_traverse_or_change_root() {
+        for path in [
+            "/root",
+            "../secret",
+            "dir/../secret",
+            "dir//file",
+            ".git/config",
+        ] {
+            assert!(!valid_repository_file_path(path), "{path}");
+        }
+        assert!(valid_repository_file_path(
+            ".gitlab/agents/devcenter/config.yaml"
+        ));
+    }
+
     // The four below characterise the OAuth behaviour that moved to `connector-oauth`. They were
     // written with the move, because the five tests above it do not reach the OAuth path at all —
     // "the existing tests still pass" was true of this refactor and proved nothing about it.
