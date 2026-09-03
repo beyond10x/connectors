@@ -10,7 +10,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
     default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
@@ -166,6 +166,16 @@ enum Command {
     Operation {
         #[command(subcommand)]
         command: OperationCommand,
+    },
+    /// Print a completion script for one shell, generated from this same command tree.
+    ///
+    /// Install it where the shell reads completions at start-up, for example
+    /// `connectors completions fish > ~/.config/fish/completions/connectors.fish` or
+    /// `connectors completions bash > ~/.local/share/bash-completion/completions/connectors`.
+    Completions {
+        /// Which shell's syntax to print.
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
     },
 }
 
@@ -373,6 +383,8 @@ enum MainError {
     Init(#[from] init::InitError),
     #[error(transparent)]
     Output(#[from] output::OutputError),
+    #[error("could not write the completion script: {0}")]
+    Completions(io::Error),
     /// `doctor` found something that cannot work. The detail is in the report it already printed.
     #[error("this installation has a problem `connectors doctor` named above")]
     Unhealthy,
@@ -399,6 +411,7 @@ impl MainError {
             Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
             Self::Connect(_) => "connect",
             Self::Output(_) => "output",
+            Self::Completions(_) => "output",
             Self::Refused(refusal) => &refusal.code,
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
@@ -436,6 +449,17 @@ where
 async fn run(cli: Cli) -> Result<(), MainError> {
     let format = cli.output;
     match cli.command {
+        // A shell program rather than a result, so `--output` does not apply to it. Rendered to a
+        // buffer first: `clap_complete::generate` panics on a write error, and a reader that stops
+        // early (`| head`) is not an error at all.
+        Command::Completions { shell } => {
+            let mut script = Vec::new();
+            clap_complete::generate(shell, &mut Cli::command(), "connectors", &mut script);
+            match io::Write::write_all(&mut io::stdout().lock(), &script) {
+                Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+                result => result.map_err(MainError::Completions),
+            }
+        }
         Command::Login {
             base,
             no_browser,
@@ -878,7 +902,7 @@ fn read_config(path: Option<PathBuf>) -> Result<PersonalConfig, MainError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::CommandFactory as _;
+    use clap::ValueEnum as _;
 
     #[test]
     fn normal_help_exposes_the_guided_flow_and_hides_acquisition_plumbing() {
@@ -894,6 +918,28 @@ mod tests {
         assert!(connection_help.contains("list"));
         assert!(!connection_help.contains("create"));
         assert!(!connection_help.contains("status"));
+    }
+
+    #[test]
+    fn every_supported_shell_gets_a_script_naming_the_whole_surface() {
+        for shell in clap_complete::Shell::value_variants() {
+            let mut script = Vec::new();
+            clap_complete::generate(*shell, &mut Cli::command(), "connectors", &mut script);
+            let script = String::from_utf8(script).unwrap();
+            for verb in ["serve-hosted", "connect", "operation", "completions"] {
+                assert!(
+                    script.contains(verb),
+                    "{shell} script does not name `{verb}`"
+                );
+            }
+        }
+        let cli = Cli::try_parse_from(["connectors", "completions", "fish"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Completions {
+                shell: clap_complete::Shell::Fish
+            }
+        ));
     }
 
     #[test]

@@ -27,7 +27,10 @@ const MODULE_LINE_LIMIT: usize = 1_500;
 // Raised 960 -> 966 for hosted Integration administration. The six frontend lines are the Clap
 // command slot, typed error/exit classification, and one dispatch arm; login, secret input,
 // rendering, and HTTP behavior all live behind connectors-console/connectors-client.
-const CLI_TOTAL_LINE_LIMIT: usize = 966;
+// Raised 966 -> 1006 on 2026-09-04 for `connectors completions <shell>`: the Clap variant with its
+// install note, one dispatch arm that hands the parser's own command tree to `clap_complete`, and
+// one test that renders every shell's script. The script is generated, never maintained here.
+const CLI_TOTAL_LINE_LIMIT: usize = 1006;
 
 /// Existing large catalog modules are named debts. The ceiling prevents a waiver from becoming
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.
@@ -311,6 +314,10 @@ fn product_cli_is_a_thin_frontend() {
     }
     const CLI_DEPENDENCIES: &[&str] = &[
         "clap",
+        // Renders the parser's own command tree into each shell's completion syntax. Presentation
+        // of the argument surface, and the one dependency that makes the script unable to drift
+        // from the parser it completes.
+        "clap_complete",
         "connectors-client",
         // The operator-facing surface — writing a configuration, diagnosing an installation,
         // reading the catalogue, rendering a result. It is on this list because it is the answer

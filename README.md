@@ -154,6 +154,11 @@ connectors mcp
 connectors logout
 ```
 
+`connectors completions <shell>` prints a completion script for `bash`, `zsh`, `fish`, `elvish`
+or `powershell`, generated from the same command tree that parses the arguments. Write it where
+the shell reads completions at start-up, for example
+`connectors completions fish > ~/.config/fish/completions/connectors.fish`.
+
 The Connectors deployment publishes an unauthenticated bootstrap document naming the neutral
 Identity origin and exact Connector audience it trusts. Browser login returns an opaque session
 which is stored only in the operating-system keyring; non-secret account and deployment selection

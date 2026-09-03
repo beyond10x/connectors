@@ -30,6 +30,7 @@ local-identity = ["connectors-runtime/local-identity"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 connectors-client = { version = "0.5.3", path = "../connectors-client" }
 # The operator-facing behaviour this frontend delegates to: writing a configuration, diagnosing an
 # installation, reading the catalogue, rendering a result. Kept out of the binary because the
