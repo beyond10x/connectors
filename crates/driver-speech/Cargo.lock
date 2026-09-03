@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "catalog"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -51,7 +51,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.5.3"
+version = "0.5.5"
 
 [[package]]
 name = "cfg-if"
@@ -61,14 +61,14 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "connector-address"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connector-resolve"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -82,7 +82,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "thiserror",
 ]
@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "domain",
  "schemars",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "async-trait",
  "base64",
