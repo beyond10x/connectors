@@ -2216,7 +2216,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -2331,8 +2331,8 @@ dependencies = [
 
 [[package]]
 name = "identity-client"
-version = "0.4.0"
-source = "git+https://github.com/beyond10x/identity?rev=bb3fdab4f5cfd64774a9df121d438e488431bbb8#bb3fdab4f5cfd64774a9df121d438e488431bbb8"
+version = "0.5.6"
+source = "git+https://github.com/beyond10x/identity?tag=0.5.6#e3231bc34eb65695ba0486e1bbe3a0f1ec5b2a23"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -3772,7 +3772,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -3811,7 +3811,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -5147,7 +5147,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
