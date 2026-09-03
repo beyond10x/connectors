@@ -2,7 +2,7 @@
 name = "integration-platform"
 description = "The platform-owned native driver and private service Connector Integration."
 edition = "2021"
-version = "0.5.2"
+version = "0.5.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -13,23 +13,23 @@ workspace = "../connectors-runtime"
 [dependencies]
 async-trait = "0.1"
 base64 = "0.22"
-catalog = { version = "0.5.2", path = "../catalog" }
-connector-resolve = { version = "0.5.2", path = "../connector-resolve" }
-connectors-config = { version = "0.5.2", path = "../connectors-config" }
-domain = { version = "0.5.2", path = "../domain" }
-driver-speech = { version = "0.5.2", path = "../driver-speech" }
-driver-cdp = { version = "0.5.2", path = "../driver-cdp" }
+catalog = { version = "0.5.3", path = "../catalog" }
+connector-resolve = { version = "0.5.3", path = "../connector-resolve" }
+connectors-config = { version = "0.5.3", path = "../connectors-config" }
+domain = { version = "0.5.3", path = "../domain" }
+driver-speech = { version = "0.5.3", path = "../driver-speech" }
+driver-cdp = { version = "0.5.3", path = "../driver-cdp" }
 ed25519-dalek = { version = "2", features = ["pem", "pkcs8"] }
 getrandom = "0.3"
 hex = "0.4"
-connector-state = { version = "0.5.2", path = "../connector-state" }
+connector-state = { version = "0.5.3", path = "../connector-state" }
 jsonschema = { version = "0.49.2", default-features = false }
-protocol = { version = "0.5.2", path = "../protocol" }
+protocol = { version = "0.5.3", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.5.2", path = "../service" }
+service = { version = "0.5.3", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["rt", "sync", "time"] }
