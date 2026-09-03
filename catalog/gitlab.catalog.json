@@ -5071,13 +5071,13 @@
           "symbol": "project_id"
         },
         {
-          "description": "The repository-relative file path encoded as one URI path segment; slashes are `%2F`",
+          "description": "The repository-relative file path; the GitLab integration encodes it as one URI path segment",
           "name": "file_path",
           "position": "path",
           "required": true,
           "schema": {
             "maxLength": 3072,
-            "pattern": "^(?!%2[fF]|%2[eE]%2[eE](?:%2[fF]|$))(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$",
+            "minLength": 1,
             "type": "string"
           },
           "symbol": "file_path"
