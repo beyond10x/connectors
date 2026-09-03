@@ -18,7 +18,7 @@
   ],
   "connector": "prometheus",
   "description": "Query Prometheus metrics with bounded native PromQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.5.6",
+  "generator": "connectors 0.5.7",
   "operations": [
     {
       "auth": [],
