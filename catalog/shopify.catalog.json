@@ -51,7 +51,7 @@
     ]
   ],
   "description": "Shopify Admin REST API: read orders, products, customers and inventory levels, and update a product",
-  "generator": "connectors 0.5.5",
+  "generator": "connectors 0.5.6",
   "operations": [
     {
       "auth": [

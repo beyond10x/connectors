@@ -11,6 +11,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.6 — 2026-09-03
+
+### Fixed
+
+- Canonicalize the Identity repository source URL so downstream Cargo graphs cannot instantiate
+  duplicate Identity client types from the same 0.5.6 commit.
+
 ## 0.5.5 — 2026-09-03
 
 ### Fixed

@@ -75,7 +75,7 @@ exclude = [
 edition = "2021"
 # The predecessor differential has passed and its 0.26 line is retired. `0.1.0` is the first
 # beyond10x/connectors artifact identity; generator, lock rows and wire User-Agent move together.
-version = "0.5.5"
+version = "0.5.6"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -90,21 +90,21 @@ publish = false
 schemars = "1"
 # Internal crates. Path-local names: the package name, the library name and the workspace key are
 # the same word, so there is no `package = "…"` alias to keep in step with anything.
-connector-address = { version = "0.5.5", path = "crates/connector-address" }
-connector-spec = { version = "0.5.5", path = "crates/connector-spec" }
-catalog-reader = { version = "0.5.5", path = "crates/catalog-reader" }
-catalog = { version = "0.5.5", path = "crates/catalog" }
-connector-resolve = { version = "0.5.5", path = "crates/connector-resolve" }
-connector-oauth = { version = "0.5.5", path = "crates/connector-oauth" }
-connector-secrets = { version = "0.5.5", path = "crates/connector-secrets" }
-connector-state = { version = "0.5.5", path = "crates/connector-state" }
-connectors-client = { version = "0.5.5", path = "crates/connectors-client" }
-subscription-custody = { version = "0.5.5", path = "crates/subscription-custody" }
-catalog-build = { version = "0.5.5", path = "crates/catalog-build" }
-domain = { version = "0.5.5", path = "crates/domain" }
-protocol = { version = "0.5.5", path = "crates/protocol" }
-service = { version = "0.5.5", path = "crates/service" }
-server = { version = "0.5.5", path = "crates/server" }
+connector-address = { version = "0.5.6", path = "crates/connector-address" }
+connector-spec = { version = "0.5.6", path = "crates/connector-spec" }
+catalog-reader = { version = "0.5.6", path = "crates/catalog-reader" }
+catalog = { version = "0.5.6", path = "crates/catalog" }
+connector-resolve = { version = "0.5.6", path = "crates/connector-resolve" }
+connector-oauth = { version = "0.5.6", path = "crates/connector-oauth" }
+connector-secrets = { version = "0.5.6", path = "crates/connector-secrets" }
+connector-state = { version = "0.5.6", path = "crates/connector-state" }
+connectors-client = { version = "0.5.6", path = "crates/connectors-client" }
+subscription-custody = { version = "0.5.6", path = "crates/subscription-custody" }
+catalog-build = { version = "0.5.6", path = "crates/catalog-build" }
+domain = { version = "0.5.6", path = "crates/domain" }
+protocol = { version = "0.5.6", path = "crates/protocol" }
+service = { version = "0.5.6", path = "crates/service" }
+server = { version = "0.5.6", path = "crates/server" }
 
 # Shared third-party.
 anyhow = "1"
@@ -140,7 +140,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tokio = { version = "1", default-features = false }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 url = "2"
-identity-client = { git = "https://github.com/beyond10x/identity", tag = "0.5.6" }
+identity-client = { git = "https://github.com/beyond10x/identity.git", tag = "0.5.6" }
 # Dependencies at opt-level 2 even in dev: the test suites' cost is parse-dominated (21 MB of
 # vendored specs through serde per whole-catalogue sweep), and debug-mode serde made one
 # conformance test alone take 200 s. Workspace members stay at opt-level 0 for fast incremental
