@@ -11,6 +11,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.5 — 2026-09-03
+
+### Fixed
+
+- Refresh every satellite workspace lockfile after the 0.5.4 dependency and artifact-identity
+  changes so the sharded release gate remains reproducible under `--locked`.
+
 ## 0.5.4 — 2026-09-03
 
 ### Changed

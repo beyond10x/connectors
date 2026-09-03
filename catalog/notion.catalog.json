@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Notion workspace: read a page's properties, query a database, search shared content, and create a page",
-  "generator": "connectors 0.5.4",
+  "generator": "connectors 0.5.5",
   "operations": [
     {
       "auth": [
