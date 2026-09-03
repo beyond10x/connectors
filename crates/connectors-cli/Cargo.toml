@@ -2,7 +2,7 @@
 name = "connectors-cli"
 description = "Thin command-line frontend for reusable Connector client and runtime libraries."
 edition = "2021"
-version = "0.5.2"
+version = "0.5.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -30,13 +30,13 @@ local-identity = ["connectors-runtime/local-identity"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-connectors-client = { version = "0.5.2", path = "../connectors-client" }
+connectors-client = { version = "0.5.3", path = "../connectors-client" }
 # The operator-facing behaviour this frontend delegates to: writing a configuration, diagnosing an
 # installation, reading the catalogue, rendering a result. Kept out of the binary because the
 # architecture fence caps what a thin frontend may contain, and it is right to.
-connectors-console = { version = "0.5.2", path = "../connectors-console" }
-connectors-runtime = { version = "0.5.2", path = "../connectors-runtime" }
-protocol = { version = "0.5.2", path = "../protocol" }
+connectors-console = { version = "0.5.3", path = "../connectors-console" }
+connectors-runtime = { version = "0.5.3", path = "../connectors-runtime" }
+protocol = { version = "0.5.3", path = "../protocol" }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std"] }
 serde_json = "1"
 thiserror = "2"
