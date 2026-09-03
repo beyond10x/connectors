@@ -18,7 +18,7 @@
   ],
   "connector": "alertmanager",
   "description": "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection",
-  "generator": "connectors 0.5.2",
+  "generator": "connectors 0.5.3",
   "operations": [
     {
       "auth": [],

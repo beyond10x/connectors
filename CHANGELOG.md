@@ -11,6 +11,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.3 — 2026-09-03
+
+### Fixed
+
+- Encode validated repository-relative GitLab file paths as one API path segment, so nested files
+  can be read at an exact commit without weakening generic Connector path safety.
+
 ## 0.5.2 — 2026-09-03
 
 ### Added
