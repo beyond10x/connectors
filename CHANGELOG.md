@@ -11,6 +11,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.4 — 2026-09-03
+
+### Changed
+
+- Upgrade the hosted Identity client from 0.4.0 to 0.5.6 so Connector grants use the current
+  Identity contract throughout the deployed stack.
+
 ## 0.5.3 — 2026-09-03
 
 ### Fixed
