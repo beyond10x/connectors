@@ -45,6 +45,7 @@ use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
 
 use crate::profiles::GitlabProfile;
+use crate::repository_file::resolve_operation_plan;
 use crate::transport::{
     bearer_headers, decode_page_response, decode_response, decode_value_response, form_body,
     http_request,
@@ -57,7 +58,7 @@ pub(crate) const LOGIN_SERVICE: &str = "login";
 const ACCESS_TOKEN_CREDENTIAL: &str = "access_token";
 const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
 pub(crate) const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
-const REPOSITORY_FILE_GET: &str = "gitlab-repository-file-get";
+pub(crate) const REPOSITORY_FILE_GET: &str = "gitlab-repository-file-get";
 pub(crate) const STATE_KEY: &str = "gitlab.connections";
 const AUDIT_KEY: &str = "gitlab.audit";
 pub(crate) const STATE_VERSION: u8 = 1;
@@ -2625,59 +2626,6 @@ pub(crate) fn parse_origin(value: &str) -> Result<url::Url, GitlabError> {
         return Err(GitlabError::new("origin"));
     }
     Ok(origin)
-}
-
-fn resolve_operation_plan(
-    operation: &connector_resolve::document::Operation,
-    base: &str,
-    input: &Value,
-    credentials: &[connector_resolve::auth::Assembled],
-) -> Result<connector_resolve::RequestPlan, ()> {
-    let mut resolved_input = input.clone();
-    let repository_file_path = if operation.id == REPOSITORY_FILE_GET {
-        let path = input
-            .get("file_path")
-            .and_then(Value::as_str)
-            .filter(|path| valid_repository_file_path(path))
-            .ok_or(())?
-            .to_owned();
-        resolved_input
-            .as_object_mut()
-            .ok_or(())?
-            .insert("file_path".to_owned(), Value::String("file".to_owned()));
-        Some(path)
-    } else {
-        None
-    };
-    let mut plan = connector_resolve::resolve(
-        operation,
-        base,
-        &resolved_input,
-        &BTreeMap::new(),
-        credentials,
-    )
-    .map_err(|_| ())?;
-    if let Some(path) = repository_file_path {
-        let mut target = url::Url::parse(&plan.request.url).map_err(|_| ())?;
-        target
-            .path_segments_mut()
-            .map_err(|_| ())?
-            .pop()
-            .push(&path);
-        plan.request.url = target.to_string();
-        plan.permission_subjects = vec![plan.request.url.clone()];
-    }
-    Ok(plan)
-}
-
-fn valid_repository_file_path(path: &str) -> bool {
-    !path.is_empty()
-        && path.len() <= 3_072
-        && !path.starts_with('/')
-        && !path.contains(['\0', '\\'])
-        && path
-            .split('/')
-            .all(|component| !component.is_empty() && !matches!(component, "." | ".." | ".git"))
 }
 
 fn same_origin(expected: &url::Url, actual: &url::Url) -> bool {
