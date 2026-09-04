@@ -4,7 +4,12 @@ id: story:explicit-target-never-implicit
 kind: story
 status: draft
 title: A command names its target; nothing infers it from a stored login
-revision: 1
+relations:
+- derived_from: epic:cli-surface
+scope:
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+revision: 2
 ---
 # Story: a command names its target; nothing infers it from a stored login
 
