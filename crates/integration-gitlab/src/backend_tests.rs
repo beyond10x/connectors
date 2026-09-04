@@ -1,8 +1,143 @@
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use crate::profiles::{PROFILE_OAUTH, PROFILE_PAT};
     use crate::repository_file::valid_repository_file_path;
+    use connector_secrets::MemoryStore;
+    use service::{EgressTransportError, EgressWebSocket};
+
+    struct PagedProjectsEgress {
+        calls: AtomicUsize,
+        continuation: &'static str,
+    }
+
+    #[async_trait]
+    impl EgressTransport for PagedProjectsEgress {
+        async fn execute(
+            &self,
+            _authority_ref: &str,
+            request: EgressHttpRequest,
+        ) -> Result<EgressHttpResponse, EgressTransportError> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            let target = url::Url::parse(&request.request.url).expect("provider URL");
+            let page = target
+                .query_pairs()
+                .find_map(|(key, value)| (key == "page").then_some(value.into_owned()))
+                .expect("the bounded scan always names its page");
+            assert_eq!(page, (call + 1).to_string());
+            let projects = if call == 0 {
+                (1..=100)
+                    .map(|id| {
+                        serde_json::json!({
+                            "id": id,
+                            "path_with_namespace": format!("group/repository-{id}")
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                vec![serde_json::json!({
+                    "id": 101,
+                    "path_with_namespace": "group/selected-repository"
+                })]
+            };
+            Ok(EgressHttpResponse {
+                status: 200,
+                headers: if call == 0 {
+                    BTreeMap::from([(
+                        "x-next-page".to_owned(),
+                        self.continuation.to_owned(),
+                    )])
+                } else {
+                    BTreeMap::new()
+                },
+                body: serde_json::to_vec(&projects).unwrap(),
+            })
+        }
+
+        async fn connect_websocket(
+            &self,
+            _authority_ref: &str,
+            _url: String,
+            _maximum_message_bytes: usize,
+        ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+            Err(EgressTransportError::Refused)
+        }
+    }
+
+    async fn paged_backend(continuation: &'static str) -> (GitlabBackend, Arc<PagedProjectsEgress>) {
+        let egress = Arc::new(PagedProjectsEgress {
+            calls: AtomicUsize::new(0),
+            continuation,
+        });
+        let backend = GitlabBackend::open_inner(
+            "tenant-one".to_owned(),
+            HostedGitlabConfig {
+                origin: "https://gitlab.example.test".to_owned(),
+                public_origin: "https://connectors.example.test/api/connectors/v1".to_owned(),
+                oauth_client_id: "client-one".to_owned(),
+                oauth_redirect_uri:
+                    "https://connectors.example.test/api/connectors/v1/oauth/gitlab/callback"
+                        .to_owned(),
+                user_grant_ref: "grant:gitlab:user".to_owned(),
+                initiation: InitiationConfig::Provider,
+                connect_session_ttl_seconds: 300,
+                refresh_skew_seconds: 300,
+            },
+            Arc::new(MemoryStore::new()),
+            GitlabState::Hosted(Arc::new(connector_state::MemoryState::new())),
+            egress.clone(),
+        )
+        .await
+        .unwrap();
+        (backend, egress)
+    }
+
+    #[tokio::test]
+    async fn project_admission_reaches_a_repository_after_the_first_hundred() {
+        let (backend, egress) = paged_backend("2").await;
+        let mut selected = None;
+        let stopped = backend
+            .inner
+            .scan_membership_projects(
+                "connection:gitlab:one",
+                &Secret::new("synthetic-gitlab-token"),
+                true,
+                |project| {
+                    let id = project.get("id").and_then(Value::as_u64);
+                    if id == Some(101) {
+                        selected = id;
+                        true
+                    } else {
+                        false
+                    }
+                },
+            )
+            .await
+            .unwrap();
+
+        assert!(stopped);
+        assert_eq!(selected, Some(101));
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn project_admission_refuses_a_non_advancing_continuation() {
+        let (backend, egress) = paged_backend("1").await;
+        let result = backend
+            .inner
+            .scan_membership_projects(
+                "connection:gitlab:one",
+                &Secret::new("synthetic-gitlab-token"),
+                false,
+                |_| false,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn origins_are_exact_https_only() {

@@ -5,6 +5,7 @@
 mod backend;
 mod open;
 mod profiles;
+mod project_scan;
 mod repository_file;
 mod state;
 mod transport;
