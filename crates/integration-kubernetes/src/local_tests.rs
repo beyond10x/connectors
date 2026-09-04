@@ -235,4 +235,82 @@ contexts:
         .unwrap();
         assert!(candidates(&kubeconfig).is_empty());
     }
+
+    /// **Two activated clusters are two callable Connections**, not one.
+    ///
+    /// The regression: `cluster_connection` answered `state.clients.keys().next()`, so an operator
+    /// who had activated five kubeconfig contexts — all `authorized`, all with a live client — got
+    /// exactly one of them from `operation describe kubernetes.deployment.status`, and an `invoke`
+    /// against any other refused `not_found: no Integration owns this operation`. The refusal named
+    /// the operation for a fault in Connection selection, which is the part that made it hard to
+    /// see. Activation is what admits a cluster; nothing after it may narrow the set.
+    ///
+    /// Asserted over [`cluster_rows`], which is the whole of the rule and the exact list the
+    /// description lease hashes — so a cluster arriving also moves the lease, and a restart
+    /// approved against a one-cluster description cannot be dispatched after a second is attached.
+    #[test]
+    fn every_activated_cluster_is_published_in_a_stable_order() {
+        let described = descriptions(&[
+            "connection:kubernetes:beta",
+            "connection:kubernetes:alpha",
+        ]);
+        let attached: Vec<String> = vec![
+            "connection:kubernetes:beta".to_owned(),
+            "connection:kubernetes:alpha".to_owned(),
+        ];
+
+        let rows = cluster_rows(attached.iter(), &described);
+        assert_eq!(
+            rows.iter().map(|(r, _)| r.as_str()).collect::<Vec<_>>(),
+            vec!["connection:kubernetes:beta", "connection:kubernetes:alpha"],
+            "every attached cluster, in the order the attachment map yields"
+        );
+
+        // Adding one changes the published list, which is what invalidates a lease taken before it.
+        let one = cluster_rows(attached[..1].iter(), &described);
+        assert_ne!(one, rows);
+    }
+
+    /// A cluster with a live client but no description is not published, and neither is a
+    /// description with no client. Both halves are what activation writes together.
+    #[test]
+    fn a_half_attached_cluster_is_not_published() {
+        let described = descriptions(&["connection:kubernetes:alpha"]);
+        let attached: Vec<String> = vec![
+            "connection:kubernetes:alpha".to_owned(),
+            "connection:kubernetes:never-described".to_owned(),
+        ];
+        let rows = cluster_rows(attached.iter(), &described);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].0, "connection:kubernetes:alpha");
+
+        // And a description nobody attached publishes nothing at all.
+        assert!(cluster_rows(std::iter::empty(), &described).is_empty());
+    }
+
+    /// Activation's own output shape, for the two references a test names.
+    fn descriptions(references: &[&str]) -> BTreeMap<String, ConnectionDescription> {
+        references
+            .iter()
+            .map(|reference| {
+                (
+                    (*reference).to_owned(),
+                    ConnectionDescription {
+                        summary: ConnectionSummary {
+                            connection_ref: (*reference).to_owned(),
+                            integration_ref: KUBERNETES.to_owned(),
+                            label: (*reference).to_owned(),
+                            state: ConnectionState::Authorized,
+                            initiation: vec![ConnectionInitiator::Platform],
+                            route: ConnectionRoute::Direct,
+                            scope: None,
+                            actor: None,
+                            auth_profile: None,
+                        },
+                        channels: Vec::new(),
+                    },
+                )
+            })
+            .collect()
+    }
 }
