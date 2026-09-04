@@ -267,6 +267,11 @@ impl Inner {
             initiation: InitiationConfig::Platform,
             allow_writes: false,
             endpoints: BTreeMap::new(),
+            // Hosted self-service stores no user half today, so a `basic` connector is not
+            // connectable through it. Stated as an empty map rather than left implicit: the
+            // personal placement fills this from `[catalog.usernames]`, and the hosted gap is a
+            // missing acquisition surface, not a different resolution rule.
+            usernames: BTreeMap::new(),
             operator_approved: false,
             credential: Some(connection.credential.clone()),
             network: connectors_config::NetworkScopeConfig::Public,
@@ -428,6 +433,11 @@ impl Inner {
             initiation: InitiationConfig::Platform,
             allow_writes: false,
             endpoints: BTreeMap::new(),
+            // Hosted self-service stores no user half today, so a `basic` connector is not
+            // connectable through it. Stated as an empty map rather than left implicit: the
+            // personal placement fills this from `[catalog.usernames]`, and the hosted gap is a
+            // missing acquisition surface, not a different resolution rule.
+            usernames: BTreeMap::new(),
             operator_approved: false,
             credential: Some(session.credential.clone()),
             network: connectors_config::NetworkScopeConfig::Public,

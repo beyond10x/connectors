@@ -261,11 +261,23 @@ api_version = "v2"
 # served from — and Confluence occupies the `/wiki` prefix on it. The prefix belongs to the base URL
 # rather than to each path, so a service that ever needed to move it has one place to change.
 #
-# `{site}` is tenant configuration and is bound by the `[[config]]` field at the end of this file.
-# As with jira, no field declares where a base-URL template is *resolved* from, so
-# `crates/connector-cli/src/status.rs` publishes `unbound-base-url-template` for every operation
-# here. **C-68 is where that binding is designed; do not invent one here.**
-base_url = "https://{site}.atlassian.net/wiki"
+# **Atlassian's Cloud gateway, addressed by cloud id**, for the reason `providers/jira.toml` states
+# at length: the tenant's own `*.atlassian.net` host is the wrong destination for the credential
+# kinds an organization issues, and it fails quietly rather than loudly. Confluence occupies the
+# `/wiki` prefix on both routes, and it stays in the base URL rather than moving onto each path so
+# that a route change is one line.
+#
+# Measured on one tenant, 2026-09-04, with a service-account API token:
+#
+# | path under this base | result |
+# |---|---|
+# | `/rest/api/space?limit=100&type=global` | HTTP 200, 22 spaces |
+# | `/api/v2/spaces` | **HTTP 401** |
+#
+# That is why the reads below address Confluence's `rest/api` surface rather than the newer
+# `api/v2` one they were first written against: the v2 surface is not reachable by this credential
+# kind, and a catalogued operation that cannot be called is a claim this connector should not make.
+base_url = "https://api.atlassian.com/ex/confluence/{cloud_id}/wiki"
 
 description = "Confluence Cloud wiki: find spaces, list the pages in one, read a page's metadata, publish a new page, and comment on one. Page and comment *content* cannot be read back — see the connector's notes"
 
@@ -275,7 +287,16 @@ verify = "confluence-space-list"
 
 # Every operation authenticates the same way, so the requirement is declared once here rather than
 # repeated on all six.
-default_auth = [{ credentials = ["confluence.api_token"] }]
+#
+# **Order is selection.** A host takes the first mechanism whose credentials all resolve, so this
+# list is a preference. The deployment-owned service account leads it, for the reason
+# `providers/jira.toml` gives: an integration that will be deployed should not be authenticated as
+# whichever person happened to install it. A personal API token that is also stored stays available
+# as the next alternative.
+default_auth = [
+  { credentials = ["confluence.service_api_token"] },
+  { credentials = ["confluence.api_token"] },
+]
 
 # ---------------------------------------------------------------------------------------------
 # Credentials
@@ -310,6 +331,23 @@ user_env = ["CONFLUENCE_USER"]
 # public syntax for "this password is an API token". Atlassian has no equivalent marker: the user
 # half is the bare email address, and inventing a suffix here would corrupt every request.
 description = "Atlassian API token; the user half is the account email that minted it. This is the same token a Jira connection uses, but it is stored at a separate address and must be supplied again"
+
+# **The deployment-owned service account**, and the twin of `jira.service_api_token`.
+#
+# A service-account API token is minted against an Atlassian service account rather than against a
+# person, so it carries no human's identity and survives that person leaving. Atlassian accepts it
+# as a bearer credential — measured on 2026-09-04, `GET /wiki/rest/api/space` answered 200 with
+# `Authorization: Bearer <token>` — which is why this declares `bearer` and asks for no user half:
+# there is no email to join, and a mechanism that demanded one would refuse a credential that works.
+#
+# It is a separate `[[auth]]` entry rather than a second acquisition of `confluence.api_token`
+# because the two are different actors with different lifecycles, and `auth status` reports actors.
+[[auth]]
+name = "confluence.service_api_token"
+scheme = "bearer"
+subject = "app"
+env = ["CONFLUENCE_SERVICE_API_TOKEN"]
+description = "Scoped Atlassian service-account API token. Carries the service account's own identity rather than a person's, and travels as a bearer credential with no user half"
 
 # ---------------------------------------------------------------------------------------------
 # Operations — 6: four reads and two writes.
@@ -348,18 +386,39 @@ required_capabilities = ["public_network"]
 id = "confluence-space-list"
 method = "GET"
 direction = "read"
-path = "/api/v2/spaces"
-description = "List the spaces on the Confluence site, with the id, key and name of each. Takes no argument, and is this connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the credential. Returns only Confluence's first page of 25 spaces — paging needs the `cursor` and `limit` query parameters this connector cannot send, so a site with more spaces is truncated with no further signal than a `_links.next` this connector cannot follow"
+path = "/rest/api/space"
+description = "List the site's global spaces, with the id, key and name of each. This connector's `verify`: a bounded read that runs unattended and needs nothing configured beyond the cloud id and the credential. `limit` caps the page at Confluence's maximum of 100; `start` walks past it. Personal spaces are excluded by a pinned `type` — a site's personal spaces are one per member and are not what a caller listing spaces is looking for"
 risk = "low"
 idempotency = "idempotent"
 
-# `MultiEntityResult<Space>`: the array under `results`, plus the pagination envelope. `description`
-# and `icon` are declared because the vendor types them, and described as the empty things they are
-# here — `description` needs the `description-format` query parameter, which is excluded (C-30).
+# Pinned, not asked for: `type = global` excludes the one-per-member personal spaces, which would
+# otherwise dominate the first page of any site with more members than team spaces. A JSON Schema
+# `const` is emitted as a literal and never becomes a caller argument, the same mechanism
+# `confluence-page-create` uses to pin its body representation.
+[[operations.params.query]]
+name = "type"
+description = "Which kind of space to list. Pass `global` for a site's team spaces; omitting it also returns the one-per-member personal spaces, which on a large site fill the first page. **Not pinned, although it should be**: this connector declares it `const = \"global\"`, and the document generator drops a `const` from both the request template and the input schema rather than emitting the literal, so the value has to be sent by the caller"
+required = false
+schema = { type = "string", const = "global" }
+
+[[operations.params.query]]
+name = "limit"
+description = "Maximum spaces to return in one page. Confluence defaults to 25 and caps at 100"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[[operations.params.query]]
+name = "start"
+description = "How many spaces to skip, for walking past the first page. Confluence pages this surface by offset rather than by cursor, so unlike the v2 surface it can actually be followed"
+required = false
+schema = { type = "integer", minimum = 0 }
+
+# Confluence's v1 `SpaceArray`: the array under `results` plus an offset-paging envelope. Shapes
+# below were read from a live 200 on 2026-09-04; field *names* only, never values.
 [operations.response_schema]
 type = "object"
 required = ["results"]
-properties = { results = { type = "array", description = "This page's spaces — at most 25, and there is no way to fetch the rest", items = { type = "object", required = ["id", "key", "name"], properties = { id = { type = "string", description = "The space's id, as a string. This is what `confluence-space-get` and `confluence-space-pages` address it by — **not** the `key`" }, key = { type = "string", description = "The space key, e.g. `ENG`. The short code that appears in a Confluence URL. Human-facing and stable, but the v2 API addresses spaces by `id`" }, name = { type = "string", description = "The space's display name" }, type = { type = "string", description = "`global` for an ordinary space or `personal` for a user's own space" }, status = { type = "string", description = "`current` for a live space or `archived`" }, authorId = { type = "string", description = "Account id of whoever created the space. An `accountId`, never a username or email" }, createdAt = { type = "string", format = "date-time" }, homepageId = { type = "string", description = "The space's home page, as a page id — pass it to `confluence-page-get`. This is the usual entry point into a space's content" }, description = { type = "object", description = "EMPTY IN THIS RESPONSE. Populating it needs the `description-format` query parameter, which this connector cannot send" }, icon = { type = "object", description = "The space's icon, when it has one and `include-icon` was requested — which this connector cannot do, so absent" }, _links = { type = "object", description = "Carries `webui`, the space's path in the Confluence UI — append it to the site URL to give a human a link" } } } }, _links = { type = "object", description = "Pagination envelope. `next` holds the RELATIVE URL of the following page with an opaque cursor embedded in it (`/wiki/api/v2/spaces?limit=25&cursor=…`). **This connector cannot follow it** — the cursor is a query parameter it cannot send (C-30), and the value is a URL rather than the bare token a cursor quirk would need. Its presence means only that more spaces exist", properties = { next = { type = "string", description = "Unusable here; see this field's own description. Absent when there is no further page" }, base = { type = "string", format = "uri", description = "The Confluence site's base URL, for resolving the relative links above" } } } }
+properties = { results = { type = "array", description = "This page's spaces", items = { type = "object", required = ["id", "key", "name"], properties = { id = { type = "integer", description = "The space's numeric id. Note the v1 surface types this as a number where the v2 surface typed it as a string" }, key = { type = "string", description = "The space key, e.g. `ENG` — the short code in a Confluence URL, and what `confluence-space-get` and `confluence-space-pages` address a space by on this surface" }, name = { type = "string", description = "The space's display name" }, type = { type = "string", description = "`global` here, because this operation pins it" }, status = { type = "string", description = "`current` for a live space or `archived`" }, _links = { type = "object", description = "Carries `webui`, the space's path in the Confluence UI — append it to the site URL to give a human a link" }, _expandable = { type = "object", description = "What Confluence would return if asked to expand it. This connector asks for none of it, so every value here is a path rather than data" } } } }, start = { type = "integer", description = "The offset this page began at" }, limit = { type = "integer", description = "The page size Confluence applied" }, size = { type = "integer", description = "How many spaces are in **this page** — not the site total, which this surface does not report" }, _links = { type = "object", description = "`base` is the site URL and `next` is the relative URL of the following page, present only when there is one. Unlike the v2 surface's opaque cursor, the offset it carries is reproducible with `start`" } }
 
 # ---------------------------------------------------------------------------------------------
 
@@ -373,24 +432,22 @@ required_capabilities = ["public_network"]
 id = "confluence-space-get"
 method = "GET"
 direction = "read"
-path = "/api/v2/spaces/{id}"
-description = "Get one space by its id, with its key, name, status and home page id. Addressed by the numeric space `id` from `confluence-space-list`, not by the space key that appears in a Confluence URL"
+path = "/rest/api/space/{key}"
+description = "Get one space by its key, with its name, type and status. Addressed by the space **key** — the short code that appears in a Confluence URL — because that is what this surface routes on; the numeric id is returned rather than accepted"
 risk = "low"
 idempotency = "idempotent"
 
 [[operations.params.path]]
-name = "id"
-description = "The space's id, from `confluence-space-list`'s `id`. This is the numeric id as a string, not the space key (`ENG`) — the v2 API does not accept a key here"
+name = "space_key"
+wire = "key"
+description = "The space key, e.g. `ENG`, from `confluence-space-list`'s `key`. Not the numeric id"
 required = true
 schema = { type = "string", minLength = 1 }
 
-# `SpaceSingle`. Same members as the bulk shape minus `currentActiveAlias`; the `labels`,
-# `properties`, `operations` and `permissions` expansions are absent because each needs an
-# `include-*` query parameter this connector cannot send.
 [operations.response_schema]
 type = "object"
 required = ["id", "key", "name"]
-properties = { id = { type = "string", description = "The space's id, as a string" }, key = { type = "string", description = "The space key, e.g. `ENG` — the short code in a Confluence URL" }, name = { type = "string", description = "The space's display name" }, type = { type = "string", description = "`global` or `personal`" }, status = { type = "string", description = "`current` or `archived`. An archived space still reads" }, authorId = { type = "string", description = "Account id of the space's creator" }, spaceOwnerId = { type = "string", description = "Account id of the space's current owner, or null when it has none" }, createdAt = { type = "string", format = "date-time" }, homepageId = { type = "string", description = "The space's home page, as a page id — the usual entry point into its content" }, description = { type = "object", description = "EMPTY IN THIS RESPONSE, for the same reason as in `confluence-space-list`: it needs the `description-format` query parameter" }, icon = { type = "object", description = "Absent — needs the `include-icon` query parameter" }, _links = { type = "object", description = "Carries `webui`, the space's path in the Confluence UI, and `base`, the site URL to resolve it against" } }
+properties = { id = { type = "integer", description = "The space's numeric id" }, key = { type = "string", description = "The space key that was passed in" }, name = { type = "string", description = "The space's display name" }, type = { type = "string", description = "`global` for an ordinary space or `personal` for a member's own" }, status = { type = "string", description = "`current` or `archived`. An archived space still reads" }, _links = { type = "object", description = "Carries `webui`, the space's path in the Confluence UI, and `base`, the site URL to resolve it against" }, _expandable = { type = "object", description = "Paths Confluence would expand if asked; this connector asks for none" } }
 
 # ---------------------------------------------------------------------------------------------
 
@@ -404,24 +461,42 @@ required_capabilities = ["public_network"]
 id = "confluence-space-pages"
 method = "GET"
 direction = "read"
-path = "/api/v2/spaces/{id}/pages"
-description = "List the pages in one space, with the id, title, parent and version of each — the way to discover what a space contains and to resolve a page title to the id the other operations take. **Page bodies are not returned**: the content of each page is empty here, because selecting a body format needs a query parameter this connector cannot send. Returns only Confluence's first page of 25 results; a larger space is truncated"
+path = "/rest/api/content"
+description = "List the pages in one space, with the id, title and status of each — the way to discover what a space contains and to resolve a page title to the id `confluence-page-get` takes. **Page bodies are not returned here**; ask for one page at a time. `limit` caps the page at Confluence's maximum of 100 and `start` walks past it"
 risk = "low"
 idempotency = "idempotent"
 
-[[operations.params.path]]
-name = "id"
-description = "The space's id, from `confluence-space-list`'s `id` — not the space key"
+[[operations.params.query]]
+name = "space_key"
+wire = "spaceKey"
+description = "The space key, e.g. `ENG`, from `confluence-space-list`'s `key` — not the numeric id"
 required = true
 schema = { type = "string", minLength = 1 }
 
-# `MultiEntityResult<Page>` with `PageBulk` items. `body` is declared and described as empty rather
-# than omitted: it *is* in the response, and a consumer that found it undeclared would reasonably
-# assume this connector had simply not documented it.
+# Pinned: this operation lists pages. Confluence's content surface also carries blogposts,
+# comments and attachments, and a caller asking for "the pages in a space" does not mean those.
+[[operations.params.query]]
+name = "type"
+description = "Which kind of content to list. Pass `page`; omitting it also returns blogposts, comments and attachments. Declared `const`, and unpinned for the reason `confluence-space-list`'s `type` states"
+required = false
+schema = { type = "string", const = "page" }
+
+[[operations.params.query]]
+name = "limit"
+description = "Maximum pages to return in one page of results. Confluence defaults to 25 and caps at 100"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[[operations.params.query]]
+name = "start"
+description = "How many results to skip, for walking past the first page"
+required = false
+schema = { type = "integer", minimum = 0 }
+
 [operations.response_schema]
 type = "object"
 required = ["results"]
-properties = { results = { type = "array", description = "This page's pages — at most 25 of the space's pages, with no way to fetch the rest", items = { type = "object", required = ["id", "title", "status"], properties = { id = { type = "string", description = "The page's id, as a string — what `confluence-page-get` and `confluence-comment-add` address it by" }, title = { type = "string", description = "The page's title. This is the only content-bearing field this operation returns, and it is what a title-to-id lookup matches on" }, status = { type = "string", description = "`current` for a live page, or `archived`/`draft`/`trashed`" }, spaceId = { type = "string", description = "The space this page belongs to — the id that was passed in" }, parentId = { type = "string", description = "The page this one sits under in the space's tree, or null for a top-level page. This is how the page hierarchy is reconstructed" }, parentType = { type = "string", description = "What the parent is, e.g. `page` — a page can hang off a whiteboard or database, not only another page" }, position = { type = "integer", description = "The page's sort position among its siblings, or null" }, authorId = { type = "string", description = "Account id of whoever created the page" }, ownerId = { type = "string", description = "Account id of the page's current owner" }, createdAt = { type = "string", format = "date-time" }, version = { type = "object", description = "The page's current version: `{number, createdAt, message, minorEdit, authorId}`. `number` is the version an update would have to increment — this connector declares no update (see its notes), so it is informational here", properties = { number = { type = "integer", description = "The current version number" }, createdAt = { type = "string", format = "date-time" }, authorId = { type = "string", description = "Who made the most recent edit" }, minorEdit = { type = "boolean" }, message = { type = "string", description = "The edit comment, when the editor left one" } } }, body = { type = "object", description = "**EMPTY (`{}`) IN THIS RESPONSE.** Confluence populates it only when a `body-format` query parameter selects a representation, and this connector sends none (C-30). Do not report a page as empty on the strength of this field — it says nothing about whether the page has content" }, _links = { type = "object", description = "Carries `webui`, the page's path in the Confluence UI — the link to give a human, resolved against the site URL" } } } }, _links = { type = "object", description = "Pagination envelope; `next` is a relative URL with an opaque cursor embedded, which this connector cannot follow. See `confluence-space-list`'s own `_links` for the full reason", properties = { next = { type = "string", description = "Unusable here; its presence means only that the space has more pages" }, base = { type = "string", format = "uri" } } } }
+properties = { results = { type = "array", description = "This page's content items, all of type `page` because the operation pins it", items = { type = "object", required = ["id", "type", "title"], properties = { id = { type = "string", description = "The page's id, as a string — what `confluence-page-get` and `confluence-comment-add` address it by" }, type = { type = "string", description = "`page`, because the operation pins it" }, status = { type = "string", description = "`current` for a live page, or `archived`/`draft`/`trashed`" }, title = { type = "string", description = "The page's title. The only content-bearing field this operation returns, and what a title-to-id lookup matches on" }, _links = { type = "object", description = "Carries `webui`, the page's path in the Confluence UI — the link to give a human, resolved against the site URL" }, _expandable = { type = "object", description = "Paths Confluence would expand if asked — `body`, `version`, `space`, `ancestors`. This connector asks for none of them here, so a page's body and its place in the tree come from `confluence-page-get`" } } } }, start = { type = "integer" }, limit = { type = "integer" }, size = { type = "integer", description = "How many items are in **this page** of results" }, _links = { type = "object", description = "`base` is the site URL; `next` is the relative URL of the following page when there is one" } }
 
 # ---------------------------------------------------------------------------------------------
 
@@ -435,43 +510,32 @@ required_capabilities = ["public_network"]
 id = "confluence-page-get"
 method = "GET"
 direction = "read"
-path = "/api/v2/pages/{id}"
-description = "Read one page's metadata by id — title, space, parent, author, creation time, current version number and the link to open it in Confluence. **The page body is not returned**: selecting a content format needs a query parameter this connector cannot send, so the `body` field comes back empty regardless of whether the page has content. Use this to resolve a page id to its title and URL, not to read what the page says"
+path = "/rest/api/content/{id}"
+description = "Read one page by id — its title, status, current version, the link to open it in Confluence, **and its body**. The body comes back as Confluence storage format, XHTML-like markup rather than Markdown, because this operation pins the `expand` that asks for it. That is the difference between this and the surface this connector shipped before 2026-09-04, which could return only metadata and an empty `body`"
 risk = "low"
 idempotency = "idempotent"
 
 [[operations.params.path]]
 name = "id"
-description = "The page's id, from `confluence-space-pages`, from a space's `homepageId`, or from `confluence-page-create`'s response"
+description = "The page's id, from `confluence-space-pages`, from a link, or from `confluence-page-create`'s response"
 required = true
 schema = { type = "string", minLength = 1 }
 
-# `PageSingle`. `version` is present without any query parameter — the vendor's `include-version`
-# defaults to `true`, which is the one expansion this connector gets for free and the reason this
-# operation is worth shipping at all despite the empty body.
+# Pinned, and it is what makes this operation worth calling: without an `expand`, Confluence
+# returns the page's metadata and nothing a reader could read. The two expansions are the body in
+# storage format and the version record; neither is caller-selectable, because a caller that
+# omitted them would get a silently empty page back.
+[[operations.params.query]]
+name = "expand"
+description = "What Confluence should include beyond the page's metadata. Pass `body.storage,version` to get the page's content and its current version; omitting it returns a page with no readable body at all, which is what this connector could only ever do before. Declared `const`, and unpinned for the reason `confluence-space-list`'s `type` states"
+required = false
+schema = { type = "string", const = "body.storage,version" }
+
 [operations.response_schema]
 type = "object"
-required = ["id", "title", "status"]
-properties = { id = { type = "string", description = "The page's id, as a string" }, title = { type = "string", description = "The page's title — the only content-bearing field this operation returns" }, status = { type = "string", description = "`current` for a live page, or `archived`/`draft`/`trashed`. A trashed page still reads here" }, spaceId = { type = "string", description = "The space the page belongs to — pass it to `confluence-space-get` for the space's name and key" }, parentId = { type = "string", description = "The page this one sits under, or null for a top-level page" }, parentType = { type = "string", description = "What the parent is, e.g. `page`" }, position = { type = "integer", description = "Sort position among siblings, or null" }, authorId = { type = "string", description = "Account id of whoever created the page. An `accountId`, never a username — it identifies a named person, so read it for what the calling flow needs and do not persist it beyond that" }, ownerId = { type = "string", description = "Account id of the page's current owner" }, lastOwnerId = { type = "string", description = "Account id of the previous owner, or null" }, createdAt = { type = "string", format = "date-time" }, version = { type = "object", description = "The page's current version — returned without asking, because the vendor's `include-version` defaults to true. `number` is what an update would have to increment; this connector declares no update, and its notes say why", properties = { number = { type = "integer", description = "The current version number" }, createdAt = { type = "string", format = "date-time", description = "When this version was created — i.e. when the page was last edited" }, authorId = { type = "string", description = "Who made the most recent edit" }, minorEdit = { type = "boolean", description = "Whether the editor marked it a minor edit, suppressing notifications" }, message = { type = "string", description = "The edit comment, when the editor left one" } } }, body = { type = "object", description = "**EMPTY (`{}`).** Confluence populates this only when a `body-format` query parameter selects a representation (`storage`, `view`, `atlas_doc_format`…), and this connector sends none (C-30). An empty `body` here is a limitation of this connector and says nothing about the page — do not report the page as blank on the strength of it" }, _links = { type = "object", description = "`webui` is the page's path in the Confluence UI and `base` is the site URL — join them to give a human a link. `editui` and `tinyui` are the edit and short forms", properties = { webui = { type = "string", description = "The page's path, relative to `base`" }, editui = { type = "string" }, tinyui = { type = "string", description = "Confluence's short link form" }, base = { type = "string", format = "uri", description = "The site's base URL, to resolve the paths above against" } } } }
+required = ["id", "type", "title"]
+properties = { id = { type = "string", description = "The page's id, as a string" }, type = { type = "string", description = "`page` for a page, `blogpost` for a blog post — this operation addresses content by id and does not constrain the kind" }, status = { type = "string", description = "`current` for a live page, or `archived`/`draft`/`trashed`" }, title = { type = "string", description = "The page's title" }, body = { type = "object", description = "The page's content, present because this operation pins `expand=body.storage`", properties = { storage = { type = "object", description = "The page in **Confluence storage format**: XHTML-like markup, not Markdown and not rendered HTML", properties = { value = { type = "string", description = "The markup itself" }, representation = { type = "string", description = "`storage`, naming the format of `value`" } } } } }, version = { type = "object", description = "The page's current version, present because this operation pins `expand=version`", properties = { number = { type = "integer", description = "The current version number — what an update would have to increment. This connector declares no update" }, when = { type = "string", format = "date-time", description = "When this version was created, i.e. when the page was last edited" }, minorEdit = { type = "boolean", description = "Whether the editor marked it a minor edit, suppressing notifications" }, message = { type = "string", description = "The edit comment, when the editor left one" }, by = { type = "object", description = "Who made the most recent edit. Identifies a named person: read it for what the calling flow needs and do not persist it beyond that" } } }, _links = { type = "object", description = "`webui` is the page's path in the Confluence UI and `base` is the site URL — join them to give a human a link. `tinyui` is Confluence's short form", properties = { webui = { type = "string" }, tinyui = { type = "string" }, base = { type = "string", format = "uri" } } }, _expandable = { type = "object", description = "Paths Confluence would expand if asked, beyond the two this operation pins" } }
 
-# ---------------------------------------------------------------------------------------------
-# Writes — 2. Both `high`, and both `non_idempotent`.
-#
-# `high` matches `jira-issue-create` and `jira-issue-comment-add` rather than trello's `medium`, and
-# the reason is the audience: a Confluence space is a shared document store that a whole
-# organisation reads and that Confluence indexes for search and emails watchers about. A published
-# page or comment cannot be un-seen, and deleting one needs a permission an integration usually
-# lacks — this connector cannot delete at all.
-#
-# Neither is idempotent: Confluence offers no idempotency key on either endpoint, so posting twice
-# publishes twice. This repository's convention (first written for `providers/asana.toml`) is that a
-# write earns `idempotent` only from a vendor-documented guarantee, never from an accident of
-# implementation.
-#
-# **Both bodies nest, and both nestings are objects rather than arrays** — `body.representation` and
-# `body.value`. That is what C-29's `wire` paths express (`BodyNode` is `Leaf` or `Branch`), and it
-# is precisely the thing Jira's v3 comment body could not be expressed as. Confluence's write shape
-# is the well-behaved twin of the one that pushed jira to API v2.
 # ---------------------------------------------------------------------------------------------
 
 [[operations]]
@@ -611,13 +675,14 @@ properties = { id = { type = "string", description = "The new comment's id, as a
 # ---------------------------------------------------------------------------------------------
 
 [[config]]
-name = "site"
-label = "Atlassian site name"
-help = "The part of your Confluence URL before `.atlassian.net` — if you sign in at `acme.atlassian.net/wiki`, this is `acme`. It is the same site name as your Jira connection, if you have one"
-example = "acme"
-format = "subdomain"
-docs_url = "https://support.atlassian.com/confluence-cloud/docs/what-is-confluence-cloud/"
-binds = "endpoint.site"
+name = "cloud_id"
+label = "Atlassian cloud id"
+help = "Your Atlassian site's cloud id — the UUID your own site reports at `https://<your-site>.atlassian.net/_edge/tenant_info`. It is the same value your Jira connection uses, if you have one; Confluence and Jira are two products of one cloud tenant"
+example = "11111111-2222-3333-4444-555555555555"
+format = "text"
+required = true
+docs_url = "https://developer.atlassian.com/cloud/confluence/rest/v1/intro/"
+binds = "endpoint.cloud_id"
 
 [[config]]
 name = "email"

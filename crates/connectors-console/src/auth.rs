@@ -77,7 +77,20 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
                 Ok(reference) => store.exists(&reference).await,
                 Err(_) => Ok(false),
             };
+            // **A Basic credential is two halves and needs both.** The token is in the store; the
+            // account name it joins is configuration, and without it `assemble_credentials`
+            // refuses the mechanism — which a caller sees as `not_granted: no stored credential
+            // satisfies this operation's declared mechanisms`. Reporting the token as `stored` and
+            // the identity as `callable` was true about the store and wrong about the question.
+            let user_half = matches!(declared.acquire, catalog::Acquisition::BasicJoin { .. })
+                .then(|| {
+                    entry
+                        .usernames
+                        .get(declared.name)
+                        .is_some_and(|value| !value.trim().is_empty())
+                });
             let state = match present {
+                Ok(true) if user_half == Some(false) => "stored-without-user-half",
                 Ok(true) => {
                     stored.insert(declared.name);
                     "stored"
@@ -91,6 +104,16 @@ pub async fn status(config: &PersonalConfig, state_root: &Path) -> Result<Value,
                 "credential": declared.name,
                 "subject": subject_of(declared.subject),
                 "state": state,
+                // Present only for a credential that has a user half at all, and never the value:
+                // the answer an operator needs is whether one was configured. The section that
+                // holds it is named so the fix is a copyable instruction rather than a search.
+                "user_half": user_half.map(|configured| json!({
+                    "configured": configured,
+                    "config": format!(
+                        "[catalog.usernames] \"{}\" under this provider's [[catalog]] block",
+                        declared.name
+                    ),
+                })),
             }));
         }
 
@@ -187,6 +210,48 @@ mod tests {
                 "`{key}` is not one of the value-free fields this report may carry"
             );
         }
+    }
+
+    #[test]
+    fn a_basic_credential_row_reports_whether_its_user_half_is_configured_and_never_the_value() {
+        // The state a person hits: `jira.api_token` in the keyring, no `[catalog.usernames]`, and
+        // every call refusing. The row has to say which half is missing.
+        let row = json!({
+            "credential": "jira.api_token",
+            "subject": "unstated",
+            "state": "stored-without-user-half",
+            "user_half": {
+                "configured": false,
+                "config": "[catalog.usernames] \"jira.api_token\" under this provider's [[catalog]] block",
+            },
+        });
+        let half = row.get("user_half").expect("the row carries the half");
+        assert_eq!(half.get("configured"), Some(&json!(false)));
+        // Structural, like the test above: the report says whether, never what.
+        for key in half.as_object().expect("an object").keys() {
+            assert!(
+                matches!(key.as_str(), "configured" | "config"),
+                "`{key}` could carry an account name into a scrollback buffer"
+            );
+        }
+    }
+
+    #[test]
+    fn the_catalogue_is_what_says_a_credential_has_a_user_half() {
+        // Read from `acquire`, not from a list of provider ids: the next Basic connector is
+        // covered the moment it is catalogued.
+        let jira = catalog::provider(catalog::ProviderKey::id("jira")).expect("jira");
+        let token = jira.credential("jira.api_token").expect("the token");
+        assert!(matches!(
+            token.acquire,
+            catalog::Acquisition::BasicJoin { .. }
+        ));
+        let slack = catalog::provider(catalog::ProviderKey::id("slack")).expect("slack");
+        let bot = slack.credential("slack.bot_token").expect("the bot token");
+        assert!(
+            !matches!(bot.acquire, catalog::Acquisition::BasicJoin { .. }),
+            "a bearer credential must not grow a user-half row it can never satisfy"
+        );
     }
 
     #[test]
