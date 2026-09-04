@@ -11,6 +11,8 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.9 — 2026-09-04
+
 ### Added
 
 - Four read-only Slack operations: `slack-conversations-replies` (a thread's parent and its
