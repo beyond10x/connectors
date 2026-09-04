@@ -53,7 +53,7 @@ registry and never interprets server annotations as authority. See
 
 ## Hosted server
 
-`connectors serve-hosted --config PATH` serves the provider-credential-free Operation, Connection,
+`connectors serve hosted --config PATH` serves the provider-credential-free Operation, Connection,
 and Event contracts below `/api/connectors/v1` with
 the documented development base path. It accepts only five-minute Identity access tokens, resolves
 their complete validated authority envelope for the exact `urn:b10x:connectors` audience,
@@ -150,24 +150,24 @@ A local Connectors client can select the hosted placement once and then use it w
 token flags:
 
 ```bash
-connectors login https://connectors.example.test/api/connectors/v1
+connectors session login https://connectors.example.test/api/connectors/v1
 connectors operation search
 connectors connection list
-connectors mcp
-connectors logout
+connectors serve mcp
+connectors session logout
 ```
 
-`connectors completions <shell>` prints a completion script for `bash`, `zsh`, `fish`, `elvish`
+`connectors setup completions <shell>` prints a completion script for `bash`, `zsh`, `fish`, `elvish`
 or `powershell`, generated from the same command tree that parses the arguments. Write it where
 the shell reads completions at start-up, for example
-`connectors completions fish > ~/.config/fish/completions/connectors.fish`.
+`connectors setup completions fish > ~/.config/fish/completions/connectors.fish`.
 
 The Connectors deployment publishes an unauthenticated bootstrap document naming the neutral
 Identity origin and exact Connector audience it trusts. Browser login returns an opaque session
 which is stored only in the operating-system keyring; non-secret account and deployment selection
 is stored beneath XDG state. Each request exchanges the session only with Identity for the smallest
 required Connector scope, caches the five-minute access token in memory, and renews it before
-expiry. `connectors mcp` keeps stdout exclusively for MCP messages and never exposes either kind of
+expiry. `connectors serve mcp` keeps stdout exclusively for MCP messages and never exposes either kind of
 credential to its caller. Passing an explicit local `--config` or `--state-root` continues to select
 the personal-local placement. Provider credentials remain Connector/Vault-owned and never enter
 Operation, Connection, Event, or MCP contracts; receiver-owned admission remains independent.

@@ -95,8 +95,9 @@ components:
   # `crates/connectors-cli` — the crate whose three ambiguous verbs
   # (.engineering/planning/story/explicit-target-never-implicit.md) the target noun exists for.
   # `crates/connectors-cli/Cargo.toml:2-3` calls it a "Thin command-line frontend for reusable
-  # Connector client and runtime libraries", and `crates/catalog-build/tests/main/architecture_fence.rs:311`
-  # holds it to that. It is reached from a command line, and it now says so.
+  # Connector client and runtime libraries", and `product_cli_is_a_thin_frontend`
+  # (`crates/catalog-build/tests/main/architecture_fence.rs:292`) holds it to that. It is reached
+  # from a command line, and it now says so.
   - component: connectors-cli
     summary: Names which deployment a command reaches, instead of inferring it from a stored login.
     owns:
@@ -104,9 +105,17 @@ components:
         - connectors.target
     reached_by: command_line
     # The binary is `connectors` (`crates/connectors-cli/Cargo.toml:20-22`, `[[bin]] name`), and
-    # the five words below are the first-level words of `crates/connectors-cli/src/lib.rs:55-188`
-    # that carry a subcommand of their own: `admin` (line 72), `auth` (line 92), `connection`
-    # (line 164), `event` (line 169) and `operation` (line 174).
+    # the eight words below are the whole first level of `enum Command`
+    # (`crates/connectors-cli/src/lib.rs:55-94`), every one of which carries a subcommand of its
+    # own: `setup` (line 58), `inspect` (line 63), `session` (line 68), `serve` (line 73),
+    # `connection` (line 78), `event` (line 83), `operation` (line 88) and `admin` (line 93).
+    #
+    # `story:cli-first-level-groups` made it eight. Before it the first level was fifteen words in
+    # one block — five groups and ten leaves — and `connectors --help` could not tell an operator
+    # which of them they wanted. The four groups it added, `setup`, `inspect`, `session` and
+    # `serve`, hold the moved variants verbatim; `MOVED` in `crates/connectors-cli/src/lib.rs`
+    # rewrites a path a person typed before that release onto the one it moved to, so the old paths
+    # keep working for one release and each says on stderr where it went.
     #
     # UNMAPPED: no command is placed under any of them, and that is a fact about this system
     # rather than an omission. This component owns `connectors.target` alone, which declares no
@@ -131,7 +140,7 @@ components:
     # command it forwards rather than handles; `ess specify compose` generates such clients today
     # and has no `cli:` of its own.
     #
-    # UNMAPPED: the words a person really types under these five — `list`, `search`, `activate`,
+    # UNMAPPED: the words a person really types under these eight — `list`, `search`, `activate`,
     # `materialize`, `invoke` — are absent for the same reason, and the reads among them for a
     # second one: ESS models a read as a `views:` declaration carrying a consistency claim, and
     # the note on `connectors-service` above says why this document declares none. Settled by the
@@ -154,23 +163,24 @@ components:
     # `forwarded`, `flow`, `grouping` or `unmodelled`. **These lines are a YAML comment, so
     # `ess specify validate` never reads them and no ESS rule constrains them**; what holds them
     # is `the_exception_list_is_the_set_the_specification_enumerates`, which requires
-    # `UNSPECIFIED_PATHS` to carry exactly these paths with exactly these kinds. Twelve of the
+    # `UNSPECIFIED_PATHS` to carry exactly these paths with exactly these kinds. Thirteen of the
     # kinds are also derived from the tree and do not rest on this list at all — see
     # docs/design/19-the-cli-surface.md for which, and for why the other fourteen cannot be.
-    #   unspecified-path: connect — flow
-    #   unspecified-path: doctor — read
-    #   unspecified-path: init — lifecycle
-    #   unspecified-path: login — lifecycle
-    #   unspecified-path: logout — lifecycle
-    #   unspecified-path: mcp — lifecycle
-    #   unspecified-path: providers — read
-    #   unspecified-path: serve — lifecycle
-    #   unspecified-path: serve-hosted — lifecycle
+    #   unspecified-path: setup init — lifecycle
+    #   unspecified-path: setup connect — flow
+    #   unspecified-path: setup completions — unmodelled
+    #   unspecified-path: inspect doctor — read
+    #   unspecified-path: inspect providers — read
+    #   unspecified-path: inspect auth — read
+    #   unspecified-path: session login — lifecycle
+    #   unspecified-path: session logout — lifecycle
+    #   unspecified-path: serve local — lifecycle
+    #   unspecified-path: serve hosted — lifecycle
+    #   unspecified-path: serve mcp — lifecycle
     #   unspecified-path: admin integrations — grouping
     #   unspecified-path: admin integrations status — read
     #   unspecified-path: admin credentials — grouping
     #   unspecified-path: admin credentials set — lifecycle
-    #   unspecified-path: auth status — read
     #   unspecified-path: connection candidates — read
     #   unspecified-path: connection activate — forwarded
     #   unspecified-path: connection list — read
@@ -186,13 +196,19 @@ components:
     cli:
       binary: connectors
       groups:
-        - name: admin
-          summary: Operate an Identity-protected hosted Connectors instance.
-        - name: auth
-          summary: Which configured providers have their credential stored. Never reads one.
+        - name: setup
+          summary: Write a configuration, add a provider, install shell completions.
+        - name: inspect
+          summary: Read what is configured, what is connected, and what cannot work.
+        - name: session
+          summary: Sign in to a hosted Connector deployment, and sign out of it.
+        - name: serve
+          summary: Run a Connector for this machine, for a hosted deployment, or over stdio.
         - name: connection
           summary: Manage durable Connections through the credential-free control socket.
         - name: event
           summary: Search or receive durable normalized data events.
         - name: operation
           summary: Search, describe, or invoke admitted Connector operations.
+        - name: admin
+          summary: Operate an Identity-protected hosted Connectors instance.

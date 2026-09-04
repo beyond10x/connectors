@@ -87,7 +87,7 @@ pub struct Options {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EnrolError {
-    #[error("`{0}` is not in the catalogue; `connectors providers` lists what is")]
+    #[error("`{0}` is not in the catalogue; `connectors inspect providers` lists what is")]
     UnknownProvider(String),
     #[error("`{0}` declares no authority, so its credential has no address")]
     NoAuthority(String),
@@ -344,7 +344,7 @@ pub async fn run(
         "grant": if options.allow_writes { "read and write" } else { "read only" },
         "verify": provider.verify,
         "operations": provider.operations.len(),
-        "next": "connectors serve, then connectors operation search",
+        "next": "connectors serve local, then connectors operation search",
         // Present only when the provider issued the credential rather than a person pasting one.
         // It is the whole record of what was created on the operator's side, and every field is
         // safe to print — the token itself is not here and never was.
@@ -530,7 +530,7 @@ mod tests {
         let error = EnrolError::UnknownProvider("nosuch".to_owned());
         assert!(error.to_string().contains("nosuch"));
         assert!(
-            error.to_string().contains("connectors providers"),
+            error.to_string().contains("connectors inspect providers"),
             "the refusal points at the command that lists what is available"
         );
     }

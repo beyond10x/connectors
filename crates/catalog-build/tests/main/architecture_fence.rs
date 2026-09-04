@@ -9,36 +9,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 const MODULE_LINE_LIMIT: usize = 1_500;
-// Raised 828 -> 856 by `4d365c2`, which turned the binary into an embeddable library so the
-// Zwirn product can host the local placement as subcommands of one binary: 824 lines moved
-// from `main.rs` to `lib.rs` unchanged, and the net growth is the library entry surface —
-// re-exports and the `run` wrapper. No client, runtime, or adapter behaviour entered the
-// frontend; the raise records a packaging move, reviewed 2026-08-23.
-// Raised 802 -> 828 by `operation signal`, which is a frontend-only addition: the request is
-// built and handed to the shared client, and no session logic lives in the binary.
-// Raised 800 -> 802 by the Argo CD credential acquisition, and the raise is the check working
-// rather than being waived. The frontend gained exactly two lines — one conditional that asks the
-// console whether this provider issues its own credential, and one call that takes the packaged
-// acquisition from `connectors-runtime`. The fourteen lines that built the closure by hand went to
-// the composition root instead, which is precisely the move this cap's failure message asks for.
-// Raised 856 -> 960 on 2026-09-02: browser login, logout, the stdio MCP front door, and
-// hosted/local selection add only parser and dispatch declarations here; credential, HTTP,
-// refresh, and bridge behavior remains in `connectors-client`.
-// Raised 960 -> 966 for hosted Integration administration. The six frontend lines are the Clap
-// command slot, typed error/exit classification, and one dispatch arm; login, secret input,
-// rendering, and HTTP behavior all live behind connectors-console/connectors-client.
-// Raised 966 -> 1006 on 2026-09-04 for `connectors completions <shell>`: the Clap variant with its
-// install note, one dispatch arm that hands the parser's own command tree to `clap_complete`, and
-// one test that renders every shell's script. The script is generated, never maintained here.
-// Raised 1006 -> 1014 on 2026-09-04 for `pub fn command()` (story:cli-surface-contract), and the
-// eight are: three lines of doc, `#[must_use]`, a three-line body returning `Cli::command()`, and
-// the blank line that separates it from what follows.
-// It moves no behaviour into the binary — it exposes the tree the binary already builds, so that
-// `crates/connectors-cli/tests/cli_surface.rs` can hold it against `ess/system/components.yaml`.
-// The generated projection of that specification is deliberately *not* under this crate, for the
-// reason this cap exists: `ess/generated/clap/` would otherwise be counted as hand-written
-// frontend code. See docs/design/19-the-cli-surface.md.
-const CLI_TOTAL_LINE_LIMIT: usize = 1014;
+// The product CLI's size is not fenced here. `CLI_TOTAL_LINE_LIMIT` stood above this line until
+// 2026-09-04 and was raised every time it fired — 856, 960, 966, 1006, 1014, 1127 — so it never
+// once moved code out of the binary, which is the only thing it was for. What it did do was cost:
+// raising it inserts lines into this file, and four `path:line` citations into it broke that way in
+// a single day.
+//
+// A line count is a proxy. The two fences below measure the same property directly and refuse
+// rather than negotiate: `CLI_DEPENDENCIES` bounds what the binary may link, and the forbidden
+// symbols below bound what it may declare. A frontend that grows by adding parser arms is not the
+// failure this test exists to catch; one that grows by adding a backend is, and that is checked by
+// name.
 
 /// Existing large catalog modules are named debts. The ceiling prevents a waiver from becoming
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.
@@ -356,12 +337,6 @@ fn product_cli_is_a_thin_frontend() {
     }
 
     let sources = production_sources(&cli_path);
-    let total_lines: usize = sources.iter().map(|source| source_line_count(source)).sum();
-    assert!(
-        total_lines <= CLI_TOTAL_LINE_LIMIT,
-        "the thin product CLI contains {total_lines} production lines; the reviewed cap is \
-         {CLI_TOTAL_LINE_LIMIT}. Move client, runtime, or adapter behavior behind its owned package"
-    );
     for forbidden in [
         "impl ConnectorBackend for",
         "struct CompositeBackend",

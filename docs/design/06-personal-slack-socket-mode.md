@@ -61,7 +61,7 @@ Add Slack -> protected credential input -> Connecting -> Connected
 
 It creates the session, renders the protected input directly to the human, submits it once, follows
 the terminal state, and discards the acquisition references. It shows only the resulting durable
-Connection. The personal-local CLI façade is `connectors connect slack`; it never prints a session
+Connection. The personal-local CLI façade is `connectors setup connect slack`; it never prints a session
 reference, completion endpoint, or raw protocol envelope. The lower-level verbs exist for protocol
 tests and support tooling and are hidden from normal command help. A hosted or graphical product
 renders the same orchestration as **Settings → Connections → Add Slack**, not as a sequence of API

@@ -1,7 +1,7 @@
 <!--
   generated from connectors v1
-  model digest 9465040634bb366dd25958f1cdc7a6f96cf15eb7beffcdeac76eb2d1f9506c51
-  contract digest 04fcd536a3c100325904181a779615bd4f192f2ce7fcefcca5f8fd46ddd2b362
+  model digest 5849d9d17106bb6c8f9f7331f9c1fcf8d8addd0506851273b950db073eacb81b
+  contract digest ec905bc6d63ad79ca30a539c0a27a4d8c83bd41b4d0909594faa9ae6f34ab91e
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1

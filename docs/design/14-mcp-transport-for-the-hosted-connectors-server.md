@@ -73,7 +73,7 @@ operator-only in practice.
 
 ## Implemented amendment — native client bridge (2026-09-02)
 
-S-056 is no longer deferred. `connectors mcp` is a thin stdio front door over
+S-056 is no longer deferred. `connectors serve mcp` is a thin stdio front door over
 `connectors-client`: it forwards bounded newline-delimited MCP frames to the selected hosted
 `/mcp` endpoint, emits no non-protocol stdout, obtains catalog or invoke authority according to
 the exact request, and renews five-minute Identity access tokens before expiry. The opaque Identity

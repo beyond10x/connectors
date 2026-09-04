@@ -44,7 +44,7 @@ name local credential helpers. Review the context and set `allow_exec_auth = tru
 that helper is intended. The helper still runs only during explicit activation. API-server routes
 must be canonical HTTPS; ambient and kubeconfig HTTP proxies are not used.
 
-`connectors connect kubernetes` provides the lower-level diagnostic activation flow, and the
+`connectors setup connect kubernetes` provides the lower-level diagnostic activation flow, and the
 generic `connection observations` / `connection materialize` methods expose the same value-free
 contract. Direct in-cluster satellite Connections remain the preferred zero-user-credential
 topology for deployed environments.

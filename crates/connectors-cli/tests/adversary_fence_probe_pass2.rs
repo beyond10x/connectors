@@ -301,7 +301,8 @@ fn local_client_methods() -> BTreeMap<String, String> {
 /// took the same decision for the same reason. So the predicate is now the invariant the finding
 /// was about, in a form no rewording satisfies: the residual list is **read out of the page** and
 /// every path on it has to reach nothing, and `connect` has to reach the seven and be absent from
-/// it. The derivation follows the callee now, so the page names eleven and `connect` is derived.
+/// it. The derivation follows the callee now, so the page names twelve and `setup connect` is
+/// derived.
 #[test]
 fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
     let root = repository_root();
@@ -347,29 +348,58 @@ fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
         }
         reached
     };
-    let reaches = |leaf: &str| -> BTreeSet<String> {
-        let camel: String = leaf
-            .split(['-', ' '])
-            .map(|word| {
-                let mut characters = word.chars();
-                let mut out = String::new();
-                if let Some(first) = characters.next() {
-                    out.extend(first.to_uppercase());
-                }
-                out.push_str(characters.as_str());
-                out
-            })
-            .collect();
-        let Some(open) = cli.find(&format!("Command::{camel} ")).or_else(|| {
-            cli.find(&format!("Command::{camel} {{"))
-                .or_else(|| cli.find(&format!("Command::{camel},")))
+    // `<Group>Command::<Leaf>` for a path under one of the first level's groups, `Command::<Leaf>`
+    // for a first-level word. Both forms are here because `story:cli-first-level-groups` moved
+    // every leaf of the residual sentence one level down: a marker built from the whole path,
+    // `Command::InspectDoctor`, matches nothing, and a loop over paths that resolve to nothing is a
+    // loop that passes without reading the tree at all.
+    let marker = |path: &str| -> String {
+        // Every hyphen segment capitalised, as the derive names a variant: `serve-hosted` is
+        // `ServeHosted`. A first draft of this rewrite capitalised the first character alone,
+        // yielding `Servehosted`, which matches no arm — and a path that matches no arm reads as
+        // reaching nothing, which is a pass. The control for that is asserted right below.
+        let camel = |word: &str| -> String {
+            word.split('-')
+                .map(|segment| {
+                    let mut characters = segment.chars();
+                    let mut out = String::new();
+                    if let Some(first) = characters.next() {
+                        out.extend(first.to_uppercase());
+                    }
+                    out.push_str(characters.as_str());
+                    out
+                })
+                .collect()
+        };
+        match path.split_once(' ') {
+            Some((group, leaf)) => format!("{}Command::{}", camel(group), camel(leaf)),
+            None => format!("Command::{}", camel(path)),
+        }
+    };
+    assert_eq!(marker("serve-hosted"), "Command::ServeHosted");
+    assert_eq!(marker("serve hosted"), "ServeCommand::Hosted");
+    let reaches = |path: &str| -> BTreeSet<String> {
+        let marker = marker(path);
+        let Some(open) = cli.find(&format!("{marker} ")).or_else(|| {
+            cli.find(&format!("{marker} {{"))
+                .or_else(|| cli.find(&format!("{marker},")))
         }) else {
             return BTreeSet::new();
         };
-        let arm = &cli[open..];
-        let arm = &arm[..arm[1..]
-            .find("\n        Command::")
-            .map_or(arm.len(), |at| at + 1)];
+        // To the next dispatch arm, at whatever depth: a line whose first word is a `…Command::…`
+        // pattern. Terminating on one indentation would run an inner arm into its siblings.
+        let arm: String = cli[open..]
+            .split_inclusive('\n')
+            .enumerate()
+            .take_while(|(index, line)| {
+                *index == 0 || {
+                    let head = line.trim_start();
+                    !(head.starts_with(char::is_uppercase) && head.contains("Command::"))
+                }
+            })
+            .map(|(_, line)| line)
+            .collect();
+        let arm = arm.as_str();
         let mut reached = requests_built_by(arm);
         for module in [
             "connect",
@@ -387,7 +417,7 @@ fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
         reached
     };
 
-    let connect = reaches("connect");
+    let connect = reaches("setup connect");
     assert!(
         connect.len() >= 7,
         "`connectors connect` reaches {connect:?} through `connect::dispatch` and `LocalClient`; \
@@ -405,12 +435,36 @@ fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
     );
 
     let mut wrong = Vec::new();
-    if named.iter().any(|path| path == "connect") {
+    if named.iter().any(|path| path == "setup connect") {
         wrong.push(format!(
-            "`connect` is named as reaching no protocol request, and it reaches {connect:?}, of \
-             which {forwarded:?} carry the `naming.wire` of a command `connectors-service` accepts"
+            "`setup connect` is named as reaching no protocol request, and it reaches {connect:?}, \
+             of which {forwarded:?} carry the `naming.wire` of a command `connectors-service` \
+             accepts"
         ));
     }
+    // A path the residual sentence names and this file cannot find an arm for is read as reaching
+    // nothing, which is how a renamed path would make this loop silently stop measuring. `admin`
+    // runs its own subtree in `crates/connectors-console`, so a path under it legitimately has no
+    // arm here; every other path has to be found. Named exactly, rather than as an allowance of
+    // one: an allowance is consumed by the first path that stops resolving, unmeasured.
+    let unresolved: Vec<&String> = named
+        .iter()
+        .filter(|path| !cli.contains(&format!("{} ", marker(path))))
+        .collect();
+    let outside_admin: Vec<&&String> = unresolved
+        .iter()
+        .filter(|path| !path.starts_with("admin "))
+        .collect();
+    assert!(
+        outside_admin.is_empty(),
+        "these paths the residual sentence names resolve to no dispatch arm of \
+         crates/connectors-cli/src/lib.rs: {outside_admin:?} (marker {:?}). They are read as \
+         reaching nothing, so this case would pass without measuring them",
+        outside_admin
+            .iter()
+            .map(|path| marker(path))
+            .collect::<Vec<_>>()
+    );
     for path in &named {
         let reached = reaches(path);
         if !reached.is_empty() {

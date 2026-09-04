@@ -11,14 +11,15 @@ is written here.
 
 The first-level shape of the `connectors` binary is declared in the specification and checked
 against the parser on every run. Nothing else in this repository said what the surface is: the
-completion script was already generated from the parser (`crates/connectors-cli/src/lib.rs:463-470`),
+completion script was already generated from the parser (the `Completions` arm of `run` in
+`crates/connectors-cli/src/lib.rs`),
 which proved the parser could be a source, but the parser answered to nothing, so a command added
 in the wrong place, a command dropped, or a group renamed was invisible.
 
 Three things carry that now:
 
 - `ess/system/components.yaml` — `connectors-cli` is `reached_by: command_line` and its `cli:`
-  block names `binary: connectors` and five groups;
+  block names `binary: connectors` and eight groups;
 - `ess/generated/clap/` — the tree `ess generate synthesize --target clap` projects from it,
   committed;
 - `crates/connectors-cli/tests/cli_surface.rs` — the parser held against the declaration, both
@@ -73,15 +74,18 @@ leaving it to review.
 ## What that leaves undeclared, and how it is bounded
 
 The words a person really types under those groups — `list`, `search`, `activate`, `materialize`,
-`invoke` — are still undeclared, and so are the nine leaf words at the top level. Two countdowns
-bound that, both in `crates/connectors-cli/tests/cli_surface.rs`:
+`invoke` — are still undeclared, and so is every leaf under the four groups
+`story:cli-first-level-groups` added. Two countdowns bound that, both in
+`crates/connectors-cli/tests/cli_surface.rs`:
 
 - `UNSPECIFIED_PATHS` names each **path** the specification cannot yet carry, with a kind and a
   reason. A path is what a person types after the binary, at whatever depth: `connection activate`,
-  `admin credentials set`. It has **26 entries, 9 of them one word and 17 of them two or three**,
+  `admin credentials set`. It has **27 entries, 0 of them one word and 27 of them two or three**,
   which is the shape of the parser and not of the top of it — a list of first-level words would let
   `connectors connection harvest` and `connectors event invoke` through, and an earlier revision of
-  this page described it as one. The kind is a checked `enum Unspecified` rather than prose, so the
+  this page described it as one. Nine of them were one word until
+  `story:cli-first-level-groups` moved the whole first level into eight groups; none is now, which
+  is the same fact from the other side. The kind is a checked `enum Unspecified` rather than prose, so the
   sentence above the list cannot claim something the list does not carry. Both directions are held:
   a path the parser gains that is neither a declared group nor on the list fails
   `every_path_of_the_parser_is_declared_or_a_named_exception`, and an entry the parser no longer
@@ -104,7 +108,7 @@ bound that, both in `crates/connectors-cli/tests/cli_surface.rs`:
   `crates/connectors-cli/tests/adversary_fence_probe.rs`. What holds now is three separate things,
   and it is worth being exact about which covers what:
 
-  - **13 of the 26** kinds are derived from the tree, by `kinds_the_tree_derives`. A path is
+  - **13 of the 27** kinds are derived from the tree, by `kinds_the_tree_derives`. A path is
     followed to the frames it puts on a socket — its own dispatch arm in
     `crates/connectors-cli/src/lib.rs`, and one hop into the `connectors-console` module that arm
     hands off to, whose `LocalClient` calls are read too. Several requests is a guided sequence of
@@ -114,20 +118,21 @@ bound that, both in `crates/connectors-cli/tests/cli_surface.rs`:
     `Unmodelled`.
   - **2 more** are `Grouping`, decided by the parser: the path carries subcommands, and no other
     kind may.
-  - **The remaining 11** — `doctor`, `providers`, `auth status`, `admin integrations status` and
-    the seven `Lifecycle` steps — reach no protocol request, in their own arm or through the
-    module it calls, and the tree says nothing about them. Their kind is a **claim**, recorded in
+  - **The remaining 12** — `inspect doctor`, `inspect providers`, `inspect auth`,
+    `admin integrations status`, `setup completions` and the seven `Lifecycle` steps — reach no
+    protocol request, in their own arm or through the module it calls, and the tree says nothing
+    about them. Their kind is a **claim**, recorded in
     `ess/system/components.yaml` so that changing it is an edit to the reviewed document, and
     nothing measures whether it is true. That is the honest size of it.
 
   **The callee is followed because stopping at the arm was measured and found wrong.** An
-  adversary pass showed `connectors connect` reaching seven request variants through
+  adversary pass showed `connectors setup connect` reaching seven request variants through
   `connect::dispatch` and `LocalClient` — three of them the `naming.wire` of a command
   `connectors-service` accepts — while an earlier revision of this page said the tree was silent
   about it. One hop is enough here because `product_cli_is_a_thin_frontend` keeps it so; when it
   stops being enough, `kinds_the_tree_derives` fails its own count guard rather than deriving
-  less. `connect` derives `Flow`, which is the kind the list already gave it, and it is now the
-  measured one: seven requests through one word is a sequence of steps.
+  less. `setup connect` derives `Flow`, which is the kind the list already gave it, and it is now
+  the measured one: seven requests through one word is a sequence of steps.
 
   **What the derivation still reads out of prose, and how that prose is held.** The `Read`
   half — eight of the thirteen — turns on the read-verb enumeration in a YAML comment in
@@ -173,16 +178,19 @@ generates such clients today and has no `cli:` block of its own.
 ## The generated tree is a parallel artifact, not a replacement
 
 `crates/connectors-cli/src/lib.rs` still declares the parser by hand, and `ess/generated/clap/` sits
-beside the specification rather than inside the crate. Two reasons, both measured:
+beside the specification rather than inside the crate. The reason is what the target emits: a whole
+crate — `crates/<system>-cli/Cargo.toml` and three modules — so an `--out` inside the real crate puts
+a second `Cargo.toml` named `connectors-cli` under its own `src/`.
 
-- the architecture fence caps the thin frontend at `CLI_TOTAL_LINE_LIMIT` production lines and
-  counts every `.rs` file under `crates/connectors-cli` whose path contains `src`
-  (`crates/catalog-build/tests/main/architecture_fence.rs:357-363`, `crates/catalog-build/tests/main/architecture_fence.rs:599-613`). Generated source
-  placed there would be measured as hand-written frontend code, which is the wrong thing to
-  measure;
-- the clap target emits a whole crate — `crates/<system>-cli/Cargo.toml` and three modules — so an
-  `--out` inside the real crate puts a second `Cargo.toml` named `connectors-cli` under its own
-  `src/`.
+**A second reason stood here until 2026-09-04 and does not any more.** The architecture fence used
+to cap the thin frontend at a production line count, and generated source under the crate would have
+been counted as hand-written frontend code. That cap is gone: it was raised every one of the six
+times it fired and never once moved a line out of the binary, which is the only thing a cap is for,
+while raising it inserted lines into the file four `path:line` citations pointed into. The frontend
+is still bounded, by `product_cli_is_a_thin_frontend` in
+`crates/catalog-build/tests/main/architecture_fence.rs` — what the binary may link and what it may
+declare, which are the properties the cap was a proxy for. Nothing about that bound depends on where
+generated source sits, so the sentence above is the whole reason now rather than the second of two.
 
 **A note on `path:line` citations, after four of them broke in one day.** Both this page and
 `ess/system/components.yaml` cited `ess_claim_fence.rs:156` as the enforcement of the `naming.wire`
@@ -197,7 +205,13 @@ and a fence can resolve it by looking for the declaration. Both sentences now ca
 the line beside it is held inside the named function's span by
 `adversary_fence_probe.rs::the_wire_name_rule_citation_in_the_design_document_points_at_the_rule`
 and its sibling for the specification. The number is kept only because those two cases read it;
-if it is ever dropped, the name is the half that was doing the work.
+if it is ever dropped, the name is the half that was doing the work. A fifth broke the same day —
+`architecture_fence.rs:319`, cited for `product_cli_is_a_thin_frontend`, had become `"rpassword",`
+inside that function's body, and the case holding it accepted any line of the body — so
+`every_citation_that_names_a_symbol_lands_on_its_declaration` in
+`crates/connectors-cli/tests/cli_surface.rs` now holds every citation of this unit that names a
+symbol to that symbol's declaration line, or the attributes and doc comment directly above it. A
+line inside a body is the one place a citation cannot survive an edit.
 
 Two things about the emitted files are the generator's and not this repository's, and are recorded
 here because a reader has no other way to find out. Their headers say to regenerate with
