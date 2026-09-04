@@ -17,7 +17,7 @@ Skill version 0.6.1 (`.claude-plugin/plugin.json`). Status: **stage 2, approved 
 | worktree | `/home/timo/.local/state/worktree/trees/b10x/connectors/wt-d41dd2700a2e` |
 | build directory | `/home/timo/.local/state/worktree/trees/b10x/connectors/wt-d41dd2700a2e/target` |
 | scratch root | `/home/timo/.cache/connectors-wave/informative-command-readability/scratch` |
-| stage | **correction round 2**, final — the attack budget is spent |
+| stage | **closed, merged** |
 
 ## Acceptance, from the artifact
 
@@ -117,7 +117,26 @@ branch into `main`. **Nothing else** — no push, no tag, no release, no second 
 | correction 1 | returned **green**, cases 62 → 72, all 6 adversary cases now pass. Commit `06e1e22`, +794/−71 over two files. `providers` last column moved 196 → 120; compact `wc -l` 66 → 65. |
 | attack 2 | returned **red**, cases 72 → 77, 4 red, 9 findings. Recorded as `review-result:adversary-informative-readability-pass-2`. |
 | ledger | `aep artifact findings` between the two passes: **carried 0, new 9, resolved 10.** The correction landed whole; nothing regressed. The nine are ground the correction itself opened. |
-| correction 2 | dispatched to the same implementor, which never lost its context. No third attack: the budget is two passes, and the coordinator verifies this diff instead. |
+| correction 2 | returned **green**, cases 77 → 80. Commit `fc3a91b`. |
+| verification | the coordinator's, replacing the third attack. Two assertions removed against 18 added; the one deleted test was the implementor's own, whose contract the blocker fix overturned. The one edited adversary needle was re-run against the pre-fix renderer: **4 of 5 still fail**, so it was not neutered. |
+| integration | unit merged as `e211b07`. The gate lane for `connectors-console` added as `b256d74`. The size fence then refused `output.rs` at 1556 lines, so its tests were split out as `34151f1`, following the pattern `document.rs` and `backend.rs` already use. |
+| gate | `scripts/gate.sh` sharded over 12 workspaces plus `--final`: **every step exit 0**, no step skipped. Log `~/.cache/connectors-gate/wave-gate2.log`. |
+
+## What the unit changed, measured
+
+| command | before | after |
+|---|---|---|
+| `doctor` text | 26 lines for 6 checks | 9 |
+| `providers` text, last column begins at | wrapped, 927 lines | column 119 of a 120 budget, every id whole |
+| `providers -o compact`, `wc -l` | 65, `healthy` and siblings dropped | 65, every field carried on every line |
+
+## Cost
+
+| agent | tokens | tool uses | wall |
+|---|---|---|---|
+| `adp:implementor` (3 rounds, one resumed after an auth kill) | 716,493 | 170 | 43m |
+| `adp:adversary` pass 1 | 151,468 | 55 | 21m |
+| `adp:adversary` pass 2 | 172,859 | 58 | 19m |
 
 ## Findings routed out of this unit
 
