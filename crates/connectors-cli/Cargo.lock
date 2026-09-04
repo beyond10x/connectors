@@ -896,7 +896,9 @@ dependencies = [
  "connectors-runtime",
  "protocol",
  "rustls",
+ "serde",
  "serde_json",
+ "serde_norway",
  "thiserror 2.0.20",
  "tokio",
 ]

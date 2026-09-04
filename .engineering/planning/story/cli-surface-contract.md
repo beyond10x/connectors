@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:cli-surface-contract
 kind: story
-status: draft
+status: active
 title: The command tree is generated, and the gate holds it there
 relations:
 - derived_from: epic:cli-surface
@@ -16,7 +16,7 @@ scope:
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
   path: scripts/gate.sh
-revision: 5
+revision: 7
 ---
 # Story: the command tree is generated, and the gate holds it there
 
