@@ -74,9 +74,11 @@ sha2 = "0.10"
 state-sqlite = { version = "0.6.0", path = "../state-sqlite" }
 subscription-custody = { version = "0.6.0", path = "../subscription-custody" }
 thiserror = "2"
-tokio = { version = "1", default-features = false, features = ["net", "time"] }
+tokio = { version = "1", default-features = false, features = ["macros", "net", "sync", "time"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12"] }
 url = "2"
 
 [dev-dependencies]
+rcgen = "0.13"
 tempfile = "3"
-tokio = { version = "1", default-features = false, features = ["macros", "rt"] }
+tokio = { version = "1", default-features = false, features = ["io-util", "macros", "rt"] }

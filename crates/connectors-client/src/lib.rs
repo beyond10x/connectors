@@ -1,18 +1,13 @@
 #![forbid(unsafe_code)]
 
 //! Typed, bounded clients and provider-neutral workflows for Connector control protocols.
-//!
-//! The raw clients own wire framing and response validation. Reusable helpers compose only generic
-//! protocol transitions such as candidate activation and Connect Session completion. The native
-//! hosted-client module owns browser login, OS-keyring session custody, exact-scope access-token
-//! renewal, and the local stdio MCP bridge; raw clients still receive credentials only at calls.
 
 use std::fs;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub use protocol::{approval, catalog, datasource, operation};
+pub use protocol::{approval, catalog, datasource, git_fetch, operation};
 use protocol::{connection, event};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
@@ -21,6 +16,7 @@ use url::Url;
 use zeroize::Zeroizing;
 
 mod admin;
+mod git_fetch_client;
 mod hosted_catalog;
 mod identity;
 mod model;
@@ -34,8 +30,9 @@ pub use identity::{
 pub use model::{
     AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,
     AdminCredentialWrite, AdminIntegrationStatus, AdminLoginMetadata, AdminStatus,
-    CandidateActivationOutcome, ClientError, MaterializationOutcome, PendingConnection,
-    RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
+    CandidateActivationOutcome, ClientError, GitFetchSession, MaterializationOutcome,
+    PendingConnection, RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart,
+    SubscriptionStatus,
 };
 use model::{
     CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,
@@ -430,6 +427,7 @@ pub struct HostedClient {
     connections: Url,
     events: Url,
     datasources: Url,
+    git_fetch_sessions: Url,
     approvals: Url,
     subscription_credential: Url,
     subscription_leases: Url,
@@ -772,6 +770,7 @@ impl HostedClient {
             connections: endpoint(&base, "connections"),
             events: endpoint(&base, "events"),
             datasources: endpoint(&base, "datasources"),
+            git_fetch_sessions: endpoint(&base, "git-fetch-sessions"),
             approvals: endpoint(&base, "approvals"),
             subscription_credential: endpoint(&base, "subscription-credentials/claude-code"),
             subscription_leases: endpoint(&base, "subscription-credentials/claude-code/leases"),

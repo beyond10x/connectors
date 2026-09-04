@@ -31,9 +31,7 @@ impl GitlabProfile {
     }
 }
 
-pub(super) fn setup_profiles(
-    provider_ref: &str,
-) -> Vec<protocol::catalog::SetupProfileSummary> {
+pub(super) fn setup_profiles(provider_ref: &str) -> Vec<protocol::catalog::SetupProfileSummary> {
     if provider_ref != INTEGRATION_REF {
         return Vec::new();
     }

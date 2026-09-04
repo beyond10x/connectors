@@ -2,13 +2,15 @@
 
 use std::collections::BTreeSet;
 use std::env;
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use connector_secrets::{FileStore, KeyringStore, MemoryStore, PreparedSecretStore, SecretStore};
 use connector_state::StateStore;
-use connectors_config::{HostedServerConfig, PersonalConfig};
+use connectors_config::{
+    HostedGitFetchOverride, HostedServerConfig, HostedServerConfigError, PersonalConfig,
+};
 use domain::GrantSet;
 use hosted_secrets::HostedSecretsStore;
 use hosted_state::PostgresState;
@@ -33,12 +35,59 @@ use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
 use server::local::LocalOperationDaemon;
 #[cfg(feature = "sip")]
 use service::CredentialSet;
-use service::{AdminIntegration, AdminRegistry, ConnectorBackend, EgressTransport};
+use service::{AdminIntegration, AdminRegistry, ConnectorBackend, EgressTransport, GitFetchBroker};
 use state_sqlite::SqliteState;
 use subscription_custody::SubscriptionCustody;
 
 use crate::claims::EventReplyClaims;
+use crate::tls_listener::TlsListener;
 use crate::{BackendRegistry, ServiceBundle};
+
+const GIT_FETCH_ORIGIN_ENV: &str = "CONNECTORS_GIT_FETCH_ORIGIN";
+const GIT_FETCH_TLS_LISTEN_ENV: &str = "CONNECTORS_GIT_FETCH_TLS_LISTEN";
+const GIT_FETCH_TLS_CERTIFICATE_FILE_ENV: &str = "CONNECTORS_GIT_FETCH_TLS_CERTIFICATE_FILE";
+const GIT_FETCH_TLS_PRIVATE_KEY_FILE_ENV: &str = "CONNECTORS_GIT_FETCH_TLS_PRIVATE_KEY_FILE";
+
+fn git_fetch_override_from_environment(
+) -> Result<Option<HostedGitFetchOverride>, HostedServerConfigError> {
+    fn value(name: &str) -> Result<Option<String>, HostedServerConfigError> {
+        match env::var(name) {
+            Ok(value) => Ok(Some(value)),
+            Err(env::VarError::NotPresent) => Ok(None),
+            Err(env::VarError::NotUnicode(_)) => Err(HostedServerConfigError::Invalid),
+        }
+    }
+
+    git_fetch_override_from_values(
+        value(GIT_FETCH_ORIGIN_ENV)?,
+        value(GIT_FETCH_TLS_LISTEN_ENV)?,
+        value(GIT_FETCH_TLS_CERTIFICATE_FILE_ENV)?,
+        value(GIT_FETCH_TLS_PRIVATE_KEY_FILE_ENV)?,
+    )
+}
+
+fn git_fetch_override_from_values(
+    origin: Option<String>,
+    listen: Option<String>,
+    certificate_file: Option<String>,
+    private_key_file: Option<String>,
+) -> Result<Option<HostedGitFetchOverride>, HostedServerConfigError> {
+    match (origin, listen, certificate_file, private_key_file) {
+        (None, None, None, None) => Ok(None),
+        (Some(origin), Some(listen), Some(certificate_file), Some(private_key_file)) => {
+            let listen = listen
+                .parse()
+                .map_err(|_| HostedServerConfigError::Invalid)?;
+            Ok(Some(HostedGitFetchOverride {
+                origin,
+                listen,
+                certificate_file: PathBuf::from(certificate_file),
+                private_key_file: PathBuf::from(private_key_file),
+            }))
+        }
+        _ => Err(HostedServerConfigError::Invalid),
+    }
+}
 
 /// Failure to validate or assemble a complete Connector runtime.
 #[derive(Debug, thiserror::Error)]
@@ -455,6 +504,8 @@ impl PersonalRuntime {
 pub struct HostedRuntime {
     listener: tokio::net::TcpListener,
     application: axum::Router,
+    git_fetch_listener: Option<TlsListener>,
+    git_fetch_application: Option<axum::Router>,
     backend: Arc<BackendRegistry>,
     readiness: Value,
 }
@@ -486,7 +537,11 @@ impl HostedRuntime {
         config_path: &Path,
         bundle: Option<ServiceBundle>,
     ) -> Result<Self, RuntimeError> {
-        let config = HostedServerConfig::read(config_path)?;
+        let git_fetch_override = git_fetch_override_from_environment()?;
+        let config = HostedServerConfig::read_with_git_fetch_override(
+            config_path,
+            git_fetch_override.as_ref(),
+        )?;
         let catalog_policy = config.catalog.clone();
         let catalog_enabled = catalog_policy.enabled;
         let mut catalog_excluded_providers = BTreeSet::new();
@@ -768,6 +823,7 @@ impl HostedRuntime {
             ));
         }
         let gitlab_enabled = config.gitlab.is_some();
+        let mut git_fetch_broker: Option<Arc<dyn GitFetchBroker>> = None;
         if let Some(gitlab) = config.gitlab {
             admin_integrations.push(
                 integration_gitlab::hosted_admin_integration(&config.tenant_id, &gitlab)
@@ -779,7 +835,8 @@ impl HostedRuntime {
                 .as_ref()
                 .ok_or(connectors_config::HostedServerConfigError::Invalid)?
                 .clone();
-            backends.push(Arc::new(
+            let fetch_enabled = gitlab.git_fetch_origin.is_some();
+            let gitlab_backend = Arc::new(
                 GitlabBackend::open_hosted(
                     config.tenant_id.clone(),
                     gitlab,
@@ -788,7 +845,11 @@ impl HostedRuntime {
                     egress,
                 )
                 .await?,
-            ));
+            );
+            if fetch_enabled {
+                git_fetch_broker = Some(gitlab_backend.clone());
+            }
+            backends.push(gitlab_backend);
         }
         let jira_enabled = config.jira.is_some();
         if let Some(jira) = config.jira {
@@ -876,6 +937,9 @@ impl HostedRuntime {
                 .map_err(|_| RuntimeError::Admin)
             })
             .transpose()?;
+        let git_fetch_control = git_fetch_broker.as_ref().map(|broker| {
+            server::hosted::git_fetch_control_router(verifier.clone(), broker.clone())
+        });
         let connector_router = server::hosted::router_with_client_discovery_and_admin(
             verifier,
             backend.clone(),
@@ -885,10 +949,25 @@ impl HostedRuntime {
             client_discovery,
             admin,
         );
+        let public_router = git_fetch_control.map_or(connector_router.clone(), |control| {
+            connector_router.merge(control)
+        });
         let application = if config.server.base_path == "/" {
-            connector_router
+            public_router
         } else {
-            axum::Router::new().nest(&config.server.base_path, connector_router)
+            axum::Router::new().nest(&config.server.base_path, public_router)
+        };
+        let (git_fetch_listener, git_fetch_application) = match (
+            git_fetch_broker.as_ref(),
+            config.server.git_fetch_tls.as_ref(),
+        ) {
+            (Some(broker), Some(tls)) => (
+                Some(TlsListener::bind(tls).await?),
+                Some(server::hosted::git_fetch_internal_router(broker.clone())),
+            ),
+            (None, None) => (None, None),
+            // Configuration validation rejects incomplete pairs before any listener is bound.
+            _ => return Err(connectors_config::HostedServerConfigError::Invalid.into()),
         };
         let readiness = json!({
             "ready": true,
@@ -907,12 +986,16 @@ impl HostedRuntime {
             "platform_enabled": platform_enabled,
             "slack_enabled": slack_enabled,
             "gitlab_enabled": gitlab_enabled,
+            "git_fetch_enabled": git_fetch_broker.is_some(),
+            "git_fetch_tls_listen": config.server.git_fetch_tls.as_ref().map(|tls| tls.listen),
             "jira_enabled": jira_enabled,
             "generated_services": generated_service_refs,
         });
         Ok(Self {
             listener,
             application,
+            git_fetch_listener,
+            git_fetch_application,
             backend,
             readiness,
         })
@@ -927,14 +1010,52 @@ impl HostedRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        let served = axum::serve(self.listener, self.application)
-            .with_graceful_shutdown(shutdown)
-            .await;
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+        let shutdown_signal = shutdown_tx.clone();
+        tokio::spawn(async move {
+            shutdown.await;
+            let _ = shutdown_signal.send(true);
+        });
+        let public = axum::serve(self.listener, self.application)
+            .with_graceful_shutdown(wait_for_shutdown(shutdown_rx.clone()))
+            .into_future();
+        let served = if let (Some(listener), Some(application)) =
+            (self.git_fetch_listener, self.git_fetch_application)
+        {
+            let internal = axum::serve(listener, application)
+                .with_graceful_shutdown(wait_for_shutdown(shutdown_rx))
+                .into_future();
+            tokio::pin!(public, internal);
+            let (first, public_finished) = tokio::select! {
+                result = &mut public => (result, true),
+                result = &mut internal => (result, false),
+            };
+            let _ = shutdown_tx.send(true);
+            let second = if public_finished {
+                tokio::time::timeout(std::time::Duration::from_secs(15), internal.as_mut()).await
+            } else {
+                tokio::time::timeout(std::time::Duration::from_secs(15), public.as_mut()).await
+            };
+            first?;
+            match second {
+                Ok(result) => result,
+                Err(_) => Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "hosted listener did not shut down",
+                )),
+            }
+        } else {
+            public.await
+        };
         let _ =
             tokio::time::timeout(std::time::Duration::from_secs(15), self.backend.shutdown()).await;
         served?;
         Ok(())
     }
+}
+
+async fn wait_for_shutdown(mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    while !*shutdown.borrow() && shutdown.changed().await.is_ok() {}
 }
 
 fn monitoring_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
@@ -1114,6 +1235,55 @@ mod tests {
     use std::os::unix::fs::PermissionsExt as _;
 
     use super::*;
+
+    #[test]
+    fn git_fetch_environment_override_is_atomic_and_secret_free() {
+        assert_eq!(
+            git_fetch_override_from_values(None, None, None, None).unwrap(),
+            None
+        );
+        assert!(matches!(
+            git_fetch_override_from_values(
+                Some("https://git-fetch.example.test".to_owned()),
+                None,
+                Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
+                Some("/etc/connectors-git-fetch/tls.key".to_owned()),
+            ),
+            Err(HostedServerConfigError::Invalid)
+        ));
+
+        let placement = git_fetch_override_from_values(
+            Some("https://git-fetch.example.test".to_owned()),
+            Some("0.0.0.0:8443".to_owned()),
+            Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
+            Some("/etc/connectors-git-fetch/tls.key".to_owned()),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(placement.origin, "https://git-fetch.example.test");
+        assert_eq!(placement.listen, "0.0.0.0:8443".parse().unwrap());
+        assert_eq!(
+            placement.certificate_file,
+            PathBuf::from("/etc/connectors-git-fetch/tls.crt")
+        );
+        assert_eq!(
+            placement.private_key_file,
+            PathBuf::from("/etc/connectors-git-fetch/tls.key")
+        );
+    }
+
+    #[test]
+    fn git_fetch_environment_override_refuses_an_invalid_listener() {
+        assert!(matches!(
+            git_fetch_override_from_values(
+                Some("https://git-fetch.example.test".to_owned()),
+                Some("not-a-listener".to_owned()),
+                Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
+                Some("/etc/connectors-git-fetch/tls.key".to_owned()),
+            ),
+            Err(HostedServerConfigError::Invalid)
+        ));
+    }
 
     #[tokio::test]
     async fn empty_personal_runtime_binds_and_cleans_without_a_credential_store() {

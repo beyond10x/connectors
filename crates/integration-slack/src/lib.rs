@@ -51,11 +51,7 @@ pub fn hosted_admin_integration(
             true,
         )?);
     }
-    Ok(AdminIntegration::new(
-        "slack",
-        configuration,
-        credentials,
-    ))
+    Ok(AdminIntegration::new("slack", configuration, credentials))
 }
 
 fn credential_requirement(
@@ -64,13 +60,8 @@ fn credential_requirement(
     credential: &str,
     required: bool,
 ) -> Result<AdminCredentialRequirement, SlackError> {
-    let reference = CredentialRef::new(
-        tenant_id,
-        backend::AUTHORITY,
-        service,
-        credential,
-    )
-    .map_err(|_| SlackError::new("credential-address"))?;
+    let reference = CredentialRef::new(tenant_id, backend::AUTHORITY, service, credential)
+        .map_err(|_| SlackError::new("credential-address"))?;
     Ok(AdminCredentialRequirement::token(
         credential, required, reference,
     ))
@@ -108,10 +99,7 @@ mod tests {
     async fn organization_credentials_do_not_claim_personal_oauth_is_configured() {
         for (oauth, expected) in [
             (false, vec!["app_token", "bot_token"]),
-            (
-                true,
-                vec!["app_token", "bot_token", "oauth_client_secret"],
-            ),
+            (true, vec!["app_token", "bot_token", "oauth_client_secret"]),
         ] {
             let store = Arc::new(MemoryStore::new());
             let integration = hosted_admin_integration("tenant-one", &config(oauth)).unwrap();

@@ -6,6 +6,7 @@ mod tests {
     use crate::profiles::{PROFILE_OAUTH, PROFILE_PAT};
     use crate::repository_file::valid_repository_file_path;
     use connector_secrets::MemoryStore;
+    use connector_state::StateStore as _;
     use service::{EgressTransportError, EgressWebSocket};
 
     struct PagedProjectsEgress {
@@ -76,6 +77,7 @@ mod tests {
             HostedGitlabConfig {
                 origin: "https://gitlab.example.test".to_owned(),
                 public_origin: "https://connectors.example.test/api/connectors/v1".to_owned(),
+                git_fetch_origin: None,
                 oauth_client_id: "client-one".to_owned(),
                 oauth_redirect_uri:
                     "https://connectors.example.test/api/connectors/v1/oauth/gitlab/callback"
@@ -92,6 +94,63 @@ mod tests {
         .await
         .unwrap();
         (backend, egress)
+    }
+
+    #[tokio::test]
+    async fn legacy_connection_without_a_grant_binding_fails_closed() {
+        let state = Arc::new(connector_state::MemoryState::new());
+        let metadata = StateFile {
+            version: STATE_VERSION,
+            next_transaction_generation: 1,
+            connections: vec![StoredConnection {
+                connection_ref: "connection:gitlab:legacy".to_owned(),
+                instance_id: "legacy".to_owned(),
+                label: "GitLab".to_owned(),
+                grant_ref: String::new(),
+                owner_subject: "person:owner".to_owned(),
+                external_user_id: 7,
+                username: "owner".to_owned(),
+                email_sha256: "a".repeat(64),
+                profile: GitlabProfile::PersonalToken,
+                scopes: vec!["read_api".to_owned()],
+                credential_generation: 1,
+                observed_at_unix_ms: 1,
+                expires_at_unix_ms: None,
+            }],
+            pending: Vec::new(),
+        };
+        state
+            .replace(
+                STATE_KEY,
+                &serde_json::to_vec(&metadata).unwrap(),
+                MAX_STATE_BYTES,
+            )
+            .unwrap();
+        let egress = Arc::new(PagedProjectsEgress {
+            calls: AtomicUsize::new(0),
+            continuation: "",
+        });
+        let opened = GitlabBackend::open_inner(
+            "tenant-one".to_owned(),
+            HostedGitlabConfig {
+                origin: "https://gitlab.example.test".to_owned(),
+                public_origin: "https://connectors.example.test/api/connectors/v1".to_owned(),
+                git_fetch_origin: None,
+                oauth_client_id: "client-one".to_owned(),
+                oauth_redirect_uri:
+                    "https://connectors.example.test/api/connectors/v1/oauth/gitlab/callback"
+                        .to_owned(),
+                user_grant_ref: "grant:gitlab:user".to_owned(),
+                initiation: InitiationConfig::Provider,
+                connect_session_ttl_seconds: 300,
+                refresh_skew_seconds: 300,
+            },
+            Arc::new(MemoryStore::new()),
+            GitlabState::Hosted(state),
+            egress,
+        )
+        .await;
+        assert!(opened.is_err());
     }
 
     #[tokio::test]
