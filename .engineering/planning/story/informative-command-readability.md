@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:informative-command-readability
 kind: story
-status: draft
+status: active
 title: Informative subcommands render as a scannable report, not a JSON dump
 summary: doctor, providers and auth status share one generic pretty-printer that spends 26 lines on 6 checks, hides the one warning among the ok rows, and drops fields in compact.
 scope:
@@ -10,7 +10,7 @@ scope:
   path: crates/connectors-console/src/doctor.rs
 - confidence: cited
   path: crates/connectors-console/src/output.rs
-revision: 2
+revision: 4
 ---
 ## Context
 
