@@ -11,6 +11,20 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.8 — 2026-09-04
+
+### Changed
+
+- Migrate the seventy-three `docs/stories/S-*.md` records into the AEP planning store, so the
+  repository has one backlog instead of two that never named each other. Every source file keeps
+  its text and gains a backlink to the artifact that now carries it; nothing was deleted.
+- The thirty-five stories the sources call `done` are recorded as resting on an assertion rather
+  than an observed run, and `aep artifact validate` reports that count on every run.
+
+No crate source changed in this release. The version moves because it is the artifact identity
+written into every catalog document, `connectors.lock` and the wire User-Agent, and those move
+together or not at all.
+
 ## 0.5.7 — 2026-09-04
 
 ### Added

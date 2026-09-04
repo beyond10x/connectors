@@ -51,7 +51,7 @@
     ]
   ],
   "description": "Intercom contacts and conversations: read and create contacts, read a conversation, reply to it, and note it",
-  "generator": "connectors 0.5.7",
+  "generator": "connectors 0.5.8",
   "operations": [
     {
       "auth": [

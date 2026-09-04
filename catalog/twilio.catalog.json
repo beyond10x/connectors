@@ -256,7 +256,7 @@
       "service": "default"
     }
   ],
-  "generator": "connectors 0.5.7",
+  "generator": "connectors 0.5.8",
   "operations": [
     {
       "auth": [
