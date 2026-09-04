@@ -73,14 +73,14 @@
   "config": [
     {
       "approval": "none",
-      "binds": "endpoint.site",
-      "docs_url": "https://support.atlassian.com/jira-software-cloud/docs/what-is-a-jira-site/",
-      "example": "acme",
-      "format": "subdomain",
-      "help": "The part of your Jira URL before `.atlassian.net` — if you sign in at `acme.atlassian.net`, this is `acme`",
-      "label": "Atlassian site name",
+      "binds": "endpoint.cloud_id",
+      "docs_url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/",
+      "example": "11111111-2222-3333-4444-555555555555",
+      "format": "text",
+      "help": "Your Atlassian site's cloud id — the UUID your own site reports at `https://<your-site>.atlassian.net/_edge/tenant_info`. It addresses the tenant through Atlassian's Cloud gateway, which is the route this connector calls; the site host itself is not",
+      "label": "Atlassian cloud id",
       "level": "connection",
-      "name": "site",
+      "name": "cloud_id",
       "required": true,
       "secret": false,
       "service": "default"
@@ -155,6 +155,9 @@
   "connector": "jira",
   "default_auth": [
     [
+      "jira.service_api_token"
+    ],
+    [
       "jira.api_token"
     ],
     [
@@ -162,12 +165,21 @@
     ],
     [
       "jira.service_oauth"
-    ],
-    [
-      "jira.service_api_token"
     ]
   ],
   "default_auth_requirements": [
+    {
+      "credentials": [
+        "jira.service_api_token"
+      ],
+      "scopes": {
+        "jira.service_api_token": [
+          [
+            "read:jira-work"
+          ]
+        ]
+      }
+    },
     {
       "credentials": [
         "jira.api_token"
@@ -196,18 +208,6 @@
           ]
         ]
       }
-    },
-    {
-      "credentials": [
-        "jira.service_api_token"
-      ],
-      "scopes": {
-        "jira.service_api_token": [
-          [
-            "read:jira-work"
-          ]
-        ]
-      }
     }
   ],
   "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
@@ -216,6 +216,9 @@
     {
       "auth": [
         [
+          "jira.service_api_token"
+        ],
+        [
           "jira.api_token"
         ],
         [
@@ -223,12 +226,21 @@
         ],
         [
           "jira.service_oauth"
-        ],
-        [
-          "jira.service_api_token"
         ]
       ],
       "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
         {
           "credentials": [
             "jira.api_token"
@@ -252,18 +264,6 @@
           ],
           "scopes": {
             "jira.service_oauth": [
-              [
-                "read:jira-work"
-              ]
-            ]
-          }
-        },
-        {
-          "credentials": [
-            "jira.service_api_token"
-          ],
-          "scopes": {
-            "jira.service_api_token": [
               [
                 "read:jira-work"
               ]
@@ -293,8 +293,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -420,8 +420,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -539,6 +539,9 @@
     {
       "auth": [
         [
+          "jira.service_api_token"
+        ],
+        [
           "jira.api_token"
         ],
         [
@@ -546,12 +549,21 @@
         ],
         [
           "jira.service_oauth"
-        ],
-        [
-          "jira.service_api_token"
         ]
       ],
       "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
         {
           "credentials": [
             "jira.api_token"
@@ -575,18 +587,6 @@
           ],
           "scopes": {
             "jira.service_oauth": [
-              [
-                "read:jira-work"
-              ]
-            ]
-          }
-        },
-        {
-          "credentials": [
-            "jira.service_api_token"
-          ],
-          "scopes": {
-            "jira.service_api_token": [
               [
                 "read:jira-work"
               ]
@@ -616,8 +616,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -768,8 +768,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -876,6 +876,9 @@
     {
       "auth": [
         [
+          "jira.service_api_token"
+        ],
+        [
           "jira.api_token"
         ],
         [
@@ -883,12 +886,21 @@
         ],
         [
           "jira.service_oauth"
-        ],
-        [
-          "jira.service_api_token"
         ]
       ],
       "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
         {
           "credentials": [
             "jira.api_token"
@@ -912,18 +924,6 @@
           ],
           "scopes": {
             "jira.service_oauth": [
-              [
-                "read:jira-work"
-              ]
-            ]
-          }
-        },
-        {
-          "credentials": [
-            "jira.service_api_token"
-          ],
-          "scopes": {
-            "jira.service_api_token": [
               [
                 "read:jira-work"
               ]
@@ -953,8 +953,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -1094,8 +1094,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -1205,8 +1205,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -1319,8 +1319,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -1465,8 +1465,8 @@
         "network"
       ],
       "endpoint": {
-        "site": [
-          "host"
+        "cloud_id": [
+          "path"
         ]
       },
       "expose": true,
@@ -1563,7 +1563,7 @@
         "product-manager",
         "project-manager"
       ],
-      "base_url": "https://{site}.atlassian.net",
+      "base_url": "https://api.atlassian.com/ex/jira/{cloud_id}",
       "gid": "com.atlassian.jira:2",
       "legacy": true,
       "name": "default",

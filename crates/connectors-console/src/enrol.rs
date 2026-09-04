@@ -36,6 +36,18 @@ use connectors_config::PersonalConfig;
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
+/// Where one declared configuration value belongs, read from its `binds` grammar.
+///
+/// The catalogue's answer, not a guess from the field's name: `email` is a user half for Atlassian
+/// because it declares `binds = "username.jira.api_token"`, and another connector's `email` that
+/// declared an endpoint would be an endpoint.
+enum Slot<'a> {
+    /// A `{variable}` in the provider's declared base URL.
+    Endpoint(&'a str),
+    /// The non-secret user half of the named credential's Basic join.
+    Username(&'a str),
+}
+
 /// What the caller fixed on the command line, so nothing already answered is asked again.
 #[derive(Default)]
 pub struct Options {
@@ -148,13 +160,32 @@ pub async fn run(
             .ok_or_else(|| EnrolError::NoCredential(provider_id.to_owned()))?,
     };
 
-    // Everything the base URL needs, and nothing else. A provider whose hosts are fixed — most of
-    // the catalogue — asks nothing here.
+    let credential_name = credential.name;
+    // Everything the base URL needs and every user half a Basic credential joins, and nothing else.
+    // A provider whose hosts are fixed and whose token is a bearer — most of the catalogue — asks
+    // nothing here.
+    //
+    // **Both come from the same walk over `provider.config`**, because the catalogue already says
+    // which is which: `binds = "endpoint.<variable>"` is a URL slot, `binds = "username.<credential>"`
+    // is the non-secret user half of that credential's Basic join. Asking only for the first is
+    // what made a stored Atlassian token unusable — the value had nowhere to be written down, so
+    // every Jira and Confluence call refused a credential that was demonstrably there.
     let mut endpoints = BTreeMap::new();
+    let mut usernames = BTreeMap::new();
     let mut approval_needed = Vec::new();
     for field in provider.config {
-        let Some(variable) = field.binds.strip_prefix("endpoint.") else {
-            continue;
+        let target = match (
+            field.binds.strip_prefix("endpoint."),
+            field.binds.strip_prefix("username."),
+        ) {
+            (Some(variable), _) => Slot::Endpoint(variable),
+            // **Only the credential being supplied.** A provider may declare a Basic token and a
+            // bearer service-account token; the Basic one needs an account name and the bearer one
+            // has no user half at all. Asking for every declared user half would make connecting
+            // the bearer credential demand an email that belongs to a credential this invocation
+            // is not supplying — which is exactly what it did, and it refused rather than storing.
+            (_, Some(credential)) if credential == credential_name => Slot::Username(credential),
+            _ => continue,
         };
         let value = match options.values.get(field.name) {
             Some(supplied) => supplied.clone(),
@@ -173,7 +204,10 @@ pub async fn run(
         {
             approval_needed.push(field.name.to_owned());
         }
-        endpoints.insert(variable.to_owned(), value);
+        match target {
+            Slot::Endpoint(variable) => endpoints.insert(variable.to_owned(), value),
+            Slot::Username(credential) => usernames.insert(credential.to_owned(), value),
+        };
     }
 
     // Whose authority the value will carry, from the catalogue's own declaration. It is the fact an
@@ -233,6 +267,7 @@ pub async fn run(
         initiation: connectors_config::InitiationConfig::Platform,
         allow_writes: options.allow_writes,
         endpoints: endpoints.clone(),
+        usernames: usernames.clone(),
         operator_approved: true,
         network: connectors_config::NetworkScopeConfig::Public,
         credential: Some(credential.name.to_owned()),
@@ -258,12 +293,31 @@ pub async fn run(
     // The first cut refused this as "already configured", which pushed an operator into inventing
     // a second identity (`timo-ai-user`) for what is one actor holding two tokens.
     if already {
+        // A user half supplied against an entry that already exists is **not** written: this
+        // command appends whole blocks and does not rewrite one an operator may have commented and
+        // reordered. Saying so, and naming the section, is the difference between a person adding
+        // two lines and a person debugging a `not_granted` for an hour.
+        let pending: Vec<&String> = usernames
+            .iter()
+            .filter(|(name, _)| {
+                !existing.catalog.iter().any(|entry| {
+                    entry.provider == provider_id
+                        && entry.instance() == identity
+                        && entry.usernames.contains_key(*name)
+                })
+            })
+            .map(|(name, _)| name)
+            .collect();
         return Ok(json!({
             "provider": provider_id,
             "name": identity,
             "credential": credential.name,
             "store": backend,
             "added_to_existing_identity": true,
+            "user_half_not_written": (!pending.is_empty()).then(|| json!({
+                "credentials": pending,
+                "add_to": "[catalog.usernames] under this provider's existing [[catalog]] block",
+            })),
             "verify": provider.verify,
         }));
     }
@@ -273,6 +327,7 @@ pub async fn run(
         provider_id,
         credential.name,
         &endpoints,
+        &usernames,
         &options,
     )?;
 
@@ -282,6 +337,10 @@ pub async fn run(
         "credential": credential.name,
         "store": backend,
         "endpoints": endpoints,
+        // The non-secret half of a Basic join, reported exactly as the endpoints are: the
+        // catalogue declares it `secret = false`, and an operator whose Jira call refuses needs to
+        // see whether the account name was recorded at all. The token is not here and never was.
+        "usernames": usernames,
         "grant": if options.allow_writes { "read and write" } else { "read only" },
         "verify": provider.verify,
         "operations": provider.operations.len(),
@@ -392,6 +451,7 @@ fn append_entry(
     provider: &str,
     credential: &str,
     endpoints: &BTreeMap<String, String>,
+    usernames: &BTreeMap<String, String>,
     options: &Options,
 ) -> Result<(), EnrolError> {
     let previous = std::fs::read_to_string(config_path)?;
@@ -413,6 +473,15 @@ fn append_entry(
         let _ = write!(block, "\n[catalog.endpoints]\n");
         for (name, value) in endpoints {
             let _ = write!(block, "{name} = \"{value}\"\n");
+        }
+    }
+    // Quoted keys: a credential name is dotted (`jira.api_token`), and a bare dotted key in TOML
+    // is a nested table, not one name. Written unquoted it would parse as
+    // `usernames.jira.api_token`, which is a different map the resolver never asks.
+    if !usernames.is_empty() {
+        let _ = write!(block, "\n[catalog.usernames]\n");
+        for (name, value) in usernames {
+            let _ = write!(block, "\"{name}\" = \"{value}\"\n");
         }
     }
 

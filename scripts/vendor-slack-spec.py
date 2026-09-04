@@ -27,7 +27,11 @@ GROUPS = {
     "web": (
         "chat_postMessage",
         "conversations_history",
+        "conversations_info",
+        "conversations_list",
+        "conversations_replies",
         "users_info",
+        "users_list",
         "reactions_add",
     ),
     "admin": (
