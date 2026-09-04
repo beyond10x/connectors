@@ -12,8 +12,9 @@ use async_trait::async_trait;
 use futures_util::{SinkExt as _, StreamExt as _};
 use reqwest::{Method, RequestBuilder};
 use service::{
-    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError,
-    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
+    EgressByteStream, EgressHttpRequest, EgressHttpResponse, EgressStreamingHttpRequest,
+    EgressStreamingHttpResponse, EgressTransport, EgressTransportError, EgressTransportFailure,
+    EgressWebSocket, EgressWebSocketFrame,
 };
 use tokio::net::{lookup_host, TcpStream};
 use tokio_tungstenite::tungstenite::handshake::client::Response;
@@ -23,6 +24,9 @@ use url::Url;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const STREAM_TOTAL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const STREAM_HEADER_TIMEOUT: Duration = Duration::from_secs(30);
+const STREAM_BODY_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 const USER_AGENT: &str = "b10x-connectors/0.1";
 const MAX_RESPONSE_HEADERS: usize = 16;
 const MAX_RESPONSE_HEADER_BYTES: usize = 8 * 1024;
@@ -30,6 +34,7 @@ const MAX_WEBSOCKET_MESSAGE_BYTES: usize = 1024 * 1024;
 const MAX_REQUEST_BYTES: usize = 256 * 1024;
 const MAX_REQUEST_HEADERS: usize = 64;
 const MAX_URL_BYTES: usize = 8 * 1024;
+const MAX_STREAM_RESPONSE_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// Address classes admitted after DNS resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +161,7 @@ impl ConnectionEgress {
         authority_ref: &str,
         method: Method,
         url: Url,
+        timeout: Duration,
     ) -> Result<RequestBuilder, EgressError> {
         validate_authority_ref(authority_ref)?;
         let destination = self.resolve(&url).await?;
@@ -163,7 +169,7 @@ impl ConnectionEgress {
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
+            .timeout(timeout)
             .user_agent(USER_AGENT);
         if url
             .host()
@@ -265,7 +271,7 @@ impl EgressTransport for ConnectionEgress {
             return Err(EgressTransportError::Refused);
         }
         let mut outbound = self
-            .request(authority_ref, method, url)
+            .request(authority_ref, method, url, REQUEST_TIMEOUT)
             .await
             .map_err(|_| EgressTransportError::Refused)?;
         for (name, value) in request.request.headers {
@@ -328,6 +334,81 @@ impl EgressTransport for ConnectionEgress {
         })
     }
 
+    async fn execute_stream(
+        &self,
+        authority_ref: &str,
+        request: EgressStreamingHttpRequest,
+    ) -> Result<EgressStreamingHttpResponse, EgressTransportError> {
+        if request.maximum_response_bytes == 0
+            || request.maximum_response_bytes > MAX_STREAM_RESPONSE_BYTES
+            || request.response_headers.len() > MAX_RESPONSE_HEADERS
+            || request.url.len() > MAX_URL_BYTES
+            || request.headers.len() > MAX_REQUEST_HEADERS
+            || request.headers.iter().any(|(name, value)| {
+                name.len() > MAX_RESPONSE_HEADER_BYTES || value.len() > MAX_RESPONSE_HEADER_BYTES
+            })
+            || request
+                .body
+                .as_ref()
+                .is_some_and(|body| body.len() > MAX_REQUEST_BYTES)
+        {
+            return Err(EgressTransportError::Refused);
+        }
+        let method = Method::from_bytes(request.method.as_bytes())
+            .map_err(|_| EgressTransportError::Refused)?;
+        let url = Url::parse(&request.url).map_err(|_| EgressTransportError::Refused)?;
+        if url.scheme() != "https" {
+            return Err(EgressTransportError::Refused);
+        }
+        let mut outbound = self
+            .request(authority_ref, method, url, STREAM_TOTAL_TIMEOUT)
+            .await
+            .map_err(|_| EgressTransportError::Refused)?;
+        for (name, value) in request.headers {
+            let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| EgressTransportError::Refused)?;
+            let value = reqwest::header::HeaderValue::from_str(&value)
+                .map_err(|_| EgressTransportError::Refused)?;
+            outbound = outbound.header(name, value);
+        }
+        if let Some(body) = request.body {
+            outbound = outbound.body(body);
+        }
+        let response = tokio::time::timeout(STREAM_HEADER_TIMEOUT, outbound.send())
+            .await
+            .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::Timeout))?
+            .map_err(|error| EgressTransportError::Transport(classify_send_failure(&error)))?;
+        if response
+            .content_length()
+            .is_some_and(|size| size > request.maximum_response_bytes)
+        {
+            return Err(EgressTransportError::ResponseTooLarge);
+        }
+        let status = response.status().as_u16();
+        let mut headers = std::collections::BTreeMap::new();
+        for requested in request.response_headers {
+            let name = reqwest::header::HeaderName::from_bytes(requested.as_bytes())
+                .map_err(|_| EgressTransportError::Refused)?;
+            if let Some(value) = response.headers().get(&name) {
+                let value = value.to_str().map_err(|_| EgressTransportError::Refused)?;
+                if value.len() > MAX_RESPONSE_HEADER_BYTES {
+                    return Err(EgressTransportError::Refused);
+                }
+                headers.insert(name.as_str().to_owned(), value.to_owned());
+            }
+        }
+        Ok(EgressStreamingHttpResponse {
+            status,
+            headers,
+            body: Box::new(ReqwestByteStream {
+                response,
+                observed: 0,
+                maximum: request.maximum_response_bytes,
+                deadline: tokio::time::Instant::now() + STREAM_TOTAL_TIMEOUT,
+            }),
+        })
+    }
+
     async fn connect_websocket(
         &self,
         authority_ref: &str,
@@ -346,6 +427,41 @@ impl EgressTransport for ConnectionEgress {
             .await
             .map_err(|_| EgressTransportError::Refused)?;
         Ok(Box::new(ServerWebSocket { socket }))
+    }
+}
+
+struct ReqwestByteStream {
+    response: reqwest::Response,
+    observed: u64,
+    maximum: u64,
+    deadline: tokio::time::Instant,
+}
+
+#[async_trait]
+impl EgressByteStream for ReqwestByteStream {
+    async fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, EgressTransportError> {
+        let remaining = self
+            .deadline
+            .checked_duration_since(tokio::time::Instant::now())
+            .ok_or(EgressTransportError::Transport(
+                EgressTransportFailure::Timeout,
+            ))?;
+        let chunk = tokio::time::timeout(
+            remaining.min(STREAM_BODY_IDLE_TIMEOUT),
+            self.response.chunk(),
+        )
+        .await
+        .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::Timeout))?
+        .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::BodyRead))?;
+        let Some(chunk) = chunk else {
+            return Ok(None);
+        };
+        self.observed = self
+            .observed
+            .checked_add(chunk.len() as u64)
+            .filter(|observed| *observed <= self.maximum)
+            .ok_or(EgressTransportError::ResponseTooLarge)?;
+        Ok(Some(chunk.to_vec()))
     }
 }
 

@@ -1,0 +1,140 @@
+domain: connectors.git
+
+summary: Establish a bounded, read-only Smart Git session without releasing provider credentials.
+
+types:
+  - {name: connectors.git.GitFetchSessionId, kind: newtype, of: String}
+  - {name: connectors.git.ConnectionRef, kind: newtype, of: String}
+  - {name: connectors.git.ProjectRef, kind: newtype, of: String}
+  - {name: connectors.git.GitReference, kind: newtype, of: String}
+  - {name: connectors.git.CommitId, kind: newtype, of: String}
+  - {name: connectors.git.IdempotencyKey, kind: newtype, of: String}
+  - {name: connectors.git.SourceName, kind: newtype, of: String}
+  - {name: connectors.git.SourceLocator, kind: newtype, of: String}
+
+entities:
+  - name: connectors.git.GitFetchSession
+    identity: {name: session_id, type: connectors.git.GitFetchSessionId}
+    fields:
+      - {name: idempotency_key, type: connectors.git.IdempotencyKey}
+      - {name: connection_ref, type: connectors.git.ConnectionRef}
+      - {name: project_ref, type: connectors.git.ProjectRef}
+      - {name: source_name, type: connectors.git.SourceName}
+      - {name: source_locator, type: connectors.git.SourceLocator}
+      - {name: reference, type: connectors.git.GitReference}
+      - {name: expected_commit, type: connectors.git.CommitId}
+      - {name: depth, type: Integer}
+      - {name: expires_at, type: Timestamp}
+      - {name: request_limit, type: Integer}
+      - {name: byte_limit, type: Integer}
+    lifecycle:
+      initial: Active
+      states: [Active, Spent, Expired, Revoked]
+      terminal: [Spent, Expired, Revoked]
+      transitions:
+        - {name: spend, from: [Active], to: Spent}
+        - {name: expire, from: [Active], to: Expired}
+        - {name: revoke, from: [Active], to: Revoked}
+
+errors:
+  - name: connectors.git.GitFetchRefused
+    summary: Current authority does not admit the exact connection, project, reference, or commit.
+
+commands:
+  - name: connectors.git.CreateGitFetchSession
+    input:
+      - {name: idempotency_key, type: connectors.git.IdempotencyKey}
+      - {name: connection_ref, type: connectors.git.ConnectionRef}
+      - {name: project_ref, type: connectors.git.ProjectRef}
+      - {name: reference, type: connectors.git.GitReference}
+      - {name: expected_commit, type: connectors.git.CommitId}
+      - {name: depth, type: Integer}
+    outcomes:
+      - name: created
+        creates: connectors.git.GitFetchSession
+        instance: session_id
+        emits: [connectors.git.GitFetchSessionCreated]
+        payload:
+          connectors.git.GitFetchSessionCreated:
+            session_id: entity.session_id
+            expected_commit: input.expected_commit
+      - name: refused
+        external: Identity or the current Connector grant refuses repository acquisition
+        error: connectors.git.GitFetchRefused
+
+  - name: connectors.git.CompleteGitFetchSession
+    input:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+    outcomes:
+      - name: spent
+        moves: connectors.git.GitFetchSession.spend
+        instance: session_id
+        emits: [connectors.git.GitFetchSessionCompleted]
+        payload:
+          connectors.git.GitFetchSessionCompleted:
+            session_id: input.session_id
+      - name: refused
+        external: session authority, lifetime, request, or byte limits no longer admit transfer
+        error: connectors.git.GitFetchRefused
+
+  - name: connectors.git.ExpireGitFetchSession
+    input:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+    outcomes:
+      - name: expired
+        moves: connectors.git.GitFetchSession.expire
+        instance: session_id
+        emits: [connectors.git.GitFetchSessionExpired]
+        payload:
+          connectors.git.GitFetchSessionExpired:
+            session_id: input.session_id
+
+  - name: connectors.git.RevokeGitFetchSession
+    input:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+    outcomes:
+      - name: revoked
+        moves: connectors.git.GitFetchSession.revoke
+        instance: session_id
+        emits: [connectors.git.GitFetchSessionRevoked]
+        payload:
+          connectors.git.GitFetchSessionRevoked:
+            session_id: input.session_id
+
+events:
+  - name: connectors.git.GitFetchSessionCreated
+    fields:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+      - {name: expected_commit, type: connectors.git.CommitId}
+
+  - name: connectors.git.GitFetchSessionCompleted
+    fields:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+
+  - name: connectors.git.GitFetchSessionExpired
+    fields:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+
+  - name: connectors.git.GitFetchSessionRevoked
+    fields:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+
+views:
+  - name: connectors.git.GitFetchSessionObservation
+    source: connectors.git.GitFetchSession
+    fields:
+      - {name: session_id, type: connectors.git.GitFetchSessionId}
+      - {name: project_ref, type: connectors.git.ProjectRef}
+      - {name: reference, type: connectors.git.GitReference}
+      - {name: expected_commit, type: connectors.git.CommitId}
+      - {name: depth, type: Integer}
+      - {name: expires_at, type: Timestamp}
+      - {name: state, type: connectors.git.GitFetchSession.State}
+
+actors:
+  - name: connectors.git.WorkspaceService
+    may:
+      - connectors.git.CreateGitFetchSession
+      - connectors.git.CompleteGitFetchSession
+      - connectors.git.ExpireGitFetchSession
+      - connectors.git.RevokeGitFetchSession

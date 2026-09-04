@@ -22,6 +22,8 @@ pub enum ClientError {
     HostedAuthentication,
     #[error("hosted Connector Identity authority was refused")]
     HostedNotGranted,
+    #[error("hosted Connector refused the Git fetch request with status {0}")]
+    GitFetchRefused(u16),
     #[error("hosted Connector refused the subscription request with status {0}")]
     SubscriptionRefused(u16),
     #[error("hosted Connector refused the administrative request with status {0}")]
@@ -139,6 +141,54 @@ pub struct MaterializationOutcome {
     pub connections: Vec<connection::ConnectionSummary>,
     pub unsupported: usize,
     pub not_granted: usize,
+}
+
+/// One exact, bounded Git source grant. The source authority is wiped on drop and redacted.
+pub struct GitFetchSession {
+    pub session_ref: String,
+    pub source: String,
+    pub locator: String,
+    pub reference: String,
+    pub expected_commit: String,
+    pub depth: u8,
+    pub expires_at_unix_ms: u64,
+    source_authorization: Zeroizing<String>,
+}
+
+impl GitFetchSession {
+    pub(crate) fn from_wire(created: protocol::git_fetch::CreatedSession) -> Self {
+        Self {
+            session_ref: created.session_ref,
+            source: created.source,
+            locator: created.locator,
+            reference: created.reference,
+            expected_commit: created.expected_commit,
+            depth: created.depth,
+            expires_at_unix_ms: created.expires_at_unix_ms,
+            source_authorization: Zeroizing::new(created.source_authorization),
+        }
+    }
+
+    #[must_use]
+    pub fn expose_at_source_boundary(&self) -> &str {
+        self.source_authorization.as_str()
+    }
+}
+
+impl std::fmt::Debug for GitFetchSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("GitFetchSession")
+            .field("session_ref", &self.session_ref)
+            .field("source", &self.source)
+            .field("locator", &self.locator)
+            .field("reference", &self.reference)
+            .field("expected_commit", &self.expected_commit)
+            .field("depth", &self.depth)
+            .field("expires_at_unix_ms", &self.expires_at_unix_ms)
+            .field("source_authorization", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]

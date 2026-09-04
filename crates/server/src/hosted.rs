@@ -36,6 +36,7 @@ mod connect;
 mod connection_route;
 mod docs;
 mod enforcement;
+mod git_fetch;
 mod health;
 mod mcp;
 mod principal;
@@ -50,6 +51,7 @@ use enforcement::InvokeAdmission;
 pub use enforcement::{
     canonical_input_digest, issue_approval, HostedAuthority, RecoveryError, SIGNAL_AUDIT_STATE_KEY,
 };
+pub use git_fetch::{git_fetch_control_router, git_fetch_internal_router};
 pub use principal::HostedPrincipal;
 use routing::MAX_COMPLETION_BYTES;
 pub use routing::{

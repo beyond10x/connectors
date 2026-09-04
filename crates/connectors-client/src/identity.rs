@@ -392,6 +392,29 @@ impl AuthenticatedHostedClient {
         }
     }
 
+    /// Create one Git fetch session with automatic catalog-scope token renewal.
+    pub async fn create_git_fetch_session(
+        &self,
+        request: protocol::git_fetch::CreateRequest,
+    ) -> Result<crate::GitFetchSession, AuthenticatedHostedError> {
+        let token = self.tokens.access_token(CATALOG_SCOPE).await?;
+        match self
+            .hosted
+            .create_git_fetch_session(&token, &self.context, request.clone())
+            .await
+        {
+            Err(ClientError::HostedAuthentication) => {
+                self.tokens.invalidate(CATALOG_SCOPE)?;
+                let token = self.tokens.access_token(CATALOG_SCOPE).await?;
+                Ok(self
+                    .hosted
+                    .create_git_fetch_session(&token, &self.context, request)
+                    .await?)
+            }
+            result => Ok(result?),
+        }
+    }
+
     pub async fn event(
         &self,
         request: event::EventRequest,
