@@ -2,7 +2,7 @@
 name = "identity-http"
 description = "HTTP adapter for Identity-issued Connector access authority."
 edition = "2021"
-version = "0.6.0"
+version = "0.6.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"

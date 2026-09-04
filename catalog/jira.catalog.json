@@ -211,7 +211,7 @@
     }
   ],
   "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
-  "generator": "connectors 0.6.0",
+  "generator": "connectors 0.6.1",
   "operations": [
     {
       "auth": [
