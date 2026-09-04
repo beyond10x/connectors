@@ -53,3 +53,11 @@ field turns out to be the right shape).
 - 2026-08-23 — merged to main as `95ffc8f` after independent review (PASS, 0 blocking, 2 minor:
   best-effort refusal journaling on the replay branch; retiring the required field makes existing
   SIP personal configs carrying `approval_evidence_ref` refuse to parse until edited).
+
+## Superseded by
+
+`story:a-companion-reply-is-claimed-exactly-once-locally` in the AEP planning store, at
+`.engineering/planning/story/a-companion-reply-is-claimed-exactly-once-locally.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

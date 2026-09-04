@@ -58,3 +58,11 @@ anyone writing configuration.
   import warning and the untested trailing-empty-page edge). Chart RBAC needed at deploy time:
   get+list on plural `databases` in groups mysql.sql.crossplane.io and
   postgresql.sql.crossplane.io — confirmed present on the live cluster.
+
+## Superseded by
+
+`story:kubernetes-discovers-database-endpoints` in the AEP planning store, at
+`.engineering/planning/story/kubernetes-discovers-database-endpoints.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

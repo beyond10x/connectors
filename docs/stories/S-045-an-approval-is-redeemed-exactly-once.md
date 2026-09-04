@@ -27,3 +27,11 @@ same reference refuses and audits as replay.
 - A mismatched operation, Connection, digest or expired record refuses without naming the axis.
 - Attempted audit exists for every dispatch attempt, including refusals and crashes between
   redemption and terminal write (proven by a kill-point test or documented crash-recovery scan).
+
+## Superseded by
+
+`story:an-approval-is-redeemed-exactly-once` in the AEP planning store, at
+`.engineering/planning/story/an-approval-is-redeemed-exactly-once.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

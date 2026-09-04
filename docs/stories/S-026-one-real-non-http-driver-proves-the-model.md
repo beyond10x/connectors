@@ -41,3 +41,11 @@ this story retains the abstraction-level acceptance.
   to a symmetric-RTP peer before the outer adapter can inspect it, and both the complete lifecycle
   matrix and shared production audit/serving path remain open. S-032 therefore remains the stable
   support gate rather than treating the successful development call as completion.
+
+## Superseded by
+
+`story:one-real-non-http-driver-proves-the-model` in the AEP planning store, at
+`.engineering/planning/story/one-real-non-http-driver-proves-the-model.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

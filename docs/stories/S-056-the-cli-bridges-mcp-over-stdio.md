@@ -33,3 +33,11 @@ stays a thin frontend.
   keeping stdout protocol-pure. A controlled Rust integration crosses initialize/list/invoke,
   verifies least-privilege catalog versus invoke tokens, advances through the refresh margin and
   proves that neither the Identity session nor access tokens reach the MCP caller.
+
+## Superseded by
+
+`story:the-cli-bridges-mcp-over-stdio` in the AEP planning store, at
+`.engineering/planning/story/the-cli-bridges-mcp-over-stdio.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

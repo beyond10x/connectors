@@ -49,3 +49,11 @@ durable credential into Agent Platform, Devcenter, configuration, logs, or an ag
   lease is revoked before the new generation can be redeemed. This describes the 0.3.0 seam;
   [S-077](S-077-claude-subscriptions-connect-with-pkce-and-refresh.md) adds refresh-capable OAuth
   custody without changing the attempt-lease contract.
+
+## Superseded by
+
+`story:an-agent-attempt-can-lease-a-user-subscription` in the AEP planning store, at
+`.engineering/planning/story/an-agent-attempt-can-lease-a-user-subscription.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

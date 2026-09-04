@@ -77,3 +77,11 @@ safe path, which is why `auth status` exists rather than a documentation warning
 - End to end: `credential_store: keyring` in readiness, the GitLab credential present in the
   keyring with its address as attributes, and `gitlab-user-get` returning live data with no
   plaintext credential file on disk.
+
+## Superseded by
+
+`story:the-os-keyring-becomes-the-local-store` in the AEP planning store, at
+`.engineering/planning/story/the-os-keyring-becomes-the-local-store.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

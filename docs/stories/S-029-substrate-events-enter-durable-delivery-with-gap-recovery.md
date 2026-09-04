@@ -52,3 +52,11 @@ without pretending those guarantees are identical.
   required platform crates now exist, but stable adoption still requires an owner-signed Substrate
   bundle before the bridge is implemented. It is not blocked on an architectural owner or recovery
   decision.
+
+## Superseded by
+
+`story:substrate-events-enter-durable-delivery-with-gap-recovery` in the AEP planning store, at
+`.engineering/planning/story/substrate-events-enter-durable-delivery-with-gap-recovery.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

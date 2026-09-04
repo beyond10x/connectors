@@ -68,3 +68,11 @@ family.
 - Not done, deliberately: `If-None-Match`/304 handling (acceptance asks for the immutable
   content-hash header only) and the connect-session/oauth browser routes stay outside the
   machine contract.
+
+## Superseded by
+
+`story:the-server-serves-its-own-openapi-contract` in the AEP planning store, at
+`.engineering/planning/story/the-server-serves-its-own-openapi-contract.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -46,3 +46,11 @@ from proofs.
   `undeclared_facts()`. Still open, deliberately: declared risk/effects/idempotency facts do not
   yet travel with the description, and `SessionSignal` remains outside the Grant evaluator —
   neither is reachable by this story's parameterised-over-operations invariant.
+
+## Superseded by
+
+`story:effect-backends-trust-only-proofs` in the AEP planning store, at
+`.engineering/planning/story/effect-backends-trust-only-proofs.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

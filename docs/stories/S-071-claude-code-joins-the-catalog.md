@@ -61,3 +61,11 @@ path, without connectors ever being able to spend it.
 - `OAuth2Spec::public_client` and `OAuth2Spec::token_endpoint` stay unused. They exist for this
   vendor's flow (`crates/connector-spec/tests/main/oauth_token_endpoint.rs:1-13`) and the
   acquisition authority was withheld on purpose; design 16 reaffirms that.
+
+## Superseded by
+
+`story:claude-code-joins-the-catalog` in the AEP planning store, at
+`.engineering/planning/story/claude-code-joins-the-catalog.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

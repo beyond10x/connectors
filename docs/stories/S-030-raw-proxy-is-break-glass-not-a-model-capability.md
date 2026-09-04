@@ -37,3 +37,11 @@ mistaken for ordinary granted catalog execution.
   the M3 story require credential-bearing calls to use declared operations.
 - Remaining work is negative/fence coverage proving the unimplemented path cannot reappear; any
   later operator break-glass implementation must satisfy the conservative alternative above.
+
+## Superseded by
+
+`story:raw-proxy-is-break-glass-not-a-model-capability` in the AEP planning store, at
+`.engineering/planning/story/raw-proxy-is-break-glass-not-a-model-capability.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

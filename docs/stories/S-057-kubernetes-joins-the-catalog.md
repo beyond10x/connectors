@@ -37,3 +37,11 @@ projection, not an HTTP call.
 
 - 2026-08-24 — filed from Timo's "it's just HTTP" review of S-054; depends on the mcp-entry
   epic landing first (S-054 defines the pod-logs surface this story re-declares).
+
+## Superseded by
+
+`story:kubernetes-joins-the-catalog` in the AEP planning store, at
+`.engineering/planning/story/kubernetes-joins-the-catalog.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

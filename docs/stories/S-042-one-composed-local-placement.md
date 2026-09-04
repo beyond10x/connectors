@@ -72,3 +72,11 @@ and splitting it once serves all three.
 ## Depends on
 
 [S-041](S-041-state-becomes-a-port.md), because a uniform `Ports` struct needs state to be a port.
+
+## Superseded by
+
+`story:one-composed-local-placement` in the AEP planning store, at
+`.engineering/planning/story/one-composed-local-placement.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

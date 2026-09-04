@@ -48,3 +48,11 @@ Gate admission on the same `namespace_access.read_groups` as deployment status v
   in-cluster HTTP mapping is code-read only, parity with STATUS/RESTART; exact-128KiB logs
   over-claim truncation in the safe direction; above-limitBytes bodies refuse unavailable,
   matching the existing read posture).
+
+## Superseded by
+
+`story:pod-logs-are-a-hosted-read-only-kubernetes-operation` in the AEP planning store, at
+`.engineering/planning/story/pod-logs-are-a-hosted-read-only-kubernetes-operation.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

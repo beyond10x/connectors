@@ -79,3 +79,11 @@ gap it explains)."*
 - Related: [S-016](S-016-sources-are-processed-by-code.md) makes the *source* index checked in both
   directions; this makes the *operation* inventory checked in both directions. Same discipline, one
   level down.
+
+## Superseded by
+
+`story:coverage-regains-its-second-direction` in the AEP planning store, at
+`.engineering/planning/story/coverage-regains-its-second-direction.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -65,3 +65,11 @@ Declaring it would be **less** true than declaring nothing.
   supported discovered form rather than inventing one.
 - This is a `connector-spec`/schema change: it collides with any other story touching the same public
   surface, and should run solo or early in a wave.
+
+## Superseded by
+
+`story:header-name-rate-limit-retry` in the AEP planning store, at
+`.engineering/planning/story/header-name-rate-limit-retry.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -60,3 +60,11 @@ order-independent.
   16/17 line scanner's string-literal `//` limitation, a pre-existing shared mechanic). The
   verified-split was independently confirmed byte-identical (datasource) / call-site-only
   (operation); spoofing, evidence-not-demanded, retry-once and robustness probes all held.
+
+## Superseded by
+
+`story:the-hosted-server-speaks-mcp-through-the-admission-seam` in the AEP planning store, at
+`.engineering/planning/story/the-hosted-server-speaks-mcp-through-the-admission-seam.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

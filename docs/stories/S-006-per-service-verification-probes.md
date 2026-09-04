@@ -58,3 +58,11 @@ precedents analysis ordered by cost/benefit.
 - Domain model, Connection: the lifecycle is `created → authorized → callable`, with
   `degraded → reauthorize` repairing in place. This story is what makes the second arrow observable
   without a per-provider script.
+
+## Superseded by
+
+`story:per-service-verification-probes` in the AEP planning store, at
+`.engineering/planning/story/per-service-verification-probes.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

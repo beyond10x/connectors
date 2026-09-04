@@ -69,3 +69,11 @@ without any path by which connectors could spend it.
   (`authRequirement` is the one that exists), so the document failed to compile as a schema and
   every rule downstream of that `$ref` validated nothing. Pre-existing at `fee2d58`;
   `every_ref_resolves_to_a_declared_def` now catches it.
+
+## Superseded by
+
+`story:a-provider-can-hold-a-credential-it-cannot-spend` in the AEP planning store, at
+`.engineering/planning/story/a-provider-can-hold-a-credential-it-cannot-spend.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

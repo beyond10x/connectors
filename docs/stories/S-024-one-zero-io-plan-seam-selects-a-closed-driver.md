@@ -33,3 +33,11 @@ recompose grants, credentials, egress, redaction, and audit independently.
   deployment-selected permission subjects without credentials or IO.
 - `service::Dispatcher` is the closed HTTP/SIP application composition point and orders egress, redaction,
   audit, driver execution, and completion audit. Remaining work is the source/dependency fence.
+
+## Superseded by
+
+`story:one-zero-io-plan-seam-selects-a-closed-driver` in the AEP planning store, at
+`.engineering/planning/story/one-zero-io-plan-seam-selects-a-closed-driver.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

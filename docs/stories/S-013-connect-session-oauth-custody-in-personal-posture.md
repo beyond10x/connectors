@@ -67,3 +67,11 @@ connect-session contract every posture uses.
   onboarding without secret JSON).
 - Feeds [S-008](S-008-m3-connect-a-provider-and-invoke-it.md); until it is answered, the personal
   posture's acquisition half of M3 has no design.
+
+## Superseded by
+
+`story:connect-session-oauth-custody-in-personal-posture` in the AEP planning store, at
+`.engineering/planning/story/connect-session-oauth-custody-in-personal-posture.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.
