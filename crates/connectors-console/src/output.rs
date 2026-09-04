@@ -21,11 +21,15 @@
 //! five `ok` rows above it. So a list of records is rendered as one aligned row each, under a
 //! header, with the record's own rank in a marker column at the left.
 //!
-//! Two rules keep that honest. **Nothing is dropped**: a field that will not fit a cell is folded
-//! onto it rather than omitted, and `compact` spells a nested field out in full, because a format
-//! that quietly loses a field is worse than one that is hard to read. And **the rank is not
+//! Three rules keep that honest. **No field is dropped**: a field that will not fit a cell is
+//! folded onto it rather than omitted, and `compact` spells a nested field out in full, because a
+//! format that quietly loses a field is worse than one that is hard to read. **The rank is not
 //! carried by colour**: `+`, `!`, `x` and `?` survive a redirect, a pager and `NO_COLOR`, which is
-//! where an operator actually reads this.
+//! where an operator actually reads this. And **a row is one line and fits a terminal**: control
+//! characters are folded, and a table too wide for `TABLE_BUDGET` cuts its leading cells — with
+//! the cut marked, never silent — so that the last column starts on screen and every column before
+//! it is aligned there. That last rule is the one that trades text away, which is why it marks
+//! itself and why the cut never reaches `compact`, `json` or `yaml`.
 //!
 //! `json` and `yaml` are untouched by all of it. Their reader is a parser that has already
 //! committed to these bytes, and readability is not its problem.
@@ -42,7 +46,13 @@ pub enum Format {
     /// Indented key-and-value text for a person.
     #[default]
     Text,
-    /// One record per line, for `grep` and `wc -l`.
+    /// One record per line — every line a whole record, so `wc -l` counts records.
+    ///
+    /// A field the report carries *beside* its records rides on every record line rather than
+    /// taking a line of its own. A summary line spelled in the same `key=value` vocabulary is
+    /// indistinguishable from a record to `wc -l` and to an `awk -F\t` loop, and a line a script
+    /// has to learn to skip is worse than one it can read: `providers` answered 65 to `wc -l`
+    /// before this format carried its summary and must go on answering 65.
     Compact,
     /// Pretty-printed JSON.
     Json,
@@ -151,26 +161,39 @@ pub(crate) fn render(format: Format, value: &Value) -> Result<String, OutputErro
 /// them is what put `healthy` out of reach of `connectors -o compact doctor | grep healthy`, which
 /// printed nothing at all for a report whose whole purpose is to answer that one question.
 fn compact(value: &Value) -> String {
-    let mut lines = Vec::new();
-    match unwrap_single_array(value) {
-        Some(items) => {
-            // Only an object reaches here with siblings, and `unwrap_single_array` admitted it
-            // because exactly one of its fields is an array — so every non-array field is beside
-            // the records rather than one of them.
-            if let Value::Object(fields) = value {
-                let mut pairs = Vec::new();
-                for (key, field) in fields.iter().filter(|(_, field)| !field.is_array()) {
-                    flatten(key, field, &mut pairs);
-                }
-                if !pairs.is_empty() {
-                    lines.push(pairs.join("\t"));
-                }
-            }
-            lines.extend(items.iter().map(compact_line));
+    let Some(items) = unwrap_single_array(value) else {
+        return compact_line(value);
+    };
+
+    // Only an object reaches here with fields beside the records, and `unwrap_single_array`
+    // admitted it because exactly one of its fields is an array — so every non-array field is
+    // beside the records rather than one of them.
+    let mut beside = Vec::new();
+    if let Value::Object(fields) = value {
+        for (key, field) in fields.iter().filter(|(_, field)| !field.is_array()) {
+            flatten(key, field, &mut beside);
         }
-        None => lines.push(compact_line(value)),
     }
-    lines.join("\n")
+
+    // Nothing to ride on. An empty listing still carries its summary, and a format that answered
+    // an empty stream would have dropped it.
+    if items.is_empty() {
+        return beside.join("\t");
+    }
+
+    items
+        .iter()
+        .map(|item| {
+            let record = compact_line(item);
+            let mut pairs: Vec<&str> = Vec::new();
+            if !record.is_empty() {
+                pairs.push(&record);
+            }
+            pairs.extend(beside.iter().map(String::as_str));
+            pairs.join("\t")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn unwrap_single_array(value: &Value) -> Option<&Vec<Value>> {
@@ -277,11 +300,28 @@ fn is_record_list(items: &[Value]) -> bool {
             .all(|item| matches!(item, Value::Object(fields) if !fields.is_empty()))
 }
 
+/// The terminal a table is laid out for.
+///
+/// Not a guess at the real one: reading it would need a dependency this package does not have and
+/// an answer that does not exist when stdout is a pipe. 120 columns is the wide-but-ordinary
+/// terminal, and a table laid out for it is readable on a narrower one for every column that fits.
+const TABLE_BUDGET: usize = 120;
+
+/// The marker column: one glyph and one space, on every row of every table.
+const MARKER_WIDTH: usize = 2;
+
+/// The narrowest a column may be squeezed to before the layout gives up on it.
+///
+/// Three columns is an elision mark and two characters of content. Below that a column says
+/// nothing at all, and a column saying nothing is worse than a table that overruns.
+const MIN_COLUMN: usize = 3;
+
 /// One aligned row per record, under a header naming the columns.
 ///
-/// Where a record carries its own rank, the row opens with a marker column: `doctor` ranks its
-/// three states and the generic walker discarded that rank at the last inch, so one `warn` looked
-/// exactly like the five `ok` rows above it.
+/// Every row opens with a marker column: where a record carries its own rank the glyph is the
+/// rank, and where it does not the column is blank. Blank rather than absent, because a column
+/// that appears and disappears is a column a reader cannot trust — a `label` beginning `x ` would
+/// otherwise land exactly where `doctor` puts a failure.
 fn table(items: &[Value], depth: usize, buffer: &mut String) {
     let pad = "  ".repeat(depth);
 
@@ -308,8 +348,8 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
         .map(|(index, column)| {
             cells
                 .iter()
-                .map(|row| row[index].chars().count())
-                .chain(std::iter::once(column.chars().count()))
+                .map(|row| display_width(&row[index]))
+                .chain(std::iter::once(display_width(column)))
                 .max()
                 .unwrap_or_default()
         })
@@ -332,24 +372,61 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
         }
     }
 
-    let ranked = items.iter().any(|item| row_severity(item).is_some());
-    let header: Vec<String> = columns.iter().map(|column| (*column).to_owned()).collect();
-    write_row(
-        &pad,
-        if ranked { "  " } else { "" },
-        &header,
-        &widths,
-        buffer,
-    );
+    let mut header: Vec<String> = columns.iter().map(|column| (*column).to_owned()).collect();
+    fit_to_budget(&header, &mut widths, pad.len());
+    // Only the leading columns are capped, and only after the budget is settled. The last column
+    // is deliberately unbounded: it holds the free text — `doctor`'s `detail` is the sentence that
+    // says what to do about the row — and a line that wraps inside its last cell still leaves
+    // every column before it aligned on screen. Capping it would cut the one field worth reading.
+    let leading = widths.len().saturating_sub(1);
+    for index in 0..leading {
+        header[index] = elide(&header[index], widths[index]);
+        for row in &mut cells {
+            row[index] = elide(&row[index], widths[index]);
+        }
+    }
+
+    write_row(&pad, "  ", &header, &widths, buffer);
     for (item, row) in items.iter().zip(&cells) {
-        let marker = if ranked {
-            // A ranked table whose row carries no rank keeps the column and leaves it blank, so
-            // every row still starts in the same place.
-            format!("{} ", row_severity(item).map_or(' ', Severity::marker))
-        } else {
-            String::new()
-        };
+        let marker = format!("{} ", row_severity(item).map_or(' ', Severity::marker));
         write_row(&pad, &marker, row, &widths, buffer);
+    }
+}
+
+/// Squeeze the leading columns until the last one starts inside the budget.
+///
+/// Moving the widest column last cannot fix a wide table on its own: `connectors providers` has
+/// eleven columns before the moved one and they came to 196 terminal columns between them, so
+/// every row wrapped and nothing after the first column was aligned. So the leading columns give
+/// up width, widest first, in two phases — **the cells give way before the column names do**,
+/// because the name is what makes the rest of the row mean anything, and a nameless column is a
+/// worse table than a truncated cell. Only when the names alone still overrun does the second
+/// phase cut them too, down to [`MIN_COLUMN`].
+fn fit_to_budget(header: &[String], widths: &mut [usize], pad: usize) {
+    let Some(leading) = widths.len().checked_sub(1).filter(|count| *count > 0) else {
+        return;
+    };
+    let names: Vec<usize> = header.iter().map(|name| display_width(name)).collect();
+    for floors in [
+        names.clone(),
+        names.iter().map(|name| (*name).min(MIN_COLUMN)).collect(),
+    ] {
+        loop {
+            let start = pad + MARKER_WIDTH + widths[..leading].iter().map(|w| w + 2).sum::<usize>();
+            if start <= TABLE_BUDGET {
+                return;
+            }
+            // The widest column that can still give, earliest one first on a tie, one column at a
+            // time — so the columns end up as even as the budget allows rather than one of them
+            // being cut to nothing.
+            let Some(target) = (0..leading)
+                .filter(|index| widths[*index] > floors[*index])
+                .max_by_key(|index| (widths[*index], std::cmp::Reverse(*index)))
+            else {
+                break;
+            };
+            widths[target] -= 1;
+        }
     }
 }
 
@@ -360,15 +437,15 @@ fn write_row(pad: &str, marker: &str, cells: &[String], widths: &[usize], buffer
         if index > 0 {
             line.push_str("  ");
         }
-        // The last column is never padded: trailing spaces are invisible to a reader and a
-        // nuisance to everything else.
-        if index + 1 == cells.len() {
-            line.push_str(cell);
-        } else {
-            let _ = write!(line, "{cell:<width$}", width = widths[index]);
+        line.push_str(cell);
+        // The last column is never padded: no cell is ever empty, so nothing here can leave a line
+        // ending in whitespace.
+        if index + 1 < cells.len() {
+            let used = display_width(cell);
+            line.push_str(&" ".repeat(widths[index].saturating_sub(used)));
         }
     }
-    let _ = writeln!(buffer, "{}", line.trim_end());
+    let _ = writeln!(buffer, "{line}");
 }
 
 /// The one column wider than every other, if there is one.
@@ -380,6 +457,56 @@ fn strictly_widest(widths: &[usize]) -> Option<usize> {
         .filter(|(_, width)| **width == widest);
     let (index, _) = widest_columns.next()?;
     widest_columns.next().is_none().then_some(index)
+}
+
+/// How many terminal columns a string occupies, which is not how many `char`s it holds.
+///
+/// A CJK or fullwidth character is two columns wide, so counting `char`s displaces every later
+/// column on that row by one per wide character — reachable through any value chosen elsewhere,
+/// such as a Grafana target's label or the free-form `instance` of `auth status`.
+///
+/// The East Asian Wide and Fullwidth ranges, and no more: this package has no width table and is
+/// not going to grow one. A combining mark still counts as a column it does not occupy, and an
+/// emoji sequence counts as one column per code point; both are wrong and both are rarer than the
+/// case this fixes. Control characters cannot reach here — [`one_line`] has already folded them.
+fn display_width(text: &str) -> usize {
+    text.chars()
+        .map(|character| {
+            let code = character as u32;
+            let wide = (0x1100..=0x115F).contains(&code)
+                || (0x2E80..=0xA4CF).contains(&code)
+                || (0xAC00..=0xD7A3).contains(&code)
+                || (0xF900..=0xFAFF).contains(&code)
+                || (0xFE30..=0xFE6F).contains(&code)
+                || (0xFF00..=0xFF60).contains(&code)
+                || (0xFFE0..=0xFFE6).contains(&code);
+            usize::from(wide) + 1
+        })
+        .sum()
+}
+
+/// Cut a cell to `width` terminal columns, saying so.
+///
+/// The mark is what makes this honest: a silently truncated value reads as the whole value, and a
+/// reader who cannot see that text was cut has no reason to go and look at `-o json`, which still
+/// carries all of it.
+fn elide(text: &str, width: usize) -> String {
+    if display_width(text) <= width {
+        return text.to_owned();
+    }
+    let mut cut = String::new();
+    let mut used = 0;
+    for character in text.chars() {
+        let next = used + display_width(character.encode_utf8(&mut [0; 4]));
+        // One column is kept back for the mark itself.
+        if next + 1 > width {
+            break;
+        }
+        cut.push(character);
+        used = next;
+    }
+    cut.push('…');
+    cut
 }
 
 /// One cell.
@@ -407,6 +534,10 @@ fn inline(value: &Value) -> String {
                 .join(" ");
             format!("{{{pairs}}}")
         }
+        // An empty string is a value the record carries, and a cell showing nothing shows the same
+        // as a row that is not there — a record whose every field is empty rendered as a blank
+        // line. Named, like the empty list and the empty object beside it.
+        Value::String(text) if text.is_empty() => "\"\"".to_owned(),
         scalar_value => scalar(scalar_value),
     }
 }
@@ -477,18 +608,20 @@ fn severity_of(value: &Value) -> Severity {
 /// `Unknown`. The words are `doctor`'s three (`doctor.rs`), `auth status`'s four states and its
 /// three credential states (`auth.rs`), and the ordinary spellings of the same three ranks.
 ///
-/// `absent` and `unavailable` are warnings rather than failures on `auth.rs`'s own reasoning: a
-/// credential that was never stored is the ordinary state before `connect`, and a store that
-/// cannot be read is "we cannot say" rather than "it is not there".
+/// `absent`, `unavailable` and `not-callable` are warnings rather than failures on `auth.rs`'s own
+/// reasoning: a credential that was never stored is the ordinary state before `connect`, and a
+/// store that cannot be read is "we cannot say" rather than "it is not there". `not-callable` is
+/// set by exactly that state (`auth.rs`, `if satisfied.is_empty()`), so ranking it `fail` marked
+/// every configured provider on a fresh install as broken. `no-authority` and `unknown-provider`
+/// stay failures: those two are a configuration that cannot be made to work by connecting it.
 fn severity_of_word(word: &str) -> Severity {
     match word {
         "ok" | "healthy" | "ready" | "pass" | "passed" | "callable" | "stored" | "listening"
         | "connected" => Severity::Ok,
-        "warn" | "warning" | "degraded" | "absent" | "missing" | "unavailable" | "pending" => {
-            Severity::Warn
-        }
-        "fail" | "failed" | "error" | "refused" | "unhealthy" | "not-ready" | "not-callable"
-        | "no-authority" | "unknown-provider" => Severity::Fail,
+        "warn" | "warning" | "degraded" | "absent" | "missing" | "unavailable" | "pending"
+        | "not-callable" => Severity::Warn,
+        "fail" | "failed" | "error" | "refused" | "unhealthy" | "not-ready" | "no-authority"
+        | "unknown-provider" => Severity::Fail,
         _ => Severity::Unknown,
     }
 }
@@ -496,10 +629,43 @@ fn severity_of_word(word: &str) -> Severity {
 /// A scalar without JSON's quotes, which a person reading a terminal did not ask for.
 fn scalar(value: &Value) -> String {
     match value {
-        Value::String(text) => text.clone(),
+        Value::String(text) => one_line(text),
         Value::Null => "null".to_owned(),
         other => other.to_string(),
     }
+}
+
+/// One line, whatever the value had in it.
+///
+/// **The layout of both human formats rests on a value being one line, and nothing upstream
+/// guarantees that.** `toml::de::Error` renders a six-line caret diagram, `doctor` folds it into a
+/// check's `detail`, and a TOML typo is the single most likely reason anyone runs `doctor` at all:
+/// one record became six lines, five of them with nothing in the marker column. The same newline
+/// breaks `compact`'s one-record-per-line contract, and this is the one place both formats pass
+/// through.
+///
+/// Every control character is folded, not only the newline: `ESC` reaches here from any value
+/// chosen on the far side of a wire, and a terminal reads an escape sequence rather than printing
+/// it. A backslash is deliberately *not* escaped — a Windows path would pay for it on every line —
+/// so a folded `\n` is not distinguishable from a value that really held those two characters.
+/// `-o json` is the format that answers that question exactly.
+fn one_line(text: &str) -> String {
+    if !text.chars().any(char::is_control) {
+        return text.to_owned();
+    }
+    let mut folded = String::with_capacity(text.len());
+    for character in text.chars() {
+        match character {
+            '\n' => folded.push_str("\\n"),
+            '\r' => folded.push_str("\\r"),
+            '\t' => folded.push_str("\\t"),
+            control if control.is_control() => {
+                let _ = write!(folded, "\\u{{{:02x}}}", control as u32);
+            }
+            ordinary => folded.push(ordinary),
+        }
+    }
+    folded
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -758,13 +924,27 @@ mod tests {
     #[test]
     fn compact_keeps_the_scalar_a_list_response_carries_beside_its_records() {
         // `connectors -o compact doctor | grep -c healthy` printed 0: the single array was
-        // unwrapped and every scalar beside it was discarded.
+        // unwrapped and every scalar beside it was discarded. It rides on every record line rather
+        // than taking one of its own, because a line of its own is a line `wc -l` counts as a
+        // record and `awk` reads as one.
         let rendered = render(Format::Compact, &doctor_report()).unwrap();
-        assert!(
-            rendered.lines().any(|line| line.contains("healthy=false")),
-            "\n{rendered}"
-        );
-        assert_eq!(rendered.lines().count(), 4, "\n{rendered}");
+        assert_eq!(rendered.lines().count(), 3, "\n{rendered}");
+        for line in rendered.lines() {
+            assert!(line.contains("healthy=false"), "\n{rendered}");
+            assert!(line.contains("check="), "\n{rendered}");
+        }
+    }
+
+    #[test]
+    fn an_empty_listing_still_carries_the_summary_it_was_counted_with() {
+        // No record to ride on. Answering with an empty stream would drop the one field that says
+        // the listing really is empty rather than the command having failed.
+        let rendered = render(
+            Format::Compact,
+            &json!({"providers": [], "summary": {"listed": 0}}),
+        )
+        .unwrap();
+        assert_eq!(rendered, "summary.listed=0");
     }
 
     #[test]
@@ -845,11 +1025,18 @@ mod tests {
     #[test]
     fn every_status_word_this_package_emits_is_one_the_renderer_can_rank() {
         // The class, checked rather than listed: a marker column is only worth reading if every
-        // word that can appear under a severity key has a rank. A hand-kept list would need an
-        // adversary to extend it, so the package's own sources are the list — every string literal
-        // written at a `"status":`, `"state":` or `"severity":` key must rank as something other
-        // than unknown. Bounded on purpose: a word assigned through a variable
-        // (`auth.rs`'s credential `state`) is invisible here, and `doctor.rs` covers its own three.
+        // word that can appear under a severity key has a rank, and a hand-kept list of words
+        // would need an adversary to extend it.
+        //
+        // What this actually guards, exactly, because it reads less than its name suggests: a
+        // string literal written **on the same line as** a `"status":`, `"state":` or
+        // `"severity":` key, in a non-comment line of a `.rs` file directly under this package's
+        // own `src/`. It does not follow a variable (`auth.rs` assigns its credential `state` from
+        // one, so `stored`/`absent`/`unavailable` are ranked by hand instead), does not read a
+        // `json!` block whose key and value are on different lines, does not recurse into a
+        // subdirectory, and does not read any other package — the renderer is shared with results
+        // that come off the wire and their vocabulary is out of its reach, which is what the
+        // `Unknown` rank exists for. `doctor.rs` covers its own three states end to end.
         let sources = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut found = 0_usize;
         for entry in std::fs::read_dir(&sources).expect("the package's own sources") {
@@ -876,6 +1063,237 @@ mod tests {
             found >= 6,
             "the scan ranked {found} words; it has stopped reading the sources"
         );
+    }
+
+    #[test]
+    fn a_cell_never_carries_a_character_that_breaks_the_row() {
+        // The class behind the `doctor` defect: both human formats lay a record out as one line,
+        // and nothing upstream promises a value is one line. `toml::de::Error` renders a six-line
+        // caret diagram and `doctor` folds it into a `detail`, so a TOML typo — the single most
+        // likely reason to run `doctor` — turned one check into six lines with nothing in the
+        // marker column. Checked over every control character rather than the newline alone: ESC
+        // reaches a cell from any value chosen on the far side of a wire.
+        for code in (0..0x20_u32).chain([0x7f, 0x9b]) {
+            let control = char::from_u32(code).expect("a control character");
+            let value = json!({"rows": [
+                {"name": "first", "detail": format!("before{control}after")},
+                {"name": "second", "detail": "plain"},
+            ]});
+
+            let text = render(Format::Text, &value).unwrap();
+            assert_eq!(
+                text.lines().count(),
+                4,
+                "U+{code:04X} in a cell spread one record over more than one row:\n{text:?}"
+            );
+            assert!(
+                !text
+                    .chars()
+                    .any(|glyph| glyph.is_control() && glyph != '\n'),
+                "U+{code:04X} reached the terminal unfolded:\n{text:?}"
+            );
+
+            let compact = render(Format::Compact, &value).unwrap();
+            assert_eq!(
+                compact.lines().count(),
+                2,
+                "U+{code:04X} in a value broke one record per line:\n{compact:?}"
+            );
+            for line in compact.lines() {
+                // Two fields, so exactly one separator. A tab inside a value would hand an
+                // `awk -F'\t'` loop a field that is not there, which is the same defect as the
+                // newline wearing different clothes.
+                assert_eq!(
+                    line.matches('\t').count(),
+                    1,
+                    "U+{code:04X} in a value became a field separator:\n{line:?}"
+                );
+                assert!(
+                    !line
+                        .chars()
+                        .any(|glyph| glyph.is_control() && glyph != '\t'),
+                    "U+{code:04X} reached the terminal unfolded:\n{line:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_widest_column_moves_last_even_when_the_record_puts_it_first() {
+        // The reordering is the table's headline: without it a free-text column in the middle
+        // pushes every column after it off the screen. Asserted on a record that carries the wide
+        // column *first*, because a record that already carries it last cannot tell the difference.
+        let rendered = render(
+            Format::Text,
+            &json!({"rows": [{"detail": "a long free-text value", "name": "n", "status": "ok"}]}),
+        )
+        .unwrap();
+        assert_eq!(
+            rendered,
+            concat!(
+                "rows:\n",
+                "    name  status  detail\n",
+                "  + n     ok      a long free-text value\n",
+            )
+        );
+    }
+
+    #[test]
+    fn columns_of_equal_width_keep_the_order_the_record_carries() {
+        // Only a column that is *strictly* the widest moves. Two columns of the same width have no
+        // reason to be reordered, and reordering one of them would scramble the record's own order
+        // for nothing.
+        let rendered =
+            render(Format::Text, &json!({"rows": [{"a": "xxxx", "b": "yyyy"}]})).unwrap();
+        assert_eq!(
+            rendered,
+            concat!("rows:\n", "    a     b\n", "    xxxx  yyyy\n")
+        );
+    }
+
+    #[test]
+    fn a_field_a_record_does_not_carry_reads_as_absent_rather_than_blank() {
+        // A record list is not always uniform. An empty cell would read as "the value is empty";
+        // `-` reads as "this record has no such field", which is the true answer and a different
+        // one.
+        let rendered = render(
+            Format::Text,
+            &json!({"rows": [
+                {"name": "first", "note": "a longer note"},
+                {"name": "second"},
+            ]}),
+        )
+        .unwrap();
+        assert_eq!(
+            rendered,
+            concat!(
+                "rows:\n",
+                "    name    note\n",
+                "    first   a longer note\n",
+                "    second  -\n",
+            )
+        );
+    }
+
+    #[test]
+    fn no_cell_is_ever_empty_so_no_row_can_end_in_whitespace() {
+        // The invariant the row writer rests on. Every empty value has a name — `""`, `(none)`,
+        // `(empty)`, `null`, `-` — so a record whose every field is empty is still a row on screen
+        // rather than a blank line, and the unpadded last column cannot leave trailing space.
+        for value in [
+            json!(""),
+            json!({}),
+            json!([]),
+            json!(null),
+            json!(0),
+            json!(false),
+            json!([""]),
+            json!({"k": ""}),
+        ] {
+            assert!(!inline(&value).is_empty(), "{value} inlined to nothing");
+        }
+        let rendered = render(
+            Format::Text,
+            &json!({"rows": [{"a": "", "b": {}, "c": [], "d": null}]}),
+        )
+        .unwrap();
+        for line in rendered.lines() {
+            assert!(!line.trim().is_empty(), "a blank line:\n{rendered:?}");
+            assert_eq!(line, line.trim_end(), "trailing space:\n{rendered:?}");
+        }
+    }
+
+    #[test]
+    fn an_unranked_table_still_keeps_the_marker_column() {
+        // The marker column is not conditional. A first cell beginning `x ` would otherwise land
+        // exactly where a ranked table puts a failure, in the one position a reader has been
+        // taught to read as severity.
+        let rendered = render(
+            Format::Text,
+            &json!({"rows": [{"label": "x marks the spot", "target": "connection:prom:a"}]}),
+        )
+        .unwrap();
+        for line in rendered.lines().skip(1) {
+            assert_eq!(
+                line.chars().nth(2),
+                Some(' '),
+                "an unranked row put something in the marker column:\n{rendered}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_wide_character_cell_keeps_the_column_after_it_aligned() {
+        // Widths are terminal columns, not `char`s. A CJK or fullwidth character is two columns, so
+        // counting characters displaces every later column on that row — reachable through any
+        // value chosen elsewhere, such as a Grafana target's label.
+        let rendered = render(
+            Format::Text,
+            &json!({"rows": [
+                {"label": "本番Prometheus", "target": "integration:prometheus"},
+                {"label": "staging", "target": "integration:prometheus"},
+            ]}),
+        )
+        .unwrap();
+        let offsets: Vec<usize> = rendered
+            .lines()
+            .filter_map(|line| {
+                line.find("integration:prometheus")
+                    .map(|byte| display_width(&line[..byte]))
+            })
+            .collect();
+        assert_eq!(offsets.len(), 2, "\n{rendered}");
+        assert_eq!(offsets[0], offsets[1], "\n{rendered}");
+    }
+
+    #[test]
+    fn a_table_too_wide_for_a_terminal_starts_its_last_column_inside_the_budget() {
+        // Moving the widest column last cannot fix a wide table: `connectors providers` had eleven
+        // columns before the moved one and they came to 196 terminal columns between them, so every
+        // row wrapped and nothing after the first column was aligned. Asserted on the real
+        // catalogue, which is the table that produced the number.
+        for value in [
+            crate::providers::run(""),
+            json!({"rows": [(0..12)
+                .map(|index| (format!("column_{index:02}"), json!("x".repeat(40))))
+                .collect::<Map<String, Value>>()]}),
+        ] {
+            let rendered = render(Format::Text, &value).unwrap();
+            let header = rendered.lines().nth(1).expect("a header");
+            let last = header
+                .rsplit("  ")
+                .find(|name| !name.is_empty())
+                .expect("a last column");
+            let start = header.rfind(last).expect("where it begins");
+            assert!(
+                display_width(&header[..start]) <= TABLE_BUDGET,
+                "the last column starts at terminal column {}:\n{header}",
+                display_width(&header[..start])
+            );
+        }
+    }
+
+    #[test]
+    fn a_cell_the_budget_cut_says_so_and_the_column_names_are_cut_last() {
+        // Two claims. A cut cell carries the mark, because a silently truncated value reads as the
+        // whole value and gives its reader no reason to go and look at `-o json`. And the cells
+        // give way before the column names do: a nameless column makes every cell in it
+        // meaningless, so the names are the last thing the layout spends.
+        let rendered = render(Format::Text, &crate::providers::run("")).unwrap();
+        let header = rendered.lines().nth(1).expect("a header");
+        for name in ["authority", "provider", "vendor", "verify", "credentials"] {
+            assert!(
+                header.contains(name),
+                "the layout cut the column name `{name}` while cells still had width:\n{header}"
+            );
+        }
+        assert!(
+            rendered.lines().skip(2).any(|line| line.contains('…')),
+            "nothing was marked as cut in a table that does not fit:\n{header}"
+        );
+        // Nothing is lost by it: the structured formats still carry the whole value.
+        let json = render(Format::Json, &crate::providers::run("")).unwrap();
+        assert!(!json.contains('…'));
     }
 
     /// Every string literal written as the value of a severity key on one line of Rust source.
