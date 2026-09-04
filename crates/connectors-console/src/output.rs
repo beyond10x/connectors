@@ -698,8 +698,23 @@ fn severity_of_word(word: &str) -> Severity {
     match word {
         "ok" | "healthy" | "ready" | "pass" | "passed" | "callable" | "stored" | "listening"
         | "connected" | "completed" => Severity::Ok,
-        "warn" | "warning" | "degraded" | "absent" | "missing" | "unavailable" | "pending"
-        | "not-callable" | "created" | "authorized" | "starting" | "reconnecting" => Severity::Warn,
+        // `stored-without-user-half` arrived with `[catalog.usernames]` and was caught by the
+        // scan below rather than by review: the secret is in the keyring and the non-secret user
+        // half is not, so every call refuses until an operator writes one config line. That is the
+        // same shape as `not-callable` and `absent` — fixable, and not the glyph for cannot work.
+        "warn"
+        | "warning"
+        | "degraded"
+        | "absent"
+        | "missing"
+        | "unavailable"
+        | "pending"
+        | "not-callable"
+        | "stored-without-user-half"
+        | "created"
+        | "authorized"
+        | "starting"
+        | "reconnecting" => Severity::Warn,
         "fail" | "failed" | "error" | "refused" | "unhealthy" | "not-ready" | "no-authority"
         | "unknown-provider" | "revoked" | "stopped" | "expired" => Severity::Fail,
         _ => Severity::Unknown,
