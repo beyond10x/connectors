@@ -48,7 +48,7 @@
     ]
   ],
   "description": "Argo CD: inspect Applications, their live resources, drift and sync windows, and sync, roll back or terminate a deployment",
-  "generator": "connectors 0.5.10",
+  "generator": "connectors 0.5.11",
   "operations": [
     {
       "auth": [
