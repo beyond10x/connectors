@@ -52,7 +52,7 @@
     ]
   ],
   "description": "Okta identity management: read users and groups in an org, read a user's group memberships, and deactivate a user",
-  "generator": "connectors 0.6.1",
+  "generator": "connectors 0.6.2",
   "operations": [
     {
       "auth": [

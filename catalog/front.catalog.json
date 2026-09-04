@@ -36,7 +36,7 @@
     ]
   ],
   "description": "Front shared inbox: read and reply to conversations, and tag them",
-  "generator": "connectors 0.6.1",
+  "generator": "connectors 0.6.2",
   "operations": [
     {
       "auth": [
