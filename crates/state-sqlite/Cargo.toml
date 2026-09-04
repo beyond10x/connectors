@@ -2,7 +2,7 @@
 name = "state-sqlite"
 description = "SQLite-backed Connector state cells: in-memory for tests, a file for a workstation."
 edition = "2021"
-version = "0.6.1"
+version = "0.6.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
