@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:informative-command-readability
 kind: story
-status: active
+status: implemented
 title: Informative subcommands render as a scannable report, not a JSON dump
 summary: doctor, providers and auth status share one generic pretty-printer that spends 26 lines on 6 checks, hides the one warning among the ok rows, and drops fields in compact.
 scope:
@@ -10,7 +10,13 @@ scope:
   path: crates/connectors-console/src/doctor.rs
 - confidence: cited
   path: crates/connectors-console/src/output.rs
-revision: 4
+- confidence: cited
+  path: crates/connectors-console/src/output_tests.rs
+- confidence: cited
+  path: crates/connectors-console/tests/adversary_readability.rs
+- confidence: cited
+  path: crates/connectors-console/tests/adversary_readability_pass2.rs
+revision: 9
 ---
 ## Context
 
@@ -48,12 +54,22 @@ format drops a field the value carries, and the bytes of `-o json` and `-o yaml`
 
 ## Scope
 
-- `crates/connectors-console/src/output.rs` — the renderer. `text` gains a table form for an array
-  of uniform objects; `compact` stops discarding scalar siblings.
-- `crates/connectors-console/src/doctor.rs` — if severity needs to reach the renderer as more than
-  the string `"ok"`.
-- No change to `crates/connectors-cli` — the frontend passes a value and a format, and that is the
-  right seam. The thin-frontend line cap does not move for this story.
+Confirmed by the implementor across three rounds; both lines were `cited` and both held.
+
+| path | confidence | what the wave learned |
+|---|---|---|
+| `crates/connectors-console/src/output.rs` | cited, confirmed | carried every one of the 19 findings both adversary passes raised. Split during integration into `output.rs` (761 lines) and `output_tests.rs` (799), because the module-size fence refuses 1500 |
+| `crates/connectors-console/src/doctor.rs` | cited, confirmed | touched in round 1 only; the final round needed no change here |
+
+Surfaces the story did not name and the wave added:
+
+| path | why |
+|---|---|
+| `crates/connectors-console/src/output_tests.rs` | new; the renderer's tests, split out at integration |
+| `crates/connectors-console/tests/adversary_readability.rs` | new; adversary pass 1, 7 cases |
+| `crates/connectors-console/tests/adversary_readability_pass2.rs` | new; adversary pass 2, 5 cases |
+| `crates/connectors-console/Cargo.lock` | its path pins still read 0.4.1 against manifests at 0.5.8, so `--locked` refused to start |
+| `scripts/gate.sh`, `AGENTS.md` | coordinator's, not the unit's: the package was in no gate lane |
 
 ## Notes
 

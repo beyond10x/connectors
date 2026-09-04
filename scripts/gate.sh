@@ -5,8 +5,8 @@
 # `bash scripts/gate.sh` with no argument runs everything, which is what a
 # developer wants and what this script has always done. The three flags exist so
 # CI can shard the same work without keeping a second copy of the workspace
-# list: the eleven workspaces do not share a `target/` directory, and building
-# all of them on one runner needs about 39 GB, which no hosted runner has. A
+# list: the twelve workspaces do not share a `target/` directory, and building
+# all of them on one runner needs about 41 GB, which no hosted runner has. A
 # second list in a workflow file would be a list that drifts.
 #
 #   --list-workspaces   print the workspaces, one per line, for a CI matrix
@@ -19,6 +19,7 @@ workspaces=(
   .
   crates/connectors-runtime
   crates/connectors-cli
+  crates/connectors-console
   crates/driver-audio
   crates/driver-speech
   crates/driver-cdp
