@@ -9,6 +9,23 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.6.1 — 2026-09-05
+
+### Added
+
+- Add an internal TLS Smart Git byte plane that creates short-lived, read-only fetch sessions for
+  one currently admitted GitLab project, provider default branch, and exact commit. Identity,
+  Connection, Grant, project membership, branch and commit are revalidated at creation while the
+  provider credential remains inside Connectors.
+- Add the official hosted-client operation for creating a bounded Git fetch session. Stable
+  idempotent locators survive retries while authorization and expiry rotate independently.
+
+### Security
+
+- Bound Git sessions by lifetime, depth, request count, transferred bytes, concurrent actor/global
+  sessions, TLS handshakes and idle deadlines. Upload-pack is the only admitted Git service;
+  protocol v2 and legacy grants without durable grant provenance fail closed.
+
 ## 0.6.0 — 2026-09-05
 
 Every first-level word of the shipped binary moves, and bare `connectors serve` stops starting the

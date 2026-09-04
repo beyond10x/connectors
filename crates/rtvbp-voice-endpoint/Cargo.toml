@@ -2,7 +2,7 @@
 name = "rtvbp-voice-endpoint"
 description = "Voice-side b10x.voice.v1 RTVBP binding over the neutral TelephonySession port."
 edition = "2021"
-version = "0.6.0"
+version = "0.6.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
