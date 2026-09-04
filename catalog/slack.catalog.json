@@ -398,7 +398,7 @@
       "wire_value": "message"
     }
   ],
-  "generator": "connectors 0.5.8",
+  "generator": "connectors 0.5.9",
   "operations": [
     {
       "auth": [
