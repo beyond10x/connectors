@@ -541,14 +541,18 @@ fn no_shipped_provider_gives_a_secret_field_an_example() {
     assert!(secrets > 0, "no secret configuration field was checked");
 }
 
-/// The four templated providers, named. This is the list the `SCHEMA GAP:` comments used to live in,
-/// and it is here so that a fifth templated provider arriving without a config field is a failure
+/// The templated providers, named. This is the list the `SCHEMA GAP:` comments used to live in,
+/// and it is here so that another templated provider arriving without a config field is a failure
 /// with a name attached rather than only a generic one.
+///
+/// **Jira and Confluence left this list on 2026-09-04** and are pinned by
+/// [`the_atlassian_connectors_address_the_cloud_gateway_by_id`] instead: they no longer template a
+/// tenant's own host, because that host answers a service-account credential with an empty world
+/// rather than a refusal. What they template now is the cloud id.
 #[test]
-fn the_four_tenant_providers_ask_for_their_tenant() {
+fn the_templated_providers_ask_for_their_tenant() {
     for (provider, field, format) in [
         ("zendesk", "subdomain", Format::Subdomain),
-        ("jira", "site", Format::Subdomain),
         ("shopify", "shop", Format::Subdomain),
         ("freshdesk", "domain", Format::Hostname),
     ] {
@@ -1251,6 +1255,65 @@ also_binds = ["header.X-Acme-Token"]
             "a credential that also lands in a header must be refused by the `secret`/`binds` \
              agreement with `secret = {secret}`, because the two destinations disagree about what \
              the value is:\n{error}"
+        );
+    }
+}
+
+/// **Both Atlassian connectors address the Cloud gateway by cloud id**, and neither templates the
+/// tenant's own `*.atlassian.net` host.
+///
+/// The regression this pins is silent, which is why it is pinned by name. Measured on one tenant on
+/// 2026-09-04 with a service-account API token, `/rest/api/3/project/search` answered HTTP 200 with
+/// `total: 0` against the site host and HTTP 200 with `total: 40` against the gateway. A connector
+/// pointed at the site host would therefore report an empty Jira rather than a refusal anyone could
+/// act on — so "which host" is a correctness property of this catalogue, not an operator preference.
+#[test]
+fn the_atlassian_connectors_address_the_cloud_gateway_by_id() {
+    for (provider, prefix) in [
+        ("jira", "https://api.atlassian.com/ex/jira/{cloud_id}"),
+        (
+            "confluence",
+            "https://api.atlassian.com/ex/confluence/{cloud_id}/wiki",
+        ),
+    ] {
+        let connector = shipped(provider);
+        assert_eq!(
+            connector.base_url, prefix,
+            "{provider} must address the cloud gateway"
+        );
+        let declared = connector
+            .config_field("cloud_id")
+            .unwrap_or_else(|| panic!("{provider} must ask for the cloud id"));
+        assert_eq!(declared.binds, "endpoint.cloud_id");
+        assert!(declared.required, "the base URL cannot compose without it");
+        assert!(!declared.secret, "a cloud id is a public tenant id");
+        assert!(
+            connector.config_field("site").is_none(),
+            "{provider} must not still offer the site route it cannot serve"
+        );
+    }
+}
+
+/// **The deployment-owned service account leads both Atlassian connectors' mechanism order.**
+///
+/// `default_auth` is a preference, not a set: a host takes the first mechanism whose credentials all
+/// resolve. An integration that will be deployed must not authenticate as whichever person happened
+/// to install it, so the service-account token is first and a personal token remains an alternative.
+#[test]
+fn the_atlassian_connectors_prefer_their_service_account() {
+    for (provider, first) in [
+        ("jira", "jira.service_api_token"),
+        ("confluence", "confluence.service_api_token"),
+    ] {
+        let connector = shipped(provider);
+        let leading = connector
+            .default_auth
+            .first()
+            .unwrap_or_else(|| panic!("{provider} declares a default mechanism"));
+        assert_eq!(
+            leading.credentials().first().map(String::as_str),
+            Some(first),
+            "{provider}'s first mechanism must be the deployment-owned service account"
         );
     }
 }
