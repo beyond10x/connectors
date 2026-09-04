@@ -51,6 +51,10 @@ use crate::transport::{
     http_request,
 };
 
+#[path = "git_fetch.rs"]
+mod git_fetch;
+use git_fetch::GitFetchSessionRecord;
+
 pub(crate) const INTEGRATION_REF: &str = "gitlab";
 pub(crate) const AUTHORITY: &str = "com.gitlab.api";
 const SERVICE: &str = "default";
@@ -107,6 +111,7 @@ impl GitlabError {
 }
 
 /// Hosted GitLab Integration for one Identity tenant.
+#[derive(Clone)]
 pub struct GitlabBackend {
     inner: Arc<GitlabInner>,
 }
@@ -125,6 +130,7 @@ pub(crate) struct GitlabInner {
     oauth_states: Mutex<PendingStates<OAuthPending>>,
     completion_lock: tokio::sync::Mutex<()>,
     refresh_lock: tokio::sync::Mutex<()>,
+    git_fetch_sessions: Mutex<BTreeMap<String, GitFetchSessionRecord>>,
     egress: Arc<dyn EgressTransport>,
 }
 
@@ -174,6 +180,8 @@ struct StoredConnection {
     connection_ref: String,
     instance_id: String,
     label: String,
+    #[serde(default)]
+    grant_ref: String,
     owner_subject: String,
     external_user_id: u64,
     username: String,
@@ -268,6 +276,17 @@ impl GitlabBackend {
         {
             return Err(GitlabError::new("connection-state"));
         }
+        // A row written before explicit Grant binding has no evidence naming which Grant admitted
+        // its credential. Binding it to today's deployment value would silently re-authorize old
+        // custody after a policy change. The operator must reconnect it under current authority.
+        if metadata
+            .connections
+            .iter()
+            .chain(metadata.pending.iter().map(|pending| &pending.connection))
+            .any(|connection| connection.grant_ref.is_empty())
+        {
+            return Err(GitlabError::new("connection-state"));
+        }
         let inner = Arc::new(GitlabInner {
             tenant_id,
             policy,
@@ -285,6 +304,7 @@ impl GitlabBackend {
             oauth_states: Mutex::new(PendingStates::new(DEFAULT_PENDING_CAPACITY)),
             completion_lock: tokio::sync::Mutex::new(()),
             refresh_lock: tokio::sync::Mutex::new(()),
+            git_fetch_sessions: Mutex::new(BTreeMap::new()),
             egress,
         });
         inner.recover_pending().await?;
@@ -631,7 +651,10 @@ impl GitlabInner {
         lock(&self.metadata)
             .connections
             .iter()
-            .filter(|connection| connection.owner_subject == context.subject())
+            .filter(|connection| {
+                connection.owner_subject == context.subject()
+                    && connection.grant_ref == self.policy.user_grant_ref
+            })
             .cloned()
             .collect()
     }
@@ -975,6 +998,7 @@ impl GitlabInner {
             connection_ref: connection_ref.clone(),
             instance_id,
             label,
+            grant_ref: self.policy.user_grant_ref.clone(),
             owner_subject: owner.subject,
             external_user_id: evidence.user.id,
             username: bounded_string(&evidence.user.username, 128),
@@ -1341,6 +1365,9 @@ impl GitlabInner {
     }
 
     async fn connection_token(&self, connection: &StoredConnection) -> Result<Secret, GitlabError> {
+        if connection.grant_ref != self.policy.user_grant_ref {
+            return Err(GitlabError::new("connection-grant"));
+        }
         if connection.profile == GitlabProfile::OAuthUser
             && connection.expires_at_unix_ms.is_some_and(|expires| {
                 now_ms().is_none_or(|now| {
@@ -1356,6 +1383,7 @@ impl GitlabInner {
             .connections
             .iter()
             .find(|candidate| candidate.connection_ref == connection.connection_ref)
+            .filter(|candidate| candidate.grant_ref == self.policy.user_grant_ref)
             .cloned()
             .ok_or_else(|| GitlabError::new("connection-state"))?;
         self.credential_store
@@ -1370,6 +1398,7 @@ impl GitlabInner {
             .connections
             .iter()
             .find(|candidate| candidate.connection_ref == connection_ref)
+            .filter(|candidate| candidate.grant_ref == self.policy.user_grant_ref)
             .cloned()
             .ok_or_else(|| GitlabError::new("connection-state"))?;
         if connection.profile != GitlabProfile::OAuthUser
@@ -1631,39 +1660,33 @@ impl GitlabInner {
                     .await
                     .map_err(|_| datasource_unavailable())?;
                 let reached_limit = self
-                    .scan_membership_projects(
-                        &connection.connection_ref,
-                        &token,
-                        true,
-                        |project| {
-                            let Some(project_id) = project.get("id").and_then(Value::as_u64)
-                            else {
-                                return false;
-                            };
-                            let label = project
-                                .get("path_with_namespace")
-                                .and_then(Value::as_str)
-                                .map(|value| bounded_string(value, 240))
-                                .unwrap_or_else(|| format!("GitLab project {project_id}"));
-                            if !query.is_empty() && !label.to_ascii_lowercase().contains(&query) {
-                                return false;
-                            }
-                            bindings.push(DatasourceBinding {
-                                datasource_ref: datasource_ref.to_owned(),
-                                binding_ref: datasource_binding_ref(
-                                    datasource_ref,
-                                    &connection.connection_ref,
-                                    connection.credential_generation,
-                                    Some(project_id),
-                                ),
-                                connection_ref: connection.connection_ref.clone(),
-                                label,
-                                generation: connection.credential_generation,
-                                purpose: None,
-                            });
-                            bindings.len() >= limit
-                        },
-                    )
+                    .scan_membership_projects(&connection.connection_ref, &token, true, |project| {
+                        let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
+                            return false;
+                        };
+                        let label = project
+                            .get("path_with_namespace")
+                            .and_then(Value::as_str)
+                            .map(|value| bounded_string(value, 240))
+                            .unwrap_or_else(|| format!("GitLab project {project_id}"));
+                        if !query.is_empty() && !label.to_ascii_lowercase().contains(&query) {
+                            return false;
+                        }
+                        bindings.push(DatasourceBinding {
+                            datasource_ref: datasource_ref.to_owned(),
+                            binding_ref: datasource_binding_ref(
+                                datasource_ref,
+                                &connection.connection_ref,
+                                connection.credential_generation,
+                                Some(project_id),
+                            ),
+                            connection_ref: connection.connection_ref.clone(),
+                            label,
+                            generation: connection.credential_generation,
+                            purpose: None,
+                        });
+                        bindings.len() >= limit
+                    })
                     .await
                     .map_err(|_| datasource_unavailable())?;
                 drop(token);
@@ -1865,28 +1888,23 @@ impl GitlabInner {
         token: &Secret,
     ) -> Result<u64, DatasourceError> {
         let mut resolved = None;
-        self.scan_membership_projects(
-            &connection.connection_ref,
-            token,
-            false,
-            |project| {
-                let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
-                    return false;
-                };
-                if datasource_binding_ref(
-                    datasource_ref,
-                    &connection.connection_ref,
-                    connection.credential_generation,
-                    Some(project_id),
-                ) == binding_ref
-                {
-                    resolved = Some(project_id);
-                    true
-                } else {
-                    false
-                }
-            },
-        )
+        self.scan_membership_projects(&connection.connection_ref, token, false, |project| {
+            let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
+                return false;
+            };
+            if datasource_binding_ref(
+                datasource_ref,
+                &connection.connection_ref,
+                connection.credential_generation,
+                Some(project_id),
+            ) == binding_ref
+            {
+                resolved = Some(project_id);
+                true
+            } else {
+                false
+            }
+        })
         .await
         .map_err(|_| datasource_unavailable())?;
         resolved.ok_or_else(datasource_not_granted)

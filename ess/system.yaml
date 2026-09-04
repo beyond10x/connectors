@@ -1,0 +1,8 @@
+format: ess/1
+system: connectors
+version: v1
+
+summary: Governed access to external systems through connections, grants, and bounded sessions.
+
+domains:
+  - connectors.git

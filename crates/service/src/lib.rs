@@ -10,6 +10,7 @@ mod connect_session;
 mod dispatch;
 mod egress;
 mod factory;
+mod git_fetch;
 mod planning;
 mod runtime;
 mod sip;
@@ -37,13 +38,18 @@ pub use dispatch::{
     Dispatcher, SensitiveValue,
 };
 pub use egress::{
-    EgressHttpRequest, EgressHttpResponse, EgressTransport, EgressTransportError,
-    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
+    EgressByteStream, EgressHttpRequest, EgressHttpResponse, EgressStreamingHttpRequest,
+    EgressStreamingHttpResponse, EgressTransport, EgressTransportError, EgressTransportFailure,
+    EgressWebSocket, EgressWebSocketFrame,
 };
 pub use factory::{
     ConnectorServiceFactory, DeploymentApproval, DeploymentRisk, OperationDeployment,
     OperationEffect, ProviderIdentity, ServiceDeployment, ServiceDispatch, ServiceFactoryBindError,
     ServiceManifest, ServiceOperation, ServiceProviderMetadata,
+};
+pub use git_fetch::{
+    GitFetchAccess, GitFetchBroker, GitFetchControlError, GitFetchDataError, GitFetchExchange,
+    GitFetchExchangeResponse, GitFetchGrant, GitFetchService,
 };
 pub use planning::{plan_operation, PlanError, PlanningEnvironment};
 pub use runtime::{

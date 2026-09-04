@@ -727,6 +727,7 @@ dependencies = [
  "integration-sip",
  "integration-slack",
  "protocol",
+ "rcgen",
  "rustix",
  "serde_json",
  "server",
@@ -737,6 +738,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-rustls",
  "url",
 ]
 

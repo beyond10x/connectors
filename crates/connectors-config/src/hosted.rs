@@ -7,10 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use connector_address::credential::CredentialRef;
 
-use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
+use crate::hosted_git_fetch::{HostedGitlabConfig, HostedTlsListenerConfig};
 use crate::personal::{InitiationConfig, PlatformIntegrationConfig, SlackIntegrationConfig};
 
-const MAX_CONFIG_BYTES: u64 = 256 * 1024;
+pub(crate) const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
 const NATIVE_SIP_SERVICE: &str = "default";
 
@@ -140,24 +140,6 @@ pub enum JiraSharedAuth {
     ServiceApiToken,
 }
 
-/// Value-free policy for delegated GitLab user Connections.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HostedGitlabConfig {
-    /// Exact self-managed GitLab origin; the Integration appends `/api/v4` itself.
-    pub origin: String,
-    /// Public Connectors origin used to construct one-use setup pages.
-    pub public_origin: String,
-    pub oauth_client_id: String,
-    pub oauth_redirect_uri: String,
-    pub user_grant_ref: String,
-    pub initiation: InitiationConfig,
-    #[serde(default = "default_connect_session_ttl_seconds")]
-    pub connect_session_ttl_seconds: u64,
-    #[serde(default = "default_gitlab_refresh_skew_seconds")]
-    pub refresh_skew_seconds: u64,
-}
-
 /// Value-free hosted Slack policy. Operator registration credentials arrive through the admin API;
 /// principal-owned credentials arrive through Connect Sessions. All use the configured SecretStore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,6 +196,12 @@ pub struct HostedListenerConfig {
     pub listen: SocketAddr,
     #[serde(default = "default_base_path")]
     pub base_path: String,
+    /// Dedicated TLS-only listener for the internal Git byte plane.
+    ///
+    /// This is intentionally a second socket: the public hosted listener never mounts the
+    /// `/internal/git-fetch` routes, even when an ingress is accidentally broadened.
+    #[serde(default)]
+    pub git_fetch_tls: Option<HostedTlsListenerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -382,17 +370,10 @@ pub enum HostedServerConfigError {
 
 impl HostedServerConfig {
     pub fn read(path: &Path) -> Result<Self, HostedServerConfigError> {
-        let text = read_trusted_config(path, MAX_CONFIG_BYTES, TrustedOwner::CurrentUserOrRoot)
-            .map_err(|error| match error {
-                TrustedConfigReadError::Io(_) => HostedServerConfigError::Read,
-                TrustedConfigReadError::Unsafe => HostedServerConfigError::Invalid,
-            })?;
-        let config: Self = toml::from_str(&text).map_err(|_| HostedServerConfigError::Parse)?;
-        config.validate()?;
-        Ok(config)
+        Self::read_with_git_fetch_override(path, None)
     }
 
-    fn validate(&self) -> Result<(), HostedServerConfigError> {
+    pub(crate) fn validate(&self) -> Result<(), HostedServerConfigError> {
         let mut module_tenants = self.module_tenant_ids.clone();
         module_tenants.sort();
         module_tenants.dedup();
@@ -423,6 +404,11 @@ impl HostedServerConfig {
         let gitlab_valid = self.gitlab.as_ref().is_none_or(|gitlab| {
             let origin = url::Url::parse(&gitlab.origin);
             let public_origin = url::Url::parse(&gitlab.public_origin);
+            let git_fetch_origin = gitlab
+                .git_fetch_origin
+                .as_deref()
+                .map(url::Url::parse)
+                .transpose();
             let redirect = url::Url::parse(&gitlab.oauth_redirect_uri);
             let callback_valid = public_origin
                 .as_ref()
@@ -449,11 +435,28 @@ impl HostedServerConfig {
                 });
             origin.is_ok_and(|origin| valid_https_origin(&origin))
                 && callback_valid
+                && git_fetch_origin
+                    .is_ok_and(|origin| origin.as_ref().is_none_or(valid_https_origin))
                 && valid_ref(&gitlab.oauth_client_id, 256)
                 && valid_ref(&gitlab.user_grant_ref, 512)
                 && (60..=900).contains(&gitlab.connect_session_ttl_seconds)
                 && (60..=900).contains(&gitlab.refresh_skew_seconds)
         });
+        let git_fetch_tls_valid = match (
+            self.gitlab
+                .as_ref()
+                .and_then(|gitlab| gitlab.git_fetch_origin.as_ref()),
+            self.server.git_fetch_tls.as_ref(),
+        ) {
+            (None, None) => true,
+            (Some(_), Some(tls)) => {
+                tls.listen != self.server.listen
+                    && tls.certificate_file.is_absolute()
+                    && tls.private_key_file.is_absolute()
+                    && tls.certificate_file != tls.private_key_file
+            }
+            _ => false,
+        };
         let jira_valid = self.jira.as_ref().is_none_or(|jira| {
             let site = url::Url::parse(&jira.site_origin);
             let public_origin = url::Url::parse(&jira.public_origin);
@@ -540,8 +543,7 @@ impl HostedServerConfig {
             self.catalog.public_origin.is_none()
                 && self.catalog.grant_ref.is_none()
                 && self.catalog.providers.is_empty()
-                && self.catalog.connect_session_ttl_seconds
-                    == default_connect_session_ttl_seconds()
+                && self.catalog.connect_session_ttl_seconds == default_connect_session_ttl_seconds()
         };
         let vault_required = self.claude_code.enabled
             || self.catalog.enabled
@@ -609,6 +611,7 @@ impl HostedServerConfig {
             || !valid_groups(&self.authority.operator_groups)
             || !slack_valid
             || !gitlab_valid
+            || !git_fetch_tls_valid
             || !jira_valid
             || !catalog_valid
         {
@@ -620,11 +623,10 @@ impl HostedServerConfig {
         {
             return Err(HostedServerConfigError::Invalid);
         }
-        let supported_credential_egress =
-            self.slack.is_some()
-                || self.gitlab.is_some()
-                || self.grafana.enabled
-                || self.catalog.enabled;
+        let supported_credential_egress = self.slack.is_some()
+            || self.gitlab.is_some()
+            || self.grafana.enabled
+            || self.catalog.enabled;
         let unsupported_credential_egress = self.sip.credentials.is_some() || self.jira.is_some();
         if unsupported_credential_egress
             || (supported_credential_egress
@@ -812,10 +814,6 @@ fn valid_https_origin(origin: &url::Url) -> bool {
         && origin.query().is_none()
         && origin.fragment().is_none()
         && matches!(origin.path(), "" | "/")
-}
-
-fn default_gitlab_refresh_skew_seconds() -> u64 {
-    300
 }
 
 fn default_jira_refresh_skew_seconds() -> u64 {
@@ -1326,6 +1324,20 @@ refresh_skew_seconds = 300
         assert!(config.validate().is_err());
         config.gitlab.as_mut().unwrap().oauth_redirect_uri =
             "https://code.example.test/api/connectors/v1/oauth/gitlab/callback".to_owned();
+
+        config.gitlab.as_mut().unwrap().git_fetch_origin =
+            Some("https://connectors-git-fetch.example.test".to_owned());
+        assert!(config.validate().is_err());
+        config.server.git_fetch_tls = Some(HostedTlsListenerConfig {
+            listen: "0.0.0.0:8443".parse().unwrap(),
+            certificate_file: PathBuf::from("/etc/connectors-git-fetch/tls.crt"),
+            private_key_file: PathBuf::from("/etc/connectors-git-fetch/tls.key"),
+        });
+        assert!(config.validate().is_ok());
+        config.server.git_fetch_tls.as_mut().unwrap().listen = config.server.listen;
+        assert!(config.validate().is_err());
+        config.server.git_fetch_tls.as_mut().unwrap().listen = "0.0.0.0:8443".parse().unwrap();
+
         config.vault.enabled = false;
         assert!(config.validate().is_err());
     }

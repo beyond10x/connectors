@@ -28,7 +28,9 @@ use service::{
 };
 use sha2::{Digest as _, Sha256};
 
-use super::{credential_address, connection_ref, origin_of, CatalogBackend, CatalogIntegrationError};
+use super::{
+    connection_ref, credential_address, origin_of, CatalogBackend, CatalogIntegrationError,
+};
 
 const STATE_KEY: &str = "catalog.connections.v1";
 const STATE_VERSION: u8 = 1;
@@ -202,7 +204,10 @@ impl Inner {
         }
         let provider = catalog::provider(catalog::ProviderKey::id(provider_ref))?;
         if provider.authority.is_none()
-            || provider.services.iter().any(|service| service.base_url.contains('{'))
+            || provider
+                .services
+                .iter()
+                .any(|service| service.base_url.contains('{'))
         {
             return None;
         }
@@ -420,7 +425,9 @@ impl Inner {
     ) -> Result<String, HostedCatalogError> {
         let provider = catalog::provider(catalog::ProviderKey::id(&session.provider))
             .ok_or(HostedCatalogError::InvalidPolicy)?;
-        let authority = provider.authority.ok_or(HostedCatalogError::InvalidPolicy)?;
+        let authority = provider
+            .authority
+            .ok_or(HostedCatalogError::InvalidPolicy)?;
         let credential = self
             .profile(&session.provider, &session.credential)
             .ok_or(HostedCatalogError::InvalidPolicy)?;
@@ -503,9 +510,9 @@ impl Inner {
                 .connections
                 .retain(|candidate| candidate.connection_ref != connection.connection_ref);
             metadata.connections.push(connection.clone());
-            metadata.connections.sort_by(|left, right| {
-                left.connection_ref.cmp(&right.connection_ref)
-            });
+            metadata
+                .connections
+                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
             self.persist(&metadata)?;
         }
         let _ = self.prepared.reclaim(generation).await;
@@ -544,9 +551,9 @@ impl Inner {
                 .pending
                 .retain(|candidate| candidate.transaction_id != record.transaction_id);
             metadata.connections.push(record.connection);
-            metadata.connections.sort_by(|left, right| {
-                left.connection_ref.cmp(&right.connection_ref)
-            });
+            metadata
+                .connections
+                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
             metadata
                 .connections
                 .dedup_by(|left, right| left.connection_ref == right.connection_ref);
@@ -565,7 +572,9 @@ impl Inner {
         let Some(operation_ref) = provider.verify else {
             return Ok(None);
         };
-        let authority = provider.authority.ok_or(HostedCompletionError::Unavailable)?;
+        let authority = provider
+            .authority
+            .ok_or(HostedCompletionError::Unavailable)?;
         let credential = self
             .profile(&session.provider, &session.credential)
             .ok_or(HostedCompletionError::Unavailable)?;
@@ -643,9 +652,9 @@ impl ConnectorBackend for HostedCatalogBackend {
     fn owns_operation(&self, request: &OperationRequest) -> bool {
         match request {
             OperationRequest::Search(_) => true,
-            OperationRequest::Describe(request) => catalog::operation(
-                catalog::OperationKey::id(&request.operation_ref),
-            )
+            OperationRequest::Describe(request) => catalog::operation(catalog::OperationKey::id(
+                &request.operation_ref,
+            ))
             .is_some_and(|operation| {
                 lock(&self.inner.metadata)
                     .connections
@@ -662,12 +671,13 @@ impl ConnectorBackend for HostedCatalogBackend {
 
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
         match request {
-            ConnectionRequest::ConnectSessionCreate(request) => request
-                .auth_profile
-                .as_deref()
-                .is_some_and(|profile| {
-                    self.inner.profile(&request.integration_ref, profile).is_some()
-                }),
+            ConnectionRequest::ConnectSessionCreate(request) => {
+                request.auth_profile.as_deref().is_some_and(|profile| {
+                    self.inner
+                        .profile(&request.integration_ref, profile)
+                        .is_some()
+                })
+            }
             ConnectionRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).contains_key(&request.connect_session_ref)
             }
@@ -685,7 +695,9 @@ impl ConnectorBackend for HostedCatalogBackend {
         request: &protocol::connection::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         if request.auth_profile.as_deref().is_some_and(|profile| {
-            self.inner.profile(&request.integration_ref, profile).is_some()
+            self.inner
+                .profile(&request.integration_ref, profile)
+                .is_some()
         }) {
             ConnectSessionAccess::SelfService
         } else {
@@ -797,10 +809,12 @@ impl ConnectorBackend for HostedCatalogBackend {
                 .owned_connections(context)
                 .into_iter()
                 .find(|connection| connection.connection_ref == request.connection_ref)
-                .map(|connection| ConnectionResult::Describe(ConnectionDescription {
-                    summary: connection_summary(connection),
-                    channels: Vec::new(),
-                }))
+                .map(|connection| {
+                    ConnectionResult::Describe(ConnectionDescription {
+                        summary: connection_summary(connection),
+                        channels: Vec::new(),
+                    })
+                })
                 .ok_or_else(connection_not_found),
             ConnectionRequest::ConnectSessionCreate(request) => {
                 let profile = request.auth_profile.as_deref().ok_or_else(|| {
@@ -810,12 +824,7 @@ impl ConnectorBackend for HostedCatalogBackend {
                     )
                 })?;
                 self.inner
-                    .create_session(
-                        context,
-                        &request.integration_ref,
-                        profile,
-                        request.label,
-                    )
+                    .create_session(context, &request.integration_ref, profile, request.label)
                     .map(ConnectionResult::ConnectSessionCreate)
             }
             ConnectionRequest::ConnectSessionStatus(request) => self
@@ -831,7 +840,11 @@ impl ConnectorBackend for HostedCatalogBackend {
 pub fn hosted_admitted_origins(
     policy: &HostedCatalogConfig,
 ) -> Result<Vec<String>, HostedCatalogError> {
-    let admitted = policy.providers.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let admitted = policy
+        .providers
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let mut origins = BTreeSet::new();
     for provider in catalog::providers() {
         if !admitted.is_empty() && !admitted.contains(provider.id) {
@@ -843,7 +856,11 @@ pub fn hosted_admitted_origins(
         }) {
             continue;
         }
-        if provider.services.iter().any(|service| service.base_url.contains('{')) {
+        if provider
+            .services
+            .iter()
+            .any(|service| service.base_url.contains('{'))
+        {
             continue;
         }
         for service in provider.services {
@@ -1143,11 +1160,15 @@ mod tests {
         let second_ref = connect(&backend, &second, "Second key", SENTINEL_TWO).await;
         assert_ne!(first_ref, second_ref);
 
-        let ConnectionResult::Search { connections: first_rows } = search(&backend, &first).await
+        let ConnectionResult::Search {
+            connections: first_rows,
+        } = search(&backend, &first).await
         else {
             panic!("wrong search result")
         };
-        let ConnectionResult::Search { connections: second_rows } = search(&backend, &second).await
+        let ConnectionResult::Search {
+            connections: second_rows,
+        } = search(&backend, &second).await
         else {
             panic!("wrong search result")
         };

@@ -6,6 +6,7 @@ mod claims;
 mod composition;
 mod registry;
 mod service_bundle;
+mod tls_listener;
 
 pub use claims::{ClaimError, EventReplyClaims};
 pub use composition::{

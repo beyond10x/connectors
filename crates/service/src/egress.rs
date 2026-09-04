@@ -23,6 +23,39 @@ pub struct EgressHttpResponse {
     pub body: Vec<u8>,
 }
 
+/// One credential-bearing HTTP exchange whose response is consumed incrementally.
+///
+/// Unlike [`EgressHttpRequest`], the body is raw bytes because Git Smart HTTP request frames are
+/// binary. The runtime remains responsible for destination policy, redirect refusal, and bounds.
+pub struct EgressStreamingHttpRequest {
+    pub method: String,
+    pub url: String,
+    pub headers: BTreeMap<String, String>,
+    pub body: Option<Vec<u8>>,
+    pub maximum_response_bytes: u64,
+    pub response_headers: Vec<String>,
+}
+
+/// Incremental response body owned by the runtime egress boundary.
+#[async_trait]
+pub trait EgressByteStream: Send + Unpin {
+    async fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, EgressTransportError>;
+}
+
+/// Selected metadata and an unbuffered provider response body.
+pub struct EgressStreamingHttpResponse {
+    pub status: u16,
+    pub headers: BTreeMap<String, String>,
+    pub body: Box<dyn EgressByteStream>,
+}
+
+impl EgressStreamingHttpResponse {
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers.get(name).map(String::as_str)
+    }
+}
+
 impl EgressHttpResponse {
     #[must_use]
     pub fn is_success(&self) -> bool {
@@ -60,6 +93,18 @@ pub trait EgressTransport: Send + Sync + 'static {
         authority_ref: &str,
         request: EgressHttpRequest,
     ) -> Result<EgressHttpResponse, EgressTransportError>;
+
+    /// Execute one binary response exchange without buffering the response body.
+    ///
+    /// Existing transports refuse until they deliberately implement this capability. This keeps
+    /// a new byte plane from silently falling back to the ordinary small JSON response path.
+    async fn execute_stream(
+        &self,
+        _authority_ref: &str,
+        _request: EgressStreamingHttpRequest,
+    ) -> Result<EgressStreamingHttpResponse, EgressTransportError> {
+        Err(EgressTransportError::Refused)
+    }
 
     async fn connect_websocket(
         &self,

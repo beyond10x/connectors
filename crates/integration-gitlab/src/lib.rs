@@ -24,6 +24,7 @@ pub fn hosted_admin_integration(
     let configuration = [
         "origin",
         "public_origin",
+        "git_fetch_origin",
         "oauth_client_id",
         "oauth_redirect_uri",
         "user_grant_ref",
