@@ -149,3 +149,16 @@ will spawn children as each milestone is designed.
 - **Later-shaped work** named in the vision — SDKs, the platform CLI, an MCP endpoint, the SaaS org
   lifecycle, catalog overlays, the coverage-matrix projection, the meta-tools discovery surface — is
   deliberately unfiled until its milestone is in reach.
+
+## Superseded by
+
+This file is an **index**, and it is annotated once rather than row by row. Every `S-*.md` beside it
+was migrated into the AEP planning store on 2026-09-04 and carries its own `## Superseded by` line
+naming the artifact that now holds it. The store is the plan; this directory is the source it was
+migrated from, and nothing here was deleted.
+
+Read the migrated plan with `aep artifact list`, `aep artifact board` and `aep artifact blocked`.
+Two facts the store records that this index cannot: the four `blocked` rows are now typed blocker
+artifacts naming what would clear each, and every row this index calls `done` stands at `active` in
+the store because reaching `implemented` needs a `test_result` record that the migration did not
+have and would not invent.
