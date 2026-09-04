@@ -788,3 +788,94 @@ fn the_walk_finds_an_edge_that_is_not_direct() {
     assert!(!severed.closure("catalog-build").contains(HOST_LIBRARY));
     assert_eq!(severed.path_to("catalog-build", HOST_LIBRARY), None);
 }
+
+/// **The gate's workspace list is the only place the count and the disk budget are stated.**
+///
+/// `scripts/gate.sh` holds the list so that CI can shard it without a second copy, and its own
+/// header states two facts about that list — how many workspaces there are and roughly how much
+/// disk building all of them takes. `.github/workflows/release.yml` restates both, because the job
+/// that reads `--list-workspaces` explains itself. Nothing compared them, and they disagreed:
+/// eleven workspaces and 39 GB in the workflow against twelve and 41 GB in the script, which is
+/// what a second copy of a number always eventually does.
+///
+/// The count is read out of the array rather than out of either sentence, so the number that
+/// decides is the one the gate actually runs.
+#[test]
+fn the_gate_and_the_release_workflow_state_the_gates_own_workspace_count() {
+    const SPELLINGS: &[&str] = &[
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+    ];
+
+    let root = workspace_root();
+    let script = std::fs::read_to_string(root.join("scripts/gate.sh")).expect("scripts/gate.sh");
+    let workflow = std::fs::read_to_string(root.join(".github/workflows/release.yml"))
+        .expect(".github/workflows/release.yml");
+
+    let array = script
+        .split_once("\nworkspaces=(\n")
+        .expect("scripts/gate.sh declares `workspaces=(`")
+        .1;
+    let array = array
+        .split_once("\n)")
+        .expect("the workspace array closes")
+        .0;
+    let counted = array
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+        .count();
+    assert!(
+        counted > 1,
+        "the workspace array was read as {counted} entries; the array moved, so read \
+         scripts/gate.sh again before believing any result from this test"
+    );
+
+    let spelling = SPELLINGS
+        .get(counted)
+        .unwrap_or_else(|| panic!("{counted} workspaces is past this test's spelling table"));
+    for (name, source) in [
+        ("scripts/gate.sh", &script),
+        (".github/workflows/release.yml", &workflow),
+    ] {
+        let stated = SPELLINGS
+            .iter()
+            .enumerate()
+            .filter(|(_, word)| source.contains(&format!("{word} workspaces")))
+            .map(|(value, _)| value)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            stated,
+            vec![counted],
+            "{name} says {stated:?} workspaces; `scripts/gate.sh` runs {counted}, which is \
+             `{spelling} workspaces`. The array is the only count; a sentence restating it is a \
+             copy, and the two had already drifted apart once"
+        );
+    }
+
+    // The disk budget each file states *about that same list*: the first `N GB` after the
+    // sentence that counts the workspaces. The workflow states three other GB figures — a
+    // runner's free disk, the largest single workspace, and what reclaiming the preinstalled
+    // toolchains buys — and those are facts about one runner rather than a second copy of this
+    // one, so they are not compared.
+    let budget = |name: &str, source: &str| {
+        let phrase = format!("{spelling} workspaces");
+        let index = source
+            .find(&phrase)
+            .unwrap_or_else(|| panic!("{name} states `{phrase}`"));
+        let rest = &source[index..];
+        let mark = rest
+            .find(" GB")
+            .unwrap_or_else(|| panic!("{name} states a disk budget in GB for the whole list"));
+        rest[..mark]
+            .rsplit(|character: char| !character.is_ascii_digit())
+            .next()
+            .and_then(|digits| digits.parse::<usize>().ok())
+            .unwrap_or_else(|| panic!("{name} states a disk budget as a number"))
+    };
+    assert_eq!(
+        budget(".github/workflows/release.yml", &workflow),
+        budget("scripts/gate.sh", &script),
+        ".github/workflows/release.yml states a different disk budget from scripts/gate.sh, and \
+         the script's is the one measured against the list it holds"
+    );
+}

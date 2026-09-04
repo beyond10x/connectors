@@ -620,6 +620,52 @@ mod tests {
     }
 
     #[test]
+    fn the_budget_is_documented_as_what_it_is_and_a_real_row_is_wider_than_it() {
+        // The module header said "a row is one line and fits a terminal" at a 120-column budget,
+        // and the renderer has never made that true: `fit_to_budget` narrows the *leading* columns
+        // until the last one begins inside the budget, and the last column is deliberately never
+        // cut. So the row is as wide as its final cell. The code is as designed; the sentence was
+        // not, and nothing measured it.
+        //
+        // Both halves are held here, because correcting the sentence alone leaves the next author
+        // free to write it again. The width is measured on the real catalogue, which is the table
+        // the false claim was written about.
+        let rendered = render(Format::Text, &crate::providers::run("")).unwrap();
+        let widths: Vec<usize> = rendered.lines().map(display_width).collect();
+        let over = widths.iter().filter(|width| **width > TABLE_BUDGET).count();
+        assert!(
+            over > 0,
+            "no line of `connectors providers` is wider than {TABLE_BUDGET} columns, so the \
+             renderer now does bound a row and the module header should say so"
+        );
+
+        // The module header as one line, so a check on what it says is not a check on where the
+        // author wrapped it.
+        let source = include_str!("output.rs");
+        let header: String = source
+            .split("\nuse ")
+            .next()
+            .unwrap_or(source)
+            .lines()
+            .filter_map(|line| line.trim_start().strip_prefix("//!"))
+            .flat_map(str::split_whitespace)
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            !header.contains("fits a terminal"),
+            "output.rs claims a row fits a terminal again. {over} of the {} lines \
+             `connectors providers` prints are wider than {TABLE_BUDGET}; the longest is {}",
+            widths.len(),
+            widths.iter().max().copied().unwrap_or(0)
+        );
+        assert!(
+            header.contains("the last column *begins* inside the budget"),
+            "output.rs no longer says what the budget guarantees — that the last column begins \
+             inside it — so a reader has only the constant's name to go on"
+        );
+    }
+
+    #[test]
     fn a_cell_the_budget_cut_says_so_and_the_column_names_are_cut_last() {
         // Two claims. A cut cell carries the mark, because a silently truncated value reads as the
         // whole value and gives its reader no reason to go and look at `-o json`. And the cells
