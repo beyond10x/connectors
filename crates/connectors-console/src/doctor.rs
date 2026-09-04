@@ -407,4 +407,41 @@ mod tests {
         assert_eq!(value["checks"][0]["check"], "configuration");
         assert_eq!(value["checks"][0]["status"], "ok");
     }
+
+    #[test]
+    fn every_state_a_check_can_report_reaches_the_reader_as_its_own_marker() {
+        // This module ranks its three states — `fail` is "this cannot work", `warn` is "this works
+        // and you should know" — and the rank is worth nothing if the last inch flattens it, which
+        // is what the generic pretty-printer used to do. Asserted through the real renderer rather
+        // than against a table of words, so the two cannot drift apart.
+        let report = Report {
+            checks: vec![
+                Check::new("first", Status::Ok, "fine"),
+                Check::new("second", Status::Warn, "worth knowing"),
+                Check::new("third", Status::Fail, "cannot work"),
+            ],
+        };
+        let rendered = crate::output::render(crate::output::Format::Text, &report.to_value())
+            .expect("a text rendering");
+        let marker = |name: &str| {
+            rendered
+                .lines()
+                .find(|line| line.contains(name))
+                .unwrap_or_else(|| panic!("no row for `{name}`:\n{rendered}"))
+                .trim_start()
+                .chars()
+                .next()
+                .expect("a leading marker")
+        };
+        let markers = [marker("first"), marker("second"), marker("third")];
+        assert_eq!(
+            std::collections::BTreeSet::from(markers).len(),
+            markers.len(),
+            "two states share one marker: {markers:?}\n{rendered}"
+        );
+        assert!(
+            !markers.contains(&'?'),
+            "a state the renderer cannot rank: {markers:?}\n{rendered}"
+        );
+    }
 }
