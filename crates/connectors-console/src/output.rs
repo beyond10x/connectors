@@ -173,8 +173,9 @@ pub(crate) fn render(format: Format, value: &Value) -> Result<String, OutputErro
 /// element becomes its own line.
 ///
 /// The fields *beside* the records become the first line rather than being discarded. Dropping
-/// them is what put `healthy` out of reach of `connectors -o compact doctor | grep healthy`, which
-/// printed nothing at all for a report whose whole purpose is to answer that one question.
+/// them is what put `healthy` out of reach of `connectors -o compact inspect doctor | grep
+/// healthy`, which printed nothing at all for a report whose whole purpose is to answer that one
+/// question.
 fn compact(value: &Value) -> String {
     let Some((name, items)) = unwrap_single_array(value) else {
         return compact_line(value);
@@ -449,7 +450,7 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
 
 /// Squeeze the leading columns until the last one starts inside the budget.
 ///
-/// Moving the widest column last cannot fix a wide table on its own: `connectors providers` has
+/// Moving the widest column last cannot fix a wide table on its own: the providers table has
 /// eleven columns before the moved one and they came to 196 terminal columns between them, so
 /// every row wrapped and nothing after the first column was aligned.
 ///

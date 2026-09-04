@@ -116,7 +116,7 @@ fn check_config(path: &Path) -> Check {
             "configuration",
             Status::Fail,
             format!(
-                "no configuration at {}; run `connectors init`",
+                "no configuration at {}; run `connectors setup init`",
                 path.display()
             ),
         );
@@ -273,7 +273,7 @@ fn check_daemon(state_root: &Path) -> Check {
         return Check::new(
             "daemon",
             Status::Warn,
-            "not running; one-shot commands work, `event receive` needs `connectors serve`",
+            "not running; one-shot commands work, `event receive` needs `connectors serve local`",
         );
     }
     match std::os::unix::net::UnixStream::connect(&socket) {
@@ -382,7 +382,7 @@ mod tests {
     fn a_missing_configuration_is_fatal_and_names_the_command_that_fixes_it() {
         let check = check_config(std::path::Path::new("/nonexistent/connectors.toml"));
         assert_eq!(check.status, Status::Fail);
-        assert!(check.detail.contains("connectors init"));
+        assert!(check.detail.contains("connectors setup init"));
     }
 
     #[test]

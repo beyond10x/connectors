@@ -96,51 +96,65 @@ const EVERY_KIND: &[Unspecified] = &[
 ///
 /// Both directions are checked, so this list cannot grow by accident and cannot outlive the parser.
 const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
-    // First-level words that are not groups.
+    // Under `setup`.
     (
-        "connect",
-        Unspecified::Flow,
-        "a guided acquisition flow, not one declared command",
-    ),
-    (
-        "doctor",
-        Unspecified::Read,
-        "a read of the installation; no entity moves",
-    ),
-    (
-        "init",
+        "setup init",
         Unspecified::Lifecycle,
         "writes a configuration file; no entity of this specification moves",
     ),
     (
-        "login",
-        Unspecified::Lifecycle,
-        "acquires an Identity session; no entity of this specification moves",
+        "setup connect",
+        Unspecified::Flow,
+        "a guided acquisition flow, not one declared command",
     ),
     (
-        "logout",
-        Unspecified::Lifecycle,
-        "discards an Identity session; no entity of this specification moves",
+        "setup completions",
+        Unspecified::Unmodelled,
+        "renders this binary's own command tree as a shell script; no command of this \
+         specification names it",
+    ),
+    // Under `inspect`.
+    (
+        "inspect doctor",
+        Unspecified::Read,
+        "a read of the installation; no entity moves",
     ),
     (
-        "mcp",
-        Unspecified::Lifecycle,
-        "serves a transport; no entity moves",
-    ),
-    (
-        "providers",
+        "inspect providers",
         Unspecified::Read,
         "a read of the embedded catalogue; ESS models a read as a view",
     ),
     (
-        "serve",
+        "inspect auth",
+        Unspecified::Read,
+        "a read of which configured providers have a credential stored",
+    ),
+    // Under `session`.
+    (
+        "session login",
+        Unspecified::Lifecycle,
+        "acquires an Identity session; no entity of this specification moves",
+    ),
+    (
+        "session logout",
+        Unspecified::Lifecycle,
+        "discards an Identity session; no entity of this specification moves",
+    ),
+    // Under `serve`.
+    (
+        "serve local",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
     ),
     (
-        "serve-hosted",
+        "serve hosted",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
+    ),
+    (
+        "serve mcp",
+        Unspecified::Lifecycle,
+        "serves a transport; no entity moves",
     ),
     // Under `admin`. Both are groups of their own, and the tree runs one word deeper here than
     // anywhere else in the binary — which a contract comparing first-level words could not see.
@@ -163,12 +177,6 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         "admin credentials set",
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
-    ),
-    // Under `auth`.
-    (
-        "auth status",
-        Unspecified::Read,
-        "a read of which configured providers have a credential stored",
     ),
     // Under `connection`.
     (
@@ -664,77 +672,352 @@ fn the_committed_generated_tree_is_the_specification_word_for_word() {
     );
 }
 
+/// The documents whose `path:line` citations are held here: the two this unit wrote, and every
+/// test file of this crate, whose doc comments cite the tree as freely as the two documents do and
+/// had, until the second adversary pass, exactly the same defect. The directory is read rather than
+/// listed: a list of three here is how a fourth and a fifth file came to carry citations nothing
+/// read.
+fn documents_this_unit_cites() -> Vec<String> {
+    let root = repository_root();
+    let mut documents = vec![
+        "ess/system/components.yaml".to_owned(),
+        "docs/design/19-the-cli-surface.md".to_owned(),
+    ];
+    let mut tests: Vec<String> = std::fs::read_dir(root.join("crates/connectors-cli/tests"))
+        .expect("read crates/connectors-cli/tests")
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "rs"))
+        .map(|path| {
+            path.strip_prefix(&root)
+                .unwrap_or(&path)
+                .display()
+                .to_string()
+        })
+        .collect();
+    tests.sort();
+    assert!(
+        tests.len() >= 5,
+        "only {tests:?} were found under crates/connectors-cli/tests; the layout moved"
+    );
+    documents.extend(tests);
+    documents
+}
+
+/// One `path:line` or `path:a-b` citation, and the backticked symbol it names, when it names one.
+struct Citation {
+    document: String,
+    path: String,
+    numbers: String,
+    first: usize,
+    last: usize,
+    symbol: Option<String>,
+}
+
+/// The item kinds a backticked token may carry in front of its name: `` `enum Command` ``.
+const KINDS: &[&str] = &[
+    "fn",
+    "struct",
+    "enum",
+    "trait",
+    "type",
+    "const",
+    "static",
+    "mod",
+    "macro_rules!",
+];
+
+/// Every citation of `text`, found the way `every_citation_this_unit_wrote_resolves` has always
+/// found them: a path with a `/` in it ending `.rs` or `.yaml`, a colon, digits.
+///
+/// A citation **names a symbol** when a backticked token stands immediately in front of it, with
+/// nothing between the two but whitespace, a comment marker, an opening parenthesis, a comma and
+/// the citation's own backtick — `` `product_cli_is_a_thin_frontend`
+/// (`crates/catalog-build/tests/main/architecture_fence.rs:292`) ``. The token is an identifier,
+/// on its own or after one of [`KINDS`]. A path in backticks is not one, so a citation in front of
+/// a citation names nothing, and a word of prose between the two — "answered at", "and" — means
+/// the sentence is not saying that the citation *is* the symbol.
+fn citations_of(document: &str, text: &str) -> Vec<Citation> {
+    let mut found = Vec::new();
+    for (index, _) in text.match_indices(':') {
+        // Walk back over the path: everything up to the delimiter that opened it.
+        let head = &text[..index];
+        let start = head
+            .rfind(|character: char| {
+                character.is_whitespace() || character == '`' || character == '('
+            })
+            .map_or(0, |position| position + 1);
+        let path = &head[start..];
+        if !path.contains('/') || !(path.ends_with(".rs") || path.ends_with(".yaml")) {
+            continue;
+        }
+        let numbers: String = text[index + 1..]
+            .chars()
+            .take_while(|character| character.is_ascii_digit() || *character == '-')
+            .collect();
+        let mut parts = numbers
+            .split('-')
+            .filter(|part| !part.is_empty())
+            .filter_map(|part| part.parse::<usize>().ok());
+        let Some(first) = parts.next() else {
+            continue;
+        };
+        let last = parts.last().unwrap_or(first);
+        found.push(Citation {
+            document: document.to_owned(),
+            path: path.to_owned(),
+            numbers,
+            first,
+            last,
+            symbol: symbol_named_before(&head[..start]),
+        });
+    }
+    found
+}
+
+/// The backticked identifier that stands immediately in front of a citation, if one does.
+fn symbol_named_before(before: &str) -> Option<String> {
+    let before = before.strip_suffix('`').unwrap_or(before);
+    let before = before.trim_end_matches(|character: char| {
+        character.is_whitespace() || matches!(character, '#' | '/' | '(' | ',')
+    });
+    let before = before.strip_suffix('`')?;
+    let identifier = before
+        .rfind(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+        .map_or(0, |position| position + 1);
+    let name = &before[identifier..];
+    if name.is_empty() || name.starts_with(|character: char| character.is_ascii_digit()) {
+        return None;
+    }
+    let opener = &before[..identifier];
+    let backticked = opener.ends_with('`');
+    let after_a_kind = KINDS
+        .iter()
+        .any(|kind| opener.ends_with(&format!("`{kind} ")));
+    (backticked || after_a_kind).then(|| name.to_owned())
+}
+
+/// The 1-based lines on which `source` declares `name`.
+///
+/// In Rust: an item — `fn name(`, `pub enum name {`, `const name:` — after any visibility and
+/// qualifier, or a variant or field at the head of a line, `name(`, `name {`, `name,`, `name: `.
+/// In YAML: `- name: X` or `X:`.
+fn declaration_lines(source: &str, name: &str, yaml: bool) -> Vec<usize> {
+    const QUALIFIERS: &[&str] = &[
+        "pub(crate) ",
+        "pub(super) ",
+        "pub(self) ",
+        "pub ",
+        "async ",
+        "unsafe ",
+        "extern \"C\" ",
+        "default ",
+    ];
+    let declares = |line: &str| -> bool {
+        let mut text = line.trim_start();
+        if yaml {
+            return text == format!("- name: {name}") || text.starts_with(&format!("{name}:"));
+        }
+        loop {
+            let Some(qualifier) = QUALIFIERS
+                .iter()
+                .find(|qualifier| text.starts_with(*qualifier))
+            else {
+                break;
+            };
+            text = &text[qualifier.len()..];
+        }
+        for kind in KINDS {
+            let Some(mut rest) = text.strip_prefix(&format!("{kind} ")) else {
+                continue;
+            };
+            if *kind == "const" {
+                if let Some(function) = rest.strip_prefix("fn ") {
+                    rest = function;
+                }
+            }
+            return rest.strip_prefix(name).is_some_and(|after| {
+                !after.starts_with(|character: char| {
+                    character.is_ascii_alphanumeric() || character == '_'
+                })
+            });
+        }
+        text.strip_prefix(name).is_some_and(|after| {
+            after.starts_with(['(', '{', ','])
+                || after.starts_with(": ")
+                || after.starts_with(" {")
+                || after.starts_with(" =")
+                || after.starts_with(" (")
+        })
+    };
+    source
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| declares(line))
+        .map(|(index, _)| index + 1)
+        .collect()
+}
+
+/// The first line of the run of attributes and doc comments directly above `declaration`, both
+/// 1-based: `#[test]` above `fn`, `#[derive(…)]` above `enum`, a `///` block above either.
+fn span_start(lines: &[&str], declaration: usize) -> usize {
+    let mut first = declaration;
+    while first > 1 {
+        let above = lines[first - 2].trim_start();
+        if above.starts_with("#[")
+            || above.starts_with("///")
+            || above.starts_with("//!")
+            || above.starts_with('#')
+        {
+            first -= 1;
+        } else {
+            break;
+        }
+    }
+    first
+}
+
+/// Whether `line` carries `name` delimited on both sides by something that is not part of an
+/// identifier: `"admin"` does, `administer` does not.
+fn names_as_a_word(line: &str, name: &str) -> bool {
+    line.match_indices(name).any(|(at, _)| {
+        let is_part = |character: char| character.is_ascii_alphanumeric() || character == '_';
+        !line[..at].chars().next_back().is_some_and(is_part)
+            && !line[at + name.len()..].chars().next().is_some_and(is_part)
+    })
+}
+
 /// **Every `path:line` citation this unit wrote resolves to a line that exists.**
 ///
 /// The class behind one finding. `ess/system/components.yaml` cited
 /// `architecture_fence.rs:303`, which pointed at the right line until seven lines were inserted
 /// above it and then pointed at a different test — and nothing said so, because
 /// `crates/catalog-build/tests/main/ess_citation_fence.rs` checks that a citation is *present*,
-/// never that it lands anywhere. Every citation in the two documents this unit owns is resolved
-/// here instead: the file has to exist and the last line of the range has to be inside it.
+/// never that it lands anywhere. Every citation in the documents of
+/// [`documents_this_unit_cites`] is resolved here instead: the file has to exist and the last line
+/// of the range has to be inside it.
 ///
-/// It does not check that the line *means* what the sentence says — that is what
-/// `crates/connectors-cli/tests/cli_surface_drift.rs::the_thin_frontend_citation_points_at_the_thin_frontend_test`
-/// does for the one citation where the meaning is load-bearing. This catches the whole class of
-/// citations pointing past the end of a file that shrank, or at a file that moved.
+/// It does not check that the line *means* what the sentence says. For a citation that names a
+/// symbol, `every_citation_that_names_a_symbol_lands_on_its_declaration` does; this catches the
+/// whole class of citations pointing past the end of a file that shrank, or at a file that moved.
 #[test]
 fn every_citation_this_unit_wrote_resolves() {
     let root = repository_root();
     let mut broken = Vec::new();
+    let mut resolved = 0usize;
 
-    for document in [
-        "ess/system/components.yaml",
-        "docs/design/19-the-cli-surface.md",
-        // The three test files' own doc comments, which cite the tree as freely as the two
-        // documents above and had, until the second adversary pass, exactly the same defect.
-        "crates/connectors-cli/tests/cli_surface.rs",
-        "crates/connectors-cli/tests/cli_surface_drift.rs",
-        "crates/connectors-cli/tests/cli_surface_pass_two.rs",
-    ] {
-        let text = read(&root.join(document));
-        for (index, _) in text.match_indices(':') {
-            // Walk back over the path: everything up to the delimiter that opened it.
-            let head = &text[..index];
-            let start = head
-                .rfind(|character: char| {
-                    character.is_whitespace() || character == '`' || character == '('
-                })
-                .map_or(0, |position| position + 1);
-            let path = &head[start..];
-            if !path.contains('/') || !(path.ends_with(".rs") || path.ends_with(".yaml")) {
-                continue;
-            }
-            let numbers: String = text[index + 1..]
-                .chars()
-                .take_while(|character| character.is_ascii_digit() || *character == '-')
-                .collect();
-            let Some(last) = numbers
-                .rsplit('-')
-                .find(|part| !part.is_empty())
-                .and_then(|part| part.parse::<usize>().ok())
-            else {
-                continue;
-            };
-            let cited = root.join(path);
+    for document in documents_this_unit_cites() {
+        let text = read(&root.join(&document));
+        for citation in citations_of(&document, &text) {
+            let cited = root.join(&citation.path);
             if !cited.is_file() {
                 broken.push(format!(
-                    "{document} cites `{path}:{numbers}`, and no such file exists"
+                    "{document} cites `{}:{}`, and no such file exists",
+                    citation.path, citation.numbers
                 ));
                 continue;
             }
             let lines = read(&cited).lines().count();
-            if last > lines {
+            if citation.last > lines {
                 broken.push(format!(
-                    "{document} cites `{path}:{numbers}`, and that file has {lines} lines"
+                    "{document} cites `{}:{}`, and that file has {lines} lines",
+                    citation.path, citation.numbers
+                ));
+                continue;
+            }
+            resolved += 1;
+        }
+    }
+
+    assert!(
+        resolved > 20,
+        "only {resolved} citations were found in the documents this unit cites; the extraction is \
+         wrong, and a check that finds nothing to look at passes without looking"
+    );
+    assert!(
+        broken.is_empty(),
+        "citations that no longer resolve:\n  {}",
+        broken.join("\n  ")
+    );
+}
+
+/// **A citation that names a symbol lands on that symbol's declaration.**
+///
+/// The class behind five findings in one day. `every_citation_this_unit_wrote_resolves` checks that
+/// the cited line exists, and the first version of
+/// `cli_surface_drift.rs::the_thin_frontend_citation_points_at_the_thin_frontend_test` checked that
+/// one citation fell anywhere inside one function's body. Both passed
+/// `architecture_fence.rs:319` for `product_cli_is_a_thin_frontend` — line 319 being
+/// `"rpassword",` inside an array that function declares — and both passed `tree.rs:17-20` for
+/// the generated `admin`, those lines being the generated `setup`. A line number that is inside the
+/// file is almost always resolvable and almost never meaningful.
+///
+/// So a citation with a backticked symbol immediately in front of it has to land on that symbol.
+/// A single line is the declaration line, or one of the attribute and doc-comment lines directly
+/// above it — `#[test]` above `fn`, `#[derive]` above `enum`. A range contains the declaration
+/// line, or starts in that run above it. Where the cited file declares nothing by that name — the
+/// generated tree names `admin` only as `Command::new("admin")` — the first cited line has to carry
+/// the name as a whole word, which is the least a citation can mean.
+#[test]
+fn every_citation_that_names_a_symbol_lands_on_its_declaration() {
+    let root = repository_root();
+    let mut wrong = Vec::new();
+    let mut checked = 0usize;
+
+    for document in documents_this_unit_cites() {
+        let text = read(&root.join(&document));
+        for citation in citations_of(&document, &text) {
+            let Some(symbol) = &citation.symbol else {
+                continue;
+            };
+            let cited = root.join(&citation.path);
+            if !cited.is_file() {
+                // `every_citation_this_unit_wrote_resolves` reports it.
+                continue;
+            }
+            let source = read(&cited);
+            let lines: Vec<&str> = source.lines().collect();
+            checked += 1;
+            let declarations = declaration_lines(&source, symbol, citation.path.ends_with(".yaml"));
+            let lands = if declarations.is_empty() {
+                lines
+                    .get(citation.first - 1)
+                    .is_some_and(|line| names_as_a_word(line, symbol))
+            } else {
+                declarations.iter().any(|&declaration| {
+                    (span_start(&lines, declaration)..=declaration).contains(&citation.first)
+                        || (citation.first..=citation.last).contains(&declaration)
+                })
+            };
+            if !lands {
+                wrong.push(format!(
+                    "{} cites `{}:{}` as `{symbol}`; line {} is `{}`, and `{symbol}` is declared \
+                     at {}",
+                    citation.document,
+                    citation.path,
+                    citation.numbers,
+                    citation.first,
+                    lines.get(citation.first - 1).map_or("", |line| line.trim()),
+                    if declarations.is_empty() {
+                        "no line of that file".to_owned()
+                    } else {
+                        format!("{declarations:?}")
+                    }
                 ));
             }
         }
     }
 
     assert!(
-        broken.is_empty(),
-        "citations that no longer resolve:\n  {}",
-        broken.join("\n  ")
+        checked >= 8,
+        "only {checked} citations naming a symbol were found in the documents this unit cites; \
+         the extraction is wrong, and a check that finds nothing to look at passes without looking"
+    );
+    assert!(
+        wrong.is_empty(),
+        "citations that name a symbol and do not land on it:\n  {}\nCite the declaration line, or \
+         the attribute above it; a line inside the body moves every time the body is edited.",
+        wrong.join("\n  ")
     );
 }
 
@@ -847,7 +1130,7 @@ fn no_word_of_the_parser_answers_to_a_name_the_specification_cannot_declare() {
 ///
 /// The kind is carried here and not only in the Rust list because an adversary pass measured what
 /// the Rust list alone was worth: relabelling nineteen entries one at a time produced two
-/// refusals. Twelve of the twenty-six kinds are derived from the tree by
+/// refusals. Thirteen of the twenty-seven kinds are derived from the tree by
 /// [`kinds_the_tree_derives`] and rest on nothing anybody wrote down; the other fourteen are a
 /// claim, and a claim belongs in the reviewed document rather than in the test that reads it.
 fn paths_the_specification_names() -> BTreeSet<String> {
@@ -1490,7 +1773,7 @@ fn commands_named_by(reason: &str) -> Vec<String> {
 /// an entry in it means editing the document the whole contract is about.
 ///
 /// **Where the tree decides the kind, the tree decides it.** [`kinds_the_tree_derives`] settles
-/// twelve of the twenty-six off the dispatch in `crates/connectors-cli/src/lib.rs`, the accepted
+/// thirteen of the twenty-seven off the dispatch in `crates/connectors-cli/src/lib.rs`, the accepted
 /// commands' `naming.wire` values and the read verbs the specification enumerates. An entry whose
 /// kind disagrees is refused whatever either document says.
 ///
@@ -1500,9 +1783,10 @@ fn commands_named_by(reason: &str) -> Vec<String> {
 /// component accepts; a reason that names one may not be labelled anything else.
 ///
 /// An adversary pass measured what the last two were worth on their own: relabelling each of the
-/// nineteen non-`Lifecycle` entries `Lifecycle`, with a sentence naming no command, was refused
-/// for two. The kind column of the specification and the twelve derivations are the answer to
-/// that, and `docs/design/19-the-cli-surface.md` states which of the twenty-six each one covers.
+/// non-`Lifecycle` entries the list then carried `Lifecycle`, with a sentence naming no command,
+/// was refused for two. The kind column of the specification and the thirteen derivations are the
+/// answer to that, and `docs/design/19-the-cli-surface.md` states which of the twenty-seven each
+/// one covers.
 fn exception_list_refusals(
     entries: &[(&str, Unspecified, &str)],
     parser: &clap::Command,
@@ -1974,7 +2258,14 @@ fn the_kinds_the_tree_derives_are_the_kinds_the_list_carries() {
                 .to_owned()
         })
         .unwrap_or_default();
-    let lifecycle_steps = ["init", "login", "logout", "mcp", "serve", "serve-hosted"];
+    let lifecycle_steps = [
+        "setup init",
+        "session login",
+        "session logout",
+        "serve local",
+        "serve hosted",
+        "serve mcp",
+    ];
     for path in &residual {
         let covered_by_the_phrase =
             lifecycle_steps.contains(path) || **path == *"admin credentials set";

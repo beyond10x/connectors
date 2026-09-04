@@ -128,7 +128,7 @@ pub enum IdentityError {
     Keyring,
     #[error("the local non-secret Identity session metadata is invalid or unavailable")]
     State,
-    #[error("there is no active hosted Connectors login; run `connectors login <URL>`")]
+    #[error("there is no active hosted Connectors login; run `connectors session login <URL>`")]
     NoActiveLogin,
     #[error("Identity could not issue a short-lived Connector access token")]
     AccessToken,

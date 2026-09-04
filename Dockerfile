@@ -23,4 +23,4 @@ COPY --from=builder /out/connectors-secrets-migrate /usr/local/bin/connectors-se
 VOLUME ["/var/lib/b10x-connectors"]
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/connectors"]
-CMD ["serve-hosted", "--config", "/etc/b10x-connectors/hosted.toml"]
+CMD ["serve", "hosted", "--config", "/etc/b10x-connectors/hosted.toml"]
