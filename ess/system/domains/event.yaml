@@ -1,0 +1,145 @@
+# The event nouns of the runtime side, docs/design/01-domain-model.md:366-399, and the wire shapes
+# `crates/protocol/src/event.rs` projects for them. `Channel` is in `connectors.connection`, with
+# the other nouns `crates/protocol/src/connection.rs` declares.
+domain: connectors.event
+
+summary: One normalized unit of something happening, the inbound transport that receives it, and the two ways it reaches a client.
+
+types:
+  - name: connectors.event.EventRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.ChannelRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.ConnectionRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.IntegrationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.WebhookRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.DeliveryRef
+    kind: newtype
+    of: String
+
+  - name: connectors.event.SubscriptionRef
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/event.rs:65-70. "every event carries provenance — `native` (pushed by the
+  # provider) vs `polled` (synthesized) — honestly. No reliability theater."
+  # (docs/design/01-domain-model.md:375-376).
+  - name: connectors.event.EventProvenance
+    kind: enum
+    variants: [Native, Polled]
+
+  # The two disjoint families of docs/design/01-domain-model.md:368-373. They are never mixed and
+  # carry separate subscriptions, which is why this is a declared axis and not a label.
+  # UNMAPPED: the family is not projected on the wire. `DataEvent`
+  # (crates/protocol/src/event.rs:84-93) is the data family and the protocol has no operational
+  # counterpart at all, so nothing carries this discriminant. Settled by the operational event
+  # stream gaining a wire shape.
+  - name: connectors.event.EventFamily
+    kind: enum
+    variants: [Data, Operational]
+
+entities:
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:366-376), so this is a single-state lifecycle. `Normalized` is
+  # the document's own word: "One normalized unit of something happening"
+  # (docs/design/01-domain-model.md:368). An event is a fact and facts do not move, so this one is
+  # unlikely to gain a second state. Settled by a state enum in `crates/protocol/src/`.
+  # Fields: `DataEvent`, crates/protocol/src/event.rs:84-93.
+  - name: connectors.event.Event
+
+    identity:
+      name: event_ref
+      type: connectors.event.EventRef
+
+    fields:
+      - name: channel_ref
+        type: connectors.event.ChannelRef
+      - name: connection_ref
+        type: connectors.event.ConnectionRef
+      - name: integration_ref
+        type: connectors.event.IntegrationRef
+      - name: event_type
+        type: String
+      - name: provenance
+        type: connectors.event.EventProvenance
+      - name: received_at_unix_ms
+        type: Integer
+      - name: family
+        type: connectors.event.EventFamily
+
+    lifecycle:
+      initial: Normalized
+      states: [Normalized]
+      terminal: [Normalized]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:378-383), so this is a single-state lifecycle. `Declared` is
+  # the document's own word: verification and attribution are "declared in the catalog"
+  # (docs/design/01-domain-model.md:381). Settled by a state enum, or by the registration path
+  # becoming observable.
+  # UNMAPPED: the Webhook-to-Channel relation. docs/design/01-domain-model.md:380 calls a Webhook
+  # "the webhook transport of channels" and says there is "one platform endpoint", which states
+  # neither how many channels one endpoint serves nor whether a channel has more than one
+  # transport. Settled by the declarative routing grammar
+  # (`story:declarative-webhook-routing-grammar`), which is where the attribution rules live.
+  - name: connectors.event.Webhook
+
+    identity:
+      name: webhook_ref
+      type: connectors.event.WebhookRef
+
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:385-399), so this is a single-state lifecycle. `Queued` is the
+  # document's own word: "durable per-endpoint push queues"
+  # (docs/design/01-domain-model.md:388). The retries with backoff on the same line are a delivery
+  # attempt's states, not the Delivery's, and nothing enumerates them. Settled by a delivery
+  # attempt state enum, which is what `replay-by-id` (docs/design/01-domain-model.md:390) would
+  # read.
+  - name: connectors.event.Delivery
+
+    identity:
+      name: delivery_ref
+      type: connectors.event.DeliveryRef
+
+    lifecycle:
+      initial: Queued
+      states: [Queued]
+      terminal: [Queued]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:385-391), so this is a single-state lifecycle. `Streaming` is
+  # taken from the document's own "one multiplexed stream per client"
+  # (docs/design/01-domain-model.md:387-388). Settled by a state enum in `crates/protocol/src/`.
+  # UNMAPPED: the Subscription-to-Grant relation. docs/design/01-domain-model.md:387-388 says a
+  # subscription is "gated by inbound grants", plural, and docs/design/01-domain-model.md:293-294
+  # says inbound grants admit "a **closed** event set (no wildcards)" — so a subscription reads
+  # more than one grant, and nothing says how the sets combine. Settled by the grant evaluation
+  # that gates the stream.
+  - name: connectors.event.Subscription
+
+    identity:
+      name: subscription_ref
+      type: connectors.event.SubscriptionRef
+
+    lifecycle:
+      initial: Streaming
+      states: [Streaming]
+      terminal: [Streaming]

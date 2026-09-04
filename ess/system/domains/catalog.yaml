@@ -1,0 +1,169 @@
+# The catalog side of the three layers, docs/design/01-domain-model.md:107-174.
+domain: connectors.catalog
+
+summary: The reviewed, compiled template of one vendor surface, its declared operations, and the sealed set a deployment serves.
+
+types:
+  - name: connectors.catalog.ProviderRef
+    kind: newtype
+    of: String
+
+  - name: connectors.catalog.OperationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.catalog.CatalogRef
+    kind: newtype
+    of: String
+
+  # Reverse-DNS authority, e.g. `com.gitlab.api` (docs/design/01-domain-model.md:111); it leads
+  # every credential path and is never repointed once published
+  # (docs/design/01-domain-model.md:141).
+  - name: connectors.catalog.Authority
+    kind: newtype
+    of: String
+
+  - name: connectors.catalog.ServiceName
+    kind: newtype
+    of: String
+
+  # An `sre`/`developer`/`sales-rep`-style token; discovery metadata only, never authorization
+  # (docs/design/01-domain-model.md:136-138).
+  - name: connectors.catalog.Audience
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/catalog.rs:127-128: an authored risk token, ordered
+  # (docs/design/01-domain-model.md:145-146). The set itself is not enumerated in either place.
+  # UNMAPPED: the closed risk vocabulary. docs/design/01-domain-model.md:419 says risk is a closed
+  # vocabulary and `crates/protocol/src/catalog.rs:128` carries it as a `String`, so no member of
+  # the set is stated anywhere this document can cite. Settled by the catalog schema that defines
+  # the token set.
+  - name: connectors.catalog.RiskToken
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/catalog.rs:108-115.
+  - name: connectors.catalog.SetupProfileActor
+    kind: enum
+    variants: [Person, Application]
+
+  # `SetupProfileSummary`, crates/protocol/src/catalog.rs:100-105. "One credential-acquisition
+  # flow a person may start for themselves" (crates/protocol/src/catalog.rs:97). The
+  # `auth_profile` field is typed as `connectors.connection.AuthProfile` because
+  # crates/protocol/src/catalog.rs:101 states they are the same value: the id is carried "exactly
+  # as `ConnectSessionCreateRequest.auth_profile` accepts it"
+  # (crates/protocol/src/connection.rs:99-101).
+  - name: connectors.catalog.SetupProfileSummary
+    kind: struct
+    fields:
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: actor
+        type: connectors.catalog.SetupProfileActor
+
+entities:
+  # UNMAPPED: no state enum and no drawn lifecycle (docs/design/01-domain-model.md:109-141), so
+  # this is a single-state lifecycle. `Compiled` is the word the document itself uses for what a
+  # Provider is: "'Provider' names the *compiled catalog entry*"
+  # (docs/design/01-domain-model.md:124-125). Settled by a stored state, or by a drawn lifecycle
+  # in the design document, for the ingest-to-published path
+  # (docs/design/01-domain-model.md:119-123).
+  # Fields: `ProviderSummary`, crates/protocol/src/catalog.rs:71-95.
+  - name: connectors.catalog.Provider
+
+    identity:
+      name: provider_ref
+      type: connectors.catalog.ProviderRef
+
+    fields:
+      - name: authority
+        type: Optional<connectors.catalog.Authority>
+      - name: vendor
+        type: String
+      - name: description
+        type: String
+      - name: audiences
+        type: List<connectors.catalog.Audience>
+      - name: services
+        type: List<connectors.catalog.ServiceName>
+      - name: operation_count
+        type: Integer
+      # "Whether this runtime publishes a Connector-owned setup flow for the provider"
+      # (crates/protocol/src/catalog.rs:86-87). A deployment fact carried on the catalog
+      # projection, not a catalog fact.
+      - name: configurable
+        type: Boolean
+      # "The credential-acquisition flows this deployment can actually complete for a person who
+      # is not its operator, in catalog order" (crates/protocol/src/catalog.rs:88-94). Empty is a
+      # statement, not an omission (crates/protocol/src/catalog.rs:91-93).
+      - name: setup_profiles
+        type: List<connectors.catalog.SetupProfileSummary>
+
+    lifecycle:
+      initial: Compiled
+      states: [Compiled]
+      terminal: [Compiled]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:143-160), so this is a single-state lifecycle. `Declared` is
+  # the document's own word: "One declared, invocable unit of a provider"
+  # (docs/design/01-domain-model.md:145). Settled by a state enum in `crates/protocol/src/` or a
+  # lifecycle drawn beside the Connection one.
+  # Fields: `CatalogOperationSummary`, crates/protocol/src/catalog.rs:120-131.
+  # UNMAPPED: the Provider-to-Operation relation. `ProviderDescription`
+  # (crates/protocol/src/catalog.rs:136-141) carries a provider beside a list of operations, but
+  # `CatalogOperationSummary` carries no `provider_ref`, so nothing states whether an Operation
+  # belongs to exactly one Provider. Settled by a `provider_ref` on the operation projection, or
+  # by the catalog document schema that decides the containment.
+  - name: connectors.catalog.Operation
+
+    identity:
+      name: operation_ref
+      type: connectors.catalog.OperationRef
+
+    fields:
+      - name: service
+        type: connectors.catalog.ServiceName
+      - name: description
+        type: String
+      - name: risk
+        type: connectors.catalog.RiskToken
+      # "Whether it is curated for model exposure. This is not callability."
+      # (crates/protocol/src/catalog.rs:129-130).
+      - name: exposed
+        type: Boolean
+
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:162-174), so this is a single-state lifecycle. `Sealed` is the
+  # document's own word: "The sealed, versioned set of providers a deployment serves"
+  # (docs/design/01-domain-model.md:164). Settled by the startup path that either verifies the
+  # pack or refuses (docs/design/01-domain-model.md:168) becoming an observable state rather than
+  # a process outcome.
+  # UNMAPPED: the Catalog-to-Provider relation. docs/design/01-domain-model.md:164-165 says one
+  # value per process and calls the Catalog a set of providers, but nothing states whether a
+  # Provider may appear in more than one Catalog; docs/design/01-domain-model.md:172-174 defers
+  # composition, which is exactly the question. Settled by that composition work.
+  - name: connectors.catalog.Catalog
+
+    identity:
+      name: catalog_ref
+      type: connectors.catalog.CatalogRef
+
+    fields:
+      # "its schema version and its content **generation** (monotonic)"
+      # (docs/design/01-domain-model.md:164-165).
+      - name: schema_version
+        type: String
+      - name: generation
+        type: Integer
+
+    lifecycle:
+      initial: Sealed
+      states: [Sealed]
+      terminal: [Sealed]
