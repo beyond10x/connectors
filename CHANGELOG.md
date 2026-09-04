@@ -28,8 +28,11 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 - `connectors doctor`, `providers` and `auth status` render as a scannable report rather than a
   JSON dump. A list of records is one aligned row each, led by an ASCII severity marker that
-  survives a pipe, and the table is laid out to a 120-column budget that is spent on content
-  rather than on column names. `doctor` goes from 26 lines for six checks to 9; `providers` keeps
+  survives a pipe. The leading columns are laid out to a 120-column budget, spent on content
+  rather than on column names, so that the last column *starts* within the first 120 terminal
+  columns and everything before it is aligned there. It does not make a row fit 120 columns: the
+  last column is never cut, so 66 of the 71 lines `connectors providers` prints are wider than
+  that and the longest is 237. `doctor` goes from 26 lines for six checks to 9; `providers` keeps
   every catalogued id whole instead of wrapping at 927 lines.
 - `-o compact` no longer drops fields. A record carries every scalar the value holds beside it, at
   every nesting depth, so `healthy` and the `summary` counts survive. An empty listing answers
