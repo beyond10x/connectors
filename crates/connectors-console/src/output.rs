@@ -78,6 +78,11 @@ impl Format {
 /// Serialization failure for the selected format, or a closed stdout.
 pub fn emit(format: Format, value: &Value) -> Result<(), OutputError> {
     let rendered = render(format, value)?;
+    // Nothing to say is not the same as a blank line. `compact` answers an empty listing with no
+    // records at all, and a newline for it is a line `wc -l` counts and an `awk` loop reads.
+    if rendered.is_empty() {
+        return Ok(());
+    }
     let mut stdout = io::stdout().lock();
     stdout.write_all(rendered.as_bytes())?;
     if !rendered.ends_with('\n') {
@@ -161,7 +166,7 @@ pub(crate) fn render(format: Format, value: &Value) -> Result<String, OutputErro
 /// them is what put `healthy` out of reach of `connectors -o compact doctor | grep healthy`, which
 /// printed nothing at all for a report whose whole purpose is to answer that one question.
 fn compact(value: &Value) -> String {
-    let Some(items) = unwrap_single_array(value) else {
+    let Some((name, items)) = unwrap_single_array(value) else {
         return compact_line(value);
     };
 
@@ -175,16 +180,29 @@ fn compact(value: &Value) -> String {
         }
     }
 
-    // Nothing to ride on. An empty listing still carries its summary, and a format that answered
-    // an empty stream would have dropped it.
+    // Nothing to ride on. The report-level fields on a line of their own would be a line spelled
+    // exactly like a record and counted as one by `wc -l`, which is the defect this format's own
+    // documentation names — so an empty listing is an empty stream, and the summary of an empty
+    // listing is read in `text`, `json` or `yaml`. This is the one place `compact` answers less
+    // than the value holds, and it is the format's contract that decides it.
     if items.is_empty() {
-        return beside.join("\t");
+        return String::new();
     }
 
     items
         .iter()
         .map(|item| {
-            let record = compact_line(item);
+            // A record that is not an object is a single value, and the array's own key is the
+            // only name it has. Writing it bare put a token on the line that no `key=value` reader
+            // could address: `connect slack` lost the name `events` off its own event list.
+            let record = match (item, name) {
+                (Value::Object(_), _) | (_, None) => compact_line(item),
+                (single, Some(name)) => {
+                    let mut pairs = Vec::new();
+                    flatten(name, single, &mut pairs);
+                    pairs.join("\t")
+                }
+            };
             let mut pairs: Vec<&str> = Vec::new();
             if !record.is_empty() {
                 pairs.push(&record);
@@ -196,13 +214,20 @@ fn compact(value: &Value) -> String {
         .join("\n")
 }
 
-fn unwrap_single_array(value: &Value) -> Option<&Vec<Value>> {
+/// The records a list response carries, and the name the report gave them.
+///
+/// The name matters to a reader of the line: a record that is not an object has no key of its own,
+/// so the array's key is the only name its value will ever have.
+fn unwrap_single_array(value: &Value) -> Option<(Option<&str>, &Vec<Value>)> {
     match value {
-        Value::Array(items) => Some(items),
+        // A bare array was never named by anything.
+        Value::Array(items) => Some((None, items)),
         Value::Object(fields) => {
-            let mut arrays = fields.values().filter_map(Value::as_array);
+            let mut arrays = fields
+                .iter()
+                .filter_map(|(key, field)| Some((key.as_str(), field.as_array()?)));
             let only = arrays.next()?;
-            arrays.next().is_none().then_some(only)
+            arrays.next().is_none().then_some((Some(only.0), only.1))
         }
         _ => None,
     }
@@ -316,6 +341,16 @@ const MARKER_WIDTH: usize = 2;
 /// nothing at all, and a column saying nothing is worse than a table that overruns.
 const MIN_COLUMN: usize = 3;
 
+/// What a cut cell carries in place of the text it lost.
+const ELISION: char = '~';
+
+/// What a column name keeps while the cells beside it are still being paid.
+///
+/// Three characters and a mark. Measured against this catalogue: at three columns `reads` and
+/// `required_config_fields` both render `re…` and the table has two columns with one name, which
+/// is the header's own version of the collision this allocation exists to prevent.
+const NAME_FLOOR: usize = 4;
+
 /// One aligned row per record, under a header naming the columns.
 ///
 /// Every row opens with a marker column: where a record carries its own rank the glyph is the
@@ -342,29 +377,39 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
         .iter()
         .map(|item| columns.iter().map(|column| cell(item, column)).collect())
         .collect();
-    let mut widths: Vec<usize> = columns
-        .iter()
-        .enumerate()
-        .map(|(index, column)| {
+    // A column name is a JSON key and a JSON key is data: nothing upstream stops one carrying a
+    // newline, and it reaches the header without passing through a cell.
+    let mut header: Vec<String> = columns.iter().map(|column| one_line(column)).collect();
+    // What the cells alone need, kept apart from what the name needs. The budget is spent on
+    // content first, and this is the number that says how much content there is.
+    let content: Vec<usize> = (0..columns.len())
+        .map(|index| {
             cells
                 .iter()
                 .map(|row| display_width(&row[index]))
-                .chain(std::iter::once(display_width(column)))
                 .max()
                 .unwrap_or_default()
         })
         .collect();
+    let mut widths: Vec<usize> = content
+        .iter()
+        .zip(&header)
+        .map(|(cells, name)| *cells.max(&display_width(name)))
+        .collect();
+    let mut content = content;
 
     // A table is only aligned in practice if the column that runs long is the last one: a free-text
     // `detail` in the middle pushes every column after it past the width of a terminal and the row
     // wraps, which is the thing one row per record exists to prevent. Moved only when a single
     // column is strictly the widest, so an ordinary table keeps the order its records carry.
     if let Some(widest) = strictly_widest(&widths) {
-        if widest + 1 < columns.len() {
-            let column = columns.remove(widest);
-            columns.push(column);
+        if widest + 1 < widths.len() {
+            let name = header.remove(widest);
+            header.push(name);
             let width = widths.remove(widest);
             widths.push(width);
+            let needed = content.remove(widest);
+            content.push(needed);
             for row in &mut cells {
                 let moved = row.remove(widest);
                 row.push(moved);
@@ -372,8 +417,7 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
         }
     }
 
-    let mut header: Vec<String> = columns.iter().map(|column| (*column).to_owned()).collect();
-    fit_to_budget(&header, &mut widths, pad.len());
+    fit_to_budget(&header, &content, &mut widths, pad.len());
     // Only the leading columns are capped, and only after the budget is settled. The last column
     // is deliberately unbounded: it holds the free text — `doctor`'s `detail` is the sentence that
     // says what to do about the row — and a line that wraps inside its last cell still leaves
@@ -397,23 +441,40 @@ fn table(items: &[Value], depth: usize, buffer: &mut String) {
 ///
 /// Moving the widest column last cannot fix a wide table on its own: `connectors providers` has
 /// eleven columns before the moved one and they came to 196 terminal columns between them, so
-/// every row wrapped and nothing after the first column was aligned. So the leading columns give
-/// up width, widest first, in two phases — **the cells give way before the column names do**,
-/// because the name is what makes the rest of the row mean anything, and a nameless column is a
-/// worse table than a truncated cell. Only when the names alone still overrun does the second
-/// phase cut them too, down to [`MIN_COLUMN`].
-fn fit_to_budget(header: &[String], widths: &mut [usize], pad: usize) {
+/// every row wrapped and nothing after the first column was aligned.
+///
+/// **The budget is spent on content, and a name longer than its content is what gives way first.**
+/// Paying the name first is what the previous shape did, and it cost the story its point: a
+/// 22-character `required_config_fields` held 22 columns for one-character cells while `provider`
+/// was cut to eight, so 18 of 65 catalogued ids were truncated and four pairs of distinct
+/// authorities rendered as the same string. An identifier that collides on screen is worse than a
+/// name that is short, so a name is cut down to its content, and to [`NAME_FLOOR`] at the least —
+/// three characters and a mark, which is what keeps `reads` and `required_config_fields` apart.
+/// Only when even that does not fit does the second phase take content down too, to
+/// [`MIN_COLUMN`], and no column is ever squeezed below the one column its elision mark occupies.
+fn fit_to_budget(header: &[String], content: &[usize], widths: &mut [usize], pad: usize) {
     let Some(leading) = widths.len().checked_sub(1).filter(|count| *count > 0) else {
         return;
     };
-    let names: Vec<usize> = header.iter().map(|name| display_width(name)).collect();
+    let paid: Vec<usize> = header
+        .iter()
+        .zip(content)
+        .map(|(name, needed)| (*needed).max(display_width(name).min(NAME_FLOOR)).max(1))
+        .collect();
     for floors in [
-        names.clone(),
-        names.iter().map(|name| (*name).min(MIN_COLUMN)).collect(),
+        paid.clone(),
+        // Never below one column: that is what the elision mark itself occupies, and a column
+        // narrower than its own mark spends a terminal column the layout did not allocate and
+        // pushes every column after it out of line.
+        paid.iter()
+            .map(|floor| (*floor).clamp(1, MIN_COLUMN))
+            .collect(),
     ] {
         loop {
             let start = pad + MARKER_WIDTH + widths[..leading].iter().map(|w| w + 2).sum::<usize>();
-            if start <= TABLE_BUDGET {
+            // Strictly inside: a terminal `TABLE_BUDGET` columns wide holds cells `0..TABLE_BUDGET`,
+            // so a column *beginning* at the budget has not one character on the line.
+            if start < TABLE_BUDGET {
                 return;
             }
             // The widest column that can still give, earliest one first on a tie, one column at a
@@ -467,8 +528,11 @@ fn strictly_widest(widths: &[usize]) -> Option<usize> {
 ///
 /// The East Asian Wide and Fullwidth ranges, and no more: this package has no width table and is
 /// not going to grow one. A combining mark still counts as a column it does not occupy, and an
-/// emoji sequence counts as one column per code point; both are wrong and both are rarer than the
-/// case this fixes. Control characters cannot reach here — [`one_line`] has already folded them.
+/// emoji sequence counts as one column per code point; both are wrong, both are rarer than the
+/// case this fixes, and neither is chased here. A control character would be counted as a column
+/// it does not occupy either, which is why everything measured has been through [`one_line`] —
+/// cells by way of `scalar`, and column names, which are JSON keys and never touched a cell,
+/// where the header is built.
 fn display_width(text: &str) -> usize {
     text.chars()
         .map(|character| {
@@ -490,6 +554,12 @@ fn display_width(text: &str) -> usize {
 /// The mark is what makes this honest: a silently truncated value reads as the whole value, and a
 /// reader who cannot see that text was cut has no reason to go and look at `-o json`, which still
 /// carries all of it.
+///
+/// `~` rather than a typographic ellipsis, because the mark is **one byte as well as one column**.
+/// Everything that reads a line off a terminal counts bytes — `cut -c`, `awk`, `wc -c`, and a test
+/// asking where a column begins — and a three-byte mark makes the layout's own arithmetic disagree
+/// with theirs by two bytes per cut cell. Whatever skew the data brings is the data's; the layout
+/// adds none of its own.
 fn elide(text: &str, width: usize) -> String {
     if display_width(text) <= width {
         return text.to_owned();
@@ -505,7 +575,7 @@ fn elide(text: &str, width: usize) -> String {
         cut.push(character);
         used = next;
     }
-    cut.push('…');
+    cut.push(ELISION);
     cut
 }
 
@@ -587,13 +657,15 @@ fn row_severity(item: &Value) -> Option<Severity> {
 
 fn severity_of(value: &Value) -> Severity {
     match value {
-        // A readiness field is the whole answer: `ready: false` is a row an operator has to do
-        // something about, which is what the marker is for.
+        // A readiness field is the whole answer, and `false` is a warning rather than a failure:
+        // 13 of 65 catalogued providers declare no verify probe, and every one of them can still
+        // be connected. Marking them "this cannot work" says something untrue about most of the
+        // catalogue; `warn` and `ok` are still two different glyphs, so readiness stays visible.
         Value::Bool(ready) => {
             if *ready {
                 Severity::Ok
             } else {
-                Severity::Fail
+                Severity::Warn
             }
         }
         Value::String(word) => severity_of_word(word),
@@ -608,6 +680,14 @@ fn severity_of(value: &Value) -> Severity {
 /// `Unknown`. The words are `doctor`'s three (`doctor.rs`), `auth status`'s four states and its
 /// three credential states (`auth.rs`), and the ordinary spellings of the same three ranks.
 ///
+/// The second half of the vocabulary is the protocol's, and it is ranked against this module's own
+/// definition of `fail` — *this cannot work* — rather than against how the word sounds. A
+/// `revoked` Connection and a `stopped` Channel cannot carry a call as they stand, and an
+/// `expired` Connect Session can no longer be completed; `created`, `authorized`, `starting` and
+/// `reconnecting` are all a step on the way to working, which is a warning. Held to the enums
+/// themselves by `every_protocol_state_this_renderer_can_be_handed_has_a_rank`, whose match is
+/// exhaustive, so a variant added upstream cannot compile until it is answered here.
+///
 /// `absent`, `unavailable` and `not-callable` are warnings rather than failures on `auth.rs`'s own
 /// reasoning: a credential that was never stored is the ordinary state before `connect`, and a
 /// store that cannot be read is "we cannot say" rather than "it is not there". `not-callable` is
@@ -617,11 +697,11 @@ fn severity_of(value: &Value) -> Severity {
 fn severity_of_word(word: &str) -> Severity {
     match word {
         "ok" | "healthy" | "ready" | "pass" | "passed" | "callable" | "stored" | "listening"
-        | "connected" => Severity::Ok,
+        | "connected" | "completed" => Severity::Ok,
         "warn" | "warning" | "degraded" | "absent" | "missing" | "unavailable" | "pending"
-        | "not-callable" => Severity::Warn,
+        | "not-callable" | "created" | "authorized" | "starting" | "reconnecting" => Severity::Warn,
         "fail" | "failed" | "error" | "refused" | "unhealthy" | "not-ready" | "no-authority"
-        | "unknown-provider" => Severity::Fail,
+        | "unknown-provider" | "revoked" | "stopped" | "expired" => Severity::Fail,
         _ => Severity::Unknown,
     }
 }
@@ -936,15 +1016,37 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_listing_still_carries_the_summary_it_was_counted_with() {
-        // No record to ride on. Answering with an empty stream would drop the one field that says
-        // the listing really is empty rather than the command having failed.
+    fn an_empty_listing_is_an_empty_stream_rather_than_a_line_shaped_like_a_record() {
+        // Two contracts collide here and this format's own is the one that wins: a summary on a
+        // line of its own is spelled exactly like a record, counted by `wc -l` as a record and
+        // read by `awk -F'\t'` as a record. So `compact` — and only `compact` — answers an empty
+        // listing with nothing, and `emit` writes no newline for it either. The summary of an
+        // empty listing is read in `text`, `json` or `yaml`, all three of which still carry it.
+        let empty = json!({"providers": [], "summary": {"listed": 0}});
+        assert_eq!(render(Format::Compact, &empty).unwrap(), "");
+        assert!(render(Format::Text, &empty).unwrap().contains("listed: 0"));
+        assert!(render(Format::Json, &empty)
+            .unwrap()
+            .contains("\"listed\": 0"));
+    }
+
+    #[test]
+    fn a_record_that_is_not_an_object_keeps_the_name_the_report_gave_it() {
+        // `connect slack` carries one array and it holds strings, so `compact_line` wrote each
+        // element bare and the name `events` was never written at all — a token on the line that
+        // no `key=value` reader can address, and the acceptance says no format drops a field.
         let rendered = render(
             Format::Compact,
-            &json!({"providers": [], "summary": {"listed": 0}}),
+            &json!({"connection_ref": "connection:slack:T1", "events": ["message", "reaction"]}),
         )
         .unwrap();
-        assert_eq!(rendered, "summary.listed=0");
+        assert_eq!(
+            rendered,
+            concat!(
+                "events=message\tconnection_ref=connection:slack:T1\n",
+                "events=reaction\tconnection_ref=connection:slack:T1",
+            )
+        );
     }
 
     #[test]
@@ -1266,8 +1368,9 @@ mod tests {
                 .expect("a last column");
             let start = header.rfind(last).expect("where it begins");
             assert!(
-                display_width(&header[..start]) <= TABLE_BUDGET,
-                "the last column starts at terminal column {}:\n{header}",
+                display_width(&header[..start]) < TABLE_BUDGET,
+                "the last column starts at terminal column {} of a {TABLE_BUDGET}-column \
+                 terminal, so none of it is on the line:\n{header}",
                 display_width(&header[..start])
             );
         }
@@ -1288,12 +1391,136 @@ mod tests {
             );
         }
         assert!(
-            rendered.lines().skip(2).any(|line| line.contains('…')),
+            rendered.lines().skip(2).any(|line| line.contains(ELISION)),
             "nothing was marked as cut in a table that does not fit:\n{header}"
         );
+        // The mark costs one byte as well as one column, so where a reader counting bytes thinks
+        // a column begins is where it begins on screen.
+        for line in rendered.lines() {
+            assert_eq!(
+                line.len(),
+                display_width(line),
+                "the layout put a byte/column skew in a line of its own making:\n{line}"
+            );
+        }
         // Nothing is lost by it: the structured formats still carry the whole value.
         let json = render(Format::Json, &crate::providers::run("")).unwrap();
-        assert!(!json.contains('…'));
+        assert!(!json.contains(ELISION));
+    }
+
+    #[test]
+    fn every_protocol_state_this_renderer_can_be_handed_has_a_rank() {
+        use protocol::connection::{ChannelState, ConnectSessionState, ConnectionState};
+
+        // The other half of the vocabulary, and the half this package does not own: these three
+        // enums are what a result off the wire puts under a `state` key. The source scan below
+        // cannot see them — they arrive as an enum, not as a literal — so they are held to the
+        // enums themselves. **Every match here is exhaustive on purpose**: a variant added upstream
+        // will not compile until somebody has decided what a reader should see for it, which is the
+        // only form of this check that does not rot. `revoked` arriving as `?` is what this is for.
+        let connection = |state: ConnectionState| match state {
+            ConnectionState::Callable => Severity::Ok,
+            // On the way to callable, and reached by doing the next thing in the flow.
+            ConnectionState::Created | ConnectionState::Authorized => Severity::Warn,
+            ConnectionState::Degraded => Severity::Warn,
+            // The authority is gone. Nothing this Connection is asked to do can work.
+            ConnectionState::Revoked => Severity::Fail,
+        };
+        let channel = |state: ChannelState| match state {
+            ChannelState::Connected => Severity::Ok,
+            ChannelState::Starting | ChannelState::Reconnecting => Severity::Warn,
+            ChannelState::Stopped => Severity::Fail,
+        };
+        let session = |state: ConnectSessionState| match state {
+            ConnectSessionState::Completed => Severity::Ok,
+            ConnectSessionState::Pending => Severity::Warn,
+            ConnectSessionState::Expired | ConnectSessionState::Failed => Severity::Fail,
+        };
+
+        let mut ranked = 0_usize;
+        for (word, expected) in [
+            ConnectionState::Created,
+            ConnectionState::Authorized,
+            ConnectionState::Callable,
+            ConnectionState::Degraded,
+            ConnectionState::Revoked,
+        ]
+        .into_iter()
+        .map(|state| {
+            (
+                serde_json::to_value(state).expect("a wire word"),
+                connection(state),
+            )
+        })
+        .chain(
+            [
+                ChannelState::Starting,
+                ChannelState::Connected,
+                ChannelState::Reconnecting,
+                ChannelState::Stopped,
+            ]
+            .into_iter()
+            .map(|state| {
+                (
+                    serde_json::to_value(state).expect("a wire word"),
+                    channel(state),
+                )
+            }),
+        )
+        .chain(
+            [
+                ConnectSessionState::Pending,
+                ConnectSessionState::Completed,
+                ConnectSessionState::Expired,
+                ConnectSessionState::Failed,
+            ]
+            .into_iter()
+            .map(|state| {
+                (
+                    serde_json::to_value(state).expect("a wire word"),
+                    session(state),
+                )
+            }),
+        ) {
+            assert_eq!(severity_of(&word), expected, "the rank of {word}");
+            ranked += 1;
+        }
+        assert_eq!(ranked, 13, "a state went unranked");
+    }
+
+    #[test]
+    fn two_providers_that_differ_in_their_id_differ_on_screen() {
+        // Why the budget is spent on content: with the column *name* paid first, `provider` was
+        // squeezed to eight columns, 18 of 65 catalogued ids arrived cut, and four pairs of
+        // distinct authorities rendered as the same string. A listing whose identifiers collide is
+        // a listing nobody can act on, which is the story's whole point.
+        let all = crate::providers::run("");
+        let rendered = render(Format::Text, &all).unwrap();
+        let mut checked = 0_usize;
+        for record in all["providers"].as_array().expect("the records") {
+            let id = record["provider"].as_str().expect("an id");
+            // Space-delimited: a cell is padded, so a whole id reads as ` id `, and a fragment of
+            // one inside a longer cell — `jira` inside `com.atlassian.jira` — does not.
+            assert!(
+                rendered.contains(&format!(" {id} ")),
+                "`{id}` does not appear on screen as a whole id"
+            );
+            checked += 1;
+        }
+        assert!(checked > 40, "only {checked} ids were checked");
+
+        // And the names stay apart too: at three columns `reads` and `required_config_fields` are
+        // both `re~`, which is the same collision one row up.
+        let header = rendered.lines().nth(1).expect("a header");
+        let names: Vec<&str> = header.split("  ").filter(|name| !name.is_empty()).collect();
+        assert_eq!(
+            names.len(),
+            names
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            "two columns share one name: {names:?}"
+        );
     }
 
     /// Every string literal written as the value of a severity key on one line of Rust source.
