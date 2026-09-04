@@ -2,21 +2,35 @@
 format: aep.planning-md/1
 id: story:cli-surface-contract
 kind: story
-status: draft
+status: implemented
 title: The command tree is generated, and the gate holds it there
 relations:
 - derived_from: epic:cli-surface
 - depends_on: story:connectors-ess-domain
 scope:
 - confidence: cited
+  path: .github/workflows/release.yml
+- confidence: cited
+  path: Cargo.toml
+- confidence: cited
+  path: crates/catalog-build/tests/main/architecture_fence.rs
+- confidence: cited
   path: crates/connectors-cli/src/generated
 - confidence: cited
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: cited
+  path: crates/connectors-cli/tests/cli_surface_drift.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface_pass_two.rs
+- confidence: cited
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
+  path: ess/generated/clap
+- confidence: cited
+  path: ess/system/components.yaml
+- confidence: cited
   path: scripts/gate.sh
-revision: 5
+revision: 15
 ---
 # Story: the command tree is generated, and the gate holds it there
 

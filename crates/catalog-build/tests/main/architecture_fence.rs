@@ -30,7 +30,15 @@ const MODULE_LINE_LIMIT: usize = 1_500;
 // Raised 966 -> 1006 on 2026-09-04 for `connectors completions <shell>`: the Clap variant with its
 // install note, one dispatch arm that hands the parser's own command tree to `clap_complete`, and
 // one test that renders every shell's script. The script is generated, never maintained here.
-const CLI_TOTAL_LINE_LIMIT: usize = 1006;
+// Raised 1006 -> 1014 on 2026-09-04 for `pub fn command()` (story:cli-surface-contract), and the
+// eight are: three lines of doc, `#[must_use]`, a three-line body returning `Cli::command()`, and
+// the blank line that separates it from what follows.
+// It moves no behaviour into the binary — it exposes the tree the binary already builds, so that
+// `crates/connectors-cli/tests/cli_surface.rs` can hold it against `ess/system/components.yaml`.
+// The generated projection of that specification is deliberately *not* under this crate, for the
+// reason this cap exists: `ess/generated/clap/` would otherwise be counted as hand-written
+// frontend code. See docs/design/19-the-cli-surface.md.
+const CLI_TOTAL_LINE_LIMIT: usize = 1014;
 
 /// Existing large catalog modules are named debts. The ceiling prevents a waiver from becoming
 /// permission for unbounded growth; splitting below 1,500 lines must delete the waiver.
