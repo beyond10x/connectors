@@ -14,6 +14,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 Every first-level word of the shipped binary moves, and bare `connectors serve` stops starting the
 local server: the breaking change the preamble puts in a minor bump.
 
+### Added
+
+- Expose the hosted Slack organization bot's app and bot tokens through the tenant-bound
+  administrative credential surface. A deployment can activate that bot without claiming that
+  personal Slack OAuth is configured; the personal flow appears only when its paired client
+  registration is present.
+
 ### Changed
 
 - **`connectors --help` lists eight words, not sixteen.** Ten first-level commands that were five
@@ -54,6 +61,15 @@ local server: the breaking change the preamble puts in a minor bump.
   `crates/catalog-build/tests/main/architecture_fence.rs`. It was raised at every one of the six
   times it fired and never once moved a line out of the binary; `product_cli_is_a_thin_frontend`
   still bounds what the frontend may link and what it may declare.
+
+### Fixed
+
+- Page the GitLab membership scan used by both project-binding discovery and redemption. A
+  repository listed after the first 100 memberships no longer becomes inaccessible when a caller
+  opens it, while malformed or unbounded provider pagination still fails closed.
+- Accept a scope-omitting Claude Code refresh response only by carrying forward the scopes from the
+  previously verified OAuth record. Initial responses without the required inference scope remain
+  refused.
 
 ## 0.5.11 — 2026-09-04
 
