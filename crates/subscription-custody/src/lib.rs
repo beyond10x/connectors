@@ -144,6 +144,7 @@ struct ProviderTokenResponse {
     expires_in: u64,
     #[serde(default)]
     refresh_token_expires_in: Option<u64>,
+    #[serde(default)]
     scope: String,
 }
 
@@ -921,8 +922,7 @@ mod tests {
                 assert_eq!(exchange, 1);
                 Json(json!({
                     "access_token":"synthetic-access-token-two",
-                    "expires_in":3600,
-                    "scope":"user:inference user:profile"
+                    "expires_in":3600
                 }))
             }
             other => panic!("unexpected grant type: {other:?}"),
@@ -1002,6 +1002,21 @@ mod tests {
             .unwrap();
         assert_eq!(redeemed.expose_secret(), "synthetic-access-token-two");
         assert_eq!(exchanges.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn an_initial_oauth_response_without_scopes_is_still_refused() {
+        let response: ProviderTokenResponse = serde_json::from_value(json!({
+            "access_token":"synthetic-access-token-one",
+            "refresh_token":"synthetic-refresh-token-one",
+            "expires_in":3600
+        }))
+        .expect("a scope-omitting provider response has a closed default");
+
+        assert!(matches!(
+            oauth_record(response, None, 1_700_000_000_000),
+            Err(CustodyError::OauthRefused)
+        ));
     }
 
     #[tokio::test]
