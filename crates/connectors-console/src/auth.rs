@@ -259,6 +259,13 @@ mod tests {
         // Keyring first, file second. If these ever disagree, `auth status` would report on a
         // different store than the daemon reads, which is worse than not reporting at all.
         let directory = tempfile::tempdir().expect("a temporary directory");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+                .expect("the test state root becomes owner-only");
+        }
         let (_store, backend) = open_store(directory.path()).expect("a store opens");
         assert!(
             backend == "keyring" || backend.starts_with("file"),
