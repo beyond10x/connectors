@@ -94,6 +94,19 @@ jobs:
       - name: Populate the registry
         run: cargo fetch --locked
 
+      # `gate.sh --final` validates `ess/system` and regenerates `ess/generated/clap`, and `ess`
+      # is not a workspace dependency, so `cargo fetch` above does not bring it. The gate refuses
+      # rather than skipping when it is absent: a step that skips itself exits 0 and is
+      # indistinguishable in the status from one that ran.
+      #
+      # `beyond10x/ess` is public, so no credential is needed here. Pinned to a tag rather than a
+      # revision, because the tag is what `ess-xtask release status` holds to having a GitHub
+      # Release behind it.
+      - name: The ESS toolchain
+        run: |
+          cargo install --locked --git https://github.com/beyond10x/ess.git --tag 0.16.0 ess-cli
+          ess --version
+
       - name: Catalog lock verifier and documentation checks
         run: bash scripts/gate.sh --final
 
