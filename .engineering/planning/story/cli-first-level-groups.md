@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:cli-first-level-groups
 kind: story
-status: draft
+status: implemented
 title: The top level reads as categories, not as sixteen commands
 relations:
 - derived_from: epic:cli-surface
@@ -12,7 +12,7 @@ scope:
   path: crates/catalog-build/tests/main/architecture_fence.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
-revision: 3
+revision: 8
 ---
 # Story: the top level reads as categories, not as sixteen commands
 
@@ -49,19 +49,62 @@ Four subcommand enums hold the moved variants verbatim — the variants move, th
 
 ## Compatibility
 
-Old paths keep working for one release. In `run_from` (`lib.rs:430`) a const table maps a legacy
-first token to its group pair before clap is handed the argv, and one stderr line names the new
-path. It rewrites `argv[1]` and never inspects a flag: clap remains the only parser, and the repeated
-rule that a Rust CLI uses clap derive is not bent by it.
+Old paths keep working for one release. `moved` rewrites a legacy path before the command runs, and
+one stderr line names the path it moved to.
 
-The table is the same one the contract test reads, so the shim cannot drift from the specification.
+**Nothing in it reads an option's syntax.** clap parses argv, and each parse it performs answers one
+question:
+
+1. **Is a word that moved present at all?** Unless one of the first `LEGACY_WINDOW` — 8 — words is
+   the first word of a `MOVED` row, no tree is built and nothing is allocated. Every current path
+   pays this and nothing else.
+2. **Does this release already read the argv?** The real tree is asked to parse it. Only two
+   refusals mean a word that moved: `InvalidSubcommand` — `doctor`, `auth status`, `help doctor` —
+   and `UnknownArgument`, which is `serve --config` at the group that took the old leaf's name.
+   Every other outcome is clap's to answer as it stands: a parse, a help request, a version
+   request, a missing value.
+3. **Which path was typed?** `read_one_word` reads the argv one word at a time, each read stepping
+   over the global options in front of that word — asked of the parser, not named here, so a global
+   added later needs no edit. `-o json`, `--output json`, `--output=json` and `-ojson` are one case,
+   because clap's option syntax is clap's. The argv handed on is rebuilt from what clap read: the
+   globals, `help` if it was there, the new words, then the tail verbatim.
+
+The first version pre-scanned argv from `argv[1]` with a hand-written `spans` that reimplemented
+clap's four option-value spellings. That is the argv parsing a Rust CLI does not do, and it was
+wrong in six ways, each a path that worked before the move:
+
+| typed | was |
+|---|---|
+| `connectors --output json <word>` | all eleven entries refused; `--output` is `global = true` |
+| `connectors help <word>` | ten of eleven refused, and `help` is a word `--help` advertises |
+| `connectors serve help` | rewritten to `serve local help` and refused |
+| `connectors auth` | refused, naming no destination |
+| `connectors auth help` | the one-word `auth` row put the group's own `help` where `inspect auth` takes no positional |
+| `connectors auth -o json status` | a global between the two words of a row defeated the match |
+
+`serve` is in the table and does not shadow the group it names. The row fires only after the real
+parse refused, so bare `connectors serve`, `serve --help` and `serve -h` are the group — the way
+bare `setup`, `inspect` and `session` are — and `serve --config X` is the old leaf.
+
+`auth` is in the table twice, as the group a person typed and as the two-word path under it. The
+longest matching row wins, so the order of the table decides nothing.
+
+`MOVED` and `moved` are `pub`. `tests/moved_paths_are_not_taught.rs` asks the shipped function
+whether a written invocation names a path that moved, rather than restating its rules: the
+restatement drifted once, which is how `connectors -o compact doctor` shipped, and a hand-copied
+`MOVED` in an adversary suite ran three cases against eleven rows of twelve.
 
 ## Fence
 
-`CLI_TOTAL_LINE_LIMIT` is 1006 and `crates/connectors-cli/src/lib.rs` is at 998
-(`crates/catalog-build/tests/main/architecture_fence.rs:33`). Raise it with a dated reason comment,
-in the form the `966 → 1006` completions bump set, to what the build reports rather than to an
-estimate.
+**The CLI line cap is gone.** `CLI_TOTAL_LINE_LIMIT` was removed on 2026-09-04 by operator
+instruction. It had been raised at every one of the six times it fired — 856, 960, 966, 1006, 1014,
+1127 — so it never once moved code out of the binary, which is the only thing it was for. What it
+did do was cost: raising it inserts lines into `architecture_fence.rs`, and citations into that file
+broke that way twice in one day.
+
+`product_cli_is_a_thin_frontend` still bounds the frontend by what it may **link**
+(`CLI_DEPENDENCIES`) and what it may **declare** (the forbidden symbols). Those measure the property
+directly and refuse rather than negotiate.
 
 ## Cross-repository
 
