@@ -175,7 +175,7 @@
     ]
   ],
   "description": "Zendesk Support ticketing: search, read and update tickets and comments; inspect audits, incremental exports and custom-object definitions",
-  "generator": "connectors 0.5.11",
+  "generator": "connectors 0.6.0",
   "operations": [
     {
       "auth": [

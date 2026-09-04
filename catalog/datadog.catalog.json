@@ -63,7 +63,7 @@
     ]
   ],
   "description": "Datadog monitoring: list and inspect monitors, list and inspect incidents. Authenticates every request with an API key and an Application key together",
-  "generator": "connectors 0.5.11",
+  "generator": "connectors 0.6.0",
   "operations": [
     {
       "auth": [
