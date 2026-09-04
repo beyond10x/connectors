@@ -278,14 +278,36 @@ fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
     let mut all = documents(&workspace, &plan);
     let slack = all.remove("slack").expect("Slack ships");
     let operations = slack["operations"].as_array().expect("operations");
-    assert_eq!(
-        operations.len(),
-        8,
-        "Slack's initial callable surface is exact"
-    );
-    assert!(operations
+    assert_eq!(operations.len(), 12, "Slack's callable surface is exact");
+    // **Callable is not projected.** `slack-users-list` is catalogued and exposed to nothing: a
+    // workspace directory is a bulk read of named people, and the per-person question a model asks
+    // is already `slack-users-info`. Every other operation here is curated for a model.
+    let projected: Vec<&str> = operations
         .iter()
-        .all(|operation| operation["expose"] == true));
+        .filter(|operation| operation["expose"] == true)
+        .map(|operation| operation["id"].as_str().expect("id"))
+        .collect();
+    assert_eq!(projected.len(), 11);
+    assert!(!projected.contains(&"slack-users-list"));
+
+    // Direct messages and group DMs are outside this connector entirely, and the enforcement is
+    // that no input can reach them: `conversations.list` takes a `types` parameter which is not
+    // declared, so Slack's documented `public_channel` default is the only value it can send.
+    // Asserted over the request templates rather than over prose, because a reviewed `enum` would
+    // not survive into a published input schema.
+    for operation in operations {
+        for parameter in operation["request"]["query"]
+            .as_array()
+            .unwrap_or(&Vec::new())
+        {
+            assert_ne!(
+                parameter["name"].as_str(),
+                Some("types"),
+                "{} must not admit a conversation-type selector",
+                operation["id"]
+            );
+        }
+    }
 
     for operation in operations {
         let service = operation["service"].as_str().expect("service");
@@ -323,8 +345,9 @@ fn slack_surface_is_curated_and_credential_scopes_never_cross_purposes() {
         assert_eq!(requirements.len(), 2);
         let expected_scope = match operation["id"].as_str().expect("operation id") {
             "slack-chat-post-message" => "chat:write",
-            "slack-conversations-history" => "channels:history",
-            "slack-users-info" => "users:read",
+            "slack-conversations-history" | "slack-conversations-replies" => "channels:history",
+            "slack-conversations-list" | "slack-conversations-info" => "channels:read",
+            "slack-users-info" | "slack-users-list" => "users:read",
             "slack-reactions-add" => "reactions:write",
             other => panic!("unexpected curated Slack operation {other}"),
         };
@@ -443,8 +466,9 @@ fn gitlab_user_and_automation_connections_are_distinct_and_scope_gated() {
 /// S-015 is a vocabulary migration, not a behavioural edit. The digest began as the pre-migration
 /// inventory of 151 non-empty operation trait sets, normalized without the old umbrella key, and
 /// advances only when a new operation deliberately adds one of those promoted traits. It last
-/// advanced to 161 when `runpod` declared Runpod's RFC 9457 error envelope on its six exposed
-/// reads.
+/// advanced to 176 when Slack's four added reads declared their cursor pagination and Slack's
+/// `ok: false` error envelope, and Confluence's four rewritten reads moved to the surface a
+/// service-account credential can actually reach.
 #[test]
 fn promoted_operation_traits_equal_the_pre_migration_inventory() {
     let (workspace, plan) = full_plan();
@@ -473,11 +497,11 @@ fn promoted_operation_traits_equal_the_pre_migration_inventory() {
             fact["id"].as_str().unwrap()
         )
     });
-    assert_eq!(facts.len(), 172);
+    assert_eq!(facts.len(), 176);
     let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
     assert_eq!(
         digest,
-        "dff0fc0fdcc743b4fe50241d0b7a6d93f1c1fff751a03c8d6a1780a657888d35"
+        "69be55901f935d327ea8af6fea51c2f65fd6e3d95d047dd541db3e4cb96390f9"
     );
 }
 

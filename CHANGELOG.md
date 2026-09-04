@@ -11,7 +11,7 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
-## 0.5.9 — 2026-09-04
+## 0.5.10 — 2026-09-04
 
 ### Changed
 
@@ -32,6 +32,51 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
   `exclude` list and in no lane, so nothing had ever executed its tests; the package now carries
   three test binaries and 80 cases.
 
+## 0.5.9 — 2026-09-04
+
+### Added
+
+- Four read-only Slack operations: `slack-conversations-replies` (a thread's parent and its
+  replies, which nothing could reach before), `slack-conversations-list`, `slack-conversations-info`
+  and `slack-users-list`. The first three are projected to a model; the workspace directory is
+  catalogued and not projected.
+- `confluence.service_api_token`, the deployment-owned bearer twin of the personal Basic token.
+- `[catalog.usernames]` in the personal configuration: a value-free home for the non-secret user
+  half of a `basic` credential, keyed by the credential it joins. `connectors connect --set` writes
+  it, and `connectors auth status` reports whether it is present.
+
+  **The section is optional and a configuration without it reads unchanged — but it is a new key,
+  and the configuration is `deny_unknown_fields`, so a binary older than this release refuses a file
+  that carries one.** Install before writing, not after; observed as a red `connectors doctor` on
+  2026-09-04 when a 0.5.3 binary met a file a newer build had written.
+
+### Changed
+
+- **Both Atlassian connectors address the vendor's cloud gateway by cloud id** rather than the
+  tenant's own site host, and Confluence's four reads moved from the `api/v2` surface to `rest/api`.
+  This is a correctness fix, not a preference: measured on one tenant with a service-account API
+  token, a project search returned HTTP 200 and `total: 0` against the site host and HTTP 200 with
+  40 results against the gateway, while `api/v2` answered 401. A connector pointed at the old route
+  reported an empty world rather than a refusal anyone could act on. `site` is replaced by
+  `cloud_id` in both `[[catalog]]` entries.
+- `confluence-page-get` now returns the page body, because it sends the expansion that asks for it.
+- Both Atlassian connectors declare their service-account mechanism first, so a placement holding
+  both a personal and a service-account token authenticates as the service account.
+- The Slack user-token declaration no longer requests `im:*` or `mpim:*` scopes; no operation names
+  them, and `slack-conversations-list` withholds the parameter that would reach a DM.
+
+### Fixed
+
+- A personal-local `basic` credential could not be assembled at all. The user half resolves through
+  the configuration port, and both `CatalogBackend` constructors built a port that could only answer
+  endpoint variables — so a stored Atlassian token refused with `not_granted: no stored credential
+  satisfies this operation's declared mechanisms` while `auth status` reported it as stored.
+- Personal-local Kubernetes served exactly one activated cluster. `cluster_connection` answered the
+  first key of a map, so an operator with five authorized contexts saw one in
+  `operation describe kubernetes.deployment.status` and got `not_found` from every other — a message
+  about the operation for a fault in Connection selection.
+- A non-2xx vendor answer carried one sentence for every cause. It now names the HTTP status, and
+  401, 403, 404 and 429 each say what to check.
 ## 0.5.8 — 2026-09-04
 
 ### Changed

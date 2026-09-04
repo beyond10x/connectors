@@ -28,8 +28,11 @@ the full SaaS or satellite surface.
   Slack connection flow.
 - [docs/guides/connect-gitlab.md](docs/guides/connect-gitlab.md) — connect GitLab as yourself or as
   a bounded automation identity.
-- [docs/guides/connect-jira.md](docs/guides/connect-jira.md) — deployment-owned read-only Jira and
-  delegated, approval-gated user writes.
+- [docs/guides/connect-jira.md](docs/guides/connect-jira.md) — Jira Cloud: the personal-local
+  placement (a scoped service-account or personal API token, routed by `cloud_id` through the
+  Atlassian cloud gateway) and the deployment-owned read-only Integration with delegated user OAuth.
+- [docs/guides/connect-confluence.md](docs/guides/connect-confluence.md) — Confluence Cloud on the
+  same gateway route and token, reads only.
 - [docs/stories/README.md](docs/stories/README.md) — sequenced design and implementation backlog.
 - [docs/research/](docs/research/) — the platform-category survey and mined catalog-as-text
   precedents (with vendored primary sources under `docs/research/vendor/`).

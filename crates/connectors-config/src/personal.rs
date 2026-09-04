@@ -93,6 +93,18 @@ pub struct CatalogIntegrationConfig {
     /// self-managed GitLab, `origin`.
     #[serde(default)]
     pub endpoints: BTreeMap<String, String>,
+    /// The **non-secret user half** of a `basic` credential, keyed by the credential it joins.
+    ///
+    /// An Atlassian API token travels as `base64(email:token)`: the token is the secret and lives
+    /// in the credential store, the email is not and has to live somewhere a deployment can write.
+    /// Without it a stored token assembles into nothing and the call refuses with `not_granted`,
+    /// which says something untrue about why. Keyed by the credential's flat name
+    /// (`jira.api_token`) rather than the configuration field's local one, because that is the key
+    /// `ConfigField::Username` asks under; the catalogue says which field is a user half, by
+    /// binding `username.<credential>`. A `secret` field binds `credential.*` and cannot land here,
+    /// and validation refuses anything but bounded printable ASCII.
+    #[serde(default)]
+    pub usernames: BTreeMap<String, String>,
     /// Whether the operator has approved these configuration values.
     ///
     /// The catalogue marks some fields as needing deployment approval before they can influence a
@@ -149,6 +161,14 @@ impl CatalogIntegrationConfig {
                 .is_some_and(|path| !path.is_absolute())
         {
             return Err(ConfigError::Invalid);
+        }
+        // A user half is a credential *name* and a printable account identifier, both bounded.
+        // Refused here rather than at assembly time so a configuration that cannot work is a
+        // configuration the daemon never starts on.
+        for (credential, user) in &self.usernames {
+            if !config_ref(credential, 256) || !config_ref(user, 512) {
+                return Err(ConfigError::Invalid);
+            }
         }
         Ok(())
     }

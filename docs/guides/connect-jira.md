@@ -22,6 +22,90 @@ the current operation-description lease. Deletes, attachments, arbitrary Jira `f
 objects, description edits, and automatic transitions are not admitted. A failed delegated
 credential never falls back to the organization credential.
 
+## Which token kind you hold, and which base URL it needs
+
+Atlassian issues three things an operator can reasonably call "a Jira token", and they are not
+interchangeable. `connectors providers jira` lists four declared mechanisms and says nothing about
+which one a value in your clipboard is, so start here.
+
+| what you have | mechanism | how it travels | base URL that accepts it |
+|---|---|---|---|
+| An API token you minted at `id.atlassian.com` under your own account | `jira.api_token` | Basic `email:token` | the Cloud gateway |
+| An API token minted **by a service account** (organization-issued, no person behind it) | `jira.service_api_token` | Bearer | the Cloud gateway |
+| An OAuth 2.0 (3LO) access token a person granted | `jira.user_oauth` | Bearer | the Cloud gateway |
+
+The base URL is the same for all three, and it is **not** your `*.atlassian.net` site:
+
+```text
+https://api.atlassian.com/ex/jira/<cloud id>
+```
+
+**The site host is the trap.** It answers, so nothing looks wrong. Measured on one tenant on
+2026-09-04 with a service-account API token, `GET /rest/api/3/project/search` returned HTTP 200 and
+`total: 0` against `https://<site>.atlassian.net`, and HTTP 200 with `total: 40` against the
+gateway. A connector pointed at the site would report an empty Jira rather than a refusal anybody
+could act on, so this catalogue does not offer that route at all — `jira` templates a cloud id and
+nothing else.
+
+Your cloud id is the UUID your own site reports at `https://<your-site>.atlassian.net/_edge/tenant_info`.
+
+## Personal-local configuration
+
+The personal placement serves Jira generically from the catalogue: there is no `[jira]` section and
+no per-provider Rust, only a `[[catalog]]` row and a credential in the store.
+
+A service-account token, which is what an integration that will be deployed should carry:
+
+```shell-session
+connectors connect jira \
+  --as jira.service_api_token \
+  --set cloud_id=11111111-2222-3333-4444-555555555555 \
+  --credential-file ~/.config/b10x/atlassian/jira.token
+```
+
+A personal API token instead, which is Basic and therefore has two halves — the token goes to the
+store, the account email is configuration:
+
+```shell-session
+connectors connect jira \
+  --as jira.api_token \
+  --set cloud_id=11111111-2222-3333-4444-555555555555 \
+  --set email=you@example.com
+```
+
+Either writes a row like this, and never a credential value:
+
+```toml
+[[catalog]]
+provider = "jira"
+grant_ref = "grant:jira:local"
+initiation = "platform"
+allow_writes = false
+credential = "jira.service_api_token"
+operator_approved = true
+
+[catalog.endpoints]
+cloud_id = "11111111-2222-3333-4444-555555555555"
+
+# Only for the Basic mechanism. Keyed by the credential the account name joins, not by the
+# configuration field's own name.
+[catalog.usernames]
+"jira.api_token" = "you@example.com"
+```
+
+`connectors auth status` reports both halves. A Basic credential whose account name is missing reads
+`stored-without-user-half` rather than `stored`, because a token that cannot be joined is a token
+that cannot be sent.
+
+**Order is selection.** A host takes the first declared mechanism whose credentials all resolve, and
+`jira.service_api_token` is declared first. Storing a personal token beside a service-account one
+therefore leaves the service account in charge, which is the intended default for anything that will
+be deployed.
+
+Adding a second credential to a Jira row that already exists stores the value and does **not**
+rewrite the row; `connect` appends whole blocks rather than editing one an operator may have
+commented. If a `[catalog.usernames]` entry was needed, the command says so by name.
+
 ## Hosted configuration
 
 Jira is value-free and disabled by default. One exact site and at least one sorted project key are

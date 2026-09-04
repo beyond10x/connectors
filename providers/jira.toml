@@ -183,19 +183,42 @@ authority = "com.atlassian.jira"
 # and the version records what this connector actually calls — not the newest one the vendor offers.
 api_version = "2"
 
-# See the `{site}` gap above. An operator's Jira Cloud site — `https://acme.atlassian.net` — is
-# tenant configuration, and `{site}` is the template a binding will resolve.
-base_url = "https://{site}.atlassian.net"
+# **Atlassian's Cloud gateway, addressed by cloud id** — not the tenant's own `*.atlassian.net`
+# host, which this connector used until 2026-09-04 and which is the wrong destination for the
+# credential kinds an organization actually issues.
+#
+# The two routes are not equivalent, and the difference is silent rather than loud. Measured
+# against one tenant on 2026-09-04, with a service-account API token:
+#
+# | route | `/rest/api/3/project/search` |
+# |---|---|
+# | `https://{site}.atlassian.net` | HTTP 200, **`total: 0`** |
+# | `https://api.atlassian.com/ex/jira/{cloud_id}` | HTTP 200, `total: 40` |
+#
+# The site route answered successfully and returned an empty world. A connector cannot distinguish
+# that from a tenant with no projects, so the failure would have been read as "there is nothing
+# there" rather than as "this is the wrong door" — which is exactly why the route is declared here
+# rather than left to an operator to choose between.
+#
+# The gateway serves the same `/rest/api/…` paths every operation below is written against, and
+# accepts the same credential mechanisms (measured: bearer and basic both 200 on `/myself`). The
+# cloud id is the tenant's UUID, bound by the `[[config]]` field at the end of this file.
+base_url = "https://api.atlassian.com/ex/jira/{cloud_id}"
 
 description = "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions"
 
 # Every operation authenticates the same way, so the requirement is declared once here rather than
 # repeated on the read surface; every write narrows to the delegated-user profile explicitly.
+#
+# **Order is selection.** A host tries these in order and takes the first whose credentials all
+# resolve, so the list is a preference, not a set. The deployment-owned service account leads it:
+# an integration that will be deployed should not be authenticated as whichever person happened to
+# install it, and a personal token that is also stored stays available as the next alternative.
 default_auth = [
+  { credentials = ["jira.service_api_token"], scopes = { "jira.service_api_token" = [["read:jira-work"]] } },
   { credentials = ["jira.api_token"] },
   { credentials = ["jira.user_oauth"], scopes = { "jira.user_oauth" = [["read:jira-work"]] } },
   { credentials = ["jira.service_oauth"], scopes = { "jira.service_oauth" = [["read:jira-work"]] } },
-  { credentials = ["jira.service_api_token"], scopes = { "jira.service_api_token" = [["read:jira-work"]] } },
 ]
 
 # ---------------------------------------------------------------------------------------------
@@ -703,14 +726,15 @@ schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$", minLength
 # ---------------------------------------------------------------------------------------------
 
 [[config]]
-name = "site"
+name = "cloud_id"
 service = "default"
-label = "Atlassian site name"
-help = "The part of your Jira URL before `.atlassian.net` — if you sign in at `acme.atlassian.net`, this is `acme`"
-example = "acme"
-format = "subdomain"
-docs_url = "https://support.atlassian.com/jira-software-cloud/docs/what-is-a-jira-site/"
-binds = "endpoint.site"
+label = "Atlassian cloud id"
+help = "Your Atlassian site's cloud id — the UUID your own site reports at `https://<your-site>.atlassian.net/_edge/tenant_info`. It addresses the tenant through Atlassian's Cloud gateway, which is the route this connector calls; the site host itself is not"
+example = "11111111-2222-3333-4444-555555555555"
+format = "text"
+required = true
+docs_url = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/"
+binds = "endpoint.cloud_id"
 
 [[config]]
 name = "email"

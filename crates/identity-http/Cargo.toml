@@ -2,7 +2,7 @@
 name = "identity-http"
 description = "HTTP adapter for Identity-issued Connector access authority."
 edition = "2021"
-version = "0.5.9"
+version = "0.5.10"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -25,7 +25,7 @@ hex = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-server = { version = "0.5.9", path = "../server" }
+server = { version = "0.5.10", path = "../server" }
 sha2 = "0.10"
 thiserror = "2"
 url = "2"

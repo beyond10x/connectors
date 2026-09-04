@@ -15,10 +15,10 @@ path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
 origin = "vendor-derived"
 derived_from = "specs/slack/web-api-1.7.0-2026-08-15.swagger.json"
 reviewed_at = "2026-08-15"
-sha256 = "65c0a917f18a343b84a8dcf4b70b29676c0e4894eaa8598b0a0c741f20fa5c2c"
+sha256 = "917d7c249a0572ea80e9254398a95514d2ca98adc0348f04efe01c59a56fd10d"
 coverage = "exact-curated-workspace-surface"
-selected_operation_ids = ["chat_postMessage", "conversations_history", "users_info", "reactions_add"]
-purpose = "Reference-closed OpenAPI 3 projection of the four explicitly curated ordinary Web API operations."
+selected_operation_ids = ["chat_postMessage", "conversations_history", "conversations_info", "conversations_list", "conversations_replies", "users_info", "users_list", "reactions_add"]
+purpose = "Reference-closed OpenAPI 3 projection of the eight explicitly curated ordinary Web API operations."
 
 [[spec]]
 path = "specs/slack/admin-api-selected-1.7.0-2026-08-15.openapi.json"
@@ -45,12 +45,12 @@ purpose = "B10x-authored AsyncAPI 3 description of the two normalized inner Even
 
 [[normalization]]
 kind = "swagger-2-to-openapi-3-exact-projection"
-count = 8
+count = 12
 detail = "Prefixes Swagger basePath /api, removes credential-bearing token parameters, prefers documented JSON request bodies, closes schema references, and models Slack's ok=false HTTP-200 failure bodies alongside success."
 
 [[normalization]]
 kind = "reviewed-scope-overlay"
-count = 10
+count = 14
 detail = "Operation and event scopes live in providers/slack.toml rather than being inferred from Swagger security arrays, because several live-source entries retain legacy or logically ambiguous scope spellings."
 
 [[normalization]]
