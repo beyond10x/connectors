@@ -340,16 +340,31 @@ errors:
     summary: This daemon generation holds no record of the session, and a call that may have run must never be reported as one that did not.
 
 events:
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.runtime.InvokeOperation`'s `established` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.runtime.SessionEstablished
     fields:
       - name: execution_ref
         type: connectors.runtime.ExecutionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.runtime.TerminateSession`'s `terminating` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.runtime.SessionTerminating
     fields:
       - name: execution_ref
         type: connectors.runtime.ExecutionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.runtime.SettleSession`'s `terminated` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.runtime.SessionTerminated
     fields:
       - name: execution_ref

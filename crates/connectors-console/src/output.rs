@@ -25,11 +25,21 @@
 //! folded onto it rather than omitted, and `compact` spells a nested field out in full, because a
 //! format that quietly loses a field is worse than one that is hard to read. **The rank is not
 //! carried by colour**: `+`, `!`, `x` and `?` survive a redirect, a pager and `NO_COLOR`, which is
-//! where an operator actually reads this. And **a row is one line and fits a terminal**: control
-//! characters are folded, and a table too wide for `TABLE_BUDGET` cuts its leading cells — with
-//! the cut marked, never silent — so that the last column starts on screen and every column before
-//! it is aligned there. That last rule is the one that trades text away, which is why it marks
-//! itself and why the cut never reaches `compact`, `json` or `yaml`.
+//! where an operator actually reads this. And **a row is one line, and every column of it begins
+//! inside the budget**: control characters are folded, a table too wide for `TABLE_BUDGET` cuts
+//! its leading cells — the cut marked, never silent — so that the last column starts on screen,
+//! and every column before it is aligned there. Read that guarantee exactly as it is written:
+//! the last column *begins* inside the budget. It is the one rule here that trades text away,
+//! which is why it marks itself and why the cut never reaches `compact`, `json` or `yaml`.
+//!
+//! **It does not make a row fit.** The last column is never cut — a cut last column would be a
+//! value silently truncated at the one place a reader is looking — so a row is exactly as wide as
+//! its final cell needs, and on the real catalogue 66 of the 71 lines `connectors providers`
+//! prints are wider than `TABLE_BUDGET`, the longest at 237 terminal columns. That is the design
+//! and not a defect: what the budget buys is that the last column is *reachable* without
+//! horizontal scrolling and that everything before it stays aligned.
+//! `a_table_too_wide_for_a_terminal_starts_its_last_column_inside_the_budget` is the assertion,
+//! and it says in its own name what is guaranteed.
 //!
 //! `json` and `yaml` are untouched by all of it. Their reader is a parser that has already
 //! committed to these bytes, and readability is not its problem.
