@@ -77,51 +77,65 @@ enum Unspecified {
 }
 
 const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
-    // First-level words that are not groups.
+    // Under `setup`.
     (
-        "connect",
-        Unspecified::Flow,
-        "a guided acquisition flow, not one declared command",
-    ),
-    (
-        "doctor",
-        Unspecified::Read,
-        "a read of the installation; no entity moves",
-    ),
-    (
-        "init",
+        "setup init",
         Unspecified::Lifecycle,
         "writes a configuration file; no entity of this specification moves",
     ),
     (
-        "login",
-        Unspecified::Lifecycle,
-        "acquires an Identity session; no entity of this specification moves",
+        "setup connect",
+        Unspecified::Flow,
+        "a guided acquisition flow, not one declared command",
     ),
     (
-        "logout",
-        Unspecified::Lifecycle,
-        "discards an Identity session; no entity of this specification moves",
+        "setup completions",
+        Unspecified::Unmodelled,
+        "renders this binary's own command tree as a shell script; no command of this \
+         specification names it",
+    ),
+    // Under `inspect`.
+    (
+        "inspect doctor",
+        Unspecified::Read,
+        "a read of the installation; no entity moves",
     ),
     (
-        "mcp",
-        Unspecified::Lifecycle,
-        "serves a transport; no entity moves",
-    ),
-    (
-        "providers",
+        "inspect providers",
         Unspecified::Read,
         "a read of the embedded catalogue; ESS models a read as a view",
     ),
     (
-        "serve",
+        "inspect auth",
+        Unspecified::Read,
+        "a read of which configured providers have a credential stored",
+    ),
+    // Under `session`.
+    (
+        "session login",
+        Unspecified::Lifecycle,
+        "acquires an Identity session; no entity of this specification moves",
+    ),
+    (
+        "session logout",
+        Unspecified::Lifecycle,
+        "discards an Identity session; no entity of this specification moves",
+    ),
+    // Under `serve`.
+    (
+        "serve local",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
     ),
     (
-        "serve-hosted",
+        "serve hosted",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
+    ),
+    (
+        "serve mcp",
+        Unspecified::Lifecycle,
+        "serves a transport; no entity moves",
     ),
     // Under `admin`. Both are groups of their own, and the tree runs one word deeper here than
     // anywhere else in the binary — which a contract comparing first-level words could not see.
@@ -144,12 +158,6 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         "admin credentials set",
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
-    ),
-    // Under `auth`.
-    (
-        "auth status",
-        Unspecified::Read,
-        "a read of which configured providers have a credential stored",
     ),
     // Under `connection`.
     (
@@ -1022,9 +1030,10 @@ const A_LIFECYCLE_SENTENCE: &str =
 ///
 /// `docs/design/19-the-cli-surface.md` says the kinds are "held to the tree" and that the change
 /// "makes the *kind* a claim the tree can contradict". A claim the tree can contradict is one that
-/// fails when it is false, so each of the nineteen entries whose shipped kind is not `Lifecycle` is
-/// relabelled `Lifecycle` here, one at a time, with a reason that names no command — and each has
-/// to be refused.
+/// fails when it is false, so every entry whose shipped kind is not `Lifecycle` is relabelled
+/// `Lifecycle` here, one at a time, with a reason that names no command — and each has to be
+/// refused. There are twenty of them; the number is not asserted, because the loop is over the list
+/// rather than over a count of it.
 ///
 /// Nothing about the parser, the specification or the accepted-command set is changed; only the
 /// kind column and the sentence beside it, which are the two things the claim is about.

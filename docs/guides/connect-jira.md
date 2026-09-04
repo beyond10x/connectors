@@ -25,7 +25,7 @@ credential never falls back to the organization credential.
 ## Which token kind you hold, and which base URL it needs
 
 Atlassian issues three things an operator can reasonably call "a Jira token", and they are not
-interchangeable. `connectors providers jira` lists four declared mechanisms and says nothing about
+interchangeable. `connectors inspect providers --query jira` lists four declared mechanisms and says nothing about
 which one a value in your clipboard is, so start here.
 
 | what you have | mechanism | how it travels | base URL that accepts it |
@@ -57,7 +57,7 @@ no per-provider Rust, only a `[[catalog]]` row and a credential in the store.
 A service-account token, which is what an integration that will be deployed should carry:
 
 ```shell-session
-connectors connect jira \
+connectors setup connect jira \
   --as jira.service_api_token \
   --set cloud_id=11111111-2222-3333-4444-555555555555 \
   --credential-file ~/.config/b10x/atlassian/jira.token
@@ -67,7 +67,7 @@ A personal API token instead, which is Basic and therefore has two halves — th
 store, the account email is configuration:
 
 ```shell-session
-connectors connect jira \
+connectors setup connect jira \
   --as jira.api_token \
   --set cloud_id=11111111-2222-3333-4444-555555555555 \
   --set email=you@example.com
@@ -93,7 +93,7 @@ cloud_id = "11111111-2222-3333-4444-555555555555"
 "jira.api_token" = "you@example.com"
 ```
 
-`connectors auth status` reports both halves. A Basic credential whose account name is missing reads
+`connectors inspect auth` reports both halves. A Basic credential whose account name is missing reads
 `stored-without-user-half` rather than `stored`, because a token that cannot be joined is a token
 that cannot be sent.
 

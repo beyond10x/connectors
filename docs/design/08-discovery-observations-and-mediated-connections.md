@@ -230,7 +230,7 @@ Endpoint.
 
 ## 8. Implemented personal-local slice
 
-The `connectors` daemon now composes Grafana beside SIP and Slack. `connectors connect grafana`
+The `connectors` daemon now composes Grafana beside SIP and Slack. `connectors setup connect grafana`
 submits one service-account token to a one-use owner-only completion socket, verifies it by listing
 Grafana data sources, stores the token only in daemon memory, and materializes recognized data
 sources for which the value-free configuration names an independent target Grant. Unknown types
@@ -244,7 +244,7 @@ HTTPS JSON only, follows no redirects, uses no ambient proxy, and places only th
 credential.
 
 The first alpha deliberately does not persist that credential. Restarting the daemon removes it and
-requires `connectors connect grafana` again. OS-keychain, wired secret-provider, and satellite-local
+requires `connectors setup connect grafana` again. OS-keychain, wired secret-provider, and satellite-local
 write-only custody remain the persistence/topology implementations specified by Design 07; no
 plaintext file fallback is allowed while they are absent.
 
