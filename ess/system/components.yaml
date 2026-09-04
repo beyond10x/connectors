@@ -1,9 +1,11 @@
-# UNMAPPED: the `cli:` block and `reached_by: command_line` are deliberately absent. They belong
-# to the unit that gives the three ambiguous verbs a `--target` flag; this document types the
-# nouns and stops there. Settled by that unit, which is
-# `story:explicit-target-never-implicit` plus the surface work of `epic:cli-surface`: it is the
-# one that decides which verbs carry the flag, and a `cli:` block written before that decision
-# would name verbs nothing has agreed on.
+# **A component's command tree is exactly what it accepts, and it accepts only its own domains'
+# commands.** Both halves are ESS rules, and together they decide where the `cli:` block below
+# sits. `validate_command_placement` refuses a tree that places a command the component does not
+# accept, and refuses an accepted command the tree places nowhere; `ESS-COMPONENT-004` refuses a
+# component that accepts a command from a domain another component owns — "§9 gives a command one
+# handler, and it is the component owning its domain". There is therefore no third place to write
+# a filter: a surface a person types and a surface something calls are different sets only by
+# being different components.
 components:
   # `crates/service/src/lib.rs:3` — "Pure Connectors use cases." Every command below is one of
   # those use cases; the transports that carry them are `crates/server/src/lib.rs:3`, "Inbound
@@ -80,12 +82,57 @@ components:
 
   # `crates/connectors-cli` — the crate whose three ambiguous verbs
   # (.engineering/planning/story/explicit-target-never-implicit.md) the target noun exists for.
-  # UNMAPPED: `reached_by` is left at its default here rather than declared. The honest value is
-  # a command line, and stating it is the later unit's, together with the `cli:` block that gives
-  # it meaning. Settled by that same unit: `reached_by: command_line` without a `cli:` block
-  # declares a reach with no surface behind it, so the two land together or neither does.
+  # `crates/connectors-cli/Cargo.toml:2-3` calls it a "Thin command-line frontend for reusable
+  # Connector client and runtime libraries", and `crates/catalog-build/tests/main/architecture_fence.rs:311`
+  # holds it to that. It is reached from a command line, and it now says so.
   - component: connectors-cli
     summary: Names which deployment a command reaches, instead of inferring it from a stored login.
     owns:
       domains:
         - connectors.target
+    reached_by: command_line
+    # The binary is `connectors` (`crates/connectors-cli/Cargo.toml:20-22`, `[[bin]] name`), and
+    # the five words below are the first-level words of `crates/connectors-cli/src/lib.rs:55-188`
+    # that carry a subcommand of their own: `admin` (line 72), `auth` (line 92), `connection`
+    # (line 164), `event` (line 169) and `operation` (line 174).
+    #
+    # UNMAPPED: no command is placed under any of them, and that is a fact about this system
+    # rather than an omission. This component owns `connectors.target` alone, which declares no
+    # command, and the two rules at the head of this file mean it may place none of the sixteen
+    # `connectors-service` accepts: the frontend *forwards* those, it does not handle them.
+    # `ess/generated/clap/TARGET.md` names all sixteen as target refusals — "no component
+    # declaring `reached_by: command_line` accepts this command, so no tree places it and there
+    # is no word to type" — which is the difference between the accepted surface and the
+    # command-line surface, written by the generator instead of asserted here.
+    #
+    # It is also the right answer rather than merely the permitted one. A command's typed word is
+    # `naming.wire` where it has one and the qualified name's last segment otherwise, verbatim and
+    # un-cased; eleven of the sixteen carry no `naming.wire`, because in this document a
+    # `naming.wire` is the protocol `method` tag and nothing else (`ess/system/system.yaml`,
+    # enforced by `crates/catalog-build/tests/main/ess_claim_fence.rs:156`). Placing them would
+    # emit `SuperviseChannel`, `FinishConnectSession` and `SettleSession` as words at a shell —
+    # measured, not supposed — and each of those is an act the platform performs on its own
+    # (`ess/system/domains/connection.yaml:435-439`,
+    # `crates/integration-sip/src/backend/sessions.rs:148-150`),
+    # not one a person asks for. Settled by a construct that lets a client declare a tree over a
+    # command it forwards rather than handles; `ess specify compose` generates such clients today
+    # and has no `cli:` of its own.
+    #
+    # UNMAPPED: the words a person really types under these five — `list`, `search`, `activate`,
+    # `materialize`, `invoke` — are absent for the same reason, and the reads among them for a
+    # second one: ESS models a read as a `views:` declaration carrying a consistency claim, and
+    # the note on `connectors-service` above says why this document declares none. Settled by the
+    # same two things: reads gaining that claim, and a forwarded command gaining a place.
+    cli:
+      binary: connectors
+      groups:
+        - name: admin
+          summary: Operate an Identity-protected hosted Connectors instance.
+        - name: auth
+          summary: Which configured providers have their credential stored. Never reads one.
+        - name: connection
+          summary: Manage durable Connections through the credential-free control socket.
+        - name: event
+          summary: Search or receive durable normalized data events.
+        - name: operation
+          summary: Search, describe, or invoke admitted Connector operations.

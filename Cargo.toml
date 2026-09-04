@@ -69,6 +69,11 @@ exclude = [
     "crates/integration-slack",
     "crates/monitoring-model",
     "crates/connectors-cli",
+    # The clap tree `ess generate synthesize` projects from `ess/system`, committed as a checked
+    # parallel artifact (docs/design/19-the-cli-surface.md). It is a package manifest inside this
+    # directory, so cargo refuses to read it until it is named here or in `members`; it is not a
+    # member, because the cutover has not happened and nothing may build against it yet.
+    "ess/generated/clap/crates/connectors-cli",
 ]
 
 [workspace.package]
