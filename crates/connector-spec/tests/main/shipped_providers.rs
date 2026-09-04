@@ -147,10 +147,13 @@ fn operation_selection_stays_curated() {
         // operation outright rather than trimming one. See the header comment in
         // `providers/openrouter.toml`.
         ("openrouter", 4),
-        // Four workspace messaging members plus four explicitly read-only Enterprise Admin
+        // Eight workspace messaging members plus four explicitly read-only Enterprise Admin
         // members, all exact selections from the pinned live Slack source. No admin write enters
-        // the callable catalog.
-        ("slack", 8),
+        // the callable catalog. The workspace set grew from four on 2026-09-04: reading a thread's
+        // replies, listing and describing channels, and listing members. `conversations.list`
+        // withholds the `types` parameter, so direct and group messages are unreachable by
+        // construction rather than by a rule the input schema could not carry.
+        ("slack", 12),
         // C-69 curates 8 across **three services** — gmail (message get, message send, labels list),
         // calendar (event get, event insert, calendar get) and drive (file get, file metadata
         // update). The cut is the query-encoding gap once more, and it bites hardest here: Gmail's

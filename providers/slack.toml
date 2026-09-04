@@ -39,7 +39,7 @@ path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
 source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
 upstream_version = "1.7.0"
 fetched_at = "2026-08-15T00:00:00Z"
-sha256 = "65c0a917f18a343b84a8dcf4b70b29676c0e4894eaa8598b0a0c741f20fa5c2c"
+sha256 = "917d7c249a0572ea80e9254398a95514d2ca98adc0348f04efe01c59a56fd10d"
 
 [[spec]]
 service = "admin"
@@ -89,7 +89,13 @@ description = "Delegated OAuth token for the consenting Slack member. Zwirn may 
 endpoint = "login"
 authorize_path = "/oauth/v2_user/authorize"
 token_path = "/api/oauth.v2.user.access"
-scopes = ["channels:read", "channels:history", "groups:read", "groups:history", "im:read", "im:history", "mpim:read", "mpim:history", "users:read", "users:read.email", "chat:write", "reactions:write"]
+# `im:*` and `mpim:*` were requested here until 2026-09-04 and are gone. No catalogued operation
+# names them, and a scope requested but never used is authority granted for nothing — it widens the
+# consent screen a person reads and the blast radius of a leaked token without buying a single call.
+# Direct messages and group DMs are outside this connector's surface: `slack-conversations-list`
+# withholds the `types` parameter that would reach them, and nothing else addresses them at all.
+# `groups:*` stays, because a private channel the person is already in is a channel.
+scopes = ["channels:read", "channels:history", "groups:read", "groups:history", "users:read", "users:read.email", "chat:write", "reactions:write"]
 scope_separator = "comma"
 scope_response_pointer = "/authed_user/scope"
 grants = ["authorization_code", "refresh_token"]
@@ -115,9 +121,10 @@ entry = "connect_session"
 subject = "app"
 description = "Slack app signing secret used only to verify inbound Events API requests"
 
-# Agent curation: exactly four ordinary Web API operations. The live document contains 170 paths;
-# source presence grants nothing. Scope claims are reviewed overlays rather than copied blindly from
-# Swagger because parts of Slack's Swagger scope vocabulary retain legacy spellings.
+# Agent curation: eight ordinary Web API operations, seven of them projected to a model. The live
+# document contains 170 paths; source presence grants nothing. Scope claims are reviewed overlays
+# rather than copied blindly from Swagger because parts of Slack's Swagger scope vocabulary retain
+# legacy spellings.
 
 [[patch.operations]]
 service = "default"
@@ -193,6 +200,171 @@ schema = { type = "string" }
 name = "oldest"
 position = "query"
 schema = { type = "string" }
+
+[[patch.operations.params]]
+name = "limit"
+position = "query"
+schema = { type = "integer", minimum = 1, maximum = 999, default = 100 }
+
+# Reading a thread, and reading what a workspace contains. Added 2026-09-04: `conversations.history`
+# alone returns a channel's top-level messages with a `thread_ts` on each parent and no way to
+# follow one, so a reader could see that a conversation happened and never what was said in it.
+#
+# **`im` and `mpim` are not reachable through any operation here, and that is enforced by omission
+# rather than by a rule.** `conversations.list` takes a `types` parameter whose value would decide
+# it; this connector does not declare that parameter at all, so Slack applies its documented
+# default of `public_channel` and there is no input a caller could send to widen it. A declared
+# parameter with a reviewed enum would not do: the document generator drops `enum` and `const` from
+# a published input schema (measured across all 65 connectors: zero survive), so the restriction
+# would exist only in prose while the wire accepted anything.
+
+[[patch.operations]]
+service = "default"
+select = "conversations_replies"
+rename = "slack-conversations-replies"
+description = "Read one thread: the parent message and its replies, oldest first. `ts` is the parent's timestamp, which `slack-conversations-history` returns as `thread_ts` on a threaded message. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:history"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["channels:history"]] } },
+]
+omit.query = ["inclusive"]
+pagination = { cursor = { cursor_param = "cursor", next_cursor_pointer = "/response_metadata/next_cursor", max_pages = 10 } }
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations.params]]
+name = "channel"
+position = "query"
+required = true
+description = "Channel id the thread lives in"
+schema = { type = "string", minLength = 1 }
+
+# Slack's own document types every timestamp as `number`, and they are not numbers: a `ts` is a
+# string like `1788456757.820299` whose trailing digits are significant and whose identity is
+# textual. Sending it as a number loses them and addresses a different message, or none. The same
+# override is already on `slack-conversations-history`'s `latest` and `oldest`.
+[[patch.operations.params]]
+name = "ts"
+position = "query"
+required = true
+description = "The parent message's timestamp, exactly as Slack spells it — a string, not a number"
+schema = { type = "string", minLength = 1 }
+
+[[patch.operations.params]]
+name = "latest"
+position = "query"
+schema = { type = "string" }
+
+[[patch.operations.params]]
+name = "oldest"
+position = "query"
+schema = { type = "string" }
+
+[[patch.operations.params]]
+name = "limit"
+position = "query"
+schema = { type = "integer", minimum = 1, maximum = 999, default = 100 }
+
+[[patch.operations]]
+service = "default"
+select = "conversations_list"
+rename = "slack-conversations-list"
+description = "List the workspace's public channels, with the id, name, topic, purpose and member count of each — the way to resolve a channel name to the id every other operation takes. Direct messages and group DMs are not listed and cannot be requested. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:read"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["channels:read"]] } },
+]
+# `types` is the parameter that would admit `im` and `mpim`. Withheld, so Slack's documented
+# default of `public_channel` is the only value this operation can ever send.
+omit.query = ["types"]
+pagination = { cursor = { cursor_param = "cursor", next_cursor_pointer = "/response_metadata/next_cursor", max_pages = 10 } }
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations.params]]
+name = "exclude_archived"
+position = "query"
+description = "Leave out archived channels. Worth setting on a workspace with a long history"
+schema = { type = "boolean" }
+
+[[patch.operations.params]]
+name = "limit"
+position = "query"
+schema = { type = "integer", minimum = 1, maximum = 999, default = 100 }
+
+[[patch.operations]]
+service = "default"
+select = "conversations_info"
+rename = "slack-conversations-info"
+description = "Look up one channel by id — its name, topic, purpose, creation time and whether it is archived. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = true
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["channels:read"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["channels:read"]] } },
+]
+omit.query = ["include_locale", "include_num_members"]
+error_envelope = { message_pointer = "/error" }
+
+[[patch.operations.params]]
+name = "channel"
+position = "query"
+required = true
+description = "Channel id to describe"
+schema = { type = "string", minLength = 1 }
+
+# **Catalogued, not exposed.** A workspace directory is a bulk read of named people, and the
+# per-person question a model actually asks is already answered by `slack-users-info`. It is
+# callable by anything that names it, which is the distinction AGENTS.md draws between the
+# catalogue and what reaches a model.
+[[patch.operations]]
+service = "default"
+select = "users_list"
+rename = "slack-users-list"
+description = "List the workspace's members, with the id, name and profile of each — the way to resolve a display name to the id `slack-users-info` takes. Returns named people: read it for what the calling flow needs and do not persist it beyond that. Inspect `ok` because Slack reports API failures inside HTTP 200 responses"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+expose = false
+auth = [
+  { credentials = ["slack.bot_token"], scopes = { "slack.bot_token" = [["users:read"]] } },
+  { credentials = ["slack.user_token"], scopes = { "slack.user_token" = [["users:read"]] } },
+]
+omit.query = ["include_locale"]
+pagination = { cursor = { cursor_param = "cursor", next_cursor_pointer = "/response_metadata/next_cursor", max_pages = 10 } }
+error_envelope = { message_pointer = "/error" }
 
 [[patch.operations.params]]
 name = "limit"

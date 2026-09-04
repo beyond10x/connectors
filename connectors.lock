@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "f876b4f928782da08dbc168b8bf8a85f6418c4a4276ba37b9ef1bad5e08b53a1"
+sha256 = "68d1b52a752c6a90cb72414b24b49425aa5f2187b7dfc2b55016e10c8f827a77"
 
 [[provider]]
 id = "airtable"
@@ -251,11 +251,11 @@ ir_sha256 = "5ec8959f98f8d96a333885e8b13966652059949c6aa23a7b06d25e6fc07d6ddd"
 [[provider]]
 id = "confluence"
 generator = "connectors 0.5.8"
-toml_sha256 = "f140f430c8c20fdf15cbcdd2af6396648e923fb9763af6cf57abc153f572ace3"
-ir_sha256 = "83701fe1a6494075bbe6debaa859cf21204a5bce3957095abfb0fa8b33a2dd0e"
+toml_sha256 = "35cd9116c45f4d89f508d8df9819f388be35fe5bef9129980d0acf178afc52c0"
+ir_sha256 = "d9667f463077bcb93416cb7be661fce9f3877a8d67f8d1e16e01c8630f9f3a4f"
 
 [provider.artifacts]
-"catalog/confluence.catalog.json" = "9cf1ea4ffe020cf8020f94d211682cf645a90779febdec9fe0009384ff109a78"
+"catalog/confluence.catalog.json" = "4b4e8c76af72f0b5bf34f7b521aaa5353130d1bbddfb183064ae8a386a0e3784"
 
 [[provider]]
 id = "contentful"
@@ -412,11 +412,11 @@ ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 [[provider]]
 id = "jira"
 generator = "connectors 0.5.8"
-toml_sha256 = "3ac215b109702decc43df8ec9a54e3926c293bca4da87e9f42562706769912ea"
-ir_sha256 = "4fa0eb82914254ef01cd7525f01634b6575634509f5e018991b6a75223dafd09"
+toml_sha256 = "b5a82924bdf58daf9a61ce3da7bfb7b86d7c283cf5fe719bbb63498a5e483ae6"
+ir_sha256 = "429da4e5ffc187f1fe16dcebc7b224e714f3aaa6105dd43a641a154d9039d44d"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "8e09e7918f878326d7f3cdb1667cadcfe0617c404fbe9d204651c618f56f453f"
+"catalog/jira.catalog.json" = "9bf58886a2129173ea961db1ffec8fd5a74f868e1fbcd10e466a1b9aea9fa0f7"
 
 [[provider]]
 id = "klaviyo"
@@ -665,15 +665,15 @@ ir_sha256 = "f3c4aa8d851678564f424fdbdbfa47559f7a4a79a340ff02a6d491e3f0fd2478"
 [[provider]]
 id = "slack"
 generator = "connectors 0.5.8"
-toml_sha256 = "d5785e6fcb2ad9432e7ccd47edc667b3b5a105e5a94dcb7656fd7507db90dddb"
-ir_sha256 = "15348fba2fa6f3ac516e4dfe7cdb8aef12d85ae35005b25256cd5db1c11652f8"
+toml_sha256 = "de2e171c1b896afb4b1b357b06a22935a4527774cbe13b41ff268be55426cf25"
+ir_sha256 = "cad77ed4e4ec6fd0f1eba25183c285adb113f65107db321a822a7635cb158da0"
 
 [[provider.specs]]
 path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
 service = "default"
 source_url = "https://api.slack.com/specs/openapi/v2/slack_web.json"
 upstream_version = "1.7.0"
-sha256 = "65c0a917f18a343b84a8dcf4b70b29676c0e4894eaa8598b0a0c741f20fa5c2c"
+sha256 = "917d7c249a0572ea80e9254398a95514d2ca98adc0348f04efe01c59a56fd10d"
 
 [[provider.specs]]
 path = "specs/slack/admin-api-selected-1.7.0-2026-08-15.openapi.json"
@@ -689,7 +689,7 @@ upstream_version = "2026-08-15"
 sha256 = "43e1b4ecf8ea8393fa8d759bdad4629a29042299ce69d85384169c970f031e69"
 
 [provider.artifacts]
-"catalog/slack.catalog.json" = "1b0ce4932b86076492132bad876e5b82febe99c9575bdb3074972e9ba1eebd79"
+"catalog/slack.catalog.json" = "9f216de78845e9c6ddadc3d56cd98c4cb577e8d8b900eb925c68acf6a1f7a09f"
 
 [[provider]]
 id = "statuspage"

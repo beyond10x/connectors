@@ -215,7 +215,7 @@ impl CatalogBackend {
                     InitiationConfig::Provider => InitiationPolicy::provider_only(),
                     InitiationConfig::Both => InitiationPolicy::bidirectional(),
                 },
-                config: DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
+                config: declared_config(entry),
                 allow_writes: entry.allow_writes,
                 instance: match entry.instance.as_deref() {
                     Some(name) => Some(instance_for(&entry.provider, name)?),
@@ -263,7 +263,7 @@ impl CatalogBackend {
                     InitiationConfig::Provider => InitiationPolicy::provider_only(),
                     InitiationConfig::Both => InitiationPolicy::bidirectional(),
                 },
-                config: DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
+                config: declared_config(entry),
                 allow_writes: entry.allow_writes,
                 instance: match entry.instance.as_deref() {
                     Some(name) => Some(instance_for(&entry.provider, name)?),
@@ -570,9 +570,28 @@ impl Inner {
             })?;
 
         if !response.is_success() {
+            // **The status code, because without it the message names no cause.** A wrong issue
+            // key, an unauthenticated credential and a permission the token does not carry are
+            // three different jobs, and "the provider refused the request" is the same sentence
+            // for all of them — the first live Atlassian invocation cost exactly this, with a
+            // stored token, a configured user half and nothing saying which end was wrong.
+            //
+            // The **body is deliberately not carried**: a vendor's error text is unbounded, is not
+            // covered by the catalogue's declared output schema, and is the one place a rejected
+            // request can echo what was sent. A number is the whole diagnosis.
+            let hint = match response.status {
+                401 => " — the credential was not accepted; a `basic` mechanism has two halves, the stored secret and the `[catalog.usernames]` user half",
+                403 => " — the credential is valid but lacks permission for this resource",
+                404 => " — the resource does not exist, or is not visible to this credential",
+                429 => " — the provider is rate-limiting this credential",
+                _ => "",
+            };
             return Err(refusal(
                 OperationErrorCode::Unavailable,
-                "the provider refused the request",
+                format!(
+                    "the provider refused the request with HTTP {}{hint}",
+                    response.status
+                ),
             ));
         }
         let output = serde_json::from_slice(&response.body).unwrap_or_else(|_| {
@@ -709,6 +728,27 @@ fn origin_of(base: &str) -> String {
         return String::new();
     }
     format!("{scheme}://{authority}")
+}
+
+/// **Both halves of a Connection's declared configuration**, from the one entry that carries them.
+///
+/// Endpoint values fill the `{variable}` slots a base URL declares. Usernames are the non-secret
+/// user half of a `basic` credential — an Atlassian account email against `jira.api_token` — which
+/// [`connector_resolve::assemble_credentials`] asks for through
+/// [`ConfigField::Username`](connector_resolve::ConfigField) and refuses the whole mechanism
+/// without.
+///
+/// It exists as one function because both constructors need it and neither may have a different
+/// answer: [`CatalogBackend::open`] built the endpoints alone and [`CatalogBackend::bind_stored`]
+/// built the same thing again, so a stored Atlassian token resolved to
+/// `MissingCredentialConfig` — surfaced to a caller as `not_granted: no stored credential
+/// satisfies this operation's declared mechanisms` — while `auth status` reported it as stored.
+/// Both statements were true and neither was the problem.
+fn declared_config(entry: &CatalogIntegrationConfig) -> DeclaredConfig {
+    entry.usernames.iter().fold(
+        DeclaredConfig::new(entry.endpoints.clone(), entry.operator_approved),
+        |config, (credential, user)| config.with_username(credential, user),
+    )
 }
 
 fn credential_leaf(
@@ -884,8 +924,8 @@ fn digest(parts: &[&str]) -> String {
     hex::encode(&hasher.finalize()[..16])
 }
 
-fn refusal(code: OperationErrorCode, message: &str) -> OperationError {
-    OperationError::new(code, message, false)
+fn refusal(code: OperationErrorCode, message: impl Into<String>) -> OperationError {
+    OperationError::new(code, message.into(), false)
 }
 
 #[cfg(test)]
@@ -1043,6 +1083,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect(),
+            usernames: BTreeMap::new(),
             operator_approved: true,
             network: connectors_config::NetworkScopeConfig::Public,
             credential: None,
@@ -1069,6 +1110,86 @@ mod tests {
             error,
             CatalogIntegrationError::MissingEndpointValue(_, _)
         ));
+    }
+
+    #[test]
+    fn a_basic_credentials_user_half_reaches_the_resolver_from_the_entry() {
+        // The whole bug in one assertion. `jira.api_token` is `scheme = "basic"`, so the assembler
+        // asks the ConfigPort for its user half and refuses the mechanism without one. Both
+        // constructors used to build a config that could only answer endpoints, so a token that
+        // was demonstrably stored produced `MissingCredentialConfig`.
+        use connector_resolve::{ConfigField, ConfigPort as _};
+
+        let mut with_user = entry("jira", &[("site", "example")]);
+        with_user
+            .usernames
+            .insert("jira.api_token".to_owned(), "ops@example.test".to_owned());
+        let config = declared_config(&with_user);
+        assert_eq!(
+            config
+                .resolve(ConfigField::Username("jira.api_token"))
+                .map(|value| value.value().to_owned()),
+            Some("ops@example.test".to_owned())
+        );
+
+        // And the catalogue is what says this credential has a user half at all, so the test does
+        // not depend on anyone remembering that Atlassian uses Basic.
+        let jira = catalog::provider(catalog::ProviderKey::id("jira")).expect("jira");
+        let credential = jira
+            .credential("jira.api_token")
+            .expect("the declared token");
+        assert!(matches!(
+            credential.acquire,
+            catalog::Acquisition::BasicJoin { .. }
+        ));
+        let field = jira
+            .config
+            .iter()
+            .find(|field| field.binds == "username.jira.api_token")
+            .expect("the catalogue declares which field is the user half");
+        assert!(!field.secret, "a user half is configuration, not a secret");
+    }
+
+    #[test]
+    fn an_entry_stating_no_user_half_answers_none_rather_than_an_empty_string() {
+        // `ConfigPort::resolve` returning `Some("")` would make the assembler compose
+        // `base64(":token")` and send it, which fails at the vendor with a message about the
+        // credential rather than about the configuration.
+        use connector_resolve::{ConfigField, ConfigPort as _};
+        let config = declared_config(&entry("jira", &[("site", "example")]));
+        assert!(config
+            .resolve(ConfigField::Username("jira.api_token"))
+            .is_none());
+    }
+
+    #[test]
+    fn every_declared_user_half_field_names_a_credential_that_actually_wants_one() {
+        // A catalogue-wide fence rather than a Jira one: a `username.<credential>` binding whose
+        // credential is not a Basic join would be a configuration value nothing ever reads.
+        for provider in catalog::providers() {
+            for field in provider.config {
+                let Some(name) = field.binds.strip_prefix("username.") else {
+                    continue;
+                };
+                let credential = provider.credential(name).unwrap_or_else(|| {
+                    panic!(
+                        "`{}`'s field `{}` binds an undeclared credential",
+                        provider.id, field.name
+                    )
+                });
+                assert!(
+                    matches!(credential.acquire, catalog::Acquisition::BasicJoin { .. }),
+                    "`{}`'s `{}` is not a Basic join, so it has no user half to configure",
+                    provider.id,
+                    name
+                );
+                assert!(
+                    !field.secret,
+                    "`{}`'s `{}` is not a secret",
+                    provider.id, field.name
+                );
+            }
+        }
     }
 
     #[test]

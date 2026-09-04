@@ -101,6 +101,27 @@ pub(crate) struct KubernetesServiceConnection {
     pub(crate) resource_binding: String,
 }
 
+/// **The Connection rows the workload operations publish**, from the two maps that decide them: the
+/// clusters with a live client, and the descriptions activation wrote.
+///
+/// A free function rather than a method so it can be tested without constructing a `kube::Client`.
+/// Building one composes a TLS stack, and under this workspace's unified feature set rustls finds
+/// two crypto providers and panics rather than choosing — a fact about the workspace, not about the
+/// selection rule this is. Testing the rule needs neither.
+fn cluster_rows<'a>(
+    attached: impl IntoIterator<Item = &'a String>,
+    connections: &BTreeMap<String, ConnectionDescription>,
+) -> Vec<(String, String)> {
+    attached
+        .into_iter()
+        .filter_map(|connection_ref| {
+            connections
+                .get(connection_ref)
+                .map(|description| (connection_ref.clone(), description.summary.label.clone()))
+        })
+        .collect()
+}
+
 /// Personal-local backend which passively detects kubeconfig contexts, then contacts a cluster
 /// only after one opaque candidate is explicitly activated.
 pub struct KubernetesLocalBackend {
@@ -382,19 +403,31 @@ impl KubernetesLocalBackend {
         lock(&self.state).observations.get(observation_ref).cloned()
     }
 
-    /// The cluster Connection itself, when it is attached.
+    /// **Every attached cluster Connection**, in a stable order.
     ///
     /// Distinct from the child Service Connections below it: those are Prometheus and Loki behind
-    /// Kubernetes Services, reached by proxy. This is the cluster, and it is what
+    /// Kubernetes Services, reached by proxy. These are the clusters, and they are what
     /// `kubernetes.deployment.*` acts on.
-    fn cluster_connection(&self) -> Option<(String, String)> {
+    ///
+    /// # Why this is a list
+    ///
+    /// It answered `state.clients.keys().next()` until 2026-09-04 — the first key of a `BTreeMap`,
+    /// which is one arbitrary cluster of however many the operator activated. An operator who had
+    /// activated five kubeconfig contexts, all reported `authorized` by `connection describe`, saw
+    /// `operation describe kubernetes.deployment.status` list exactly one of them, and an `invoke`
+    /// against any other refused with `not_found: no Integration owns this operation` — a message
+    /// about the operation, for a Connection that was attached and working.
+    ///
+    /// Activation is what admits a cluster. Nothing downstream of it may then quietly pick one.
+    fn cluster_connections(&self) -> Vec<(String, String)> {
         let state = lock(&self.state);
-        state.clients.keys().next().and_then(|connection_ref| {
-            state
-                .connections
-                .get(connection_ref)
-                .map(|description| (connection_ref.clone(), description.summary.label.clone()))
-        })
+        cluster_rows(state.clients.keys(), &state.connections)
+    }
+
+    /// Whether `connection_ref` names a cluster this backend has attached.
+    fn is_cluster_connection(&self, connection_ref: &str) -> bool {
+        let state = lock(&self.state);
+        state.clients.contains_key(connection_ref) && state.connections.contains_key(connection_ref)
     }
 
     fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
@@ -403,7 +436,8 @@ impl KubernetesLocalBackend {
         // call: the Connection was attached, readable as a datasource, and had no operation at all.
         if matches!(operation_ref, STATUS_OPERATION | RESTART_OPERATION) {
             return self
-                .cluster_connection()
+                .cluster_connections()
+                .into_iter()
                 .map(|(connection_ref, label)| OperationConnectionSummary {
                     connection_ref,
                     label,
@@ -411,7 +445,6 @@ impl KubernetesLocalBackend {
                     audiences: vec!["operations".to_owned()],
                     purpose: None,
                 })
-                .into_iter()
                 .collect();
         }
         let provider = monitoring_model::provider_for_operation(operation_ref);
@@ -627,10 +660,11 @@ impl KubernetesLocalBackend {
         context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
-        let Some((connection_ref, _)) = self.cluster_connection() else {
-            return Err(operation_not_found());
-        };
-        if request.connection_ref != connection_ref {
+        // **The Connection the caller named**, not whichever one this backend would have picked.
+        // A caller holding two clusters has to be able to say which; refusing an attached one here
+        // is what made four of five activated clusters uncallable.
+        let connection_ref = request.connection_ref.clone();
+        if !self.is_cluster_connection(&connection_ref) {
             return Err(operation_not_found());
         }
         if request.description_ref
@@ -836,9 +870,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
                     || (matches!(
                         request.operation_ref.as_str(),
                         STATUS_OPERATION | RESTART_OPERATION
-                    ) && self
-                        .cluster_connection()
-                        .is_some_and(|(reference, _)| reference == request.connection_ref))
+                    ) && self.is_cluster_connection(&request.connection_ref))
             }
             OperationRequest::Search(_) => false,
             _ => false,
