@@ -18,7 +18,7 @@ Today, to read your own GitLab from your own machine you install `dex`, or `flux
 both, and each keeps its own copy of your token. Three tools know your credentials and none of them
 agrees with the others about what you are allowed to do with them.
 
-After: you run `connectors init`, name the provider once, and every consumer — the CLI, the Zwirn
+After: you run `connectors setup init`, name the provider once, and every consumer — the CLI, the Zwirn
 workbench, an agent mid-conversation — reaches it through the same process, under the same grant,
 with the same audit trail. **None of them ever sees the token.** Adding a provider is a row in a
 configuration file, not a new program.

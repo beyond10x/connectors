@@ -87,7 +87,7 @@ connectors/
 │   │   ├── tests/supervised.rs           # real SIP/RTP + authenticated RTVBP WebSocket journey
 │   │   └── Cargo.lock                    # joined, independently gated runtime closure
 │   └── connectors-cli/                   # isolated product binary/runtime consumer
-│       ├── src/main.rs                   # connectors serve + safe personal state root
+│       ├── src/main.rs                   # connectors serve local + safe personal state root
 │       ├── src/sip_backend.rs            # catalog/authority/approval/session projection
 │       ├── src/runtime.rs                # VoiceRuntime launcher + exact TLS application route
 │       ├── examples/asterisk-dev.example.toml
