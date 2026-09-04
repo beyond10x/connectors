@@ -310,29 +310,44 @@ fn the_drift_suites_copies_are_checked_rather_than_cited() {
 /// `datasource` group could never have entered the countdown, so the countdown would have reached
 /// zero while that group still inferred its target.
 ///
-/// This reads `crates/protocol/src` the same way and requires the contract to have no literal left
-/// to filter.
+/// This reads `crates/protocol/src` the same way and requires **every** file that declares a
+/// `deployment_protocol_modules` to have no literal left to filter. The rule is about the
+/// derivation, not about one file: the contract was corrected and the drift suite's copy of it was
+/// left as the literal for another day, under a header claiming a faithful restatement of every
+/// assertion the contract makes — so this asserts over both, and over any third file that grows
+/// one.
 #[test]
 fn the_target_countdown_candidates_are_derived_from_every_protocol_a_deployment_answers() {
-    let contract = read("crates/connectors-cli/tests/cli_surface.rs");
     let literal = r#"["connection", "event", "operation"]"#;
-    let derivation = contract
-        .split_once("fn deployment_protocol_modules()")
-        .expect("cli_surface.rs declares `deployment_protocol_modules`")
-        .1
-        .split_once("\n}")
-        .expect("the function closes")
-        .0;
-    assert!(
-        !derivation.contains(literal),
-        "`deployment_protocol_modules` names {literal} again. A filter over a literal can only \
-         remove a module, so a group named after a protocol outside the literal never enters \
-         `TARGET_EXCEPTIONS` and the countdown reaches zero without it"
-    );
-    assert!(
-        derivation.contains("read_dir"),
-        "`deployment_protocol_modules` no longer reads crates/protocol/src, so its candidates are \
-         named somewhere rather than derived"
+    let restatements = [
+        "crates/connectors-cli/tests/cli_surface.rs",
+        "crates/connectors-cli/tests/cli_surface_drift.rs",
+    ];
+    let mut derived = 0usize;
+    for file in restatements {
+        let source = read(file);
+        let Some((_, rest)) = source.split_once("fn deployment_protocol_modules()") else {
+            continue;
+        };
+        let derivation = rest.split_once("\n}").expect("the function closes").0;
+        derived += 1;
+        assert!(
+            !derivation.contains(literal),
+            "{file}'s `deployment_protocol_modules` names {literal} again. A filter over a \
+             literal can only remove a module, so a group named after a protocol outside the \
+             literal never enters `TARGET_EXCEPTIONS` and the countdown reaches zero without it"
+        );
+        assert!(
+            derivation.contains("read_dir"),
+            "{file}'s `deployment_protocol_modules` no longer reads crates/protocol/src, so its \
+             candidates are named somewhere rather than derived"
+        );
+    }
+    assert_eq!(
+        derived,
+        restatements.len(),
+        "one of {restatements:?} no longer declares `deployment_protocol_modules`, so this case \
+         checked fewer files than it names"
     );
 
     let directory = repository_root().join("crates/protocol/src");
