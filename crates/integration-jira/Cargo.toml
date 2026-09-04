@@ -2,7 +2,7 @@
 name = "integration-jira"
 description = "Jira Cloud organization-read and delegated-user Connector Integration adapter."
 edition = "2021"
-version = "0.6.0"
+version = "0.6.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -17,7 +17,7 @@ catalog = { version = "0.6.0", path = "../catalog" }
 connector-oauth = { version = "0.6.0", path = "../connector-oauth" }
 connector-resolve = { version = "0.6.0", path = "../connector-resolve" }
 connector-secrets = { version = "0.6.0", path = "../connector-secrets" }
-connectors-config = { version = "0.6.0", path = "../connectors-config" }
+connectors-config = { version = "0.6.1", path = "../connectors-config" }
 getrandom = "0.3"
 hex = "0.4"
 connector-state = { version = "0.6.0", path = "../connector-state" }

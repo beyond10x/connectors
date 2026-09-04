@@ -21,7 +21,7 @@
     ]
   ],
   "description": "Runpod GPU cloud: inspect and manage pods, serverless endpoints, clusters, templates, network volumes and registry credentials, and read GPU/CPU catalog metadata, prices and billing history",
-  "generator": "connectors 0.6.0",
+  "generator": "connectors 0.6.1",
   "operations": [
     {
       "auth": [

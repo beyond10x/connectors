@@ -2,7 +2,7 @@
 name = "integration-slack"
 description = "Slack Socket Mode Connector Integration adapter."
 edition = "2021"
-version = "0.6.0"
+version = "0.6.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,11 +14,11 @@ workspace = "../connectors-runtime"
 async-trait = "0.1"
 base64 = "0.22"
 catalog = { version = "0.6.0", path = "../catalog" }
-connect-session-transport = { version = "0.6.0", path = "../connect-session-transport" }
+connect-session-transport = { version = "0.6.1", path = "../connect-session-transport" }
 connector-oauth = { version = "0.6.0", path = "../connector-oauth" }
 connector-secrets = { version = "0.6.0", path = "../connector-secrets" }
 connector-resolve = { version = "0.6.0", path = "../connector-resolve" }
-connectors-config = { version = "0.6.0", path = "../connectors-config" }
+connectors-config = { version = "0.6.1", path = "../connectors-config" }
 getrandom = "0.3"
 hex = "0.4"
 connector-state = { version = "0.6.0", path = "../connector-state" }

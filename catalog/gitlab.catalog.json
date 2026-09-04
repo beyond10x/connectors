@@ -216,7 +216,7 @@
     }
   ],
   "description": "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only",
-  "generator": "connectors 0.6.0",
+  "generator": "connectors 0.6.1",
   "operations": [
     {
       "auth": [

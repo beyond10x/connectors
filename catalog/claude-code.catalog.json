@@ -30,7 +30,7 @@
   "connector": "claude-code",
   "custody_only": true,
   "description": "Claude Code subscription credential custody for user-bound Harness runs",
-  "generator": "connectors 0.6.0",
+  "generator": "connectors 0.6.1",
   "operations": [],
   "schema_version": 2,
   "services": [],
