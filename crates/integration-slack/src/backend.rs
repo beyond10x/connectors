@@ -70,9 +70,9 @@ use state_file::{read_state, write_state};
 
 const INTEGRATION_REF: &str = "slack";
 pub(crate) const AUTHORITY: &str = "com.slack.api";
-const SERVICE: &str = "default";
-const APP_TOKEN_CREDENTIAL: &str = "app_token";
-const BOT_TOKEN_CREDENTIAL: &str = "bot_token";
+pub(crate) const SERVICE: &str = "default";
+pub(crate) const APP_TOKEN_CREDENTIAL: &str = "app_token";
+pub(crate) const BOT_TOKEN_CREDENTIAL: &str = "bot_token";
 const USER_TOKEN_CREDENTIAL: &str = "user_token";
 const SOCKET_BINDING_REF: &str = "com.slack.api:v1#socket";
 // 4: `StoredConnection.purpose`. The field defaults, so an older state file still reads; the
