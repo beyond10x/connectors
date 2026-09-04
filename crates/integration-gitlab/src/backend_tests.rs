@@ -33,10 +33,9 @@ mod tests {
         assert_eq!(profiles.len(), 2);
         assert_eq!(profiles[0].auth_profile, PROFILE_OAUTH);
         assert_eq!(profiles[1].auth_profile, PROFILE_PAT);
-        assert!(profiles.iter().all(|profile| matches!(
-            profile.actor,
-            protocol::catalog::SetupProfileActor::Person
-        )));
+        assert!(profiles
+            .iter()
+            .all(|profile| matches!(profile.actor, protocol::catalog::SetupProfileActor::Person)));
         assert!(crate::profiles::setup_profiles("jira").is_empty());
     }
 
@@ -195,13 +194,12 @@ mod tests {
     }
 
     #[test]
-    fn the_refresh_policy_still_requires_bearer_a_refresh_token_and_api_scope() {
+    fn the_refresh_policy_still_requires_bearer_and_a_refresh_token() {
         type Break = fn(&mut TokenResponse);
         let cases: &[(&str, Break)] = &[
             ("token_type", |r| r.token_type = "MAC".to_owned()),
             ("empty access", |r| r.access_token = String::new()),
             ("empty refresh", |r| r.refresh_token = Some(String::new())),
-            ("scope without api", |r| r.scope = "read_api".to_owned()),
         ];
         for (name, break_it) in cases {
             let mut response = exchange_response();
@@ -211,6 +209,23 @@ mod tests {
                 "{name} must refuse on refresh too"
             );
         }
+    }
+
+    #[test]
+    fn a_gitlab_refresh_response_without_scope_is_accepted_for_live_reverification() {
+        let response: OAuthTokenResponse = serde_json::from_value(serde_json::json!({
+            "access_token": "SENTINEL-NOT-A-REAL-SECRET-access",
+            "token_type": "Bearer",
+            "expires_in": 7_200,
+            "refresh_token": "SENTINEL-NOT-A-REAL-SECRET-refresh",
+            "created_at": 1_724_500_000
+        }))
+        .expect("GitLab's documented refresh response shape");
+
+        let carried = token_response(response);
+        assert!(carried.scope.is_empty());
+        connector_oauth::validate(carried, &REFRESH_POLICY)
+            .expect("scope is verified from /oauth/token/info after refresh");
     }
 
     /// The adapter carries every field across, and marks the two GitLab always sends as present.
@@ -227,7 +242,7 @@ mod tests {
             refresh_token: "SENTINEL-NOT-A-REAL-SECRET-refresh".to_owned(),
             expires_in: 7_200,
             created_at: 1_724_500_000,
-            scope: "api read_api".to_owned(),
+            scope: Some("api read_api".to_owned()),
             token_type: "Bearer".to_owned(),
         });
 

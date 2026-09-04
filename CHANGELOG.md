@@ -11,6 +11,17 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.5.11 — 2026-09-04
+
+### Fixed
+
+- Keep delegated GitLab repository reads alive after the two-hour OAuth access token expires.
+  GitLab refresh responses may omit `scope`; Connectors now accepts that documented response shape
+  and continues to verify the refreshed token's exact scopes through `/oauth/token/info` before
+  committing the rotated access and refresh credentials.
+- Make the CLI credential-store test create the owner-only state root required by the runtime,
+  instead of depending on the hosted runner's `/tmp` permissions and blocking releases in CI.
+
 ## 0.5.10 — 2026-09-04
 
 ### Changed
