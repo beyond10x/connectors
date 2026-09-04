@@ -2,7 +2,7 @@
 name = "voice-runtime"
 description = "Supervised composition of admitted sipx telephony and authenticated RTVBP voice sessions."
 edition = "2021"
-version = "0.5.7"
+version = "0.5.8"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -15,19 +15,19 @@ members = ["."]
 
 [dependencies]
 async-trait = "0.1"
-domain = { version = "0.5.7", path = "../domain" }
-driver-sip = { version = "0.5.7", path = "../driver-sip" }
+domain = { version = "0.5.8", path = "../domain" }
+driver-sip = { version = "0.5.8", path = "../driver-sip" }
 getrandom = "0.3"
-protocol = { version = "0.5.7", path = "../protocol" }
+protocol = { version = "0.5.8", path = "../protocol" }
 rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
-rtvbp-voice-endpoint = { version = "0.5.7", path = "../rtvbp-voice-endpoint" }
-service = { version = "0.5.7", path = "../service" }
+rtvbp-voice-endpoint = { version = "0.5.8", path = "../rtvbp-voice-endpoint" }
+service = { version = "0.5.8", path = "../service" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "rt", "sync", "time"] }
 tokio-util = "0.7"
 
 [dev-dependencies]
-connector-resolve = { version = "0.5.7", path = "../connector-resolve" }
+connector-resolve = { version = "0.5.8", path = "../connector-resolve" }
 ed25519-dalek = "2"
 futures-util = "0.3"
 serde_json = "1"

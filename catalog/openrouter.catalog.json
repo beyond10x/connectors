@@ -21,7 +21,7 @@
     ]
   ],
   "description": "OpenRouter model router: list models and their endpoints, create chat completions, and read credit balance",
-  "generator": "connectors 0.5.7",
+  "generator": "connectors 0.5.8",
   "operations": [
     {
       "auth": [
