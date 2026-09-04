@@ -80,7 +80,7 @@
     ]
   ],
   "description": "Confluence Cloud wiki: find spaces, list the pages in one, read a page's metadata, publish a new page, and comment on one. Page and comment *content* cannot be read back — see the connector's notes",
-  "generator": "connectors 0.5.8",
+  "generator": "connectors 0.5.9",
   "operations": [
     {
       "auth": [
