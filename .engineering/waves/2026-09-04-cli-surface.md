@@ -12,7 +12,7 @@ Skill version **0.6.1**. Coordinator: this session. Base branch `main`.
 
 | unit | story | scope | branch | worktree | build dir | scratch | stage |
 |---|---|---|---|---|---|---|---|
-| 1 | `story:connectors-ess-domain` | cited | `impl/connectors-ess-domain` | `~/.local/state/worktree/trees/b10x/connectors/wt-2a8ad5b88c79` | `~/.cache/wave-cli-surface/unit1-target` | `~/.cache/wave-cli-surface/unit1-scratch` | verified, merging |
+| 1 | `story:connectors-ess-domain` | cited | `impl/connectors-ess-domain` | `~/.local/state/worktree/trees/b10x/connectors/wt-2a8ad5b88c79` | `~/.cache/wave-cli-surface/unit1-target` | `~/.cache/wave-cli-surface/unit1-scratch` | **closed, merged to main** |
 
 **N is 1.** Not for want of candidates — for what the verb computed, below.
 
@@ -159,7 +159,7 @@ wave. The standing rule *never commit unasked* returns when this wave closes.
   budget.
 - 2026-09-04 — **operator granted standing approval for waves 2 and 3.** It carries the same
   bounded grant each wave's own approval would: per wave, one opening commit, one commit per unit,
-  the merges into that wave'''s integration branch, the closing store commit, and the merge into
+  the merges into that wave's integration branch, the closing store commit, and the merge into
   `main`. It does **not** carry a push, a tag, a version bump or a release. The release remains the
   one mandatory human stop, and the standing rule *never commit unasked* returns when wave 3
   closes.
@@ -181,7 +181,7 @@ wave. The standing rule *never commit unasked* returns when this wave closes.
 - 2026-09-04 — adversary pass 2 **red**: 8 findings, all introduced. Recorded as
   `review-result:adversary-ess-domain-pass-2`. It wrote a second fence,
   `crates/catalog-build/tests/main/ess_claim_fence.rs` (5 cases), attacking claims the document
-  makes about the tree rather than pass 1'''s citations. 183,169 tokens, 71 tool uses, 917 s.
+  makes about the tree rather than pass 1's citations. 183,169 tokens, 71 tool uses, 917 s.
 - 2026-09-04 — **ledger between the passes: carried 0, new 8, resolved 11.** Nothing regressed; the
   corrections landed and pass 2 found new ground. Budget spent, so correction round 2 ran and the
   coordinator verified it rather than opening a third attack.
@@ -193,15 +193,64 @@ wave. The standing rule *never commit unasked* returns when this wave closes.
   byte-identical to HEAD as claimed. The four wire names are genuinely snake_case, not removed to
   dodge the fence.
 
+## Close
+
+| step | result |
+|---|---|
+| unit commit | `cd8d18b` |
+| merge into `wave/cli-surface` | `e49e5af` |
+| closing store commit | `3411da1` |
+| merge into `main` | `26d5083` |
+| whole gate, sharded one workspace per step | **13 steps, every exit 0, 670 s**, disk floor 74 G |
+| `aep artifact validate` | 127 artifacts, valid. 35 closed on an assertion — all pre-existing, from the 2026-09-04 legacy migration |
+
+Per-step gate, read as each step's own status and never through a pipe:
+
+```
+workspace .                                exit=0     158s  free=75G
+workspace crates/connectors-runtime        exit=0     109s  free=74G
+workspace crates/connectors-cli            exit=0      91s  free=75G
+workspace crates/connectors-console        exit=0      33s  free=77G
+workspace crates/driver-audio              exit=0       8s  free=78G
+workspace crates/driver-speech             exit=0      21s  free=77G
+workspace crates/driver-cdp                exit=0      21s  free=77G
+workspace crates/driver-sip                exit=0      64s  free=74G
+workspace crates/driver-sql                exit=0      25s  free=74G
+workspace crates/rtvbp-voice-endpoint      exit=0      37s  free=74G
+workspace crates/voice-local-audio         exit=0       7s  free=75G
+workspace crates/voice-runtime             exit=0      44s  free=74G
+final                                      exit=0      49s  free=74G
+```
+
+### Cost, per agent
+
+| agent | tokens | tool uses | wall |
+|---|---|---|---|
+| implementor, first run | 208,673 | 112 | 1,246 s |
+| adversary pass 1 | 191,533 | 82 | 1,166 s |
+| implementor, correction 1 | 279,734 | 143 | 620 s |
+| adversary pass 2 | 183,169 | 71 | 917 s |
+| implementor, correction 2 | 333,030 | 25 | 399 s |
+| **total** | **1,196,139** | **433** | **4,348 s** |
+
+Plus the gate at 670 s and the coordinator's own verification. One unit, five agent runs.
+
+### What the untracked records held, read before the tree was removed
+
+`citation-sweep.txt` — 226 citations swept, 3 with a blank last line
+(`crates/protocol/src/connection.rs:131-135`, `:156-160`, `:167-174`). Sub-threshold and not filed;
+recorded here so the next wave does not re-derive it. The remaining scratch files were run logs and
+the two round-1 patches, one applied and one superseded.
+
 ## Carried forward to wave 2
 
 **7 of the 12 commands the component accepts declare no `naming.wire`** — `SuperviseChannel`,
 `ReconnectChannel`, `ConnectChannel`, `StopChannel`, `FinishConnectSession`, `RefreshObservation`,
 `SettleSession`. That is consistent with this document: they are modelled acts rather than protocol
-methods, each carrying an UNMAPPED marker saying the command name is this document'''s.
+methods, each carrying an UNMAPPED marker saying the command name is this document's.
 
 It is not a defect in unit 1, and it **is** a constraint on unit 2. The ESS `cli:` block refuses an
-accepted command the tree places nowhere, and the clap target derives a command'''s word from
+accepted command the tree places nowhere, and the clap target derives a command's word from
 `Naming::wire_or` — so a `cli:` block over this surface would emit words like `SuperviseChannel`.
-Unit 2 either gives those commands wire names, or the component'''s accepted surface and its
+Unit 2 either gives those commands wire names, or the component's accepted surface and its
 command-line surface are not the same set and the document has to say so.
