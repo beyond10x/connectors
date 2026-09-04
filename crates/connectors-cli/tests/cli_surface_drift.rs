@@ -75,51 +75,65 @@ enum Unspecified {
 }
 
 const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
-    // First-level words that are not groups.
+    // Under `setup`.
     (
-        "connect",
-        Unspecified::Flow,
-        "a guided acquisition flow, not one declared command",
-    ),
-    (
-        "doctor",
-        Unspecified::Read,
-        "a read of the installation; no entity moves",
-    ),
-    (
-        "init",
+        "setup init",
         Unspecified::Lifecycle,
         "writes a configuration file; no entity of this specification moves",
     ),
     (
-        "login",
-        Unspecified::Lifecycle,
-        "acquires an Identity session; no entity of this specification moves",
+        "setup connect",
+        Unspecified::Flow,
+        "a guided acquisition flow, not one declared command",
     ),
     (
-        "logout",
-        Unspecified::Lifecycle,
-        "discards an Identity session; no entity of this specification moves",
+        "setup completions",
+        Unspecified::Unmodelled,
+        "renders this binary's own command tree as a shell script; no command of this \
+         specification names it",
+    ),
+    // Under `inspect`.
+    (
+        "inspect doctor",
+        Unspecified::Read,
+        "a read of the installation; no entity moves",
     ),
     (
-        "mcp",
-        Unspecified::Lifecycle,
-        "serves a transport; no entity moves",
-    ),
-    (
-        "providers",
+        "inspect providers",
         Unspecified::Read,
         "a read of the embedded catalogue; ESS models a read as a view",
     ),
     (
-        "serve",
+        "inspect auth",
+        Unspecified::Read,
+        "a read of which configured providers have a credential stored",
+    ),
+    // Under `session`.
+    (
+        "session login",
+        Unspecified::Lifecycle,
+        "acquires an Identity session; no entity of this specification moves",
+    ),
+    (
+        "session logout",
+        Unspecified::Lifecycle,
+        "discards an Identity session; no entity of this specification moves",
+    ),
+    // Under `serve`.
+    (
+        "serve local",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
     ),
     (
-        "serve-hosted",
+        "serve hosted",
         Unspecified::Lifecycle,
         "starts a process; no entity moves",
+    ),
+    (
+        "serve mcp",
+        Unspecified::Lifecycle,
+        "serves a transport; no entity moves",
     ),
     // Under `admin`. Both are groups of their own, and the tree runs one word deeper here than
     // anywhere else in the binary — which a contract comparing first-level words could not see.
@@ -142,12 +156,6 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         "admin credentials set",
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
-    ),
-    // Under `auth`.
-    (
-        "auth status",
-        Unspecified::Read,
-        "a read of which configured providers have a credential stored",
     ),
     // Under `connection`.
     (
@@ -663,7 +671,7 @@ fn a_target_flag_on_the_group_itself_is_seen_by_the_countdown() {
 ///
 /// The assertion is flipped rather than deleted, because the correction is a fact about the
 /// repository and a fact is worth holding: the generated `admin`
-/// (`ess/generated/clap/crates/connectors-cli/src/tree.rs:17-20`) is a group with
+/// (`ess/generated/clap/crates/connectors-cli/src/tree.rs:59-63`) is a group with
 /// `subcommand_required(true)` and nothing under it, which is all the specification can emit while
 /// `connectors-cli` accepts no command. Putting it in the parser deletes `admin integrations` and
 /// `admin credentials`, and the contract refuses that twice — once for a declared group whose word
@@ -701,11 +709,20 @@ fn cutting_the_admin_group_over_to_the_generated_tree_is_refused() {
 
 /// **The specification's citation for the thin-frontend rule points at the rule.**
 ///
-/// `ess/system/components.yaml` says `crates/catalog-build/tests/main/architecture_fence.rs:303`
-/// "holds it to that", `that` being "Thin command-line frontend for reusable Connector client and
-/// runtime libraries". `crates/catalog-build/tests/main/ess_citation_fence.rs:8-10` states what a
-/// citation of this document is for: "a citation which drifts away from what it points at fails
+/// `ess/system/components.yaml` cites `crates/catalog-build/tests/main/architecture_fence.rs` as
+/// what "holds it to that", `that` being "Thin command-line frontend for reusable Connector client
+/// and runtime libraries". `crates/catalog-build/tests/main/ess_citation_fence.rs:8-10` states what
+/// a citation of this document is for: "a citation which drifts away from what it points at fails
 /// here rather than being believed by the next reader."
+///
+/// It cited `:303` when this case was written, which had become a different test. The first
+/// version of this case then accepted any line inside `product_cli_is_a_thin_frontend`, and the
+/// specification came to cite `:319` — `"rpassword",` inside the `CLI_DEPENDENCIES` array that
+/// function declares — and passed. A citation that names a test lands on the test: its `fn` line,
+/// or the `#[test]` and doc comment directly above it. Nothing inside the body is stable, because
+/// the body is what gets edited. `cli_surface.rs::every_citation_that_names_a_symbol_lands_on_its_declaration`
+/// holds every symbol-naming citation of this unit to the same rule; this is the one it was learnt
+/// from, kept.
 #[test]
 fn the_thin_frontend_citation_points_at_the_thin_frontend_test() {
     let root = repository_root();
@@ -723,25 +740,24 @@ fn the_thin_frontend_citation_points_at_the_thin_frontend_test() {
 
     let fence = read(&root.join("crates/catalog-build/tests/main/architecture_fence.rs"));
     let lines: Vec<&str> = fence.lines().collect();
-    let start = lines
+    let declaration = lines
         .iter()
         .position(|line| line.starts_with("fn product_cli_is_a_thin_frontend()"))
         .expect("architecture_fence.rs declares product_cli_is_a_thin_frontend");
-    let end = start
-        + 1
-        + lines[start + 1..]
-            .iter()
-            .position(|line| *line == "}")
-            .expect("the function closes");
+    let mut first = declaration;
+    while first > 0 && (lines[first - 1].starts_with("#[") || lines[first - 1].starts_with("///")) {
+        first -= 1;
+    }
 
     assert!(
-        (start..=end + 1).contains(&(cited - 1)),
+        (first..=declaration).contains(&(cited - 1)),
         "ess/system/components.yaml cites architecture_fence.rs:{cited}, which is `{}`; the test \
          that holds `connectors-cli` to being a thin command-line frontend is \
-         `product_cli_is_a_thin_frontend`, lines {}-{}",
+         `product_cli_is_a_thin_frontend`, declared at line {}, with its attributes from line {}. \
+         A citation naming the test lands there, not inside its body",
         lines[cited - 1].trim(),
-        start + 1,
-        end + 1
+        declaration + 1,
+        first + 1
     );
 }
 

@@ -11,6 +11,50 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+Every first-level word of the shipped binary moves, and bare `connectors serve` stops starting the
+local server: the breaking change the preamble puts in a minor bump.
+
+### Changed
+
+- **`connectors --help` lists eight words, not sixteen.** Ten first-level commands that were five
+  different activities in one block are grouped: `setup` (`init`, `connect`, `completions`),
+  `inspect` (`doctor`, `providers`, `auth` — which was `auth status`), `session` (`login`, `logout`)
+  and `serve` (`local` — which was bare `serve` — `hosted` and `mcp`). `connection`, `event`,
+  `operation` and `admin` stay where they were.
+- **Every old path but one works for one more release.** `connectors doctor`,
+  `connectors auth status`, `connectors serve-hosted --config …` and the rest are rewritten onto
+  their new path before the arguments are parsed, produce the same output, and write one line to
+  stderr naming where they went. Clap decides the rewrite: the global `-o`/`--output` may stand in
+  front of the words or between them in any of its four spellings, and
+  `connectors help <old word>` and `connectors auth help` answer as they did. The table that does
+  it, `MOVED` in `crates/connectors-cli/src/lib.rs`, is removed in the release after this one. The
+  one path not carried is the next entry.
+- **`connectors serve` no longer starts the local server; `connectors serve local` does.** This is
+  a break, not a deprecated path that still works: bare `connectors serve`,
+  `connectors serve --help`, `connectors serve -h`, and `connectors serve` with nothing but global
+  options in front of it or behind it — `connectors serve -o json`, `connectors -o json serve` —
+  are the `serve` group, a `Commands:` listing as for `setup`, `inspect` and `session`, and exit 2
+  without serving and without a note. A script that started the server with bare
+  `connectors serve` has to say `connectors serve local` from this release on. `serve` and
+  `serve -o json` are one invocation, so one of them starting a server while the other listed
+  commands would be two commands under one name, which is the defect this release removed. Only
+  `connectors serve --config …` and `connectors serve --state-root …` — the old leaf's own
+  options, which the group refuses and `serve local` declares — are still rewritten onto
+  `connectors serve local`, with the note.
+- The hosted image starts on `connectors serve hosted`. `README.md`, the guides, `Taskfile.yaml`
+  and the design pages name the new paths, and the fence that refuses shipped text naming an old
+  one now reads all of them rather than Rust sources alone.
+- The `connectors` command-line surface is declared in `ess/system/components.yaml`, and the clap
+  tree projected from it is committed under `ess/generated/clap/` and held against the parser on
+  every run (`docs/design/19-the-cli-surface.md`).
+
+### Removed
+
+- `CLI_TOTAL_LINE_LIMIT`, the cap on the thin frontend's line count in
+  `crates/catalog-build/tests/main/architecture_fence.rs`. It was raised at every one of the six
+  times it fired and never once moved a line out of the binary; `product_cli_is_a_thin_frontend`
+  still bounds what the frontend may link and what it may declare.
+
 ## 0.5.11 — 2026-09-04
 
 ### Fixed
