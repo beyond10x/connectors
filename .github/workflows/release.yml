@@ -29,10 +29,11 @@ env:
   CLI_MANIFEST: crates/connectors-cli/Cargo.toml
 
 jobs:
-  # The workspace list lives in `scripts/gate.sh` and is read from it, never copied here. Eleven
-  # workspaces that do not share a `target/` directory need about 39 GB between them, which no
-  # hosted runner has — so the tests shard one workspace per runner. A second copy of the list in
-  # this file would be a list that drifts from the one developers actually run.
+  # The workspace list lives in `scripts/gate.sh` and is read from it, never copied here. The
+  # twelve workspaces do not share a `target/` directory and need about 41 GB between them, which
+  # no hosted runner has — so the tests shard one workspace per runner. The two numbers are
+  # `scripts/gate.sh`'s own, and a second copy of the list in this file would be a list that
+  # drifts from the one developers actually run.
   plan:
     name: shard the gate
     runs-on: ubuntu-latest
@@ -104,7 +105,7 @@ jobs:
       # Release behind it.
       - name: The ESS toolchain
         run: |
-          cargo install --locked --git https://github.com/beyond10x/ess.git --tag 0.16.0 ess-cli
+          cargo install --locked --git https://github.com/beyond10x/ess.git --tag 0.18.0 ess-cli
           ess --version
 
       - name: Catalog lock verifier and documentation checks
