@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:cli-surface-fences-assert-what-they-claim
 kind: story
-status: active
+status: implemented
 title: The CLI surface fences assert what they claim to
 relations:
 - derived_from: epic:cli-surface
@@ -33,7 +33,7 @@ scope:
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
   path: ess/system/components.yaml
-revision: 16
+revision: 17
 ---
 # Story: the CLI surface fences assert what they claim to
 
