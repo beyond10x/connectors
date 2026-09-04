@@ -1,0 +1,28 @@
+# **A `naming.wire` on a command is the `method` tag, and nothing else.**
+#
+# `ConnectionRequest` (crates/protocol/src/connection.rs:28-48), `OperationRequest`
+# (crates/protocol/src/operation.rs:42-56), `CatalogRequest` (crates/protocol/src/catalog.rs:34-46)
+# and `EventRequest` (crates/protocol/src/event.rs:29-40) are each
+# `#[serde(tag = "method", content = "params", rename_all = "snake_case", deny_unknown_fields)]`,
+# so the word a caller writes is the variant identifier in **snake_case** — never kebab-case. The
+# frozen vectors spell them out: `contracts/connector-connection/v0alpha1/vectors.json:11, 21, 31`
+# carry `"method":"candidate_search"`, `"candidate_activate"` and `"connect_session_create"`, and
+# `deny_unknown_fields` refuses any other spelling before it reaches a handler. Downstream units
+# take these values verbatim, so a wrong one is not cosmetic.
+# `crates/catalog-build/tests/main/ess_claim_fence.rs` checks this over the whole document.
+format: ess/1
+system: connectors
+version: v1
+
+summary: >-
+  The connector platform: a reviewed catalog of provider surfaces, tenant-configured
+  integrations, authorized connections, and the granted invocations, sessions and events
+  that run over them.
+
+domains:
+  - connectors.catalog
+  - connectors.connection
+  - connectors.deployment
+  - connectors.event
+  - connectors.runtime
+  - connectors.target

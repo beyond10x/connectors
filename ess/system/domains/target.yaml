@@ -1,0 +1,14 @@
+# The noun `story:explicit-target-never-implicit` introduces. This unit types it and nothing more:
+# the `--target` flag that carries it, and the three verbs that gain it, are a later unit's.
+domain: connectors.target
+
+summary: Which deployment a command reaches, said explicitly rather than inferred from a stored login.
+
+types:
+  # A closed set. `local` is what an undeclared target means; a hosted target is chosen, never
+  # fallen into (.engineering/planning/story/explicit-target-never-implicit.md, "Shape").
+  - name: connectors.target.Target
+    kind: enum
+    variants: [Local, Hosted]
+    naming:
+      display: Target
