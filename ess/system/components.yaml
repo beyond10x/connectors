@@ -59,7 +59,7 @@ components:
         - connectors.runtime.SessionTerminating
         - connectors.runtime.SessionTerminated
     # UNMAPPED: this surface is the write half only. The read verbs of the three protocols —
-    # `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
+    # `CandidateSearch`, `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
     # (crates/protocol/src/connection.rs:35-48), `SessionStatus`, `SessionReconcile`
     # (crates/protocol/src/operation.rs:49-56), `Receive`, `Replay`
     # (crates/protocol/src/event.rs:36-39) — change no entity, and ESS models a read as a `views:`
@@ -67,6 +67,18 @@ components:
     # tree states that claim for any of them, so declaring one would invent it. Settled by the
     # consistency each read actually offers being written down, which the caller's contract
     # (docs/design/04-the-callers-contract.md) is where it would go.
+    #
+    # Neither an accepted command nor a read — `SessionSignal`
+    # (crates/protocol/src/operation.rs:56) — sends DTMF into a live call. It moves no entity this
+    # document declares and no command above names it, so it is in neither half of the sentence
+    # before this one, and `connectors operation signal` is excused as `unmodelled` below.
+    #
+    # Those three parts are a partition, not three lists: every variant of the three request enums
+    # cited above is in exactly one of them, and
+    # `crates/connectors-cli/tests/cli_surface.rs::the_read_verb_enumeration_partitions_the_protocols_it_names`
+    # is what says so. Without it these sentences are prose in a YAML comment that decides eight of
+    # the kinds `UNSPECIFIED_PATHS` carries, and a verb quietly dropped from the read half would
+    # move a command-line word from `read` to `unmodelled` with nothing objecting.
     # In hosted posture the caller is not deployed with the service: it presents a validated
     # Identity envelope over a wire (docs/design/01-domain-model.md:48-50, 67-70).
     reached_by: network
@@ -109,7 +121,8 @@ components:
     # `naming.wire` where it has one and the qualified name's last segment otherwise, verbatim and
     # un-cased; eleven of the sixteen carry no `naming.wire`, because in this document a
     # `naming.wire` is the protocol `method` tag and nothing else (`ess/system/system.yaml`,
-    # enforced by `crates/catalog-build/tests/main/ess_claim_fence.rs:156`). Placing them would
+    # enforced by `every_declared_wire_name_is_a_method_the_protocol_accepts`,
+    # `crates/catalog-build/tests/main/ess_claim_fence.rs:360`). Placing them would
     # emit `SuperviseChannel`, `FinishConnectSession` and `SettleSession` as words at a shell —
     # measured, not supposed — and each of those is an act the platform performs on its own
     # (`ess/system/domains/connection.yaml:435-439`,
@@ -123,6 +136,53 @@ components:
     # second one: ESS models a read as a `views:` declaration carrying a consistency claim, and
     # the note on `connectors-service` above says why this document declares none. Settled by the
     # same two things: reads gaining that claim, and a forwarded command gaining a place.
+    #
+    # UNMAPPED: the words a person types under this binary that neither marker above lets this
+    # document declare are enumerated below, one per line, so that the set is a fact of this
+    # specification rather than an allowlist private to a test file. `UNSPECIFIED_PATHS` in
+    # `crates/connectors-cli/tests/cli_surface.rs` has to equal this set exactly, in both
+    # directions: a command absorbed into that list without being written down here is refused,
+    # and a path written here that the parser has dropped is refused too. Each carries a kind
+    # over there, and each kind is one of the reasons the two markers above give — a read waiting
+    # on a `views:` consistency claim, a command this frontend forwards rather than handles, a
+    # process or credential lifecycle step that moves no entity of this specification, a guided
+    # flow, a word that only carries other words, or an act no command of this specification
+    # names. Settled by the same two things: reads gaining that claim, and a forwarded command
+    # gaining a place.
+    #
+    # Each line below is `<path> — <kind>`, and the kind is one of `read`, `lifecycle`,
+    # `forwarded`, `flow`, `grouping` or `unmodelled`. **These lines are a YAML comment, so
+    # `ess specify validate` never reads them and no ESS rule constrains them**; what holds them
+    # is `the_exception_list_is_the_set_the_specification_enumerates`, which requires
+    # `UNSPECIFIED_PATHS` to carry exactly these paths with exactly these kinds. Twelve of the
+    # kinds are also derived from the tree and do not rest on this list at all — see
+    # docs/design/19-the-cli-surface.md for which, and for why the other fourteen cannot be.
+    #   unspecified-path: connect — flow
+    #   unspecified-path: doctor — read
+    #   unspecified-path: init — lifecycle
+    #   unspecified-path: login — lifecycle
+    #   unspecified-path: logout — lifecycle
+    #   unspecified-path: mcp — lifecycle
+    #   unspecified-path: providers — read
+    #   unspecified-path: serve — lifecycle
+    #   unspecified-path: serve-hosted — lifecycle
+    #   unspecified-path: admin integrations — grouping
+    #   unspecified-path: admin integrations status — read
+    #   unspecified-path: admin credentials — grouping
+    #   unspecified-path: admin credentials set — lifecycle
+    #   unspecified-path: auth status — read
+    #   unspecified-path: connection candidates — read
+    #   unspecified-path: connection activate — forwarded
+    #   unspecified-path: connection list — read
+    #   unspecified-path: connection observations — read
+    #   unspecified-path: connection materialize — forwarded
+    #   unspecified-path: event search — read
+    #   unspecified-path: event receive — read
+    #   unspecified-path: event replay — read
+    #   unspecified-path: operation search — read
+    #   unspecified-path: operation describe — read
+    #   unspecified-path: operation signal — unmodelled
+    #   unspecified-path: operation invoke — forwarded
     cli:
       binary: connectors
       groups:

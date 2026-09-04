@@ -126,33 +126,112 @@ fn implementation_sources(directory: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// **Every error the specification declares is either cited or explicitly unmapped.**
+/// **Every error and every event the specification declares is either cited or explicitly
+/// unmapped.**
 ///
-/// The document's own rule. An error that names neither a refusal in the tree nor an `UNMAPPED:`
-/// marker is a refusal nothing performs, presented as one that something does.
+/// The document's own rule, over every block that makes a claim about the tree. An error that
+/// names neither a refusal in the tree nor an `UNMAPPED:` marker is a refusal nothing performs,
+/// presented as one that something does — and an event is the same claim in the other direction: a
+/// fact this system says it publishes.
+///
+/// `errors` was the only block this ever read. `events` was not, and 18 of the 20 events these
+/// documents declare carried neither a citation nor a marker, while no file under `crates/` so
+/// much as mentions 19 of the 20 names. `ESS-COMMAND-007` requires an `emits:` or an `error:` per
+/// outcome, so the names are schema-forced — which is a reason for them to exist and not a reason
+/// for them to be uncited. The blocks are named in a list here rather than one function per block,
+/// because the rule is one rule and a second copy of it is how `events` came to be exempt.
 #[test]
-fn every_declared_error_is_cited_or_unmapped() {
+fn every_declared_error_and_event_is_cited_or_unmapped() {
+    const CLAIMING_BLOCKS: &[&str] = &["errors", "events"];
     let root = workspace_root();
     let mut uncited = Vec::new();
+    let mut checked = 0usize;
     for file in specification_files(&root) {
         let source = read(&file);
         let lines = source.lines().collect::<Vec<_>>();
-        for (index, name) in entries_of_block(&source, "errors") {
-            let block = preceding_comment_block(&lines, index);
-            if !block.contains("UNMAPPED:") && !carries_a_citation(&block) {
-                uncited.push(format!(
-                    "{}:{} {name}",
-                    file.strip_prefix(&root).unwrap_or(&file).display(),
-                    index + 1
-                ));
+        for block_name in CLAIMING_BLOCKS {
+            for (index, name) in entries_of_block(&source, block_name) {
+                checked += 1;
+                let block = preceding_comment_block(&lines, index);
+                if !block.contains("UNMAPPED:") && !carries_a_citation(&block) {
+                    uncited.push(format!(
+                        "{}:{} {name} (`{block_name}:`)",
+                        file.strip_prefix(&root).unwrap_or(&file).display(),
+                        index + 1
+                    ));
+                }
             }
         }
     }
     assert!(
+        checked > 20,
+        "only {checked} entries were read out of the `errors:` and `events:` blocks of \
+         ess/system; the blocks moved, so read them again before believing any result from this \
+         test"
+    );
+    assert!(
         uncited.is_empty(),
-        "the specification claims every error is read from the tree and cited, or carries an \
-         `UNMAPPED:` marker naming what would settle it. These carry neither:\n  {}",
+        "the specification claims everything it declares is read from the tree and cited, or \
+         carries an `UNMAPPED:` marker naming what would settle it. These carry neither:\n  {}",
         uncited.join("\n  ")
+    );
+}
+
+/// **Every event a component says it publishes is an event some domain declares.**
+///
+/// `publishes.events` in `ess/system/components.yaml` is a list of bare names, so nothing about it
+/// is checked by the rule above: the names have no entry of their own to carry a citation. What
+/// makes them checkable is the other end — each has to be an event a domain of this specification
+/// declares, where the rule above does apply. A name in the `publishes` list and in no `events:`
+/// block is a published fact this system has no definition of.
+#[test]
+fn every_published_event_is_an_event_some_domain_declares() {
+    let root = workspace_root();
+    let mut declared = std::collections::BTreeSet::new();
+    for file in specification_files(&root) {
+        for (_, name) in entries_of_block(&read(&file), "events") {
+            declared.insert(name);
+        }
+    }
+    assert!(
+        !declared.is_empty(),
+        "no `events:` entry was read out of ess/system; the blocks moved"
+    );
+
+    let components = read(&root.join("ess/system/components.yaml"));
+    let mut published = Vec::new();
+    let mut inside = false;
+    for line in components.lines() {
+        if line.trim_start().starts_with('#') {
+            continue;
+        }
+        if line.trim() == "events:" {
+            inside = true;
+            continue;
+        }
+        match line.strip_prefix("        - ") {
+            Some(name) if inside => published.push(name.trim().to_owned()),
+            _ => {
+                if !line.trim().is_empty() {
+                    inside = false;
+                }
+            }
+        }
+    }
+    assert!(
+        !published.is_empty(),
+        "no `publishes.events` entry was read out of ess/system/components.yaml"
+    );
+
+    let undefined: Vec<&String> = published
+        .iter()
+        .filter(|name| !declared.contains(*name))
+        .collect();
+    assert!(
+        undefined.is_empty(),
+        "ess/system/components.yaml says a component publishes these, and no `events:` block of \
+         this specification declares them, so nothing carries their fields or their citation:\n  \
+         {undefined:#?}"
     );
 }
 
@@ -400,5 +479,84 @@ fn the_reobserve_site_leaves_a_connection_ref_and_the_specification_says_so() {
          `target_provider` — so the specification has to carry `rematerialize`. Declaring only \
          `reobserve: Withdrawn -> Observed` states a transition the tree does not perform.",
         derivation + materialized + 1
+    );
+}
+
+/// **Every `path:line` citation of the specification resolves to a line that exists.**
+///
+/// The class behind the two rules above. Both of them ask whether a citation is *present*; neither
+/// opens what it points at, so a citation surviving a file that shrank, moved or was renamed reads
+/// to the next person as evidence. `crates/connectors-cli/tests/cli_surface.rs` does exactly this
+/// for the two documents that unit wrote, and the reason it exists there is a citation in
+/// `ess/system/components.yaml` that pointed at the right line until seven lines were inserted
+/// above it. Every document of `ess/system` is read here, on the same argument.
+///
+/// It does not check that the line *means* what the sentence says — that is what
+/// [`ess_claim_fence`](super::ess_claim_fence) does for the claims where the meaning is
+/// load-bearing.
+#[test]
+fn every_citation_of_the_specification_resolves() {
+    let root = workspace_root();
+    let mut broken = Vec::new();
+    let mut resolved = 0usize;
+
+    for file in specification_files(&root) {
+        let document = file
+            .strip_prefix(&root)
+            .unwrap_or(&file)
+            .display()
+            .to_string();
+        let text = read(&file);
+        for (index, _) in text.match_indices(':') {
+            let head = &text[..index];
+            let start = head
+                .rfind(|character: char| {
+                    !(character.is_ascii_alphanumeric() || "._-/".contains(character))
+                })
+                .map_or(0, |position| position + 1);
+            let path = &head[start..];
+            if !path.contains('/')
+                || !(path.ends_with(".rs") || path.ends_with(".md") || path.ends_with(".yaml"))
+            {
+                continue;
+            }
+            let numbers: String = text[index + 1..]
+                .chars()
+                .take_while(|character| character.is_ascii_digit() || *character == '-')
+                .collect();
+            let Some(last) = numbers
+                .rsplit('-')
+                .find(|part| !part.is_empty())
+                .and_then(|part| part.parse::<usize>().ok())
+            else {
+                continue;
+            };
+            let cited = root.join(path);
+            if !cited.is_file() {
+                broken.push(format!(
+                    "{document} cites `{path}:{numbers}`, and no such file exists"
+                ));
+                continue;
+            }
+            let lines = read(&cited).lines().count();
+            if last > lines {
+                broken.push(format!(
+                    "{document} cites `{path}:{numbers}`, and that file has {lines} lines"
+                ));
+                continue;
+            }
+            resolved += 1;
+        }
+    }
+
+    assert!(
+        resolved > 100,
+        "only {resolved} citations were resolved out of ess/system; the extraction is wrong, and \
+         a check that finds nothing to look at passes without looking"
+    );
+    assert!(
+        broken.is_empty(),
+        "citations of the specification that no longer resolve:\n  {}",
+        broken.join("\n  ")
     );
 }

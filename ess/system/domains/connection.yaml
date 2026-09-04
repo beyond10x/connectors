@@ -724,11 +724,21 @@ errors:
     summary: No candidate is stored under this reference, so nothing was activated.
 
 events:
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.AuthorizeConnection`'s `authorized` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectionAuthorized
     fields:
       - name: connection_ref
         type: connectors.connection.ConnectionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.VerifyConnection`'s `callable` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.connection.ConnectionBecameCallable
     fields:
       - name: connection_ref
@@ -741,16 +751,31 @@ events:
       - name: connection_ref
         type: connectors.connection.ConnectionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.ReauthorizeConnection`'s `reauthorized` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectionReauthorized
     fields:
       - name: connection_ref
         type: connectors.connection.ConnectionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.RevokeConnection`'s `revoked` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.connection.ConnectionRevoked
     fields:
       - name: connection_ref
         type: connectors.connection.ConnectionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.SuperviseChannel`'s `starting` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.connection.ChannelStarting
     fields:
       - name: channel_ref
@@ -758,11 +783,21 @@ events:
       - name: binding_ref
         type: connectors.connection.BindingRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.ReconnectChannel`'s `reconnecting` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ChannelReconnecting
     fields:
       - name: channel_ref
         type: connectors.connection.ChannelRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.ConnectChannel`'s `connected` outcome. crates/protocol/src/event.rs:3-4
+  # carries the data family only and says the operational one is "intentionally absent", so no file
+  # under crates/ names this fact and nothing was read for its publication. Settled by the
+  # operational family gaining a transport.
   - name: connectors.connection.ChannelConnected
     fields:
       - name: channel_ref
@@ -775,6 +810,11 @@ events:
       - name: channel_ref
         type: connectors.connection.ChannelRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.CreateConnectSession`'s `pending` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectSessionCreated
     fields:
       - name: connect_session_ref
@@ -782,36 +822,71 @@ events:
       - name: integration_ref
         type: connectors.connection.IntegrationRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.FinishConnectSession`'s `completed` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectSessionCompleted
     fields:
       - name: connect_session_ref
         type: connectors.connection.ConnectSessionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.FinishConnectSession`'s `expired` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectSessionExpired
     fields:
       - name: connect_session_ref
         type: connectors.connection.ConnectSessionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.FinishConnectSession`'s `failed` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ConnectSessionFailed
     fields:
       - name: connect_session_ref
         type: connectors.connection.ConnectSessionRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.ActivateCandidate`'s `activated` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.CandidateActivated
     fields:
       - name: candidate_ref
         type: connectors.connection.CandidateRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.MaterializeObservation`'s `materialized` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ObservationMaterialized
     fields:
       - name: observation_ref
         type: connectors.connection.ObservationRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.RefreshObservation`'s `withdrawn` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ObservationWithdrawn
     fields:
       - name: observation_ref
         type: connectors.connection.ObservationRef
 
+  # UNMAPPED: an operational event (docs/design/01-domain-model.md:366-373), emitted by
+  # `connectors.connection.RefreshObservation`'s `reobserved` outcome.
+  # crates/protocol/src/event.rs:3-4 carries the data family only and says the operational one is
+  # "intentionally absent", so no file under crates/ names this fact and nothing was read for its
+  # publication. Settled by the operational family gaining a transport.
   - name: connectors.connection.ObservationReobserved
     fields:
       - name: observation_ref
