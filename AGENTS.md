@@ -182,7 +182,7 @@ The agent instruction is therefore short:
 
 ### The gate does not fit on one machine
 
-Eleven workspaces, none sharing a `target/` directory, need about **39 GB** between them —
+Twelve workspaces, none sharing a `target/` directory, need about **41 GB** between them —
 `connectors-runtime` alone is 11 GB. A hosted CI runner starts with roughly 14 GB, so the gate is
 sharded one workspace per runner. `scripts/gate.sh` takes three flags for that:
 
