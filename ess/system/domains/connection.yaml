@@ -1,0 +1,818 @@
+# The nouns `crates/protocol/src/connection.rs` carries together: that module's own first line
+# (`crates/protocol/src/connection.rs:1`) calls itself the "Credential-free Connection and Connect
+# Session protocol", and every state enum modelled here is declared in it.
+domain: connectors.connection
+
+summary: An authorized instance of an integration, the channel it supervises, and the connect sessions, candidates and observations that produce one.
+
+types:
+  # Every identity below is an opaque `String` reference in the protocol; the wire names are the
+  # field names of the value-free summaries in `crates/protocol/src/connection.rs`.
+  - name: connectors.connection.ConnectionRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.IntegrationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.Label
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/connection.rs:123-128.
+  - name: connectors.connection.ConnectionScope
+    kind: enum
+    variants: [Tenant, Principal]
+
+  # crates/protocol/src/connection.rs:131-135.
+  - name: connectors.connection.ConnectionActor
+    kind: enum
+    variants: [App, User]
+
+  # crates/protocol/src/connection.rs:138-143. `Platform` is wire id `b10x` (line 140).
+  - name: connectors.connection.ConnectionInitiator
+    kind: enum
+    variants: [Platform, Provider]
+
+  # crates/protocol/src/connection.rs:156-160.
+  - name: connectors.connection.RouteAdapter
+    kind: enum
+    variants: [GrafanaDatasourceProxyV1, KubernetesServiceProxyV1]
+
+  - name: connectors.connection.ChannelRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.BindingRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.EventName
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.ConnectSessionRef
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/connection.rs:99-101: it selects a credential purpose, never a credential.
+  - name: connectors.connection.AuthProfile
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.CandidateRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.ObservationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.DiscoveryRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.ProviderRef
+    kind: newtype
+    of: String
+
+  - name: connectors.connection.Title
+    kind: newtype
+    of: String
+
+  # Opaque content digest of the evidence a candidate or observation was read from
+  # (crates/protocol/src/connection.rs:234, 250).
+  - name: connectors.connection.EvidenceDigest
+    kind: newtype
+    of: String
+
+entities:
+  # States: crates/protocol/src/connection.rs:112-117 (`ConnectionState`).
+  # Transitions: docs/design/01-domain-model.md:198-201, the only drawn lifecycle in the tree.
+  # Fields: `ConnectionSummary`, crates/protocol/src/connection.rs:186-200.
+  # UNMAPPED: `route` (crates/protocol/src/connection.rs:167-174) is `direct` or
+  # `via_connection(parent Connection, resource binding, adapter)`, so a mediated Connection
+  # references a parent Connection. The cardinality of that relation is not stated anywhere:
+  # docs/design/01-domain-model.md:235-241 says every Connection has one immutable route but does
+  # not say how many children one parent may carry. Settled by the storage or reconciliation code
+  # that indexes children by parent; `crates/integration-monitoring/src/backend.rs:1684-1690`
+  # walks `ChildConnection` records but does not bound them.
+  - name: connectors.connection.Connection
+
+    identity:
+      name: connection_ref
+      type: connectors.connection.ConnectionRef
+
+    fields:
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: label
+        type: connectors.connection.Label
+      - name: initiation
+        type: List<connectors.connection.ConnectionInitiator>
+      - name: scope
+        type: Optional<connectors.connection.ConnectionScope>
+      - name: actor
+        type: Optional<connectors.connection.ConnectionActor>
+      # crates/protocol/src/connection.rs:198-199. The provider-declared acquisition profile the
+      # Connection was made under; it selects a credential purpose, never a credential
+      # (crates/protocol/src/connection.rs:99-101). Same value as
+      # `connectors.catalog.SetupProfileSummary.auth_profile`
+      # (crates/protocol/src/catalog.rs:101).
+      - name: auth_profile
+        type: Optional<connectors.connection.AuthProfile>
+
+    lifecycle:
+      initial: Created
+      states: [Created, Authorized, Callable, Degraded, Revoked]
+      terminal: [Revoked]
+      transitions:
+        - name: authorize
+          from: [Created]
+          to: Authorized
+        - name: verify
+          from: [Authorized]
+          to: Callable
+        - name: degrade
+          from: [Callable]
+          to: Degraded
+        - name: reauthorize
+          from: [Degraded]
+          to: Authorized
+        - name: revoke
+          from: [Degraded]
+          to: Revoked
+
+  # States: crates/protocol/src/connection.rs:147-151 (`ChannelState`).
+  # Transitions read from the supervisor that performs them,
+  # `crates/integration-slack/src/backend/connection_runtime.rs`: `Starting` on
+  # `start_supervisor` (line 704), `Reconnecting` at each loop head (line 730), `Connected` once
+  # the socket is open (line 801), `Stopped` when the loop breaks (line 746).
+  # The protocol declares `ChannelSummary` twice, and the two projections differ. Both are read:
+  # Fields: `ChannelSummary`, crates/protocol/src/connection.rs:177-182.
+  # Fields: `ChannelSummary`, crates/protocol/src/event.rs:74-80.
+  # The connection.rs projection omits `connection_ref` because it is nested inside
+  # `ConnectionDescription` (crates/protocol/src/connection.rs:204-208), where the Connection is
+  # already named; the event.rs projection carries `pub connection_ref: String`
+  # (crates/protocol/src/event.rs:76) and it is not optional. So the Channel-to-Connection
+  # direction is cited and single-valued, and is modelled as a required field below.
+  # UNMAPPED: the *other* direction. A Channel's key is `(Connection, source_scope)` and not
+  # Connection alone (docs/design/01-domain-model.md:359-364), so a Connection may carry more
+  # than one Channel and nothing states how many. Settled by the substrate ingestion work that
+  # mints `source_scope`, which is where the partition is decided.
+  - name: connectors.connection.Channel
+
+    identity:
+      name: channel_ref
+      type: connectors.connection.ChannelRef
+
+    fields:
+      # crates/protocol/src/event.rs:76-77.
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: binding_ref
+        type: connectors.connection.BindingRef
+      - name: events
+        type: List<connectors.connection.EventName>
+
+    lifecycle:
+      initial: Starting
+      states: [Starting, Connected, Reconnecting, Stopped]
+      terminal: [Stopped]
+      transitions:
+        - name: supervise
+          from: [Starting, Connected]
+          to: Reconnecting
+        - name: attach
+          from: [Reconnecting]
+          to: Connected
+        - name: stop
+          from: [Starting, Connected, Reconnecting]
+          to: Stopped
+
+  # States: crates/protocol/src/connection.rs:259-263 (`ConnectSessionState`).
+  # Two registries perform these moves, not one, and the transitions below are the union of what
+  # both do:
+  #   `crates/service/src/connect_session.rs` — created `Pending` (line 154), `Completed`
+  #   (line 209), `Expired` (line 214), `Failed` (line 215 in `finish`, line 233 in
+  #   `fail_pending`). Both movers guard on `Pending` first: `finish` at line 204, `fail_pending`
+  #   at line 228.
+  #   `crates/integration-catalog/src/hosted.rs` — `Expired` (line 383, guarded on `Pending` at
+  #   line 382) and `Completed` (line 758), reached from
+  #   `crates/connectors-runtime/src/registry.rs:509`.
+  # UNMAPPED: `Expired -> Completed` is reachable on the hosted path and this document does not
+  # carry it. `complete_hosted_session` does take the `Pending` guard the other registry takes —
+  # it filters on `session.state == ConnectSessionState::Pending`
+  # (crates/integration-catalog/src/hosted.rs:731) and refuses with `NotFound` when the filter
+  # drops the session — but it takes it under a lock it then releases at
+  # crates/integration-catalog/src/hosted.rs:738, awaits `verify_credential` and
+  # `commit_connection` at :748-753, and re-looks the session up at :754-758 without re-checking
+  # the state. `expire_sessions` (crates/integration-catalog/src/hosted.rs:379-386) can flip that
+  # session `Pending -> Expired` inside that window, and the write at :758 then overwrites it. So
+  # the move is a race, not a design, and declaring it would state as design what reads as a
+  # missing re-check. `Failed` is not part of this: nothing under `crates/integration-catalog/src`
+  # ever assigns `ConnectSessionState::Failed`, and the hosted map is built empty at
+  # crates/integration-catalog/src/hosted.rs:181 — `Failed` is written only by the other registry,
+  # at crates/service/src/connect_session.rs:233, over its own map. Settled by
+  # `story:hosted-session-completes-out-of-terminal-state`, which carries the re-check.
+  # Fields: `ConnectSessionStatus`, crates/protocol/src/connection.rs:272-284.
+  - name: connectors.connection.ConnectSession
+
+    identity:
+      name: connect_session_ref
+      type: connectors.connection.ConnectSessionRef
+
+    fields:
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: expires_at_unix_ms
+        type: Integer
+      - name: completion_endpoint
+        type: Optional<String>
+      - name: browser_completion_url
+        type: Optional<String>
+      # The one relation the protocol states, and it states its cardinality too: a finished
+      # session names at most one Connection (crates/protocol/src/connection.rs:282-283,
+      # docs/design/01-domain-model.md:98-99).
+      - name: connection_ref
+        type: Optional<connectors.connection.ConnectionRef>
+
+    lifecycle:
+      initial: Pending
+      states: [Pending, Completed, Expired, Failed]
+      terminal: [Completed, Expired, Failed]
+      transitions:
+        - name: complete
+          from: [Pending]
+          to: Completed
+        - name: expire
+          from: [Pending]
+          to: Expired
+        - name: fail
+          from: [Pending]
+          to: Failed
+
+  # States: crates/protocol/src/connection.rs:221-223 (`ConnectionCandidateState`).
+  # Transition read from the code that performs it: `Detected` on discovery
+  # (crates/integration-kubernetes/src/local.rs:1112), `Activated` once the candidate has a
+  # Connection (crates/integration-kubernetes/src/local.rs:250-256), which
+  # `ConnectionRequest::CandidateActivate` (crates/protocol/src/connection.rs:38-39) asks for.
+  # The protocol enforces the pairing at crates/protocol/src/connection.rs:495-496: `Detected`
+  # exactly when `connection_ref` is absent, `Activated` exactly when it is present.
+  # Fields: `ConnectionCandidateSummary`, crates/protocol/src/connection.rs:229-237.
+  - name: connectors.connection.ConnectionCandidate
+
+    identity:
+      name: candidate_ref
+      type: connectors.connection.CandidateRef
+
+    fields:
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: title
+        type: connectors.connection.Title
+      - name: evidence_sha256
+        type: connectors.connection.EvidenceDigest
+      - name: connection_ref
+        type: Optional<connectors.connection.ConnectionRef>
+
+    lifecycle:
+      initial: Detected
+      states: [Detected, Activated]
+      terminal: [Activated]
+      transitions:
+        - name: activate
+          from: [Detected]
+          to: Activated
+
+  # States: crates/protocol/src/connection.rs:212-216 (`DiscoveryObservationState`).
+  # Transitions read from the code that performs each one:
+  #   `Observed`   — crates/integration-kubernetes/src/local_services.rs:266,
+  #                  crates/integration-monitoring/src/backend.rs:1576 (`active: true`);
+  #   `materialize`— crates/integration-kubernetes/src/local.rs:644, asked for by
+  #                  `ConnectionRequest::Materialize` (crates/protocol/src/connection.rs:44-45);
+  #   `withdraw`   — crates/integration-monitoring/src/backend.rs:1546 and 1362
+  #                  (`observation.active = false`);
+  #   `reobserve`  — crates/integration-monitoring/src/backend.rs:1562
+  #                  (`observation.active = true` on a re-seen observation).
+  # UNMAPPED: `Unsupported` (crates/protocol/src/connection.rs:214) is absent here because
+  # nothing moves to it. crates/integration-monitoring/src/backend.rs:1661-1664 derives it from
+  # the *absence* of `target_provider`, so it classifies a newly observed resource rather than
+  # naming a move out of `Observed`, and a lifecycle declares one `initial`. Settled by a code
+  # site that performs the change the way crates/integration-kubernetes/src/local.rs:644 performs
+  # `Materialized` — that is, by the observation state becoming stored rather than derived.
+  # Fields: `DiscoveryObservationSummary`, crates/protocol/src/connection.rs:242-255.
+  - name: connectors.connection.DiscoveryObservation
+
+    identity:
+      name: observation_ref
+      type: connectors.connection.ObservationRef
+
+    fields:
+      - name: discovery_ref
+        type: connectors.connection.DiscoveryRef
+      - name: source_connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: observed_type
+        type: String
+      - name: title
+        type: connectors.connection.Title
+      - name: evidence_generation
+        type: Integer
+      - name: evidence_sha256
+        type: connectors.connection.EvidenceDigest
+      - name: target_provider_ref
+        type: Optional<connectors.connection.ProviderRef>
+      - name: connection_ref
+        type: Optional<connectors.connection.ConnectionRef>
+
+    lifecycle:
+      initial: Observed
+      states: [Observed, Materialized, Withdrawn]
+      transitions:
+        - name: materialize
+          from: [Observed]
+          to: Materialized
+        - name: withdraw
+          from: [Observed, Materialized]
+          to: Withdrawn
+        - name: reobserve
+          from: [Withdrawn]
+          to: Observed
+        # The state is derived, not stored, and `observation_summary`
+        # (crates/integration-monitoring/src/backend.rs:1656-1665) tests `!active` first, then
+        # `connection_ref.is_some()` -> `Materialized`, and only then
+        # `target_provider.is_some()` -> `Observed`. The re-activating branch
+        # (crates/integration-monitoring/src/backend.rs:1558-1565) sets `active = true` and never
+        # clears `connection_ref`, so a withdrawn observation that had been materialized comes
+        # back as `Materialized`, not as `Observed`. That is a fourth move and it is declared.
+        - name: rematerialize
+          from: [Withdrawn]
+          to: Materialized
+
+commands:
+  # The four verbs the drawing names (docs/design/01-domain-model.md:199-201) become four commands.
+  # UNMAPPED: the command names are this document's. docs/design/01-domain-model.md:198-201 draws
+  # the transition verbs and names no caller-facing command for any of them, and no variant of
+  # `ConnectionRequest` (crates/protocol/src/connection.rs:35-48) performs one. Settled by the CLI
+  # and RPC surface work (`story:cli-surface-contract`), which decides what a caller actually says.
+  - name: connectors.connection.AuthorizeConnection
+    input:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+    outcomes:
+      - name: authorized
+        moves: connectors.connection.Connection.authorize
+        instance: connection_ref
+        emits: [connectors.connection.ConnectionAuthorized]
+        payload:
+          connectors.connection.ConnectionAuthorized:
+            connection_ref: input.connection_ref
+        summary: The connection holds vendor credential material (docs/design/01-domain-model.md:199).
+
+  - name: connectors.connection.VerifyConnection
+    input:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+    outcomes:
+      - name: callable
+        moves: connectors.connection.Connection.verify
+        instance: connection_ref
+        emits: [connectors.connection.ConnectionBecameCallable]
+        payload:
+          connectors.connection.ConnectionBecameCallable:
+            connection_ref: input.connection_ref
+        summary: Verification succeeded and the connection is callable (docs/design/01-domain-model.md:199).
+      # UNMAPPED: docs/design/01-domain-model.md:200 labels the callable-to-degraded arrow with a
+      # cause ("credential expiry / revocation upstream"), not a verb, and names nothing that
+      # observes it. The verb `degrade` and its attachment to this command are this document's.
+      # Settled by the code that assigns `ConnectionState::Degraded`: today the only assignment in
+      # the tree derives it from a channel state
+      # (`crates/integration-slack/src/backend/connection_runtime.rs:35`) rather than performing a
+      # move, so there is nothing yet that a command could be named after.
+      - name: degraded
+        external: the provider reports the credential expired or was revoked upstream
+        moves: connectors.connection.Connection.degrade
+        instance: connection_ref
+        emits: [connectors.connection.ConnectionDegraded]
+        payload:
+          connectors.connection.ConnectionDegraded:
+            connection_ref: input.connection_ref
+        summary: The credential expired or was revoked upstream (docs/design/01-domain-model.md:200).
+
+  - name: connectors.connection.ReauthorizeConnection
+    input:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+    outcomes:
+      - name: reauthorized
+        moves: connectors.connection.Connection.reauthorize
+        instance: connection_ref
+        emits: [connectors.connection.ConnectionReauthorized]
+        payload:
+          connectors.connection.ConnectionReauthorized:
+            connection_ref: input.connection_ref
+        summary: Repaired in place; the connection id is unchanged (docs/design/01-domain-model.md:201, 204-206).
+
+  - name: connectors.connection.RevokeConnection
+    input:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+    outcomes:
+      - name: revoked
+        moves: connectors.connection.Connection.revoke
+        instance: connection_ref
+        emits: [connectors.connection.ConnectionRevoked]
+        payload:
+          connectors.connection.ConnectionRevoked:
+            connection_ref: input.connection_ref
+        summary: The connection is withdrawn and is no longer callable (docs/design/01-domain-model.md:201).
+
+  # The four supervisor steps that perform the Channel moves.
+  # UNMAPPED: none of these four is a caller-facing command. The channel lifecycle is
+  # "owned by the platform" (docs/design/01-domain-model.md:357) and no `ConnectionRequest`
+  # variant (crates/protocol/src/connection.rs:35-48) names one; the names below are taken from
+  # the functions that perform the moves. Settled by a surface that lets an operator supervise a
+  # channel, if one is ever declared.
+  - name: connectors.connection.SuperviseChannel
+    input:
+      - name: binding_ref
+        type: connectors.connection.BindingRef
+    outcomes:
+      - name: starting
+        creates: connectors.connection.Channel
+        instance: channel_ref
+        emits: [connectors.connection.ChannelStarting]
+        payload:
+          connectors.connection.ChannelStarting:
+            binding_ref: input.binding_ref
+        summary: The supervisor is registered and the channel is Starting (crates/integration-slack/src/backend/connection_runtime.rs:702-704).
+
+  - name: connectors.connection.ReconnectChannel
+    input:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+    outcomes:
+      - name: reconnecting
+        moves: connectors.connection.Channel.supervise
+        instance: channel_ref
+        emits: [connectors.connection.ChannelReconnecting]
+        payload:
+          connectors.connection.ChannelReconnecting:
+            channel_ref: input.channel_ref
+        summary: The supervisor loop is about to open a socket (crates/integration-slack/src/backend/connection_runtime.rs:726-730).
+
+  - name: connectors.connection.ConnectChannel
+    input:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+    outcomes:
+      - name: connected
+        moves: connectors.connection.Channel.attach
+        instance: channel_ref
+        emits: [connectors.connection.ChannelConnected]
+        payload:
+          connectors.connection.ChannelConnected:
+            channel_ref: input.channel_ref
+        summary: The socket is open and events flow (crates/integration-slack/src/backend/connection_runtime.rs:793-801).
+
+  - name: connectors.connection.StopChannel
+    input:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+    outcomes:
+      - name: stopped
+        moves: connectors.connection.Channel.stop
+        instance: channel_ref
+        emits: [connectors.connection.ChannelStopped]
+        payload:
+          connectors.connection.ChannelStopped:
+            channel_ref: input.channel_ref
+        summary: Shutdown was observed and the supervisor left its loop (crates/integration-slack/src/backend/connection_runtime.rs:732-746).
+
+  # crates/protocol/src/connection.rs:46 (`ConnectionRequest::ConnectSessionCreate`) and its
+  # request shape at crates/protocol/src/connection.rs:96-102.
+  - name: connectors.connection.CreateConnectSession
+    naming:
+      wire: connect_session_create
+    input:
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: label
+        type: connectors.connection.Label
+      - name: auth_profile
+        type: Optional<connectors.connection.AuthProfile>
+    outcomes:
+      - name: pending
+        creates: connectors.connection.ConnectSession
+        instance: connect_session_ref
+        emits: [connectors.connection.ConnectSessionCreated]
+        payload:
+          connectors.connection.ConnectSessionCreated:
+            integration_ref: input.integration_ref
+        summary: A single-purpose acquisition session is open (crates/service/src/connect_session.rs:150-160).
+      - name: at-capacity
+        external: the bounded pending set is already at `maximum_pending`
+        error: connectors.connection.ConnectSessionCapacity
+        summary: The bounded pending set is full and nothing was created (crates/service/src/connect_session.rs:141-149).
+
+  # `finish` at crates/service/src/connect_session.rs:195-222 is the one function that performs
+  # every terminal move, and `fail_pending` (lines 225-236) reaches the same `fail`.
+  # UNMAPPED: the command name is this document's. No `ConnectionRequest` variant
+  # (crates/protocol/src/connection.rs:35-48) finishes a session; the caller-visible surface is
+  # `ConnectSessionStatus` (line 47), which reads and does not move. Settled by the completion
+  # endpoint's own contract, which docs/design/01-domain-model.md:95-96 says is called once.
+  - name: connectors.connection.FinishConnectSession
+    input:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+    outcomes:
+      - name: completed
+        moves: connectors.connection.ConnectSession.complete
+        instance: connect_session_ref
+        emits: [connectors.connection.ConnectSessionCompleted]
+        payload:
+          connectors.connection.ConnectSessionCompleted:
+            connect_session_ref: input.connect_session_ref
+        summary: The vendor credential was acquired and the terminal event names the connection id, nothing else (docs/design/01-domain-model.md:98-99).
+      - name: expired
+        external: the session outlived its `expires_at_unix_ms`
+        moves: connectors.connection.ConnectSession.expire
+        instance: connect_session_ref
+        emits: [connectors.connection.ConnectSessionExpired]
+        payload:
+          connectors.connection.ConnectSessionExpired:
+            connect_session_ref: input.connect_session_ref
+        summary: The session expired without acquiring anything (crates/service/src/connect_session.rs:214).
+      - name: failed
+        external: the acquisition attempt failed, or the process shut down with the session still pending
+        moves: connectors.connection.ConnectSession.fail
+        instance: connect_session_ref
+        emits: [connectors.connection.ConnectSessionFailed]
+        payload:
+          connectors.connection.ConnectSessionFailed:
+            connect_session_ref: input.connect_session_ref
+        summary: The session failed (crates/service/src/connect_session.rs:215, 225-236).
+      - name: not-pending
+        wrong_state: true
+        error: connectors.connection.ConnectSessionNotPending
+        summary: The session is already terminal and nothing moved (crates/service/src/connect_session.rs:204-205).
+
+  # crates/protocol/src/connection.rs:38-39 (`ConnectionRequest::CandidateActivate`) and its
+  # request shape at crates/protocol/src/connection.rs:60-64.
+  - name: connectors.connection.ActivateCandidate
+    naming:
+      wire: candidate_activate
+    input:
+      - name: candidate_ref
+        type: connectors.connection.CandidateRef
+      - name: label
+        type: connectors.connection.Label
+    outcomes:
+      - name: activated
+        moves: connectors.connection.ConnectionCandidate.activate
+        instance: candidate_ref
+        emits: [connectors.connection.CandidateActivated]
+        payload:
+          connectors.connection.CandidateActivated:
+            candidate_ref: input.candidate_ref
+        summary: The candidate now has its direct Connection (crates/integration-kubernetes/src/local.rs:250-256).
+      # crates/integration-kubernetes/src/local.rs:278-282: an unknown candidate_ref is
+      # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
+      # (crates/protocol/src/connection.rs:314).
+      - name: not-found
+        external: no candidate is stored under this reference
+        error: connectors.connection.CandidateNotFound
+        summary: No such candidate, so nothing was activated (crates/integration-kubernetes/src/local.rs:278-282).
+      # UNMAPPED: there is deliberately no wrong-state branch here. Activating an
+      # already-activated candidate is not refused: crates/integration-kubernetes/src/local.rs:286-296
+      # returns the Connection the earlier activation produced, so the call is idempotent and
+      # `Activated` is not a state this command refuses from. Declaring `wrong_state` would make a
+      # consumer generate a test for a refusal the tree does not perform. Settled by that path
+      # refusing, if idempotence is ever traded for a conflict.
+
+  # crates/protocol/src/connection.rs:44-45 (`ConnectionRequest::Materialize`) and its request
+  # shape at crates/protocol/src/connection.rs:89-92.
+  - name: connectors.connection.MaterializeObservation
+    naming:
+      wire: materialize
+    input:
+      - name: observation_ref
+        type: connectors.connection.ObservationRef
+    outcomes:
+      - name: materialized
+        moves: connectors.connection.DiscoveryObservation.materialize
+        instance: observation_ref
+        emits: [connectors.connection.ObservationMaterialized]
+        payload:
+          connectors.connection.ObservationMaterialized:
+            observation_ref: input.observation_ref
+        summary: The observation now has its mediated Connection (crates/integration-kubernetes/src/local.rs:640-646).
+      # `fn materialize` (crates/integration-monitoring/src/backend.rs:1177) refuses in six
+      # places. Three of them are refusals a caller can be told apart and are declared here:
+      #   :1183      `connection_not_found` — no observation under this reference;
+      #   :1184-1189 `Conflict`, "discovery observation is no longer current";
+      #   :1208-1213 and :1218-1224 `NotGranted`, the observed type has no target Provider
+      #              contract, or that Provider has no independent Connector Grant. One outcome,
+      #              because docs/design/01-domain-model.md:299-300 says a refusal never names the
+      #              axis that refused it.
+      - name: not-found
+        external: no observation is stored under this reference
+        error: connectors.connection.ObservationNotFound
+        summary: No such observation, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1179-1183).
+      - name: no-longer-current
+        external: the observation was deactivated by a later refresh pass
+        error: connectors.connection.ObservationNoLongerCurrent
+        summary: The observation is no longer current, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1184-1189).
+      - name: not-granted
+        external: the observed type has no target Provider contract, or that Provider has no independent Connector Grant
+        error: connectors.connection.MaterializationNotGranted
+        summary: Nothing admits a mediated Connection for this observation (crates/integration-monitoring/src/backend.rs:1208-1224).
+      # UNMAPPED: the other two refusal sites are not declared, and neither is a state change a
+      # caller drives. Both are on the already-materialized branch
+      # (crates/integration-monitoring/src/backend.rs:1191-1206), which returns the existing child
+      # Connection rather than moving anything: :1195 is `connection_protocol`, an internal
+      # invariant failure when a `connection_ref` names no child, and :1197-1201 is `Conflict`
+      # when the child no longer matches current discovery evidence. Modelling either would put a
+      # move on an outcome that performs none. Settled by that branch becoming a declared move —
+      # a re-materialization — rather than a read with two ways to fail.
+      # UNMAPPED: `wrong_state` is deliberately not declared, because it would claim a refusal in
+      # every state `materialize` does not run from, and `Materialized` is not one: the branch
+      # above returns the existing child. Settled by that path refusing, or by a construct that
+      # says "refuses from this state" rather than "from every other".
+
+  # One refresh pass over one observation. The pass
+  # (crates/integration-monitoring/src/backend.rs:1541-1584) deactivates every observation of a
+  # source and then re-activates the ones it sees again, so per observation it was seen
+  # (line 1562) or it was not (line 1546) — and a re-seen one lands in one of two states,
+  # because the branch that re-activates it leaves `connection_ref` as it found it and the
+  # derivation at crates/integration-monitoring/src/backend.rs:1659-1662 reads that before it
+  # reads `target_provider`.
+  # UNMAPPED: the refresh has no `ConnectionRequest` variant of its own —
+  # crates/protocol/src/connection.rs:42-43 says the stored read is the protocol surface and that
+  # "an active provider refresh remains an admitted operation", elsewhere. Settled by naming that
+  # catalog Operation, which is `connectors.catalog.Operation` and not a command of this domain.
+  - name: connectors.connection.RefreshObservation
+    input:
+      - name: observation_ref
+        type: connectors.connection.ObservationRef
+    outcomes:
+      - name: reobserved
+        moves: connectors.connection.DiscoveryObservation.reobserve
+        instance: observation_ref
+        emits: [connectors.connection.ObservationReobserved]
+        payload:
+          connectors.connection.ObservationReobserved:
+            observation_ref: input.observation_ref
+        summary: The refresh saw the resource again and it carries no connection, so it is Observed (crates/integration-monitoring/src/backend.rs:1557-1564, 1661-1662).
+      - name: rematerialized
+        external: the re-seen observation still carries the `connection_ref` a materialization set
+        moves: connectors.connection.DiscoveryObservation.rematerialize
+        instance: observation_ref
+        emits: [connectors.connection.ObservationReobserved]
+        payload:
+          connectors.connection.ObservationReobserved:
+            observation_ref: input.observation_ref
+        summary: The refresh saw the resource again and its connection reference survived withdrawal, so it derives as Materialized (crates/integration-monitoring/src/backend.rs:1558-1565, 1659-1660).
+      - name: withdrawn
+        external: the refresh pass no longer sees the resource this observation was read from
+        moves: connectors.connection.DiscoveryObservation.withdraw
+        instance: observation_ref
+        emits: [connectors.connection.ObservationWithdrawn]
+        payload:
+          connectors.connection.ObservationWithdrawn:
+            observation_ref: input.observation_ref
+        summary: The observation is no longer active (crates/integration-monitoring/src/backend.rs:1546, 1362).
+
+errors:
+  # `ConnectSessionLifecycleError::Capacity`, crates/service/src/connect_session.rs:29-30.
+  - name: connectors.connection.ConnectSessionCapacity
+    summary: Too many connect sessions are pending, so no new one was created.
+
+  # `ConnectSessionLifecycleError::NotPending`, crates/service/src/connect_session.rs:35-36.
+  - name: connectors.connection.ConnectSessionNotPending
+    summary: The connect session is no longer pending, so nothing moved.
+    fields:
+      - name: state
+        type: connectors.connection.ConnectSession.State
+
+  # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
+  # (crates/protocol/src/connection.rs:314), raised at
+  # crates/integration-monitoring/src/backend.rs:1179-1183.
+  - name: connectors.connection.ObservationNotFound
+    summary: No discovery observation is stored under this reference, so nothing was materialized.
+
+  # `ConnectionErrorCode::NotGranted` (crates/protocol/src/connection.rs:315), raised at
+  # crates/integration-monitoring/src/backend.rs:1208-1213 and :1218-1224. One error for both,
+  # because the refusal never names the axis that refused
+  # (docs/design/01-domain-model.md:299-300).
+  - name: connectors.connection.MaterializationNotGranted
+    summary: Nothing admits a mediated Connection for this observation.
+
+  # `ConnectionErrorCode::Conflict` with the message "discovery observation is no longer
+  # current", crates/integration-monitoring/src/backend.rs:1184-1189.
+  - name: connectors.connection.ObservationNoLongerCurrent
+    summary: The discovery observation is no longer current, so nothing was materialized.
+
+  # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
+  # (crates/protocol/src/connection.rs:314), raised at
+  # crates/integration-kubernetes/src/local.rs:278-282.
+  - name: connectors.connection.CandidateNotFound
+    summary: No candidate is stored under this reference, so nothing was activated.
+
+events:
+  - name: connectors.connection.ConnectionAuthorized
+    fields:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+
+  - name: connectors.connection.ConnectionBecameCallable
+    fields:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+
+  # An operational event in the sense of docs/design/01-domain-model.md:372-373, which names
+  # "credential degraded" as one of the three the platform reports about itself.
+  - name: connectors.connection.ConnectionDegraded
+    fields:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+
+  - name: connectors.connection.ConnectionReauthorized
+    fields:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+
+  - name: connectors.connection.ConnectionRevoked
+    fields:
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+
+  - name: connectors.connection.ChannelStarting
+    fields:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+      - name: binding_ref
+        type: connectors.connection.BindingRef
+
+  - name: connectors.connection.ChannelReconnecting
+    fields:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+
+  - name: connectors.connection.ChannelConnected
+    fields:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+
+  # "channel down" is one of the three operational events named at
+  # docs/design/01-domain-model.md:372-373.
+  - name: connectors.connection.ChannelStopped
+    fields:
+      - name: channel_ref
+        type: connectors.connection.ChannelRef
+
+  - name: connectors.connection.ConnectSessionCreated
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+
+  - name: connectors.connection.ConnectSessionCompleted
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+
+  - name: connectors.connection.ConnectSessionExpired
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+
+  - name: connectors.connection.ConnectSessionFailed
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+
+  - name: connectors.connection.CandidateActivated
+    fields:
+      - name: candidate_ref
+        type: connectors.connection.CandidateRef
+
+  - name: connectors.connection.ObservationMaterialized
+    fields:
+      - name: observation_ref
+        type: connectors.connection.ObservationRef
+
+  - name: connectors.connection.ObservationWithdrawn
+    fields:
+      - name: observation_ref
+        type: connectors.connection.ObservationRef
+
+  - name: connectors.connection.ObservationReobserved
+    fields:
+      - name: observation_ref
+        type: connectors.connection.ObservationRef
