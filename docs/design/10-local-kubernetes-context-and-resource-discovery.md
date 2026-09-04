@@ -163,8 +163,8 @@ The configuration contains policy only: source Grant, initiation, optional names
 independent target Grants, auth-exec opt-in, and object limit. It contains no kubeconfig path,
 credential value, server URL, context name, or resource binding.
 
-`connectors connect kubernetes` lists detected contexts when selection is ambiguous and performs no
-cluster request. `connectors connect kubernetes --context NAME` activates the exact label, verifies
+`connectors setup connect kubernetes` lists detected contexts when selection is ambiguous and performs no
+cluster request. `connectors setup connect kubernetes --context NAME` activates the exact label, verifies
 identity/RBAC, creates the Kubernetes Connection, and prints the stored supported Service
 observations. The user then materializes an observation explicitly; only Prometheus, Loki, and
 Alertmanager become callable through the Service proxy in this slice. Generic clients can use

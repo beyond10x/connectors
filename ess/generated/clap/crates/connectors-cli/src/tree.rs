@@ -1,6 +1,6 @@
 // generated from connectors v1
-// model digest 9465040634bb366dd25958f1cdc7a6f96cf15eb7beffcdeac76eb2d1f9506c51
-// contract digest 04fcd536a3c100325904181a779615bd4f192f2ce7fcefcca5f8fd46ddd2b362
+// model digest 5849d9d17106bb6c8f9f7331f9c1fcf8d8addd0506851273b950db073eacb81b
+// contract digest ec905bc6d63ad79ca30a539c0a27a4d8c83bd41b4d0909594faa9ae6f34ab91e
 // do not edit: regenerate with `cargo xtask synth --target clap`
 
 
@@ -14,16 +14,28 @@ pub fn command() -> ::clap::Command {
         .arg_required_else_help(true)
         .about("Names which deployment a command reaches, instead of inferring it from a stored login.")
         .subcommand(
-            ::clap::Command::new("admin")
+            ::clap::Command::new("setup")
                 .subcommand_required(true)
                 .arg_required_else_help(true)
-                .about("Operate an Identity-protected hosted Connectors instance."),
+                .about("Write a configuration, add a provider, install shell completions."),
         )
         .subcommand(
-            ::clap::Command::new("auth")
+            ::clap::Command::new("inspect")
                 .subcommand_required(true)
                 .arg_required_else_help(true)
-                .about("Which configured providers have their credential stored. Never reads one."),
+                .about("Read what is configured, what is connected, and what cannot work."),
+        )
+        .subcommand(
+            ::clap::Command::new("session")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .about("Sign in to a hosted Connector deployment, and sign out of it."),
+        )
+        .subcommand(
+            ::clap::Command::new("serve")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .about("Run a Connector for this machine, for a hosted deployment, or over stdio."),
         )
         .subcommand(
             ::clap::Command::new("connection")
@@ -42,6 +54,12 @@ pub fn command() -> ::clap::Command {
                 .subcommand_required(true)
                 .arg_required_else_help(true)
                 .about("Search, describe, or invoke admitted Connector operations."),
+        )
+        .subcommand(
+            ::clap::Command::new("admin")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .about("Operate an Identity-protected hosted Connectors instance."),
         )
         .subcommand(
             ::clap::Command::new("completions")

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prove that the deployed posture cannot carry the loopback plaintext Identity exception.
 #
-# `--features local-identity` lets `connectors serve-hosted` resolve access tokens against a
+# `--features local-identity` lets `connectors serve hosted` resolve access tokens against a
 # plaintext HTTP Identity. In a deployment that puts every access token, and the authority answer
 # that admits it, on the network in the clear: anybody on the path reads a token and is then that
 # principal. So the exception must not merely be off by default — a deployment build has to refuse

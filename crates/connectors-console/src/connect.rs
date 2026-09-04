@@ -194,7 +194,7 @@ async fn kubernetes(
             "connected": false,
             // The next command, in the payload rather than only on the terminal, so a caller
             // reading JSON is told what to do rather than left with an empty result.
-            "next": "connectors connect kubernetes --context <name>",
+            "next": "connectors setup connect kubernetes --context <name>",
             "contexts": candidates.iter().map(|candidate| candidate.title.clone()).collect::<Vec<_>>(),
         }));
     };

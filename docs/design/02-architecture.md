@@ -100,7 +100,7 @@ and spend the product's name on a dev tool:
 | Binary | Crate | Audience & verbs |
 |---|---|---|
 | `catalog` | `crates/catalog-cli` — internal, **never a release artifact** | this repo's maintainers, agents and CI: `catalog build \| diff \| check \| scaffold`, `catalog sources check \| refresh \| diff \| mint` (S-016/S-017) |
-| `connectors` | `crates/connectors-cli` — the product, arrives with M2 | end users and operators, against any deployment and entirely without flux: `connectors serve`, connector-owned administration (`integration \| connection \| grant \| channel \| delivery`), and the client verbs (`connect`, `invoke`, `events`). Hosted login, organizations, memberships, sessions, and service credentials remain Identity surfaces. |
+| `connectors` | `crates/connectors-cli` — the product, arrives with M2 | end users and operators, against any deployment and entirely without flux: `connectors serve local`, connector-owned administration (`integration \| connection \| grant \| channel \| delivery`), and the client verbs (`connect`, `invoke`, `events`). Hosted login, organizations, memberships, sessions, and service credentials remain Identity surfaces. |
 
 The maintenance tool links the compiler family (`connector-spec` ingest, site projection,
 `catalog-build`); the product CLI links `protocol`/`service`/`server` and **never the
@@ -110,7 +110,7 @@ Both binaries parse their command line with **clap (derive API)** — hand-rolle
 banned in this repository. The predecessor hand-rolled its connector CLI to avoid a dependency
 mid-flight and it went sideways; the parser is not where this project spends its novelty budget.
 
-`connectors serve` with no config is the **personal posture**: prefer an owner-permissioned Unix
+`connectors serve local` with no config is the **personal posture**: prefer an owner-permissioned Unix
 socket; otherwise use a loopback listener plus a generated high-entropy token stored under the
 owner-only state root. Local reachability alone is never identity. The posture has one implicit
 deployment-local tenant namespace and refuses a working-tree state path. Zero manual configuration

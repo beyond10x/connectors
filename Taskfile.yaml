@@ -17,8 +17,8 @@ tasks:
       This task does not run the component gate. Run `cargo test` here first if you are
       installing something you have just changed.
 
-      After installing, `connectors init` writes a configuration for this machine and
-      `connectors doctor` reports whether it can work.
+      After installing, `connectors setup init` writes a configuration for this machine and
+      `connectors inspect doctor` reports whether it can work.
     preconditions:
       - sh: command -v cargo >/dev/null 2>&1
         msg: Rust and Cargo are required to install the Connectors CLI.
@@ -72,9 +72,9 @@ tasks:
         "${install_dir}/connectors" --version
         case ":${PATH:-}:" in
           *:"${install_dir}":*)
-            printf 'Next: connectors init && connectors doctor\n'
+            printf 'Next: connectors setup init && connectors inspect doctor\n'
             ;;
           *)
-            printf 'Add %s to PATH, then run: connectors init && connectors doctor\n' "${install_dir}"
+            printf 'Add %s to PATH, then run: connectors setup init && connectors inspect doctor\n' "${install_dir}"
             ;;
         esac

@@ -34,7 +34,7 @@ issues self-service scoped tokens without operator (S-055).
 3. **The projected surface (S-060, S-061).** The MCP toolset grows the monitoring tools
    (Grafana/Prometheus/Loki/Alertmanager — the infra-cluster Grafana through the dev-cluster
    connectors) and, once S-058/S-059 land, the discovered-database tools. The local connectors
-   CLI learns the zero-config hosted mode: `connectors login <connectors-base>` reads the public
+   CLI learns the zero-config hosted mode: `connectors session login <connectors-base>` reads the public
    discovery document served by that Connectors deployment, drives the neutral Identity loopback
    flow, and every subsequent hosted command uses short-lived tokens transparently (S-056's stdio
    bridge folds into this). This direction is deliberate: Connectors names its trusted Identity

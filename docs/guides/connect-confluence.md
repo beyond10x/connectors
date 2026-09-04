@@ -40,7 +40,7 @@ before, a caller can actually walk past the first page.
 A service-account token, which is what an integration that will be deployed should carry:
 
 ```shell-session
-connectors connect confluence \
+connectors setup connect confluence \
   --as confluence.service_api_token \
   --set cloud_id=11111111-2222-3333-4444-555555555555 \
   --credential-file ~/.config/b10x/atlassian/confluence.token
@@ -50,7 +50,7 @@ A personal API token instead, which is Basic and therefore has two halves — th
 store, the account email is configuration:
 
 ```shell-session
-connectors connect confluence \
+connectors setup connect confluence \
   --as confluence.api_token \
   --set cloud_id=11111111-2222-3333-4444-555555555555 \
   --set email=you@example.com
@@ -76,7 +76,7 @@ cloud_id = "11111111-2222-3333-4444-555555555555"
 "confluence.api_token" = "you@example.com"
 ```
 
-`connectors auth status` reports both halves. A Basic credential whose account name is missing reads
+`connectors inspect auth` reports both halves. A Basic credential whose account name is missing reads
 `stored-without-user-half` rather than `stored`, because a token that cannot be joined is a token
 that cannot be sent.
 

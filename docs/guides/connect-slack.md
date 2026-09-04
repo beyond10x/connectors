@@ -14,7 +14,7 @@ steps.
 For personal-local, add Slack with:
 
 ```sh
-connectors connect slack
+connectors setup connect slack
 ```
 
 The command asks for the app token with terminal echo disabled and waits for Slack to become
