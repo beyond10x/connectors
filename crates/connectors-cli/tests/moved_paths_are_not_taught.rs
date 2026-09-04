@@ -44,6 +44,19 @@ fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
 }
 
+/// Whether a file is text this repository ships, rather than bytes a tool left behind.
+///
+/// `scripts/` is read whole — no extension filter — because a guard's header comment is shipped text
+/// and carries no extension of its own. That also reaches whatever a tool wrote there: a release
+/// gate failed on `scripts/__pycache__/check-bot-files.cpython-314.pyc`, which `.gitignore:10`
+/// ignores and no release carries. A file that is not valid UTF-8 cannot teach anybody a command
+/// path, so it is not read.
+fn is_text(path: &Path) -> bool {
+    std::fs::read(path)
+        .map(|bytes| String::from_utf8(bytes).is_ok())
+        .unwrap_or(false)
+}
+
 fn visit(path: &Path, keep: &dyn Fn(&Path) -> bool, found: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(path)
         .unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
@@ -136,7 +149,7 @@ fn shipped_text() -> Vec<(String, String)> {
         files.len() - sources
     );
     let documents = files.len();
-    visit(&root.join("scripts"), &|_| true, &mut files);
+    visit(&root.join("scripts"), &is_text, &mut files);
     assert!(
         files.len() > documents + 5,
         "only {} files were found under scripts/; the layout moved",

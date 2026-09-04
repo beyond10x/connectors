@@ -9,7 +9,7 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
-## Unreleased
+## 0.6.0 — 2026-09-05
 
 Every first-level word of the shipped binary moves, and bare `connectors serve` stops starting the
 local server: the breaking change the preamble puts in a minor bump.

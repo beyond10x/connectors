@@ -2,7 +2,7 @@
 name = "rtvbp-voice-endpoint"
 description = "Voice-side b10x.voice.v1 RTVBP binding over the neutral TelephonySession port."
 edition = "2021"
-version = "0.5.11"
+version = "0.6.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -15,13 +15,13 @@ members = ["."]
 
 [dependencies]
 async-trait = "0.1"
-domain = { version = "0.5.11", path = "../domain" }
+domain = { version = "0.6.0", path = "../domain" }
 futures-util = "0.3"
-protocol = { version = "0.5.11", path = "../protocol" }
+protocol = { version = "0.6.0", path = "../protocol" }
 rtvbp = { git = "https://github.com/babelforce/rtvbp", rev = "dc0a60f7425b4899885f372152028457791b1e72" }
 serde = "1"
 serde_json = "1"
-service = { version = "0.5.11", path = "../service" }
+service = { version = "0.6.0", path = "../service" }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
