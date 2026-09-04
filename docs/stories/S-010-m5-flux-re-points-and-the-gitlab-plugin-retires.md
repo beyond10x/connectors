@@ -67,3 +67,11 @@ fixed; only the trust domain and release origin change.
   final host deletion) are follow-on stories, not this one.
 - Depends on [S-008](S-008-m3-connect-a-provider-and-invoke-it.md) and, for gitlab's channel/event
   surface, [S-009](S-009-m4-events-reach-a-client-by-push-and-by-pull.md).
+
+## Superseded by
+
+`story:m5-flux-re-points-and-the-gitlab-plugin-retires` in the AEP planning store, at
+`.engineering/planning/story/m5-flux-re-points-and-the-gitlab-plugin-retires.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

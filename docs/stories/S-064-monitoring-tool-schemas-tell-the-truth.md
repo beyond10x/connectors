@@ -71,3 +71,11 @@ misleading in three ways:
   (credential custody, audit store, or the origin's answer — e.g. a Grafana without the
   app-platform dashboards API), not from toolset or document wiring. Live re-verification
   against the deployed endpoint follows the next deploy.
+
+## Superseded by
+
+`story:monitoring-tool-schemas-tell-the-truth` in the AEP planning store, at
+`.engineering/planning/story/monitoring-tool-schemas-tell-the-truth.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -43,3 +43,11 @@ exchange continuous bytes directly under a short-lived bounded authority.
   and debug-redaction fixtures pass.
 - Satellite reachability, generation drain, durable-state inspection, and production serving
   enforcement remain open; the repository bundle is alpha and unsigned.
+
+## Superseded by
+
+`story:direct-byte-session-establishment-is-operation-scoped` in the AEP planning store, at
+`.engineering/planning/story/direct-byte-session-establishment-is-operation-scoped.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

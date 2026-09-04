@@ -48,3 +48,11 @@ and capability predicates as independent document facts without restoring a gene
   connectors and reaches a separately deployed substrate through `private_network` authority.
   `substrate_workload` would instead mean running the connector driver itself as an isolated
   substrate workload, which is the later external-artifact case and would be false here.
+
+## Superseded by
+
+`story:beyond-http-facts-enter-the-document` in the AEP planning store, at
+`.engineering/planning/story/beyond-http-facts-enter-the-document.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

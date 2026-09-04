@@ -97,3 +97,11 @@ changes owners. This is the milestone at which the client contract is real.
 - The predecessor proved most of these invariants in anger; the ones with the sharpest measured
   history are subjects-before-placement, deny>allow>predicate, and stable connection ids across
   re-auth. Read the domain model's Runtime side before designing any of them differently.
+
+## Superseded by
+
+`story:m3-connect-a-provider-and-invoke-it` in the AEP planning store, at
+`.engineering/planning/story/m3-connect-a-provider-and-invoke-it.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -112,3 +112,11 @@ tables discuss them as ordinary catalog features throughout.
   epic that set the original position, so this story is a deliberate reversal of it and should say so.
 - Vision principle 10 (*nouns are forever*) is the reason to do this **now**: the catalog schema is
   versioned and the vocabulary is not, so a bad noun is cheap today and permanent after v1.
+
+## Superseded by
+
+`story:retire-the-quirks-umbrella` in the AEP planning store, at
+`.engineering/planning/story/retire-the-quirks-umbrella.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

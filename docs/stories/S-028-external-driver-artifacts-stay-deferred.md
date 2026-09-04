@@ -30,3 +30,11 @@ drivers prove a packaging boundary and a separate supply-chain decision is accep
 ## Progress
 
 - (blocked by design; intentionally deferred)
+
+## Superseded by
+
+`story:external-driver-artifacts-stay-deferred` in the AEP planning store, at
+`.engineering/planning/story/external-driver-artifacts-stay-deferred.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

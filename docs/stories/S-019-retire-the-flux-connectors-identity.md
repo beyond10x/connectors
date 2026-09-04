@@ -99,3 +99,11 @@ half-migrated, which is the tell: it reads `flux-connectors/0.26.0 (+https://git
 - Naming is not settled here — architecture open question 1 asks whether the binary and product are
   `connectors` or something shorter, and it says the answer is cheap until M2 and expensive after.
   If that decision is close, take it first and stamp the answer once.
+
+## Superseded by
+
+`story:retire-the-flux-connectors-identity` in the AEP planning store, at
+`.engineering/planning/story/retire-the-flux-connectors-identity.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

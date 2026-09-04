@@ -27,3 +27,11 @@ socket. Every current caller moves to the local-owner path explicitly; behavior 
   the named local-owner path, and its rustdoc states what it asserts and where it must not be used
   (hosted request handling).
 - The workspace gate is green with no test weakened.
+
+## Superseded by
+
+`story:admission-proofs-become-unforgeable` in the AEP planning store, at
+`.engineering/planning/story/admission-proofs-become-unforgeable.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -107,3 +107,11 @@ origin, or a move outside the source layer.
   a claim of full Anthropic API coverage. A later curated Messages/inference expansion for the
   agent layer's direct-provider adapter remains possible from official API documentation; only
   Claude Code and consumer-subscription credential borrowing is outside this connector boundary.
+
+## Superseded by
+
+`story:orphaned-inputs-are-removed-or-re-owned` in the AEP planning store, at
+`.engineering/planning/story/orphaned-inputs-are-removed-or-re-owned.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -52,3 +52,11 @@ independently built, immutable catalog pack.
 - This is a clean-HEAD migration, not a history rewrite.
 - Removing the embedded bundle before the external loader and conformance vectors exist would break
   a current consumer; the extraction and the new loading seam ship as one coordinated cut.
+
+## Superseded by
+
+`story:deployment-catalogs-are-external-packs` in the AEP planning store, at
+`.engineering/planning/story/deployment-catalogs-are-external-packs.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

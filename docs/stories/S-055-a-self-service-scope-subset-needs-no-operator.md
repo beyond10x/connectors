@@ -35,3 +35,11 @@ demands `operator`.
 - 2026-08-24 — landed in beyond10x/identity as `f8c02a1`, merged to identity main `9732617`
   after independent review (PASS, 0 blocking, 1 minor: assertions exercise the policy fn per the
   acceptance's own wording; handler-level /v1/access-token coverage is a pre-existing gap).
+
+## Superseded by
+
+`story:a-self-service-scope-subset-needs-no-operator` in the AEP planning store, at
+`.engineering/planning/story/a-self-service-scope-subset-needs-no-operator.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

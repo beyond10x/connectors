@@ -57,3 +57,11 @@ runbook. The predecessor's per-vendor vendoring scripts remain as declared fetch
 subsumed. Bootstrapping the initial `SOURCES.toml` content happens right after M1 (from the M1
 report's import inventory); this story makes it live machinery instead of drifting prose —
 the same derive-then-test-the-derivation rule every other artifact here follows.
+
+## Superseded by
+
+`story:sources-are-processed-by-code` in the AEP planning store, at
+`.engineering/planning/story/sources-are-processed-by-code.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -109,3 +109,11 @@ declares effects, this function reads them and the paragraph goes."* This story 
 - Vision principle 2 is the thing at stake: *grants admit from risk/effects/idempotency the catalog
   declares — never from op-id lists a human maintains.* A derived effect set is an op-id list wearing
   a predicate's clothes.
+
+## Superseded by
+
+`story:effects-are-read-never-derived` in the AEP planning store, at
+`.engineering/planning/story/effects-are-read-never-derived.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

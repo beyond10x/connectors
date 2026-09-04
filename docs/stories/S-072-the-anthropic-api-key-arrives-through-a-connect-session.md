@@ -43,3 +43,11 @@ every other connector uses, rather than by writing it into a file by hand.
   prompts hidden, stores through `integration_catalog::credential_address`, and writes the
   `[[catalog]]` entry. This story is what makes the same thing true in a deployment, together with
   [S-073](S-073-the-hosted-posture-connects-a-catalogued-provider.md).
+
+## Superseded by
+
+`story:the-anthropic-api-key-arrives-through-a-connect-session` in the AEP planning store, at
+`.engineering/planning/story/the-anthropic-api-key-arrives-through-a-connect-session.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

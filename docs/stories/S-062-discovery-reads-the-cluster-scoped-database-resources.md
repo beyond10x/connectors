@@ -78,3 +78,11 @@ provider-sql shape, found live:
   ClusterRole** — cluster-scoped get+list on plural `databases` AND `providerconfigs` in both
   groups (`mysql.sql.crossplane.io`, `postgresql.sql.crossplane.io`); the namespaced RBAC
   S-059 recorded cannot authorize the cluster-scoped list.
+
+## Superseded by
+
+`story:discovery-reads-the-cluster-scoped-database-resources` in the AEP planning store, at
+`.engineering/planning/story/discovery-reads-the-cluster-scoped-database-resources.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

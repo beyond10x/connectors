@@ -53,3 +53,11 @@ credential material and never enters the credential store.
   with a service half, not a credential-store story.
 - Sibling adoptions: [S-005](S-005-header-name-rate-limit-retry.md),
   [S-006](S-006-per-service-verification-probes.md).
+
+## Superseded by
+
+`story:adopt-token-response-metadata` in the AEP planning store, at
+`.engineering/planning/story/adopt-token-response-metadata.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

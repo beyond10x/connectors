@@ -32,3 +32,11 @@ cloud, Flux, and autodev can pin a contract without copying from `main` or a sib
 - Architecture is accepted: deterministic private OCI bundles, digest pins, dedicated release
   signing, origin manifests, clean-room vectors, and current/previous-major overlap are fixed.
 - Remaining work is bundle generation, signing infrastructure, and consumer conformance in CI.
+
+## Superseded by
+
+`story:contract-bundles-are-versioned-and-pinned` in the AEP planning store, at
+`.engineering/planning/story/contract-bundles-are-versioned-and-pinned.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

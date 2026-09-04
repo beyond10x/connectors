@@ -46,3 +46,11 @@ is a convenience rather than the only way to connect and the flow is testable wi
 - Parser tests stay in-crate (`crates/connectors-cli/src/lib.rs:776-848`, `Cli::try_parse_from`);
   behaviour tests go one layer down in `connectors-console`, matching the existing split.
 - Argv is parsed with clap's derive API. Hand-rolled parsing is banned repo-wide.
+
+## Superseded by
+
+`story:the-cli-drives-a-hosted-connection` in the AEP planning store, at
+`.engineering/planning/story/the-cli-drives-a-hosted-connection.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

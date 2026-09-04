@@ -108,3 +108,11 @@ The three fields, as C-552 measured them:
 - The redaction row of any differential gate is a **restatement**, not a two-derivation comparison
   (plan and expectation share `placed_form`); if a gate table is written here, it must not read as
   though those two were independently derived.
+
+## Superseded by
+
+`story:the-document-carries-the-callers-contract` in the AEP planning store, at
+`.engineering/planning/story/the-document-carries-the-callers-contract.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

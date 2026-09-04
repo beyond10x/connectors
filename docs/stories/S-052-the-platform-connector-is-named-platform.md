@@ -47,3 +47,11 @@ serde alias or a documented migration — an existing personal config must keep 
   whole-line allowlist filter can swallow a violation co-located with an allowed token —
   pre-existing class, surface shrank with this diff; and the initiator wire token's serialize
   direction rides on serde rename bidirectionality plus the bundles round-trip test).
+
+## Superseded by
+
+`story:the-platform-connector-is-named-platform` in the AEP planning store, at
+`.engineering/planning/story/the-platform-connector-is-named-platform.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.
