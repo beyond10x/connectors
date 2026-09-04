@@ -1,0 +1,109 @@
+# The deployment side of the three layers, docs/design/01-domain-model.md:178-283. `Connection`
+# belongs to this layer in the design document and is modelled in `connectors.connection`, beside
+# the other nouns `crates/protocol/src/connection.rs` declares.
+domain: connectors.deployment
+
+summary: A tenant's configured enablement of a provider, and the vendor secret material backing the connections made from it.
+
+types:
+  - name: connectors.deployment.IntegrationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.deployment.ProviderRef
+    kind: newtype
+    of: String
+
+  - name: connectors.deployment.Scope
+    kind: newtype
+    of: String
+
+  # `CredentialRef`, crates/connector-address/src/credential.rs:265-271. The address is the
+  # identity: there is no separate opaque id anywhere in the tree.
+  - name: connectors.deployment.CredentialRef
+    kind: struct
+    fields:
+      - name: tenant
+        type: String
+      - name: authority
+        type: String
+      - name: instance
+        type: Optional<String>
+      - name: service
+        type: String
+      - name: credential
+        type: String
+
+  # docs/design/01-domain-model.md:225 — the credential subject the vendor observes.
+  - name: connectors.deployment.CredentialSubject
+    kind: enum
+    variants: [App, User]
+
+entities:
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:180-191), so this is a single-state lifecycle. `Configured` is
+  # the document's own word: "A tenant's configured enablement of a provider"
+  # (docs/design/01-domain-model.md:182). The `enabled` field below is the closest thing to a
+  # state the document names (docs/design/01-domain-model.md:183) and it is a boolean, not a
+  # ladder. Settled by a state enum in `crates/protocol/src/`, or by a lifecycle drawn beside the
+  # Connection one.
+  # UNMAPPED: the Integration-to-Provider relation. docs/design/01-domain-model.md:189 says "an
+  # integration configures a provider; it never extends one", which fixes the direction but not
+  # the cardinality — nothing says whether one provider may be configured by two integrations of
+  # the same tenant. Settled by the uniqueness rule the integration store enforces.
+  - name: connectors.deployment.Integration
+
+    identity:
+      name: integration_ref
+      type: connectors.deployment.IntegrationRef
+
+    fields:
+      # "Holds: enabled state, the deployment's OAuth registration ..., allowed scopes, settings
+      # defaults, and the **destination policy** for private-host providers"
+      # (docs/design/01-domain-model.md:183-187). The registration and the settings defaults are
+      # value-shaped secrets and configuration and are not projected here.
+      - name: enabled
+        type: Boolean
+      - name: allowed_scopes
+        type: List<connectors.deployment.Scope>
+
+    lifecycle:
+      initial: Configured
+      states: [Configured]
+      terminal: [Configured]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:249-283), so this is a single-state lifecycle. `Acquired` is
+  # the document's own word: a credential is "acquired through a connect session (OAuth
+  # authorization code, API key entry, …) or operator-entered"
+  # (docs/design/01-domain-model.md:251-252). Settled by a state enum, or by the
+  # "credential degraded" operational event at docs/design/01-domain-model.md:372 gaining a
+  # credential state to report rather than a Connection one.
+  # UNMAPPED: the Credential-to-Connection relation. docs/design/01-domain-model.md:274 puts
+  # capability evidence "on its Connection" and :281 forbids unioning scope sets "from different
+  # credentials on one Connection", so a Connection carries more than one — but nothing says how
+  # many, or which one an invocation places. Settled by the credential-capability admission work
+  # (docs/design/09-curation-and-credential-capability-admission.md).
+  - name: connectors.deployment.Credential
+
+    identity:
+      name: credential_ref
+      type: connectors.deployment.CredentialRef
+
+    fields:
+      # "every cache is bound to the credential generation that produced the evidence"
+      # (docs/design/01-domain-model.md:282-283 — the sentence starts with "every" as the last
+      # word of :282 and finishes on :283).
+      - name: generation
+        type: Integer
+      # "subject, proven granted scopes, required provider installation context, observation
+      # source, and freshness" (docs/design/01-domain-model.md:275-276).
+      - name: subject
+        type: connectors.deployment.CredentialSubject
+      - name: proven_scopes
+        type: List<connectors.deployment.Scope>
+
+    lifecycle:
+      initial: Acquired
+      states: [Acquired]
+      terminal: [Acquired]
