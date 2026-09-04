@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:cli-surface-contract
 kind: story
-status: draft
+status: implemented
 title: The command tree is generated, and the gate holds it there
 relations:
 - derived_from: epic:cli-surface
@@ -30,7 +30,7 @@ scope:
   path: ess/system/components.yaml
 - confidence: cited
   path: scripts/gate.sh
-revision: 12
+revision: 15
 ---
 # Story: the command tree is generated, and the gate holds it there
 
