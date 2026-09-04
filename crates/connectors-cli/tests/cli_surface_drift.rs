@@ -282,17 +282,42 @@ fn carries_target(command: &clap::Command) -> bool {
         || command.get_subcommands().any(carries_target)
 }
 
-/// Restates `cli_surface.rs`'s `deployment_protocol_modules`.
+/// Restates `cli_surface.rs`'s `deployment_protocol_modules`: every module of
+/// `crates/protocol/src` that declares a request enum, read from the directory.
+///
+/// It used to be the literal `["connection", "event", "operation"]` filtered by `is_file()` — the
+/// exact shape the contract had already stopped being, under a header claiming this file restates
+/// every assertion the contract makes. A filter over a literal can only ever remove a module, so a
+/// `catalog` or `datasource` group would never have entered the countdown here either, and every
+/// case in this file that touches `TARGET_EXCEPTIONS` would have been measuring a smaller
+/// candidate set than the one that ships.
 fn deployment_protocol_modules() -> BTreeSet<String> {
-    ["connection", "event", "operation"]
-        .into_iter()
-        .filter(|module| {
-            repository_root()
-                .join(format!("crates/protocol/src/{module}.rs"))
-                .is_file()
-        })
-        .map(str::to_owned)
-        .collect()
+    let directory = repository_root().join("crates/protocol/src");
+    let mut declared = BTreeSet::new();
+    for entry in std::fs::read_dir(&directory)
+        .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()))
+    {
+        let path = entry.expect("directory entry").path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+            continue;
+        }
+        let carries_a_request = read(&path).lines().any(|line| {
+            line.strip_prefix("pub enum ").is_some_and(|rest| {
+                rest.split(|character: char| !character.is_alphanumeric())
+                    .next()
+                    .is_some_and(|name| name.ends_with("Request"))
+            })
+        });
+        if carries_a_request {
+            declared.insert(
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .expect("a module name")
+                    .to_owned(),
+            );
+        }
+    }
+    declared
 }
 
 /// Restates `cli_surface.rs`'s `generated_commands`.
@@ -723,10 +748,14 @@ fn the_thin_frontend_citation_points_at_the_thin_frontend_test() {
 /// **Cargo can read the committed emitted manifest.**
 ///
 /// `ess/generated/clap/crates/connectors-cli/Cargo.toml` is a package manifest inside the root
-/// workspace directory, and the root `Cargo.toml` lists it in neither `[workspace] members` nor
-/// `[workspace] exclude`. `docs/design/19-the-cli-surface.md:78-90` calls the emitted crate a
-/// parallel artifact that a cutover moves into, and `ess/generated/clap/PLAN.md:156` reports
-/// `component port | connectors-cli` as generated — both of which require that it can be built.
+/// workspace directory, so cargo refuses to read anything in this directory until it is named in
+/// `[workspace] members` or `[workspace] exclude`. The root `Cargo.toml` excludes it — it is not a
+/// member, because the cutover has not happened and nothing may build against it — and without
+/// that line `cargo metadata` exits 101 for the whole workspace, not just for this manifest. An
+/// earlier revision of this comment said it was in neither list, which was the state the excluding
+/// line was added to fix. `docs/design/19-the-cli-surface.md` calls the emitted crate a parallel
+/// artifact that a cutover moves into, and `ess/generated/clap/PLAN.md` reports
+/// `component port | connectors-cli` as generated — both of which require that it can be read.
 #[test]
 fn cargo_can_read_the_committed_emitted_manifest() {
     let manifest = repository_root().join("ess/generated/clap/crates/connectors-cli/Cargo.toml");
