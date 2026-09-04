@@ -2,19 +2,25 @@
 format: aep.planning-md/1
 id: story:connectors-ess-domain
 kind: story
-status: active
+status: implemented
 title: The connectors domains get a typed home
 relations:
 - derived_from: epic:cli-surface
 - depends_on: story:ess-clap-target
 scope:
 - confidence: cited
+  path: crates/catalog-build/tests/main.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/ess_citation_fence.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/ess_claim_fence.rs
+- confidence: cited
   path: ess/system/components.yaml
 - confidence: cited
   path: ess/system/domains
 - confidence: cited
   path: ess/system/system.yaml
-revision: 6
+revision: 10
 ---
 # Story: the connectors domains get a typed home
 
