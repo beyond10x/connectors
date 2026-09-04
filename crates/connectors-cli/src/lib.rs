@@ -43,6 +43,14 @@ struct Cli {
     command: Command,
 }
 
+/// The parser's own command tree, built once and read by everything that needs the surface rather
+/// than a parse: `connectors completions <shell>` renders it, and `tests/cli_surface.rs` holds it
+/// against the `cli:` block of `ess/system/components.yaml`.
+#[must_use]
+pub fn command() -> clap::Command {
+    Cli::command()
+}
+
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Sign in through this hosted Connector deployment's Identity authority.
