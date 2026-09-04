@@ -95,3 +95,11 @@ to make unrepresentable now.
   stories rather than a missing milestone story.
 - Do not scaffold the platform family ahead of the build order (AGENTS.md § Boundaries). The catalog
   family already builds; M2 is the milestone that introduces the deployable platform family.
+
+## Superseded by
+
+`story:m2-the-platform-skeleton-serves` in the AEP planning store, at
+`.engineering/planning/story/m2-the-platform-skeleton-serves.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

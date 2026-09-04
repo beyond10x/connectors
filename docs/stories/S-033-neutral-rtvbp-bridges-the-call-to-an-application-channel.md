@@ -79,3 +79,11 @@ without a model or Babelforce product semantics.
   (cancellation, loss, interruption, generation drain), satellite/unserved path, complete shared
   vectors, signed owner release, and clean-room release proof remain open; support is not stable or
   hosted.
+
+## Superseded by
+
+`story:neutral-rtvbp-bridges-the-call-to-an-application-channel` in the AEP planning store, at
+`.engineering/planning/story/neutral-rtvbp-bridges-the-call-to-an-application-channel.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

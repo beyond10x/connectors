@@ -80,3 +80,11 @@ an unbounded walk.
   `a_busy_namespace_is_listed_whole_without_a_paging_surface` /
   `a_pathological_namespace_is_cut_with_an_explicit_truncation_marker` (server). Live
   re-verification against the dev cluster's `latest` namespace follows the next deploy.
+
+## Superseded by
+
+`story:the-deployment-list-pages-instead-of-refusing` in the AEP planning store, at
+`.engineering/planning/story/the-deployment-list-pages-instead-of-refusing.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

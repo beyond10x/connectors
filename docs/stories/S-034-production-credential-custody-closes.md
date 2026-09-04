@@ -47,3 +47,11 @@ unchecked item above by themselves.
 The current Connector history baseline is documented in
 [Historical secret-scan baseline](../security/secret-scan-baseline.md). It contains no broad rule
 or path exemption and is not production rotation evidence.
+
+## Superseded by
+
+`story:production-credential-custody-closes` in the AEP planning store, at
+`.engineering/planning/story/production-credential-custody-closes.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

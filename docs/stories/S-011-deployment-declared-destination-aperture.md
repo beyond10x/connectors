@@ -71,3 +71,11 @@ destination selection to a model.
   `connectors.deliveries.manage`, persists a governed destination, and rechecks the aperture
   post-resolution at dispatch. Private-endpoint
   provider work cannot start without it.
+
+## Superseded by
+
+`story:deployment-declared-destination-aperture` in the AEP planning store, at
+`.engineering/planning/story/deployment-declared-destination-aperture.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -63,3 +63,11 @@ wall mid-task, and it is a client-contract promise in the vision, not a convenie
 - The interesting failure mode to design against is a chatty one: an agent that receives a connect URL
   on every call for an integration nobody intends to configure. Decide whether the response is rate-
   limited or session-reused per (principal, integration), and record the reason.
+
+## Superseded by
+
+`story:auth-as-tool-result` in the AEP planning store, at
+`.engineering/planning/story/auth-as-tool-result.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

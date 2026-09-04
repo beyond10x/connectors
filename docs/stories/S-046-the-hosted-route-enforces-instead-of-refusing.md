@@ -41,3 +41,11 @@ through proofs.
   risk/effects/idempotency facts to the evaluation seam (until then evaluation claims worst-case
   facts, so selector grants admit hosted effects only when they admit everything — exact allow
   exceptions are the admission shape).
+
+## Superseded by
+
+`story:the-hosted-route-enforces-instead-of-refusing` in the AEP planning store, at
+`.engineering/planning/story/the-hosted-route-enforces-instead-of-refusing.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

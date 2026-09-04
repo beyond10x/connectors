@@ -28,3 +28,11 @@ and a one-time id.
 - A `GrantDecision` cannot be constructed from any other crate (compile-fail test or doc-tested
   seal), and an expired decision refuses at use.
 - SQLite and hosted-PostgreSQL store backends pass one shared conformance exercise.
+
+## Superseded by
+
+`story:a-grant-decision-is-evaluated-not-asserted` in the AEP planning store, at
+`.engineering/planning/story/a-grant-decision-is-evaluated-not-asserted.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

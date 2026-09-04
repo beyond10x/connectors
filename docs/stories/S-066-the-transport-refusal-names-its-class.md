@@ -80,3 +80,11 @@ step of the diagnosis is blind.
   `backend_tests.rs` cover all three fixes. Remaining for whoever closes this: verify
   `alertmanager_alerts` answers live alerts on dev after the next deploy carries the rebuilt
   catalog pack.
+
+## Superseded by
+
+`story:the-transport-refusal-names-its-class` in the AEP planning store, at
+`.engineering/planning/story/the-transport-refusal-names-its-class.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -134,3 +134,11 @@ shared type no caller could read.
   `POST /complete`. The extracted crate is where that route's validation belongs.
 - Watch the callback constraint at `crates/server/src/hosted/connect.rs:23-29`: `code` is capped at
   1024 characters of `[A-Za-z0-9._-]`. Confirm against real vendor codes rather than assuming.
+
+## Superseded by
+
+`story:one-oauth-implementation-not-three` in the AEP planning store, at
+`.engineering/planning/story/one-oauth-implementation-not-three.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -76,3 +76,11 @@ same context-free refusal (`integration-monitoring/src/backend.rs:110-114` and t
     the dashboards operation's resolved request; the transport error class
     (timeout/connect/TLS) is the one detail the refusal log still discards — S-066 adds it
     and closes the operation.
+
+## Superseded by
+
+`story:monitoring-refusals-name-the-upstream` in the AEP planning store, at
+`.engineering/planning/story/monitoring-refusals-name-the-upstream.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

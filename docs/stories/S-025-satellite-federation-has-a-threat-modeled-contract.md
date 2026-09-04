@@ -32,3 +32,11 @@ tenant, revocation, partition, replay, and recovery behavior.
 - Architecture is accepted: outward enrollment, five-minute control lease, observation-only grace,
   signed generation chain, bounded durable queue, and no control-channel byte tunnel are fixed.
 - Remaining work is connectors implementation and the listed conformance fixtures.
+
+## Superseded by
+
+`story:satellite-federation-has-a-threat-modeled-contract` in the AEP planning store, at
+`.engineering/planning/story/satellite-federation-has-a-threat-modeled-contract.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -70,3 +70,11 @@ to close declaratively, and the design has to be tested against real providers b
   *inbound events* is a different concern from credential verification
   ([S-006](S-006-per-service-verification-probes.md)) — the predecessor repeatedly conflated the two
   words; keep them apart in naming.
+
+## Superseded by
+
+`story:declarative-webhook-routing-grammar` in the AEP planning store, at
+`.engineering/planning/story/declarative-webhook-routing-grammar.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

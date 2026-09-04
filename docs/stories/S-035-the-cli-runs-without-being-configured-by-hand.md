@@ -147,3 +147,11 @@ Measured on 2026-08-20 against a live daemon on this machine:
   under `-o json` the same refusal arrives on stdout as a parseable envelope.
 - `doctor` against a 91-byte state root: `socket-path` and `connect-session-path` both `fail`, with
   *"Choose a --state-root at most 48 bytes long"*, exit `1`.
+
+## Superseded by
+
+`story:the-cli-runs-without-being-configured-by-hand` in the AEP planning store, at
+`.engineering/planning/story/the-cli-runs-without-being-configured-by-hand.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

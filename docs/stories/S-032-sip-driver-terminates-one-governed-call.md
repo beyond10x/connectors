@@ -80,3 +80,11 @@ SIP call without importing RTVBP or requiring a live carrier.
   learned-peer gate remain open.
 - CI builds/tests/lints the isolated exact lock, and a dependency fence keeps sipx out of the
   canonical compiler closure.
+
+## Superseded by
+
+`story:sip-driver-terminates-one-governed-call` in the AEP planning store, at
+`.engineering/planning/story/sip-driver-terminates-one-governed-call.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -60,3 +60,11 @@ already reaches on a laptop.
   the generic catalog-driven flow is what removes it.
 - Scope guard: ship it generic. Fifty-seven catalogued API-key providers become deployable by the
   same change; making it Anthropic-shaped would be a third copy of a rule that already has two.
+
+## Superseded by
+
+`story:the-hosted-posture-connects-a-catalogued-provider` in the AEP planning store, at
+`.engineering/planning/story/the-hosted-posture-connects-a-catalogued-provider.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

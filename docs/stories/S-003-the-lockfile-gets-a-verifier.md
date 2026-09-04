@@ -76,3 +76,11 @@ is the whole design.
   provenance into a checkable local record rather than treating an upstream claim as verified.
 - A scoped or partial build must never truncate the lockfile; it is a whole-catalog artifact. The
   predecessor's `a_scoped_build_leaves_the_lockfile_byte_identical` is the shape of the test to carry.
+
+## Superseded by
+
+`story:the-lockfile-gets-a-verifier` in the AEP planning store, at
+`.engineering/planning/story/the-lockfile-gets-a-verifier.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

@@ -44,3 +44,11 @@ HTML page, no external assets.
   and every refusal-code enum. Auth section: identity login → `POST /v1/access-token`
   (audience + scopes extracted from the artifact's bearer description; mint request shape
   verified against beyond10x/identity `src/lib.rs` `AccessTokenRequest`).
+
+## Superseded by
+
+`story:a-public-documentation-page-renders-the-contract` in the AEP planning store, at
+`.engineering/planning/story/a-public-documentation-page-renders-the-contract.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

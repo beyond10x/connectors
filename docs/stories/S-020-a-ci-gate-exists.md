@@ -87,3 +87,11 @@ the unchecked acceptance items below name the hosted, web, and verifier work tha
 - Keep the workflow small and readable so its exact gate remains reviewable.
 - Out of scope, deliberately: release workflows. Architecture §8 says there are no release artifacts
   pre-v1; release automation belongs to the milestone that creates a release train.
+
+## Superseded by
+
+`story:a-ci-gate-exists` in the AEP planning store, at
+`.engineering/planning/story/a-ci-gate-exists.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

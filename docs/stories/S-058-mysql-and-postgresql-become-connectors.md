@@ -61,3 +61,11 @@ read path; mutations are a later grant-gated story.
   with least-privilege DB accounts as the deployment's second fence, documented in the driver.
   The sql_v1 dispatch slot is present but returns unavailable until custody/discovery compose it
   (S-059 descriptors, S-061 wiring).
+
+## Superseded by
+
+`story:mysql-and-postgresql-become-connectors` in the AEP planning store, at
+`.engineering/planning/story/mysql-and-postgresql-become-connectors.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

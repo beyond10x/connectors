@@ -42,3 +42,11 @@ Eight of 55 providers use spec ingest today, each spec URL hunted by hand. Scali
 (and the decision-0024 plugin-retirement waves, which need specs for aws, kubernetes and the
 observability stack) means the corpus we already vendored should do the hunting — with the
 citations preserved, because a minted reference is only as good as where it came from.
+
+## Superseded by
+
+`story:mint-source-entries-from-the-mined-catalogs` in the AEP planning store, at
+`.engineering/planning/story/mint-source-entries-from-the-mined-catalogs.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

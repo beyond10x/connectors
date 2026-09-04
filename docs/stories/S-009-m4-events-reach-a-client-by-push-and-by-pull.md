@@ -78,3 +78,11 @@ first-class client API rather than a support ticket.
   per `(Connection, source_scope)`, exact native deduplication on
   `(deployment, source_scope, generation, seq)`, and snapshot-first bootstrap. This is accepted
   architecture only; it does not imply that the M4 platform crates or the S-029 adapter exist.
+
+## Superseded by
+
+`story:m4-events-reach-a-client-by-push-and-by-pull` in the AEP planning store, at
+`.engineering/planning/story/m4-events-reach-a-client-by-push-and-by-pull.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

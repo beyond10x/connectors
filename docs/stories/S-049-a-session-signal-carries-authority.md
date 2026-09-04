@@ -59,3 +59,11 @@ from the Grant that admitted the session's creation — and bring the dispatch b
   grammar parser silently skipped struct/unit variants; rework `397ff25` closes the parser over
   line shapes, journals ghost-ref refusals, strips comments from the seam scan, and completes the
   design-13 revocation-vs-termination sentence; re-review PASS, five empirical attacks all red).
+
+## Superseded by
+
+`story:a-session-signal-carries-authority` in the AEP planning store, at
+`.engineering/planning/story/a-session-signal-carries-authority.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

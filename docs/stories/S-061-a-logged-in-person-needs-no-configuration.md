@@ -37,3 +37,11 @@ Connectors publishes the Identity origin it trusts, never the other way around.
   token caching and refresh, one authenticated retry, and automatic hosted selection for
   Operation, Connection and Event commands. A fake Identity/Connectors integration proves login,
   separate exact-scope tokens, cache reuse and refresh without re-login.
+
+## Superseded by
+
+`story:a-logged-in-person-needs-no-configuration` in the AEP planning store, at
+`.engineering/planning/story/a-logged-in-person-needs-no-configuration.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

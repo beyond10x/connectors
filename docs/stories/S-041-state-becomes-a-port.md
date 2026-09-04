@@ -135,3 +135,11 @@ The remaining acceptance items touch `integration-{slack,gitlab,jira,b10x,monito
 which a concurrent session has open. Sequence with it. Once they take the port,
 [S-042](S-042-one-composed-local-placement.md) collapses the two composition ladders into one
 `compose(config, ports)` that both `connectors-cli` and Zwirn call.
+
+## Superseded by
+
+`story:state-becomes-a-port` in the AEP planning store, at
+`.engineering/planning/story/state-becomes-a-port.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.

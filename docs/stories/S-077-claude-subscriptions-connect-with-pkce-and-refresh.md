@@ -52,3 +52,11 @@ only the authenticated BFF that invokes them.
   combined `code#state` value. Completion now splits that exact wire value, refuses missing or
   mismatched returned state before any provider exchange, and sends only the authorization code to
   the token endpoint. The provider-specific correction remains entirely in Connectors.
+
+## Superseded by
+
+`story:claude-subscriptions-connect-with-pkce-and-refresh` in the AEP planning store, at
+`.engineering/planning/story/claude-subscriptions-connect-with-pkce-and-refresh.md`, now carries this story. Migrated 2026-09-04 by the
+`aep-planning:story-migration` skill; this file is kept as the source it was migrated from and is
+not the place the rung is recorded any more. The artifact quotes this file's `## Acceptance`
+verbatim and names it in its own `## Provenance`.
