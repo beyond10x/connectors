@@ -1,0 +1,356 @@
+# The runtime side of the three layers, docs/design/01-domain-model.md:287-407, minus the event
+# nouns, which are in `connectors.event`. The session nouns come from
+# `crates/protocol/src/operation.rs` and `crates/protocol/src/sip.rs`.
+domain: connectors.runtime
+
+summary: The unit of authority, the granted executions that run under it, the live sessions those executions open, and the record every one of them leaves.
+
+types:
+  - name: connectors.runtime.GrantRef
+    kind: newtype
+    of: String
+
+  - name: connectors.runtime.OperationRef
+    kind: newtype
+    of: String
+
+  - name: connectors.runtime.ConnectionRef
+    kind: newtype
+    of: String
+
+  - name: connectors.runtime.ExecutionRef
+    kind: newtype
+    of: String
+
+  - name: connectors.runtime.AuditRef
+    kind: newtype
+    of: String
+
+  - name: connectors.runtime.CallRef
+    kind: newtype
+    of: String
+
+  # UNMAPPED: the Proxy noun has no identity anywhere. docs/design/01-domain-model.md:342-347
+  # describes a break-glass capability and no artifact projects it, so this reference exists only
+  # so the noun can be named. Settled by S-030 (docs/design/01-domain-model.md:433), which is the
+  # work that would give it one.
+  - name: connectors.runtime.ProxyRef
+    kind: newtype
+    of: String
+
+  # crates/protocol/src/operation.rs:131-135.
+  - name: connectors.runtime.EffectClass
+    kind: enum
+    variants: [ReadOnly, Mutating, Destructive]
+
+  # crates/protocol/src/operation.rs:139-142.
+  - name: connectors.runtime.ApprovalPosture
+    kind: enum
+    variants: [NotRequired, Required]
+
+  # crates/protocol/src/operation.rs:204-212.
+  - name: connectors.runtime.SessionTermination
+    kind: enum
+    variants: [Completed, Cancelled, Revoked, LeaseExpired, RemoteEnded, Failed, OutcomeUnknown]
+
+entities:
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:289-322), so this is a single-state lifecycle. `Granted` is
+  # the document's own word, from the proof chain "admitted → granted → the only route to
+  # dispatch" (docs/design/01-domain-model.md:297). Settled by a state enum, or by the CAS
+  # revision at docs/design/01-domain-model.md:301 becoming an observable ladder rather than a
+  # version counter.
+  # UNMAPPED: the Grant-to-Connection relation. docs/design/01-domain-model.md:294-295 says
+  # "Grants bind to connections (which one a principal may exercise), never to credentials",
+  # which fixes the direction; nothing states how many connections one grant binds. Settled by
+  # the grant store's own selector shape (docs/design/01-domain-model.md:291-293).
+  - name: connectors.runtime.Grant
+
+    identity:
+      name: grant_ref
+      type: connectors.runtime.GrantRef
+
+    lifecycle:
+      initial: Granted
+      states: [Granted]
+      terminal: [Granted]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:324-338), so this is a single-state lifecycle. `Executed` is
+  # the document's own word: "One granted execution of one operation over one connection"
+  # (docs/design/01-domain-model.md:326). The pipeline the same line draws — parameters in,
+  # request plan, credential placed, dispatched, response or refusal out, audited — is a
+  # description of one step, not of states an invocation rests in. Settled by an invocation state
+  # enum in `crates/protocol/src/`.
+  # UNMAPPED: the invocation has no identity of its own. `InvocationResult`
+  # (crates/protocol/src/operation.rs:184-190) carries `operation_ref`, `connector_audit_ref` and
+  # an *optional* `execution_ref`, so the audit reference is the only always-present handle and is
+  # used as the identity here. Settled by an invocation id on the result projection.
+  - name: connectors.runtime.Invocation
+
+    identity:
+      name: connector_audit_ref
+      type: connectors.runtime.AuditRef
+
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: execution_ref
+        type: Optional<connectors.runtime.ExecutionRef>
+
+    lifecycle:
+      initial: Executed
+      states: [Executed]
+      terminal: [Executed]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:340-351), so this is a single-state lifecycle. `Deferred` is
+  # the document's own word: "operator-only raw proxy is deferred behind S-030"
+  # (docs/design/01-domain-model.md:433). Settled by S-030, which is the work that would give the
+  # noun any state at all.
+  - name: connectors.runtime.Proxy
+
+    identity:
+      name: proxy_ref
+      type: connectors.runtime.ProxyRef
+
+    lifecycle:
+      initial: Deferred
+      states: [Deferred]
+      terminal: [Deferred]
+
+  # States: crates/protocol/src/operation.rs:194-199 (`SessionState`).
+  # Transitions read from the code that performs them,
+  # `crates/integration-sip/src/backend/sessions.rs:148-156`: `Terminated` when the completion is
+  # set (lines 150-151), `Terminating` while the record is marked terminating (lines 152-153),
+  # `Established` otherwise (lines 154-155). The two moves a caller asks for are
+  # `OperationRequest::SessionTerminate` and `SessionReconcile`
+  # (crates/protocol/src/operation.rs:54-55).
+  # UNMAPPED: `Establishing` (crates/protocol/src/operation.rs:195) is declared and read — the
+  # coherence rule at crates/protocol/src/operation.rs:484-487 groups it with the states that
+  # carry no termination — but nothing in the tree ever assigns it, because
+  # `crates/integration-sip/src/backend/sessions.rs:148` only projects a record that already
+  # exists. It is modelled as the initial state on that reading. Settled by the establishment path
+  # assigning it, or by the enum losing it.
+  # UNMAPPED: `OutcomeUnknown` (crates/protocol/src/operation.rs:199) is absent below because
+  # nothing assigns it either; the only mention outside the enum is the coherence rule at
+  # crates/protocol/src/operation.rs:491-492. The same word exists as an `OperationErrorCode`
+  # (crates/protocol/src/operation.rs:255) and as a `SessionTermination`
+  # (crates/protocol/src/operation.rs:211), and those two *are* produced — for example at
+  # crates/integration-sip/src/backend/mod.rs:640 — which is what makes the session state look
+  # reachable when it is not. Settled by a reconcile path that sets the session state as well as
+  # the error code (`crates/integration-kubernetes/src/local_workloads.rs:106` states the rule it
+  # would follow).
+  - name: connectors.runtime.Session
+
+    identity:
+      name: execution_ref
+      type: connectors.runtime.ExecutionRef
+
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.runtime.ConnectionRef
+      - name: connector_audit_ref
+        type: connectors.runtime.AuditRef
+      - name: termination
+        type: Optional<connectors.runtime.SessionTermination>
+
+    lifecycle:
+      initial: Establishing
+      states: [Establishing, Established, Terminating, Terminated]
+      terminal: [Terminated]
+      transitions:
+        - name: establish
+          from: [Establishing]
+          to: Established
+        - name: terminate
+          from: [Established]
+          to: Terminating
+        - name: settle
+          from: [Established, Terminating]
+          to: Terminated
+
+  # State: crates/protocol/src/sip.rs:122-124 (`SipDialState`), one variant, and the field that
+  # carries it says why: "Closed state token; always `established` in this response version"
+  # (crates/protocol/src/sip.rs:115). This is the one single-state lifecycle in this document that
+  # the code states rather than the absence of code implying.
+  # Fields: `SipDialEstablished`, crates/protocol/src/sip.rs:103-117.
+  - name: connectors.runtime.SipDial
+
+    identity:
+      name: call
+      type: connectors.runtime.CallRef
+
+    fields:
+      - name: session
+        type: connectors.runtime.ExecutionRef
+      # "Absent for a raw SIP call" (crates/protocol/src/sip.rs:110-112).
+      - name: channel
+        type: Optional<String>
+
+    lifecycle:
+      initial: Established
+      states: [Established]
+      terminal: [Established]
+
+  # UNMAPPED: no state enum and no drawn lifecycle
+  # (docs/design/01-domain-model.md:401-407), so this is a single-state lifecycle. `Recorded` is
+  # the document's own word: "Append-only record of every security-relevant action"
+  # (docs/design/01-domain-model.md:403). Append-only is the reason there is only one state, so
+  # this one is unlikely ever to gain a second. Settled by a retention transition, if the
+  # retention window (docs/design/01-domain-model.md:404) ever becomes an observable move.
+  - name: connectors.runtime.Audit
+
+    identity:
+      name: connector_audit_ref
+      type: connectors.runtime.AuditRef
+
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+
+commands:
+  # crates/protocol/src/operation.rs:52 (`OperationRequest::Invoke`). The successful branch of a
+  # session-shaped operation is `sip.dial` returning `established`
+  # (crates/protocol/src/sip.rs:119-124).
+  - name: connectors.runtime.InvokeOperation
+    naming:
+      wire: invoke
+    input:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef
+    outcomes:
+      - name: established
+        moves: connectors.runtime.Session.establish
+        instance: execution_ref
+        emits: [connectors.runtime.SessionEstablished]
+        payload:
+          connectors.runtime.SessionEstablished:
+            execution_ref: input.execution_ref
+        summary: Both sides completed establishment (crates/protocol/src/sip.rs:123-124).
+      - name: refused
+        external: the grant, the approval gate or the provider refuses the call
+        error: connectors.runtime.OperationRefused
+        summary: The invocation was refused and no session exists (crates/protocol/src/operation.rs:245-256).
+
+  # crates/protocol/src/operation.rs:54 (`OperationRequest::SessionTerminate`); the record is
+  # marked terminating at crates/integration-sip/src/backend/sessions.rs:152-153.
+  - name: connectors.runtime.TerminateSession
+    naming:
+      wire: session_terminate
+    input:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef
+    outcomes:
+      - name: terminating
+        moves: connectors.runtime.Session.terminate
+        instance: execution_ref
+        emits: [connectors.runtime.SessionTerminating]
+        payload:
+          connectors.runtime.SessionTerminating:
+            execution_ref: input.execution_ref
+        summary: Termination was requested and the session is winding down.
+      # `fn session_terminate` (crates/integration-sip/src/backend/sessions.rs:45) refuses in two
+      # places, and both are declared:
+      #   :50-52 `not_found`, an unknown `execution_ref`, which is `OperationErrorCode::NotFound`
+      #          (crates/protocol/src/operation.rs:247);
+      #   :65    `unavailable()`, when the audit append fails — `OperationErrorCode::Unavailable`
+      #          (crates/integration-sip/src/backend/mod.rs:733-739), and it is `retriable`.
+      # The audit append is ordered before the terminate, so a session whose termination cannot be
+      # recorded is not terminated: docs/design/01-domain-model.md:403 makes the record part of the
+      # action, not a report of it.
+      - name: not-found
+        external: no session is held under this execution reference
+        error: connectors.runtime.SessionNotFound
+        summary: No such session, so nothing was terminated (crates/integration-sip/src/backend/sessions.rs:50-52).
+      - name: unavailable
+        external: the audit journal could not record the termination request
+        error: connectors.runtime.RuntimeUnavailable
+        summary: The termination was not recorded, so it was not requested (crates/integration-sip/src/backend/sessions.rs:54-65).
+      # UNMAPPED: there is deliberately no wrong-state branch. Terminating an already-terminated
+      # session is not refused: crates/integration-sip/src/backend/sessions.rs:53 skips the
+      # termination when a completion is already set, and line 70 returns `Ok(status(...))`
+      # regardless — so the call is accepted and nothing moves. This document has no way to say
+      # "accepted, and nothing moved" without emitting a fact the tree does not produce, and the
+      # closed code set the same document cites (crates/protocol/src/operation.rs:245-256) has no
+      # state-conflict code to name. Settled by an outcome shape for a no-op, or by that path
+      # refusing.
+
+  # What performs `settle`, as opposed to what reports it. `SessionRecord.completion` is a
+  # `watch::Receiver<Option<SessionTermination>>` (crates/integration-sip/src/backend/mod.rs:118)
+  # whose sender is held by the voice-session launcher
+  # (crates/integration-sip/src/backend/mod.rs:790, 808-809); the call ending publishes a
+  # `SessionTermination` on it, and `status` reads that at
+  # crates/integration-sip/src/backend/sessions.rs:149-151 to derive `Terminated`.
+  # UNMAPPED: this is not a caller-facing command and no `OperationRequest` variant names it —
+  # the session settles because the call ended, not because anything asked. The name is this
+  # document's, taken from the field that carries it. Settled by the same surface work as the
+  # channel supervisor steps in `connectors.connection`, if a settlement is ever something a
+  # caller can ask for.
+  # UNMAPPED: `OperationRequest::SessionReconcile` (crates/protocol/src/operation.rs:55) is
+  # deliberately not modelled as the cause, and not modelled at all. Its handler
+  # (crates/integration-sip/src/backend/mod.rs:636-648) calls `session_status`, which is a pure
+  # read (crates/integration-sip/src/backend/sessions.rs:40-43): reconciliation *observes* the
+  # move the launcher performed and never makes it, so declaring `moves:` on it would name a
+  # command that changes nothing as the thing that changes everything. It is a read, and this
+  # document models no reads — see the note in `ess/system/components.yaml`. Its one refusal,
+  # `connectors.runtime.SessionOutcomeUnknown`, is declared below without a command, because the
+  # command that raises it is a read. Settled by reads gaining `views:` here, which would give
+  # reconciliation somewhere to live.
+  - name: connectors.runtime.SettleSession
+    input:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef
+    outcomes:
+      - name: terminated
+        moves: connectors.runtime.Session.settle
+        instance: execution_ref
+        emits: [connectors.runtime.SessionTerminated]
+        payload:
+          connectors.runtime.SessionTerminated:
+            execution_ref: input.execution_ref
+        summary: A termination reason was published on the session's completion channel, so the session is terminated (crates/integration-sip/src/backend/sessions.rs:149-151, crates/protocol/src/operation.rs:488-490).
+
+errors:
+  # `OperationError` and its closed code set, crates/protocol/src/operation.rs:245-267.
+  - name: connectors.runtime.OperationRefused
+    summary: The invocation was refused; the refusal never names the axis that refused it (docs/design/01-domain-model.md:299-300).
+
+  # `unavailable()`, which is `OperationErrorCode::Unavailable`
+  # (crates/protocol/src/operation.rs:246), built at
+  # crates/integration-sip/src/backend/mod.rs:733-739 and raised at
+  # crates/integration-sip/src/backend/sessions.rs:65. Retriable, and it says so
+  # (crates/integration-sip/src/backend/mod.rs:737).
+  - name: connectors.runtime.RuntimeUnavailable
+    summary: The connector runtime is unavailable, and the request may be retried.
+
+  # `not_found`, which is `OperationErrorCode::NotFound`
+  # (crates/protocol/src/operation.rs:247), raised at
+  # crates/integration-sip/src/backend/sessions.rs:41 and :52.
+  - name: connectors.runtime.SessionNotFound
+    summary: No session is held under this execution reference.
+
+  # `OperationErrorCode::OutcomeUnknown` (crates/protocol/src/operation.rs:255), raised at
+  # crates/integration-sip/src/backend/mod.rs:636-642 with the message
+  # "session outcome is unknown to this daemon generation".
+  - name: connectors.runtime.SessionOutcomeUnknown
+    summary: This daemon generation holds no record of the session, and a call that may have run must never be reported as one that did not.
+
+events:
+  - name: connectors.runtime.SessionEstablished
+    fields:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef
+
+  - name: connectors.runtime.SessionTerminating
+    fields:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef
+
+  - name: connectors.runtime.SessionTerminated
+    fields:
+      - name: execution_ref
+        type: connectors.runtime.ExecutionRef

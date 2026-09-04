@@ -1,0 +1,91 @@
+# UNMAPPED: the `cli:` block and `reached_by: command_line` are deliberately absent. They belong
+# to the unit that gives the three ambiguous verbs a `--target` flag; this document types the
+# nouns and stops there. Settled by that unit, which is
+# `story:explicit-target-never-implicit` plus the surface work of `epic:cli-surface`: it is the
+# one that decides which verbs carry the flag, and a `cli:` block written before that decision
+# would name verbs nothing has agreed on.
+components:
+  # `crates/service/src/lib.rs:3` — "Pure Connectors use cases." Every command below is one of
+  # those use cases; the transports that carry them are `crates/server/src/lib.rs:3`, "Inbound
+  # hosted and personal-local transport adapters for Connectors application ports".
+  - component: connectors-service
+    summary: Holds the connection, credential, invocation and event use cases, and the state each of them moves.
+    owns:
+      domains:
+        - connectors.connection
+        - connectors.deployment
+        - connectors.event
+        - connectors.runtime
+    accepts:
+      commands:
+        - connectors.connection.AuthorizeConnection
+        - connectors.connection.VerifyConnection
+        - connectors.connection.ReauthorizeConnection
+        - connectors.connection.RevokeConnection
+        - connectors.connection.SuperviseChannel
+        - connectors.connection.ReconnectChannel
+        - connectors.connection.ConnectChannel
+        - connectors.connection.StopChannel
+        - connectors.connection.CreateConnectSession
+        - connectors.connection.FinishConnectSession
+        - connectors.connection.ActivateCandidate
+        - connectors.connection.MaterializeObservation
+        - connectors.connection.RefreshObservation
+        - connectors.runtime.InvokeOperation
+        - connectors.runtime.TerminateSession
+        - connectors.runtime.SettleSession
+    publishes:
+      events:
+        - connectors.connection.ConnectionAuthorized
+        - connectors.connection.ConnectionBecameCallable
+        - connectors.connection.ConnectionDegraded
+        - connectors.connection.ConnectionReauthorized
+        - connectors.connection.ConnectionRevoked
+        - connectors.connection.ChannelStarting
+        - connectors.connection.ChannelReconnecting
+        - connectors.connection.ChannelConnected
+        - connectors.connection.ChannelStopped
+        - connectors.connection.ConnectSessionCreated
+        - connectors.connection.ConnectSessionCompleted
+        - connectors.connection.ConnectSessionExpired
+        - connectors.connection.ConnectSessionFailed
+        - connectors.connection.CandidateActivated
+        - connectors.connection.ObservationMaterialized
+        - connectors.connection.ObservationWithdrawn
+        - connectors.connection.ObservationReobserved
+        - connectors.runtime.SessionEstablished
+        - connectors.runtime.SessionTerminating
+        - connectors.runtime.SessionTerminated
+    # UNMAPPED: this surface is the write half only. The read verbs of the three protocols —
+    # `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
+    # (crates/protocol/src/connection.rs:35-48), `SessionStatus`, `SessionReconcile`
+    # (crates/protocol/src/operation.rs:49-56), `Receive`, `Replay`
+    # (crates/protocol/src/event.rs:36-39) — change no entity, and ESS models a read as a `views:`
+    # declaration carrying a consistency claim (`read_your_writes` or `eventual`). Nothing in the
+    # tree states that claim for any of them, so declaring one would invent it. Settled by the
+    # consistency each read actually offers being written down, which the caller's contract
+    # (docs/design/04-the-callers-contract.md) is where it would go.
+    # In hosted posture the caller is not deployed with the service: it presents a validated
+    # Identity envelope over a wire (docs/design/01-domain-model.md:48-50, 67-70).
+    reached_by: network
+
+  # `crates/catalog-build/src/lib.rs:1` — "compile the reviewed connector declarations into the
+  # catalog artifacts". It accepts no command of this specification: the catalog nouns have no
+  # transition anything takes, which is the same fact their single-state lifecycles record.
+  - component: catalog-build
+    summary: Compiles the reviewed connector declarations into the sealed catalog a deployment serves.
+    owns:
+      domains:
+        - connectors.catalog
+
+  # `crates/connectors-cli` — the crate whose three ambiguous verbs
+  # (.engineering/planning/story/explicit-target-never-implicit.md) the target noun exists for.
+  # UNMAPPED: `reached_by` is left at its default here rather than declared. The honest value is
+  # a command line, and stating it is the later unit's, together with the `cli:` block that gives
+  # it meaning. Settled by that same unit: `reached_by: command_line` without a `cli:` block
+  # declares a reach with no surface behind it, so the two land together or neither does.
+  - component: connectors-cli
+    summary: Names which deployment a command reaches, instead of inferring it from a stored login.
+    owns:
+      domains:
+        - connectors.target
