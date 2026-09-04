@@ -42,3 +42,10 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", 
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "signal", "time"] }
+
+# Test-only. `tests/cli_surface.rs` reads `ess/system/components.yaml` and holds the parser against
+# it; the architecture fence caps `[dependencies]` and does not read this table, because a check
+# that runs beside the binary is not part of it.
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_norway = "0.9"
