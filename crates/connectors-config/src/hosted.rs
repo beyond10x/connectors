@@ -165,8 +165,10 @@ pub struct HostedGitlabConfig {
 pub struct HostedSlackConfig {
     pub public_origin: String,
     pub team_id: String,
-    pub oauth_client_id: String,
-    pub oauth_redirect_uri: String,
+    #[serde(default)]
+    pub oauth_client_id: Option<String>,
+    #[serde(default)]
+    pub oauth_redirect_uri: Option<String>,
     pub org_read_grant_ref: String,
     pub user_grant_ref: String,
     pub companion_grant_ref: String,
@@ -185,8 +187,8 @@ impl HostedSlackConfig {
             user_grant_ref: Some(self.user_grant_ref.clone()),
             companion_grant_ref: Some(self.companion_grant_ref.clone()),
             expected_team_id: Some(self.team_id.clone()),
-            oauth_client_id: Some(self.oauth_client_id.clone()),
-            oauth_redirect_uri: Some(self.oauth_redirect_uri.clone()),
+            oauth_client_id: self.oauth_client_id.clone(),
+            oauth_redirect_uri: self.oauth_redirect_uri.clone(),
             initiation: self.initiation,
             allowed_events: self.allowed_events.clone(),
             connect_session_ttl_seconds: self.connect_session_ttl_seconds,
@@ -972,6 +974,17 @@ initiation = "platform"
         .unwrap();
 
         config.validate().unwrap();
+        let mut bot_only = config.clone();
+        let slack = bot_only.slack.as_mut().unwrap();
+        slack.oauth_client_id = None;
+        slack.oauth_redirect_uri = None;
+        bot_only.validate().unwrap();
+        bot_only.slack.as_mut().unwrap().oauth_client_id = Some("123456789.987654321".to_owned());
+        assert!(matches!(
+            bot_only.validate(),
+            Err(HostedServerConfigError::Invalid)
+        ));
+
         let mut missing_policy = config;
         missing_policy.egress.policy = HostedEgressPolicy::Disabled;
         assert!(matches!(

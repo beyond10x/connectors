@@ -65,7 +65,7 @@ pub(crate) const STATE_VERSION: u8 = 1;
 pub(crate) const MAX_STATE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_AUDIT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_CONNECT_SESSIONS: usize = 32;
-const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
+pub(crate) const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
 const VALUE_PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
 const GITLAB_OPERATIONS: [&str; 15] = [
     "gitlab-user-get",
@@ -1515,7 +1515,7 @@ impl GitlabInner {
         decode_response(response)
     }
 
-    async fn execute(
+    pub(crate) async fn execute(
         &self,
         authority_ref: &str,
         request: connector_resolve::Request,
@@ -1535,7 +1535,7 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("provider-unavailable"))
     }
 
-    fn provider_url(&self, path: &str) -> Result<url::Url, GitlabError> {
+    pub(crate) fn provider_url(&self, path: &str) -> Result<url::Url, GitlabError> {
         if !path.starts_with('/') || path.contains("//") {
             return Err(GitlabError::new("provider-path"));
         }
@@ -1630,49 +1630,45 @@ impl GitlabInner {
                     .connection_token(&connection)
                     .await
                     .map_err(|_| datasource_unavailable())?;
-                let projects: Vec<Value> = self
-                    .provider_json(
+                let reached_limit = self
+                    .scan_membership_projects(
                         &connection.connection_ref,
-                        "/api/v4/projects",
                         &token,
-                        &[
-                            ("membership".to_owned(), "true".to_owned()),
-                            ("simple".to_owned(), "true".to_owned()),
-                            ("order_by".to_owned(), "last_activity_at".to_owned()),
-                            ("per_page".to_owned(), "100".to_owned()),
-                        ],
+                        true,
+                        |project| {
+                            let Some(project_id) = project.get("id").and_then(Value::as_u64)
+                            else {
+                                return false;
+                            };
+                            let label = project
+                                .get("path_with_namespace")
+                                .and_then(Value::as_str)
+                                .map(|value| bounded_string(value, 240))
+                                .unwrap_or_else(|| format!("GitLab project {project_id}"));
+                            if !query.is_empty() && !label.to_ascii_lowercase().contains(&query) {
+                                return false;
+                            }
+                            bindings.push(DatasourceBinding {
+                                datasource_ref: datasource_ref.to_owned(),
+                                binding_ref: datasource_binding_ref(
+                                    datasource_ref,
+                                    &connection.connection_ref,
+                                    connection.credential_generation,
+                                    Some(project_id),
+                                ),
+                                connection_ref: connection.connection_ref.clone(),
+                                label,
+                                generation: connection.credential_generation,
+                                purpose: None,
+                            });
+                            bindings.len() >= limit
+                        },
                     )
                     .await
                     .map_err(|_| datasource_unavailable())?;
                 drop(token);
-                for project in projects {
-                    let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
-                        continue;
-                    };
-                    let label = project
-                        .get("path_with_namespace")
-                        .and_then(Value::as_str)
-                        .map(|value| bounded_string(value, 240))
-                        .unwrap_or_else(|| format!("GitLab project {project_id}"));
-                    if !query.is_empty() && !label.to_ascii_lowercase().contains(&query) {
-                        continue;
-                    }
-                    bindings.push(DatasourceBinding {
-                        datasource_ref: datasource_ref.to_owned(),
-                        binding_ref: datasource_binding_ref(
-                            datasource_ref,
-                            &connection.connection_ref,
-                            connection.credential_generation,
-                            Some(project_id),
-                        ),
-                        connection_ref: connection.connection_ref.clone(),
-                        label,
-                        generation: connection.credential_generation,
-                        purpose: None,
-                    });
-                    if bindings.len() >= limit {
-                        return Ok(bindings);
-                    }
+                if reached_limit {
+                    return Ok(bindings);
                 }
             } else if query.is_empty() || connection.label.to_ascii_lowercase().contains(&query) {
                 bindings.push(DatasourceBinding {
@@ -1868,31 +1864,32 @@ impl GitlabInner {
         connection: &StoredConnection,
         token: &Secret,
     ) -> Result<u64, DatasourceError> {
-        let projects: Vec<Value> = self
-            .provider_json(
-                &connection.connection_ref,
-                "/api/v4/projects",
-                token,
-                &[
-                    ("membership".to_owned(), "true".to_owned()),
-                    ("simple".to_owned(), "true".to_owned()),
-                    ("per_page".to_owned(), "100".to_owned()),
-                ],
-            )
-            .await
-            .map_err(|_| datasource_unavailable())?;
-        projects
-            .into_iter()
-            .filter_map(|project| project.get("id").and_then(Value::as_u64))
-            .find(|project_id| {
-                datasource_binding_ref(
+        let mut resolved = None;
+        self.scan_membership_projects(
+            &connection.connection_ref,
+            token,
+            false,
+            |project| {
+                let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
+                    return false;
+                };
+                if datasource_binding_ref(
                     datasource_ref,
                     &connection.connection_ref,
                     connection.credential_generation,
-                    Some(*project_id),
+                    Some(project_id),
                 ) == binding_ref
-            })
-            .ok_or_else(datasource_not_granted)
+                {
+                    resolved = Some(project_id);
+                    true
+                } else {
+                    false
+                }
+            },
+        )
+        .await
+        .map_err(|_| datasource_unavailable())?;
+        resolved.ok_or_else(datasource_not_granted)
     }
 }
 

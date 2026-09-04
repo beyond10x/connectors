@@ -34,3 +34,4 @@ zeroize = "1"
 
 [dev-dependencies]
 connector-secrets = { version = "0.5.11", path = "../connector-secrets" }
+tokio = { version = "1", features = ["macros", "rt"] }
