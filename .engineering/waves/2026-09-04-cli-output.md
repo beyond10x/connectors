@@ -13,11 +13,11 @@ Skill version 0.6.1 (`.claude-plugin/plugin.json`). Status: **stage 2, approved 
 | objective | O5, the generic agent platform — the catalogue a platform tenant configures connectors from |
 | implementor | `adp:implementor` |
 | adversary | `adp:adversary` |
-| branch | _not created_ |
-| worktree | _not created_ |
-| build directory | _not created_ |
-| scratch root | _not created_ |
-| stage | proposed |
+| branch | `impl/informative-command-readability`, forked from `wave/cli-output` at `7dc4c07` |
+| worktree | `/home/timo/.local/state/worktree/trees/b10x/connectors/wt-d41dd2700a2e` |
+| build directory | `/home/timo/.local/state/worktree/trees/b10x/connectors/wt-d41dd2700a2e/target` |
+| scratch root | `/home/timo/.cache/connectors-wave/informative-command-readability/scratch` |
+| stage | **correction round 2**, final — the attack budget is spent |
 
 ## Acceptance, from the artifact
 
@@ -95,3 +95,38 @@ than waived. It was the sole cause of
 One unit commit on `impl/informative-command-readability`; its merge into the integration branch;
 one closing store commit recording evidence and moving the story; and the merge of the integration
 branch into `main`. **Nothing else** — no push, no tag, no release, no second wave.
+
+## Deviations
+
+- The opening commit (`7dc4c07`) was made on `main` rather than on `wave/cli-output`. It holds the
+  wave page and the story's lifecycle moves, no code, and it passed the cheap gate steps
+  (`check-links.py` 0, `check-stories.py` 0, `aep artifact validate` valid) before any tree existed.
+  `wave/cli-output` forks from it.
+- Worktrees are created through this machine's managed `worktree` CLI rather than under a wave-root
+  directory, because the operator's standing rule requires it. The triple above records the paths
+  the skill's cleanup step needs.
+
+## Log
+
+| when | event |
+|---|---|
+| dispatch | `adp:implementor` returned **green**, cases 44 → 55, 9 red first. Commits `facd0b1`, `7daeb22`. |
+| attack 1 | `adp:adversary` returned **red**, cases 55 → 62, 6 red. 9 findings introduced, 1 pre-existing. Recorded as `review-result:adversary-informative-readability-pass-1`. |
+| routing | 9 introduced returned to the same implementor. 1 pre-existing filed as `story:emit-treats-a-closed-pipe-as-failure`. |
+| incident | the implementor was killed mid-correction by an API `authentication_failed`, not a rate limit. Branch held both original commits plus an uncommitted measurement probe; no correction had landed. Resumed rather than re-dispatched. |
+| correction 1 | returned **green**, cases 62 → 72, all 6 adversary cases now pass. Commit `06e1e22`, +794/−71 over two files. `providers` last column moved 196 → 120; compact `wc -l` 66 → 65. |
+| attack 2 | returned **red**, cases 72 → 77, 4 red, 9 findings. Recorded as `review-result:adversary-informative-readability-pass-2`. |
+| ledger | `aep artifact findings` between the two passes: **carried 0, new 9, resolved 10.** The correction landed whole; nothing regressed. The nine are ground the correction itself opened. |
+| correction 2 | dispatched to the same implementor, which never lost its context. No third attack: the budget is two passes, and the coordinator verifies this diff instead. |
+
+## Findings routed out of this unit
+
+- `story:console-clippy-findings` — five pre-existing clippy findings in `enrol.rs`/`envelope.rs`.
+- `story:emit-treats-a-closed-pipe-as-failure` — `emit` returns `Err(BrokenPipe)`; pre-existing.
+
+## Coordinator work still owed
+
+- Apply `scratch/gate-console-lane.patch` on the integration branch. `crates/connectors-console` is
+  in the root workspace's `exclude` list and in no `scripts/gate.sh` lane, so its ~44 tests are run
+  by no gate — verified independently: `gate.sh --list-workspaces` returns 10 workspaces and none is
+  this one. Without the lane, this wave's own closing gate would not execute the unit's tests.
