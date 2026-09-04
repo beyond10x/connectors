@@ -210,7 +210,8 @@ struct OAuthTokenResponse {
     refresh_token: String,
     expires_in: u64,
     created_at: u64,
-    scope: String,
+    #[serde(default)]
+    scope: Option<String>,
     token_type: String,
 }
 
@@ -2498,6 +2499,7 @@ const EXCHANGE_POLICY: TokenPolicy<'static> = TokenPolicy {
 /// from the separate `/oauth/token/info` call rather than from the response, so `created_at` and
 /// `expires_in` here are fields the connector never reads.
 const REFRESH_POLICY: TokenPolicy<'static> = TokenPolicy {
+    required_scopes: &[],
     require_created_at: false,
     require_expires_in: false,
     ..EXCHANGE_POLICY
@@ -2509,7 +2511,7 @@ fn token_response(value: OAuthTokenResponse) -> TokenResponse {
         refresh_token: Some(value.refresh_token),
         expires_in: value.expires_in,
         created_at: Some(value.created_at),
-        scope: value.scope,
+        scope: value.scope.unwrap_or_default(),
         token_type: value.token_type,
     }
 }
