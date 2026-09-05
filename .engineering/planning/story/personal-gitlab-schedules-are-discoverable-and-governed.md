@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:personal-gitlab-schedules-are-discoverable-and-governed
 kind: story
-status: proposed
+status: active
 title: Personal GitLab schedules are discoverable and governed
 summary: Close the CLI discovery and validation gaps, then add write-gated GitLab pipeline-schedule operations.
 tags:
@@ -25,7 +25,7 @@ scope:
 - confidence: inferred
   path: crates/catalog-cli/Cargo.toml
 - confidence: inferred
-  path: crates/catalog-cli/examples/vendor_gitlab_schedules.rs
+  path: crates/catalog-cli/examples/vendor_gitlab.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -45,9 +45,12 @@ scope:
 - confidence: inferred
   path: specs/gitlab.provenance.toml
 - confidence: inferred
-  path: specs/gitlab/pipeline-schedules-19.4.openapi.yaml
-revision: 42
+  path: specs/gitlab/coverage-19.4.toml
+- confidence: inferred
+  path: specs/gitlab/openapi-19.4.yaml
+revision: 45
 ---
+
 
 ## Defect
 
@@ -109,9 +112,10 @@ Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 8
 Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
 
 - `providers/gitlab.toml` — cited.
-- `specs/gitlab/pipeline-schedules-19.4.openapi.yaml` — inferred.
+- `specs/gitlab/openapi-19.4.yaml` — inferred.
 - `specs/gitlab.provenance.toml` — inferred.
-- `crates/catalog-cli/examples/vendor_gitlab_schedules.rs` — inferred.
+- `specs/gitlab/coverage-19.4.toml` — inferred.
+- `crates/catalog-cli/examples/vendor_gitlab.rs` — inferred.
 - `crates/catalog-cli/Cargo.toml` — inferred.
 - `Cargo.lock` — inferred.
 - `SOURCES.toml` — inferred.
@@ -138,7 +142,7 @@ CLI execution queue 2026-09-06: 6 of 10. The urgent Slack delivery follow-up lea
 
 The operator confirmed on 2026-09-06: if an official OpenAPI specification exists, use it. This standing rule is now explicit in AGENTS.md. Current fetched sources: https://docs.gitlab.com/api/openapi/ and the official GitLab OpenAPI 3.0.0 document at https://gitlab.com/gitlab-org/gitlab/-/raw/master/doc/api/openapi/openapi_v3.yaml (info.version 19.4; 1,367 paths; raw SHA-256 f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530). Resolve and record an immutable upstream revision before vendoring.
 
-Use a deterministic vendor-derived slice containing GET/POST /api/v4/projects/{id}/pipeline_schedules and PUT/DELETE /api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}, plus their complete local reference closure. Preserve vendor schema truth, record the exact selections and declared example scrub, and derive catalog operations through OpenAPI ingest. No handwritten replacement endpoint/schema definitions. An importer limitation requires an importer extension or a reported capability gap. Existing inline operations retain their provenance; no claim that the new source generated them.
+Preserve the complete scrubbed official OpenAPI as the vendor source. The first ingest selection covers GET/POST /api/v4/projects/{id}/pipeline_schedules and PUT/DELETE /api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}, with a deterministic inventory accounting for every source operation and the remaining coverage backlog. Preserve vendor schema truth, record the exact selections and declared example scrub, and derive catalog operations through OpenAPI ingest. No handwritten replacement endpoint/schema definitions. An importer limitation is implementation work to extend the importer, never permission for a handwritten replacement. Existing inline operations retain their provenance; no claim that the new source generated them.
 
 The reverse OpenAPI draft was refined into value-only connectors.gitlab request/snapshot types. GitLab owns schedule lifecycle and owner identities; no Connector-owned schedule entity, credential relation or grant is invented. Losses remain explicit: omission versus null/defaults, vendor list response object versus documented array, and heterogeneous input collections outside this initial surface. Reviewed overlays must separately justify these discrepancies and policy decisions from the fetched official schedule/authentication references. The new schedule spec must not rewrite existing GitLab OAuth endpoints from incomplete vendor security metadata.
 

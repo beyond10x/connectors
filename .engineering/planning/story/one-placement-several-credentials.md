@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:one-placement-several-credentials
 kind: story
-status: proposed
+status: active
 title: One placement, several credentials, a Connection per identity
 tags:
 - ready
@@ -26,7 +26,7 @@ scope:
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/deployment.yaml
-revision: 30
+revision: 31
 ---
 # Story: one placement, several credentials, a Connection per identity
 
