@@ -63,6 +63,59 @@ impl KubeconfigReader {
         serde_json::from_str(&body)
             .map_err(|_| datasource_unavailable("Kubernetes response is malformed"))
     }
+
+    /// Both local list projections use this bounded walk over the same Deployment API.
+    /// Keep template data until the caller chooses its projection: images exist even when no
+    /// Pod has been created. A response outside the requested namespace or page bound refuses.
+    pub(crate) async fn list_deployments(
+        &self,
+        namespace: &str,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<(Vec<KubernetesDeployment>, Option<String>), DatasourceError> {
+        let namespace = path_segment(namespace)?;
+        let mut deployments = Vec::new();
+        let mut continue_token = cursor.map(str::to_owned);
+        for _ in 0..MAX_UPSTREAM_LIST_FETCHES {
+            let remaining = usize::from(limit).saturating_sub(deployments.len());
+            if remaining == 0 {
+                break;
+            }
+            let chunk = remaining.min(usize::from(UPSTREAM_PAGE_LIMIT));
+            let chunk_text = chunk.to_string();
+            let mut pairs = vec![("limit", chunk_text.as_str())];
+            if let Some(token) = continue_token.as_deref() {
+                pairs.push(("continue", token));
+            }
+            let path = format!(
+                "/apis/apps/v1/namespaces/{namespace}/deployments?{}",
+                query(&pairs)
+            );
+            let list: KubernetesList<KubernetesDeployment> = self.get_json(&path).await?;
+            if list.items.len() > chunk {
+                return Err(DatasourceError::new(
+                    DatasourceErrorCode::ResultTooLarge,
+                    "Kubernetes returned more Deployments than the requested page bound",
+                    false,
+                ));
+            }
+            if list.items.iter().any(|deployment| {
+                deployment.metadata.namespace != namespace
+                    || !valid_dns_label(&deployment.metadata.name, 253)
+            }) {
+                return Err(datasource_unavailable(
+                    "Kubernetes returned a Deployment outside the requested namespace",
+                ));
+            }
+            deployments.extend(list.items);
+            continue_token =
+                (!list.metadata.continue_token.is_empty()).then_some(list.metadata.continue_token);
+            if continue_token.is_none() {
+                break;
+            }
+        }
+        Ok((deployments, continue_token))
+    }
 }
 
 /// A refusal a person can act on, from whatever the cluster or the credential helper said.
@@ -89,11 +142,15 @@ fn datasource_error(error: kube::Error) -> DatasourceError {
 }
 
 /// The same fault, said as an operation rather than as a read.
-fn operation_from_datasource(error: DatasourceError) -> OperationError {
+pub(crate) fn operation_from_datasource(error: DatasourceError) -> OperationError {
     let code = match error.code {
         DatasourceErrorCode::NotFound => OperationErrorCode::NotFound,
         DatasourceErrorCode::NotGranted => OperationErrorCode::NotGranted,
         DatasourceErrorCode::InvalidInput => OperationErrorCode::InvalidInput,
+        DatasourceErrorCode::ResultTooLarge => OperationErrorCode::ResultTooLarge,
+        DatasourceErrorCode::CursorExpired | DatasourceErrorCode::StaleAuthority => {
+            OperationErrorCode::StaleAuthority
+        }
         _ => OperationErrorCode::Unavailable,
     };
     OperationError::new(code, error.message, error.retriable)
@@ -173,42 +230,10 @@ impl DeploymentReader for KubeconfigReader {
         limit: u16,
         cursor: Option<&str>,
     ) -> Result<WorkloadList, DatasourceError> {
-        let namespace = path_segment(namespace)?;
-        // The same bounded upstream walk as the in-cluster reader (S-063): raw objects arrive
-        // whole however small the kept projection is, so one request for a full page can
-        // exceed `MAX_KUBERNETES_RESPONSE_BYTES` on a busy namespace. A short page with a
-        // cursor is the honest answer when the fetch budget runs out first.
-        let mut workloads = Vec::new();
-        let mut continue_token = cursor.map(str::to_owned);
-        for _ in 0..MAX_UPSTREAM_LIST_FETCHES {
-            let remaining = usize::from(limit).saturating_sub(workloads.len());
-            if remaining == 0 {
-                break;
-            }
-            let chunk = remaining.min(usize::from(UPSTREAM_PAGE_LIMIT)).to_string();
-            let mut pairs = vec![("limit", chunk)];
-            if let Some(token) = continue_token.as_deref() {
-                pairs.push(("continue", token.to_owned()));
-            }
-            let borrowed = pairs
-                .iter()
-                .map(|(key, value)| (*key, value.as_str()))
-                .collect::<Vec<_>>();
-            let path = format!(
-                "/apis/apps/v1/namespaces/{namespace}/deployments?{}",
-                query(&borrowed)
-            );
-            let list: KubernetesList<KubernetesDeployment> = self.get_json(&path).await?;
-            workloads.extend(list.items.into_iter().map(project_compact));
-            continue_token =
-                (!list.metadata.continue_token.is_empty()).then_some(list.metadata.continue_token);
-            if continue_token.is_none() {
-                break;
-            }
-        }
+        let (deployments, next_cursor) = self.list_deployments(namespace, limit, cursor).await?;
         Ok(WorkloadList {
-            workloads,
-            next_cursor: continue_token,
+            workloads: deployments.into_iter().map(project_compact).collect(),
+            next_cursor,
         })
     }
 
@@ -361,6 +386,8 @@ impl DeploymentReader for KubeconfigReader {
 #[derive(Default)]
 pub(crate) struct WorkloadSurface {
     cursors: CursorStore,
+    /// Operation cursors have a separate lifetime and bind Connection as well as namespace.
+    pub(crate) inventory_cursors: CursorStore,
 }
 
 impl WorkloadSurface {
