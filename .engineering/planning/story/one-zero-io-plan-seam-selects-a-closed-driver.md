@@ -4,6 +4,9 @@ id: story:one-zero-io-plan-seam-selects-a-closed-driver
 kind: story
 status: active
 title: One zero-IO plan seam selects a closed built-in driver
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-024
@@ -18,7 +21,7 @@ scope:
   path: crates/server
 - confidence: cited
   path: crates/service
-revision: 4
+revision: 6
 ---
 ## Acceptance
 
@@ -51,3 +54,7 @@ Migrated from `docs/stories/S-024-one-zero-io-plan-seam-selects-a-closed-driver.
 - First written 2026-08-13 · last touched 2026-08-15 · 3 revision(s)
 - Legacy id `S-024`, recorded as the reference `legacy:S-024`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 2 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

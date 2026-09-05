@@ -2,14 +2,32 @@
 format: aep.planning-md/1
 id: story:connect-session-oauth-custody-in-personal-posture
 kind: story
-status: draft
+status: proposed
 title: Decide the connect-session ↔ OAuth-callback custody chain in personal posture
+tags:
+- ready
+- wave-cli
 refs:
 - provider: legacy
   reference: S-013
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/catalog
+- confidence: inferred
+  path: crates/connect-session-transport
+- confidence: inferred
+  path: crates/connector-oauth
+- confidence: inferred
+  path: crates/connector-spec
+- confidence: inferred
+  path: crates/domain
+- confidence: inferred
+  path: crates/service
+- confidence: inferred
+  path: docs/design
+revision: 5
 ---
 ## Acceptance
 
@@ -65,3 +83,7 @@ Migrated from `docs/stories/S-013-connect-session-oauth-custody-in-personal-post
 - First written 2026-08-13 · last touched 2026-08-13 · 2 revision(s)
 - Legacy id `S-013`, recorded as the reference `legacy:S-013`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 3 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

@@ -2,13 +2,33 @@
 format: aep.planning-md/1
 id: story:personal-gitlab-schedules-are-discoverable-and-governed
 kind: story
-status: draft
+status: proposed
 title: Personal GitLab schedules are discoverable and governed
 summary: Close the CLI discovery and validation gaps, then add write-gated GitLab pipeline-schedule operations.
+tags:
+- ready
+- wave-cli
 relations:
 - derived_from: epic:local-product
 - informed_by: story:explicit-target-never-implicit
-revision: 1
+scope:
+- confidence: inferred
+  path: catalog/gitlab.catalog.json
+- confidence: inferred
+  path: connectors.lock
+- confidence: inferred
+  path: crates/catalog-build
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/integration-catalog
+- confidence: inferred
+  path: crates/protocol
+- confidence: inferred
+  path: docs/guides
+- confidence: inferred
+  path: providers/gitlab.toml
+revision: 5
 ---
 ## Defect
 
@@ -60,3 +80,7 @@ target-selection scope.
 ## Acceptance
 
 With a healthy personal-local GitLab connection, the default local CLI reports one consistent connection across connection and operation discovery, documents and rejects search limits above the protocol maximum before transport, exposes source-grounded pipeline-schedule list/create/update/delete operations, and proves schedule mutations remain refused until writes are explicitly enabled and approval requirements are satisfied.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 8 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

@@ -4,6 +4,9 @@ id: story:the-os-keyring-becomes-the-local-store
 kind: story
 status: active
 title: The OS keyring becomes the local credential store
+tags:
+- ready
+- wave-cli
 refs:
 - provider: legacy
   reference: S-036
@@ -12,7 +15,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connector-secrets
-revision: 4
+revision: 6
 ---
 ## Acceptance
 
@@ -47,3 +50,7 @@ Migrated from `docs/stories/S-036-the-os-keyring-becomes-the-local-store.md`, wh
 - First written 2026-08-20 · last touched 2026-08-20 · 1 revision(s)
 - Legacy id `S-036`, recorded as the reference `legacy:S-036`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 5 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

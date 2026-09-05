@@ -2,14 +2,22 @@
 format: aep.planning-md/1
 id: story:the-claims-journal-survives-a-full-life
 kind: story
-status: draft
+status: proposed
 title: The claims journal survives a full life
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-050
 relations:
 - derived_from: epic:enforced-authority
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/connectors-runtime
+- confidence: inferred
+  path: docs/design/13-grant-evaluation-and-approval-redemption.md
+revision: 5
 ---
 ## Acceptance
 
@@ -44,3 +52,7 @@ Migrated from `docs/stories/S-050-the-claims-journal-survives-a-full-life.md`, w
 - First written 2026-08-23 · last touched 2026-08-23 · 1 revision(s)
 - Legacy id `S-050`, recorded as the reference `legacy:S-050`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 7 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

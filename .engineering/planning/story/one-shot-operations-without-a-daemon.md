@@ -2,9 +2,19 @@
 format: aep.planning-md/1
 id: story:one-shot-operations-without-a-daemon
 kind: story
-status: draft
+status: proposed
 title: One-shot operations without a daemon
-revision: 1
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-console
+- confidence: inferred
+  path: crates/connectors-runtime
+revision: 5
 ---
 # Story: one-shot operations without a daemon
 
@@ -36,3 +46,7 @@ In both, credentials never leave the connectors process; a caller still sees onl
 - With a daemon running, behaviour is unchanged (the socket is used).
 - `event receive` without a daemon is refused naming `connectors serve`.
 - `connectors doctor` names the verbs that need the daemon.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 2 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
