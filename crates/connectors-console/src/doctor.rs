@@ -101,6 +101,14 @@ impl Report {
 pub fn run(config_path: &Path, state_root: &Path) -> Report {
     let mut checks = Vec::new();
 
+    checks.push(Check::new(
+        "target",
+        Status::Ok,
+        format!(
+            "local by default: the next operation reaches {}; a saved login never changes the target; choose --target hosted explicitly",
+            state_root.join("connectors.sock").display()
+        ),
+    ));
     checks.push(check_config(config_path));
     checks.push(check_state_root(state_root));
     checks.extend(check_socket_budget(state_root));
@@ -351,6 +359,24 @@ fn which(program: &str) -> Option<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn doctor_names_the_default_local_target_and_its_socket() {
+        let root = tempfile::tempdir().unwrap();
+        let report = run(&root.path().join("missing.toml"), root.path()).to_value();
+        let target = report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|check| check["check"] == "target")
+            .expect("doctor explains target selection");
+        assert_eq!(target["status"], "ok");
+        let detail = target["detail"].as_str().unwrap();
+        assert!(detail.contains("local"));
+        assert!(detail.contains("--target hosted"));
+        assert!(detail.contains(root.path().join("connectors.sock").to_str().unwrap()));
+        assert!(detail.contains("login never changes"));
+    }
 
     #[test]
     fn the_budget_is_measured_against_the_deepest_path_the_daemon_binds() {

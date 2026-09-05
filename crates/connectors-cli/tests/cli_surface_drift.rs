@@ -223,7 +223,7 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ),
 ];
 
-const TARGET_EXCEPTIONS: &[&str] = &["connection", "event", "operation"];
+const TARGET_EXCEPTIONS: &[&str] = &[];
 
 fn repository_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -635,30 +635,24 @@ fn a_committed_tree_that_swaps_completions_for_an_undeclared_word_is_refused() {
     );
 }
 
-/// **`--target` on the group itself empties the countdown.**
+/// **Removing a group's `--target` reopens the countdown and is refused.**
 ///
-/// A flag that applies to every subcommand of `connection` is naturally declared on `connection`,
-/// not repeated on each leaf. When this case was written the contract read the leaves' arguments
-/// only and never saw such a flag, so the countdown that is supposed to reach zero when
-/// `story:explicit-target-never-implicit` lands would not have noticed that it landed. `carries_target`
-/// now reads a command's own arguments and its whole subtree, and this case is what holds it there.
+/// The explicit-target story closed the countdown. Renaming the flag on each group is the
+/// inverse mutation: the same contract must catch every group losing its declared target.
 #[test]
-fn a_target_flag_on_the_group_itself_is_seen_by_the_countdown() {
-    let drifted = connectors_cli::command().mut_subcommand("connection", |group| {
-        group.arg(
-            clap::Arg::new("target")
-                .long("target")
-                .value_parser(["local", "hosted"]),
-        )
-    });
-    let refusals = contract_refusals(&drifted, &committed_tree());
-    assert!(
-        refusals
-            .iter()
-            .any(|refusal| refusal.contains("`connection` now carries `--target`")),
-        "`connectors connection --target …` is declared and the `--target` countdown did not \
-         notice; refusals were: {refusals:?}"
-    );
+fn a_target_flag_removed_from_a_group_is_refused_by_the_countdown() {
+    for name in ["connection", "event", "operation"] {
+        let drifted = connectors_cli::command().mut_subcommand(name, |group| {
+            group.mut_arg("target", |argument| argument.long("formerly-target"))
+        });
+        let refusals = contract_refusals(&drifted, &committed_tree());
+        assert!(
+            refusals.iter().any(|refusal| refusal.contains(&format!(
+                "`{name}` still owes `--target` and is not on the allowlist"
+            ))),
+            "removing --target from {name} escaped the countdown: {refusals:?}"
+        );
+    }
 }
 
 /// **Cutting one group over to the generated tree is refused, and the design document now says so.**
