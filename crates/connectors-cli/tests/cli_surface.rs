@@ -3024,3 +3024,258 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
         }
     }
 }
+
+fn adversary_target_leaves() -> Vec<Vec<&'static str>> {
+    vec![
+        vec![
+            "connection",
+            "candidates",
+            "--integration",
+            "fixture.integration",
+        ],
+        vec![
+            "connection",
+            "activate",
+            "--candidate",
+            "fixture.candidate",
+            "--label",
+            "fixture",
+        ],
+        vec!["connection", "list"],
+        vec![
+            "connection",
+            "observations",
+            "--source",
+            "fixture.connection",
+        ],
+        vec![
+            "connection",
+            "materialize",
+            "--observation",
+            "fixture.observation",
+        ],
+        vec!["event", "search"],
+        vec![
+            "event",
+            "receive",
+            "--channel",
+            "fixture.channel",
+            "--wait-ms",
+            "0",
+        ],
+        vec!["event", "replay", "--event", "fixture.event"],
+        vec!["operation", "search"],
+        vec!["operation", "describe", "--operation", "fixture.operation"],
+        vec![
+            "operation",
+            "signal",
+            "--execution-ref",
+            "fixture.execution",
+            "--dtmf",
+            "1",
+        ],
+        vec![
+            "operation",
+            "invoke",
+            "--operation",
+            "fixture.operation",
+            "--connection",
+            "fixture.connection",
+            "--description-ref",
+            "fixture.description",
+            "--input-json",
+            "{\"target\":\"provider\"}",
+        ],
+    ]
+}
+
+#[test]
+fn all_target_conflicts_precede_local_and_hosted_state_access() {
+    let fixture = TargetFixture::new(true);
+    std::fs::write(
+        fixture
+            .root
+            .join("s/b10x/connectors/identity-sessions.json"),
+        "broken",
+    )
+    .unwrap();
+    std::fs::write(fixture.root.join("c/b10x/connectors.toml"), "broken").unwrap();
+    let absent = fixture.root.join("must-not-be-created");
+    for leaf in adversary_target_leaves() {
+        for option in ["--config", "--state-root"] {
+            for before_leaf in [false, true] {
+                let mut arguments = vec!["-o", "json", leaf[0]];
+                if before_leaf {
+                    arguments.extend(["--target=hosted"]);
+                }
+                arguments.extend_from_slice(&leaf[1..]);
+                if !before_leaf {
+                    arguments.extend(["--target=hosted"]);
+                }
+                arguments.extend([option, absent.to_str().unwrap()]);
+                let (success, value) = fixture.json(&arguments);
+                assert!(!success, "{arguments:?}");
+                assert_eq!(value["target"], "hosted", "{arguments:?}: {value}");
+                assert_eq!(
+                    value["error"]["code"], "target-conflict",
+                    "{arguments:?}: {value}"
+                );
+                assert!(
+                    !absent.exists(),
+                    "target conflict created local state: {arguments:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn broken_explicit_hosted_selection_never_falls_back_to_a_local_listener() {
+    use std::io::{BufRead as _, Write as _};
+    use std::os::unix::net::UnixListener;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+    let fixture = TargetFixture::new(true);
+    let state = fixture.root.join("s/b10x/connectors");
+    std::fs::write(state.join("identity-sessions.json"), "broken").unwrap();
+    let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let done = Arc::new(AtomicBool::new(false));
+    let worker_done = Arc::clone(&done);
+    let worker = std::thread::spawn(move || {
+        let mut requests = Vec::new();
+        while !worker_done.load(Ordering::SeqCst) {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream
+                        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                        .unwrap();
+                    let mut line = String::new();
+                    std::io::BufReader::new(&stream)
+                        .read_line(&mut line)
+                        .unwrap();
+                    let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+                    let response = serde_json::json!({"protocol": request["protocol"], "request_id": request["request_id"], "status": "error", "error": {"code": "not_found", "message": "local fixture reached", "retriable": false}});
+                    writeln!(stream, "{response}").unwrap();
+                    requests.push(request);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(std::time::Duration::from_millis(5))
+                }
+                Err(error) => panic!("fixture accept failed: {error}"),
+            }
+        }
+        requests
+    });
+    let observed: Vec<_> = adversary_target_leaves()
+        .into_iter()
+        .map(|leaf| {
+            let mut arguments = vec!["-o", "json"];
+            arguments.extend_from_slice(&leaf);
+            arguments.extend(["--target", "hosted"]);
+            (leaf, fixture.json(&arguments))
+        })
+        .collect();
+    done.store(true, Ordering::SeqCst);
+    let local_requests = worker.join().unwrap();
+    assert!(
+        local_requests.is_empty(),
+        "explicit hosted reached local transport: {local_requests:?}"
+    );
+    for (leaf, (success, value)) in observed {
+        assert!(!success, "{leaf:?}");
+        assert_eq!(value["target"], "hosted", "{leaf:?}: {value}");
+        assert_eq!(value["error"]["code"], "identity", "{leaf:?}: {value}");
+    }
+}
+
+#[test]
+fn selected_target_preserves_provider_owned_target_fields_in_every_renderer() {
+    use std::io::{BufRead as _, Write as _};
+    use std::os::unix::net::UnixListener;
+    for format in ["json", "yaml", "text", "compact"] {
+        let fixture = TargetFixture::new(true);
+        let state = fixture.root.join("s/b10x/connectors");
+        let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let worker = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && std::time::Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(5))
+                    }
+                    result => panic!("local fixture was not reached: {result:?}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+            let response = serde_json::json!({
+                "protocol": request["protocol"], "request_id": request["request_id"], "status": "ok",
+                "response": {"result": "invoke", "value": {"operation_ref": "fixture.operation", "connector_audit_ref": "fixture.audit", "output": {"target": "provider-owned", "nested": {"target": "nested-owned"}}}}
+            });
+            writeln!(stream, "{response}").unwrap();
+        });
+        let output = fixture.run(&[
+            "-o",
+            format,
+            "operation",
+            "invoke",
+            "--operation",
+            "fixture.operation",
+            "--connection",
+            "fixture.connection",
+            "--description-ref",
+            "fixture.description",
+            "--input-json",
+            "{}",
+        ]);
+        worker.join().unwrap();
+        assert!(
+            output.status.success(),
+            "{format}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        match format {
+            "json" | "yaml" => {
+                let value: serde_json::Value = if format == "json" {
+                    serde_json::from_slice(&output.stdout).unwrap()
+                } else {
+                    serde_norway::from_slice(&output.stdout).unwrap()
+                };
+                assert_eq!(value["target"], "local");
+                assert_eq!(value["output"]["target"], "provider-owned");
+                assert_eq!(value["output"]["nested"]["target"], "nested-owned");
+                assert_eq!(value["connector_audit_ref"], "fixture.audit");
+            }
+            "text" => {
+                let text = String::from_utf8(output.stdout).unwrap();
+                assert!(text.lines().any(|line| line == "target: local"), "{text}");
+                assert!(text.contains("target: provider-owned"), "{text}");
+                assert!(text.contains("target: nested-owned"), "{text}");
+            }
+            "compact" => {
+                let text = String::from_utf8(output.stdout).unwrap();
+                assert!(
+                    text.trim().split('\t').any(|field| field == "target=local"),
+                    "{text}"
+                );
+                assert!(text.contains("output.target=provider-owned"), "{text}");
+                assert!(text.contains("output.nested.target=nested-owned"), "{text}");
+            }
+            _ => unreachable!(),
+        }
+    }
+}
