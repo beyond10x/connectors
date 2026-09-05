@@ -1,6 +1,6 @@
-# Design 01: the domain model
+# Domain model (design reference)
 
-**Status:** draft for review · **Date:** 2026-08-13
+**Status:** draft for review · **Date:** 2026-08-13 · **2026-09-05 reading guide:** [Current system overview](../architecture/README.md).
 **Inputs:** [VISION.md](../VISION.md) ·
 [research/unified-api-platforms.md](../research/unified-api-platforms.md) ·
 [research/catalog-precedents.md](../research/catalog-precedents.md) · the measured entity

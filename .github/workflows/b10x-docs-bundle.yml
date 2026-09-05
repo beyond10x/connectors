@@ -9,6 +9,7 @@ on:
       - 'README.md'
       - 'b10x.docs.yaml'
       - 'changes/**/*.yaml'
+      - 'docs/architecture/*.md'
       - 'docs/design/01-domain-model.md'
       - 'docs/design/02-architecture.md'
       - 'docs/design/18-governed-outbound-mcp-services.md'
