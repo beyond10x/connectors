@@ -2,7 +2,7 @@
 name = "driver-sql"
 description = "Closed built-in sql_v1 driver: bounded read-only queries and schema inventory against MySQL and PostgreSQL over their native wire protocols."
 edition = "2021"
-version = "0.6.3"
+version = "0.6.4"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -14,7 +14,7 @@ resolver = "3"
 members = ["."]
 
 [dependencies]
-protocol = { version = "0.6.0", path = "../protocol" }
+protocol = { version = "0.6.4", path = "../protocol" }
 thiserror = "2"
 # The resolved credential lives in memory as briefly as possible and never survives a drop.
 zeroize = "1"

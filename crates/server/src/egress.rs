@@ -5,8 +5,10 @@
 //! transport. Redirects and ambient proxies are disabled, so neither a caller nor a later DNS
 //! answer can move a credential-bearing request outside the Connection's aperture.
 
+use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use futures_util::{SinkExt as _, StreamExt as _};
@@ -35,6 +37,8 @@ const MAX_REQUEST_BYTES: usize = 256 * 1024;
 const MAX_REQUEST_HEADERS: usize = 64;
 const MAX_URL_BYTES: usize = 8 * 1024;
 const MAX_STREAM_RESPONSE_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_POOLED_DESTINATIONS: usize = 64;
+const POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Address classes admitted after DNS resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,6 +132,24 @@ impl DestinationRule {
 #[derive(Debug, Clone)]
 pub struct ConnectionEgress {
     rules: Vec<DestinationRule>,
+    // The policy is immutable; clones share only this bounded connection cache. Neither current
+    // authority nor credentials are cached, and DNS/address policy runs before every lookup.
+    clients: Arc<Mutex<BTreeMap<ClientKey, PooledClient>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ClientKey {
+    authority_ref: String,
+    scheme: String,
+    host: String,
+    port: u16,
+    addresses: Vec<SocketAddr>,
+}
+
+#[derive(Debug)]
+struct PooledClient {
+    client: Arc<reqwest::Client>,
+    used_at: Instant,
 }
 
 impl ConnectionEgress {
@@ -135,7 +157,10 @@ impl ConnectionEgress {
         if rules.is_empty() {
             return Err(EgressError::InvalidRule);
         }
-        Ok(Self { rules })
+        Ok(Self {
+            rules,
+            clients: Arc::new(Mutex::new(BTreeMap::new())),
+        })
     }
 
     /// Resolve every exact rule during startup. Suffix rules are necessarily resolved only after
@@ -165,11 +190,38 @@ impl ConnectionEgress {
     ) -> Result<RequestBuilder, EgressError> {
         validate_authority_ref(authority_ref)?;
         let destination = self.resolve(&url).await?;
+        let client = self.client_for_resolved(authority_ref, &url, &destination)?;
+        Ok(client.request(method, url).timeout(timeout))
+    }
+
+    fn client_for_resolved(
+        &self,
+        authority_ref: &str,
+        url: &Url,
+        destination: &ResolvedDestination,
+    ) -> Result<Arc<reqwest::Client>, EgressError> {
+        let key = ClientKey {
+            authority_ref: authority_ref.to_owned(),
+            scheme: url.scheme().to_owned(),
+            host: destination.host.clone(),
+            port: url
+                .port_or_known_default()
+                .ok_or(EgressError::DestinationDenied)?,
+            addresses: destination.addresses.clone(),
+        };
+        let now = Instant::now();
+        let mut clients = self.clients.lock().map_err(|_| EgressError::Transport)?;
+        clients.retain(|_, entry| now.saturating_duration_since(entry.used_at) < POOL_IDLE_TIMEOUT);
+        if let Some(entry) = clients.get_mut(&key) {
+            entry.used_at = now;
+            return Ok(entry.client.clone());
+        }
         let mut builder = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(timeout)
+            .pool_idle_timeout(POOL_IDLE_TIMEOUT)
+            .pool_max_idle_per_host(2)
             .user_agent(USER_AGENT);
         if url
             .host()
@@ -178,7 +230,24 @@ impl ConnectionEgress {
             builder = builder.resolve_to_addrs(&destination.host, &destination.addresses);
         }
         let client = builder.build().map_err(|_| EgressError::Transport)?;
-        Ok(client.request(method, url))
+        if clients.len() >= MAX_POOLED_DESTINATIONS {
+            if let Some(oldest) = clients
+                .iter()
+                .min_by_key(|(_, entry)| entry.used_at)
+                .map(|(key, _)| key.clone())
+            {
+                clients.remove(&oldest);
+            }
+        }
+        let client = Arc::new(client);
+        clients.insert(
+            key,
+            PooledClient {
+                client: client.clone(),
+                used_at: now,
+            },
+        );
+        Ok(client)
     }
 
     /// Connect a WebSocket to a post-DNS-pinned address while retaining the admitted hostname for
@@ -699,6 +768,165 @@ fn is_v6_documentation(ip: Ipv6Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pool() -> ConnectionEgress {
+        ConnectionEgress::new(vec![DestinationRule::exact_origin(
+            "https://provider.example.test",
+            AddressScope::Public,
+        )
+        .unwrap()])
+        .unwrap()
+    }
+
+    fn destination(address: [u8; 4]) -> ResolvedDestination {
+        ResolvedDestination {
+            host: "provider.example.test".to_owned(),
+            addresses: vec![SocketAddr::from((address, 443))],
+        }
+    }
+
+    #[test]
+    fn pool_is_bounded_and_separates_current_addresses_authorities_origins_and_policy() {
+        let pool = pool();
+        let url = Url::parse("https://provider.example.test/one").unwrap();
+        let destination = destination([93, 184, 216, 34]);
+        let client = pool
+            .client_for_resolved("connection:one", &url, &destination)
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &client,
+            &pool
+                .clone()
+                .client_for_resolved("connection:one", &url, &destination)
+                .unwrap()
+        ));
+        assert!(!Arc::ptr_eq(
+            &client,
+            &pool
+                .client_for_resolved("connection:two", &url, &destination)
+                .unwrap()
+        ));
+        let changed = ResolvedDestination {
+            host: destination.host.clone(),
+            addresses: vec![SocketAddr::from(([93, 184, 216, 35], 443))],
+        };
+        assert!(!Arc::ptr_eq(
+            &client,
+            &pool
+                .client_for_resolved("connection:one", &url, &changed)
+                .unwrap()
+        ));
+        let changed_port = Url::parse("https://provider.example.test:8443/one").unwrap();
+        assert!(!Arc::ptr_eq(
+            &client,
+            &pool
+                .client_for_resolved("connection:one", &changed_port, &destination)
+                .unwrap()
+        ));
+        let another_policy = ConnectionEgress::new(pool.rules.clone()).unwrap();
+        assert!(!Arc::ptr_eq(
+            &client,
+            &another_policy
+                .client_for_resolved("connection:one", &url, &destination)
+                .unwrap()
+        ));
+        for index in 0..(MAX_POOLED_DESTINATIONS + 10) {
+            pool.client_for_resolved(&format!("connection:fixture-{index}"), &url, &destination)
+                .unwrap();
+        }
+        assert_eq!(pool.clients.lock().unwrap().len(), MAX_POOLED_DESTINATIONS);
+        let mut clients = pool.clients.lock().unwrap();
+        for entry in clients.values_mut() {
+            entry.used_at = Instant::now() - POOL_IDLE_TIMEOUT;
+        }
+        drop(clients);
+        pool.client_for_resolved("connection:one", &url, &destination)
+            .unwrap();
+        assert_eq!(pool.clients.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_client_cannot_bypass_current_address_policy() {
+        let url = Url::parse("https://127.0.0.1/test").unwrap();
+        let pool = ConnectionEgress::new(vec![DestinationRule::exact_origin(
+            "https://127.0.0.1",
+            AddressScope::Public,
+        )
+        .unwrap()])
+        .unwrap();
+        let destination = ResolvedDestination {
+            host: "127.0.0.1".to_owned(),
+            addresses: vec![SocketAddr::from(([127, 0, 0, 1], 443))],
+        };
+        // Simulate an already-cached endpoint. The production entry point must still resolve
+        // and refuse today's answer before considering this client's existence.
+        pool.client_for_resolved("connection:one", &url, &destination)
+            .unwrap();
+        assert!(matches!(
+            pool.request("connection:one", Method::GET, url, REQUEST_TIMEOUT)
+                .await,
+            Err(EgressError::AddressDenied)
+        ));
+    }
+
+    #[tokio::test]
+    async fn reused_connection_keeps_authorization_and_timeout_request_specific() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let fixture = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut requests = Vec::new();
+            for _ in 0..2 {
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    socket.read_exact(&mut byte).await.unwrap();
+                    request.push(byte[0]);
+                    assert!(request.len() < 4096);
+                }
+                requests.push(String::from_utf8(request).unwrap());
+                socket
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+                    .await
+                    .unwrap();
+            }
+            requests
+        });
+        let pool = pool();
+        // Loopback HTTP exercises reqwest pooling without changing production TLS trust or
+        // destination admission. The private helper takes an already-admitted destination.
+        let url = Url::parse(&format!("http://{address}/fixture")).unwrap();
+        let destination = ResolvedDestination {
+            host: "127.0.0.1".to_owned(),
+            addresses: vec![address],
+        };
+        for (credential, timeout) in [
+            ("first", Duration::from_secs(2)),
+            ("second", Duration::from_secs(3)),
+        ] {
+            let client = pool
+                .client_for_resolved("connection:one", &url, &destination)
+                .unwrap();
+            let request = client
+                .get(url.clone())
+                .header("authorization", credential)
+                .timeout(timeout)
+                .build()
+                .unwrap();
+            assert_eq!(request.timeout(), Some(&timeout));
+            let response = client.execute(request).await.unwrap();
+            assert_eq!(response.bytes().await.unwrap().as_ref(), b"ok");
+        }
+        let requests = tokio::time::timeout(Duration::from_secs(2), fixture)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(requests[0].contains("authorization: first\r\n"));
+        assert!(!requests[0].contains("second"));
+        assert!(requests[1].contains("authorization: second\r\n"));
+        assert!(!requests[1].contains("first"));
+    }
 
     #[test]
     fn exact_origin_cannot_be_widened_by_path_host_or_userinfo() {
