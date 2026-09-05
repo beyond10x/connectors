@@ -4,6 +4,9 @@ id: story:sip-driver-terminates-one-governed-call
 kind: story
 status: active
 title: The SIP driver terminates one governed call
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-032
@@ -20,7 +23,7 @@ scope:
   path: crates/server
 - confidence: cited
   path: crates/service
-revision: 4
+revision: 6
 ---
 ## Acceptance
 
@@ -78,3 +81,7 @@ Migrated from `docs/stories/S-032-sip-driver-terminates-one-governed-call.md`, w
 - First written 2026-08-14 · last touched 2026-08-16 · 7 revision(s)
 - Legacy id `S-032`, recorded as the reference `legacy:S-032`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 9 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

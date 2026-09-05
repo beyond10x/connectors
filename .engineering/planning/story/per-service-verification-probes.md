@@ -2,14 +2,32 @@
 format: aep.planning-md/1
 id: story:per-service-verification-probes
 kind: story
-status: draft
+status: proposed
 title: A service declares how a credential is verified, and what a failure means
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-006
 relations:
 - derived_from: epic:catalog-adoptions
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/catalog
+- confidence: inferred
+  path: crates/catalog-build
+- confidence: inferred
+  path: crates/connector-resolve
+- confidence: inferred
+  path: crates/connector-spec
+- confidence: inferred
+  path: crates/connectors-console
+- confidence: inferred
+  path: crates/service
+- confidence: inferred
+  path: providers
+revision: 5
 ---
 ## Acceptance
 
@@ -59,3 +77,7 @@ Migrated from `docs/stories/S-006-per-service-verification-probes.md`, which is 
 - First written 2026-08-13 · last touched 2026-08-13 · 1 revision(s)
 - Legacy id `S-006`, recorded as the reference `legacy:S-006`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 4 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

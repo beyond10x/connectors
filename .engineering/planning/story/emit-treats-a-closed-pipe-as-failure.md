@@ -2,15 +2,18 @@
 format: aep.planning-md/1
 id: story:emit-treats-a-closed-pipe-as-failure
 kind: story
-status: draft
+status: proposed
 title: A reader that closes the pipe early makes connectors exit non-zero
 summary: emit returns Err(BrokenPipe) and only the completions subcommand maps it to success, so piping into head fails above the pipe buffer.
+tags:
+- ready
+- wave-cli
 scope:
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: cited
   path: crates/connectors-console/src/output.rs
-revision: 2
+revision: 5
 ---
 ## Context
 
@@ -38,3 +41,7 @@ Reachability moved in the opposite direction this week. The CLI output readabili
 `providers` text output from roughly 40 KiB to roughly 14 KiB, which is below the pipe buffer, so
 the defect became harder to hit rather than easier. It is still wrong: `head`, `less` and a reader
 that stops early are ordinary, and the output grows with the catalogue.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 10 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

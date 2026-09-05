@@ -2,9 +2,31 @@
 format: aep.planning-md/1
 id: story:rate-limit-in-the-protocol
 kind: story
-status: draft
+status: proposed
 title: A provider's rate limit is a protocol fact, not a sentence
-revision: 1
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: catalog/slack.catalog.json
+- confidence: inferred
+  path: connectors.lock
+- confidence: inferred
+  path: crates/catalog-build
+- confidence: inferred
+  path: crates/connector-spec
+- confidence: inferred
+  path: crates/connectors-runtime
+- confidence: inferred
+  path: crates/integration-catalog
+- confidence: inferred
+  path: crates/integration-slack
+- confidence: inferred
+  path: crates/protocol
+- confidence: inferred
+  path: providers/slack.toml
+revision: 5
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -23,3 +45,7 @@ org-brain ledger walked 530 pages in one run and hit 51 such refusals) has to ma
 ## Acceptance
 - A 429 with `Retry-After: 30` is returned as `rate_limited` with `retry_after_seconds: 30`.
 - `slack-conversations-history` `describe` names the interval Slack's tier implies.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 9 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

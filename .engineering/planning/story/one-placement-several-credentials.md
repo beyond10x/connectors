@@ -2,9 +2,27 @@
 format: aep.planning-md/1
 id: story:one-placement-several-credentials
 kind: story
-status: draft
+status: proposed
 title: One placement, several credentials, a Connection per identity
-revision: 1
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: crates/connector-secrets
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-config
+- confidence: inferred
+  path: crates/connectors-config/src/personal.rs
+- confidence: inferred
+  path: crates/connectors-console
+- confidence: inferred
+  path: crates/integration-catalog
+- confidence: inferred
+  path: docs/guides/connect-slack.md
+revision: 5
 ---
 # Story: one placement, several credentials, a Connection per identity
 
@@ -35,3 +53,7 @@ holds five credential slots per instance, so the storage knows, the placement mo
   user one succeed on a public channel the bot is not in; `slack-chat-post-message` is offered on
   the bot one only.
 - An adopter's configuration that names one credential is unchanged in behaviour.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 6 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
