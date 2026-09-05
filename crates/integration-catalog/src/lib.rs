@@ -57,6 +57,7 @@ use service::{
 use sha2::{Digest as _, Sha256};
 
 mod config;
+mod confluence_reads;
 pub use config::DeclaredConfig;
 mod hosted;
 pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
@@ -489,6 +490,10 @@ impl Inner {
             )
         })?;
 
+        if operation_ref == "confluence-page-search" {
+            confluence_reads::validate_input(&input)?;
+        }
+
         let assembly = connector_resolve::assemble_credentials(
             operation,
             binding.provider,
@@ -601,6 +606,11 @@ impl Inner {
         let output = serde_json::from_slice(&response.body).unwrap_or_else(|_| {
             serde_json::Value::String(String::from_utf8_lossy(&response.body).into_owned())
         });
+        let output = if operation_ref == "confluence-page-search" {
+            confluence_reads::project(output)?
+        } else {
+            output
+        };
 
         Ok(InvocationResult {
             operation_ref: operation_ref.to_owned(),
