@@ -18,6 +18,8 @@ credential storage, and supported provider paths differ.
 
 ```mermaid
 flowchart TB
+    accTitle: Local and hosted deployments bind their own authority and storage
+    accDescr: Local access uses the owner boundary; hosted access uses Identity. Each deployment supplies its own credentials, state, and configured adapters.
     subgraph Local[Personal-local]
         owner[Local owner] --> local[Local runtime and socket]
         local --> localstore[Owner-bound state and credentials]
@@ -45,6 +47,21 @@ deployments. Each runtime supplies its own configuration and storage bindings.
 
 The project is pre-v1. A catalogued provider or local driver does not imply an equivalent hosted
 Integration is enabled. Full SaaS and satellite federation are not current deployment guarantees.
+
+## The example: hosted prerequisites
+
+The C1/E1/D1/A1 [Slack example](README.md#follow-one-slack-mention) assumes an enabled hosted Slack
+Integration, the configured workspace, C1's credentials in Vault-backed custody, and its running
+Socket Mode supervisor. The product must hold the person's admitted event authority to read E1.
+
+To attempt a reply, the deployment also needs a bound Grant/approval state store, a trusted approval
+issuer, and a Grant admitting the write through C1. Human approval issuance and the later invocation
+use their respective Identity scopes. Missing authority storage is an outage, not permission to
+skip a check.
+
+The [Slack guide](../guides/connect-slack.md) distinguishes organization bots, delegated users,
+and companion Connections. A local setup command does not provision this hosted arrangement.
+The local event-reference claim journal and the hosted approval gate are different runtime bindings.
 
 ## Install and inspect
 
