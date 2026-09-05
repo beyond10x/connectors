@@ -1,14 +1,14 @@
 <!--
   generated from connectors v1
-  model digest 5849d9d17106bb6c8f9f7331f9c1fcf8d8addd0506851273b950db073eacb81b
-  contract digest ec905bc6d63ad79ca30a539c0a27a4d8c83bd41b4d0909594faa9ae6f34ab91e
+  model digest 3dd38aa4aa8dfa6484eef894f4ef64554a34471416cb728ac32b8d147f5d15fa
+  contract digest ff324d008163ada73d593ae301c90ed7c76016fae2fd068827f423f4603d8b6c
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-158 capabilities: **142 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+162 capabilities: **146 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -69,6 +69,10 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.event.SubscriptionRef` |
 | domain type | `connectors.event.Webhook.State` |
 | domain type | `connectors.event.WebhookRef` |
+| domain type | `connectors.inventory.ContainerImage` |
+| domain type | `connectors.inventory.DeploymentSummary` |
+| domain type | `connectors.inventory.NamespaceInventory` |
+| domain type | `connectors.inventory.WorkloadInventory` |
 | domain type | `connectors.runtime.ApprovalPosture` |
 | domain type | `connectors.runtime.Audit.State` |
 | domain type | `connectors.runtime.AuditRef` |

@@ -2,14 +2,28 @@
 format: aep.planning-md/1
 id: story:explicit-target-never-implicit
 kind: story
-status: draft
+status: active
 title: A command names its target; nothing infers it from a stored login
+tags:
+- ready
+- wave-cli
+- wave-platform
 relations:
 - derived_from: epic:cli-surface
 scope:
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
-revision: 2
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface_drift.rs
+- confidence: inferred
+  path: crates/connectors-console/src/doctor.rs
+- confidence: inferred
+  path: crates/connectors-console/src/output.rs
+- confidence: cited
+  path: docs/design/19-the-cli-surface.md
+revision: 16
 ---
 # Story: a command names its target; nothing infers it from a stored login
 
@@ -31,14 +45,13 @@ local by construction. The pattern exists in connectors only; `zwirn` and the pl
 the hosted client explicitly.
 
 ## Shape
-- A target is always explicit: `--target local|hosted` on the three verbs, or a named context
-  (`connectors context use <name>`, stored per machine, printed by `doctor` and in every result
-  envelope as `target:`). No target and both a login and a local state root present → refused
-  naming both, never a guess.
+- A target is always explicit: `--target local|hosted` on the three verbs, reported
+  in every dual-target result envelope as `target:`. Named contexts are deferred; an omitted target
+  means local regardless of stored login, as the acceptance below requires.
 - The default, when nothing is declared, is **local**. A hosted target is chosen, not fallen into.
 - `--config`/`--state-root` stop implying the target; they only say which local configuration and
   which socket, and are refused together with `--target hosted`.
-- `connectors login` prints which contexts now exist and that no command changed target.
+- `connectors login` prints the hosted deployment and that no command changed the default local target.
 - `doctor` gains a `target` check: which target the next `operation` would reach and why.
 
 ## Acceptance
@@ -47,3 +60,26 @@ the hosted client explicitly.
 - `--target hosted` reaches the login's deployment; without a login it is refused by name.
 - Every result envelope names the target it came from.
 - The old implicit route is gone: a test asserts the guard no longer exists.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 5 of 10; wave-cli: 1 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `crates/connectors-cli/src/lib.rs` — cited.
+- `crates/connectors-cli/tests/cli_surface.rs` — cited.
+- `crates/connectors-cli/tests/cli_surface_drift.rs` — cited.
+- `crates/connectors-console/src/doctor.rs` — inferred.
+- `crates/connectors-console/src/output.rs` — inferred.
+- `docs/design/19-the-cli-surface.md` — cited.
+
+High confidence. Parser/routing and CLI surface exception tests are cited. Resolve contradictory Shape wording in favor of Acceptance and existing ESS Target: omitted target always means local, even with login present. No named contexts in this unit. Dual-target connection/event/operation envelopes, including errors, report the chosen target. Hosted with local-only flags is refused; missing hosted login is named.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 2 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
