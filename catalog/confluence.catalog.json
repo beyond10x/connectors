@@ -1066,6 +1066,247 @@
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "confluence.service_api_token"
+        ],
+        [
+          "confluence.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Search permitted pages with CQL scoped to a space and lastmodified window. Dates use the authenticated account's configured timezone, not necessarily UTC: use a conservative overlap and filter version.when against the UTC cutoff. Follow only the cursor query value in _links.next, keeping CQL and limit unchanged; never fetch the returned URL directly. Expands version, body.storage and space. Stable identity is id plus version.number. Requires existing search:confluence read scope.",
+        "input_schema": {
+          "properties": {
+            "cql": {
+              "type": "string"
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "expand": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cql",
+            "limit",
+            "expand"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Search permitted pages with CQL scoped to a space and lastmodified window. Dates use the authenticated account's configured timezone, not necessarily UTC: use a conservative overlap and filter version.when against the UTC cutoff. Follow only the cursor query value in _links.next, keeping CQL and limit unchanged; never fetch the returned URL directly. Expands version, body.storage and space. Stable identity is id plus version.number. Requires existing search:confluence read scope.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "confluence-page-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cql",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "cql"
+        },
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "expand",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "enum": [
+              "version,body.storage,space"
+            ],
+            "type": "string"
+          },
+          "symbol": "expand"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "cql",
+            "value": {
+              "$param": "cql"
+            }
+          },
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "expand",
+            "value": {
+              "$param": "expand"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/content/search"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "_links": {
+            "properties": {
+              "base": {
+                "type": "string"
+              },
+              "next": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "properties": {
+                "_links": {
+                  "properties": {
+                    "base": {
+                      "type": "string"
+                    },
+                    "webui": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "body": {
+                  "properties": {
+                    "storage": {
+                      "properties": {
+                        "representation": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "space": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "version": {
+                  "properties": {
+                    "number": {
+                      "type": "integer"
+                    },
+                    "when": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "version"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "size",
+          "_links"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,

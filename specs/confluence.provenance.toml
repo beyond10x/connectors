@@ -1,0 +1,11 @@
+version = 1
+
+[[spec]]
+path = "specs/confluence/incremental-reads.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-09-05"
+reviewed_at = "2026-09-05"
+sha256 = "6356ba8ac26654a84a9fcb6fffefe0d464877c4cd61c652f879cb0ff14125d52"
+coverage = "exact-added-incremental-read-surface"
+purpose = "Source-grounded incremental reads and explicit continuation, projected through the existing provider and native or generic catalog runtime. Exact official endpoint references are recorded on each OpenAPI operation."
+references = ["https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-search-get", "https://developer.atlassian.com/cloud/confluence/cql-fields/#last-modified"]

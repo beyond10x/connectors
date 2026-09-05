@@ -56,7 +56,9 @@ pub(super) const USER_SCOPES: [&str; 4] = [
     "read:me",
     "write:jira-work",
 ];
-pub(super) const JIRA_OPERATIONS: [&str; 9] = [
+pub(super) const JIRA_OPERATIONS: [&str; 11] = [
+    "jira-issue-search",
+    "jira-project-list",
     "jira-issue-get",
     "jira-issue-create",
     "jira-issue-comment-list",
@@ -283,10 +285,15 @@ impl ConnectorBackend for JiraBackend {
             OperationRequest::Describe(request) => is_jira_operation(&request.operation_ref),
             OperationRequest::Invoke(request) => {
                 is_jira_operation(&request.operation_ref)
-                    && lock(&self.inner.metadata)
-                        .connections
-                        .iter()
-                        .any(|connection| connection.connection_ref == request.connection_ref)
+                    && ((request.connection_ref == ORG_CONNECTION_REF
+                        && matches!(
+                            request.operation_ref.as_str(),
+                            "jira-issue-search" | "jira-project-list"
+                        ))
+                        || lock(&self.inner.metadata)
+                            .connections
+                            .iter()
+                            .any(|connection| connection.connection_ref == request.connection_ref))
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
