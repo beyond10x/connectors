@@ -2437,6 +2437,7 @@ dependencies = [
  "domain",
  "getrandom 0.3.4",
  "hex",
+ "jsonschema 0.33.0",
  "protocol",
  "rustix",
  "serde",
