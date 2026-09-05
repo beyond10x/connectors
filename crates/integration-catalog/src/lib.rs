@@ -8,7 +8,7 @@
 //! credential mechanisms, a declared verify probe, and an authority to address its credential by.
 //! It also had a 2,875-line hand-written Rust backend. So did Jira. So, in their own shapes, did
 //! Slack, Grafana and Kubernetes — and each grew its own copy of credential handling, its own
-//! dispatch, and its own idea of what an error is. Timo, on being shown the GitLab one:
+//! dispatch, and its own idea of what an error is. An operator, on being shown the GitLab one:
 //! *"WTF is there a backend for gitlab, it's just HTTP."*
 //!
 //! He is right, and the pieces to prove it were already committed:
@@ -355,7 +355,7 @@ impl Inner {
                 operation_ref: operation.id.to_owned(),
                 title: operation.id.to_owned(),
                 effect: effect_class(operation),
-                approval: ApprovalPosture::NotRequired,
+                approval: approval_posture(operation),
                 connections,
             })
             .collect()
@@ -366,16 +366,20 @@ impl Inner {
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no such catalogued operation"))?;
         // Any admitting Connection proves the operation is describable here; which one serves a
         // call is the caller's choice at invocation.
-        let binding = self.binding_for_operation(operation).ok_or_else(|| {
+        self.binding_for_operation(operation).ok_or_else(|| {
             refusal(
                 OperationErrorCode::NotFound,
                 "no Connection for its provider",
             )
         })?;
-        if !binding.admits(operation) {
+        if !self
+            .bindings
+            .iter()
+            .any(|binding| binding.provider.id == operation.provider && binding.admits(operation))
+        {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
-                "this Connection's grant admits reads only; connect with --allow writes to raise it",
+                "no Connection admits this operation",
             ));
         }
         let description_ref = lease_ref(operation_ref);
@@ -396,7 +400,7 @@ impl Inner {
                 .unwrap_or(serde_json::Value::Null),
             output_schema: serde_json::Value::Null,
             effect: effect_class(operation),
-            approval: ApprovalPosture::NotRequired,
+            approval: approval_posture(operation),
             // Every Connection that could serve it, so a caller reading one description can pick.
             connections: self
                 .bindings
@@ -680,6 +684,13 @@ fn effect_class(operation: &catalog::Operation) -> EffectClass {
     }
 }
 
+fn approval_posture(operation: &catalog::Operation) -> ApprovalPosture {
+    match effect_class(operation) {
+        EffectClass::ReadOnly => ApprovalPosture::NotRequired,
+        EffectClass::Mutating | EffectClass::Destructive => ApprovalPosture::Required,
+    }
+}
+
 /// The exact origins one configured provider will reach, for the deployment to admit.
 ///
 /// Computed from the catalogue rather than asked of the operator: a provider's services declare
@@ -846,8 +857,8 @@ fn connection_ref(provider: &str, name: &str) -> String {
 /// human name cannot be the address. Deriving one keeps the address stable across restarts — the
 /// same name always yields the same instance — with no registry mapping names to ids.
 ///
-/// **The provider is inside the domain separator**, not only the name. Without it `babelforce-bot`
-/// on Slack and `babelforce-bot` on another provider would derive the same instance, and two
+/// **The provider is inside the domain separator**, not only the name. Without it `support-bot`
+/// on Slack and `support-bot` on another provider would derive the same instance, and two
 /// unrelated credentials would collide at one address. This generalises the Slack-only derivation
 /// `integration-slack` arrived at first; the namespace is versioned so a later change to what goes
 /// into the digest cannot silently collide with ids an earlier build derived.
@@ -1200,12 +1211,8 @@ mod tests {
         assert!(origins.iter().all(|origin| origin.starts_with("https://")));
     }
 
-    #[test]
-    fn the_limit_drops_operations_rather_than_the_identities_that_serve_one() {
-        // The truncation bug this shape fixes: with three Slack identities, `--limit 1` used to
-        // report one operation reachable through one identity. An operation is one row; a caller
-        // choosing between identities needs to see all of them or it cannot choose.
-        let inner = Inner {
+    fn test_inner(bindings: Vec<Binding>) -> Inner {
+        Inner {
             owner: PrincipalContext::local(&protocol::operation::OwnerContext {
                 tenant_id: "local".to_owned(),
                 agent_id: "a".to_owned(),
@@ -1215,11 +1222,60 @@ mod tests {
                 authority_snapshot_sha256: "0".repeat(64),
             })
             .expect("a local principal"),
-            bindings: vec![named("first"), named("second"), named("third")],
+            bindings,
             secrets: std::sync::Arc::new(connector_secrets::MemoryStore::new()),
             egress: std::sync::Arc::new(RefusingEgress),
             leases: Mutex::new(BTreeMap::new()),
-        };
+        }
+    }
+
+    #[test]
+    fn a_read_only_first_connection_does_not_hide_an_admitted_write() {
+        let write = gitlab()
+            .operations
+            .iter()
+            .find(|operation| !binding(false).admits(operation))
+            .unwrap();
+        let inner = test_inner(vec![named("reader"), named("writer").tap(true)]);
+        let description = inner
+            .describe(write.id)
+            .expect("the second connection admits it");
+        assert_eq!(description.connections.len(), 1);
+        assert_eq!(description.connections[0].label, "writer");
+        assert_eq!(description.approval, ApprovalPosture::Required);
+        assert_eq!(
+            test_inner(vec![named("reader")])
+                .describe(write.id)
+                .unwrap_err()
+                .code,
+            OperationErrorCode::NotGranted
+        );
+    }
+
+    #[test]
+    fn search_and_describe_require_approval_for_every_admitted_write() {
+        let inner = test_inner(vec![binding(true)]);
+        let rows = inner.search("", u16::MAX);
+        assert!(!rows.is_empty());
+        for row in rows {
+            let expected = match row.effect {
+                EffectClass::ReadOnly => ApprovalPosture::NotRequired,
+                EffectClass::Mutating | EffectClass::Destructive => ApprovalPosture::Required,
+            };
+            assert_eq!(row.approval, expected, "{}", row.operation_ref);
+            assert_eq!(
+                inner.describe(&row.operation_ref).unwrap().approval,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn the_limit_drops_operations_rather_than_the_identities_that_serve_one() {
+        // The truncation bug this shape fixes: with three Slack identities, `--limit 1` used to
+        // report one operation reachable through one identity. An operation is one row; a caller
+        // choosing between identities needs to see all of them or it cannot choose.
+        let inner = test_inner(vec![named("first"), named("second"), named("third")]);
         let rows = inner.search("gitlab-user-get", 1);
         assert_eq!(rows.len(), 1, "one operation");
         assert_eq!(
@@ -1231,12 +1287,11 @@ mod tests {
 
     #[test]
     fn two_named_instances_of_one_provider_get_different_addresses() {
-        // The property Timo's two Slack identities need: babelforce-bot and timo-ai are the same
-        // provider, the same tenant and the same credential name, and must not collide.
+        // Two bot identities with the same provider, tenant and credential name must not collide.
         let mut first = entry("slack", &[]);
-        first.instance = Some("babelforce-bot".to_owned());
+        first.instance = Some("support-bot".to_owned());
         let mut second = entry("slack", &[]);
-        second.instance = Some("timo-ai".to_owned());
+        second.instance = Some("assistant-bot".to_owned());
         let a = credential_address("local", "com.slack.api", &first, "bot_token").unwrap();
         let b = credential_address("local", "com.slack.api", &second, "bot_token").unwrap();
         assert!(a.instance().is_some() && b.instance().is_some());
