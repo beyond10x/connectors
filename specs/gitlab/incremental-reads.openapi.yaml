@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: GitLab incremental activity reads (repository-authored)
+  version: '2026-09-05'
+x-b10x-origin: repository-authored
+x-b10x-coverage: project pipeline, deployment and selected-branch commit lists
+servers:
+  - url: https://gitlab.example.test/api/v4
+security:
+  - bearer: []
+paths:
+  /projects/{project_id}/pipelines:
+    get:
+      operationId: gitlab-pipeline-list
+      summary: Read one bounded project activity page
+      x-b10x-source-reference: https://docs.gitlab.com/api/pipelines/#list-project-pipelines
+      x-b10x-pagination-reference: https://docs.gitlab.com/api/rest/#pagination
+      description: Native projection returns items and next_page from X-Next-Page; overlap retains IDs and timestamps or immutable commit SHA. An invalid or non-advancing continuation is refused. HTTP arrays never include the envelope; the native adapter adds it.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: updated_after
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+        - name: updated_before
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+        - name: ref
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: One array page, with X-Next-Page continuation; user and author objects are never projected by the native adapter.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+              description: Next page number, or empty when complete.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: [integer, string]}
+                    sha: {type: string}
+                    ref: {type: string}
+                    status: {type: string}
+                    created_at: {type: string}
+                    updated_at: {type: string}
+                    committed_date: {type: string}
+                    web_url: {type: string}
+        '401': {description: Expired credential; refused, not an empty page}
+        '403': {description: Missing read permission}
+        '429': {description: Rate limited; retryable failure with no completed watermark}
+  /projects/{project_id}/deployments:
+    get:
+      operationId: gitlab-deployment-list
+      summary: Read one bounded project activity page
+      x-b10x-source-reference: https://docs.gitlab.com/api/deployments/#list-all-project-deployments
+      x-b10x-pagination-reference: https://docs.gitlab.com/api/rest/#pagination
+      description: Native projection returns items and next_page from X-Next-Page; overlap retains IDs and timestamps or immutable commit SHA. An invalid or non-advancing continuation is refused. HTTP arrays never include the envelope; the native adapter adds it.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: updated_after
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+        - name: updated_before
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: One array page, with X-Next-Page continuation; user and author objects are never projected by the native adapter.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+              description: Next page number, or empty when complete.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: [integer, string]}
+                    sha: {type: string}
+                    ref: {type: string}
+                    status: {type: string}
+                    created_at: {type: string}
+                    updated_at: {type: string}
+                    committed_date: {type: string}
+                    web_url: {type: string}
+        '401': {description: Expired credential; refused, not an empty page}
+        '403': {description: Missing read permission}
+        '429': {description: Rate limited; retryable failure with no completed watermark}
+  /projects/{project_id}/repository/commits:
+    get:
+      operationId: gitlab-repository-commit-list
+      summary: Read one bounded project activity page
+      x-b10x-source-reference: https://docs.gitlab.com/api/commits/#list-repository-commits
+      x-b10x-pagination-reference: https://docs.gitlab.com/api/rest/#pagination
+      description: Native projection returns items and next_page from X-Next-Page; overlap retains IDs and timestamps or immutable commit SHA. An invalid or non-advancing continuation is refused. HTTP arrays never include the envelope; the native adapter adds it.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: ref_name
+          in: query
+          required: true
+          schema: {type: string}
+        - name: since
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+        - name: until
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: One array page, with X-Next-Page continuation; user and author objects are never projected by the native adapter.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+              description: Next page number, or empty when complete.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: [integer, string]}
+                    sha: {type: string}
+                    ref: {type: string}
+                    status: {type: string}
+                    created_at: {type: string}
+                    updated_at: {type: string}
+                    committed_date: {type: string}
+                    web_url: {type: string}
+        '401': {description: Expired credential; refused, not an empty page}
+        '403': {description: Missing read permission}
+        '429': {description: Rate limited; retryable failure with no completed watermark}
+  /projects:
+    get:
+      operationId: gitlab-project-activity-list
+      summary: List permitted project inventory and activity
+      x-b10x-source-reference: https://docs.gitlab.com/api/projects/#list-all-projects
+      x-b10x-pagination-reference: https://docs.gitlab.com/api/rest/#pagination
+      parameters:
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: last_activity_after
+          in: query
+          schema: {type: string, format: date-time}
+        - name: last_activity_before
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Native output preserves X-Next-Page and projects identity, name, path, default branch, last activity and browser URL.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: integer}
+                    name: {type: string}
+                    path_with_namespace: {type: string}
+                    default_branch: {type: [string, 'null']}
+                    last_activity_at: {type: string}
+                    web_url: {type: string}
+  /projects/{project_id}/issues:
+    get:
+      operationId: gitlab-issue-search
+      summary: Read a bounded page of changed issue records
+      x-b10x-source-reference: https://docs.gitlab.com/api/issues/#list-project-issues
+      x-b10x-projection: Both runtime placements preserve X-Next-Page in an items/next_page envelope, stable id, iid, project_id, updated_at and safe content fields. Person objects are omitted. Issue confidentiality and MR draft booleans remain explicit. Legacy list operations remain unchanged.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 4294967295}
+        - name: updated_after
+          in: query
+          schema: {type: string, format: date-time}
+        - name: updated_before
+          in: query
+          schema: {type: string, format: date-time}
+        - name: state
+          in: query
+          schema: {type: string, enum: ["opened", "closed", "all"]}
+      responses:
+        '200':
+          description: Inclusive updated window, with pagination retained from X-Next-Page. Follow every page before completing a watermark; vendor default ordering applies.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {type: array, items: {type: object, properties: {id: {type: integer}, iid: {type: integer}, project_id: {type: integer}, updated_at: {type: string}}}}
+
+  /projects/{project_id}/merge_requests:
+    get:
+      operationId: gitlab-merge-request-search
+      summary: Read a bounded page of changed merge-request records
+      x-b10x-source-reference: https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests
+      x-b10x-projection: Both runtime placements preserve X-Next-Page in an items/next_page envelope, stable id, iid, project_id, updated_at and safe content fields. Person objects are omitted. Issue confidentiality and MR draft booleans remain explicit. Legacy list operations remain unchanged.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: integer, minimum: 1}
+        - name: per_page
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 4294967295}
+        - name: updated_after
+          in: query
+          schema: {type: string, format: date-time}
+        - name: updated_before
+          in: query
+          schema: {type: string, format: date-time}
+        - name: state
+          in: query
+          schema: {type: string, enum: ["opened", "closed", "locked", "merged", "all"]}
+      responses:
+        '200':
+          description: Inclusive updated window, with pagination retained from X-Next-Page. Follow every page before completing a watermark; vendor default ordering applies.
+          headers:
+            X-Next-Page:
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {type: array, items: {type: object, properties: {id: {type: integer}, iid: {type: integer}, project_id: {type: integer}, updated_at: {type: string}}}}
+
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, description: Reuses existing GitLab delegated OAuth or PAT credential with read_api or api.}

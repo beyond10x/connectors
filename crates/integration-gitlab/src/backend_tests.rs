@@ -9,6 +9,20 @@ mod tests {
     use connector_state::StateStore as _;
     use service::{EgressTransportError, EgressWebSocket};
 
+    #[test]
+    fn incremental_activity_operations_are_read_only_and_discoverable() {
+        for id in [
+            "gitlab-project-activity-list",
+            "gitlab-pipeline-list",
+            "gitlab-deployment-list",
+            "gitlab-repository-commit-list",
+        ] {
+            assert!(is_gitlab_operation(id), "{id} must be discoverable");
+            assert_eq!(operation_effect(id), EffectClass::ReadOnly);
+            assert_eq!(operation_approval(id), ApprovalPosture::NotRequired);
+        }
+    }
+
     struct PagedProjectsEgress {
         calls: AtomicUsize,
         continuation: &'static str,
@@ -110,6 +124,42 @@ mod tests {
         .await
         .unwrap();
         (backend, egress)
+    }
+
+    #[tokio::test]
+    async fn incremental_reads_without_an_owned_read_connection_refuse_before_dispatch() {
+        let (backend, egress) = paged_backend("").await;
+        let context = PrincipalContext::hosted(
+            "tenant-one".to_owned(),
+            "person:owner".to_owned(),
+            "person:owner".to_owned(),
+            Some("owner@example.test".to_owned()),
+            "snapshot:current".to_owned(),
+            "a".repeat(64),
+        )
+        .unwrap();
+        for id in [
+            "gitlab-pipeline-list",
+            "gitlab-deployment-list",
+            "gitlab-repository-commit-list",
+        ] {
+            let error = backend
+                .inner
+                .invoke(
+                    &context,
+                    InvokeRequest {
+                        operation_ref: id.to_owned(),
+                        connection_ref: "connection:ungranted".to_owned(),
+                        description_ref: "ungranted".to_owned(),
+                        input: serde_json::json!({"project_id":7,"per_page":2}),
+                        approval_evidence_ref: None,
+                    },
+                )
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, OperationErrorCode::NotGranted);
+        }
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
