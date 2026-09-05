@@ -80,6 +80,31 @@ Run the install command from a Connectors checkout. Inspection reports configura
 problems; it does not authorize a provider. Follow the [provider guides](../../README.md#connect-a-provider)
 to establish the Connection you need.
 
+### Update a running local daemon
+
+Installing a new executable does not replace an already-running daemon. From the reviewed source
+checkout containing the fix, run the source install above, then check which executable your shell
+selects:
+
+```bash
+command -v connectors
+connectors --version
+```
+
+Stop the daemon that owns the intended state root through its existing supervisor, or with Ctrl-C
+in the terminal running `connectors serve local`. Wait for that process to exit. Start the newly
+installed executable with the same absolute configuration and state-root paths shown under
+[Run a service](#run-a-service), then repeat the operation search and description from an ordinary
+CLI session using those same paths. Restart through the existing supervisor when it owns the
+process, and check that its executable path selects the new installation too.
+
+This restarts background channels and sessions owned by that daemon. Do not delete its state or
+socket to force a second process into the same root; the owner lock deliberately refuses that.
+`connectors --version` identifies the client executable, so it alone does not prove which build is
+serving requests. The stopped process and replacement launch establish that part of the update.
+Source installation is supported independently of the release archive schedule; use the reviewed
+source revision when a fix has not yet reached a published archive.
+
 ## Select the deployment
 
 A hosted client can record its deployment through login:
