@@ -336,6 +336,14 @@ pub(crate) struct KubernetesDeploymentSpec {
     pub(crate) replicas: i32,
     #[serde(default)]
     pub(crate) selector: KubernetesLabelSelector,
+    #[serde(default)]
+    pub(crate) template: KubernetesPodTemplate,
+}
+
+#[derive(Default, Deserialize)]
+pub(crate) struct KubernetesPodTemplate {
+    #[serde(default)]
+    pub(crate) spec: KubernetesPodSpec,
 }
 
 #[derive(Default, Deserialize)]
