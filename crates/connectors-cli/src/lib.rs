@@ -1179,6 +1179,23 @@ async fn operation(
     target: Target,
     command: OperationCommand,
 ) -> Result<(), MainError> {
+    // Resolve conflicting placement options before any branch can acquire caller input. This
+    // exhaustive match also makes each future operation variant participate in that check.
+    let (config_path, state_root) = match &command {
+        OperationCommand::Search {
+            config, state_root, ..
+        }
+        | OperationCommand::Describe {
+            config, state_root, ..
+        }
+        | OperationCommand::Signal {
+            config, state_root, ..
+        }
+        | OperationCommand::Invoke {
+            config, state_root, ..
+        } => (config, state_root),
+    };
+    target.validate(config_path, state_root)?;
     let (config_path, state_root, request) = match command {
         OperationCommand::Search {
             config,
@@ -1239,7 +1256,6 @@ async fn operation(
             )
         }
     };
-    target.validate(&config_path, &state_root)?;
     if target == Target::Hosted {
         let response = AuthenticatedHostedClient::active()?
             .operation(request)
