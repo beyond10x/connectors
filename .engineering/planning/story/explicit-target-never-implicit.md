@@ -2,14 +2,18 @@
 format: aep.planning-md/1
 id: story:explicit-target-never-implicit
 kind: story
-status: draft
+status: proposed
 title: A command names its target; nothing infers it from a stored login
+tags:
+- ready
+- wave-cli
+- wave-platform
 relations:
 - derived_from: epic:cli-surface
 scope:
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
-revision: 2
+revision: 5
 ---
 # Story: a command names its target; nothing infers it from a stored login
 
@@ -47,3 +51,7 @@ the hosted client explicitly.
 - `--target hosted` reaches the login's deployment; without a login it is refused by name.
 - Every result envelope names the target it came from.
 - The old implicit route is gone: a test asserts the guard no longer exists.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 5 of 10; wave-cli: 1 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

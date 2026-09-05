@@ -2,9 +2,19 @@
 format: aep.planning-md/1
 id: story:personal-local-workload-read
 kind: story
-status: draft
+status: proposed
 title: Personal-local Kubernetes serves a callable workload inventory
-revision: 2
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/integration-kubernetes/src/local.rs
+- confidence: inferred
+  path: crates/integration-kubernetes/src/local_workloads.rs
+revision: 6
 ---
 ## Context
 
@@ -66,3 +76,7 @@ Two shapes, and the choice is the first thing to settle:
    already answers, and the two would drift.
 
 Not implemented here by instruction; this story records the gap and the fork.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 7 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

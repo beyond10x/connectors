@@ -5,6 +5,9 @@ kind: story
 status: active
 title: Keep delegated GitLab reads alive across OAuth refresh
 summary: Rotate and durably commit GitLab OAuth credentials before expired user connections lose repository access.
+tags:
+- ready
+- wave-platform
 relations:
 - decomposes: epic:credential-production
 scope:
@@ -34,7 +37,7 @@ scope:
   path: crates/integration-gitlab/src/backend.rs
 - confidence: cited
   path: crates/integration-gitlab/src/backend_tests.rs
-revision: 5
+revision: 7
 ---
 ## Context
 
@@ -53,3 +56,7 @@ A live delegated GitLab OAuth connection remains discoverable after its two-hour
 - `crates/integration-gitlab/src/backend_tests.rs`
 - Connector protocol/product refusal mapping if required by the demonstrated failure.
 - Release metadata and live deployment evidence.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 6 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

@@ -4,6 +4,9 @@ id: story:neutral-rtvbp-bridges-the-call-to-an-application-channel
 kind: story
 status: active
 title: Neutral RTVBP bridges the call to an application channel
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-033
@@ -22,7 +25,7 @@ scope:
   path: crates/service
 - confidence: cited
   path: crates/voice-runtime
-revision: 4
+revision: 6
 ---
 ## Acceptance
 
@@ -77,3 +80,7 @@ Migrated from `docs/stories/S-033-neutral-rtvbp-bridges-the-call-to-an-applicati
 - First written 2026-08-14 · last touched 2026-08-15 · 8 revision(s)
 - Legacy id `S-033`, recorded as the reference `legacy:S-033`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 10 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
