@@ -449,3 +449,86 @@ async fn every_personal_incremental_read_classifies_expired_permission_and_rate_
         }
     }
 }
+
+#[tokio::test]
+async fn adversary_empty_optional_jira_description_is_a_valid_issue() {
+    let payload = json!({"issues":[{"id":"1","key":"PROJ-1","fields":{
+        "summary":"Issue without prose","status":{"name":"Open"},"issuetype":{"name":"Task"},
+        "updated":"2026-09-05T10:00:00Z","description":""}}],"isLast":true});
+    let (result, _) = invoke(
+        "jira",
+        "jira-issue-search",
+        json!({"project_key":"PROJ","updated_since_ms":0,"limit":1}),
+        200,
+        payload,
+    )
+    .await;
+    let output =
+        result.expect("an empty optional description must not block the complete issue page");
+    assert_eq!(output["issues"][0]["description"], "");
+}
+
+#[tokio::test]
+async fn adversary_comment_pages_preserve_missing_and_group_restriction_evidence() {
+    let comment = json!({"id":"3","body":"","created":"2026-09-05T10:00:00.000+0000",
+        "updated":"2026-09-05T10:00:00.000+0000","visibility":{"type":"group","identifier":"group-7","value":"Readers","members":[{"email":"PRIVATE-SENTINEL"}]}});
+    let (first, _) = invoke(
+        "jira",
+        "jira-issue-comments-read",
+        json!({"issue_key":"PROJ-1","limit":2}),
+        200,
+        json!({"comments":[comment.clone()],"startAt":0,"maxResults":2,"total":2}),
+    )
+    .await;
+    let first = first.unwrap();
+    assert_eq!(first["next_start_at"], 1);
+    assert!(first["comments"][0]["jsd_public"].is_null());
+    assert_eq!(first["comments"][0]["visibility"]["identifier"], "group-7");
+    assert!(!first.to_string().contains("PRIVATE-SENTINEL"));
+    let (last, _) = invoke(
+        "jira",
+        "jira-issue-comments-read",
+        json!({"issue_key":"PROJ-1","limit":2,"start_at":1}),
+        200,
+        json!({"comments":[comment],"startAt":1,"maxResults":2,"total":2}),
+    )
+    .await;
+    assert!(last.unwrap()["next_start_at"].is_null());
+    for payload in [
+        json!({"comments":[],"startAt":0,"maxResults":2,"total":1}),
+        json!({"comments":[],"startAt":0,"maxResults":0,"total":0}),
+    ] {
+        let (result, _) = invoke(
+            "jira",
+            "jira-issue-comments-read",
+            json!({"issue_key":"PROJ-1","limit":2}),
+            200,
+            payload,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().code, OperationErrorCode::Protocol);
+    }
+}
+
+#[tokio::test]
+async fn adversary_gitlab_update_searches_retain_confidential_and_draft_state() {
+    for (id, key) in [
+        ("gitlab-issue-search", "confidential"),
+        ("gitlab-merge-request-search", "draft"),
+    ] {
+        let mut item = json!({"id":2,"project_id":7,"description":"","updated_at":"2026-09-05T10:00:00Z","author":{"email":"PRIVATE-SENTINEL"}});
+        item[key] = json!(true);
+        let input = json!({"project_id":7,"per_page":1,"state":"all","updated_after":"2026-09-05T10:00:00+02:00","updated_before":"2026-09-06T10:00:00Z"});
+        let (result, transport) = invoke("gitlab", id, input, 200, json!([item])).await;
+        let output = result.unwrap();
+        assert_eq!(output["items"][0][key], true);
+        assert_eq!(output["items"][0]["description"], "");
+        assert!(!output.to_string().contains("PRIVATE-SENTINEL"));
+        let seen = transport.seen.lock().unwrap();
+        let target = url::Url::parse(&seen[0].request.url).unwrap();
+        let query: BTreeMap<_, _> = target.query_pairs().into_owned().collect();
+        assert_eq!(query["state"], "all");
+        assert_eq!(query["updated_after"], "2026-09-05T10:00:00+02:00");
+        assert_eq!(query["updated_before"], "2026-09-06T10:00:00Z");
+    }
+}
