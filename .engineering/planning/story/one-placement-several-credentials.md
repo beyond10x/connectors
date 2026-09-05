@@ -9,7 +9,11 @@ tags:
 - wave-cli
 scope:
 - confidence: cited
+  path: crates/connectors-config/src/lib.rs
+- confidence: cited
   path: crates/connectors-config/src/personal.rs
+- confidence: inferred
+  path: crates/connectors-config/src/personal/catalog.rs
 - confidence: cited
   path: crates/connectors-console/src/auth.rs
 - confidence: cited
@@ -17,17 +21,24 @@ scope:
 - confidence: inferred
   path: crates/connectors-console/src/output_tests.rs
 - confidence: cited
+  path: crates/connectors-runtime/tests/local_catalog_writes.rs
+- confidence: cited
   path: crates/integration-catalog/src/hosted.rs
 - confidence: cited
   path: crates/integration-catalog/src/lib.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/personal_connections.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/personal_connections_tests.rs
 - confidence: cited
   path: docs/guides/connect-slack.md
 - confidence: inferred
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/deployment.yaml
-revision: 31
+revision: 34
 ---
+
 # Story: one placement, several credentials, a Connection per identity
 
 ## Goal
@@ -68,6 +79,9 @@ Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 6
 Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
 
 - `crates/connectors-config/src/personal.rs` — cited.
+- `crates/connectors-config/src/personal/catalog.rs` — inferred: focused config extraction at the source-size fence.
+- `crates/integration-catalog/src/personal_connections.rs` — inferred: local binding/projection owner.
+- `crates/integration-catalog/src/personal_connections_tests.rs` — inferred: fixture cases.
 - `crates/integration-catalog/src/lib.rs` — cited.
 - `crates/integration-catalog/src/hosted.rs` — cited.
 - `crates/connectors-console/src/enrol.rs` — cited.
