@@ -22,34 +22,37 @@ satellite federation remain outside the current support claim.
 
 ```mermaid
 flowchart TB
-    caller[Application or agent] --> entry[CLI, HTTP, or MCP]
-    catalog[Reviewed provider catalog] --> service[Connectors service]
-    entry --> service
-    identity[Identity: hosted caller authority] --> service
-    service --> custody[Credential and state stores]
-    service --> adapter[Admitted provider adapter]
-    adapter --> provider[External service]
-    provider --> events[Normalized, admitted events]
-    events --> caller
+    accTitle: Connectors in context
+    accDescr: Callers send governed requests through Connectors to external services. Connectors admits provider events for authorized consumers.
+    caller[Application or agent] -->|Request| service[Connectors]
+    service -->|Admitted operation| provider[External service]
+    provider -->|Provider event| service
+    service -->|Result or admitted event| caller
 ```
 
 The catalog describes what can be called. A deployment enables an Integration; authorization
-creates a Connection. A Grant determines which operations or events a caller may use through that
-Connection. Connectors binds credentials at the execution boundary and records the result.
+creates a Connection. Receiver policy and Grants bound what a caller can do through it. Hosted
+writes require a Grant and any demanded approval. Connectors binds credentials at the execution
+boundary and records the result.
 Hosted identity comes from [Identity](https://beyond10x.github.io/docs/identity/).
 
 ## Understand the architecture
 
-Read the handbook in order, or follow the question you have.
+Start with the [system overview](docs/architecture/README.md#follow-one-slack-mention) to follow
+one hosted Slack mention through receipt, an authorized consumer, and an approved reply attempt.
+The same example connects all six chapters.
 
-| Your question | Start here |
-|---|---|
-| What are the subsystems, and who owns what? | [System overview](docs/architecture/README.md) |
-| How do accounts, permissions, and credentials fit together? | [Connections and authority](docs/architecture/authority.md) |
-| What happens when a caller invokes an operation? | [Commands and interfaces](docs/architecture/interfaces.md) |
-| How does a provider event reach a consumer? | [Events and durable state](docs/architecture/events.md) |
-| What changes between local and hosted deployments? | [Deployment and runtime](docs/architecture/deployment.md) |
-| What is specified, generated, and enforced today? | [Specification status](docs/architecture/specification.md) |
+1. [System overview](docs/architecture/README.md) — locate the boundaries and the subsystem owners.
+2. [Connections and authority](docs/architecture/authority.md) — separate account access, Grants,
+   and approval for one action.
+3. [Commands and interfaces](docs/architecture/interfaces.md) — trace a request from description
+   to dispatch, including refusals.
+4. [Events and durable state](docs/architecture/events.md) — understand what is persisted,
+   acknowledged, replayed, and still uncertain.
+5. [Deployment and runtime](docs/architecture/deployment.md) — compare local and hosted
+   prerequisites and responsibilities.
+6. [Specification status](docs/architecture/specification.md) — distinguish shipped behavior,
+   ESS declarations, generated artifacts, and coverage gaps.
 
 ## Connect a provider
 
