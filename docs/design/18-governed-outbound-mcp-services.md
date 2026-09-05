@@ -1,7 +1,7 @@
-# 18 — Governed outbound MCP services
+# Outbound MCP (design reference)
 
 Status: accepted 2026-09-02. Implements the outbound half of the MCP foundation decision and
-advances S-075 without claiming its OCI-pack loader.
+advances S-075 without claiming its OCI-pack loader. **2026-09-05 reading guide:** [Current interfaces](../architecture/interfaces.md).
 
 ## Decision
 
