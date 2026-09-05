@@ -251,7 +251,7 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
 /// the set of declared groups that name a module of `crates/protocol/src` declaring a request
 /// enum and that do not yet carry `--target`. A group that gains the flag has to leave the list, and when all three have it the
 /// list is empty.
-const TARGET_EXCEPTIONS: &[&str] = &["connection", "event", "operation"];
+const TARGET_EXCEPTIONS: &[&str] = &[];
 
 fn repository_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -762,7 +762,7 @@ fn citations_of(document: &str, text: &str) -> Vec<Citation> {
         let Some(first) = parts.next() else {
             continue;
         };
-        let last = parts.last().unwrap_or(first);
+        let last = parts.next_back().unwrap_or(first);
         found.push(Citation {
             document: document.to_owned(),
             path: path.to_owned(),
@@ -818,13 +818,10 @@ fn declaration_lines(source: &str, name: &str, yaml: bool) -> Vec<usize> {
         if yaml {
             return text == format!("- name: {name}") || text.starts_with(&format!("{name}:"));
         }
-        loop {
-            let Some(qualifier) = QUALIFIERS
-                .iter()
-                .find(|qualifier| text.starts_with(*qualifier))
-            else {
-                break;
-            };
+        while let Some(qualifier) = QUALIFIERS
+            .iter()
+            .find(|qualifier| text.starts_with(*qualifier))
+        {
             text = &text[qualifier.len()..];
         }
         for kind in KINDS {
@@ -2502,4 +2499,244 @@ fn the_read_verb_enumeration_partitions_the_protocols_it_names() {
          sentence somebody remembered to edit:\n  {}",
         wrong.join("\n  ")
     );
+}
+
+// Subprocess fixtures isolate account metadata and configuration from the operator's machine.
+struct TargetFixture {
+    root: PathBuf,
+}
+
+impl TargetFixture {
+    fn new(login: bool) -> Self {
+        use std::os::unix::fs::PermissionsExt as _;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "t{:x}{:x}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let config_dir = root.join("c/b10x");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config = config_dir.join("connectors.toml");
+        std::fs::write(&config, format!(
+            "[owner]\ntenant_id = 'fixture'\nagent_id = 'fixture'\nagent_revision = 1\nauthority_snapshot_id = 'fixture'\nauthority_snapshot_sha256 = '{}'\n\n[[catalog]]\nprovider = 'slack'\ngrant_ref = 'fixture'\ninitiation = 'platform'\n", "a".repeat(64)
+        )).unwrap();
+        std::fs::set_permissions(config, std::fs::Permissions::from_mode(0o600)).unwrap();
+        if login {
+            let state = root.join("s/b10x/connectors");
+            std::fs::create_dir_all(&state).unwrap();
+            std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let metadata = state.join("identity-sessions.json");
+            std::fs::write(
+                &metadata,
+                serde_json::to_vec(&serde_json::json!({
+                    "version": 1,
+                    "active_base": "https://connector.example.test",
+                    "sessions": [{
+                        "connectors_base": "https://connector.example.test",
+                        "identity_origin": "https://identity.example.test",
+                        "tenant_id": "fixture", "subject": "fixture", "email": null,
+                        "obtained_at": 1, "idle_expires_at": 4102444800_u64
+                    }]
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            std::fs::set_permissions(metadata, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        Self { root }
+    }
+
+    fn run(&self, arguments: &[&str]) -> std::process::Output {
+        std::process::Command::new(env!("CARGO_BIN_EXE_connectors"))
+            .args(arguments)
+            .env("HOME", &self.root)
+            .env("XDG_CONFIG_HOME", self.root.join("c"))
+            .env("XDG_STATE_HOME", self.root.join("s"))
+            .env("PATH", self.root.join("no-programs"))
+            .env_remove("DBUS_SESSION_BUS_ADDRESS")
+            .output()
+            .expect("run isolated connectors")
+    }
+
+    fn json(&self, arguments: &[&str]) -> (bool, serde_json::Value) {
+        let output = self.run(arguments);
+        let value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+            panic!(
+                "{arguments:?}: {error}; stderr: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+        });
+        (output.status.success(), value)
+    }
+}
+
+#[test]
+fn an_omitted_target_ignores_a_saved_login_for_every_dual_target_group() {
+    let fixture = TargetFixture::new(true);
+    for (group, verb) in [
+        ("connection", "list"),
+        ("event", "search"),
+        ("operation", "search"),
+    ] {
+        let (success, value) = fixture.json(&["-o", "json", group, verb]);
+        assert!(!success);
+        assert_eq!(value["target"], "local", "{group}: {value}");
+        assert_eq!(
+            value["error"]["code"], "connector-unreachable",
+            "{group}: {value}"
+        );
+    }
+}
+
+#[test]
+fn an_explicit_hosted_target_requires_a_login_by_name_for_every_group() {
+    let fixture = TargetFixture::new(false);
+    for (group, verb) in [
+        ("connection", "list"),
+        ("event", "search"),
+        ("operation", "search"),
+    ] {
+        let (success, value) = fixture.json(&["-o", "json", group, verb, "--target", "hosted"]);
+        assert!(!success);
+        assert_eq!(value["target"], "hosted", "{group}: {value}");
+        assert_eq!(
+            value["error"]["code"], "hosted-login-required",
+            "{group}: {value}"
+        );
+    }
+}
+
+#[test]
+fn hosted_refuses_each_local_only_option_for_every_group() {
+    let fixture = TargetFixture::new(false);
+    for (group, verb) in [
+        ("connection", "list"),
+        ("event", "search"),
+        ("operation", "search"),
+    ] {
+        for option in ["--config", "--state-root"] {
+            let (success, value) = fixture.json(&[
+                "-o", "json", group, "--target", "hosted", verb, option, "/unused",
+            ]);
+            assert!(!success);
+            assert_eq!(value["target"], "hosted", "{group} {option}: {value}");
+            assert_eq!(
+                value["error"]["code"], "target-conflict",
+                "{group} {option}: {value}"
+            );
+        }
+    }
+}
+
+#[test]
+fn local_success_and_protocol_refusals_report_the_selected_target() {
+    use std::io::{BufRead as _, Write as _};
+    use std::os::unix::net::UnixListener;
+    for (group, verb, field) in [
+        ("connection", "list", "connections"),
+        ("event", "search", "channels"),
+        ("operation", "search", "operations"),
+    ] {
+        for refused in [false, true] {
+            let fixture = TargetFixture::new(true);
+            let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let worker = std::thread::spawn(move || {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error)
+                            if error.kind() == std::io::ErrorKind::WouldBlock
+                                && std::time::Instant::now() < deadline =>
+                        {
+                            std::thread::sleep(std::time::Duration::from_millis(10))
+                        }
+                        result => panic!("local fixture was not reached: {result:?}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let mut response = serde_json::json!({
+                    "protocol": request["protocol"], "request_id": request["request_id"],
+                    "status": if refused { "error" } else { "ok" },
+                });
+                if refused {
+                    response["error"] = serde_json::json!({"code": "not_found", "message": "fixture refusal", "retriable": false});
+                } else {
+                    response["response"] =
+                        serde_json::json!({"result": "search", "value": {(field): []}});
+                }
+                writeln!(stream, "{response}").unwrap();
+            });
+            let (success, value) = fixture.json(&[
+                "-o",
+                "json",
+                group,
+                verb,
+                "--target",
+                "local",
+                "--state-root",
+                fixture.root.to_str().unwrap(),
+            ]);
+            worker.join().unwrap();
+            assert_eq!(success, !refused, "{group}: {value}");
+            assert_eq!(value["target"], "local", "{group}: {value}");
+            if refused {
+                assert_eq!(value["error"]["code"], "not_found");
+            } else {
+                assert_eq!(value[field], serde_json::json!([]));
+            }
+        }
+    }
+}
+
+#[test]
+fn targeted_errors_keep_the_target_in_yaml_and_text() {
+    let fixture = TargetFixture::new(false);
+    let yaml = fixture.run(&["-o", "yaml", "operation", "search", "--target", "hosted"]);
+    let value: serde_norway::Value = serde_norway::from_slice(&yaml.stdout).unwrap();
+    assert_eq!(value["target"].as_str(), Some("hosted"));
+    let text = fixture.run(&["operation", "search", "--target", "hosted"]);
+    assert!(!text.status.success());
+    assert!(String::from_utf8_lossy(&text.stderr).contains("target: hosted"));
+}
+
+#[test]
+fn the_parser_accepts_target_before_and_after_each_dual_target_leaf() {
+    for (group, verb) in [
+        ("connection", "list"),
+        ("event", "search"),
+        ("operation", "search"),
+    ] {
+        for target in ["local", "hosted"] {
+            for arguments in [
+                ["connectors", group, "--target", target, verb],
+                ["connectors", group, verb, "--target", target],
+            ] {
+                assert!(
+                    connectors_cli::command()
+                        .try_get_matches_from(arguments)
+                        .is_ok(),
+                    "{arguments:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_old_login_selected_target_guard_is_absent() {
+    let source = read(&repository_root().join("crates/connectors-cli/src/lib.rs"));
+    assert!(!source.contains("if config_path.is_none() && state_root.is_none()"));
 }
