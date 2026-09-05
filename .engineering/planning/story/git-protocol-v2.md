@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:git-protocol-v2
 kind: story
-status: active
+status: implemented
 title: Broker bounded Git protocol v2
 tags:
 - coding-workspace-speed
@@ -39,7 +39,7 @@ scope:
   path: crates/service/src/git_fetch.rs
 - confidence: inferred
   path: docs/design
-revision: 9
+revision: 10
 ---
 ## Acceptance
 
