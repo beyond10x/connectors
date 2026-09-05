@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "3e14ccc8ed194f6000a6d9ca9430c1557680105bbb6c061888bdaacbf3834c7a"
+sha256 = "a262c5a06b51aac330869ec2a912e672b4d4153b4da771069dc23b9d66b9db1a"
 
 [[provider]]
 id = "airtable"
@@ -360,11 +360,11 @@ sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 [[provider]]
 id = "gitlab"
 generator = "connectors 0.6.5"
-toml_sha256 = "ec8e7f0066c4fbf34a39165822a76d6e54a0f89c917e4f4d6ed580f564fcc5ab"
-ir_sha256 = "f71afedf038e0325ebb668375d21b2e94c8f98bf76abf5e9869374b43ffe8a64"
+toml_sha256 = "dd1c6d3b6f8e454c07960428fdb8dfe8bd15b88655854c71dc6e814f56a81c81"
+ir_sha256 = "f8df1737b01eabf28e493d212b1ee8e2acdf6a94b694e7afc6f1b3a41543d7f4"
 
 [provider.artifacts]
-"catalog/gitlab.catalog.json" = "c4b9fae8275df0e830a3a7aa99151eeaa0abe99f2214ef1eae5614c3d4d0ef74"
+"catalog/gitlab.catalog.json" = "2cf79131a4f62bb5ba40462e224d91fa10de58dcc33d9a6f5dc86b366e6e897f"
 
 [[provider]]
 id = "google"
@@ -412,11 +412,11 @@ ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 [[provider]]
 id = "jira"
 generator = "connectors 0.6.5"
-toml_sha256 = "7a254231475118aeb92aed11ce522a4923f268dd9e60b649150beeaff2c2b6b8"
-ir_sha256 = "5577b429a58a1d2698bc0937e70314891d87c0de78551a229512f7fc2ccef192"
+toml_sha256 = "73908f8f10efd84e03f7c9ca091e73aac30869a7912fadc83c0354dc9ecc2e69"
+ir_sha256 = "da1ced6c066c03e1da8c7cc4654a7f5b639ab161e4db421d6875aa85fc5d47a8"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "5bebba7dc2376b2c2f3057ecccd4248bdd9e232c753d6efb8ec5233867539802"
+"catalog/jira.catalog.json" = "f3c8374ac0bcd168b1d628cbda1e6331d19d5cce95ac1ddc2ff470d65ff95fda"
 
 [[provider]]
 id = "klaviyo"

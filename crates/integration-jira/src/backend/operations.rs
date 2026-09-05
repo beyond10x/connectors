@@ -690,6 +690,7 @@ fn operation_effect(operation_ref: &str) -> EffectClass {
             | "jira-issue-transitions-list"
             | "jira-issue-search"
             | "jira-project-list"
+            | "jira-issue-comments-read"
     ) {
         EffectClass::ReadOnly
     } else {

@@ -18,7 +18,7 @@ paths:
       operationId: jira-issue-search
       summary: Search changed issues from one admitted project
       x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get
-      x-b10x-projection: Native public project_key and updated_since_ms become fixed project equality AND updated >= unquoted epoch milliseconds, ordered updated ASC then key ASC. limit becomes maxResults. No free JQL is admitted. Safe issue projection adds stable id; raw fields are never returned.
+      x-b10x-projection: Native and personal public project_key and updated_since_ms become fixed project equality AND updated >= unquoted epoch milliseconds, ordered updated ASC then key ASC. limit becomes maxResults. No free JQL is admitted. Safe issue projection adds stable id; raw fields are never returned.
       x-b10x-timestamp-reference: https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated
       parameters:
         - name: jql
@@ -72,6 +72,37 @@ paths:
                   startAt: {type: integer}
                   maxResults: {type: integer}
                   total: {type: integer}
+  /rest/api/2/issue/{issueIdOrKey}/comment:
+    get:
+      operationId: jira-issue-comments-read
+      summary: Read a bounded page of comments without author identities
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-get
+      x-b10x-projection: Both runtimes retain id, body, created, updated, visibility type/value/identifier and jsd_public, omitting author objects. Comment visibility is principal-relative; downstream company storage must enforce its own scope. Jira timestamps retain timezone syntax including +0000. Legacy comment-list remains unchanged.
+      parameters:
+        - name: issueIdOrKey
+          in: path
+          required: true
+          schema: {type: string}
+        - name: startAt
+          in: query
+          schema: {type: integer, minimum: 0, maximum: 4294967295}
+        - name: maxResults
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+      responses:
+        '200':
+          description: Next offset is startAt plus returned comment count while that offset is below total. Missing or malformed continuation metadata fails closed. No empty nonterminal page is accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments: {type: array, items: {type: object}}
+                  startAt: {type: integer}
+                  maxResults: {type: integer}
+                  total: {type: integer}
+
 components:
   securitySchemes:
     bearer: {type: http, scheme: bearer, description: Existing Jira delegated or service credential with read:jira-work; no additional credential acquisition.}

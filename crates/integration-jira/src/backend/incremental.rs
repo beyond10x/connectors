@@ -1,8 +1,13 @@
 //! Native incremental reads share Jira custody, admission, request execution and issue projection.
 use super::*;
+#[path = "incremental/comments.rs"]
+mod comments;
 
 pub(super) fn is_incremental(id: &str) -> bool {
-    matches!(id, "jira-issue-search" | "jira-project-list")
+    matches!(
+        id,
+        "jira-issue-search" | "jira-project-list" | "jira-issue-comments-read"
+    )
 }
 
 pub(super) fn input_schema(id: &str) -> Option<Value> {
@@ -16,6 +21,10 @@ pub(super) fn input_schema(id: &str) -> Option<Value> {
             json!({"type":"integer","minimum":0,"maximum":253402300799999_u64});
         properties["next_page_token"] = json!({"type":"string","minLength":1,"maxLength":4096});
         vec!["project_key", "updated_since_ms", "limit"]
+    } else if id == "jira-issue-comments-read" {
+        properties["issue_key"] = json!({"type":"string","pattern":"^[A-Z][A-Z0-9_]{0,31}-[0-9]+$","minLength":3,"maxLength":64});
+        properties["start_at"] = json!({"type":"integer","minimum":0,"maximum":4294967295_u64});
+        vec!["issue_key", "limit"]
     } else {
         properties["start_at"] = json!({"type":"integer","minimum":0,"maximum":4294967295_u64});
         vec!["limit"]
@@ -26,42 +35,16 @@ pub(super) fn input_schema(id: &str) -> Option<Value> {
 }
 
 pub(super) fn admit(id: &str, input: &Value) -> Result<(), OperationError> {
-    let object = input.as_object().ok_or_else(operation_invalid)?;
-    let allowed: &[&str] = if id == "jira-issue-search" {
-        &[
-            "project_key",
-            "updated_since_ms",
-            "limit",
-            "next_page_token",
-        ]
-    } else {
-        &["limit", "start_at"]
-    };
-    if object.keys().any(|key| !allowed.contains(&key.as_str()))
-        || !input["limit"]
-            .as_u64()
-            .is_some_and(|limit| (1..=100).contains(&limit))
-    {
-        return Err(operation_invalid());
-    }
-    if id == "jira-issue-search" {
-        if !input["project_key"]
-            .as_str()
-            .is_some_and(|key| FieldShape::ProjectKey.admits(key, 32))
-            || !input["updated_since_ms"]
-                .as_u64()
-                .is_some_and(|value| value <= 253402300799999)
-            || object.get("next_page_token").is_some_and(|value| {
-                !value.as_str().is_some_and(|s| {
-                    !s.is_empty() && s.len() <= 4096 && !s.chars().any(char::is_control)
-                })
+    let schema = input_schema(id).ok_or_else(operation_invalid)?;
+    if !jsonschema::validator_for(&schema)
+        .map_err(|_| operation_invalid())?
+        .is_valid(input)
+        || input.as_object().is_some_and(|values| {
+            values.values().any(|v| {
+                v.as_str()
+                    .is_some_and(|s| s.trim().is_empty() || s.chars().any(char::is_control))
             })
-        {
-            return Err(operation_invalid());
-        }
-    } else if object
-        .get("start_at")
-        .is_some_and(|value| !value.as_u64().is_some_and(|v| v <= u32::MAX as u64))
+        })
     {
         return Err(operation_invalid());
     }
@@ -105,6 +88,9 @@ pub(super) fn prepare_query(
 }
 
 pub(super) fn output_schema(id: &str) -> Option<Value> {
+    if id == "jira-issue-comments-read" {
+        return Some(comments::output_schema());
+    }
     let integer = json!({"type":"integer","minimum":0});
     match id {
         "jira-issue-search" => {
@@ -136,6 +122,9 @@ pub(super) fn project(
     input: &Value,
     allowed: &[String],
 ) -> Result<Value, OperationError> {
+    if id == "jira-issue-comments-read" {
+        return comments::project(input, payload);
+    }
     let is_last = payload["isLast"].as_bool().ok_or_else(operation_protocol)?;
     let limit = input["limit"].as_u64().ok_or_else(operation_invalid)? as usize;
     if id == "jira-issue-search" {
@@ -159,6 +148,8 @@ pub(super) fn project(
             {
                 return Err(operation_protocol());
             }
+            item["assignee"] = Value::Null;
+            item["reporter"] = Value::Null;
             item["id"] = json!(required_string(value.get("id"), 64)?);
             issues.push(item);
         }
@@ -204,6 +195,28 @@ pub(super) fn project(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_comment_read_is_admitted_and_preserves_restrictions() {
+        let id = "jira-issue-comments-read";
+        let input = json!({"issue_key":"PROJ-1","limit":1});
+        assert!(is_incremental(id));
+        assert!(admit(id, &input).is_ok());
+        assert!(admit(id, &json!({"issue_key":"../escape","limit":1})).is_err());
+        let page = json!({"startAt":0,"maxResults":1,"total":2,"comments":[{"id":"3","body":"Comment","created":"2026-09-05T10:00:00.000+0000","updated":"2026-09-05T10:00:00.000+0000","jsdPublic":false,"visibility":{"type":"role","value":"Team"},"author":{"email":"PRIVATE-SENTINEL"}}]});
+        let result = project(
+            id,
+            &page,
+            &url::Url::parse("https://example.atlassian.net").unwrap(),
+            &input,
+            &["PROJ".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(result["next_start_at"], 1);
+        assert_eq!(result["comments"][0]["jsd_public"], false);
+        assert_eq!(result["comments"][0]["visibility"]["type"], "role");
+        assert!(!result.to_string().contains("PRIVATE-SENTINEL"));
+    }
 
     fn issue(id: &str, key: &str, updated: &str) -> Value {
         json!({"id":id,"key":key,"fields":{"summary":"Changed issue","status":{"name":"Open"},

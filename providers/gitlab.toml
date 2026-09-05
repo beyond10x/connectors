@@ -1330,3 +1330,89 @@ schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256
 [operations.response_schema]
 type = "array"
 items = { type = "object", properties = { id = { type = "integer" }, name = { type = "string" }, path_with_namespace = { type = "string" }, default_branch = { type = ["string", "null"] }, last_activity_at = { type = "string" }, web_url = { type = "string" } } }
+
+[[operations]]
+id = "gitlab-issue-search"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/issues"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "state"
+required = false
+schema = { type = "string", enum = ["opened", "closed", "all"] }
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, updated_at = { type = "string" }, web_url = { type = "string" } } }
+
+[[operations]]
+id = "gitlab-merge-request-search"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/merge_requests"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "state"
+required = false
+schema = { type = "string", enum = ["opened", "closed", "locked", "merged", "all"] }
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, updated_at = { type = "string" }, web_url = { type = "string" } } }
