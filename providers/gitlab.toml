@@ -1153,3 +1153,266 @@ secret = true
 required = false
 docs_url = "https://docs.gitlab.com/integration/oauth_provider/"
 binds = "oauth.client_secret"
+
+# Source evidence: specs/gitlab/incremental-reads.openapi.yaml.
+[[operations]]
+id = "gitlab-pipeline-list"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/pipelines"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "List changed project pipelines. Repeat overlapping updated_after windows and follow native next_page. Each item includes pipeline id, SHA and updated_at revision. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[[operations.params.query]]
+name = "ref"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256 }
+
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = ["integer", "string"] }, sha = { type = "string" }, ref = { type = "string" }, status = { type = "string" }, created_at = { type = "string" }, updated_at = { type = "string" }, committed_date = { type = "string" }, web_url = { type = "string" } } }
+
+
+# Source evidence: specs/gitlab/incremental-reads.openapi.yaml.
+[[operations]]
+id = "gitlab-deployment-list"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/deployments"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = ["integer", "string"] }, sha = { type = "string" }, ref = { type = "string" }, status = { type = "string" }, created_at = { type = "string" }, updated_at = { type = "string" }, committed_date = { type = "string" }, web_url = { type = "string" } } }
+
+
+# Source evidence: specs/gitlab/incremental-reads.openapi.yaml.
+[[operations]]
+id = "gitlab-repository-commit-list"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/repository/commits"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "List commits on an explicitly selected ref_name, normally the project's discovered default_branch. since/until use ISO8601; identity and revision are the full commit id. Follow native next_page. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+
+[[operations.params.query]]
+name = "ref_name"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 256 }
+
+[[operations.params.query]]
+name = "since"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[[operations.params.query]]
+name = "until"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 256, format = "date-time" }
+
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = ["integer", "string"] }, sha = { type = "string" }, ref = { type = "string" }, status = { type = "string" }, created_at = { type = "string" }, updated_at = { type = "string" }, committed_date = { type = "string" }, web_url = { type = "string" } } }
+
+
+[[operations]]
+id = "gitlab-project-activity-list"
+service = "default"
+method = "GET"
+path = "/projects"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "List permitted project inventory and activity, optionally narrowed by last_activity_after and last_activity_before ISO8601 bounds. The native adapter preserves X-Next-Page as next_page and returns safe items with stable project id, default_branch, last_activity_at and web_url. Follow every page, including overlapping windows; existing gitlab-project-list keeps its legacy array output."
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "last_activity_after"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "last_activity_before"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = "integer" }, name = { type = "string" }, path_with_namespace = { type = "string" }, default_branch = { type = ["string", "null"] }, last_activity_at = { type = "string" }, web_url = { type = "string" } } }
+
+[[operations]]
+id = "gitlab-issue-search"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/issues"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "state"
+required = false
+schema = { type = "string", enum = ["opened", "closed", "all"] }
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, updated_at = { type = "string" }, web_url = { type = "string" } } }
+
+[[operations]]
+id = "gitlab-merge-request-search"
+service = "default"
+method = "GET"
+path = "/projects/{project_id}/merge_requests"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted."
+[[operations.params.path]]
+name = "project_id"
+required = true
+schema = { type = "integer", minimum = 1 }
+[[operations.params.query]]
+name = "per_page"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "page"
+required = false
+schema = { type = "integer", minimum = 1, maximum = 4294967295 }
+[[operations.params.query]]
+name = "updated_after"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "updated_before"
+required = false
+schema = { type = "string", format = "date-time", minLength = 1, maxLength = 256 }
+[[operations.params.query]]
+name = "state"
+required = false
+schema = { type = "string", enum = ["opened", "closed", "locked", "merged", "all"] }
+[operations.response_schema]
+type = "array"
+items = { type = "object", properties = { id = { type = "integer" }, iid = { type = "integer" }, project_id = { type = "integer" }, updated_at = { type = "string" }, web_url = { type = "string" } } }

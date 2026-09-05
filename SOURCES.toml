@@ -311,3 +311,33 @@ references = [
 refresh = "authored-review"
 consumers = ["providers/postgresql.toml", "catalog/postgresql.catalog.json", "crates/driver-sql/"]
 note = "Repository-authored native-driver Provider: four read-only sql_v1 operations (bounded query plus information_schema inventory) with no vendor spec byte stream behind them. Every statement-class, protocol, port, identifier-bound and information_schema fact in the provider file cites its official PostgreSQL 17 reference inline; review is against those references."
+
+[[source]]
+id = "jira-authored-incremental-reads"
+references = ["https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-projects/#api-rest-api-2-project-search-get", "https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated"]
+kind = "openapi-spec"
+origin = "repository-authored"
+refresh = "authored-review"
+pins = "specs/jira.provenance.toml"
+consumers = ["providers/jira.toml", "catalog/jira.catalog.json"]
+note = "Exact added incremental-read surface. The repository-authored OpenAPI document cites fetched official endpoint, timestamp and pagination references on each operation."
+
+[[source]]
+id = "confluence-authored-incremental-reads"
+references = ["https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-search-get", "https://developer.atlassian.com/cloud/confluence/cql-fields/#last-modified"]
+kind = "openapi-spec"
+origin = "repository-authored"
+refresh = "authored-review"
+pins = "specs/confluence.provenance.toml"
+consumers = ["providers/confluence.toml", "catalog/confluence.catalog.json"]
+note = "Exact added incremental-read surface. The repository-authored OpenAPI document cites fetched official endpoint, timestamp and pagination references on each operation."
+
+[[source]]
+id = "gitlab-authored-incremental-reads"
+references = ["https://docs.gitlab.com/api/issues/#list-project-issues", "https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests", "https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination"]
+kind = "openapi-spec"
+origin = "repository-authored"
+refresh = "authored-review"
+pins = "specs/gitlab.provenance.toml"
+consumers = ["providers/gitlab.toml", "catalog/gitlab.catalog.json"]
+note = "Exact added incremental-read surface. The repository-authored OpenAPI document cites fetched official endpoint, timestamp and pagination references on each operation."
