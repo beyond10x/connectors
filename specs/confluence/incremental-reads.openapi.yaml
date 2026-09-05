@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Confluence incremental page search (repository-authored)
+  version: '2026-09-05'
+  description: Exact added search surface; existing space inventory and credential handling are reused.
+x-b10x-origin: repository-authored
+x-b10x-coverage: content search with page version and storage body
+servers:
+  - url: https://example.atlassian.net/wiki
+security:
+  - bearer: []
+paths:
+  /rest/api/content/search:
+    get:
+      operationId: confluence-page-search
+      summary: Search visible changed pages in a named space
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-search-get
+      x-b10x-timestamp-reference: https://developer.atlassian.com/cloud/confluence/cql-fields/#last-modified
+      description: CQL lastmodified dates are relative to the authenticated account's configured timezone, not necessarily UTC. Consumers must convert appropriately or query a conservative overlap and compare version.when UTC. Stable revision identity is content id and version.number. Follow the cursor query value from _links.next with unchanged CQL, limit and expand; never dispatch the returned URL directly.
+      parameters:
+        - name: cql
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 4096}
+        - name: cursor
+          in: query
+          schema: {type: string, minLength: 1, maxLength: 4096}
+        - name: limit
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: expand
+          in: query
+          required: true
+          schema: {type: string, enum: ['version,body.storage,space']}
+      responses:
+        '200':
+          description: One page of visible content with versions and storage bodies, and explicit next cursor URL when more results exist.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string}
+                        title: {type: string}
+                        type: {type: string}
+                        status: {type: string}
+                        version: {type: object, properties: {number: {type: integer}, when: {type: string}}}
+                        body: {type: object, properties: {storage: {type: object, properties: {value: {type: string}, representation: {type: string}}}}}
+                        space: {type: object, properties: {id: {type: integer}, key: {type: string}, name: {type: string}}}
+                        _links: {type: object, properties: {webui: {type: string}, base: {type: string}}}
+                  size: {type: integer}
+                  limit: {type: integer}
+                  _links: {type: object, properties: {next: {type: string}, base: {type: string}}}
+        '401': {description: Missing or expired read permission}
+        '429': {description: Rate limited; retry without completing the update window}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, description: Existing Confluence credential with search:confluence classic OAuth scope or equivalent permitted API token.}

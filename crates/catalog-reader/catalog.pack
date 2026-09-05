@@ -1,8 +1,8 @@
 connectors-catalog-pack 1
-digest sha256 afac3d3ec27ac455c44e6e8b3b6c7b7f645c6a5d1da39158eefe78e33b28d771
+digest sha256 01077a58c9abcaac1fc5b73fdcf2343d4c1afa68db696ab3dcbc3f7b7e57e284
 schema 2
 providers 65
-operations 1007
+operations 1014
 p airtable 0 18817
 p alertmanager 18817 2457
 p algolia 21274 25075
@@ -18,56 +18,56 @@ p calendly 10157334 24240
 p claude-code 10181574 1243
 p clickup 10182817 29667
 p cloudflare 10212484 24175
-p confluence 10236659 38554
-p contentful 10275213 22107
-p datadog 10297320 12708
-p discord 10310028 35616
-p docusign 10345644 26649
-p dropbox 10372293 20924
-p figma 10393217 21866
-p fly 10415083 22599
-p freshdesk 10437682 57917
-p front 10495599 25585
-p github 10521184 292694
-p gitlab 10813878 126688
-p google 10940566 36899
-p grafana 10977465 17870
-p hubspot 10995335 20197
-p intercom 11015532 30439
-p jira 11045971 47404
-p klaviyo 11093375 38214
-p launchdarkly 11131589 24991
-p loki 11156580 5063
-p mailchimp 11161643 40726
-p microsoft_graph 11202369 1085587
-p miro 12287956 32570
-p mysql 12320526 12675
-p newrelic 12333201 29320
-p notion 12362521 18671
-p okta 12381192 22020
-p openai 12403212 1682668
-p openrouter 14085880 12922
-p pagerduty 14098802 37369
-p postgresql 14136171 12620
-p postmark 14148791 19875
-p prometheus 14168666 4878
-p resend 14173544 18616
-p runpod 14192160 557707
-p salesforce 14749867 19132
-p sendgrid 14768999 15592
-p sentry 14784591 27670
-p shopify 14812261 27374
-p slack 14839635 751064
-p statuspage 15590699 29630
-p stripe 15620329 70617
-p supabase 15690946 13417
-p trello 15704363 26186
-p twilio 15730549 71249
-p typeform 15801798 28707
-p vercel 15830505 17402
-p webflow 15847907 21934
-p zendesk 15869841 1146354
-p zoom 17016195 9408
+p confluence 10236659 45298
+p contentful 10281957 22107
+p datadog 10304064 12708
+p discord 10316772 35616
+p docusign 10352388 26649
+p dropbox 10379037 20924
+p figma 10399961 21866
+p fly 10421827 22599
+p freshdesk 10444426 57917
+p front 10502343 25585
+p github 10527928 292694
+p gitlab 10820622 153474
+p google 10974096 36899
+p grafana 11010995 17870
+p hubspot 11028865 20197
+p intercom 11049062 30439
+p jira 11079501 57185
+p klaviyo 11136686 38214
+p launchdarkly 11174900 24991
+p loki 11199891 5063
+p mailchimp 11204954 40726
+p microsoft_graph 11245680 1085587
+p miro 12331267 32570
+p mysql 12363837 12675
+p newrelic 12376512 29320
+p notion 12405832 18671
+p okta 12424503 22020
+p openai 12446523 1682668
+p openrouter 14129191 12922
+p pagerduty 14142113 37369
+p postgresql 14179482 12620
+p postmark 14192102 19875
+p prometheus 14211977 4878
+p resend 14216855 18616
+p runpod 14235471 557707
+p salesforce 14793178 19132
+p sendgrid 14812310 15592
+p sentry 14827902 27670
+p shopify 14855572 27374
+p slack 14882946 751064
+p statuspage 15634010 29630
+p stripe 15663640 70617
+p supabase 15734257 13417
+p trello 15747674 26186
+p twilio 15773860 71249
+p typeform 15845109 28707
+p vercel 15873816 17402
+p webflow 15891218 21934
+p zendesk 15913152 1146354
+p zoom 17059506 9408
 o airtable-record-create airtable default 5053 4705
 o airtable-record-delete airtable default 14739 3734
 o airtable-record-get airtable default 724 4323
@@ -631,190 +631,197 @@ o colab-workspace-list b10x collaboration 3059515 1390
 o confluence-comment-add confluence default 10269465 5400
 o confluence-page-create confluence default 10262969 6490
 o confluence-page-get confluence default 10256270 6693
+o confluence-page-search confluence default 10274871 6738
 o confluence-space-get confluence default 10246566 3259
 o confluence-space-list confluence default 10239864 6696
 o confluence-space-pages confluence default 10249831 6433
-o contentful-asset-get contentful delivery 10286291 2703
-o contentful-entries-list contentful delivery 10282731 3554
-o contentful-entry-create contentful management 10289000 3916
-o contentful-entry-get contentful delivery 10280034 2691
-o contentful-entry-publish contentful management 10292922 3423
-o datadog-incident-get datadog default 10308273 1448
-o datadog-incident-list datadog default 10307251 1016
-o datadog-monitor-get datadog default 10303467 3778
-o datadog-monitor-list datadog default 10299714 3747
-o discord-channel-messages discord default 10331196 7148
-o discord-current-user discord default 10312405 3941
-o discord-guild-channels discord default 10326146 5044
-o discord-guild-get discord default 10319808 6332
-o discord-guild-list discord default 10316352 3450
-o discord-message-create discord default 10338350 6990
-o docusign-envelope-create-from-template docusign default 10362994 5619
-o docusign-envelope-get docusign default 10355206 3060
-o docusign-envelope-list docusign default 10350937 4263
-o docusign-envelope-recipients-get docusign default 10358272 4716
-o docusign-envelope-void docusign default 10368619 3339
-o docusign-verify docusign default 10348216 2715
-o dropbox-folder-create dropbox default 10386874 3041
-o dropbox-folder-list dropbox default 10376262 3329
-o dropbox-metadata-get dropbox default 10379597 4147
-o dropbox-search dropbox default 10383750 3118
-o dropbox-temporary-link-get dropbox default 10389921 3004
-o dropbox-user-me dropbox default 10373706 2550
-o figma-file-comments-list figma default 10410736 3989
-o figma-file-get figma default 10396565 4085
-o figma-file-nodes-get figma default 10400656 3603
-o figma-image-render-get figma default 10404265 3336
-o figma-project-files-list figma default 10407607 3123
-o figma-user-me figma default 10394528 2031
-o fly-machine-create fly machines 10425267 3091
-o fly-machine-delete fly machines 10434978 2332
-o fly-machine-events-list fly machines 10422511 2750
-o fly-machine-get fly machines 10419729 2776
-o fly-machine-restart fly machines 10432755 2217
-o fly-machine-start fly machines 10428364 2173
-o fly-machine-stop fly machines 10430543 2206
-o fly-machines-list fly machines 10417448 2275
-o fly-regions-list fly machines 10415787 1655
-o freshdesk-contact-create freshdesk default 10490759 4492
-o freshdesk-contact-get freshdesk default 10486706 4047
-o freshdesk-contact-list freshdesk default 10480793 5907
-o freshdesk-test freshdesk default 10438588 2303
-o freshdesk-ticket-create freshdesk default 10451929 12167
-o freshdesk-ticket-get freshdesk default 10446764 5159
-o freshdesk-ticket-list freshdesk default 10440897 5861
-o freshdesk-ticket-note-add freshdesk default 10475110 5677
-o freshdesk-ticket-update freshdesk default 10464102 11002
-o front-conversation-get front default 10503666 4065
-o front-conversation-list front default 10499302 4358
-o front-conversation-message-list front default 10507737 6091
-o front-conversation-reply front default 10513834 3848
-o front-conversation-tag-add front default 10517688 3216
-o front-verify front default 10496841 2455
-o github-commit-list github default 10726371 18328
-o github-issue-comment-add github default 10547046 4993
-o github-issue-create github default 10540609 6431
-o github-issue-get github default 10529198 5874
-o github-issue-list github default 10552045 94217
-o github-org-list github default 10757972 4138
-o github-org-repo-list github default 10762116 24996
-o github-pull-files-list github default 10646268 5382
-o github-pull-get github default 10535078 5525
-o github-repo-get github default 10524598 4594
-o github-user-get github default 10744705 13261
-o github-user-repo-list github default 10787118 26232
-o github-workflow-run-list github default 10651656 74709
-o gitlab-branch-create gitlab default 10914394 5556
-o gitlab-branch-list gitlab default 10908564 5824
-o gitlab-group-get gitlab default 10839572 4040
-o gitlab-group-list gitlab default 10833259 6307
-o gitlab-issue-create gitlab default 10869503 6540
-o gitlab-issue-get gitlab default 10863417 6080
-o gitlab-issue-list gitlab default 10855860 7551
-o gitlab-merge-request-create gitlab default 10888924 7382
-o gitlab-merge-request-get gitlab default 10883633 5285
-o gitlab-merge-request-list gitlab default 10876049 7578
-o gitlab-merge-request-update gitlab default 10896312 6158
-o gitlab-pipeline-get gitlab default 10902476 6082
-o gitlab-project-get gitlab default 10851611 4243
-o gitlab-project-list gitlab default 10843618 7987
-o gitlab-repository-commit-create gitlab default 10919956 7924
-o gitlab-repository-file-get gitlab default 10934212 5741
-o gitlab-repository-tree-list gitlab default 10927886 6320
-o gitlab-user-get gitlab default 10820410 4013
-o gitlab-user-get-by-id gitlab default 10829219 4034
-o gitlab-user-list gitlab default 10824429 4784
-o google-calendar-calendar-get google calendar 10967739 3684
-o google-calendar-event-get google calendar 10954296 6563
-o google-calendar-event-insert google calendar 10960865 6868
-o google-drive-file-get google drive 10971429 2298
-o google-drive-file-update google drive 10973733 2814
-o google-gmail-labels-list google gmail 10950227 4063
-o google-gmail-message-get google gmail 10941336 4995
-o google-gmail-message-send google gmail 10946337 3884
-o grafana-dashboard-get grafana default 10984734 3146
-o grafana-dashboards-list grafana default 10980283 4445
-o grafana-datasource-query grafana default 10989984 5033
-o grafana-datasources-list grafana default 10987886 2092
-o hubspot-company-get hubspot default 11008029 3550
-o hubspot-contact-create hubspot default 11000604 3927
-o hubspot-contact-get hubspot default 10996109 4489
-o hubspot-contact-update hubspot default 11004537 3486
-o hubspot-deal-get hubspot default 11011585 3622
-o intercom-contact-create intercom default 11023493 5231
-o intercom-contact-get intercom default 11017469 6018
-o intercom-contact-note-create intercom default 11041453 4274
-o intercom-conversation-get intercom default 11028730 6016
-o intercom-conversation-reply intercom default 11034752 6695
-o jira-issue-comment-add jira default 11068355 4715
-o jira-issue-comment-edit jira default 11085266 3668
-o jira-issue-comment-list jira default 11062396 5953
-o jira-issue-create jira default 11057342 5048
-o jira-issue-edit jira default 11082363 2897
-o jira-issue-get jira default 11052228 5108
-o jira-issue-link-add jira default 11088940 3708
-o jira-issue-transition jira default 11078825 3532
-o jira-issue-transitions-list jira default 11073076 5743
-o klaviyo-account-list klaviyo default 11095316 4885
-o klaviyo-event-create klaviyo default 11124586 6716
-o klaviyo-list-list klaviyo default 11120674 3906
-o klaviyo-profile-create klaviyo default 11111930 8738
-o klaviyo-profile-get klaviyo default 11106610 5314
-o klaviyo-profile-list klaviyo default 11100207 6397
+o contentful-asset-get contentful delivery 10293035 2703
+o contentful-entries-list contentful delivery 10289475 3554
+o contentful-entry-create contentful management 10295744 3916
+o contentful-entry-get contentful delivery 10286778 2691
+o contentful-entry-publish contentful management 10299666 3423
+o datadog-incident-get datadog default 10315017 1448
+o datadog-incident-list datadog default 10313995 1016
+o datadog-monitor-get datadog default 10310211 3778
+o datadog-monitor-list datadog default 10306458 3747
+o discord-channel-messages discord default 10337940 7148
+o discord-current-user discord default 10319149 3941
+o discord-guild-channels discord default 10332890 5044
+o discord-guild-get discord default 10326552 6332
+o discord-guild-list discord default 10323096 3450
+o discord-message-create discord default 10345094 6990
+o docusign-envelope-create-from-template docusign default 10369738 5619
+o docusign-envelope-get docusign default 10361950 3060
+o docusign-envelope-list docusign default 10357681 4263
+o docusign-envelope-recipients-get docusign default 10365016 4716
+o docusign-envelope-void docusign default 10375363 3339
+o docusign-verify docusign default 10354960 2715
+o dropbox-folder-create dropbox default 10393618 3041
+o dropbox-folder-list dropbox default 10383006 3329
+o dropbox-metadata-get dropbox default 10386341 4147
+o dropbox-search dropbox default 10390494 3118
+o dropbox-temporary-link-get dropbox default 10396665 3004
+o dropbox-user-me dropbox default 10380450 2550
+o figma-file-comments-list figma default 10417480 3989
+o figma-file-get figma default 10403309 4085
+o figma-file-nodes-get figma default 10407400 3603
+o figma-image-render-get figma default 10411009 3336
+o figma-project-files-list figma default 10414351 3123
+o figma-user-me figma default 10401272 2031
+o fly-machine-create fly machines 10432011 3091
+o fly-machine-delete fly machines 10441722 2332
+o fly-machine-events-list fly machines 10429255 2750
+o fly-machine-get fly machines 10426473 2776
+o fly-machine-restart fly machines 10439499 2217
+o fly-machine-start fly machines 10435108 2173
+o fly-machine-stop fly machines 10437287 2206
+o fly-machines-list fly machines 10424192 2275
+o fly-regions-list fly machines 10422531 1655
+o freshdesk-contact-create freshdesk default 10497503 4492
+o freshdesk-contact-get freshdesk default 10493450 4047
+o freshdesk-contact-list freshdesk default 10487537 5907
+o freshdesk-test freshdesk default 10445332 2303
+o freshdesk-ticket-create freshdesk default 10458673 12167
+o freshdesk-ticket-get freshdesk default 10453508 5159
+o freshdesk-ticket-list freshdesk default 10447641 5861
+o freshdesk-ticket-note-add freshdesk default 10481854 5677
+o freshdesk-ticket-update freshdesk default 10470846 11002
+o front-conversation-get front default 10510410 4065
+o front-conversation-list front default 10506046 4358
+o front-conversation-message-list front default 10514481 6091
+o front-conversation-reply front default 10520578 3848
+o front-conversation-tag-add front default 10524432 3216
+o front-verify front default 10503585 2455
+o github-commit-list github default 10733115 18328
+o github-issue-comment-add github default 10553790 4993
+o github-issue-create github default 10547353 6431
+o github-issue-get github default 10535942 5874
+o github-issue-list github default 10558789 94217
+o github-org-list github default 10764716 4138
+o github-org-repo-list github default 10768860 24996
+o github-pull-files-list github default 10653012 5382
+o github-pull-get github default 10541822 5525
+o github-repo-get github default 10531342 4594
+o github-user-get github default 10751449 13261
+o github-user-repo-list github default 10793862 26232
+o github-workflow-run-list github default 10658400 74709
+o gitlab-branch-create gitlab default 10921138 5556
+o gitlab-branch-list gitlab default 10915308 5824
+o gitlab-deployment-list gitlab default 10953654 6511
+o gitlab-group-get gitlab default 10846316 4040
+o gitlab-group-list gitlab default 10840003 6307
+o gitlab-issue-create gitlab default 10876247 6540
+o gitlab-issue-get gitlab default 10870161 6080
+o gitlab-issue-list gitlab default 10862604 7551
+o gitlab-merge-request-create gitlab default 10895668 7382
+o gitlab-merge-request-get gitlab default 10890377 5285
+o gitlab-merge-request-list gitlab default 10882793 7578
+o gitlab-merge-request-update gitlab default 10903056 6158
+o gitlab-pipeline-get gitlab default 10909220 6082
+o gitlab-pipeline-list gitlab default 10946703 6945
+o gitlab-project-activity-list gitlab default 10967167 6316
+o gitlab-project-get gitlab default 10858355 4243
+o gitlab-project-list gitlab default 10850362 7987
+o gitlab-repository-commit-create gitlab default 10926700 7924
+o gitlab-repository-commit-list gitlab default 10960171 6990
+o gitlab-repository-file-get gitlab default 10940956 5741
+o gitlab-repository-tree-list gitlab default 10934630 6320
+o gitlab-user-get gitlab default 10827154 4013
+o gitlab-user-get-by-id gitlab default 10835963 4034
+o gitlab-user-list gitlab default 10831173 4784
+o google-calendar-calendar-get google calendar 11001269 3684
+o google-calendar-event-get google calendar 10987826 6563
+o google-calendar-event-insert google calendar 10994395 6868
+o google-drive-file-get google drive 11004959 2298
+o google-drive-file-update google drive 11007263 2814
+o google-gmail-labels-list google gmail 10983757 4063
+o google-gmail-message-get google gmail 10974866 4995
+o google-gmail-message-send google gmail 10979867 3884
+o grafana-dashboard-get grafana default 11018264 3146
+o grafana-dashboards-list grafana default 11013813 4445
+o grafana-datasource-query grafana default 11023514 5033
+o grafana-datasources-list grafana default 11021416 2092
+o hubspot-company-get hubspot default 11041559 3550
+o hubspot-contact-create hubspot default 11034134 3927
+o hubspot-contact-get hubspot default 11029639 4489
+o hubspot-contact-update hubspot default 11038067 3486
+o hubspot-deal-get hubspot default 11045115 3622
+o intercom-contact-create intercom default 11057023 5231
+o intercom-contact-get intercom default 11050999 6018
+o intercom-contact-note-create intercom default 11074983 4274
+o intercom-conversation-get intercom default 11062260 6016
+o intercom-conversation-reply intercom default 11068282 6695
+o jira-issue-comment-add jira default 11101885 4715
+o jira-issue-comment-edit jira default 11118796 3668
+o jira-issue-comment-list jira default 11095926 5953
+o jira-issue-create jira default 11090872 5048
+o jira-issue-edit jira default 11115893 2897
+o jira-issue-get jira default 11085758 5108
+o jira-issue-link-add jira default 11122470 3708
+o jira-issue-search jira default 11126184 5300
+o jira-issue-transition jira default 11112355 3532
+o jira-issue-transitions-list jira default 11106606 5743
+o jira-project-list jira default 11131490 4469
+o klaviyo-account-list klaviyo default 11138627 4885
+o klaviyo-event-create klaviyo default 11167897 6716
+o klaviyo-list-list klaviyo default 11163985 3906
+o klaviyo-profile-create klaviyo default 11155241 8738
+o klaviyo-profile-get klaviyo default 11149921 5314
+o klaviyo-profile-list klaviyo default 11143518 6397
 o knowledge-explain b10x knowledge 852423 3681
 o knowledge-query b10x knowledge 834244 18173
 o knowledge-snapshot b10x knowledge 856110 18432
-o launchdarkly-environment-list launchdarkly default 11136796 4284
-o launchdarkly-flag-get launchdarkly default 11146453 4079
-o launchdarkly-flag-list launchdarkly default 11141086 5361
-o launchdarkly-flag-toggle launchdarkly default 11150538 5711
-o launchdarkly-project-list launchdarkly default 11133142 3648
-o loki-query-range loki default 11157416 3881
-o mailchimp-audience-get mailchimp default 11170961 3936
-o mailchimp-audience-list mailchimp default 11166241 4714
-o mailchimp-audience-member-get mailchimp default 11181915 6149
-o mailchimp-audience-member-list mailchimp default 11174903 7006
-o mailchimp-audience-member-upsert mailchimp default 11188070 8966
-o mailchimp-campaign-list mailchimp default 11197042 4969
-o mailchimp-ping mailchimp default 11164171 2064
-o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11229972 3752
-o microsoft_graph-calendar-category-list microsoft_graph calendar 12119332 159887
-o microsoft_graph-calendar-event-create microsoft_graph calendar 11222695 7271
-o microsoft_graph-calendar-event-get microsoft_graph calendar 11216149 6540
-o microsoft_graph-calendar-language-list microsoft_graph calendar 12282909 3988
-o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12279225 3678
-o microsoft_graph-files-item-get microsoft_graph files 11233730 5482
-o microsoft_graph-files-item-update microsoft_graph files 11239218 4785
-o microsoft_graph-mail-folder-list microsoft_graph mail 11212836 3307
-o microsoft_graph-mail-message-get microsoft_graph mail 11204123 5596
-o microsoft_graph-mail-message-list microsoft_graph mail 11244009 875317
-o microsoft_graph-mail-message-reply microsoft_graph mail 11209725 3105
-o miro-board-item-get miro default 12302208 7877
-o miro-board-item-list miro default 12292208 9994
-o miro-board-list miro default 12289351 2851
-o miro-sticky-note-create miro default 12310091 3738
-o miro-sticky-note-delete miro default 12318212 1954
-o miro-sticky-note-update miro default 12313835 4371
-o mysql-query mysql default 12320914 4163
-o mysql-schemas-list mysql default 12325083 1737
-o mysql-table-describe mysql default 12329270 3628
-o mysql-tables-list mysql default 12326826 2438
-o newrelic-alert-policy-list newrelic default 12345038 3047
-o newrelic-alert-violation-list newrelic default 12348091 4217
-o newrelic-application-get newrelic default 12340872 4160
-o newrelic-application-list newrelic default 12336205 4661
-o newrelic-deployment-create newrelic default 12356010 6144
-o newrelic-deployment-list newrelic default 12352314 3690
-o notion-database-query notion default 12369482 3464
-o notion-page-create notion default 12376143 4755
-o notion-page-get notion default 12366128 3348
-o notion-search notion default 12372952 3185
-o notion-user-me notion default 12364092 2030
-o okta-group-list okta default 12392185 3793
-o okta-user-deactivate okta default 12399793 3076
-o okta-user-get okta default 12388450 3729
-o okta-user-group-list okta default 12395984 3803
-o okta-user-list okta default 12383500 4944
+o launchdarkly-environment-list launchdarkly default 11180107 4284
+o launchdarkly-flag-get launchdarkly default 11189764 4079
+o launchdarkly-flag-list launchdarkly default 11184397 5361
+o launchdarkly-flag-toggle launchdarkly default 11193849 5711
+o launchdarkly-project-list launchdarkly default 11176453 3648
+o loki-query-range loki default 11200727 3881
+o mailchimp-audience-get mailchimp default 11214272 3936
+o mailchimp-audience-list mailchimp default 11209552 4714
+o mailchimp-audience-member-get mailchimp default 11225226 6149
+o mailchimp-audience-member-list mailchimp default 11218214 7006
+o mailchimp-audience-member-upsert mailchimp default 11231381 8966
+o mailchimp-campaign-list mailchimp default 11240353 4969
+o mailchimp-ping mailchimp default 11207482 2064
+o microsoft_graph-calendar-calendar-get microsoft_graph calendar 11273283 3752
+o microsoft_graph-calendar-category-list microsoft_graph calendar 12162643 159887
+o microsoft_graph-calendar-event-create microsoft_graph calendar 11266006 7271
+o microsoft_graph-calendar-event-get microsoft_graph calendar 11259460 6540
+o microsoft_graph-calendar-language-list microsoft_graph calendar 12326220 3988
+o microsoft_graph-calendar-time-zone-list microsoft_graph calendar 12322536 3678
+o microsoft_graph-files-item-get microsoft_graph files 11277041 5482
+o microsoft_graph-files-item-update microsoft_graph files 11282529 4785
+o microsoft_graph-mail-folder-list microsoft_graph mail 11256147 3307
+o microsoft_graph-mail-message-get microsoft_graph mail 11247434 5596
+o microsoft_graph-mail-message-list microsoft_graph mail 11287320 875317
+o microsoft_graph-mail-message-reply microsoft_graph mail 11253036 3105
+o miro-board-item-get miro default 12345519 7877
+o miro-board-item-list miro default 12335519 9994
+o miro-board-list miro default 12332662 2851
+o miro-sticky-note-create miro default 12353402 3738
+o miro-sticky-note-delete miro default 12361523 1954
+o miro-sticky-note-update miro default 12357146 4371
+o mysql-query mysql default 12364225 4163
+o mysql-schemas-list mysql default 12368394 1737
+o mysql-table-describe mysql default 12372581 3628
+o mysql-tables-list mysql default 12370137 2438
+o newrelic-alert-policy-list newrelic default 12388349 3047
+o newrelic-alert-violation-list newrelic default 12391402 4217
+o newrelic-application-get newrelic default 12384183 4160
+o newrelic-application-list newrelic default 12379516 4661
+o newrelic-deployment-create newrelic default 12399321 6144
+o newrelic-deployment-list newrelic default 12395625 3690
+o notion-database-query notion default 12412793 3464
+o notion-page-create notion default 12419454 4755
+o notion-page-get notion default 12409439 3348
+o notion-search notion default 12416263 3185
+o notion-user-me notion default 12407403 2030
+o okta-group-list okta default 12435496 3793
+o okta-user-deactivate okta default 12443104 3076
+o okta-user-get okta default 12431761 3729
+o okta-user-group-list okta default 12439295 3803
+o okta-user-list okta default 12426811 4944
 o ontology-branch-create b10x knowledge 878439 21208
 o ontology-branch-list b10x knowledge 874548 3885
 o ontology-branch-schema-extend b10x knowledge 899653 2727
@@ -827,24 +834,24 @@ o ontology-proposal-evaluate b10x knowledge 955038 6624
 o ontology-proposal-get b10x knowledge 948539 6493
 o ontology-proposal-promote b10x knowledge 963117 2095
 o ontology-schema-register b10x knowledge 965218 5429
-o openai-batch-list openai default 14072755 12873
-o openai-chat-completion openai default 12408175 5224
-o openai-embeddings-create openai default 12413405 4010
-o openai-file-list openai default 14067485 5264
-o openai-model-get openai default 12406065 2104
-o openai-models-list openai default 12403896 2163
-o openai-response-get openai default 12417421 1212702
-o openai-response-input-item-list openai default 13630129 437350
-o openrouter-chat-completion openrouter default 14090842 5888
-o openrouter-credits-get openrouter default 14096736 1808
-o openrouter-model-endpoints-list openrouter default 14088224 2612
-o openrouter-models-list openrouter default 14086581 1637
-o pagerduty-incident-acknowledge pagerduty default 14126047 5034
-o pagerduty-incident-get pagerduty default 14108879 5736
-o pagerduty-incident-list pagerduty default 14100383 8490
-o pagerduty-incident-resolve pagerduty default 14131087 4790
-o pagerduty-oncall-list pagerduty default 14120948 5093
-o pagerduty-service-list pagerduty default 14114621 6321
+o openai-batch-list openai default 14116066 12873
+o openai-chat-completion openai default 12451486 5224
+o openai-embeddings-create openai default 12456716 4010
+o openai-file-list openai default 14110796 5264
+o openai-model-get openai default 12449376 2104
+o openai-models-list openai default 12447207 2163
+o openai-response-get openai default 12460732 1212702
+o openai-response-input-item-list openai default 13673440 437350
+o openrouter-chat-completion openrouter default 14134153 5888
+o openrouter-credits-get openrouter default 14140047 1808
+o openrouter-model-endpoints-list openrouter default 14131535 2612
+o openrouter-models-list openrouter default 14129892 1637
+o pagerduty-incident-acknowledge pagerduty default 14169358 5034
+o pagerduty-incident-get pagerduty default 14152190 5736
+o pagerduty-incident-list pagerduty default 14143694 8490
+o pagerduty-incident-resolve pagerduty default 14174398 4790
+o pagerduty-oncall-list pagerduty default 14164259 5093
+o pagerduty-service-list pagerduty default 14157932 6321
 o planner-board-get b10x planning 1021694 199621
 o planner-decision-transition b10x planning 3074401 143410
 o planner-entity-create b10x planning 3217817 182491
@@ -870,154 +877,154 @@ o planner-sync-session-begin b10x planning 5239133 4648
 o planner-sync-session-confirm b10x planning 5655957 2461
 o planner-sync-session-preview b10x planning 5658424 415003
 o planner-sync-session-upload b10x planning 2960171 52735
-o postgresql-query postgresql default 14136574 4185
-o postgresql-schemas-list postgresql default 14140765 1694
-o postgresql-table-describe postgresql default 14144875 3598
-o postgresql-tables-list postgresql default 14142465 2404
-o postmark-bounce-get postmark server 14165005 3209
-o postmark-bounce-list postmark server 14160118 4881
-o postmark-deliverystats-get postmark server 14157504 2608
-o postmark-email-send postmark server 14150311 7187
-o prometheus-query-range prometheus default 14169518 3681
-o resend-domain-get resend default 14186757 5175
-o resend-domain-list resend default 14183432 3319
-o resend-email-get resend default 14178617 4809
-o resend-email-send resend default 14174388 4223
-o runpod-create-cluster runpod default 14436494 16834
-o runpod-create-delegation runpod default 14592068 3612
-o runpod-create-endpoint runpod default 14599940 37601
-o runpod-create-network-volume runpod default 14498848 5159
-o runpod-create-pod runpod default 14511837 38990
-o runpod-create-registry runpod default 14586042 3031
-o runpod-create-template runpod default 14713097 14411
-o runpod-delete-cluster runpod default 14469780 1331
-o runpod-delete-endpoint runpod default 14690561 1370
-o runpod-delete-network-volume runpod default 14510465 1366
-o runpod-delete-pod runpod default 14583171 1317
-o runpod-delete-registry runpod default 14598603 1331
-o runpod-delete-template runpod default 14748203 1288
-o runpod-get-cluster runpod default 14453334 7941
-o runpod-get-cpu-type runpod default 14336503 4889
-o runpod-get-data-center runpod default 14348420 5614
-o runpod-get-endpoint runpod default 14637547 19104
-o runpod-get-gpu-type runpod default 14323201 7894
-o runpod-get-network-volume runpod default 14504013 2554
-o runpod-get-pod runpod default 14246792 24874
-o runpod-get-registry runpod default 14597009 1588
-o runpod-get-ssh-keys runpod default 14354040 1402
-o runpod-get-template runpod default 14727514 7223
-o runpod-list-billing runpod default 14306044 17151
-o runpod-list-cluster-billing runpod default 14358461 12819
-o runpod-list-cluster-pods runpod default 14471117 27725
-o runpod-list-clusters runpod default 14427785 8703
-o runpod-list-cpu-types runpod default 14331101 5396
-o runpod-list-data-centers runpod default 14341398 7016
-o runpod-list-delegations runpod default 14589079 2983
-o runpod-list-endpoint-billing runpod default 14371286 9254
-o runpod-list-endpoint-releases runpod default 14691937 6107
-o runpod-list-endpoint-workers runpod default 14698050 7085
-o runpod-list-endpoints runpod default 14271672 21704
-o runpod-list-gpu-types runpod default 14296577 9461
-o runpod-list-network-volume-billing runpod default 14380546 12648
-o runpod-list-network-volumes runpod default 14293382 3189
-o runpod-list-pod-billing runpod default 14393200 12540
-o runpod-list-pods runpod default 14218260 28526
-o runpod-list-public-templates runpod default 14418960 8819
-o runpod-list-registries runpod default 14584494 1542
-o runpod-list-serverless-billing runpod default 14405746 13208
-o runpod-list-templates runpod default 14705141 7950
-o runpod-pod-action runpod default 14193000 25254
-o runpod-revoke-delegation runpod default 14595686 1317
-o runpod-update-cluster runpod default 14461281 8493
-o runpod-update-endpoint runpod default 14656657 33898
-o runpod-update-network-volume runpod default 14506573 3886
-o runpod-update-pod runpod default 14550833 32332
-o runpod-update-ssh-keys runpod default 14355448 3007
-o runpod-update-template runpod default 14734743 13454
-o salesforce-record-create salesforce default 14758046 3265
-o salesforce-record-get salesforce default 14754616 3424
-o salesforce-record-update salesforce default 14761317 2958
-o salesforce-sobject-describe salesforce default 14764281 4425
-o salesforce-whoami salesforce default 14751775 2835
-o sendgrid-email-validate sendgrid default 14780171 4121
-o sendgrid-suppression-bounce-list sendgrid default 14776814 3351
-o sendgrid-template-get sendgrid default 14774445 2363
-o sendgrid-template-list sendgrid default 14770350 4089
-o sentry-issue-event-latest sentry default 14805006 6935
-o sentry-issue-get sentry default 14785313 7008
-o sentry-issue-update sentry default 14792327 6365
-o sentry-project-get sentry default 14798698 6302
-o shopify-customer-get shopify default 14830653 5180
-o shopify-inventory-level-list shopify default 14835839 3461
-o shopify-order-get shopify default 14814142 6452
-o shopify-product-get shopify default 14820600 4772
-o shopify-product-update shopify default 14825378 5269
+o postgresql-query postgresql default 14179885 4185
+o postgresql-schemas-list postgresql default 14184076 1694
+o postgresql-table-describe postgresql default 14188186 3598
+o postgresql-tables-list postgresql default 14185776 2404
+o postmark-bounce-get postmark server 14208316 3209
+o postmark-bounce-list postmark server 14203429 4881
+o postmark-deliverystats-get postmark server 14200815 2608
+o postmark-email-send postmark server 14193622 7187
+o prometheus-query-range prometheus default 14212829 3681
+o resend-domain-get resend default 14230068 5175
+o resend-domain-list resend default 14226743 3319
+o resend-email-get resend default 14221928 4809
+o resend-email-send resend default 14217699 4223
+o runpod-create-cluster runpod default 14479805 16834
+o runpod-create-delegation runpod default 14635379 3612
+o runpod-create-endpoint runpod default 14643251 37601
+o runpod-create-network-volume runpod default 14542159 5159
+o runpod-create-pod runpod default 14555148 38990
+o runpod-create-registry runpod default 14629353 3031
+o runpod-create-template runpod default 14756408 14411
+o runpod-delete-cluster runpod default 14513091 1331
+o runpod-delete-endpoint runpod default 14733872 1370
+o runpod-delete-network-volume runpod default 14553776 1366
+o runpod-delete-pod runpod default 14626482 1317
+o runpod-delete-registry runpod default 14641914 1331
+o runpod-delete-template runpod default 14791514 1288
+o runpod-get-cluster runpod default 14496645 7941
+o runpod-get-cpu-type runpod default 14379814 4889
+o runpod-get-data-center runpod default 14391731 5614
+o runpod-get-endpoint runpod default 14680858 19104
+o runpod-get-gpu-type runpod default 14366512 7894
+o runpod-get-network-volume runpod default 14547324 2554
+o runpod-get-pod runpod default 14290103 24874
+o runpod-get-registry runpod default 14640320 1588
+o runpod-get-ssh-keys runpod default 14397351 1402
+o runpod-get-template runpod default 14770825 7223
+o runpod-list-billing runpod default 14349355 17151
+o runpod-list-cluster-billing runpod default 14401772 12819
+o runpod-list-cluster-pods runpod default 14514428 27725
+o runpod-list-clusters runpod default 14471096 8703
+o runpod-list-cpu-types runpod default 14374412 5396
+o runpod-list-data-centers runpod default 14384709 7016
+o runpod-list-delegations runpod default 14632390 2983
+o runpod-list-endpoint-billing runpod default 14414597 9254
+o runpod-list-endpoint-releases runpod default 14735248 6107
+o runpod-list-endpoint-workers runpod default 14741361 7085
+o runpod-list-endpoints runpod default 14314983 21704
+o runpod-list-gpu-types runpod default 14339888 9461
+o runpod-list-network-volume-billing runpod default 14423857 12648
+o runpod-list-network-volumes runpod default 14336693 3189
+o runpod-list-pod-billing runpod default 14436511 12540
+o runpod-list-pods runpod default 14261571 28526
+o runpod-list-public-templates runpod default 14462271 8819
+o runpod-list-registries runpod default 14627805 1542
+o runpod-list-serverless-billing runpod default 14449057 13208
+o runpod-list-templates runpod default 14748452 7950
+o runpod-pod-action runpod default 14236311 25254
+o runpod-revoke-delegation runpod default 14638997 1317
+o runpod-update-cluster runpod default 14504592 8493
+o runpod-update-endpoint runpod default 14699968 33898
+o runpod-update-network-volume runpod default 14549884 3886
+o runpod-update-pod runpod default 14594144 32332
+o runpod-update-ssh-keys runpod default 14398759 3007
+o runpod-update-template runpod default 14778054 13454
+o salesforce-record-create salesforce default 14801357 3265
+o salesforce-record-get salesforce default 14797927 3424
+o salesforce-record-update salesforce default 14804628 2958
+o salesforce-sobject-describe salesforce default 14807592 4425
+o salesforce-whoami salesforce default 14795086 2835
+o sendgrid-email-validate sendgrid default 14823482 4121
+o sendgrid-suppression-bounce-list sendgrid default 14820125 3351
+o sendgrid-template-get sendgrid default 14817756 2363
+o sendgrid-template-list sendgrid default 14813661 4089
+o sentry-issue-event-latest sentry default 14848317 6935
+o sentry-issue-get sentry default 14828624 7008
+o sentry-issue-update sentry default 14835638 6365
+o sentry-project-get sentry default 14842009 6302
+o shopify-customer-get shopify default 14873964 5180
+o shopify-inventory-level-list shopify default 14879150 3461
+o shopify-order-get shopify default 14857453 6452
+o shopify-product-get shopify default 14863911 4772
+o shopify-product-update shopify default 14868689 5269
 o sip-dial b10x default 809051 4029
-o slack-admin-app-requests-list slack admin 15512900 4440
-o slack-admin-conversations-search slack admin 15517346 63903
-o slack-admin-teams-list slack admin 15581255 3954
-o slack-admin-users-list slack admin 15585215 4408
-o slack-chat-post-message slack default 14851057 45332
-o slack-conversations-history slack default 14896395 49376
-o slack-conversations-info slack default 15194913 219005
-o slack-conversations-list slack default 14964459 230448
-o slack-conversations-replies slack default 14945777 18676
-o slack-reactions-add slack default 15506965 5929
-o slack-users-info slack default 15463431 43528
-o slack-users-list slack default 15413924 49501
+o slack-admin-app-requests-list slack admin 15556211 4440
+o slack-admin-conversations-search slack admin 15560657 63903
+o slack-admin-teams-list slack admin 15624566 3954
+o slack-admin-users-list slack admin 15628526 4408
+o slack-chat-post-message slack default 14894368 45332
+o slack-conversations-history slack default 14939706 49376
+o slack-conversations-info slack default 15238224 219005
+o slack-conversations-list slack default 15007770 230448
+o slack-conversations-replies slack default 14989088 18676
+o slack-reactions-add slack default 15550276 5929
+o slack-users-info slack default 15506742 43528
+o slack-users-list slack default 15457235 49501
 o speech-speak b10x default 813086 2907
 o speech-status b10x default 815999 2246
-o statuspage-component-list statuspage default 15615609 4304
-o statuspage-incident-create statuspage default 15602255 6655
-o statuspage-incident-get statuspage default 15597960 4289
-o statuspage-incident-list statuspage default 15592796 5158
-o statuspage-incident-update statuspage default 15608916 6687
-o stripe-balance-get stripe default 15627659 2591
-o stripe-billing-meter-list stripe default 15681494 9091
-o stripe-charge-get stripe default 15633336 3784
-o stripe-charge-refund-create stripe default 15652502 4638
-o stripe-country-spec-list stripe default 15657146 9134
-o stripe-customer-get stripe default 15630256 3074
-o stripe-event-list stripe default 15666286 9442
-o stripe-exchange-rate-list stripe default 15675734 5754
-o stripe-payment-intent-cancel stripe default 15648552 3944
-o stripe-payment-intent-capture stripe default 15643961 4585
-o stripe-payment-intent-get stripe default 15637126 3802
-o stripe-refund-get stripe default 15640934 3021
-o supabase-auth-settings supabase default 15700995 2955
-o supabase-rows-list supabase default 15697631 3358
-o supabase-schema-describe supabase default 15693691 3934
-o trello-board-get trello default 15710745 3619
-o trello-board-list trello default 15706917 3822
-o trello-board-lists trello default 15714370 1604
-o trello-card-archive trello default 15725801 4364
-o trello-card-create trello default 15720669 5126
-o trello-list-cards trello default 15715980 4683
-o twilio-account-get twilio default 15738971 2969
-o twilio-call-get twilio default 15761986 4476
-o twilio-call-list twilio default 15754133 7847
-o twilio-conference-list twilio default 15793774 7683
-o twilio-message-get twilio default 15749297 4830
-o twilio-message-list twilio default 15741946 7345
-o twilio-recording-get twilio default 15777149 8362
-o twilio-recording-list twilio default 15766468 10675
-o twilio-usage-record-list twilio default 15785517 8251
-o typeform-form-get typeform default 15811049 5108
-o typeform-form-list typeform default 15805446 5597
-o typeform-response-delete typeform default 15827225 3050
-o typeform-response-list typeform default 15816163 11056
-o typeform-user-me typeform default 15803167 2273
-o vercel-deployment-cancel vercel default 15844978 2663
-o vercel-deployment-get vercel default 15842017 2955
-o vercel-deployments-list vercel default 15836752 5259
-o vercel-project-get vercel default 15833783 2963
-o vercel-projects-list vercel default 15832305 1472
-o webflow-collection-get webflow default 15855290 4235
-o webflow-collection-item-get webflow default 15863616 3491
-o webflow-collection-item-list webflow default 15859531 4079
-o webflow-collection-list webflow default 15852209 3075
-o webflow-site-list webflow default 15849466 2737
-o webflow-site-publish webflow default 15867113 2360
+o statuspage-component-list statuspage default 15658920 4304
+o statuspage-incident-create statuspage default 15645566 6655
+o statuspage-incident-get statuspage default 15641271 4289
+o statuspage-incident-list statuspage default 15636107 5158
+o statuspage-incident-update statuspage default 15652227 6687
+o stripe-balance-get stripe default 15670970 2591
+o stripe-billing-meter-list stripe default 15724805 9091
+o stripe-charge-get stripe default 15676647 3784
+o stripe-charge-refund-create stripe default 15695813 4638
+o stripe-country-spec-list stripe default 15700457 9134
+o stripe-customer-get stripe default 15673567 3074
+o stripe-event-list stripe default 15709597 9442
+o stripe-exchange-rate-list stripe default 15719045 5754
+o stripe-payment-intent-cancel stripe default 15691863 3944
+o stripe-payment-intent-capture stripe default 15687272 4585
+o stripe-payment-intent-get stripe default 15680437 3802
+o stripe-refund-get stripe default 15684245 3021
+o supabase-auth-settings supabase default 15744306 2955
+o supabase-rows-list supabase default 15740942 3358
+o supabase-schema-describe supabase default 15737002 3934
+o trello-board-get trello default 15754056 3619
+o trello-board-list trello default 15750228 3822
+o trello-board-lists trello default 15757681 1604
+o trello-card-archive trello default 15769112 4364
+o trello-card-create trello default 15763980 5126
+o trello-list-cards trello default 15759291 4683
+o twilio-account-get twilio default 15782282 2969
+o twilio-call-get twilio default 15805297 4476
+o twilio-call-list twilio default 15797444 7847
+o twilio-conference-list twilio default 15837085 7683
+o twilio-message-get twilio default 15792608 4830
+o twilio-message-list twilio default 15785257 7345
+o twilio-recording-get twilio default 15820460 8362
+o twilio-recording-list twilio default 15809779 10675
+o twilio-usage-record-list twilio default 15828828 8251
+o typeform-form-get typeform default 15854360 5108
+o typeform-form-list typeform default 15848757 5597
+o typeform-response-delete typeform default 15870536 3050
+o typeform-response-list typeform default 15859474 11056
+o typeform-user-me typeform default 15846478 2273
+o vercel-deployment-cancel vercel default 15888289 2663
+o vercel-deployment-get vercel default 15885328 2955
+o vercel-deployments-list vercel default 15880063 5259
+o vercel-project-get vercel default 15877094 2963
+o vercel-projects-list vercel default 15875616 1472
+o webflow-collection-get webflow default 15898601 4235
+o webflow-collection-item-get webflow default 15906927 3491
+o webflow-collection-item-list webflow default 15902842 4079
+o webflow-collection-list webflow default 15895520 3075
+o webflow-site-list webflow default 15892777 2737
+o webflow-site-publish webflow default 15910424 2360
 o work-request-create b10x tasks 970653 6317
 o work-request-get b10x tasks 976976 4188
 o work-request-list b10x tasks 981170 8148
@@ -1038,44 +1045,44 @@ o workspaces-create b10x workspaces 3013950 4481
 o workspaces-delete b10x workspaces 3019790 2089
 o workspaces-get b10x workspaces 3018437 1347
 o workspaces-list b10x workspaces 3012912 1032
-o zendesk-custom-object-list zendesk default 15996544 5853
-o zendesk-custom-status-list zendesk default 16201588 5413
-o zendesk-group-list zendesk default 16173427 3756
-o zendesk-help-center-article-create zendesk help-center 16503252 9386
-o zendesk-help-center-article-get zendesk help-center 16481881 7842
-o zendesk-help-center-article-incremental-list zendesk help-center 16494737 8509
-o zendesk-help-center-article-list zendesk help-center 16473390 8485
-o zendesk-help-center-category-list zendesk help-center 16464649 4211
-o zendesk-help-center-section-list zendesk help-center 16468866 4518
-o zendesk-help-center-translation-list zendesk help-center 16489729 5002
-o zendesk-incremental-organization-list zendesk default 15982346 8617
-o zendesk-incremental-ticket-event-list zendesk default 15990969 5569
-o zendesk-incremental-ticket-list zendesk default 15881665 74662
-o zendesk-incremental-user-list zendesk default 15956333 26007
-o zendesk-messaging-conversation-create zendesk messaging 16512644 10167
-o zendesk-messaging-conversation-get zendesk messaging 16522817 10469
-o zendesk-messaging-conversation-update zendesk messaging 16533292 11165
-o zendesk-messaging-message-create zendesk messaging 16551517 276191
-o zendesk-messaging-message-list zendesk messaging 16827714 158036
-o zendesk-messaging-participant-list zendesk messaging 16544463 7048
-o zendesk-messaging-user-create zendesk messaging 16985756 10089
-o zendesk-messaging-user-get zendesk messaging 16995851 9350
-o zendesk-messaging-user-update zendesk messaging 17005207 9961
-o zendesk-organization-show zendesk default 16167422 5999
-o zendesk-test zendesk default 16207007 23020
-o zendesk-ticket-audit-list zendesk default 15875849 5810
-o zendesk-ticket-comment-list zendesk default 16303771 19767
-o zendesk-ticket-field-list zendesk default 16177189 15042
-o zendesk-ticket-form-list zendesk default 16192237 9345
-o zendesk-ticket-recent-list zendesk default 16002403 71467
-o zendesk-ticket-search zendesk default 16230033 5013
-o zendesk-ticket-show zendesk default 16235052 68713
-o zendesk-ticket-update zendesk default 16323544 141099
-o zendesk-user-show zendesk default 16145920 21496
-o zendesk-view-ticket-list zendesk default 16073876 72038
-o zoom-meeting-delete zoom default 17017076 2358
-o zoom-user-get zoom default 17019440 5881
-payload 17025603
+o zendesk-custom-object-list zendesk default 16039855 5853
+o zendesk-custom-status-list zendesk default 16244899 5413
+o zendesk-group-list zendesk default 16216738 3756
+o zendesk-help-center-article-create zendesk help-center 16546563 9386
+o zendesk-help-center-article-get zendesk help-center 16525192 7842
+o zendesk-help-center-article-incremental-list zendesk help-center 16538048 8509
+o zendesk-help-center-article-list zendesk help-center 16516701 8485
+o zendesk-help-center-category-list zendesk help-center 16507960 4211
+o zendesk-help-center-section-list zendesk help-center 16512177 4518
+o zendesk-help-center-translation-list zendesk help-center 16533040 5002
+o zendesk-incremental-organization-list zendesk default 16025657 8617
+o zendesk-incremental-ticket-event-list zendesk default 16034280 5569
+o zendesk-incremental-ticket-list zendesk default 15924976 74662
+o zendesk-incremental-user-list zendesk default 15999644 26007
+o zendesk-messaging-conversation-create zendesk messaging 16555955 10167
+o zendesk-messaging-conversation-get zendesk messaging 16566128 10469
+o zendesk-messaging-conversation-update zendesk messaging 16576603 11165
+o zendesk-messaging-message-create zendesk messaging 16594828 276191
+o zendesk-messaging-message-list zendesk messaging 16871025 158036
+o zendesk-messaging-participant-list zendesk messaging 16587774 7048
+o zendesk-messaging-user-create zendesk messaging 17029067 10089
+o zendesk-messaging-user-get zendesk messaging 17039162 9350
+o zendesk-messaging-user-update zendesk messaging 17048518 9961
+o zendesk-organization-show zendesk default 16210733 5999
+o zendesk-test zendesk default 16250318 23020
+o zendesk-ticket-audit-list zendesk default 15919160 5810
+o zendesk-ticket-comment-list zendesk default 16347082 19767
+o zendesk-ticket-field-list zendesk default 16220500 15042
+o zendesk-ticket-form-list zendesk default 16235548 9345
+o zendesk-ticket-recent-list zendesk default 16045714 71467
+o zendesk-ticket-search zendesk default 16273344 5013
+o zendesk-ticket-show zendesk default 16278363 68713
+o zendesk-ticket-update zendesk default 16366855 141099
+o zendesk-user-show zendesk default 16189231 21496
+o zendesk-view-ticket-list zendesk default 16117187 72038
+o zoom-meeting-delete zoom default 17060387 2358
+o zoom-user-get zoom default 17062751 5881
+payload 17068914
 {
   "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
   "auth": [
@@ -289005,6 +289012,247 @@ payload 17025603
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "confluence.service_api_token"
+        ],
+        [
+          "confluence.api_token"
+        ]
+      ],
+      "contract": {
+        "description": "Search permitted pages with CQL scoped to a space and lastmodified window. Dates use the authenticated account's configured timezone, not necessarily UTC: use a conservative overlap and filter version.when against the UTC cutoff. Follow only the cursor query value in _links.next, keeping CQL and limit unchanged; never fetch the returned URL directly. Expands version, body.storage and space. Stable identity is id plus version.number. Requires existing search:confluence read scope.",
+        "input_schema": {
+          "properties": {
+            "cql": {
+              "type": "string"
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "expand": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cql",
+            "limit",
+            "expand"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Search permitted pages with CQL scoped to a space and lastmodified window. Dates use the authenticated account's configured timezone, not necessarily UTC: use a conservative overlap and filter version.when against the UTC cutoff. Follow only the cursor query value in _links.next, keeping CQL and limit unchanged; never fetch the returned URL directly. Expands version, body.storage and space. Stable identity is id plus version.number. Requires existing search:confluence read scope.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "confluence-page-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "cql",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "cql"
+        },
+        {
+          "name": "cursor",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "cursor"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "expand",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "enum": [
+              "version,body.storage,space"
+            ],
+            "type": "string"
+          },
+          "symbol": "expand"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "cql",
+            "value": {
+              "$param": "cql"
+            }
+          },
+          {
+            "name": "cursor",
+            "value": {
+              "$param": "cursor"
+            }
+          },
+          {
+            "name": "expand",
+            "value": {
+              "$param": "expand"
+            }
+          },
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/content/search"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "_links": {
+            "properties": {
+              "base": {
+                "type": "string"
+              },
+              "next": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "properties": {
+                "_links": {
+                  "properties": {
+                    "base": {
+                      "type": "string"
+                    },
+                    "webui": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "body": {
+                  "properties": {
+                    "storage": {
+                      "properties": {
+                        "representation": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "space": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "version": {
+                  "properties": {
+                    "number": {
+                      "type": "integer"
+                    },
+                    "when": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "version"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "size",
+          "_links"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,
@@ -311122,6 +311370,1111 @@ payload 17025603
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List changed project pipelines. Repeat overlapping updated_after windows and follow native next_page. Each item includes pipeline id, SHA and updated_at revision. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List changed project pipelines. Repeat overlapping updated_after windows and follow native next_page. Each item includes pipeline id, SHA and updated_at revision. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-pipeline-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        },
+        {
+          "name": "ref",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "ref"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "ref",
+            "value": {
+              "$param": "ref"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/pipelines"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-deployment-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/deployments"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List commits on an explicitly selected ref_name, normally the project's discovered default_branch. since/until use ISO8601; identity and revision are the full commit id. Follow native next_page. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "ref_name": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page",
+            "ref_name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List commits on an explicitly selected ref_name, normally the project's discovered default_branch. since/until use ISO8601; identity and revision are the full commit id. Follow native next_page. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-repository-commit-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "ref_name",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "ref_name"
+        },
+        {
+          "name": "since",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "since"
+        },
+        {
+          "name": "until",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "until"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "ref_name",
+            "value": {
+              "$param": "ref_name"
+            }
+          },
+          {
+            "name": "since",
+            "value": {
+              "$param": "since"
+            }
+          },
+          {
+            "name": "until",
+            "value": {
+              "$param": "until"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/repository/commits"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List permitted project inventory and activity, optionally narrowed by last_activity_after and last_activity_before ISO8601 bounds. The native adapter preserves X-Next-Page as next_page and returns safe items with stable project id, default_branch, last_activity_at and web_url. Follow every page, including overlapping windows; existing gitlab-project-list keeps its legacy array output.",
+        "input_schema": {
+          "properties": {
+            "last_activity_after": {
+              "type": "string"
+            },
+            "last_activity_before": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List permitted project inventory and activity, optionally narrowed by last_activity_after and last_activity_before ISO8601 bounds. The native adapter preserves X-Next-Page as next_page and returns safe items with stable project id, default_branch, last_activity_at and web_url. Follow every page, including overlapping windows; existing gitlab-project-list keeps its legacy array output.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-project-activity-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "last_activity_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "last_activity_after"
+        },
+        {
+          "name": "last_activity_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "last_activity_before"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "last_activity_after",
+            "value": {
+              "$param": "last_activity_after"
+            }
+          },
+          {
+            "name": "last_activity_before",
+            "value": {
+              "$param": "last_activity_before"
+            }
+          },
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          }
+        ],
+        "url": "{base}/projects"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "default_branch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "integer"
+            },
+            "last_activity_at": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "path_with_namespace": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,
@@ -315932,6 +317285,399 @@ payload 17025603
         "public_network"
       ],
       "risk": "high",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.service_api_token"
+        ],
+        [
+          "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Read changed issues from one admitted project. The native Jira adapter builds fixed JQL with updated >= unquoted epoch milliseconds, orders updated ASC then key ASC, and reuses its safe issue projection. Repeat the same window and opaque next_page_token until is_last; overlapping windows retain stable issue id plus updated revision. No JQL text is accepted.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "next_page_token": {
+              "type": "string"
+            },
+            "project_key": {
+              "type": "string"
+            },
+            "updated_since_ms": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_key",
+            "updated_since_ms",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Read changed issues from one admitted project. The native Jira adapter builds fixed JQL with updated >= unquoted epoch milliseconds, orders updated ASC then key ASC, and reuses its safe issue projection. Repeat the same window and opaque next_page_token until is_last; overlapping windows retain stable issue id plus updated revision. No JQL text is accepted.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_key",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}$",
+            "type": "string"
+          },
+          "symbol": "project_key"
+        },
+        {
+          "name": "updated_since_ms",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 253402300799999,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "updated_since_ms"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "next_page_token",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "next_page_token"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "value": {
+              "$param": "next_page_token"
+            }
+          },
+          {
+            "name": "project_key",
+            "value": {
+              "$param": "project_key"
+            }
+          },
+          {
+            "name": "updated_since_ms",
+            "value": {
+              "$param": "updated_since_ms"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/2/search/jql"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "isLast": {
+            "type": "boolean"
+          },
+          "issues": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextPageToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "issues",
+          "isLast"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.service_api_token"
+        ],
+        [
+          "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List permitted Jira projects through the native adapter, restricted to configured project keys. Follow next_start_at even when local policy removes every item in a provider page. Project id is stable; key and name are discovery metadata.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "start_at": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List permitted Jira projects through the native adapter, restricted to configured project keys. Follow next_start_at even when local policy removes every item in a provider page. Project id is stable; key and name are discovery metadata.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "jira-project-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "start_at",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "start_at",
+          "wire": "startAt"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit",
+          "wire": "maxResults"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "maxResults",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "startAt",
+            "value": {
+              "$param": "start_at"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/2/project/search"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "isLast": {
+            "type": "boolean"
+          },
+          "maxResults": {
+            "type": "integer"
+          },
+          "startAt": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "values": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "values",
+          "isLast",
+          "startAt",
+          "maxResults",
+          "total"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
       "semantic_effects": [],
       "service": "default"
     }

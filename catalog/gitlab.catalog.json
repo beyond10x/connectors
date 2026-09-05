@@ -5169,6 +5169,1111 @@
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List changed project pipelines. Repeat overlapping updated_after windows and follow native next_page. Each item includes pipeline id, SHA and updated_at revision. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List changed project pipelines. Repeat overlapping updated_after windows and follow native next_page. Each item includes pipeline id, SHA and updated_at revision. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-pipeline-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        },
+        {
+          "name": "ref",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "ref"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "ref",
+            "value": {
+              "$param": "ref"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/pipelines"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-deployment-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/deployments"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List commits on an explicitly selected ref_name, normally the project's discovered default_branch. since/until use ISO8601; identity and revision are the full commit id. Follow native next_page. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "ref_name": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page",
+            "ref_name"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List commits on an explicitly selected ref_name, normally the project's discovered default_branch. since/until use ISO8601; identity and revision are the full commit id. Follow native next_page. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-repository-commit-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "ref_name",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "ref_name"
+        },
+        {
+          "name": "since",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "since"
+        },
+        {
+          "name": "until",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "until"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "ref_name",
+            "value": {
+              "$param": "ref_name"
+            }
+          },
+          {
+            "name": "since",
+            "value": {
+              "$param": "since"
+            }
+          },
+          {
+            "name": "until",
+            "value": {
+              "$param": "until"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/repository/commits"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "committed_date": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List permitted project inventory and activity, optionally narrowed by last_activity_after and last_activity_before ISO8601 bounds. The native adapter preserves X-Next-Page as next_page and returns safe items with stable project id, default_branch, last_activity_at and web_url. Follow every page, including overlapping windows; existing gitlab-project-list keeps its legacy array output.",
+        "input_schema": {
+          "properties": {
+            "last_activity_after": {
+              "type": "string"
+            },
+            "last_activity_before": {
+              "type": "string"
+            },
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List permitted project inventory and activity, optionally narrowed by last_activity_after and last_activity_before ISO8601 bounds. The native adapter preserves X-Next-Page as next_page and returns safe items with stable project id, default_branch, last_activity_at and web_url. Follow every page, including overlapping windows; existing gitlab-project-list keeps its legacy array output.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-project-activity-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "last_activity_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "last_activity_after"
+        },
+        {
+          "name": "last_activity_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "last_activity_before"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "last_activity_after",
+            "value": {
+              "$param": "last_activity_after"
+            }
+          },
+          {
+            "name": "last_activity_before",
+            "value": {
+              "$param": "last_activity_before"
+            }
+          },
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          }
+        ],
+        "url": "{base}/projects"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "default_branch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "integer"
+            },
+            "last_activity_at": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "path_with_namespace": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,

@@ -1,0 +1,11 @@
+version = 1
+
+[[spec]]
+path = "specs/gitlab/incremental-reads.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-09-05"
+reviewed_at = "2026-09-05"
+sha256 = "129650268db2202c3bded0a77257d8c4beb353d9e206b14bce5d855d97abb225"
+coverage = "exact-added-incremental-read-surface"
+purpose = "Source-grounded incremental reads and explicit continuation, projected through the existing provider and native or generic catalog runtime. Exact official endpoint references are recorded on each OpenAPI operation."
+references = ["https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination"]
