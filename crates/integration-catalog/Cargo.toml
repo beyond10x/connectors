@@ -2,7 +2,7 @@
 name = "integration-catalog"
 description = "Executes any catalogued HTTP operation from its declared request template. One adapter for every declared provider, instead of one crate each."
 edition = "2021"
-version = "0.6.4"
+version = "0.6.5"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -16,17 +16,17 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 # The reviewed facts: operations, credentials, configuration fields, risk, direction, verify probe.
-catalog = { version = "0.6.4", path = "../catalog" }
+catalog = { version = "0.6.5", path = "../catalog" }
 # The engine-free half: credential assembly, endpoint resolution, and the request plan. This crate
 # adds a socket to that and nothing else.
-connector-resolve = { version = "0.6.4", path = "../connector-resolve" }
-connector-address = { version = "0.6.4", path = "../connector-address" }
-connector-secrets = { version = "0.6.4", path = "../connector-secrets" }
-connector-state = { version = "0.6.4", path = "../connector-state" }
-connectors-config = { version = "0.6.4", path = "../connectors-config" }
-domain = { version = "0.6.4", path = "../domain" }
-protocol = { version = "0.6.4", path = "../protocol" }
-service = { version = "0.6.4", path = "../service" }
+connector-resolve = { version = "0.6.5", path = "../connector-resolve" }
+connector-address = { version = "0.6.5", path = "../connector-address" }
+connector-secrets = { version = "0.6.5", path = "../connector-secrets" }
+connector-state = { version = "0.6.5", path = "../connector-state" }
+connectors-config = { version = "0.6.5", path = "../connectors-config" }
+domain = { version = "0.6.5", path = "../domain" }
+protocol = { version = "0.6.5", path = "../protocol" }
+service = { version = "0.6.5", path = "../service" }
 
 async-trait = "0.1"
 getrandom = "0.3"
