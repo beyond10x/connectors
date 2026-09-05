@@ -4,7 +4,9 @@ use super::*;
 pub(super) fn is_incremental(id: &str) -> bool {
     matches!(
         id,
-        "gitlab-project-activity-list"
+        "gitlab-issue-search"
+            | "gitlab-merge-request-search"
+            | "gitlab-project-activity-list"
             | "gitlab-pipeline-list"
             | "gitlab-deployment-list"
             | "gitlab-repository-commit-list"
@@ -39,6 +41,13 @@ pub(super) fn input_schema(id: &str) -> Option<Value> {
     } else if id == "gitlab-pipeline-list" {
         properties["ref"] = serde_json::json!({"type":"string","minLength":1,"maxLength":256});
     }
+    if matches!(id, "gitlab-issue-search" | "gitlab-merge-request-search") {
+        properties["state"] = if id == "gitlab-issue-search" {
+            serde_json::json!({"type":"string","enum":["opened","closed","all"]})
+        } else {
+            serde_json::json!({"type":"string","enum":["opened","closed","locked","merged","all"]})
+        };
+    }
     Some(
         serde_json::json!({"type":"object","additionalProperties":false,"required":required,"properties":properties}),
     )
@@ -53,6 +62,7 @@ pub(super) fn output_schema(id: &str) -> Option<Value> {
                 "id" if id == "gitlab-repository-commit-list" => {
                     serde_json::json!({"type":"string"})
                 }
+                "confidential" | "draft" => serde_json::json!({"type":"boolean"}),
                 "id" | "iid" | "project_id" => serde_json::json!({"type":"integer"}),
                 _ => serde_json::json!({"type":["string","null"]}),
             };
@@ -72,6 +82,36 @@ pub(super) fn output_schema(id: &str) -> Option<Value> {
 
 fn fields(id: &str) -> Option<&'static [&'static str]> {
     match id {
+        "gitlab-issue-search" => Some(&[
+            "id",
+            "iid",
+            "project_id",
+            "title",
+            "description",
+            "state",
+            "confidential",
+            "created_at",
+            "updated_at",
+            "closed_at",
+            "web_url",
+        ]),
+        "gitlab-merge-request-search" => Some(&[
+            "id",
+            "iid",
+            "project_id",
+            "title",
+            "description",
+            "state",
+            "draft",
+            "sha",
+            "source_branch",
+            "target_branch",
+            "created_at",
+            "updated_at",
+            "merged_at",
+            "closed_at",
+            "web_url",
+        ]),
         "gitlab-project-activity-list" => Some(&[
             "id",
             "name",
@@ -146,7 +186,7 @@ pub(super) fn decode(
             value
                 .parse::<u64>()
                 .ok()
-                .filter(|next| *next > current)
+                .filter(|next| *next > current && *next <= u32::MAX as u64)
                 .ok_or_else(protocol_error)?,
         ),
         None => {
@@ -160,6 +200,13 @@ pub(super) fn decode(
             None
         }
     };
+    if next.is_none()
+        && response
+            .header("link")
+            .is_some_and(|value| value.contains("rel=\"next\"") || value.contains("rel=next"))
+    {
+        return Err(protocol_error());
+    }
     let payload = decode_value_response(response).map_err(|_| protocol_error())?;
     let items = payload.as_array().ok_or_else(protocol_error)?;
     let limit = input["per_page"].as_u64().ok_or_else(operation_invalid)?;
@@ -180,6 +227,7 @@ pub(super) fn decode(
         for key in allowed {
             if let Some(value) = object.get(*key) {
                 if !(value.is_null()
+                    || value.is_boolean()
                     || value.is_number()
                     || value.as_str().is_some_and(|s| s.len() <= 32768))
                 {
@@ -210,7 +258,11 @@ pub(super) fn decode(
             "updated_at"
         };
         // The vendor list must supply revision evidence: missing timestamps are an error, not a fresh observation.
-        if !item.get(revision).is_some_and(Value::is_string) {
+        if !item
+            .get(revision)
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.is_empty() && s.len() <= 64)
+        {
             return Err(protocol_error());
         }
         projected.push(Value::Object(item));
@@ -260,6 +312,8 @@ mod tests {
     #[test]
     fn two_pages_preserve_overlap_revisions_and_scrub_unknown_members() {
         for id in [
+            "gitlab-issue-search",
+            "gitlab-merge-request-search",
             "gitlab-project-activity-list",
             "gitlab-pipeline-list",
             "gitlab-deployment-list",

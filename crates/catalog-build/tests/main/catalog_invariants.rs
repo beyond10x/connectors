@@ -85,11 +85,20 @@ fn incremental_reads_are_catalogued_with_explicit_continuations() {
     let (workspace, plan) = full_plan();
     let documents = documents(&workspace, &plan);
     for (provider, ids) in [
-        ("jira", vec!["jira-project-list", "jira-issue-search"]),
+        (
+            "jira",
+            vec![
+                "jira-project-list",
+                "jira-issue-search",
+                "jira-issue-comments-read",
+            ],
+        ),
         ("confluence", vec!["confluence-page-search"]),
         (
             "gitlab",
             vec![
+                "gitlab-issue-search",
+                "gitlab-merge-request-search",
                 "gitlab-project-activity-list",
                 "gitlab-pipeline-list",
                 "gitlab-deployment-list",
@@ -110,7 +119,7 @@ fn incremental_reads_are_catalogued_with_explicit_continuations() {
             let properties = &operation["contract"]["input_schema"]["properties"];
             let (limit, continuation) = match id {
                 "jira-issue-search" => ("limit", "next_page_token"),
-                "jira-project-list" => ("limit", "start_at"),
+                "jira-project-list" | "jira-issue-comments-read" => ("limit", "start_at"),
                 "confluence-page-search" => ("limit", "cursor"),
                 _ => ("per_page", "page"),
             };

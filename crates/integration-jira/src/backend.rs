@@ -56,7 +56,8 @@ pub(super) const USER_SCOPES: [&str; 4] = [
     "read:me",
     "write:jira-work",
 ];
-pub(super) const JIRA_OPERATIONS: [&str; 11] = [
+pub(super) const JIRA_OPERATIONS: [&str; 12] = [
+    "jira-issue-comments-read",
     "jira-issue-search",
     "jira-project-list",
     "jira-issue-get",
@@ -288,7 +289,7 @@ impl ConnectorBackend for JiraBackend {
                     && ((request.connection_ref == ORG_CONNECTION_REF
                         && matches!(
                             request.operation_ref.as_str(),
-                            "jira-issue-search" | "jira-project-list"
+                            "jira-issue-search" | "jira-project-list" | "jira-issue-comments-read"
                         ))
                         || lock(&self.inner.metadata)
                             .connections

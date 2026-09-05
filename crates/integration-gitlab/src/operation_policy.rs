@@ -1,7 +1,9 @@
 //! GitLab operation identity and read/write admission policy.
 use super::*;
 
-pub(super) const GITLAB_OPERATIONS: [&str; 19] = [
+pub(super) const GITLAB_OPERATIONS: [&str; 21] = [
+    "gitlab-issue-search",
+    "gitlab-merge-request-search",
     "gitlab-project-activity-list",
     "gitlab-pipeline-list",
     "gitlab-deployment-list",
