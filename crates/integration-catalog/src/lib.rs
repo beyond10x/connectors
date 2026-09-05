@@ -379,7 +379,9 @@ impl Inner {
         {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
-                "no Connection admits this operation",
+                "no Connection admits this operation; for a personal catalog instance, authorize \
+                 allow_writes = true in its [[catalog]] policy and restart its daemon \
+                 (--allow writes applies when enrolling a new instance)",
             ));
         }
         let description_ref = lease_ref(operation_ref);
@@ -462,7 +464,9 @@ impl Inner {
         if !binding.admits(operation) {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
-                "this Connection's grant admits reads only; connect with --allow writes to raise it",
+                "this Connection's grant admits reads only; for this personal catalog instance, \
+                 authorize allow_writes = true in its [[catalog]] policy and restart its daemon \
+                 (--allow writes applies when enrolling a new instance)",
             ));
         }
         if !binding
