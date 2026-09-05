@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 2
-sha256 = "1915fcafc0ac718f6aa204e3521bc218e3c1da12e10ded27f6f20750dfa9ece4"
+sha256 = "3e14ccc8ed194f6000a6d9ca9430c1557680105bbb6c061888bdaacbf3834c7a"
 
 [[provider]]
 id = "airtable"
@@ -251,11 +251,11 @@ ir_sha256 = "5ec8959f98f8d96a333885e8b13966652059949c6aa23a7b06d25e6fc07d6ddd"
 [[provider]]
 id = "confluence"
 generator = "connectors 0.6.5"
-toml_sha256 = "35cd9116c45f4d89f508d8df9819f388be35fe5bef9129980d0acf178afc52c0"
-ir_sha256 = "d9667f463077bcb93416cb7be661fce9f3877a8d67f8d1e16e01c8630f9f3a4f"
+toml_sha256 = "b138f4f54ba8d8df0205707a7e6af0beb308521e220aa075e9f05483a702f189"
+ir_sha256 = "0f3023424331d4d95f6a924e796ebc10c4bb4b8e28eba13174bc2a4e8b5a334f"
 
 [provider.artifacts]
-"catalog/confluence.catalog.json" = "bac453aeae9d14240ce122ffa2ea2287625c939bdaeb55fff6960f2503b94d19"
+"catalog/confluence.catalog.json" = "5ec6c6f45c42c9d5be1e76a93c8e65400cf8406c6654b8edad4211a10b29dbb9"
 
 [[provider]]
 id = "contentful"
@@ -360,11 +360,11 @@ sha256 = "a7a3293268f062d09eb576806f0e5af271c039b9427f9852c8280c8fecc692e7"
 [[provider]]
 id = "gitlab"
 generator = "connectors 0.6.5"
-toml_sha256 = "599f0e59cce58b3bc6337989ad910b0c0272f2e56c53b620b6a2b35f41ae6449"
-ir_sha256 = "8f296f62a418dfcb6e59b15f93f939063ed8f6060ce383b602084701571b0084"
+toml_sha256 = "ec8e7f0066c4fbf34a39165822a76d6e54a0f89c917e4f4d6ed580f564fcc5ab"
+ir_sha256 = "f71afedf038e0325ebb668375d21b2e94c8f98bf76abf5e9869374b43ffe8a64"
 
 [provider.artifacts]
-"catalog/gitlab.catalog.json" = "d0f9c2b7141e91bccdfd778568f11e670736e095738a4a85b5e7731311b98881"
+"catalog/gitlab.catalog.json" = "c4b9fae8275df0e830a3a7aa99151eeaa0abe99f2214ef1eae5614c3d4d0ef74"
 
 [[provider]]
 id = "google"
@@ -412,11 +412,11 @@ ir_sha256 = "2aa268b3584a81c12b74429e75768630db084db3f1080fae87f2c93d1f19eef1"
 [[provider]]
 id = "jira"
 generator = "connectors 0.6.5"
-toml_sha256 = "b5a82924bdf58daf9a61ce3da7bfb7b86d7c283cf5fe719bbb63498a5e483ae6"
-ir_sha256 = "429da4e5ffc187f1fe16dcebc7b224e714f3aaa6105dd43a641a154d9039d44d"
+toml_sha256 = "7a254231475118aeb92aed11ce522a4923f268dd9e60b649150beeaff2c2b6b8"
+ir_sha256 = "5577b429a58a1d2698bc0937e70314891d87c0de78551a229512f7fc2ccef192"
 
 [provider.artifacts]
-"catalog/jira.catalog.json" = "931eefc57f37069e70d2bf8a038c84881e7afb2aa265f0e1f0777672e9c156ce"
+"catalog/jira.catalog.json" = "5bebba7dc2376b2c2f3057ecccd4248bdd9e232c753d6efb8ec5233867539802"
 
 [[provider]]
 id = "klaviyo"

@@ -793,3 +793,70 @@ secret = true
 required = false
 docs_url = "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
 binds = "oauth.client_secret"
+
+# Repository-authored read contract: specs/jira/incremental-reads.openapi.yaml.
+[[operations]]
+id = "jira-issue-search"
+service = "default"
+method = "GET"
+path = "/rest/api/2/search/jql"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Read changed issues from one admitted project. The native Jira adapter builds fixed JQL with updated >= unquoted epoch milliseconds, orders updated ASC then key ASC, and reuses its safe issue projection. Repeat the same window and opaque next_page_token until is_last; overlapping windows retain stable issue id plus updated revision. No JQL text is accepted."
+[[operations.params.query]]
+name = "project_key"
+required = true
+schema = { type = "string", pattern = "^[A-Z][A-Z0-9_]{0,31}$", minLength = 1, maxLength = 32 }
+[[operations.params.query]]
+name = "updated_since_ms"
+required = true
+schema = { type = "integer", minimum = 0, maximum = 253402300799999 }
+[[operations.params.query]]
+name = "limit"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "next_page_token"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 4096 }
+[operations.response_schema]
+type = "object"
+required = ["issues", "isLast"]
+properties = { issues = { type = "array", items = { type = "object" } }, isLast = { type = "boolean" }, nextPageToken = { type = "string" } }
+
+[[operations]]
+id = "jira-project-list"
+service = "default"
+method = "GET"
+path = "/rest/api/2/project/search"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "List permitted Jira projects through the native adapter, restricted to configured project keys. Follow next_start_at even when local policy removes every item in a provider page. Project id is stable; key and name are discovery metadata."
+[[operations.params.query]]
+name = "start_at"
+wire = "startAt"
+required = false
+schema = { type = "integer", minimum = 0, maximum = 4294967295 }
+[[operations.params.query]]
+name = "limit"
+wire = "maxResults"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[operations.response_schema]
+type = "object"
+required = ["values", "isLast", "startAt", "maxResults", "total"]
+properties = { values = { type = "array", items = { type = "object", properties = { id = { type = "string" }, key = { type = "string" }, name = { type = "string" } } } }, isLast = { type = "boolean" }, startAt = { type = "integer" }, maxResults = { type = "integer" }, total = { type = "integer" } }
