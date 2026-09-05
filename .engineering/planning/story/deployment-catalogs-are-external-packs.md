@@ -2,14 +2,28 @@
 format: aep.planning-md/1
 id: story:deployment-catalogs-are-external-packs
 kind: story
-status: draft
+status: proposed
 title: Deployment catalogs are external immutable packs
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-075
 relations:
 - derived_from: epic:deployment-packs
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/catalog-build
+- confidence: inferred
+  path: crates/catalog-reader
+- confidence: inferred
+  path: crates/connectors-config
+- confidence: inferred
+  path: crates/connectors-runtime
+- confidence: inferred
+  path: docs/design
+revision: 9
 ---
 ## Acceptance
 
@@ -55,3 +69,7 @@ Migrated from `docs/stories/S-075-deployment-catalogs-are-external-packs.md`, wh
 - First written 2026-09-01 · last touched 2026-09-02 · 2 revision(s)
 - Legacy id `S-075`, recorded as the reference `legacy:S-075`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 1 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

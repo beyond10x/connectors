@@ -2,14 +2,44 @@
 format: aep.planning-md/1
 id: story:connect-session-oauth-custody-in-personal-posture
 kind: story
-status: draft
+status: proposed
 title: Decide the connect-session ↔ OAuth-callback custody chain in personal posture
+tags:
+- ready
+- wave-cli
 refs:
 - provider: legacy
   reference: S-013
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: cited
+  path: crates/catalog-build/src/document.rs
+- confidence: cited
+  path: crates/catalog/src/lib.rs
+- confidence: cited
+  path: crates/catalog/src/table.rs
+- confidence: inferred
+  path: crates/catalog/tests/main/consumer_api.rs
+- confidence: inferred
+  path: crates/connector-spec/schema/provider-toml.schema.json
+- confidence: cited
+  path: crates/connector-spec/src/auth.rs
+- confidence: inferred
+  path: crates/connector-spec/src/provider/auth_validation.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/oauth2_acquisition.rs
+- confidence: cited
+  path: docs/design/07-credential-custody-topologies.md
+- confidence: inferred
+  path: docs/design/21-personal-oauth-callback-custody.md
+- confidence: inferred
+  path: providers/gitlab.toml
+- confidence: inferred
+  path: providers/jira.toml
+- confidence: inferred
+  path: providers/slack.toml
+revision: 33
 ---
 ## Acceptance
 
@@ -65,3 +95,33 @@ Migrated from `docs/stories/S-013-connect-session-oauth-custody-in-personal-post
 - First written 2026-08-13 · last touched 2026-08-13 · 2 revision(s)
 - Legacy id `S-013`, recorded as the reference `legacy:S-013`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 3 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `docs/design/21-personal-oauth-callback-custody.md` — inferred.
+- `crates/connector-spec/src/auth.rs` — cited.
+- `crates/connector-spec/src/provider/auth_validation.rs` — inferred.
+- `crates/connector-spec/schema/provider-toml.schema.json` — inferred.
+- `crates/connector-spec/tests/main/oauth2_acquisition.rs` — inferred.
+- `crates/catalog/src/lib.rs` — cited.
+- `crates/catalog/src/table.rs` — cited.
+- `crates/catalog-build/src/document.rs` — cited.
+- `crates/catalog/tests/main/consumer_api.rs` — inferred.
+- `docs/design/07-credential-custody-topologies.md` — cited.
+- `providers/gitlab.toml` — inferred.
+- `providers/slack.toml` — inferred.
+- `providers/jira.toml` — inferred.
+
+Medium confidence. Existing PendingStates/PKCE/custody are reusable. Current raw-credential loopback is not an OAuth callback. A decision and schema alone cannot satisfy runtime acceptance; confirm provider callback facts from official sources, settle callback/device transport and type any new values before dispatch. Reserve design 21 for this decision.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 9 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
