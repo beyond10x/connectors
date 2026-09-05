@@ -76,21 +76,52 @@ enum Command {
     },
     /// Manage durable Connections through the credential-free control socket.
     Connection {
+        /// Deployment to reach. A saved login never changes the local default.
+        #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
+        target: Target,
         #[command(subcommand)]
         command: ConnectionCommand,
     },
     /// Search or receive durable normalized data events.
     Event {
+        /// Deployment to reach. A saved login never changes the local default.
+        #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
+        target: Target,
         #[command(subcommand)]
         command: EventCommand,
     },
     /// Search, describe, or invoke admitted Connector operations.
     Operation {
+        /// Deployment to reach. A saved login never changes the local default.
+        #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
+        target: Target,
         #[command(subcommand)]
         command: OperationCommand,
     },
     /// Operate an Identity-protected hosted Connectors instance.
     Admin(admin::CommandOptions),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum Target {
+    Local,
+    Hosted,
+}
+
+impl Target {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Hosted => "hosted",
+        }
+    }
+
+    fn validate(self, config: &Option<PathBuf>, state: &Option<PathBuf>) -> Result<(), MainError> {
+        if self == Self::Hosted && (config.is_some() || state.is_some()) {
+            return Err(MainError::TargetConflict);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -426,6 +457,8 @@ enum MainError {
     Unhealthy,
     #[error("`connectors serve mcp` owns stdout and cannot be combined with --output")]
     McpOutput,
+    #[error("--target hosted cannot be combined with local-only --config or --state-root")]
+    TargetConflict,
 }
 
 impl MainError {
@@ -440,6 +473,7 @@ impl MainError {
             Self::Runtime(_) => "runtime",
             Self::Config(_) | Self::Init(_) => "configuration",
             Self::Client(_) => "connector-unreachable",
+            Self::Identity(IdentityError::NoActiveLogin) => "hosted-login-required",
             Self::Identity(_) => "identity",
             Self::Hosted(_) => "hosted-connector",
             Self::Io(_) => "io",
@@ -451,6 +485,7 @@ impl MainError {
             Self::Refused(refusal) => &refusal.code,
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
+            Self::TargetConflict => "target-conflict",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",
             Self::Admin(_) => "admin",
@@ -513,10 +548,7 @@ const LEGACY_WINDOW: usize = 8;
 /// before the external subcommand is reached. So the escape is looked for among the tokens clap
 /// took in front of the word: the tail is the argv after the word verbatim, so those are
 /// everything before it. This is the one token read here without clap, and it is clap's own.
-fn read_one_word(
-    tree: &clap::Command,
-    words: &[OsString],
-) -> Option<(Vec<OsString>, Option<(String, Vec<OsString>)>)> {
+fn read_one_word(tree: &clap::Command, words: &[OsString]) -> Option<ReadWord> {
     let globals: Vec<&clap::Arg> = tree
         .get_arguments()
         .filter(|argument| argument.is_global_set())
@@ -571,6 +603,8 @@ fn read_one_word(
     }
     Some((read, word))
 }
+
+type ReadWord = (Vec<OsString>, Option<(String, Vec<OsString>)>);
 
 /// The row of [`MOVED`] the words walked so far name: the longest whose old path they begin with.
 fn row(walked: &[&str]) -> Option<(&'static [&'static str], &'static [&'static str])> {
@@ -758,10 +792,16 @@ where
     // Captured before dispatch: a failure must be rendered in the format the caller asked for, and
     // the command that failed is no longer available to ask.
     let format = cli.output;
+    let target = match &cli.command {
+        Command::Connection { target, .. }
+        | Command::Event { target, .. }
+        | Command::Operation { target, .. } => Some(target.as_str()),
+        _ => None,
+    };
     match run(cli).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
-            output::emit_error(format, error.code(), &error.to_string());
+            output::emit_error_with_target(format, error.code(), &error.to_string(), target);
             std::process::ExitCode::FAILURE
         }
     }
@@ -870,6 +910,8 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                         "connectors_base": session.connectors_base,
                         "identity_origin": session.identity_origin,
                         "tenant_id": session.tenant_id,
+                        "default_target": "local",
+                        "note": "Login never changes the default local target; choose --target hosted to use this deployment.",
                     }),
                 )?;
                 Ok(())
@@ -896,9 +938,9 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 Ok(())
             }
         },
-        Command::Connection { command } => connection(format, command).await,
-        Command::Event { command } => event(format, command).await,
-        Command::Operation { command } => operation(format, command).await,
+        Command::Connection { target, command } => connection(format, target, command).await,
+        Command::Event { target, command } => event(format, target, command).await,
+        Command::Operation { target, command } => operation(format, target, command).await,
         Command::Admin(command) => admin::run(format, command).await.map_err(Into::into),
     }
 }
@@ -988,7 +1030,11 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
     Ok(())
 }
 
-async fn connection(format: Format, command: ConnectionCommand) -> Result<(), MainError> {
+async fn connection(
+    format: Format,
+    target: Target,
+    command: ConnectionCommand,
+) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         ConnectionCommand::Candidates {
             config,
@@ -1055,16 +1101,13 @@ async fn connection(format: Format, command: ConnectionCommand) -> Result<(), Ma
             }),
         ),
     };
-    if config_path.is_none() && state_root.is_none() {
-        match AuthenticatedHostedClient::active() {
-            Ok(client) => {
-                let response = client.connection(request).await?;
-                output::emit(format, &reduce_envelope!(response)?)?;
-                return Ok(());
-            }
-            Err(IdentityError::NoActiveLogin) => {}
-            Err(error) => return Err(error.into()),
-        }
+    target.validate(&config_path, &state_root)?;
+    if target == Target::Hosted {
+        let response = AuthenticatedHostedClient::active()?
+            .connection(request)
+            .await?;
+        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        return Ok(());
     }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
@@ -1072,11 +1115,11 @@ async fn connection(format: Format, command: ConnectionCommand) -> Result<(), Ma
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .connection(&config.owner_context(), request)
         .await?;
-    output::emit(format, &reduce_envelope!(response)?)?;
+    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
-async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
+async fn event(format: Format, target: Target, command: EventCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         EventCommand::Search {
             config,
@@ -1115,16 +1158,11 @@ async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
             EventRequest::Replay(ReplayRequest { event_ref: event }),
         ),
     };
-    if config_path.is_none() && state_root.is_none() {
-        match AuthenticatedHostedClient::active() {
-            Ok(client) => {
-                let response = client.event(request).await?;
-                output::emit(format, &reduce_envelope!(response)?)?;
-                return Ok(());
-            }
-            Err(IdentityError::NoActiveLogin) => {}
-            Err(error) => return Err(error.into()),
-        }
+    target.validate(&config_path, &state_root)?;
+    if target == Target::Hosted {
+        let response = AuthenticatedHostedClient::active()?.event(request).await?;
+        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        return Ok(());
     }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
@@ -1132,11 +1170,15 @@ async fn event(format: Format, command: EventCommand) -> Result<(), MainError> {
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
         .await?;
-    output::emit(format, &reduce_envelope!(response)?)?;
+    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
-async fn operation(format: Format, command: OperationCommand) -> Result<(), MainError> {
+async fn operation(
+    format: Format,
+    target: Target,
+    command: OperationCommand,
+) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
         OperationCommand::Search {
             config,
@@ -1197,16 +1239,13 @@ async fn operation(format: Format, command: OperationCommand) -> Result<(), Main
             )
         }
     };
-    if config_path.is_none() && state_root.is_none() {
-        match AuthenticatedHostedClient::active() {
-            Ok(client) => {
-                let response = client.operation(request).await?;
-                output::emit(format, &reduce_envelope!(response)?)?;
-                return Ok(());
-            }
-            Err(IdentityError::NoActiveLogin) => {}
-            Err(error) => return Err(error.into()),
-        }
+    target.validate(&config_path, &state_root)?;
+    if target == Target::Hosted {
+        let response = AuthenticatedHostedClient::active()?
+            .operation(request)
+            .await?;
+        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        return Ok(());
     }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
@@ -1214,7 +1253,7 @@ async fn operation(format: Format, command: OperationCommand) -> Result<(), Main
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .operation(&config.owner_context(), request)
         .await?;
-    output::emit(format, &reduce_envelope!(response)?)?;
+    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
