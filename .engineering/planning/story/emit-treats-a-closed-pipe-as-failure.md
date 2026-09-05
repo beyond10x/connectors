@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:emit-treats-a-closed-pipe-as-failure
 kind: story
-status: proposed
+status: active
 title: A reader that closes the pipe early makes connectors exit non-zero
 summary: emit returns Err(BrokenPipe) and only the completions subcommand maps it to success, so piping into head fails above the pipe buffer.
 tags:
@@ -13,7 +13,7 @@ scope:
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/closed_pipe.rs
-revision: 11
+revision: 12
 ---
 ## Context
 

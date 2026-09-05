@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 12
+revision: 13
 ---
 
 ## Authorization and objective
@@ -1034,3 +1034,836 @@ The operator further clarified on 2026-09-06: connector definitions should norma
 Before publication, the coordinator retained the original unpublished review/store delta privately, restored its own uncommitted store changes to the committed base, and replayed them through AEP with local home prefixes replaced by `~`. Immutable published review records were not edited. Raw reports remain available in assigned private scratch; public records declare the mechanical path redaction without changing counts, assertions or findings. Subsequent planning writes identify the executing wave agent through AEP_ACTOR.
 
 Atlas authority advanced to clean remote main 4911915de3bea434b6092d245b9f3ef98d6f0eca and was provisioned read-only in managed tree wt-ae608b71b66b. Both final adversarial passes found nothing: target selection 168→171 executed cases, workload inventory 60→63. Corrections and retained cases preserve prior reviewed commits as ancestors.
+
+## Second implementation batch
+
+First batch is integrated at 76f3fef9ce53a92d54d5e1c8147c5943315d423f. Full integration gate remains pending; story closure waits for it and final delivery. The next three worker assignments start at that exact source base. The same four-slot harness cap allows three workers. Disk before provisioning: 54 GB free; floor remains 20 GB.
+
+| Unit | Branch | Managed tree | Build below tree | Scratch | Short TMPDIR | Stage |
+|---|---|---|---|---|---|---|
+| `one-placement-several-credentials` | `impl/one-placement-several-credentials` | `~/.local/state/worktree/trees/b10x/connectors/wt-03d120cf8736` | `crates/connectors-runtime/target; crates/connectors-console/target` | `~/.cache/connectors-cli-wave-20260906/one-placement-several-credentials` | `~/.cache/cw6/m` | implementation |
+| `emit-treats-a-closed-pipe-as-failure` | `impl/emit-treats-a-closed-pipe-as-failure` | `~/.local/state/worktree/trees/b10x/connectors/wt-55b6348b9982` | `crates/connectors-cli/target` | `~/.cache/connectors-cli-wave-20260906/emit-treats-a-closed-pipe-as-failure` | `~/.cache/cw6/e` | implementation |
+| `personal-gitlab-schedules-are-discoverable-and-governed` | `impl/personal-gitlab-schedules-are-discoverable-and-governed` | `~/.local/state/worktree/trees/b10x/connectors/wt-0374e7372138` | `target` | `~/.cache/connectors-cli-wave-20260906/personal-gitlab-schedules-are-discoverable-and-governed` | `~/.cache/cw6/g` | official-source stage only |
+
+The computed full-story proposal separates GitLab from the CLI and catalog-runtime owners. This dispatch follows that constraint by limiting its first stage to official-source vendoring, importer/projection and catalog artifacts. It cannot edit the CLI or catalog runtime while closed-pipe and multi-credential units own them. Coordinator integrates those prerequisites before GitLab's second stage; no story is closed on source prep alone. Each unit brief names this stage restriction and exact paths. One-shot CLI composition follows the closed-pipe unit; rate-limit work follows a coordinated version decision; OAuth precedes auth remediation.
+
+Full unfiltered computed proposal before these three moves:
+
+```json
+{
+  "waves": [
+    {
+      "wave": 1,
+      "artifacts": [
+        {
+          "id": "story:auth-as-tool-result",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "contracts"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/identity.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/response.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/domain/src/grant.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-gitlab/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/api_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/connection_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/connection.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/operation.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/tests/bundles.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/admission.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/connection_route.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/enforcement.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server/src/hosted/tests"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/local.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/service/src/connect_session.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/service/src/runtime.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/connection.yaml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/runtime.yaml"
+            }
+          ]
+        },
+        {
+          "id": "story:connect-session-oauth-custody-in-personal-posture",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/src/document.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/table.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog/tests/main/consumer_api.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/schema/provider-toml.schema.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/auth.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/src/provider/auth_validation.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/tests/main/oauth2_acquisition.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/design/07-credential-custody-topologies.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design/21-personal-oauth-callback-custody.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/gitlab.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/jira.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/slack.toml"
+            }
+          ]
+        },
+        {
+          "id": "story:deployment-catalogs-are-external-packs",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-reader"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-config"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "artifacts": [
+        {
+          "id": "story:deployment-declared-destination-aperture",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-config"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/domain"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/service"
+            }
+          ]
+        },
+        {
+          "id": "story:emit-treats-a-closed-pipe-as-failure",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/tests/closed_pipe.rs"
+            }
+          ]
+        },
+        {
+          "id": "story:one-placement-several-credentials",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-config/src/personal.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/auth.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/enrol.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-console/src/output_tests.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-catalog/src/hosted.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/guides/connect-slack.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/connection.yaml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/deployment.yaml"
+            }
+          ]
+        },
+        {
+          "id": "story:sources-are-processed-by-code",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec"
+            }
+          ]
+        },
+        {
+          "id": "story:the-claims-journal-survives-a-full-life",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design/13-grant-evaluation-and-approval-redemption.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "artifacts": [
+        {
+          "id": "story:one-shot-operations-without-a-daemon",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/README.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/tests/one_shot_operations.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/doctor.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/composition.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/local.rs"
+            }
+          ]
+        },
+        {
+          "id": "story:per-service-verification-probes",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-resolve"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-console"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/service"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "artifacts": [
+        {
+          "id": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "Cargo.lock"
+            },
+            {
+              "confidence": "inferred",
+              "path": "SOURCES.toml"
+            },
+            {
+              "confidence": "cited",
+              "path": "catalog/gitlab.catalog.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "connectors.lock"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/tests/main/catalog_invariants.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-cli/Cargo.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-cli/examples/vendor_gitlab.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/tests/search_bounds.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime/src/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-catalog/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/guides/connect-gitlab.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/gitlab.yaml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/system.yaml"
+            },
+            {
+              "confidence": "cited",
+              "path": "providers/gitlab.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "specs/gitlab.provenance.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "specs/gitlab/coverage-19.4.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "specs/gitlab/openapi-19.4.yaml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "artifacts": [
+        {
+          "id": "story:rate-limit-in-the-protocol",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "catalog/slack.catalog.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "connectors.lock"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/connector-operation/v0alpha1"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/tests/main/catalog_invariants.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog/src/table.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-resolve/src/document.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/ir.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/envelope.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/output.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/service_bundle.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-gitlab/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-jira/src/backend/operations.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-kubernetes/src"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-mcp/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-monitoring/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-platform/src/datasource.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-platform/src/surface.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-sip/src/backend/mod.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/api_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/operation.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/tests/bundles.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server/src/hosted/mcp/toolset.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/tests"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/catalog.yaml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/slack.toml"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "collisions": [
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:emit-treats-a-closed-pipe-as-failure",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:one-placement-several-credentials",
+      "path": "ess/system/domains/connection.yaml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:one-shot-operations-without-a-daemon",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:one-shot-operations-without-a-daemon",
+      "path": "crates/server/src/local.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "crates/connectors-runtime/src/registry.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-runtime/src/registry.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-gitlab/src/backend.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-slack/src/backend/api_runtime.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/protocol/src/operation.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/protocol/tests/bundles.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/server/src/hosted.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/server/src/hosted/tests",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "providers/gitlab.toml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog/src/table.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "providers/slack.toml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:deployment-declared-destination-aperture",
+      "path": "crates/connectors-config",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:per-service-verification-probes",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:the-claims-journal-survives-a-full-life",
+      "path": "crates/connectors-runtime",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-declared-destination-aperture",
+      "b": "story:per-service-verification-probes",
+      "path": "crates/service",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:emit-treats-a-closed-pipe-as-failure",
+      "b": "story:one-shot-operations-without-a-daemon",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:emit-treats-a-closed-pipe-as-failure",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:emit-treats-a-closed-pipe-as-failure",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:one-placement-several-credentials",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "crates/integration-catalog/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:one-placement-several-credentials",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-catalog/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:one-shot-operations-without-a-daemon",
+      "b": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:one-shot-operations-without-a-daemon",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:per-service-verification-probes",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:per-service-verification-probes",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/connector-spec",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "connectors.lock",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog-build/tests/main/catalog_invariants.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-runtime/src/registry.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:personal-gitlab-schedules-are-discoverable-and-governed",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-catalog/src/lib.rs",
+      "confidence": "cited"
+    }
+  ],
+  "unassessed": [],
+  "cycles": []
+}
+
+```
