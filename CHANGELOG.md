@@ -9,6 +9,12 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## Unreleased
+
+- Catalog write descriptions now use any admitting connection instead of being hidden by an
+  earlier read-only connection. Search and describe report required approval for writes, matching
+  the operation protocol; invocation still validates the explicitly selected connection.
+
 ## 0.6.5 — 2026-09-05
 
 - Keep legacy GitLab connections inactive until a verified reconnect binds current authority,

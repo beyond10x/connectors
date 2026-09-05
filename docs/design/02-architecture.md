@@ -416,3 +416,12 @@ credential-path machinery.
    same-origin lesson) — after M3 at the earliest.
 4. Encryption-at-rest and tenant-isolation evidence for the hosted PostgreSQL posture — decide
    with the SaaS design while keeping all secret material out of the database.
+
+
+## 2026-09-05 amendment: catalog connection admission
+
+Discovery describes an operation when at least one configured connection admits it. Connection
+order cannot hide a write that another connection admits. Search and describe both project the
+operation's declared effect into the protocol's approval posture: writes require approval. The
+invocation path still checks the caller's selected connection and its grant before credentials
+are resolved. Approval enforcement remains at the operation boundary, not inside the adapter.
