@@ -1,6 +1,6 @@
-# Design 02: architecture
+# Architecture (design reference)
 
-**Status:** draft for review · **Date:** 2026-08-13
+**Status:** draft for review · **Date:** 2026-08-13 · **2026-09-05 reading guide:** [Current architecture handbook](../architecture/README.md).
 **Inputs:** [01-domain-model.md](01-domain-model.md) ·
 [../research/catalog-precedents.md](../research/catalog-precedents.md) · the measured predecessor
 inventory (what migrates wholesale, what is redesigned, what is left behind).
