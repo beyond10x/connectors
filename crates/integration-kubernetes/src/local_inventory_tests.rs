@@ -816,4 +816,207 @@ mod inventory_tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn adversary_final_invalid_inputs_do_not_spend_a_live_inventory_cursor() {
+        let (client, calls) = fixture_client(vec![
+            (
+                200,
+                page(
+                    vec![deployment("first", "apps", "example/first:v1", 1)],
+                    "next",
+                ),
+            ),
+            (
+                200,
+                page(vec![deployment("last", "apps", "example/last:v1", 1)], ""),
+            ),
+        ]);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        let first = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "limit": 1}),
+        )
+        .await
+        .unwrap();
+        let cursor = first["next_cursor"].as_str().unwrap();
+        let description = backend
+            .operation_description(&backend.owner, WORKLOADS)
+            .unwrap();
+        assert_eq!(
+            description.input_schema["properties"]["limit"]["minimum"],
+            1
+        );
+        assert_eq!(
+            description.input_schema["properties"]["limit"]["maximum"],
+            100
+        );
+        for limit in [
+            json!(null),
+            json!("1"),
+            json!(0.999),
+            json!(100.001),
+            json!(-1e100),
+            json!(1e100),
+        ] {
+            let result = invoke(
+                &backend,
+                WORKLOADS,
+                "connection:alpha",
+                json!({"namespace": "apps", "limit": limit, "cursor": cursor}),
+            )
+            .await;
+            assert!(
+                matches!(result, Err(ref error) if error.code == OperationErrorCode::InvalidInput),
+                "{limit}: {result:?}"
+            );
+            assert_eq!(calls.lock().unwrap().len(), 1);
+        }
+        for input in [
+            json!({"namespace": "apps", "cursor": cursor, "unknown": false}),
+            json!({"namespace": "apps", "cursor": null}),
+            json!({"namespace": "Apps", "cursor": cursor}),
+            json!(["apps", 1, cursor]),
+        ] {
+            let result = invoke(&backend, WORKLOADS, "connection:alpha", input.clone()).await;
+            assert!(
+                matches!(result, Err(ref error) if error.code == OperationErrorCode::InvalidInput),
+                "{input}: {result:?}"
+            );
+            assert_eq!(calls.lock().unwrap().len(), 1);
+        }
+        let last = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "limit": 100.0, "cursor": cursor}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(last["deployments"][0]["name"], "last");
+        assert!(last.get("next_cursor").is_none());
+        assert_eq!(calls.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn adversary_final_overlapping_cursor_replays_dispatch_only_once() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let recorded = calls.clone();
+        let responses = Arc::new(Mutex::new(std::collections::VecDeque::from([
+            page(
+                vec![deployment("first", "apps", "example/first:v1", 1)],
+                "next",
+            ),
+            page(vec![deployment("last", "apps", "example/last:v1", 1)], ""),
+        ])));
+        let service = tower::service_fn(move |request: http::Request<kube::client::Body>| {
+            recorded.lock().unwrap().push(request.uri().to_string());
+            assert_eq!(request.method(), http::Method::GET);
+            let response = responses
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("cursor replay dispatched an extra cluster request");
+            async move {
+                // Leave the first invocation in flight while the second resolves the same cursor.
+                tokio::task::yield_now().await;
+                Ok::<_, std::io::Error>(
+                    http::Response::builder()
+                        .status(200)
+                        .header("content-type", "application/json")
+                        .body(kube::client::Body::from(
+                            serde_json::to_vec(&response).unwrap(),
+                        ))
+                        .unwrap(),
+                )
+            }
+        });
+        let backend = backend(
+            vec![("connection:alpha", Client::new(service, "default"))],
+            &["apps"],
+        );
+        let first = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "limit": 1}),
+        )
+        .await
+        .unwrap();
+        let input = json!({"namespace": "apps", "limit": 1, "cursor": first["next_cursor"]});
+        let (left, right) = tokio::join!(
+            invoke(&backend, WORKLOADS, "connection:alpha", input.clone()),
+            invoke(&backend, WORKLOADS, "connection:alpha", input),
+        );
+        let results = [left, right];
+        assert_eq!(
+            results.iter().filter(|result| result.is_ok()).count(),
+            1,
+            "{results:?}"
+        );
+        assert_eq!(results.iter().filter(|result| matches!(result, Err(error) if error.code == OperationErrorCode::StaleAuthority)).count(), 1, "{results:?}");
+        assert_eq!(calls.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn adversary_final_empty_fetch_budget_retains_continuation_and_malformed_pages_refuse() {
+        let responses = (0..8)
+            .map(|_| (200, page(vec![], "next")))
+            .chain([(
+                200,
+                page(vec![deployment("last", "apps", "example/last:v1", 0)], ""),
+            )])
+            .collect();
+        let (client, calls) = fixture_client(responses);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        let first = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "limit": 100}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(first["deployments"], json!([]));
+        assert_eq!(calls.lock().unwrap().len(), 8);
+        let cursor = first["next_cursor"]
+            .as_str()
+            .expect("empty bounded page is not a completed inventory");
+        assert_ne!(cursor, "next");
+        let last = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "cursor": cursor}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(last["deployments"][0]["name"], "last");
+        assert_eq!(last["deployments"][0]["desired_replicas"], 0);
+        assert!(last.get("next_cursor").is_none());
+        assert_eq!(calls.lock().unwrap().len(), 9);
+
+        for malformed in [
+            json!({"metadata": {"continue": null}, "items": []}),
+            json!({"metadata": {"continue": []}, "items": []}),
+            json!({"metadata": {"continue": ""}, "items": null}),
+        ] {
+            let (client, calls) = fixture_client(vec![(200, malformed.clone())]);
+            let backend = self::backend(vec![("connection:alpha", client)], &["apps"]);
+            let result = invoke(
+                &backend,
+                WORKLOADS,
+                "connection:alpha",
+                json!({"namespace": "apps"}),
+            )
+            .await;
+            assert!(
+                matches!(result, Err(ref error) if error.code == OperationErrorCode::Unavailable),
+                "{malformed}: {result:?}"
+            );
+            assert_eq!(calls.lock().unwrap().len(), 1);
+        }
+    }
 }
