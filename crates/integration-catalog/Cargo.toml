@@ -2,7 +2,7 @@
 name = "integration-catalog"
 description = "Executes any catalogued HTTP operation from its declared request template. One adapter for every declared provider, instead of one crate each."
 edition = "2021"
-version = "0.6.2"
+version = "0.6.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -23,7 +23,7 @@ connector-resolve = { version = "0.6.0", path = "../connector-resolve" }
 connector-address = { version = "0.6.0", path = "../connector-address" }
 connector-secrets = { version = "0.6.0", path = "../connector-secrets" }
 connector-state = { version = "0.6.0", path = "../connector-state" }
-connectors-config = { version = "0.6.2", path = "../connectors-config" }
+connectors-config = { version = "0.6.3", path = "../connectors-config" }
 domain = { version = "0.6.0", path = "../domain" }
 protocol = { version = "0.6.0", path = "../protocol" }
 service = { version = "0.6.0", path = "../service" }

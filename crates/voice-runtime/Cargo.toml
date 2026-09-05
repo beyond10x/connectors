@@ -2,7 +2,7 @@
 name = "voice-runtime"
 description = "Supervised composition of admitted sipx telephony and authenticated RTVBP voice sessions."
 edition = "2021"
-version = "0.6.2"
+version = "0.6.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"

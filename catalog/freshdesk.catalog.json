@@ -19,7 +19,7 @@
   ],
   "connector": "freshdesk",
   "description": "Freshdesk ticketing: list, read, create and update tickets and the contacts they belong to",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
