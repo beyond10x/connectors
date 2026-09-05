@@ -102,24 +102,49 @@ pub fn emit(format: Format, value: &Value) -> Result<(), OutputError> {
     Ok(())
 }
 
+/// Render a dual-target result with its selected deployment beside the payload fields.
+///
+/// # Errors
+///
+/// Serialization failure for the selected format, or a closed stdout.
+pub fn emit_targeted(format: Format, value: &Value, target: &str) -> Result<(), OutputError> {
+    let mut value = value.clone();
+    if !value.is_object() {
+        value = serde_json::json!({"value": value});
+    }
+    value["target"] = Value::String(target.to_owned());
+    emit(format, &value)
+}
+
 /// Render one failure, choosing the stream the caller can actually read.
 ///
 /// `code` names a class of fault and never carries a credential; `message` is the human sentence.
 pub fn emit_error(format: Format, code: &str, message: &str) {
+    emit_error_with_target(format, code, message, None);
+}
+
+/// Render a failure with the selected deployment when the command can target more than one.
+pub fn emit_error_with_target(format: Format, code: &str, message: &str, target: Option<&str>) {
     if format.errors_on_stdout() {
-        let envelope = Value::Object(Map::from_iter([(
+        let mut envelope = Value::Object(Map::from_iter([(
             "error".to_owned(),
             Value::Object(Map::from_iter([
                 ("code".to_owned(), Value::String(code.to_owned())),
                 ("message".to_owned(), Value::String(message.to_owned())),
             ])),
         )]));
+        if let Some(target) = target {
+            envelope["target"] = Value::String(target.to_owned());
+        }
         // A failure to render the failure still has to say something, and it must not be silent.
         match render(format, &envelope) {
             Ok(rendered) => println!("{}", rendered.trim_end()),
             Err(_) => eprintln!("{code}: {message}"),
         }
         return;
+    }
+    if let Some(target) = target {
+        eprintln!("target: {target}");
     }
     eprintln!("{code}: {message}");
 }
