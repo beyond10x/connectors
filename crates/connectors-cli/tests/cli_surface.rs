@@ -2740,3 +2740,287 @@ fn the_old_login_selected_target_guard_is_absent() {
     let source = read(&repository_root().join("crates/connectors-cli/src/lib.rs"));
     assert!(!source.contains("if config_path.is_none() && state_root.is_none()"));
 }
+
+#[test]
+fn target_conflict_precedes_invoke_payload_loading() {
+    let fixture = TargetFixture::new(false);
+    let absent = fixture.root.join("absent-input.json");
+    let mut failures = Vec::new();
+    for local_option in ["--config", "--state-root"] {
+        let (success, value) = fixture.json(&[
+            "-o",
+            "json",
+            "operation",
+            "--target",
+            "hosted",
+            "invoke",
+            "--operation",
+            "fixture.operation",
+            "--connection",
+            "fixture.connection",
+            "--description-ref",
+            "fixture.description",
+            local_option,
+            fixture.root.to_str().unwrap(),
+            "--input-file",
+            absent.to_str().unwrap(),
+        ]);
+        assert!(!success);
+        assert_eq!(value["target"], "hosted");
+        if value["error"]["code"] != "target-conflict" {
+            failures.push(format!("{local_option}: {value}"));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "a conflicting target must be refused before reading caller input: {}",
+        failures.join("\n")
+    );
+}
+
+#[test]
+fn target_conflict_precedes_missing_or_malformed_inline_input() {
+    let fixture = TargetFixture::new(false);
+    for local_option in ["--config", "--state-root"] {
+        for input_arguments in [vec![], vec!["--input-json", "not-json"]] {
+            let mut arguments = vec![
+                "-o",
+                "json",
+                "operation",
+                "invoke",
+                "--target",
+                "hosted",
+                "--operation",
+                "fixture.operation",
+                "--connection",
+                "fixture.connection",
+                "--description-ref",
+                "fixture.description",
+                local_option,
+                fixture.root.to_str().unwrap(),
+            ];
+            arguments.extend(input_arguments);
+            let (success, value) = fixture.json(&arguments);
+            assert!(!success);
+            assert_eq!(value["target"], "hosted");
+            assert_eq!(
+                value["error"]["code"], "target-conflict",
+                "{arguments:?}: {value}"
+            );
+        }
+    }
+}
+
+#[test]
+fn target_conflict_does_not_wait_for_open_stdin() {
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+    let fixture = TargetFixture::new(false);
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_connectors"))
+        .args([
+            "-o",
+            "json",
+            "operation",
+            "invoke",
+            "--target",
+            "hosted",
+            "--operation",
+            "fixture.operation",
+            "--connection",
+            "fixture.connection",
+            "--description-ref",
+            "fixture.description",
+            "--config",
+            fixture.root.to_str().unwrap(),
+            "--input",
+            "-",
+        ])
+        .env("HOME", &fixture.root)
+        .env("XDG_CONFIG_HOME", fixture.root.join("c"))
+        .env("XDG_STATE_HOME", fixture.root.join("s"))
+        .env("PATH", fixture.root.join("no-programs"))
+        .env_remove("DBUS_SESSION_BUS_ADDRESS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // Keep the producer open: a target conflict requires no payload or EOF to diagnose.
+    let producer = child.stdin.take().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let exited = loop {
+        if child.try_wait().unwrap().is_some() {
+            break true;
+        }
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            break false;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    drop(producer);
+    let output = child.wait_with_output().unwrap();
+    assert!(exited, "target-conflicting invocation waited for caller stdin instead of refusing; stdout: {}; stderr: {}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(!output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["target"], "hosted");
+    assert_eq!(value["error"]["code"], "target-conflict");
+}
+
+#[test]
+fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
+    use std::io::{BufRead as _, Write as _};
+    use std::os::unix::net::UnixListener;
+    let leaves: &[(&[&str], &str)] = &[
+        (
+            &[
+                "connection",
+                "candidates",
+                "--integration",
+                "fixture.integration",
+            ],
+            "candidate_search",
+        ),
+        (
+            &[
+                "connection",
+                "activate",
+                "--candidate",
+                "fixture.candidate",
+                "--label",
+                "fixture",
+            ],
+            "candidate_activate",
+        ),
+        (&["connection", "list"], "search"),
+        (
+            &[
+                "connection",
+                "observations",
+                "--source",
+                "fixture.connection",
+            ],
+            "observation_search",
+        ),
+        (
+            &[
+                "connection",
+                "materialize",
+                "--observation",
+                "fixture.observation",
+            ],
+            "materialize",
+        ),
+        (&["event", "search"], "search"),
+        (
+            &[
+                "event",
+                "receive",
+                "--channel",
+                "fixture.channel",
+                "--wait-ms",
+                "0",
+            ],
+            "receive",
+        ),
+        (&["event", "replay", "--event", "fixture.event"], "replay"),
+        (&["operation", "search"], "search"),
+        (
+            &["operation", "describe", "--operation", "fixture.operation"],
+            "describe",
+        ),
+        (
+            &[
+                "operation",
+                "signal",
+                "--execution-ref",
+                "fixture.execution",
+                "--dtmf",
+                "1",
+            ],
+            "session_signal",
+        ),
+        (
+            &[
+                "operation",
+                "invoke",
+                "--operation",
+                "fixture.operation",
+                "--connection",
+                "fixture.connection",
+                "--description-ref",
+                "fixture.description",
+                "--input-json",
+                "{\"target\":\"payload-owned\"}",
+            ],
+            "invoke",
+        ),
+    ];
+    for explicit in [false, true] {
+        for &(leaf, method) in leaves {
+            let fixture = TargetFixture::new(true);
+            std::fs::write(
+                fixture
+                    .root
+                    .join("s/b10x/connectors/identity-sessions.json"),
+                "broken metadata",
+            )
+            .unwrap();
+            let state = fixture.root.join("s/b10x/connectors");
+            let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let worker = std::thread::spawn(move || {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error)
+                            if error.kind() == std::io::ErrorKind::WouldBlock
+                                && std::time::Instant::now() < deadline =>
+                        {
+                            std::thread::sleep(std::time::Duration::from_millis(10))
+                        }
+                        result => panic!("local fixture not reached: {result:?}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let response = serde_json::json!({
+                    "protocol": request["protocol"], "request_id": request["request_id"],
+                    "status": "error", "error": {"code": "not_found", "message": "fixture refusal", "retriable": false}
+                });
+                writeln!(stream, "{response}").unwrap();
+                request
+            });
+            let mut arguments = vec!["-o", "json"];
+            arguments.extend_from_slice(leaf);
+            if explicit {
+                arguments.extend(["--target", "local"]);
+            }
+            let (success, value) = fixture.json(&arguments);
+            let request = worker.join().unwrap();
+            assert!(!success, "{arguments:?}");
+            assert_eq!(value["target"], "local", "{arguments:?}: {value}");
+            assert_eq!(
+                value["error"]["code"], "not_found",
+                "{arguments:?}: {value}"
+            );
+            assert_eq!(
+                request["request"]["method"], method,
+                "{arguments:?}: {request}"
+            );
+            if method == "invoke" {
+                assert_eq!(
+                    request["request"]["params"]["input"]["target"],
+                    "payload-owned"
+                );
+            }
+        }
+    }
+}
