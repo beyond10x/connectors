@@ -14,7 +14,7 @@ scope:
   path: docs/architecture
 - confidence: cited
   path: docs/guides/connect-slack.md
-revision: 6
+revision: 7
 ---
 ## Outcome
 
@@ -37,6 +37,8 @@ Repository gates, existing consumer rendering, 320/390-pixel mobile and desktop 
 
 ## Evidence
 
-Connectors gate: green (catalog: 65 providers, 68 artifacts; portable Markdown links; story index; ESS system valid; committed clap tree matches specification generation). The hosted Slack example was checked against hosted/approval.rs and hosted/enforcement.rs: hosted writes need a Grant and an issued one-time ApprovalRecord. An event reference is not hosted approval; the local runtime claim journal is a separate mechanism. The Slack guide now states that boundary.
+The complete Connectors gate passes on 0.6.4: catalog (65 providers, 68 artifacts), portable Markdown links, story consistency, ESS validation, and exact committed clap-outline comparison. Hosted approval claims were checked against hosted/approval.rs and hosted/enforcement.rs; event E1 is not hosted approval A1.
 
-Docs System gate passes for the additive frame/table exports and native accessibility tests. Website integration, browser review, and publication remain in progress.
+Docs System's full gate passes at 1c8c31697e87235dda8bec9467264b22a7fa0c95. Website's production gate and GitHub gate 33959605114 pass at runtime 815fad1b977992d01695f6b5c79495c02576212b. Browser checks pass for all seven handbook pages in 56 combinations: desktop, 320/390px, 200% reflow, and both themes. Actual touch panning, keyboard scrolling, final table columns, the existing DependencyGraph, and deduplicated search titles pass. The browser regression caught and verified the fix for an initially zero-width SVG.
+
+Atlas's managed-root reconciliation and built-portal checks pass. Runtime/caller promotion and exact live verification are in progress under Atlas ADR 0035.
