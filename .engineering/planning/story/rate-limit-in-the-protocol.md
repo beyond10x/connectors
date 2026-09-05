@@ -12,14 +12,18 @@ scope:
   path: catalog/slack.catalog.json
 - confidence: inferred
   path: connectors.lock
-- confidence: cited
-  path: contracts/connector-operation/v0alpha1
+- confidence: inferred
+  path: contracts/connector-operation/v0alpha2
 - confidence: cited
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: inferred
   path: crates/catalog/src/lib.rs
 - confidence: inferred
   path: crates/catalog/src/table.rs
+- confidence: inferred
+  path: crates/client/src/lib.rs
+- confidence: inferred
+  path: crates/client/src/response.rs
 - confidence: inferred
   path: crates/connector-resolve/src/document.rs
 - confidence: cited
@@ -56,6 +60,8 @@ scope:
   path: crates/integration-slack/src/backend/api_runtime.rs
 - confidence: cited
   path: crates/protocol/src/operation.rs
+- confidence: inferred
+  path: crates/protocol/src/operation/legacy.rs
 - confidence: cited
   path: crates/protocol/tests/bundles.rs
 - confidence: cited
@@ -65,10 +71,14 @@ scope:
 - confidence: cited
   path: crates/server/src/hosted/tests
 - confidence: inferred
+  path: crates/server/src/local.rs
+- confidence: inferred
   path: ess/system/domains/catalog.yaml
 - confidence: inferred
+  path: json-schemas.toml
+- confidence: inferred
   path: providers/slack.toml
-revision: 54
+revision: 56
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -134,3 +144,9 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 8 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Version migration decision
+
+The source/consumer inventory establishes that structured rate_limit fields require ConnectorOperation v0alpha2. Preserve the full frozen v0alpha1 bundle byte for byte and serve both versions through explicit transport adapters, replying in the requested version. Existing v1 receives the legacy Unavailable shape without v2-only fields. No automatic invoke resend on version failure. Internal 429 parsing and existing RateLimit IR alone do not change contract identity.
+
+A concrete proposed Atlas ADR 0039 now names Service SDK, Devcenter, Workspace, Agent Platform, Org Brain, legacy Zwirn/Platform and Website, with provider-first order and SDK-before-embedded-host ABI alignment. It is in managed tree wt-19c8158c5cae on plan/connector-operation-v2. It is proposed and does not claim architecture acceptance, consumer upgrades, release or deployment. Existing missing Atlas dependency/pin observations and v1 schema/runtime purpose/session_signal discrepancies are recorded without rewriting frozen bytes. Auth remediation is a separate trusted-surface decision and adds no speculative v2 fields.

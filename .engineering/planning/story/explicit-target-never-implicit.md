@@ -2,10 +2,9 @@
 format: aep.planning-md/1
 id: story:explicit-target-never-implicit
 kind: story
-status: active
+status: implemented
 title: A command names its target; nothing infers it from a stored login
 tags:
-- ready
 - wave-cli
 - wave-platform
 relations:
@@ -27,7 +26,7 @@ scope:
   path: crates/connectors-console/src/output.rs
 - confidence: cited
   path: docs/design/19-the-cli-surface.md
-revision: 19
+revision: 21
 ---
 # Story: a command names its target; nothing infers it from a stored login
 

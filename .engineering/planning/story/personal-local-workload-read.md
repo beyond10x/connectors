@@ -2,10 +2,9 @@
 format: aep.planning-md/1
 id: story:personal-local-workload-read
 kind: story
-status: active
+status: implemented
 title: Personal-local Kubernetes serves a callable workload inventory
 tags:
-- ready
 - wave-cli
 scope:
 - confidence: cited
@@ -28,7 +27,7 @@ scope:
   path: crates/integration-kubernetes/src/workloads.rs
 - confidence: inferred
   path: docs/guides/connect-kubernetes.md
-revision: 24
+revision: 26
 ---
 ## Context
 

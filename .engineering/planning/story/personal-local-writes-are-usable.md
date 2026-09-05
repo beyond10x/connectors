@@ -25,8 +25,9 @@ scope:
   path: docs/architecture/deployment.md
 - confidence: cited
   path: docs/guides/connect-slack.md
-revision: 29
+revision: 30
 ---
+
 ## Objective
 
 O1: governed reach. An individual who has explicitly enabled a Slack connection for writes must be able to discover and perform an authorized post through the ordinary local CLI workflow.
@@ -82,6 +83,6 @@ The coordinator installed the source at opening commit 4769ce32a331bb8daddaf066b
 
 The normal local daemon still failed write search before restart (protocol, exit 1), proving client installation alone did not fix it. Its graceful restart initially refused a home-directory cwd because the state root must be outside cwd; restart with the original cwd succeeded. An immediate query raced readiness and was unreachable; after ready, write search and describe both exited 0. The separate brain daemon reproduced the same protocol failure before its graceful replacement; afterwards search and describe both exited 0. Both show the admitted writable Slack connection and required approval posture. No live provider invocation or Slack message was sent.
 
-Long-lived daemon logs were moved outside disposable wave scratch into each daemon's existing state root as daemon-wave-20260906.log; their processes retain the open files. Final integration must reinstall the reviewed bytes before closing the delivery story. Socket fixture invocation and adversarial review remain pending.
+Long-lived daemon logs were moved outside disposable wave scratch into each daemon's existing state root as daemon-wave-20260906.log; their processes retain the open files. Final integration must reinstall the reviewed bytes before closing the delivery story. Socket fixture invocation and adversarial review subsequently passed, and the complete integration gate is recorded in the wave runbook.
 
 The fixture found actionable guidance missing when all bindings are read-only. Coordinator reviewed and applied the implementor's exact two-string catalog-guidance.patch, extending scope to integration-catalog/src/lib.rs. It names an intentional allow_writes policy update and daemon restart; the existing enrollment command only sets the flag on a new instance. No grant policy was changed by this wave.
