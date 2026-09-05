@@ -2,7 +2,7 @@
 name = "connectors-console"
 description = "Operator-facing surface below the command line: writing a configuration, diagnosing an installation, reading the catalogue, and rendering a result."
 edition = "2021"
-version = "0.6.4"
+version = "0.6.5"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -20,19 +20,19 @@ members = ["."]
 [dependencies]
 # The compiled catalogue, embedded. `providers` reports what this binary can actually reach rather
 # than what a document last claimed, which is only true if the answer comes from the build.
-catalog = { version = "0.6.4", path = "../catalog" }
+catalog = { version = "0.6.5", path = "../catalog" }
 # The configuration vocabulary `init` writes and `doctor` reads back.
 # The credential address a stored value must land at is the backend's own function, not a second
 # copy of the rule.
-integration-catalog = { version = "0.6.4", path = "../integration-catalog" }
-connectors-config = { version = "0.6.4", path = "../connectors-config" }
+integration-catalog = { version = "0.6.5", path = "../integration-catalog" }
+connectors-config = { version = "0.6.5", path = "../connectors-config" }
 # The guided flows talk to the local Connector through the reusable client; they neither frame a
 # request nor compose an adapter.
-connector-address = { version = "0.6.4", path = "../connector-address" }
+connector-address = { version = "0.6.5", path = "../connector-address" }
 # `auth status` asks the store whether a credential is present. It never reads one.
-connector-secrets = { version = "0.6.4", path = "../connector-secrets" }
-connectors-client = { version = "0.6.4", path = "../connectors-client" }
-protocol = { version = "0.6.4", path = "../protocol" }
+connector-secrets = { version = "0.6.5", path = "../connector-secrets" }
+connectors-client = { version = "0.6.5", path = "../connectors-client" }
+protocol = { version = "0.6.5", path = "../protocol" }
 clap = { version = "4", features = ["derive"] }
 # A credential is typed with echo disabled and held in a zeroizing buffer until the one-use socket
 # takes it.

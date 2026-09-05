@@ -259,6 +259,9 @@ impl GitlabBackend {
         state_store: GitlabState,
         egress: Arc<dyn EgressTransport>,
     ) -> Result<Self, GitlabError> {
+        if policy.user_grant_ref.trim().is_empty() {
+            return Err(GitlabError::new("connection-grant"));
+        }
         let origin = parse_origin(&policy.origin)?;
         let public_origin = url::Url::parse(&policy.public_origin)
             .map_err(|_| GitlabError::new("public-origin"))?;
@@ -276,17 +279,10 @@ impl GitlabBackend {
         {
             return Err(GitlabError::new("connection-state"));
         }
-        // A row written before explicit Grant binding has no evidence naming which Grant admitted
-        // its credential. Binding it to today's deployment value would silently re-authorize old
-        // custody after a policy change. The operator must reconnect it under current authority.
-        if metadata
-            .connections
-            .iter()
-            .chain(metadata.pending.iter().map(|pending| &pending.connection))
-            .any(|connection| connection.grant_ref.is_empty())
-        {
-            return Err(GitlabError::new("connection-state"));
-        }
+        // Legacy rows have no evidence naming the Grant that admitted their credentials.
+        // Keep them durable but unusable: owned_connections and credential access require the
+        // current explicit binding. The normal verified connect flow replaces a legacy row.
+        // Refusing the whole host here would also prevent that flow from repairing the row.
         let inner = Arc::new(GitlabInner {
             tenant_id,
             policy,
@@ -313,7 +309,11 @@ impl GitlabBackend {
 
     #[must_use]
     pub fn connection_count(&self) -> usize {
-        lock(&self.inner.metadata).connections.len()
+        lock(&self.inner.metadata)
+            .connections
+            .iter()
+            .filter(|connection| connection.grant_ref == self.inner.policy.user_grant_ref)
+            .count()
     }
 }
 
@@ -1099,6 +1099,11 @@ impl GitlabInner {
     async fn recover_pending(&self) -> Result<(), GitlabError> {
         let pending_transactions = lock(&self.metadata).pending.clone();
         for pending in pending_transactions {
+            // Never complete custody under an absent or superseded Grant. Preserve the pending
+            // record for recovery; only a fresh verified connect may bind current authority.
+            if pending.connection.grant_ref != self.policy.user_grant_ref {
+                continue;
+            }
             let transaction = decode_transaction(&pending.transaction_id)?;
             match self
                 .credential_store
