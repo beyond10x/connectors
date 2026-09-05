@@ -314,7 +314,7 @@ note = "Repository-authored native-driver Provider: four read-only sql_v1 operat
 
 [[source]]
 id = "jira-authored-incremental-reads"
-references = ["https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-projects/#api-rest-api-2-project-search-get", "https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated"]
+references = ["https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-projects/#api-rest-api-2-project-search-get", "https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated"]
 kind = "openapi-spec"
 origin = "repository-authored"
 refresh = "authored-review"
@@ -334,7 +334,7 @@ note = "Exact added incremental-read surface. The repository-authored OpenAPI do
 
 [[source]]
 id = "gitlab-authored-incremental-reads"
-references = ["https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination"]
+references = ["https://docs.gitlab.com/api/issues/#list-project-issues", "https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests", "https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination"]
 kind = "openapi-spec"
 origin = "repository-authored"
 refresh = "authored-review"

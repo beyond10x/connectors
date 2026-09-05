@@ -6274,6 +6274,572 @@
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-issue-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        },
+        {
+          "name": "state",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              "opened",
+              "closed",
+              "all"
+            ],
+            "type": "string"
+          },
+          "symbol": "state"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "state",
+            "value": {
+              "$param": "state"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/issues"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "iid": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted.",
+        "input_schema": {
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "per_page": {
+              "type": "number"
+            },
+            "project_id": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            },
+            "updated_after": {
+              "type": "string"
+            },
+            "updated_before": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "per_page"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Bounded changed records from one project; updated_after and updated_before are inclusive ISO8601 bounds. Native and personal runtimes return safe items plus next_page from X-Next-Page. Follow every page of the same window, then deduplicate stable id and updated_at; the legacy list keeps its array contract. Identity objects are omitted.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-merge-request-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "project_id"
+        },
+        {
+          "name": "per_page",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "name": "updated_after",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_after"
+        },
+        {
+          "name": "updated_before",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "updated_before"
+        },
+        {
+          "name": "state",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              "opened",
+              "closed",
+              "locked",
+              "merged",
+              "all"
+            ],
+            "type": "string"
+          },
+          "symbol": "state"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "state",
+            "value": {
+              "$param": "state"
+            }
+          },
+          {
+            "name": "updated_after",
+            "value": {
+              "$param": "updated_after"
+            }
+          },
+          {
+            "name": "updated_before",
+            "value": {
+              "$param": "updated_before"
+            }
+          }
+        ],
+        "url": "{base}/projects/{project_id}/merge_requests"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "items": {
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "iid": {
+              "type": "integer"
+            },
+            "project_id": {
+              "type": "integer"
+            },
+            "updated_at": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,
