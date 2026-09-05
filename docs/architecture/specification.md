@@ -15,7 +15,7 @@ Connectors has a working Rust implementation and a partial
 domain declarations and generates a checked CLI outline. It is not yet a complete executable
 definition of Connectors' behavior.
 
-This page describes the 0.6.3 source. The website's source-and-revision link identifies the exact
+This page describes the 0.6.4 source. The website's source-and-revision link identifies the exact
 documentation snapshot; the hosted API reference identifies the deployed binary's contract.
 
 ## Four kinds of evidence

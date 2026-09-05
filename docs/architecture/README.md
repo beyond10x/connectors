@@ -14,7 +14,7 @@ Connectors sits between a caller and an external service. It turns a reviewed op
 permitted Connection into an execution, while keeping provider credentials in its own custody.
 It also admits and stores provider events for consumers.
 
-This handbook describes the 0.6.3 implementation. Its diagrams group responsibilities for readers;
+This handbook describes the 0.6.4 implementation. Its diagrams group responsibilities for readers;
 the [ESS specification](specification.md) currently declares a smaller set of components and does
 not generate this system map.
 
