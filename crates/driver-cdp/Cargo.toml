@@ -2,7 +2,7 @@
 name = "driver-cdp"
 description = "Closed built-in cdp_v1 driver: bounded browser observation and navigation on a dedicated profile."
 edition = "2021"
-version = "0.6.4"
+version = "0.6.5"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -15,15 +15,15 @@ members = ["."]
 
 [dependencies]
 base64 = "0.22"
-domain = { version = "0.6.4", path = "../domain" }
-protocol = { version = "0.6.4", path = "../protocol" }
+domain = { version = "0.6.5", path = "../domain" }
+protocol = { version = "0.6.5", path = "../protocol" }
 # The driver's only HTTP call is `http://127.0.0.1:<port>/json/list`, the DevTools target list.
 # **No TLS backend is enabled**, so this client cannot reach an https endpoint at all: the aperture
 # is loopback plaintext by construction rather than by policy.
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-service = { version = "0.6.4", path = "../service" }
+service = { version = "0.6.5", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
 tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }

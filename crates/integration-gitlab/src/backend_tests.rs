@@ -23,6 +23,23 @@ mod tests {
         ) -> Result<EgressHttpResponse, EgressTransportError> {
             let call = self.calls.fetch_add(1, Ordering::SeqCst);
             let target = url::Url::parse(&request.request.url).expect("provider URL");
+            let credential_evidence = match target.path() {
+                "/api/v4/personal_access_tokens/self" => Some(serde_json::json!({
+                    "active": true, "revoked": false, "scopes": ["read_api"]
+                })),
+                "/api/v4/user" => Some(serde_json::json!({
+                    "id": 7, "username": "owner", "state": "active",
+                    "email": "owner@example.test", "bot": false
+                })),
+                _ => None,
+            };
+            if let Some(evidence) = credential_evidence {
+                return Ok(EgressHttpResponse {
+                    status: 200,
+                    headers: BTreeMap::new(),
+                    body: serde_json::to_vec(&evidence).unwrap(),
+                });
+            }
             let page = target
                 .query_pairs()
                 .find_map(|(key, value)| (key == "page").then_some(value.into_owned()))
@@ -46,10 +63,7 @@ mod tests {
             Ok(EgressHttpResponse {
                 status: 200,
                 headers: if call == 0 {
-                    BTreeMap::from([(
-                        "x-next-page".to_owned(),
-                        self.continuation.to_owned(),
-                    )])
+                    BTreeMap::from([("x-next-page".to_owned(), self.continuation.to_owned())])
                 } else {
                     BTreeMap::new()
                 },
@@ -67,7 +81,9 @@ mod tests {
         }
     }
 
-    async fn paged_backend(continuation: &'static str) -> (GitlabBackend, Arc<PagedProjectsEgress>) {
+    async fn paged_backend(
+        continuation: &'static str,
+    ) -> (GitlabBackend, Arc<PagedProjectsEgress>) {
         let egress = Arc::new(PagedProjectsEgress {
             calls: AtomicUsize::new(0),
             continuation,
@@ -97,14 +113,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legacy_connection_without_a_grant_binding_fails_closed() {
+    async fn legacy_connection_starts_unusable_and_preserves_pending_custody() {
         let state = Arc::new(connector_state::MemoryState::new());
         let metadata = StateFile {
             version: STATE_VERSION,
             next_transaction_generation: 1,
             connections: vec![StoredConnection {
                 connection_ref: "connection:gitlab:legacy".to_owned(),
-                instance_id: "legacy".to_owned(),
+                instance_id: "00000000-0000-4000-8000-000000000007".to_owned(),
                 label: "GitLab".to_owned(),
                 grant_ref: String::new(),
                 owner_subject: "person:owner".to_owned(),
@@ -119,18 +135,24 @@ mod tests {
             }],
             pending: Vec::new(),
         };
+        let mut encoded = serde_json::to_value(&metadata).unwrap();
+        encoded["connections"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("grant_ref");
+        encoded["pending"] = serde_json::json!([{
+            "transaction_id": "legacy-transaction-must-not-be-recovered",
+            "connection": encoded["connections"][0].clone()
+        }]);
+        let original = serde_json::to_vec(&encoded).unwrap();
         state
-            .replace(
-                STATE_KEY,
-                &serde_json::to_vec(&metadata).unwrap(),
-                MAX_STATE_BYTES,
-            )
+            .replace(STATE_KEY, &original, MAX_STATE_BYTES)
             .unwrap();
         let egress = Arc::new(PagedProjectsEgress {
             calls: AtomicUsize::new(0),
             continuation: "",
         });
-        let opened = GitlabBackend::open_inner(
+        let backend = GitlabBackend::open_inner(
             "tenant-one".to_owned(),
             HostedGitlabConfig {
                 origin: "https://gitlab.example.test".to_owned(),
@@ -146,11 +168,105 @@ mod tests {
                 refresh_skew_seconds: 300,
             },
             Arc::new(MemoryStore::new()),
-            GitlabState::Hosted(state),
-            egress,
+            GitlabState::Hosted(state.clone()),
+            egress.clone(),
+        )
+        .await
+        .expect("unbound metadata must not take unrelated integrations offline");
+        assert_eq!(backend.connection_count(), 0);
+        let owner = PrincipalContext::hosted(
+            "tenant-one".to_owned(),
+            "person:owner".to_owned(),
+            "person:owner".to_owned(),
+            Some("owner@example.test".to_owned()),
+            "snapshot:current".to_owned(),
+            "a".repeat(64),
+        )
+        .unwrap();
+        assert!(backend.inner.owned_connections(&owner).is_empty());
+        let refusal = backend
+            .inner
+            .connection_token(&metadata.connections[0])
+            .await
+            .unwrap_err();
+        assert_eq!(refusal.code, "connection-grant");
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            state.read(STATE_KEY, MAX_STATE_BYTES).unwrap().unwrap(),
+            original
+        );
+
+        let session = backend
+            .inner
+            .create_session(&owner, "GitLab".to_owned(), GitlabProfile::PersonalToken)
+            .unwrap();
+        let url = url::Url::parse(session.browser_completion_url.as_deref().unwrap()).unwrap();
+        let capability = url.fragment().unwrap().strip_prefix("token=").unwrap();
+        backend
+            .complete_hosted_session(
+                &session.connect_session_ref,
+                capability,
+                HostedCompletionSubmission::new(b"synthetic-fresh-token".to_vec()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 2);
+        let connections = backend.inner.owned_connections(&owner);
+        assert_eq!(connections.len(), 1);
+        assert_eq!(
+            connections[0].connection_ref,
+            metadata.connections[0].connection_ref
+        );
+        assert_eq!(connections[0].grant_ref, "grant:gitlab:user");
+        assert_eq!(backend.connection_count(), 1);
+        let persisted: StateFile =
+            serde_json::from_slice(&state.read(STATE_KEY, MAX_STATE_BYTES).unwrap().unwrap())
+                .unwrap();
+        assert_eq!(persisted.connections.len(), 1);
+        assert_eq!(persisted.pending.len(), 1);
+        assert!(persisted.pending[0].connection.grant_ref.is_empty());
+    }
+
+    #[tokio::test]
+    async fn malformed_state_and_empty_grant_policy_still_fail_closed() {
+        let (baseline, egress) = paged_backend("").await;
+        for invalid_version in [true, false] {
+            let state = Arc::new(connector_state::MemoryState::new());
+            let mut metadata = StateFile::default();
+            if invalid_version {
+                metadata.version = 0;
+            } else {
+                metadata.next_transaction_generation = 0;
+            }
+            state
+                .replace(
+                    STATE_KEY,
+                    &serde_json::to_vec(&metadata).unwrap(),
+                    MAX_STATE_BYTES,
+                )
+                .unwrap();
+            let opened = GitlabBackend::open_inner(
+                "tenant-one".to_owned(),
+                baseline.inner.policy.clone(),
+                Arc::new(MemoryStore::new()),
+                GitlabState::Hosted(state),
+                egress.clone(),
+            )
+            .await;
+            assert!(matches!(opened, Err(error) if error.code == "connection-state"));
+        }
+        let mut policy = baseline.inner.policy.clone();
+        policy.user_grant_ref.clear();
+        let opened = GitlabBackend::open_inner(
+            "tenant-one".to_owned(),
+            policy,
+            Arc::new(MemoryStore::new()),
+            GitlabState::Hosted(Arc::new(connector_state::MemoryState::new())),
+            egress.clone(),
         )
         .await;
-        assert!(opened.is_err());
+        assert!(matches!(opened, Err(error) if error.code == "connection-grant"));
+        assert_eq!(egress.calls.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
