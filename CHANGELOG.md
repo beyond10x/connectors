@@ -9,6 +9,22 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.6.4 — 2026-09-05
+
+### Added
+
+- Support Git protocol v2 on the internal fetch proxy, with targeted reference discovery and an
+  exact-commit shallow-fetch grammar. Preserve legacy negotiation and the existing control payload.
+- Verify the admitted branch and HEAD after filtering provider references; bound capabilities,
+  packet framing and streamed pack sections. Reference commands leave the final fetch available,
+  and interrupted transfers require a fresh source capability.
+
+### Performance
+
+- Reuse a bounded set of provider HTTP connections while rechecking destination policy and DNS on
+  every request. Clients are separated by authority, origin and current admitted addresses;
+  credentials and request deadlines remain request-specific.
+
 ## 0.6.3 — 2026-09-05
 
 ### Fixed

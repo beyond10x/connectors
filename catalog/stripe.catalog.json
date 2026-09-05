@@ -232,7 +232,7 @@
       "service": "default"
     }
   ],
-  "generator": "connectors 0.6.3",
+  "generator": "connectors 0.6.4",
   "operations": [
     {
       "auth": [

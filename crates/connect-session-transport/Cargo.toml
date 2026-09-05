@@ -2,7 +2,7 @@
 name = "connect-session-transport"
 description = "Shared owner-authenticated, bounded Unix transport for Connector credential acquisition."
 edition = "2021"
-version = "0.6.3"
+version = "0.6.4"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"
@@ -12,7 +12,7 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 base64 = "0.22"
-connector-secrets = { version = "0.6.0", path = "../connector-secrets" }
+connector-secrets = { version = "0.6.4", path = "../connector-secrets" }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["io-util", "net", "time"] }

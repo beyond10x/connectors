@@ -274,9 +274,13 @@ fn source_access(
     headers: &HeaderMap,
     service: GitFetchService,
 ) -> Result<GitFetchAccess, ()> {
-    // This release implements the legacy upload-pack grammar only. Reject every Git-Protocol
-    // header explicitly; silently dropping version=2 would make request validation meaningless.
-    if headers.contains_key("git-protocol") {
+    let protocols = headers.get_all("git-protocol").iter().collect::<Vec<_>>();
+    let git_protocol = match protocols.as_slice() {
+        [] => None,
+        [value] if value.as_bytes() == b"version=2" => Some("version=2".to_owned()),
+        _ => return Err(()),
+    };
+    if headers.get_all(SOURCE_AUTHORIZATION).iter().count() != 1 {
         return Err(());
     }
     let authorization = headers
@@ -294,7 +298,7 @@ fn source_access(
         repository,
         source_authorization: Zeroizing::new(authorization.to_owned()),
         service,
-        git_protocol: None,
+        git_protocol,
     })
 }
 
@@ -567,7 +571,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejected_source_authority_and_git_v2_are_decided_before_body_or_broker_exchange() {
+    async fn rejected_source_authority_is_decided_before_body_or_broker_exchange() {
         let polled = Arc::new(AtomicBool::new(false));
         let observed = polled.clone();
         let body = Body::from_stream(stream::once(async move {
@@ -604,6 +608,48 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(v2.status(), StatusCode::NOT_FOUND);
+        assert_eq!(v2.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn ambiguous_protocol_or_source_headers_are_refused_before_reading_the_body() {
+        for protocols in [
+            vec!["version=0"],
+            vec!["version=1"],
+            vec!["version=2:agent=other"],
+            vec!["version=2, version=2"],
+            vec!["version=2", "version=2"],
+            vec!["version=2", "version=1"],
+        ] {
+            let polled = Arc::new(AtomicBool::new(false));
+            let observed = polled.clone();
+            let body = Body::from_stream(stream::once(async move {
+                observed.store(true, Ordering::SeqCst);
+                Ok::<_, std::io::Error>(Bytes::from_static(b"request"))
+            }));
+            let mut request =
+                Request::post("/internal/git-fetch/git-fetch:one/repository.git/git-upload-pack")
+                    .header(
+                        header::CONTENT_TYPE,
+                        "application/x-git-upload-pack-request",
+                    )
+                    .header(SOURCE_AUTHORIZATION, "x".repeat(43));
+            for protocol in protocols {
+                request = request.header("git-protocol", protocol);
+            }
+            let response = git_fetch_internal_router(Arc::new(Broker))
+                .oneshot(request.body(body).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
+            assert!(!polled.load(Ordering::SeqCst));
+        }
+        let response = git_fetch_internal_router(Arc::new(Broker)).oneshot(
+            Request::get("/internal/git-fetch/git-fetch:one/repository.git/info/refs?service=git-upload-pack")
+                .header(SOURCE_AUTHORIZATION, "x".repeat(43))
+                .header(SOURCE_AUTHORIZATION, "x".repeat(43))
+                .body(Body::empty()).unwrap()
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }

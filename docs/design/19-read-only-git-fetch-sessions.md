@@ -72,6 +72,9 @@ discovery parser buffers a bounded advertisement and returns only the admitted d
 its exact commit (plus the matching `HEAD` row and capabilities). Other branch, tag, and object ids
 are not disclosed.
 
+**2026-09-05 amendment:** [design 20](20-bounded-git-protocol-v2.md) adds bounded protocol v2
+negotiation while preserving this legacy path and the existing control contract.
+
 Before proxying an upload-pack request, Connectors parses its packet-line negotiation. Every
 `want` must name the admitted exact commit and the request must carry a positive `deepen` no larger
 than the session depth. Alternate commits and unbounded, deepen-since, deepen-not, and want-ref
