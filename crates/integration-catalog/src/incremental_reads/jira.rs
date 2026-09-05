@@ -132,7 +132,8 @@ pub(super) fn project(
         let optional = |key: &str, max: usize| -> Result<Value, OperationError> {
             match fields.get(key) {
                 None | Some(Value::Null) => Ok(Value::Null),
-                Some(value) => Ok(json!(string(value, max)?)),
+                Some(Value::String(value)) if value.len() <= max => Ok(json!(value)),
+                Some(_) => Err(protocol()),
             }
         };
         let labels = match fields.get("labels") {
