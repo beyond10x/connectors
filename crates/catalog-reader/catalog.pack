@@ -1,5 +1,5 @@
 connectors-catalog-pack 1
-digest sha256 af94953005f49c3d96569c615c7a65efa484463065bed410e7544a887b6f05bb
+digest sha256 1336457e5f788a9b02729bafd8a7eadceeff44b9b1aaf430d520788186bca747
 schema 2
 providers 65
 operations 1007
@@ -1099,7 +1099,7 @@ payload 17025603
     ]
   ],
   "description": "Airtable records: read, create, update and delete a record in a base's table",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -1644,7 +1644,7 @@ payload 17025603
   ],
   "connector": "alertmanager",
   "description": "Inspect Alertmanager alerts through its native API contract, directly or through a mediated Connection",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -1769,7 +1769,7 @@ payload 17025603
     ]
   ],
   "description": "Algolia search: list an application's indices, search one, and read, save or delete a single record by its object id",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -2507,7 +2507,7 @@ payload 17025603
     ]
   ],
   "description": "Anthropic platform: the model catalogue and a curated read-only Admin API surface",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -3699,7 +3699,7 @@ payload 17025603
     ]
   ],
   "description": "Argo CD: inspect Applications, their live resources, drift and sync windows, and sync, roll back or terminate a deployment",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -6065,7 +6065,7 @@ payload 17025603
     ]
   ],
   "description": "Asana work management: read tasks and projects, create and update tasks, comment on a task",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -15786,7 +15786,7 @@ payload 17025603
       "wire_value": "CallClaimed"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -28075,7 +28075,7 @@ payload 17025603
       "service": "planning"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -165236,7 +165236,7 @@ payload 17025603
     ]
   ],
   "description": "Babelforce voice platform: agent availability, live and reported calls, and the session variables a flow reads and writes. The full manager-sdk surface — agents, calls, sessions, outbound, phonebook, reporting, task automation and scheduling — is catalogued and callable; the operations above are the ones a model drives directly",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -283566,7 +283566,7 @@ payload 17025603
     ]
   ],
   "description": "Bitbucket Cloud repositories and pull requests for one pinned workspace: list the workspace's repositories, read one, list and read its open pull requests, open a pull request, comment on one, and approve one",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -284769,7 +284769,7 @@ payload 17025603
     ]
   ],
   "description": "Box: browse folder contents, read file and folder metadata, create folders, and copy files",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -285394,7 +285394,7 @@ payload 17025603
     ]
   ],
   "description": "Calendly scheduling: read the authenticated user, event types, scheduled events and their invitees",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -286162,7 +286162,7 @@ payload 17025603
   "connector": "claude-code",
   "custody_only": true,
   "description": "Claude Code subscription credential custody for user-bound Harness runs",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [],
   "schema_version": 2,
   "services": [],
@@ -286207,7 +286207,7 @@ payload 17025603
     ]
   ],
   "description": "ClickUp: list workspaces and a space's folders, and read, list, create and update tasks in a list",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -287251,7 +287251,7 @@ payload 17025603
     ]
   ],
   "description": "Cloudflare zones and DNS: list zones, list and manage DNS records for a zone, and purge a zone's cache",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -288019,7 +288019,7 @@ payload 17025603
     ]
   ],
   "description": "Confluence Cloud wiki: find spaces, list the pages in one, read a page's metadata, publish a new page, and comment on one. Page and comment *content* cannot be read back — see the connector's notes",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -289140,7 +289140,7 @@ payload 17025603
     ]
   ],
   "description": "Contentful headless CMS: read published content from the Content Delivery API, and create and publish entries through the Content Management API — two different hosts and two different tokens for one vendor",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -289798,7 +289798,7 @@ payload 17025603
     ]
   ],
   "description": "Datadog monitoring: list and inspect monitors, list and inspect incidents. Authenticates every request with an API key and an Application key together",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -290187,7 +290187,7 @@ payload 17025603
     ]
   ],
   "description": "Discord bot API v10: read the bot's own identity, list the guilds it has joined, read one guild and its channels, read a channel's recent messages, and post a message. Every request authenticates as a bot — `Authorization: Bot <token>`, never `Bearer`, which is Discord's scheme word for a different credential with different reach. Every Discord id is a snowflake and is carried as a string, because a 64-bit id does not survive a JSON number. Discord rate-limits per route and answers 429 with a `Retry-After` header instead of queueing: honour it rather than retrying immediately",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -291136,7 +291136,7 @@ payload 17025603
     ]
   ],
   "description": "DocuSign eSignature REST API: list and read envelopes and their recipients, create an envelope from a template, and void one",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -291929,7 +291929,7 @@ payload 17025603
     ]
   ],
   "description": "Dropbox: browse folder contents, read file and folder metadata, search files, create folders, and get temporary download links",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -292539,7 +292539,7 @@ payload 17025603
     ]
   ],
   "description": "Figma REST API: read a file, specific nodes, rendered images, a project's files and a file's comments — a read-only design surface",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -293187,7 +293187,7 @@ payload 17025603
     ]
   ],
   "description": "Fly.io Machines: discover regions and inspect, create, start, stop, restart or delete Machines",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -293997,7 +293997,7 @@ payload 17025603
   ],
   "connector": "freshdesk",
   "description": "Freshdesk ticketing: list, read, create and update tickets and the contacts they belong to",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -296233,7 +296233,7 @@ payload 17025603
     ]
   ],
   "description": "Front shared inbox: read and reply to conversations, and tag them",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -297020,7 +297020,7 @@ payload 17025603
     ]
   ],
   "description": "GitHub REST API: discover the authenticated user, their organisations and reachable repositories; read repositories, commits, issues, pull requests and Actions workflow runs; and write issues and issue comments",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -306169,7 +306169,7 @@ payload 17025603
     }
   ],
   "description": "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -311174,7 +311174,7 @@ payload 17025603
     ]
   ],
   "description": "Google Workspace: read and send Gmail messages, read and create Calendar events, read and rename Drive files",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -312276,7 +312276,7 @@ payload 17025603
       "service": "default"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -312847,7 +312847,7 @@ payload 17025603
     ]
   ],
   "description": "HubSpot CRM: read contacts, companies and deals, and create and update contact records",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -313492,7 +313492,7 @@ payload 17025603
     ]
   ],
   "description": "Intercom contacts and conversations: read and create contacts, read a conversation, reply to it, and note it",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -314593,7 +314593,7 @@ payload 17025603
     }
   ],
   "description": "Jira Cloud issue tracking: read, create and edit issues, manage comments and links, and drive workflow transitions",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -316004,7 +316004,7 @@ payload 17025603
     ]
   ],
   "description": "Klaviyo marketing platform: read the account a key belongs to, read and create customer profiles, read lists, and post an event that can trigger a flow. Every request carries a dated API revision the vendor requires",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -317036,7 +317036,7 @@ payload 17025603
     ]
   ],
   "description": "LaunchDarkly feature management: read projects, environments and feature flags, and toggle a flag on or off in one environment",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -317828,7 +317828,7 @@ payload 17025603
   ],
   "connector": "loki",
   "description": "Query Loki logs with bounded native LogQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -318071,7 +318071,7 @@ payload 17025603
     ]
   ],
   "description": "Mailchimp Marketing API: check connectivity, read audiences and their contacts, add or update a contact, and list campaigns. Authenticates with a single API key sent as a bearer token, against a host whose datacentre label the operator supplies",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -319166,7 +319166,7 @@ payload 17025603
     ]
   ],
   "description": "Microsoft Graph: read and reply to Outlook mail, inspect Outlook settings, read and create Calendar events, and read and rename OneDrive files",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -328882,7 +328882,7 @@ payload 17025603
     ]
   ],
   "description": "Miro boards and board items: discover boards, read items of any type, and create, update and delete sticky notes",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -329959,7 +329959,7 @@ payload 17025603
   "authority": "com.mysql.server",
   "connector": "mysql",
   "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -330416,7 +330416,7 @@ payload 17025603
     ]
   ],
   "description": "New Relic APM and alerting over the REST v2 API: list the applications an account is monitoring and read one in detail, read the account's alert policies and its current violations, and list or record deployment markers against an application. The account's region host is configured once, not chosen per call",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -331189,7 +331189,7 @@ payload 17025603
     ]
   ],
   "description": "Notion workspace: read a page's properties, query a database, search shared content, and create a page",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -331759,7 +331759,7 @@ payload 17025603
     ]
   ],
   "description": "Okta identity management: read users and groups in an org, read a user's group memberships, and deactivate a user",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -332420,7 +332420,7 @@ payload 17025603
     ]
   ],
   "description": "OpenAI platform: inspect models, stored responses, files and batches, and create chat completions and embeddings",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -362051,7 +362051,7 @@ payload 17025603
     ]
   ],
   "description": "OpenRouter model router: list models and their endpoints, create chat completions, and read credit balance",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -362478,7 +362478,7 @@ payload 17025603
     ]
   ],
   "description": "PagerDuty incident response: read incidents, services and who is on call, and acknowledge or resolve an incident",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -363563,7 +363563,7 @@ payload 17025603
   "authority": "org.postgresql.server",
   "connector": "postgresql",
   "description": "Read a PostgreSQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -363996,7 +363996,7 @@ payload 17025603
     ]
   ],
   "description": "Postmark transactional email: send a message, read delivery stats and bounces. Listing and inspecting servers is withheld — the Account API returns live Server Tokens in plaintext (C-430)",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -364653,7 +364653,7 @@ payload 17025603
   ],
   "connector": "prometheus",
   "description": "Query Prometheus metrics with bounded native PromQL range semantics, directly or through a mediated Connection",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [],
@@ -364859,7 +364859,7 @@ payload 17025603
     ]
   ],
   "description": "Resend transactional email: send a message, read what happened to it, and list or inspect the domains a key may send from",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -365451,7 +365451,7 @@ payload 17025603
     ]
   ],
   "description": "Runpod GPU cloud: inspect and manage pods, serverless endpoints, clusters, templates, network volumes and registry credentials, and read GPU/CPU catalog metadata, prices and billing history",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -379347,7 +379347,7 @@ payload 17025603
     ]
   ],
   "description": "Salesforce REST API: read the authenticated identity, read/create/update an SObject record, and describe an SObject's schema",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -379959,7 +379959,7 @@ payload 17025603
     ]
   ],
   "description": "SendGrid transactional email: read templates and bounce suppressions, validate an email address. Cannot send mail — see the header comment for why the send envelope is not expressible here",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -380471,7 +380471,7 @@ payload 17025603
     ]
   ],
   "description": "Sentry error tracking: read an issue and its latest event, triage an issue, read a project",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -381298,7 +381298,7 @@ payload 17025603
     ]
   ],
   "description": "Shopify Admin REST API: read orders, products, customers and inventory levels, and update a product",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -382452,7 +382452,7 @@ payload 17025603
       "wire_value": "message"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -399828,7 +399828,7 @@ payload 17025603
     ]
   ],
   "description": "Atlassian Statuspage: read a status page's components and incidents, and open or update a publicly visible incident on it",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -400860,7 +400860,7 @@ payload 17025603
       "service": "default"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -402629,7 +402629,7 @@ payload 17025603
     ]
   ],
   "description": "Supabase project data and configuration: describe the tables the API exposes, read a table's rows, and read which sign-in methods the project has enabled. Reads only, through the project's public anon key, so every row returned is bounded by the project's own row-level-security policies",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -402981,7 +402981,7 @@ payload 17025603
     ]
   ],
   "description": "Trello boards and cards: list the boards a token can see, read a board and its lists, read a list's cards, create a card, and archive one. Authenticates every request with an API key and a token together, both in the query string",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -404056,7 +404056,7 @@ payload 17025603
       "service": "default"
     }
   ],
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -406020,7 +406020,7 @@ payload 17025603
     ]
   ],
   "description": "Typeform: read the authenticated account, forms and their responses, and delete responses",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -406887,7 +406887,7 @@ payload 17025603
     ]
   ],
   "description": "Vercel: list and inspect projects and deployments, and cancel an in-progress deployment",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -407471,7 +407471,7 @@ payload 17025603
     ]
   ],
   "description": "Webflow sites and CMS: discover sites, read a collection's own field schema, read collection items of any tenant-defined shape, and publish a site live",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -408261,7 +408261,7 @@ payload 17025603
     ]
   ],
   "description": "Zendesk Support ticketing: search, read and update tickets and comments; inspect audits, incremental exports and custom-object definitions",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [
@@ -431933,7 +431933,7 @@ payload 17025603
     ]
   ],
   "description": "Zoom meeting administration: cancel a meeting, and read a user. Reading and creating a meeting are withheld — both return the host's ZAK token in `start_url` (C-430)",
-  "generator": "connectors 0.6.2",
+  "generator": "connectors 0.6.3",
   "operations": [
     {
       "auth": [

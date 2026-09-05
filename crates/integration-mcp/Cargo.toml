@@ -2,7 +2,7 @@
 name = "integration-mcp"
 description = "Governed outbound MCP service adapter for Connectors."
 edition = "2021"
-version = "0.6.2"
+version = "0.6.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"

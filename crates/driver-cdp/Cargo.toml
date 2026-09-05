@@ -2,7 +2,7 @@
 name = "driver-cdp"
 description = "Closed built-in cdp_v1 driver: bounded browser observation and navigation on a dedicated profile."
 edition = "2021"
-version = "0.6.2"
+version = "0.6.3"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/beyond10x/connectors"
 homepage = "https://github.com/beyond10x/connectors"

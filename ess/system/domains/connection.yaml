@@ -200,24 +200,16 @@ entities:
   #   (line 209), `Expired` (line 214), `Failed` (line 215 in `finish`, line 233 in
   #   `fail_pending`). Both movers guard on `Pending` first: `finish` at line 204, `fail_pending`
   #   at line 228.
-  #   `crates/integration-catalog/src/hosted.rs` — `Expired` (line 383, guarded on `Pending` at
-  #   line 382) and `Completed` (line 758), reached from
+  #   `crates/integration-catalog/src/hosted.rs` — `Expired` (guarded on `Pending`) and `Completed`,
+  #   reached from
   #   `crates/connectors-runtime/src/registry.rs:509`.
-  # UNMAPPED: `Expired -> Completed` is reachable on the hosted path and this document does not
-  # carry it. `complete_hosted_session` does take the `Pending` guard the other registry takes —
-  # it filters on `session.state == ConnectSessionState::Pending`
-  # (crates/integration-catalog/src/hosted.rs:731) and refuses with `NotFound` when the filter
-  # drops the session — but it takes it under a lock it then releases at
-  # crates/integration-catalog/src/hosted.rs:738, awaits `verify_credential` and
-  # `commit_connection` at :748-753, and re-looks the session up at :754-758 without re-checking
-  # the state. `expire_sessions` (crates/integration-catalog/src/hosted.rs:379-386) can flip that
-  # session `Pending -> Expired` inside that window, and the write at :758 then overwrites it. So
-  # the move is a race, not a design, and declaring it would state as design what reads as a
-  # missing re-check. `Failed` is not part of this: nothing under `crates/integration-catalog/src`
+  # `complete_hosted_session` guards on `Pending` before it releases the session lock and re-checks
+  # that state after credential verification and custody have awaited, immediately before writing
+  # `Completed`. A concurrent expiry therefore remains terminal instead of being overwritten.
+  # `Failed` is not part of this: nothing under `crates/integration-catalog/src`
   # ever assigns `ConnectSessionState::Failed`, and the hosted map is built empty at
   # crates/integration-catalog/src/hosted.rs:181 — `Failed` is written only by the other registry,
-  # at crates/service/src/connect_session.rs:233, over its own map. Settled by
-  # `story:hosted-session-completes-out-of-terminal-state`, which carries the re-check.
+  # at crates/service/src/connect_session.rs:233, over its own map.
   # Fields: `ConnectSessionStatus`, crates/protocol/src/connection.rs:272-284.
   - name: connectors.connection.ConnectSession
 

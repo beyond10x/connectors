@@ -9,6 +9,14 @@ The version is an **artifact identity**: `[workspace.package] version` is what
 `catalog-build`'s `generator` string carries, so cutting a version rewrites every catalog document,
 every `connectors.lock` row, and the wire User-Agent. Those three move together, always.
 
+## 0.6.3 — 2026-09-05
+
+### Fixed
+
+- Re-check a hosted Connect Session's `Pending` state after credential verification and custody
+  awaits. Concurrent expiry is now terminal and cannot be overwritten with `Completed`; the ESS
+  lifecycle marker for the former race has been retired with a deterministic regression test.
+
 ## 0.6.2 — 2026-09-05
 
 ### Fixed
