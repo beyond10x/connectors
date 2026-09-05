@@ -2,9 +2,27 @@
 format: aep.planning-md/1
 id: story:one-shot-operations-without-a-daemon
 kind: story
-status: draft
+status: proposed
 title: One-shot operations without a daemon
-revision: 1
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: crates/connectors-cli/README.md
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/one_shot_operations.rs
+- confidence: cited
+  path: crates/connectors-console/src/doctor.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/lib.rs
+- confidence: cited
+  path: crates/server/src/local.rs
+revision: 19
 ---
 # Story: one-shot operations without a daemon
 
@@ -36,3 +54,27 @@ In both, credentials never leave the connectors process; a caller still sees onl
 - With a daemon running, behaviour is unchanged (the socket is used).
 - `event receive` without a daemon is refused naming `connectors serve`.
 - `connectors doctor` names the verbs that need the daemon.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 2 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `crates/connectors-cli/src/lib.rs` — cited.
+- `crates/connectors-runtime/src/composition.rs` — cited.
+- `crates/server/src/local.rs` — cited.
+- `crates/connectors-runtime/src/lib.rs` — inferred.
+- `crates/connectors-console/src/doctor.rs` — cited.
+- `crates/connectors-cli/tests/one_shot_operations.rs` — inferred.
+- `crates/connectors-cli/README.md` — inferred.
+
+Medium confidence. Choose ephemeral composition for ordinary bounded operations; no socket or idle process remains. Refactor existing composition and dispatch owners, do not duplicate runtimes. Measure two-process describe/invoke lease behavior before inventing durable state: registry re-describes and catalog refs are deterministic. Session-shaped operations may require an explicit daemon.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 3 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.

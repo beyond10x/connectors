@@ -2,14 +2,26 @@
 format: aep.planning-md/1
 id: story:deployment-declared-destination-aperture
 kind: story
-status: draft
+status: proposed
 title: Deployment-declared destination aperture
+tags:
+- ready
+- wave-platform
 refs:
 - provider: legacy
   reference: S-011
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/connectors-config
+- confidence: inferred
+  path: crates/domain
+- confidence: inferred
+  path: crates/server
+- confidence: inferred
+  path: crates/service
+revision: 8
 ---
 ## Acceptance
 
@@ -62,3 +74,7 @@ Migrated from `docs/stories/S-011-deployment-declared-destination-aperture.md`, 
 - First written 2026-08-13 · last touched 2026-09-02 · 7 revision(s)
 - Legacy id `S-011`, recorded as the reference `legacy:S-011`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-platform: 3 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.

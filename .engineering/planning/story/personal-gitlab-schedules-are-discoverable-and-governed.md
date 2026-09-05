@@ -2,13 +2,45 @@
 format: aep.planning-md/1
 id: story:personal-gitlab-schedules-are-discoverable-and-governed
 kind: story
-status: draft
+status: proposed
 title: Personal GitLab schedules are discoverable and governed
 summary: Close the CLI discovery and validation gaps, then add write-gated GitLab pipeline-schedule operations.
+tags:
+- ready
+- wave-cli
 relations:
 - derived_from: epic:local-product
 - informed_by: story:explicit-target-never-implicit
-revision: 1
+scope:
+- confidence: inferred
+  path: SOURCES.toml
+- confidence: cited
+  path: catalog/gitlab.catalog.json
+- confidence: cited
+  path: connectors.lock
+- confidence: cited
+  path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/search_bounds.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/registry.rs
+- confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+- confidence: inferred
+  path: docs/guides/connect-gitlab.md
+- confidence: inferred
+  path: ess/system/domains/gitlab.yaml
+- confidence: inferred
+  path: ess/system/system.yaml
+- confidence: cited
+  path: providers/gitlab.toml
+- confidence: inferred
+  path: specs/gitlab.provenance.toml
+- confidence: inferred
+  path: specs/gitlab/pipeline-schedules.openapi.yaml
+revision: 37
 ---
 ## Defect
 
@@ -34,7 +66,7 @@ The separate implicit hosted-target defect is already governed by
 `story:explicit-target-never-implicit`; this story is informed by it and does not duplicate its
 target-selection scope.
 
-## Scope
+## Original scope requirements
 
 - Make a catalog-backed personal-local connection appear consistently in `connection list` and
   `operation search`, with tests proving the same opaque connection reference is reported by both.
@@ -60,3 +92,34 @@ target-selection scope.
 ## Acceptance
 
 With a healthy personal-local GitLab connection, the default local CLI reports one consistent connection across connection and operation discovery, documents and rejects search limits above the protocol maximum before transport, exposes source-grounded pipeline-schedule list/create/update/delete operations, and proves schedule mutations remain refused until writes are explicitly enabled and approval requirements are satisfied.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 8 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `providers/gitlab.toml` — cited.
+- `specs/gitlab/pipeline-schedules.openapi.yaml` — inferred.
+- `specs/gitlab.provenance.toml` — inferred.
+- `SOURCES.toml` — inferred.
+- `catalog/gitlab.catalog.json` — cited.
+- `connectors.lock` — cited.
+- `crates/catalog-build/tests/main/catalog_invariants.rs` — cited.
+- `crates/integration-catalog/src/lib.rs` — cited.
+- `crates/connectors-cli/src/lib.rs` — cited.
+- `crates/connectors-cli/tests/search_bounds.rs` — inferred.
+- `crates/connectors-runtime/src/registry.rs` — inferred.
+- `docs/guides/connect-gitlab.md` — inferred.
+- `ess/system/domains/gitlab.yaml` — inferred.
+- `ess/system/system.yaml` — inferred.
+
+Medium confidence. Add catalog Connection capability using existing binding refs. Bound search at operations 1..25 and Connection/event 1..64 before transport. Fetch official schedule API facts before authored spec/provenance and deterministic catalog build. Literal operation-id search needs an explicit supported query or separately tested token matching. Required approval metadata is not proof enforcement; retain the established local grant boundary. Type any newly introduced schedule resource from the fetched contract before implementation.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 6 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.

@@ -1,0 +1,49 @@
+# Proposed output values for story:personal-local-workload-read (2026-09-06).
+# These are observations, not Connector-owned Kubernetes entities or lifecycles.
+# Existing counts/names: integration-kubernetes/src/workloads.rs WorkloadCompact.
+# Template images: Kubernetes DeploymentSpec.template.spec.containers, official reference
+# fetched 2026-09-06: https://kubernetes.io/docs/reference/kubernetes-api/apps/deployment-v1/
+domain: connectors.inventory
+
+summary: Bounded workload observations from one explicitly selected, activated Connection.
+
+types:
+  - name: connectors.inventory.ContainerImage
+    kind: struct
+    fields:
+      - name: name
+        type: String
+      - name: image
+        type: String
+
+  - name: connectors.inventory.DeploymentSummary
+    kind: struct
+    fields:
+      - name: name
+        type: String
+      - name: containers
+        type: List<connectors.inventory.ContainerImage>
+      - name: desired_replicas
+        type: Integer
+      - name: ready_replicas
+        type: Integer
+
+  - name: connectors.inventory.NamespaceInventory
+    kind: struct
+    fields:
+      - name: connection_ref
+        type: connectors.runtime.ConnectionRef
+      - name: namespaces
+        type: List<String>
+
+  - name: connectors.inventory.WorkloadInventory
+    kind: struct
+    fields:
+      - name: connection_ref
+        type: connectors.runtime.ConnectionRef
+      - name: namespace
+        type: String
+      - name: deployments
+        type: List<connectors.inventory.DeploymentSummary>
+      - name: next_cursor
+        type: Optional<String>

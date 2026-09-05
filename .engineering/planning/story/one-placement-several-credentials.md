@@ -2,9 +2,31 @@
 format: aep.planning-md/1
 id: story:one-placement-several-credentials
 kind: story
-status: draft
+status: proposed
 title: One placement, several credentials, a Connection per identity
-revision: 1
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: cited
+  path: crates/connectors-config/src/personal.rs
+- confidence: cited
+  path: crates/connectors-console/src/auth.rs
+- confidence: cited
+  path: crates/connectors-console/src/enrol.rs
+- confidence: inferred
+  path: crates/connectors-console/src/output_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/hosted.rs
+- confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: docs/guides/connect-slack.md
+- confidence: inferred
+  path: ess/system/domains/connection.yaml
+- confidence: inferred
+  path: ess/system/domains/deployment.yaml
+revision: 29
 ---
 # Story: one placement, several credentials, a Connection per identity
 
@@ -35,3 +57,29 @@ holds five credential slots per instance, so the storage knows, the placement mo
   user one succeed on a public channel the bot is not in; `slack-chat-post-message` is offered on
   the bot one only.
 - An adopter's configuration that names one credential is unchanged in behaviour.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 6 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `crates/connectors-config/src/personal.rs` — cited.
+- `crates/integration-catalog/src/lib.rs` — cited.
+- `crates/integration-catalog/src/hosted.rs` — cited.
+- `crates/connectors-console/src/enrol.rs` — cited.
+- `crates/connectors-console/src/auth.rs` — cited.
+- `crates/connectors-console/src/output_tests.rs` — inferred.
+- `ess/system/domains/deployment.yaml` — inferred.
+- `ess/system/domains/connection.yaml` — inferred.
+- `docs/guides/connect-slack.md` — cited.
+
+Medium confidence. Preserve the legacy first-connection digest; derive additional bindings explicitly and prevent choosing a different credential at invocation. Slack supports both bot and user token posting in the current catalog: token subject alone is not a permission rule. Use explicit per-binding grants. Global Credential-to-Connection cardinality remains UNMAPPED; settle only the local config projection before dispatch.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 4 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.

@@ -24,5 +24,6 @@ domains:
   - connectors.connection
   - connectors.deployment
   - connectors.event
+  - connectors.inventory
   - connectors.runtime
   - connectors.target

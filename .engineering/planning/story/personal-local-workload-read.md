@@ -2,9 +2,27 @@
 format: aep.planning-md/1
 id: story:personal-local-workload-read
 kind: story
-status: draft
+status: active
 title: Personal-local Kubernetes serves a callable workload inventory
-revision: 2
+tags:
+- ready
+- wave-cli
+scope:
+- confidence: inferred
+  path: crates/integration-kubernetes/src/lib.rs
+- confidence: cited
+  path: crates/integration-kubernetes/src/local.rs
+- confidence: inferred
+  path: crates/integration-kubernetes/src/local_inventory.rs
+- confidence: inferred
+  path: crates/integration-kubernetes/src/local_inventory_tests.rs
+- confidence: cited
+  path: crates/integration-kubernetes/src/local_workloads.rs
+- confidence: cited
+  path: crates/integration-kubernetes/src/workloads.rs
+- confidence: inferred
+  path: docs/guides/connect-kubernetes.md
+revision: 22
 ---
 ## Context
 
@@ -43,7 +61,7 @@ desired and ready replica counts — without naming a deployment first. The read
 admission the workload operations already pass, are refused for a Connection that was never
 activated, and every authorized Connection answers rather than one of them.
 
-## Scope
+## Original scope requirements
 
 - `crates/integration-kubernetes/src/local.rs` — the personal-local dispatch, whichever surface the
   decision below picks.
@@ -66,3 +84,27 @@ Two shapes, and the choice is the first thing to settle:
    already answers, and the two would drift.
 
 Not implemented here by instruction; this story records the gap and the fork.
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 7 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `crates/integration-kubernetes/src/local.rs` — cited.
+- `crates/integration-kubernetes/src/local_workloads.rs` — cited.
+- `crates/integration-kubernetes/src/workloads.rs` — cited.
+- `crates/integration-kubernetes/src/local_inventory.rs` — inferred.
+- `crates/integration-kubernetes/src/lib.rs` — inferred.
+- `crates/integration-kubernetes/src/local_inventory_tests.rs` — inferred.
+- `docs/guides/connect-kubernetes.md` — inferred.
+
+Medium confidence. Choose the two bounded read operations kubernetes.namespace.list and kubernetes.workload.list through existing operation CLI. Reuse selected activated Connection admission and bounded reader; never select the first cluster. The committed connectors.inventory ESS value types define results without claiming Kubernetes ownership/lifecycle. Namespace list means the configured admitted namespaces; empty does not mean every namespace. Template images survive zero pods/replicas. Existing compact datasource shape stays compatible.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 5 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.

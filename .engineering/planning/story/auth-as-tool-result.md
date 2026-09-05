@@ -2,14 +2,64 @@
 format: aep.planning-md/1
 id: story:auth-as-tool-result
 kind: story
-status: draft
+status: proposed
 title: 'Not-connected is a next step: the response carries a connect URL'
+tags:
+- ready
+- wave-cli
 refs:
 - provider: legacy
   reference: S-014
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: inferred
+  path: contracts
+- confidence: cited
+  path: crates/client/src/identity.rs
+- confidence: cited
+  path: crates/client/src/lib.rs
+- confidence: cited
+  path: crates/client/src/response.rs
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/registry.rs
+- confidence: cited
+  path: crates/domain/src/grant.rs
+- confidence: cited
+  path: crates/integration-gitlab/src/backend.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend/api_runtime.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend/connection_runtime.rs
+- confidence: cited
+  path: crates/protocol/src/connection.rs
+- confidence: cited
+  path: crates/protocol/src/operation.rs
+- confidence: cited
+  path: crates/protocol/tests/bundles.rs
+- confidence: cited
+  path: crates/server/src/hosted.rs
+- confidence: cited
+  path: crates/server/src/hosted/admission.rs
+- confidence: cited
+  path: crates/server/src/hosted/connection_route.rs
+- confidence: cited
+  path: crates/server/src/hosted/enforcement.rs
+- confidence: inferred
+  path: crates/server/src/hosted/tests
+- confidence: cited
+  path: crates/server/src/local.rs
+- confidence: cited
+  path: crates/service/src/connect_session.rs
+- confidence: cited
+  path: crates/service/src/runtime.rs
+- confidence: inferred
+  path: ess/system/domains/connection.yaml
+- confidence: inferred
+  path: ess/system/domains/runtime.yaml
+revision: 37
 ---
 ## Acceptance
 
@@ -63,3 +113,43 @@ Migrated from `docs/stories/S-014-auth-as-tool-result.md`, which is not deleted 
 - First written 2026-08-13 · last touched 2026-08-14 · 2 revision(s)
 - Legacy id `S-014`, recorded as the reference `legacy:S-014`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Readiness
+
+Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 4 of 10. The ready tag records selection; proposed is the pre-implementation lifecycle state, and existing active work stays active. Existing dependencies and implementation evidence requirements still apply.
+
+## Scope
+
+Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+
+- `crates/protocol/src/operation.rs` — cited.
+- `crates/protocol/src/connection.rs` — cited.
+- `contracts` — inferred.
+- `crates/protocol/tests/bundles.rs` — cited.
+- `crates/domain/src/grant.rs` — cited.
+- `crates/service/src/runtime.rs` — cited.
+- `crates/service/src/connect_session.rs` — cited.
+- `crates/server/src/hosted.rs` — cited.
+- `crates/server/src/hosted/admission.rs` — cited.
+- `crates/server/src/hosted/enforcement.rs` — cited.
+- `crates/server/src/hosted/connection_route.rs` — cited.
+- `crates/server/src/local.rs` — cited.
+- `crates/connectors-runtime/src/registry.rs` — cited.
+- `crates/client/src/lib.rs` — cited.
+- `crates/client/src/response.rs` — cited.
+- `crates/client/src/identity.rs` — cited.
+- `crates/connectors-cli/src/lib.rs` — inferred.
+- `crates/integration-slack/src/backend/api_runtime.rs` — cited.
+- `crates/integration-slack/src/backend/connection_runtime.rs` — cited.
+- `crates/integration-gitlab/src/backend.rs` — cited.
+- `ess/system/domains/connection.yaml` — inferred.
+- `ess/system/domains/runtime.yaml` — inferred.
+- `crates/server/src/hosted/tests` — inferred.
+
+Low confidence until prerequisites are settled. Existing grants bind a Connection and cannot authorize missing-connection creation implicitly. Domain authority forbids ConnectSession URLs in model tool results: authentication remediation belongs to the trusted outer CLI/control-plane boundary. Distinguish transport outage from credential expiry, bind repair to the original Connection, and complete personal OAuth custody first. Frozen wire changes require the coordinated migration authority, not editing v0alpha1 in place.
+
+Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+
+## Execution queue
+
+CLI execution queue 2026-09-06: 10 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
