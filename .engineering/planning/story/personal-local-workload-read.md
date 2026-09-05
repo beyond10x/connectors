@@ -8,6 +8,12 @@ tags:
 - ready
 - wave-cli
 scope:
+- confidence: cited
+  path: crates/connectors-runtime/Cargo.lock
+- confidence: cited
+  path: crates/integration-kubernetes/Cargo.toml
+- confidence: cited
+  path: crates/integration-kubernetes/src/hosted_tests.rs
 - confidence: inferred
   path: crates/integration-kubernetes/src/lib.rs
 - confidence: cited
@@ -22,7 +28,7 @@ scope:
   path: crates/integration-kubernetes/src/workloads.rs
 - confidence: inferred
   path: docs/guides/connect-kubernetes.md
-revision: 22
+revision: 24
 ---
 ## Context
 

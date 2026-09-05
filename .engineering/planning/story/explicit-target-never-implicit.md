@@ -19,11 +19,15 @@ scope:
   path: crates/connectors-cli/tests/cli_surface_drift.rs
 - confidence: inferred
   path: crates/connectors-console/src/doctor.rs
+- confidence: cited
+  path: crates/connectors-console/src/enrol.rs
+- confidence: cited
+  path: crates/connectors-console/src/envelope.rs
 - confidence: inferred
   path: crates/connectors-console/src/output.rs
 - confidence: cited
   path: docs/design/19-the-cli-surface.md
-revision: 16
+revision: 19
 ---
 # Story: a command names its target; nothing infers it from a stored login
 
@@ -83,3 +87,7 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 2 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Coordinator gate correction
+
+The coordinator applied the exact returned console-unused-import.patch in the target unit: remove an already-unused test import from crates/connectors-console/src/envelope.rs so the required all-targets clippy lane can run. No test or assertion was removed. This is a pre-existing lint cleanup, not target behavior. The source scope is extended to hold that reviewed patch.

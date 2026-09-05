@@ -24,6 +24,7 @@ domains:
   - connectors.connection
   - connectors.deployment
   - connectors.event
+  - connectors.gitlab
   - connectors.inventory
   - connectors.runtime
   - connectors.target

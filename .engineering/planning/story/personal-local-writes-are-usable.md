@@ -20,10 +20,12 @@ scope:
 - confidence: inferred
   path: crates/connectors-runtime/tests/local_catalog_writes.rs
 - confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+- confidence: cited
   path: docs/architecture/deployment.md
 - confidence: cited
   path: docs/guides/connect-slack.md
-revision: 27
+revision: 29
 ---
 ## Objective
 
@@ -73,3 +75,13 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 1 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Delivery evidence in progress
+
+The coordinator installed the source at opening commit 4769ce32a331bb8daddaf066b69459c4148fb749 with the supported cargo install path (debug profile, locked dependencies). Install exit 0; installed connectors reports 0.6.5. Installed binary and workspace build have identical SHA256 483879ea4d9d3a8522c9e163b4559ca520f4d99afb134e522aebfd59e1e7edef.
+
+The normal local daemon still failed write search before restart (protocol, exit 1), proving client installation alone did not fix it. Its graceful restart initially refused a home-directory cwd because the state root must be outside cwd; restart with the original cwd succeeded. An immediate query raced readiness and was unreachable; after ready, write search and describe both exited 0. The separate brain daemon reproduced the same protocol failure before its graceful replacement; afterwards search and describe both exited 0. Both show the admitted writable Slack connection and required approval posture. No live provider invocation or Slack message was sent.
+
+Long-lived daemon logs were moved outside disposable wave scratch into each daemon's existing state root as daemon-wave-20260906.log; their processes retain the open files. Final integration must reinstall the reviewed bytes before closing the delivery story. Socket fixture invocation and adversarial review remain pending.
+
+The fixture found actionable guidance missing when all bindings are read-only. Coordinator reviewed and applied the implementor's exact two-string catalog-guidance.patch, extending scope to integration-catalog/src/lib.rs. It names an intentional allow_writes policy update and daemon restart; the existing enrollment command only sets the flag on a new instance. No grant policy was changed by this wave.
