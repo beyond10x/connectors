@@ -1288,8 +1288,13 @@ impl GitlabInner {
         );
         drop(token);
         let base = format!("{}/api/v4", self.origin.as_str().trim_end_matches('/'));
-        let plan = resolve_operation_plan(operation, &base, &request.input, &[assembled])
+        let mut plan = resolve_operation_plan(operation, &base, &request.input, &[assembled])
             .map_err(|()| operation_invalid())?;
+        incremental_reads::prepare_request(
+            &request.operation_ref,
+            &request.input,
+            &mut plan.request,
+        )?;
         let target = url::Url::parse(&plan.request.url).map_err(|_| operation_unavailable())?;
         if !same_origin(&self.origin, &target) || !target.path().starts_with("/api/v4/") {
             return Err(operation_not_granted());

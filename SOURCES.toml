@@ -334,7 +334,7 @@ note = "Exact added incremental-read surface. The repository-authored OpenAPI do
 
 [[source]]
 id = "gitlab-authored-incremental-reads"
-references = ["https://docs.gitlab.com/api/issues/#list-project-issues", "https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests", "https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination"]
+references = ["https://docs.gitlab.com/api/issues/#list-project-issues", "https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests", "https://docs.gitlab.com/api/projects/", "https://docs.gitlab.com/api/pipelines/", "https://docs.gitlab.com/api/deployments/", "https://docs.gitlab.com/api/commits/", "https://docs.gitlab.com/api/rest/#pagination", "https://gitlab.com/gitlab-org/gitlab/-/work_items/328500"]
 kind = "openapi-spec"
 origin = "repository-authored"
 refresh = "authored-review"

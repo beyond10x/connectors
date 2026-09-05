@@ -13,6 +13,24 @@ pub(super) fn is_incremental(id: &str) -> bool {
     )
 }
 
+pub(super) fn prepare_request(
+    id: &str,
+    input: &Value,
+    request: &mut connector_resolve::Request,
+) -> Result<(), OperationError> {
+    if id == "gitlab-deployment-list"
+        && (input.get("updated_after").is_some() || input.get("updated_before").is_some())
+    {
+        // GitLab requires update-date filtering and updated_at ordering together.
+        let mut target = url::Url::parse(&request.url).map_err(|_| operation_invalid())?;
+        target
+            .query_pairs_mut()
+            .append_pair("order_by", "updated_at");
+        request.url = target.into();
+    }
+    Ok(())
+}
+
 pub(super) fn input_schema(id: &str) -> Option<Value> {
     if !is_incremental(id) {
         return None;

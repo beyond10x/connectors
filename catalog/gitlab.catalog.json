@@ -5557,7 +5557,7 @@
         }
       ],
       "contract": {
-        "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+        "description": "List changed project deployments. An updated_after or updated_before bound automatically selects order_by=updated_at; without either bound, vendor default ordering applies. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
         "input_schema": {
           "properties": {
             "page": {
@@ -5584,7 +5584,7 @@
         }
       },
       "credential_requirement": "declared",
-      "description": "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
+      "description": "List changed project deployments. An updated_after or updated_before bound automatically selects order_by=updated_at; without either bound, vendor default ordering applies. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array.",
       "direction": "read",
       "effects": [
         "read",

@@ -76,6 +76,15 @@ pub(super) fn prepare_request(
 ) -> Result<(), OperationError> {
     if id == "jira-issue-search" {
         jira::prepare_request(input, request)?;
+    } else if id == "gitlab-deployment-list"
+        && (input.get("updated_after").is_some() || input.get("updated_before").is_some())
+    {
+        // GitLab requires update-date filtering and updated_at ordering together.
+        let mut target = url::Url::parse(&request.url).map_err(|_| invalid())?;
+        target
+            .query_pairs_mut()
+            .append_pair("order_by", "updated_at");
+        request.url = target.into();
     }
     Ok(())
 }
