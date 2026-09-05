@@ -573,4 +573,247 @@ mod inventory_tests {
         assert!(result.next_cursor.is_none());
         assert_eq!(calls.lock().unwrap().len(), 1);
     }
+
+    #[tokio::test]
+    async fn adversary_inventory_rejects_null_cursor_as_its_published_schema_requires() {
+        let (client, calls) = fixture_client(vec![(200, page(vec![], ""))]);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        let description = backend
+            .operation_description(&backend.owner, WORKLOADS)
+            .unwrap();
+        assert_eq!(
+            description.input_schema["properties"]["cursor"]["type"],
+            "string"
+        );
+        let result = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "cursor": null}),
+        )
+        .await;
+        assert!(
+            matches!(&result, Err(error) if error.code == OperationErrorCode::InvalidInput),
+            "the published string-only cursor contract must refuse explicit null before cluster I/O; got {result:?} and {} request(s)",
+            calls.lock().unwrap().len(),
+        );
+        assert!(calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn adversary_inventory_walks_empty_pages_and_preserves_all_regular_container_images() {
+        let deployment = json!({
+            "metadata": {"name": "app.v2", "namespace": "apps"},
+            "spec": {"template": {"spec": {"containers": [
+                {"name": "first", "image": "example/first@sha256:abcdef", "env": [{"name": "PRIVATE", "value": "must-not-escape"}]},
+                {"name": "second", "image": "example/second:v2"}
+            ]}}}
+        });
+        let (client, calls) = fixture_client(vec![
+            (200, page(vec![], "opaque+/=?&next")),
+            (200, page(vec![deployment], "")),
+        ]);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        let result = invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps", "limit": 1}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            result,
+            json!({
+                "connection_ref": "connection:alpha", "namespace": "apps", "deployments": [{
+                    "name": "app.v2", "desired_replicas": 1, "ready_replicas": 0,
+                    "containers": [
+                        {"name": "first", "image": "example/first@sha256:abcdef"},
+                        {"name": "second", "image": "example/second:v2"}
+                    ]
+                }]
+            })
+        );
+        assert_eq!(calls.lock().unwrap().len(), 2);
+        let second = calls.lock().unwrap()[1].clone();
+        assert!(
+            second.contains("continue=opaque%2B%2F%3D%3F%26next"),
+            "{second}"
+        );
+    }
+
+    fn optional_properties(schema: &Value) -> BTreeSet<&str> {
+        schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .filter(|property| {
+                !schema["required"]
+                    .as_array()
+                    .is_some_and(|required| required.iter().any(|value| value == property))
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn inventory_optional_inputs_distinguish_absence_from_explicit_values() {
+        let (client, calls) = fixture_client(vec![(200, page(vec![], ""))]);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        let description = backend
+            .operation_description(&backend.owner, WORKLOADS)
+            .unwrap();
+        assert_eq!(
+            optional_properties(&description.input_schema),
+            BTreeSet::from(["cursor", "limit"])
+        );
+        let namespaces = backend
+            .operation_description(&backend.owner, NAMESPACES)
+            .unwrap();
+        assert!(optional_properties(&namespaces.input_schema).is_empty());
+
+        for property in optional_properties(&description.input_schema) {
+            let schema = &description.input_schema["properties"][property];
+            assert!(matches!(
+                schema["type"].as_str(),
+                Some("string" | "integer")
+            ));
+            for value in [Value::Null, json!(true), json!([]), json!({})] {
+                let mut input = json!({"namespace": "apps"});
+                input[property] = value.clone();
+                let result = invoke(&backend, WORKLOADS, "connection:alpha", input).await;
+                assert!(
+                    matches!(result, Err(ref error) if error.code == OperationErrorCode::InvalidInput),
+                    "{property}={value}: {result:?}"
+                );
+                assert!(calls.lock().unwrap().is_empty());
+            }
+        }
+        for (property, values) in [
+            (
+                "limit",
+                vec![json!("25"), json!(0), json!(101), json!(-1), json!(1.5)],
+            ),
+            (
+                "cursor",
+                vec![json!(25), json!(1.5), json!(""), json!("x".repeat(513))],
+            ),
+        ] {
+            for value in values {
+                let mut input = json!({"namespace": "apps"});
+                input[property] = value.clone();
+                let result = invoke(&backend, WORKLOADS, "connection:alpha", input).await;
+                assert!(
+                    matches!(result, Err(ref error) if error.code == OperationErrorCode::InvalidInput),
+                    "{property}={value}: {result:?}"
+                );
+                assert!(calls.lock().unwrap().is_empty());
+            }
+        }
+        invoke(
+            &backend,
+            WORKLOADS,
+            "connection:alpha",
+            json!({"namespace": "apps"}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            calls.lock().unwrap().len(),
+            1,
+            "both fields may be absent for a first page"
+        );
+    }
+
+    #[tokio::test]
+    async fn inventory_optional_limit_accepts_every_in_range_integer_number_representation() {
+        for limit in [
+            json!(1),
+            json!(25),
+            json!(100),
+            json!(1.0),
+            json!(25.0),
+            serde_json::from_str::<Value>("1e2").unwrap(),
+        ] {
+            let (client, calls) = fixture_client(vec![(200, page(vec![], ""))]);
+            let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+            let result = invoke(
+                &backend,
+                WORKLOADS,
+                "connection:alpha",
+                json!({"namespace": "apps", "limit": limit}),
+            )
+            .await;
+            assert!(result.is_ok(), "an integer-valued JSON number within the schema range is admitted: {limit}: {result:?}");
+            assert_eq!(calls.lock().unwrap().len(), 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn inventory_optional_output_cursor_is_omitted_or_a_string_never_null() {
+        for (provider_cursor, has_cursor) in [("", false), ("next-page", true)] {
+            let (client, _) = fixture_client(vec![(
+                200,
+                page(
+                    vec![deployment("app", "apps", "example/app:v1", 1)],
+                    provider_cursor,
+                ),
+            )]);
+            let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+            let description = backend
+                .operation_description(&backend.owner, WORKLOADS)
+                .unwrap();
+            assert_eq!(
+                optional_properties(&description.output_schema),
+                BTreeSet::from(["next_cursor"])
+            );
+            assert_eq!(
+                description.output_schema["properties"]["next_cursor"]["type"],
+                "string"
+            );
+            let namespaces = backend
+                .operation_description(&backend.owner, NAMESPACES)
+                .unwrap();
+            assert!(optional_properties(&namespaces.output_schema).is_empty());
+            let result = invoke(
+                &backend,
+                WORKLOADS,
+                "connection:alpha",
+                json!({"namespace": "apps", "limit": 1}),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result.get("next_cursor").is_some(), has_cursor);
+            if let Some(cursor) = result.get("next_cursor") {
+                assert!(cursor.as_str().is_some_and(|value| !value.is_empty()));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn inventory_inputs_require_the_published_object_shape() {
+        let (client, calls) = fixture_client(vec![(200, page(vec![], ""))]);
+        let backend = backend(vec![("connection:alpha", client)], &["apps"]);
+        for operation in [NAMESPACES, WORKLOADS] {
+            let description = backend
+                .operation_description(&backend.owner, operation)
+                .unwrap();
+            assert_eq!(description.input_schema["type"], "object");
+            for value in [
+                Value::Null,
+                json!(true),
+                json!(25),
+                json!("apps"),
+                json!([]),
+                json!(["apps", 25]),
+            ] {
+                let result = invoke(&backend, operation, "connection:alpha", value.clone()).await;
+                assert!(
+                    matches!(result, Err(ref error) if error.code == OperationErrorCode::InvalidInput),
+                    "{operation} with {value}: {result:?}"
+                );
+                assert!(calls.lock().unwrap().is_empty());
+            }
+        }
+    }
 }
