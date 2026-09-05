@@ -1,14 +1,14 @@
 <!--
   generated from connectors v1
-  model digest 3dd38aa4aa8dfa6484eef894f4ef64554a34471416cb728ac32b8d147f5d15fa
-  contract digest ff324d008163ada73d593ae301c90ed7c76016fae2fd068827f423f4603d8b6c
+  model digest 0aa2d494f51c4ba02a1b005bbb6a0bd20b873d70223617df699bda747e61ec61
+  contract digest fe12c35666d3635d4130f4f24409f23b955f206748d8be7c978d35362b9490b0
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-162 capabilities: **146 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+171 capabilities: **155 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -54,6 +54,7 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.deployment.CredentialSubject` |
 | domain type | `connectors.deployment.Integration.State` |
 | domain type | `connectors.deployment.IntegrationRef` |
+| domain type | `connectors.deployment.LocalCredentialSelection` |
 | domain type | `connectors.deployment.ProviderRef` |
 | domain type | `connectors.deployment.Scope` |
 | domain type | `connectors.event.ChannelRef` |
@@ -69,6 +70,14 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.event.SubscriptionRef` |
 | domain type | `connectors.event.Webhook.State` |
 | domain type | `connectors.event.WebhookRef` |
+| domain type | `connectors.gitlab.ScheduleCreateFields` |
+| domain type | `connectors.gitlab.ScheduleCreateRequest` |
+| domain type | `connectors.gitlab.ScheduleDeleteRequest` |
+| domain type | `connectors.gitlab.ScheduleListRequest` |
+| domain type | `connectors.gitlab.ScheduleScope` |
+| domain type | `connectors.gitlab.ScheduleSnapshot` |
+| domain type | `connectors.gitlab.ScheduleUpdateFields` |
+| domain type | `connectors.gitlab.ScheduleUpdateRequest` |
 | domain type | `connectors.inventory.ContainerImage` |
 | domain type | `connectors.inventory.DeploymentSummary` |
 | domain type | `connectors.inventory.NamespaceInventory` |

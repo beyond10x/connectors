@@ -1,0 +1,1019 @@
+---
+format: aep.planning-md/1
+id: review-result:cli-target-adversary-1-20260906
+kind: review-result
+status: active
+title: Explicit target adversary pass 1
+refs:
+- provider: git
+  reference: a0c02381c413a5ada4e65a4a6a0bcbc06d8bc54d
+relations:
+- reviews: story:explicit-target-never-implicit
+revision: 1
+---
+unit: story:explicit-target-never-implicit at a0c02381c413a5ada4e65a4a6a0bcbc06d8bc54d
+verdict: NEEDS-CHANGE
+cases: executed 164→167, red 2
+origin: introduced 0 / pre-existing 0 / undecided 1
+wrote-outside-worktree: 9 report/log files; 522 retained fixture paths; shared tool-managed sccache
+needs-coordinator: route target validation ordering failure to implementor
+
+```text
+ crates/connectors-cli/tests/cli_surface.rs | 251 +++++++++++++++++++++++++++++
+ 1 file changed, 251 insertions(+)
+```
+
+## 2. Cases written before execution
+
+Case: `crates/connectors-cli/tests/cli_surface.rs::target_conflict_precedes_invoke_payload_loading`.
+
+Command: `env -u CARGO_TARGET_DIR TMPDIR=~/.cache/cw6/t RUSTC_WRAPPER=/usr/bin/sccache CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=3 cargo test --manifest-path crates/connectors-cli/Cargo.toml -p connectors-cli --locked --test cli_surface target_conflict_precedes_invoke_payload_loading -- --exact`
+
+```text
+warning: connector-secrets@0.6.5: no live Vault was offered (CONNECTOR_SECRETS_VAULT_ADDR and CONNECTOR_SECRETS_VAULT_TOKEN are unset), so the reqwest HttpTransport is UNEXERCISED by this build: tests/vault_live.rs is compiled #[ignore]d
+   Compiling connectors-cli v0.6.5 (~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli)
+    Finished `test` profile [unoptimized] target(s) in 1.63s
+     Running tests/cli_surface.rs (crates/connectors-cli/target/debug/deps/cli_surface-a182753279fee22f)
+
+running 1 test
+test target_conflict_precedes_invoke_payload_loading ... FAILED
+
+failures:
+
+---- target_conflict_precedes_invoke_payload_loading stdout ----
+
+thread 'target_conflict_precedes_invoke_payload_loading' (546124) panicked at tests/cli_surface.rs:2774:5:
+a conflicting target must be refused before reading caller input: --config: {"error":{"code":"invalid-argument","message":"the input file could not be read: No such file or directory (os error 2)"},"target":"hosted"}
+--state-root: {"error":{"code":"invalid-argument","message":"the input file could not be read: No such file or directory (os error 2)"},"target":"hosted"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    target_conflict_precedes_invoke_payload_loading
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p connectors-cli --test cli_surface`
+```
+
+Exit status: 101.
+
+Case: `crates/connectors-cli/tests/cli_surface.rs::target_conflict_does_not_wait_for_open_stdin`.
+
+Command: `env -u CARGO_TARGET_DIR TMPDIR=~/.cache/cw6/t RUSTC_WRAPPER=/usr/bin/sccache CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=3 cargo test --manifest-path crates/connectors-cli/Cargo.toml -p connectors-cli --locked --test cli_surface target_conflict_does_not_wait_for_open_stdin -- --exact`
+
+```text
+warning: connector-secrets@0.6.5: no live Vault was offered (CONNECTOR_SECRETS_VAULT_ADDR and CONNECTOR_SECRETS_VAULT_TOKEN are unset), so the reqwest HttpTransport is UNEXERCISED by this build: tests/vault_live.rs is compiled #[ignore]d
+   Compiling connectors-cli v0.6.5 (~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli)
+    Finished `test` profile [unoptimized] target(s) in 1.57s
+     Running tests/cli_surface.rs (crates/connectors-cli/target/debug/deps/cli_surface-a182753279fee22f)
+
+running 1 test
+test target_conflict_does_not_wait_for_open_stdin ... FAILED
+
+failures:
+
+---- target_conflict_does_not_wait_for_open_stdin stdout ----
+
+thread 'target_conflict_does_not_wait_for_open_stdin' (548891) panicked at tests/cli_surface.rs:2830:5:
+target-conflicting invocation waited for caller stdin instead of refusing; stdout: ; stderr: 
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    target_conflict_does_not_wait_for_open_stdin
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 2.01s
+
+error: test failed, to rerun pass `-p connectors-cli --test cli_surface`
+```
+
+Exit status: 101.
+
+Case: `crates/connectors-cli/tests/cli_surface.rs::every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request`.
+
+Command: `env -u CARGO_TARGET_DIR TMPDIR=~/.cache/cw6/t RUSTC_WRAPPER=/usr/bin/sccache CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=3 cargo test --manifest-path crates/connectors-cli/Cargo.toml -p connectors-cli --locked --test cli_surface every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request -- --exact`
+
+```text
+warning: connector-secrets@0.6.5: no live Vault was offered (CONNECTOR_SECRETS_VAULT_ADDR and CONNECTOR_SECRETS_VAULT_TOKEN are unset), so the reqwest HttpTransport is UNEXERCISED by this build: tests/vault_live.rs is compiled #[ignore]d
+    Finished `test` profile [unoptimized] target(s) in 0.36s
+     Running tests/cli_surface.rs (crates/connectors-cli/target/debug/deps/cli_surface-a182753279fee22f)
+
+running 1 test
+test every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.30s
+
+```
+
+Exit status: 0.
+
+## 3. Affected suites, after the deciding cases
+
+The implementor reported 164 executed cases (77 CLI, 87 console). This pass executes 167 (80 CLI, 87 console), with two failed CLI cases. CLI uses `--no-fail-fast` so later test binaries still execute.
+
+Command: `env -u CARGO_TARGET_DIR TMPDIR=~/.cache/cw6/t RUSTC_WRAPPER=/usr/bin/sccache CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=3 cargo test --manifest-path crates/connectors-cli/Cargo.toml -p connectors-cli --locked --no-fail-fast`
+
+```text
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: connector-secrets@0.6.5: no live Vault was offered (CONNECTOR_SECRETS_VAULT_ADDR and CONNECTOR_SECRETS_VAULT_TOKEN are unset), so the reqwest HttpTransport is UNEXERCISED by this build: tests/vault_live.rs is compiled #[ignore]d
+    Finished `test` profile [unoptimized] target(s) in 0.33s
+     Running unittests src/lib.rs (crates/connectors-cli/target/debug/deps/connectors_cli-38a26c90d743ef42)
+
+running 5 tests
+test tests::grafana_connect_uses_the_same_guided_surface ... ok
+test tests::kubernetes_connect_accepts_an_exact_context_selection ... ok
+test tests::slack_connect_needs_no_internal_reference_or_path_argument ... ok
+test tests::normal_help_exposes_the_guided_flow_and_hides_acquisition_plumbing ... ok
+test tests::every_supported_shell_gets_a_script_naming_the_whole_surface ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (crates/connectors-cli/target/debug/deps/connectors-23e728bf6e359b3b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/adversary_cli_cap_pass3.rs (crates/connectors-cli/target/debug/deps/adversary_cli_cap_pass3-728995953b17e671)
+
+running 1 test
+test the_cap_the_design_page_says_is_measured_is_declared_and_asserted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/adversary_fence_probe.rs (crates/connectors-cli/target/debug/deps/adversary_fence_probe-7703694c004a0637)
+
+running 6 tests
+test the_wire_name_rule_citation_in_the_design_document_points_at_the_rule ... ok
+test the_wire_name_rule_citation_in_the_specification_points_at_the_rule ... ok
+test the_typeable_words_are_the_words_the_design_document_names ... ok
+test the_copies_this_probe_carries_are_still_copies ... ok
+test a_forwarding_reason_that_names_no_command_is_refused_whatever_kind_it_carries ... ok
+test every_entry_that_is_not_a_lifecycle_step_is_refused_when_it_claims_to_be_one ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/adversary_fence_probe_pass2.rs (crates/connectors-cli/target/debug/deps/adversary_fence_probe_pass2-329b7d26d642c510)
+
+running 3 tests
+test every_file_the_committed_contract_opens_is_a_file_a_clone_has ... ok
+test the_kinds_the_design_document_says_rest_on_no_sentence_rest_on_no_sentence ... ok
+test the_paths_the_design_document_says_send_no_protocol_request_send_none ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/adversary_shim_pass3.rs (crates/connectors-cli/target/debug/deps/adversary_shim_pass3-ef2c4ea286dd4433)
+
+running 6 tests
+test the_serve_group_advertises_a_help_subcommand ... ok
+test a_help_path_of_the_new_tree_under_serve_is_left_alone ... ok
+test connectors_help_still_answers_for_a_path_that_moved ... ok
+test a_moved_path_typed_with_the_global_output_flag_still_works ... ok
+test the_group_word_whose_only_command_moved_still_points_somewhere ... ok
+test nothing_this_product_prints_names_a_moved_path_behind_a_global_flag ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.19s
+
+     Running tests/adversary_shim_pass4.rs (crates/connectors-cli/target/debug/deps/adversary_shim_pass4-e90fa4ddec4cdde1)
+
+running 3 tests
+test the_table_this_suite_copies_by_hand_is_the_table_the_binary_ships ... ok
+test the_auth_group_still_answers_the_help_subcommand_it_advertised ... ok
+test a_two_word_path_that_moved_works_with_the_global_flag_between_its_words ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/adversary_shim_pass5.rs (crates/connectors-cli/target/debug/deps/adversary_shim_pass5-d7babecf7c496bb5)
+
+running 4 tests
+test a_positional_value_spelled_help_is_a_value_not_a_help_request ... ok
+test an_argument_neither_the_group_nor_the_leaf_declares_is_not_the_old_leaf ... ok
+test the_double_dash_escape_is_not_a_word_that_moved ... ok
+test serve_with_only_global_options_is_the_group_in_every_spelling_and_position ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/cli_surface.rs (crates/connectors-cli/target/debug/deps/cli_surface-a182753279fee22f)
+
+running 30 tests
+test every_kind_of_exception_is_used_and_every_entry_gives_a_reason ... ok
+test every_named_exception_is_still_a_path_of_the_parser ... ok
+test no_word_of_the_parser_answers_to_a_name_the_specification_cannot_declare ... ok
+test no_path_is_both_declared_and_excepted ... ok
+test the_committed_generated_tree_is_the_specification_word_for_word ... ok
+test every_declared_group_is_a_group_of_the_parser ... ok
+test the_old_login_selected_target_guard_is_absent ... ok
+test every_path_of_the_parser_is_declared_or_a_named_exception ... ok
+test every_declared_group_help_line_is_the_summary_the_specification_declares ... ok
+test every_declaration_the_adversary_probe_copies_is_still_a_copy ... ok
+test the_read_verb_enumeration_partitions_the_protocols_it_names ... ok
+test every_citation_this_unit_wrote_resolves ... ok
+test the_specification_names_the_binary_the_parser_builds ... ok
+test the_target_countdown_is_exactly_what_the_parser_still_owes ... ok
+test the_regeneration_command_the_documents_name_is_the_one_the_gate_runs ... ok
+test the_parser_accepts_target_before_and_after_each_dual_target_leaf ... ok
+test the_kinds_the_tree_derives_are_the_kinds_the_list_carries ... ok
+test a_command_absorbed_into_the_exception_list_alone_is_refused ... ok
+test every_citation_that_names_a_symbol_lands_on_its_declaration ... ok
+test the_exception_list_is_the_set_the_specification_enumerates ... ok
+test a_read_stops_being_an_exception_once_the_specification_declares_a_view ... ok
+test target_conflict_precedes_invoke_payload_loading ... FAILED
+test targeted_errors_keep_the_target_in_yaml_and_text ... ok
+test an_omitted_target_ignores_a_saved_login_for_every_dual_target_group ... ok
+test an_explicit_hosted_target_requires_a_login_by_name_for_every_group ... ok
+test hosted_refuses_each_local_only_option_for_every_group ... ok
+test an_exception_whose_kind_the_tree_contradicts_is_refused ... ok
+test local_success_and_protocol_refusals_report_the_selected_target ... ok
+test every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request ... ok
+test target_conflict_does_not_wait_for_open_stdin ... FAILED
+
+failures:
+
+---- target_conflict_precedes_invoke_payload_loading stdout ----
+
+thread 'target_conflict_precedes_invoke_payload_loading' (564556) panicked at tests/cli_surface.rs:2774:5:
+a conflicting target must be refused before reading caller input: --config: {"error":{"code":"invalid-argument","message":"the input file could not be read: No such file or directory (os error 2)"},"target":"hosted"}
+--state-root: {"error":{"code":"invalid-argument","message":"the input file could not be read: No such file or directory (os error 2)"},"target":"hosted"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- target_conflict_does_not_wait_for_open_stdin stdout ----
+
+thread 'target_conflict_does_not_wait_for_open_stdin' (564555) panicked at tests/cli_surface.rs:2830:5:
+target-conflicting invocation waited for caller stdin instead of refusing; stdout: ; stderr: 
+
+
+failures:
+    target_conflict_does_not_wait_for_open_stdin
+    target_conflict_precedes_invoke_payload_loading
+
+test result: FAILED. 28 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.01s
+
+error: test failed, to rerun pass `-p connectors-cli --test cli_surface`
+     Running tests/cli_surface_drift.rs (crates/connectors-cli/target/debug/deps/cli_surface_drift-54c6716a31d65891)
+
+running 10 tests
+test the_copied_declarations_are_still_copies ... ok
+test the_thin_frontend_citation_points_at_the_thin_frontend_test ... ok
+test a_committed_tree_whose_group_about_no_longer_matches_the_specification_is_refused ... ok
+test a_command_added_under_a_declared_group_is_refused ... ok
+test a_committed_tree_that_swaps_completions_for_an_undeclared_word_is_refused ... ok
+test a_command_added_under_the_wrong_declared_group_is_refused ... ok
+test cutting_the_admin_group_over_to_the_generated_tree_is_refused ... ok
+test the_restated_contract_is_green_against_the_unchanged_tree ... ok
+test a_target_flag_removed_from_a_group_is_refused_by_the_countdown ... ok
+test cargo_can_read_the_committed_emitted_manifest ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cli_surface_pass_two.rs (crates/connectors-cli/target/debug/deps/cli_surface_pass_two-e5ac027a941a00de)
+
+running 6 tests
+test the_design_document_describes_the_countdown_assertion_the_contract_makes ... ok
+test the_design_document_names_only_constants_that_exist ... ok
+test the_design_document_states_the_shape_of_the_exception_list ... ok
+test the_target_countdown_candidates_are_derived_from_every_protocol_a_deployment_answers ... ok
+test the_drift_suites_copies_are_checked_rather_than_cited ... ok
+test the_drift_suite_attributes_nothing_to_the_contract_that_is_not_there ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/first_level_groups.rs (crates/connectors-cli/target/debug/deps/first_level_groups-3efdb248e70da056)
+
+running 5 tests
+test the_first_level_is_eight_words ... ok
+test doctor_reports_the_same_installation_at_both_paths ... ok
+test a_path_of_the_new_tree_is_left_alone ... ok
+test the_serve_group_answers_bare_and_with_help_like_the_other_groups ... ok
+test every_moved_path_still_works_and_names_where_it_went ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/moved_paths_are_not_taught.rs (crates/connectors-cli/target/debug/deps/moved_paths_are_not_taught-d9a0438e91f74c90)
+
+running 1 test
+test nothing_this_product_prints_names_a_path_that_moved ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+   Doc-tests connectors_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p connectors-cli --test cli_surface`
+```
+
+Exit status: 101.
+
+
+Command: `env -u CARGO_TARGET_DIR TMPDIR=~/.cache/cw6/t RUSTC_WRAPPER=/usr/bin/sccache CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=3 cargo test --manifest-path crates/connectors-console/Cargo.toml -p connectors-console --locked`
+
+```text
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 0.23s
+     Running unittests src/lib.rs (crates/connectors-console/target/debug/deps/connectors_console-04d869bc2d5c0fc0)
+
+running 72 tests
+test auth::tests::a_basic_credential_row_reports_whether_its_user_half_is_configured_and_never_the_value ... ok
+test auth::tests::nothing_in_the_result_can_carry_a_secret ... ok
+test connect::tests::a_provider_outside_the_guided_set_is_refused_by_name ... ok
+test connect::tests::the_error_for_an_unknown_provider_names_it ... ok
+test admin::tests::explicit_secret_file_must_be_owner_only ... ok
+test doctor::tests::a_missing_configuration_is_fatal_and_names_the_command_that_fixes_it ... ok
+test auth::tests::the_store_preference_matches_what_the_runtime_composes ... ok
+test doctor::tests::a_short_state_root_passes_both_budgets ... ok
+test doctor::tests::a_report_is_unhealthy_only_when_something_cannot_work ... ok
+test doctor::tests::the_report_renders_every_check_as_data ... ok
+test enrol::tests::a_provider_outside_the_catalogue_is_named_rather_than_guessed_at ... ok
+test doctor::tests::every_state_a_check_can_report_reaches_the_reader_as_its_own_marker ... ok
+test doctor::tests::the_budget_is_measured_against_the_deepest_path_the_daemon_binds ... ok
+test connect::tests::a_catalogued_provider_whose_curated_backend_is_absent_takes_the_catalogue_path ... ok
+test doctor::tests::doctor_names_the_default_local_target_and_its_socket ... ok
+test envelope::tests::a_refusal_becomes_an_error_rather_than_a_result ... ok
+test envelope::tests::an_envelope_carrying_neither_is_a_named_failure_not_an_empty_success ... ok
+test envelope::tests::a_result_loses_its_envelope_and_its_discriminant ... ok
+test init::tests::admitting_a_credential_plugin_is_a_choice_and_its_absence_is_explained ... ok
+test init::tests::an_agent_id_is_stable_across_calls ... ok
+test admin::tests::command_shape_accepts_secret_stdin_without_a_secret_argument ... ok
+test input::tests::an_inline_object_is_parsed ... ok
+test input::tests::no_source_names_all_three_rather_than_defaulting_to_empty ... ok
+test init::tests::the_snapshot_digest_is_stable_and_moves_with_the_admitted_set ... ok
+test output::tests::a_payload_carrying_its_own_value_field_is_left_alone ... ok
+test output::tests::a_record_that_is_not_an_object_keeps_the_name_the_report_gave_it ... ok
+test output::tests::a_table_reads_left_to_right_with_the_column_that_runs_long_last ... ok
+test init::tests::an_existing_configuration_is_never_replaced_silently ... ok
+test input::tests::input_accepts_only_the_stdin_marker ... ok
+test output::tests::a_row_shows_its_severity_before_anybody_reads_it ... ok
+test init::tests::the_separator_keeps_a_concatenation_from_colliding ... ok
+test output::tests::a_structured_format_carries_its_failure_on_stdout ... ok
+test output::tests::a_field_a_record_does_not_carry_reads_as_absent_rather_than_blank ... ok
+test input::tests::a_file_is_read_from_its_path ... ok
+test output::tests::an_object_with_two_arrays_is_not_unwrapped ... ok
+test output::tests::a_word_the_renderer_cannot_rank_is_marked_unknown_rather_than_good ... ok
+test output::tests::an_empty_listing_is_an_empty_stream_rather_than_a_line_shaped_like_a_record ... ok
+test output::tests::an_unranked_table_still_keeps_the_marker_column ... ok
+test output::tests::columns_of_equal_width_keep_the_order_the_record_carries ... ok
+test output::tests::a_wide_character_cell_keeps_the_column_after_it_aligned ... ok
+test output::tests::compact_keeps_a_field_a_record_carries_below_its_top_level ... ok
+test output::tests::compact_keeps_the_scalar_a_list_response_carries_beside_its_records ... ok
+test output::tests::compact_leaves_a_single_record_as_one_line ... ok
+test output::tests::every_protocol_state_this_renderer_can_be_handed_has_a_rank ... ok
+test output::tests::compact_unwraps_the_one_array_a_list_response_carries ... ok
+test output::tests::no_cell_is_ever_empty_so_no_row_can_end_in_whitespace ... ok
+test output::tests::text_does_not_quote_a_string_a_person_is_reading ... ok
+test output::tests::severity_survives_a_pipe_because_it_is_not_carried_by_colour ... ok
+test output::tests::text_says_none_rather_than_printing_an_empty_bracket ... ok
+test output::tests::text_keeps_every_field_a_record_carries_including_a_nested_list ... ok
+test output::tests::the_result_discriminant_is_stripped_so_compact_can_see_the_records ... ok
+test output::tests::text_spends_one_aligned_row_on_each_record ... ok
+test output::tests::the_widest_column_moves_last_even_when_the_record_puts_it_first ... ok
+test output::tests::the_structured_formats_render_the_bytes_they_rendered_before ... ok
+test output::tests::yaml_renders_through_the_maintained_crate ... ok
+test output::tests::a_cell_never_carries_a_character_that_breaks_the_row ... ok
+test output::tests::every_status_word_this_package_emits_is_one_the_renderer_can_rank ... ok
+test init::tests::a_configuration_the_daemon_would_refuse_is_not_left_on_disk ... ok
+test init::tests::what_init_writes_is_what_the_daemon_can_read ... ok
+test auth::tests::the_catalogue_is_what_says_a_credential_has_a_user_half ... ok
+test enrol::tests::a_self_hosted_origin_is_the_case_operator_approval_exists_for ... ok
+test enrol::tests::slack_declares_a_bot_and_a_user_credential_which_one_identity_may_both_hold ... ok
+test enrol::tests::most_of_the_catalogue_asks_no_configuration_question_at_all ... ok
+test enrol::tests::gitlab_asks_for_nothing_when_its_default_origin_is_wanted ... ok
+test providers::tests::a_provider_without_a_probe_is_not_ready_and_says_why_by_omission ... ok
+test providers::tests::an_unmatched_query_is_an_empty_listing_rather_than_the_whole_catalogue ... ok
+test providers::tests::a_query_narrows_to_one_provider_and_its_summary_follows ... ok
+test providers::tests::the_shipped_catalogue_is_reported_rather_than_asserted ... ok
+test output::tests::a_table_too_wide_for_a_terminal_starts_its_last_column_inside_the_budget ... ok
+test output::tests::the_budget_is_documented_as_what_it_is_and_a_real_row_is_wider_than_it ... ok
+test output::tests::two_providers_that_differ_in_their_id_differ_on_screen ... ok
+test output::tests::a_cell_the_budget_cut_says_so_and_the_column_names_are_cut_last ... ok
+
+test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+     Running tests/adversary_budget_prose.rs (crates/connectors-console/target/debug/deps/adversary_budget_prose-e698524ec7985705)
+
+running 3 tests
+test pass3_render_helper_child ... ok
+test the_quoted_module_header_sentence_is_at_the_line_the_pass_two_suite_cites ... ok
+test the_widths_the_documents_state_are_the_widths_the_renderer_prints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+     Running tests/adversary_readability.rs (crates/connectors-console/target/debug/deps/adversary_readability-5df21c78ad04b16c)
+
+running 7 tests
+test render_helper_child ... ok
+test an_unranked_table_lets_a_cell_sit_where_the_severity_marker_sits ... ok
+test a_record_whose_cells_are_all_empty_is_rendered_as_a_blank_line ... ok
+test a_wide_character_cell_leaves_the_column_after_it_ragged ... ok
+test doctor_spreads_one_check_over_several_unmarked_lines_when_the_configuration_is_malformed ... ok
+test compact_no_longer_puts_one_record_on_every_line ... ok
+test providers_starts_its_last_column_past_the_width_of_any_terminal ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+
+     Running tests/adversary_readability_pass2.rs (crates/connectors-console/target/debug/deps/adversary_readability_pass2-558df7c3d207b050)
+
+running 5 tests
+test pass2_render_helper_child ... ok
+test compact_drops_the_name_of_the_array_a_report_carries ... ok
+test a_column_the_budget_squeezes_to_nothing_pushes_every_later_column_out_of_line ... ok
+test compact_answers_an_empty_listing_with_a_line_that_is_not_a_record ... ok
+test the_last_column_of_providers_begins_one_column_past_the_terminal_it_is_laid_out_for ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
+   Doc-tests connectors_console
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+```
+
+Exit status: 0.
+
+
+Additional test-only checks: `git --no-pager diff --check` and `rustfmt --edition 2021 --check crates/connectors-cli/tests/cli_surface.rs` both exited 0 with empty output.
+
+## 4. Finding
+
+Covers commit `a0c02381c413a5ada4e65a4a6a0bcbc06d8bc54d` with only this pass's test additions. No implementation files were changed.
+
+| File:line | Category | Severity | Verdict | Origin | Finding |
+| --- | --- | --- | --- | --- | --- |
+| crates/connectors-cli/src/lib.rs:1242 | acceptance | blocker | NEEDS-CHANGE | undecided | A hosted invocation with local-only flags reads caller input before target validation, masking target-conflict behind input errors or waiting indefinitely for stdin. |
+
+**What was measured:** `target_conflict_precedes_invoke_payload_loading` at tests/cli_surface.rs:2774 failed, exit 101: both `--config` and `--state-root` returned `invalid-argument` for an absent input file. `target_conflict_does_not_wait_for_open_stdin` at tests/cli_surface.rs:2830 failed, exit 101: the subprocess did not exit within two seconds while its stdin writer stayed open; the fixture killed and reaped it. The source at lib.rs:1228 calls blocking `input::read`, which waits for EOF in connectors-console/src/input.rs:43, before reaching target validation at lib.rs:1242. The measured run establishes the two-second wait; the unbounded wait follows from that read-to-EOF implementation.
+
+**What reaches it:** a valid parser invocation of `connectors -o json operation invoke --target hosted --config <local-path> --operation fixture.operation --connection fixture.connection --description-ref fixture.description --input -`, with a shell pipeline or producer keeping stdin open. All required command fields are present. The unit's dated design section promises `target-conflict` whenever hosted is combined with local-only options. The matching absent-file case uses `--input-file <missing-path>` and reaches the same ordering without timing.
+
+**Origin limit:** the base source was read using `git show 4769ce32a331bb8daddaf066b69459c4148fb749:crates/connectors-cli/src/lib.rs`. Input reading already preceded transport selection there; the explicit target check is new in this unit. No base checkout was assigned and no base execution was performed, so the charter's `undecided` label is retained rather than claiming a reproduced pre-existing origin. Coordinator should route this unmet unit contract back to the implementor.
+
+**Repair direction:** validate the target/local-options combination before reading invocation payloads. Both failing tests remain unchanged in the tree. No additional judgement-only findings.
+
+## 5. Attacks without a break
+
+- All 12 dual-target local command leaves, with omitted and explicit local target (24 subprocess runs), reached the fixture Unix socket despite deliberately malformed saved-login metadata; their protocol method and nested invocation payload were preserved.
+- The prior target placement/countdown mutation tests and local success/error rendering tests remained green in the affected suite.
+- Authenticated hosted success was not exercised through a live login or keyring; this pass makes no live-service claim.
+
+## 6. Paths written outside the worktree
+
+Nine report/log files:
+
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/deciding-file.log`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/deciding-stdin.log`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/deciding-leaves.log`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/suite-cli.log`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/suite-cli.exit`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/suite-console.log`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/suite-console.exit`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/outside-paths.txt`
+- `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit/adversary-1/report.md`
+
+Fixture paths retained by the subprocess suites, enumerated below and identically in `outside-paths.txt`. The inventory includes newly modified descendants under the coordinator-assigned short fixture root, using the first deciding log timestamp minus its ten-second build/run window. Existing fixture helpers leave these directories in place; none was deleted by this pass.
+
+```text
+~/.cache/cw6/t/t8554b0
+~/.cache/cw6/t/t8554b0/c
+~/.cache/cw6/t/t8554b0/c/b10x
+~/.cache/cw6/t/t8554b0/c/b10x/connectors.toml
+~/.cache/cw6/t/t8601a0
+~/.cache/cw6/t/t8601a0/c
+~/.cache/cw6/t/t8601a0/c/b10x
+~/.cache/cw6/t/t8601a0/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d0
+~/.cache/cw6/t/t86e5d0/c
+~/.cache/cw6/t/t86e5d0/c/b10x
+~/.cache/cw6/t/t86e5d0/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d0/s
+~/.cache/cw6/t/t86e5d0/s/b10x
+~/.cache/cw6/t/t86e5d0/s/b10x/connectors
+~/.cache/cw6/t/t86e5d0/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d0/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d1
+~/.cache/cw6/t/t86e5d1/c
+~/.cache/cw6/t/t86e5d1/c/b10x
+~/.cache/cw6/t/t86e5d1/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d1/s
+~/.cache/cw6/t/t86e5d1/s/b10x
+~/.cache/cw6/t/t86e5d1/s/b10x/connectors
+~/.cache/cw6/t/t86e5d1/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d1/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d10
+~/.cache/cw6/t/t86e5d10/c
+~/.cache/cw6/t/t86e5d10/c/b10x
+~/.cache/cw6/t/t86e5d10/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d10/s
+~/.cache/cw6/t/t86e5d10/s/b10x
+~/.cache/cw6/t/t86e5d10/s/b10x/connectors
+~/.cache/cw6/t/t86e5d10/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d10/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d11
+~/.cache/cw6/t/t86e5d11/c
+~/.cache/cw6/t/t86e5d11/c/b10x
+~/.cache/cw6/t/t86e5d11/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d11/s
+~/.cache/cw6/t/t86e5d11/s/b10x
+~/.cache/cw6/t/t86e5d11/s/b10x/connectors
+~/.cache/cw6/t/t86e5d11/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d11/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d12
+~/.cache/cw6/t/t86e5d12/c
+~/.cache/cw6/t/t86e5d12/c/b10x
+~/.cache/cw6/t/t86e5d12/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d12/s
+~/.cache/cw6/t/t86e5d12/s/b10x
+~/.cache/cw6/t/t86e5d12/s/b10x/connectors
+~/.cache/cw6/t/t86e5d12/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d12/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d13
+~/.cache/cw6/t/t86e5d13/c
+~/.cache/cw6/t/t86e5d13/c/b10x
+~/.cache/cw6/t/t86e5d13/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d13/s
+~/.cache/cw6/t/t86e5d13/s/b10x
+~/.cache/cw6/t/t86e5d13/s/b10x/connectors
+~/.cache/cw6/t/t86e5d13/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d13/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d14
+~/.cache/cw6/t/t86e5d14/c
+~/.cache/cw6/t/t86e5d14/c/b10x
+~/.cache/cw6/t/t86e5d14/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d14/s
+~/.cache/cw6/t/t86e5d14/s/b10x
+~/.cache/cw6/t/t86e5d14/s/b10x/connectors
+~/.cache/cw6/t/t86e5d14/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d14/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d15
+~/.cache/cw6/t/t86e5d15/c
+~/.cache/cw6/t/t86e5d15/c/b10x
+~/.cache/cw6/t/t86e5d15/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d15/s
+~/.cache/cw6/t/t86e5d15/s/b10x
+~/.cache/cw6/t/t86e5d15/s/b10x/connectors
+~/.cache/cw6/t/t86e5d15/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d15/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d16
+~/.cache/cw6/t/t86e5d16/c
+~/.cache/cw6/t/t86e5d16/c/b10x
+~/.cache/cw6/t/t86e5d16/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d16/s
+~/.cache/cw6/t/t86e5d16/s/b10x
+~/.cache/cw6/t/t86e5d16/s/b10x/connectors
+~/.cache/cw6/t/t86e5d16/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d16/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d17
+~/.cache/cw6/t/t86e5d17/c
+~/.cache/cw6/t/t86e5d17/c/b10x
+~/.cache/cw6/t/t86e5d17/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d17/s
+~/.cache/cw6/t/t86e5d17/s/b10x
+~/.cache/cw6/t/t86e5d17/s/b10x/connectors
+~/.cache/cw6/t/t86e5d17/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d17/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d2
+~/.cache/cw6/t/t86e5d2/c
+~/.cache/cw6/t/t86e5d2/c/b10x
+~/.cache/cw6/t/t86e5d2/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d2/s
+~/.cache/cw6/t/t86e5d2/s/b10x
+~/.cache/cw6/t/t86e5d2/s/b10x/connectors
+~/.cache/cw6/t/t86e5d2/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d2/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d3
+~/.cache/cw6/t/t86e5d3/c
+~/.cache/cw6/t/t86e5d3/c/b10x
+~/.cache/cw6/t/t86e5d3/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d3/s
+~/.cache/cw6/t/t86e5d3/s/b10x
+~/.cache/cw6/t/t86e5d3/s/b10x/connectors
+~/.cache/cw6/t/t86e5d3/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d3/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d4
+~/.cache/cw6/t/t86e5d4/c
+~/.cache/cw6/t/t86e5d4/c/b10x
+~/.cache/cw6/t/t86e5d4/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d4/s
+~/.cache/cw6/t/t86e5d4/s/b10x
+~/.cache/cw6/t/t86e5d4/s/b10x/connectors
+~/.cache/cw6/t/t86e5d4/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d4/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d5
+~/.cache/cw6/t/t86e5d5/c
+~/.cache/cw6/t/t86e5d5/c/b10x
+~/.cache/cw6/t/t86e5d5/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d5/s
+~/.cache/cw6/t/t86e5d5/s/b10x
+~/.cache/cw6/t/t86e5d5/s/b10x/connectors
+~/.cache/cw6/t/t86e5d5/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d5/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d6
+~/.cache/cw6/t/t86e5d6/c
+~/.cache/cw6/t/t86e5d6/c/b10x
+~/.cache/cw6/t/t86e5d6/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d6/s
+~/.cache/cw6/t/t86e5d6/s/b10x
+~/.cache/cw6/t/t86e5d6/s/b10x/connectors
+~/.cache/cw6/t/t86e5d6/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d6/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d7
+~/.cache/cw6/t/t86e5d7/c
+~/.cache/cw6/t/t86e5d7/c/b10x
+~/.cache/cw6/t/t86e5d7/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d7/s
+~/.cache/cw6/t/t86e5d7/s/b10x
+~/.cache/cw6/t/t86e5d7/s/b10x/connectors
+~/.cache/cw6/t/t86e5d7/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d7/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d8
+~/.cache/cw6/t/t86e5d8/c
+~/.cache/cw6/t/t86e5d8/c/b10x
+~/.cache/cw6/t/t86e5d8/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d8/s
+~/.cache/cw6/t/t86e5d8/s/b10x
+~/.cache/cw6/t/t86e5d8/s/b10x/connectors
+~/.cache/cw6/t/t86e5d8/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d8/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5d9
+~/.cache/cw6/t/t86e5d9/c
+~/.cache/cw6/t/t86e5d9/c/b10x
+~/.cache/cw6/t/t86e5d9/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5d9/s
+~/.cache/cw6/t/t86e5d9/s/b10x
+~/.cache/cw6/t/t86e5d9/s/b10x/connectors
+~/.cache/cw6/t/t86e5d9/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5d9/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5da
+~/.cache/cw6/t/t86e5da/c
+~/.cache/cw6/t/t86e5da/c/b10x
+~/.cache/cw6/t/t86e5da/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5da/s
+~/.cache/cw6/t/t86e5da/s/b10x
+~/.cache/cw6/t/t86e5da/s/b10x/connectors
+~/.cache/cw6/t/t86e5da/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5da/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5db
+~/.cache/cw6/t/t86e5db/c
+~/.cache/cw6/t/t86e5db/c/b10x
+~/.cache/cw6/t/t86e5db/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5db/s
+~/.cache/cw6/t/t86e5db/s/b10x
+~/.cache/cw6/t/t86e5db/s/b10x/connectors
+~/.cache/cw6/t/t86e5db/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5db/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5dc
+~/.cache/cw6/t/t86e5dc/c
+~/.cache/cw6/t/t86e5dc/c/b10x
+~/.cache/cw6/t/t86e5dc/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5dc/s
+~/.cache/cw6/t/t86e5dc/s/b10x
+~/.cache/cw6/t/t86e5dc/s/b10x/connectors
+~/.cache/cw6/t/t86e5dc/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5dc/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5dd
+~/.cache/cw6/t/t86e5dd/c
+~/.cache/cw6/t/t86e5dd/c/b10x
+~/.cache/cw6/t/t86e5dd/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5dd/s
+~/.cache/cw6/t/t86e5dd/s/b10x
+~/.cache/cw6/t/t86e5dd/s/b10x/connectors
+~/.cache/cw6/t/t86e5dd/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5dd/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5de
+~/.cache/cw6/t/t86e5de/c
+~/.cache/cw6/t/t86e5de/c/b10x
+~/.cache/cw6/t/t86e5de/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5de/s
+~/.cache/cw6/t/t86e5de/s/b10x
+~/.cache/cw6/t/t86e5de/s/b10x/connectors
+~/.cache/cw6/t/t86e5de/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5de/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t86e5df
+~/.cache/cw6/t/t86e5df/c
+~/.cache/cw6/t/t86e5df/c/b10x
+~/.cache/cw6/t/t86e5df/c/b10x/connectors.toml
+~/.cache/cw6/t/t86e5df/s
+~/.cache/cw6/t/t86e5df/s/b10x
+~/.cache/cw6/t/t86e5df/s/b10x/connectors
+~/.cache/cw6/t/t86e5df/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t86e5df/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d360
+~/.cache/cw6/t/t89d360/c
+~/.cache/cw6/t/t89d360/c/b10x
+~/.cache/cw6/t/t89d360/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361
+~/.cache/cw6/t/t89d361/c
+~/.cache/cw6/t/t89d361/c/b10x
+~/.cache/cw6/t/t89d361/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361/s
+~/.cache/cw6/t/t89d361/s/b10x
+~/.cache/cw6/t/t89d361/s/b10x/connectors
+~/.cache/cw6/t/t89d361/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3610
+~/.cache/cw6/t/t89d3610/c
+~/.cache/cw6/t/t89d3610/c/b10x
+~/.cache/cw6/t/t89d3610/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3610/connectors.sock
+~/.cache/cw6/t/t89d3610/s
+~/.cache/cw6/t/t89d3610/s/b10x
+~/.cache/cw6/t/t89d3610/s/b10x/connectors
+~/.cache/cw6/t/t89d3610/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3611
+~/.cache/cw6/t/t89d3611/c
+~/.cache/cw6/t/t89d3611/c/b10x
+~/.cache/cw6/t/t89d3611/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3611/s
+~/.cache/cw6/t/t89d3611/s/b10x
+~/.cache/cw6/t/t89d3611/s/b10x/connectors
+~/.cache/cw6/t/t89d3611/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3611/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3612
+~/.cache/cw6/t/t89d3612/c
+~/.cache/cw6/t/t89d3612/c/b10x
+~/.cache/cw6/t/t89d3612/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3612/s
+~/.cache/cw6/t/t89d3612/s/b10x
+~/.cache/cw6/t/t89d3612/s/b10x/connectors
+~/.cache/cw6/t/t89d3612/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3612/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3613
+~/.cache/cw6/t/t89d3613/c
+~/.cache/cw6/t/t89d3613/c/b10x
+~/.cache/cw6/t/t89d3613/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3613/s
+~/.cache/cw6/t/t89d3613/s/b10x
+~/.cache/cw6/t/t89d3613/s/b10x/connectors
+~/.cache/cw6/t/t89d3613/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3613/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3614
+~/.cache/cw6/t/t89d3614/c
+~/.cache/cw6/t/t89d3614/c/b10x
+~/.cache/cw6/t/t89d3614/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3614/s
+~/.cache/cw6/t/t89d3614/s/b10x
+~/.cache/cw6/t/t89d3614/s/b10x/connectors
+~/.cache/cw6/t/t89d3614/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3614/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3615
+~/.cache/cw6/t/t89d3615/c
+~/.cache/cw6/t/t89d3615/c/b10x
+~/.cache/cw6/t/t89d3615/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3615/s
+~/.cache/cw6/t/t89d3615/s/b10x
+~/.cache/cw6/t/t89d3615/s/b10x/connectors
+~/.cache/cw6/t/t89d3615/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3615/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3616
+~/.cache/cw6/t/t89d3616/c
+~/.cache/cw6/t/t89d3616/c/b10x
+~/.cache/cw6/t/t89d3616/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3616/s
+~/.cache/cw6/t/t89d3616/s/b10x
+~/.cache/cw6/t/t89d3616/s/b10x/connectors
+~/.cache/cw6/t/t89d3616/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3616/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3617
+~/.cache/cw6/t/t89d3617/c
+~/.cache/cw6/t/t89d3617/c/b10x
+~/.cache/cw6/t/t89d3617/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3617/s
+~/.cache/cw6/t/t89d3617/s/b10x
+~/.cache/cw6/t/t89d3617/s/b10x/connectors
+~/.cache/cw6/t/t89d3617/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3617/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3618
+~/.cache/cw6/t/t89d3618/c
+~/.cache/cw6/t/t89d3618/c/b10x
+~/.cache/cw6/t/t89d3618/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3618/s
+~/.cache/cw6/t/t89d3618/s/b10x
+~/.cache/cw6/t/t89d3618/s/b10x/connectors
+~/.cache/cw6/t/t89d3618/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3618/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3619
+~/.cache/cw6/t/t89d3619/c
+~/.cache/cw6/t/t89d3619/c/b10x
+~/.cache/cw6/t/t89d3619/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3619/s
+~/.cache/cw6/t/t89d3619/s/b10x
+~/.cache/cw6/t/t89d3619/s/b10x/connectors
+~/.cache/cw6/t/t89d3619/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3619/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361a
+~/.cache/cw6/t/t89d361a/c
+~/.cache/cw6/t/t89d361a/c/b10x
+~/.cache/cw6/t/t89d361a/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361a/s
+~/.cache/cw6/t/t89d361a/s/b10x
+~/.cache/cw6/t/t89d361a/s/b10x/connectors
+~/.cache/cw6/t/t89d361a/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361a/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361b
+~/.cache/cw6/t/t89d361b/c
+~/.cache/cw6/t/t89d361b/c/b10x
+~/.cache/cw6/t/t89d361b/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361b/s
+~/.cache/cw6/t/t89d361b/s/b10x
+~/.cache/cw6/t/t89d361b/s/b10x/connectors
+~/.cache/cw6/t/t89d361b/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361b/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361c
+~/.cache/cw6/t/t89d361c/c
+~/.cache/cw6/t/t89d361c/c/b10x
+~/.cache/cw6/t/t89d361c/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361c/s
+~/.cache/cw6/t/t89d361c/s/b10x
+~/.cache/cw6/t/t89d361c/s/b10x/connectors
+~/.cache/cw6/t/t89d361c/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361c/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361d
+~/.cache/cw6/t/t89d361d/c
+~/.cache/cw6/t/t89d361d/c/b10x
+~/.cache/cw6/t/t89d361d/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361d/s
+~/.cache/cw6/t/t89d361d/s/b10x
+~/.cache/cw6/t/t89d361d/s/b10x/connectors
+~/.cache/cw6/t/t89d361d/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361d/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361e
+~/.cache/cw6/t/t89d361e/c
+~/.cache/cw6/t/t89d361e/c/b10x
+~/.cache/cw6/t/t89d361e/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361e/s
+~/.cache/cw6/t/t89d361e/s/b10x
+~/.cache/cw6/t/t89d361e/s/b10x/connectors
+~/.cache/cw6/t/t89d361e/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361e/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d361f
+~/.cache/cw6/t/t89d361f/c
+~/.cache/cw6/t/t89d361f/c/b10x
+~/.cache/cw6/t/t89d361f/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d361f/s
+~/.cache/cw6/t/t89d361f/s/b10x
+~/.cache/cw6/t/t89d361f/s/b10x/connectors
+~/.cache/cw6/t/t89d361f/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d361f/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d362
+~/.cache/cw6/t/t89d362/c
+~/.cache/cw6/t/t89d362/c/b10x
+~/.cache/cw6/t/t89d362/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d362/s
+~/.cache/cw6/t/t89d362/s/b10x
+~/.cache/cw6/t/t89d362/s/b10x/connectors
+~/.cache/cw6/t/t89d362/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d362/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3620
+~/.cache/cw6/t/t89d3620/c
+~/.cache/cw6/t/t89d3620/c/b10x
+~/.cache/cw6/t/t89d3620/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3620/s
+~/.cache/cw6/t/t89d3620/s/b10x
+~/.cache/cw6/t/t89d3620/s/b10x/connectors
+~/.cache/cw6/t/t89d3620/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3620/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3621
+~/.cache/cw6/t/t89d3621/c
+~/.cache/cw6/t/t89d3621/c/b10x
+~/.cache/cw6/t/t89d3621/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3621/s
+~/.cache/cw6/t/t89d3621/s/b10x
+~/.cache/cw6/t/t89d3621/s/b10x/connectors
+~/.cache/cw6/t/t89d3621/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3621/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3622
+~/.cache/cw6/t/t89d3622/c
+~/.cache/cw6/t/t89d3622/c/b10x
+~/.cache/cw6/t/t89d3622/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3622/s
+~/.cache/cw6/t/t89d3622/s/b10x
+~/.cache/cw6/t/t89d3622/s/b10x/connectors
+~/.cache/cw6/t/t89d3622/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3622/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d3623
+~/.cache/cw6/t/t89d3623/c
+~/.cache/cw6/t/t89d3623/c/b10x
+~/.cache/cw6/t/t89d3623/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d3623/s
+~/.cache/cw6/t/t89d3623/s/b10x
+~/.cache/cw6/t/t89d3623/s/b10x/connectors
+~/.cache/cw6/t/t89d3623/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d3623/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d363
+~/.cache/cw6/t/t89d363/c
+~/.cache/cw6/t/t89d363/c/b10x
+~/.cache/cw6/t/t89d363/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d364
+~/.cache/cw6/t/t89d364/c
+~/.cache/cw6/t/t89d364/c/b10x
+~/.cache/cw6/t/t89d364/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d364/connectors.sock
+~/.cache/cw6/t/t89d364/s
+~/.cache/cw6/t/t89d364/s/b10x
+~/.cache/cw6/t/t89d364/s/b10x/connectors
+~/.cache/cw6/t/t89d364/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d365
+~/.cache/cw6/t/t89d365/c
+~/.cache/cw6/t/t89d365/c/b10x
+~/.cache/cw6/t/t89d365/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d366
+~/.cache/cw6/t/t89d366/c
+~/.cache/cw6/t/t89d366/c/b10x
+~/.cache/cw6/t/t89d366/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d367
+~/.cache/cw6/t/t89d367/c
+~/.cache/cw6/t/t89d367/c/b10x
+~/.cache/cw6/t/t89d367/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d368
+~/.cache/cw6/t/t89d368/c
+~/.cache/cw6/t/t89d368/c/b10x
+~/.cache/cw6/t/t89d368/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d368/connectors.sock
+~/.cache/cw6/t/t89d368/s
+~/.cache/cw6/t/t89d368/s/b10x
+~/.cache/cw6/t/t89d368/s/b10x/connectors
+~/.cache/cw6/t/t89d368/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d369
+~/.cache/cw6/t/t89d369/c
+~/.cache/cw6/t/t89d369/c/b10x
+~/.cache/cw6/t/t89d369/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d369/s
+~/.cache/cw6/t/t89d369/s/b10x
+~/.cache/cw6/t/t89d369/s/b10x/connectors
+~/.cache/cw6/t/t89d369/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d369/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36a
+~/.cache/cw6/t/t89d36a/c
+~/.cache/cw6/t/t89d36a/c/b10x
+~/.cache/cw6/t/t89d36a/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36a/s
+~/.cache/cw6/t/t89d36a/s/b10x
+~/.cache/cw6/t/t89d36a/s/b10x/connectors
+~/.cache/cw6/t/t89d36a/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d36a/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36b
+~/.cache/cw6/t/t89d36b/c
+~/.cache/cw6/t/t89d36b/c/b10x
+~/.cache/cw6/t/t89d36b/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36b/connectors.sock
+~/.cache/cw6/t/t89d36b/s
+~/.cache/cw6/t/t89d36b/s/b10x
+~/.cache/cw6/t/t89d36b/s/b10x/connectors
+~/.cache/cw6/t/t89d36b/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36c
+~/.cache/cw6/t/t89d36c/c
+~/.cache/cw6/t/t89d36c/c/b10x
+~/.cache/cw6/t/t89d36c/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36c/s
+~/.cache/cw6/t/t89d36c/s/b10x
+~/.cache/cw6/t/t89d36c/s/b10x/connectors
+~/.cache/cw6/t/t89d36c/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d36c/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36d
+~/.cache/cw6/t/t89d36d/c
+~/.cache/cw6/t/t89d36d/c/b10x
+~/.cache/cw6/t/t89d36d/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36d/connectors.sock
+~/.cache/cw6/t/t89d36d/s
+~/.cache/cw6/t/t89d36d/s/b10x
+~/.cache/cw6/t/t89d36d/s/b10x/connectors
+~/.cache/cw6/t/t89d36d/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36e
+~/.cache/cw6/t/t89d36e/c
+~/.cache/cw6/t/t89d36e/c/b10x
+~/.cache/cw6/t/t89d36e/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36e/connectors.sock
+~/.cache/cw6/t/t89d36e/s
+~/.cache/cw6/t/t89d36e/s/b10x
+~/.cache/cw6/t/t89d36e/s/b10x/connectors
+~/.cache/cw6/t/t89d36e/s/b10x/connectors/identity-sessions.json
+~/.cache/cw6/t/t89d36f
+~/.cache/cw6/t/t89d36f/c
+~/.cache/cw6/t/t89d36f/c/b10x
+~/.cache/cw6/t/t89d36f/c/b10x/connectors.toml
+~/.cache/cw6/t/t89d36f/s
+~/.cache/cw6/t/t89d36f/s/b10x
+~/.cache/cw6/t/t89d36f/s/b10x/connectors
+~/.cache/cw6/t/t89d36f/s/b10x/connectors/connectors.sock
+~/.cache/cw6/t/t89d36f/s/b10x/connectors/identity-sessions.json
+```
+
+Shared compiler cache: `~/.cache/sccache` (tool-managed writes through the explicitly assigned `/usr/bin/sccache` wrapper). Cargo target output stayed inside the assigned worktree; `CARGO_TARGET_DIR` remained unset.
+
+```findings
+- file: crates/connectors-cli/src/lib.rs
+  line: 1242
+  category: acceptance
+  severity: blocker
+  verdict: NEEDS-CHANGE
+  origin: undecided
+  message: A hosted invocation with local-only flags reads caller input before target validation, masking target-conflict behind input errors or waiting indefinitely for stdin.
+```
+
+
+Report publication: local home prefixes are mechanically replaced with `~`; raw runner output remains in private wave scratch. Counts, assertions and findings are unchanged.

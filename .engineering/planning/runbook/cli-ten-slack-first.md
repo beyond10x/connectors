@@ -6,8 +6,9 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 1
+revision: 12
 ---
+
 ## Authorization and objective
 
 Interactive run, preapproved by the operator on 2026-09-06: "commit and push (planning artifacts) ... the next 10 stories ahead, with highest prio the slack bug ... dispatch the stories with up to 5 agents". The operator then confirmed an unlimited subscription budget. aep-drive:wave skill version 0.8.0. O1 governed reach and O5 generic platform, using existing typed owners; Atlas ADR 0038 keeps extension-host responsibility independent of the platform core.
@@ -49,9 +50,9 @@ Integration branch `wave/cli-ten-slack-first`, worktree id `wt-2c3596f5baa5`. Ro
 
 | Story | Branch | Head | Worktree | Build directory | Scratch | Stage |
 |---|---|---|---|---|---|---|
-| `personal-local-writes-are-usable` | `impl/personal-local-writes-are-usable` | opening commit (assigned before dispatch) | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482` | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-writes-are-usable` | provisioned, awaiting opening commit |
-| `explicit-target-never-implicit` | `impl/explicit-target-never-implicit` | opening commit (assigned before dispatch) | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866` | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli/target` | `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit` | provisioned, awaiting opening commit |
-| `personal-local-workload-read` | `impl/personal-local-workload-read` | opening commit (assigned before dispatch) | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb` | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-workload-read` | provisioned, awaiting opening commit |
+| `personal-local-writes-are-usable` | `impl/personal-local-writes-are-usable` | 60a031b382ad7b0ffa98182cd0333bd37542c430 | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482` | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-writes-are-usable` | integrated; full gate pending |
+| `explicit-target-never-implicit` | `impl/explicit-target-never-implicit` | fd8bae818e2a1661f7eb9153cba0ba590f50f7f8 | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866` | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli/target` | `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit` | final adversary passed; integration gate pending |
+| `personal-local-workload-read` | `impl/personal-local-workload-read` | a3eab7a42ebb63f4c265dc204f2f6c7f419f1abc | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb` | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-workload-read` | final adversary passed; integration gate pending |
 
 ## Computed proposal
 
@@ -993,3 +994,43 @@ Verbatim output of `aep plan artifact waves --kind story --status proposed --for
   "cycles": []
 }
 ```
+
+## Scratch-path correction
+
+The full runtime baseline found Unix SUN_LEN failure under the long assigned scratch path (31 passed, 1 failed). Coordinator creates short additional temporary roots, preserving original reports/logs: Slack `~/.cache/cw6/s`, target `~/.cache/cw6/t`, workload `~/.cache/cw6/k`, integration `~/.cache/cw6/p`. Set TMPDIR to the respective short root, and create socket fixtures there. Both original scratch and these exact roots are coordinator-owned cleanup inputs; no repository test is weakened.
+
+Workload fixture dependency correction: coordinator applied the returned patch adding tower 0.5 util as a dev dependency in crates/integration-kubernetes/Cargo.toml. Runtime offline metadata exited 0 and required no lock diff. This assigned manifest is disjoint from the other first-batch units.
+
+## Coordinator package gate corrections
+
+The coordinator applied the exact reviewed pre-existing lint corrections returned by both units: unused Datasource imports in Kubernetes hosted tests; newline-preserving writeln substitutions and moving unchanged Argo CD helper functions above the console test module. No test case, assertion or lint was suppressed. Those files are explicitly assigned to their respective units. The workload fixture additionally required the existing tower dependency in the runtime lockfile row; full offline metadata, rather than --no-deps, produced that lock update.
+
+## Workload review routing
+
+Workload adversary pass 1 is recorded verbatim as review-result:cli-workload-adversary-1-20260906 (54 to 56 cases, one introduced warning). Its retained null-cursor contract case is red; same implementor receives correction-1.md to reject explicit null before I/O and preserve omitted cursor. This is the first correction, not a repeated failed fix.
+
+## Retained review cases
+
+Adversarial cases are committed after the implementation commit, preserving the reviewed commit as a reachable ancestor rather than rewriting its evidence identity. These per-unit test/correction commits and integration merges are part of completing the authorized wave. Slack pass 1 is recorded verbatim as review-result:cli-slack-adversary-1-20260906; no findings, 72 to 75 cases. Its outcome is no-op; the added test coverage remains in the unit branch.
+
+## Target review routing
+
+Target pass 1 is recorded verbatim as review-result:cli-target-adversary-1-20260906 (164 to 167 cases, two red cases for one ordering finding). The adversary marked origin undecided. Coordinator classifies it introduced: base has no target flag or conflict contract; this unit added target.validate after the input-acquisition match, exposing the new conflicting hosted command to file reads/stdin blocking before its required refusal. Same implementor receives correction-1.md.
+
+## Standing connector direction
+
+The operator clarified the standing direction on 2026-09-06: official OpenAPI is mandatory when available; the usual connector goal is ALL operations. Focused surfaces are consumer projections or prebuilt Connectors projections. Administrative and regular-user surfaces may be separated, grounded in the provider permission model. A projection never grants authority.
+
+The four pipeline-schedule operations are the first delivery slice selected by this wave, not the target GitLab API coverage. Keep the full official OpenAPI as source authority and account for every operation in a deterministic coverage inventory: admitted/catalogued, platform authentication flow, or an explicit remaining coverage/importer gap. Preserve a backlog for the remaining source operations. Do not let a four-operation source extraction become an invisible limit on connector scope. Narrow model exposure and complete underlying callability are independent decisions.
+
+Before implementing the GitLab source path, revise its bounded vendoring proposal to retain the complete scrubbed vendor document and derive the schedule slice through reviewed ingest selections. Classify administrative versus regular-user operations only from source-grounded permissions, and carry unresolved classifications as explicit gaps rather than assuming access. Existing inline operation provenance remains truthful until each operation is migrated to the official source.
+
+## Official source formats
+
+The operator further clarified on 2026-09-06: connector definitions should normally never be hand-authored. When an official source format is unsupported, build the importer. Official OpenAPI is used whenever available. This supersedes any earlier suggestion that an unsupported importer permits authored endpoint/schema replacements. The only authored-source exception is a documented absence of a usable official machine-readable source, grounded in fetched official documentation. Full operation coverage and focused consumer/prebuilt projections remain the goal; administrative and regular-user projections do not grant authority.
+
+## Review publication and current authority
+
+Before publication, the coordinator retained the original unpublished review/store delta privately, restored its own uncommitted store changes to the committed base, and replayed them through AEP with local home prefixes replaced by `~`. Immutable published review records were not edited. Raw reports remain available in assigned private scratch; public records declare the mechanical path redaction without changing counts, assertions or findings. Subsequent planning writes identify the executing wave agent through AEP_ACTOR.
+
+Atlas authority advanced to clean remote main 4911915de3bea434b6092d245b9f3ef98d6f0eca and was provisioned read-only in managed tree wt-ae608b71b66b. Both final adversarial passes found nothing: target selection 168→171 executed cases, workload inventory 60→63. Corrections and retained cases preserve prior reviewed commits as ancestors.

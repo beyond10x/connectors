@@ -1,0 +1,112 @@
+# Refined from `aep plan reverse openapi` over the four-operation vendor slice, 2026-09-06.
+# Official source: https://gitlab.com/gitlab-org/gitlab/-/blob/master/doc/api/openapi/openapi_v3.yaml
+# Raw SHA256: f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530.
+# Field requirements also checked against https://docs.gitlab.com/api/pipeline_schedules/.
+# These are external payload values, not Connector-owned GitLab resources or lifecycles.
+domain: connectors.gitlab
+
+summary: Bounded external GitLab pipeline-schedule request and response values.
+
+types:
+  # Product narrowing preserves the existing connector's numeric-project-ID policy.
+  - name: connectors.gitlab.ScheduleListRequest
+    kind: struct
+    fields:
+      - name: id
+        type: Integer
+      - name: page
+        type: Optional<Integer>
+      - name: per_page
+        type: Optional<Integer>
+      - name: scope
+        type: Optional<connectors.gitlab.ScheduleScope>
+
+  - name: connectors.gitlab.ScheduleScope
+    kind: enum
+    variants: [active, inactive]
+
+  # Concrete required values narrow the vendor's nullable required create fields.
+  # Heterogeneous `inputs` are deliberately outside this first bounded surface.
+  - name: connectors.gitlab.ScheduleCreateFields
+    kind: struct
+    fields:
+      - name: description
+        type: String
+      - name: ref
+        type: String
+      - name: cron
+        type: String
+      - name: cron_timezone
+        type: Optional<String>
+      - name: active
+        type: Optional<Boolean>
+
+  - name: connectors.gitlab.ScheduleUpdateFields
+    kind: struct
+    fields:
+      - name: description
+        type: Optional<String>
+      - name: ref
+        type: Optional<String>
+      - name: cron
+        type: Optional<String>
+      - name: cron_timezone
+        type: Optional<String>
+      - name: active
+        type: Optional<Boolean>
+
+  - name: connectors.gitlab.ScheduleCreateRequest
+    kind: struct
+    fields:
+      - name: id
+        type: Integer
+      - name: body
+        type: connectors.gitlab.ScheduleCreateFields
+
+  - name: connectors.gitlab.ScheduleUpdateRequest
+    kind: struct
+    fields:
+      - name: id
+        type: Integer
+      - name: pipeline_schedule_id
+        type: Integer
+      - name: body
+        type: Optional<connectors.gitlab.ScheduleUpdateFields>
+
+  - name: connectors.gitlab.ScheduleDeleteRequest
+    kind: struct
+    fields:
+      - name: id
+        type: Integer
+      - name: pipeline_schedule_id
+        type: Integer
+
+  # Partial response projection: the vendor schema declares no required fields.
+  - name: connectors.gitlab.ScheduleSnapshot
+    kind: struct
+    fields:
+      - name: id
+        type: Optional<Integer>
+      - name: description
+        type: Optional<String>
+      - name: ref
+        type: Optional<String>
+      - name: cron
+        type: Optional<String>
+      - name: cron_timezone
+        type: Optional<String>
+      - name: next_run_at
+        type: Optional<Timestamp>
+      - name: active
+        type: Optional<Boolean>
+      - name: created_at
+        type: Optional<Timestamp>
+      - name: updated_at
+        type: Optional<Timestamp>
+
+# UNMAPPED: the vendor GET schema references one Schedule, while its API documentation shows a
+# list. The provider's reviewed projection must record this normalization before publication.
+# UNMAPPED: external ownership and lifecycles cannot be derived from these payloads. No entities,
+# references inferred from nested values, or Connector-owned mutation outcomes are declared.
+# UNMAPPED: Optional alone does not preserve omission/null/default distinctions. The vendor source
+# and reviewed provider mapping retain those transport details; no lossless round trip is claimed.
