@@ -15,7 +15,7 @@ Connectors has a working Rust implementation and a partial
 domain declarations and generates a checked CLI outline. It is not yet a complete executable
 definition of Connectors' behavior.
 
-This page describes the 0.6.3 source. The website's source-and-revision link identifies the exact
+This page describes the 0.6.4 source. The website's source-and-revision link identifies the exact
 documentation snapshot; the hosted API reference identifies the deployed binary's contract.
 
 ## Four kinds of evidence
@@ -29,6 +29,23 @@ documentation snapshot; the hosted API reference identifies the deployed binary'
 
 Validation proves that declarations satisfy ESS rules. It does not establish that every capability
 has been declared or that the runtime executes those definitions.
+
+## The example across the four layers
+
+The [Slack mention-to-reply example](README.md#follow-one-slack-mention) crosses more boundaries
+than a generated CLI outline can establish.
+
+| Capability | Implemented authority | ESS and generation limit |
+|---|---|---|
+| Establish C1 | Connect Session lifecycle, Slack setup, and credential custody | Selected Connection lifecycles are declared; a complete typed authority/custody relationship model is absent. |
+| Persist and receive E1 | Slack intake/store and the provider data-event protocol | Core event declarations do not model the entire intake, read, replay, or delivery policy. |
+| Describe D1 and invoke | Rust protocol, routing, backend admission, and adapter dispatch | ESS has selected commands, but no core search/describe views and no complete invocation request contract. |
+| Issue and redeem A1 | Hosted human approval issuance and the domain approval gate | Declaring an invocation does not generate approval issuance, exact-input binding, or one-time redemption. |
+| Enforce relationships and invariants | Rust checks, state operations, and targeted tests | Core typed relations and entity invariants remain absent; these checks are not a complete model-derived conformance suite. |
+| Reach a CLI command | Shipped clap parser and Rust dispatch | ESS generates the checked group outline; leaf behavior remains handwritten. |
+
+The public walkthrough does not add those missing definitions to ESS. It makes the implemented
+path and its model coverage independently inspectable.
 
 ## What the model covers
 
@@ -63,6 +80,8 @@ artifacts. That step does not cover the separate Git system entry.
 
 ```mermaid
 flowchart TB
+    accTitle: The shipped CLI combines handwritten behavior with a checked ESS outline
+    accDescr: ESS generates top-level groups and contributes contract checks. Handwritten Rust implements the parser and dispatch that ship in the binary.
     spec[ESS: eight top-level groups] --> generated[Generated clap outline]
     spec --> checks[Contract and drift checks]
     handwritten[Handwritten parser and dispatch] --> checks
