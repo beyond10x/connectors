@@ -464,24 +464,24 @@ fn append_entry(
         options.allow_writes
     );
     if let Some(name) = options.instance.as_deref() {
-        let _ = write!(block, "instance = \"{name}\"\n");
+        let _ = writeln!(block, "instance = \"{name}\"");
     }
     if options.operator_network {
-        let _ = write!(block, "network = \"operator\"\n");
+        let _ = writeln!(block, "network = \"operator\"");
     }
     if !endpoints.is_empty() {
-        let _ = write!(block, "\n[catalog.endpoints]\n");
+        let _ = writeln!(block, "\n[catalog.endpoints]");
         for (name, value) in endpoints {
-            let _ = write!(block, "{name} = \"{value}\"\n");
+            let _ = writeln!(block, "{name} = \"{value}\"");
         }
     }
     // Quoted keys: a credential name is dotted (`jira.api_token`), and a bare dotted key in TOML
     // is a nested table, not one name. Written unquoted it would parse as
     // `usernames.jira.api_token`, which is a different map the resolver never asks.
     if !usernames.is_empty() {
-        let _ = write!(block, "\n[catalog.usernames]\n");
+        let _ = writeln!(block, "\n[catalog.usernames]");
         for (name, value) in usernames {
-            let _ = write!(block, "\"{name}\" = \"{value}\"\n");
+            let _ = writeln!(block, "\"{name}\" = \"{value}\"");
         }
     }
 
@@ -496,6 +496,78 @@ fn append_entry(
         return Err(EnrolError::Config(error));
     }
     Ok(())
+}
+
+/// Whether this provider issues its own credential rather than expecting a pasted one.
+///
+/// One name today, and deliberately a function rather than a catalogue lookup: acquiring is
+/// hand-written per provider, so a provider is on this list exactly when code exists to do it.
+/// The catalogue cannot answer "is there an implementation", and a declaration that claimed one
+/// without it would fail at the moment a person is holding a password.
+#[must_use]
+pub fn acquires(provider: &str) -> bool {
+    provider == "argocd"
+}
+
+/// Ask for the parts of an Argo CD acquisition the catalogue cannot supply.
+///
+/// The project and role are the operator's own nouns, and the password is the one value here that
+/// must not outlive its use — it goes into the request as a `Zeroizing` and the acquisition drops
+/// it after the single sign-in it pays for.
+fn argocd_request(
+    origin: String,
+    allow_sync: bool,
+) -> Result<integration_catalog::argocd::AcquireRequest, EnrolError> {
+    eprintln!();
+    eprintln!("Argo CD issues its own tokens, so there is nothing for you to fetch first.");
+    eprintln!(
+        "Sign in once and a scoped, expiring token is minted and stored; the password is not."
+    );
+    let project = ask("Argo CD project whose applications this connection reads")?;
+    let role = ask_with_default("Role to create in that project", "b10x")?;
+    let username = ask("Argo CD username with `projects, update` on it (often `admin`)")?;
+    let password = Zeroizing::new(rpassword::prompt_password("Argo CD password: ")?);
+    if password.trim().is_empty() {
+        return Err(EnrolError::MissingValue("password".to_owned()));
+    }
+    Ok(integration_catalog::argocd::AcquireRequest {
+        origin,
+        username,
+        password,
+        project,
+        role,
+        allow_sync,
+        expires_in_seconds: integration_catalog::argocd::DEFAULT_EXPIRES_IN_SECONDS,
+    })
+}
+
+fn ask(prompt: &str) -> Result<String, EnrolError> {
+    use std::io::{BufRead as _, Write as _};
+
+    eprint!("{prompt}: ");
+    std::io::stderr().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().lock().read_line(&mut answer)?;
+    let answer = answer.trim().to_owned();
+    if answer.is_empty() {
+        return Err(EnrolError::MissingValue(prompt.to_owned()));
+    }
+    Ok(answer)
+}
+
+fn ask_with_default(prompt: &str, default: &str) -> Result<String, EnrolError> {
+    use std::io::{BufRead as _, Write as _};
+
+    eprint!("{prompt} [{default}]: ");
+    std::io::stderr().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().lock().read_line(&mut answer)?;
+    let answer = answer.trim();
+    Ok(if answer.is_empty() {
+        default.to_owned()
+    } else {
+        answer.to_owned()
+    })
 }
 
 #[cfg(test)]
@@ -584,76 +656,4 @@ mod tests {
             "only {askless} providers can be connected without answering an endpoint question"
         );
     }
-}
-
-/// Whether this provider issues its own credential rather than expecting a pasted one.
-///
-/// One name today, and deliberately a function rather than a catalogue lookup: acquiring is
-/// hand-written per provider, so a provider is on this list exactly when code exists to do it.
-/// The catalogue cannot answer "is there an implementation", and a declaration that claimed one
-/// without it would fail at the moment a person is holding a password.
-#[must_use]
-pub fn acquires(provider: &str) -> bool {
-    provider == "argocd"
-}
-
-/// Ask for the parts of an Argo CD acquisition the catalogue cannot supply.
-///
-/// The project and role are the operator's own nouns, and the password is the one value here that
-/// must not outlive its use — it goes into the request as a `Zeroizing` and the acquisition drops
-/// it after the single sign-in it pays for.
-fn argocd_request(
-    origin: String,
-    allow_sync: bool,
-) -> Result<integration_catalog::argocd::AcquireRequest, EnrolError> {
-    eprintln!();
-    eprintln!("Argo CD issues its own tokens, so there is nothing for you to fetch first.");
-    eprintln!(
-        "Sign in once and a scoped, expiring token is minted and stored; the password is not."
-    );
-    let project = ask("Argo CD project whose applications this connection reads")?;
-    let role = ask_with_default("Role to create in that project", "b10x")?;
-    let username = ask("Argo CD username with `projects, update` on it (often `admin`)")?;
-    let password = Zeroizing::new(rpassword::prompt_password("Argo CD password: ")?);
-    if password.trim().is_empty() {
-        return Err(EnrolError::MissingValue("password".to_owned()));
-    }
-    Ok(integration_catalog::argocd::AcquireRequest {
-        origin,
-        username,
-        password,
-        project,
-        role,
-        allow_sync,
-        expires_in_seconds: integration_catalog::argocd::DEFAULT_EXPIRES_IN_SECONDS,
-    })
-}
-
-fn ask(prompt: &str) -> Result<String, EnrolError> {
-    use std::io::{BufRead as _, Write as _};
-
-    eprint!("{prompt}: ");
-    std::io::stderr().flush()?;
-    let mut answer = String::new();
-    std::io::stdin().lock().read_line(&mut answer)?;
-    let answer = answer.trim().to_owned();
-    if answer.is_empty() {
-        return Err(EnrolError::MissingValue(prompt.to_owned()));
-    }
-    Ok(answer)
-}
-
-fn ask_with_default(prompt: &str, default: &str) -> Result<String, EnrolError> {
-    use std::io::{BufRead as _, Write as _};
-
-    eprint!("{prompt} [{default}]: ");
-    std::io::stderr().flush()?;
-    let mut answer = String::new();
-    std::io::stdin().lock().read_line(&mut answer)?;
-    let answer = answer.trim();
-    Ok(if answer.is_empty() {
-        default.to_owned()
-    } else {
-        answer.to_owned()
-    })
 }

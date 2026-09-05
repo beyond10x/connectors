@@ -158,8 +158,8 @@ The words a person really types under those groups — `list`, `search`, `activa
   file of its own because it is a fact about that component's surface and belongs beside the two
   `UNMAPPED:` markers that explain why the surface cannot be declared — and because a reviewer
   reading the specification to find out what `connectors` types should not have to open a test.
-- `TARGET_EXCEPTIONS` is `connection`, `event` and `operation`: the groups whose commands do not say
-  which deployment they reach. `the_target_countdown_is_exactly_what_the_parser_still_owes` asserts
+- `TARGET_EXCEPTIONS` is empty as of 2026-09-06: `connection`, `event` and `operation` each
+  declare `--target local|hosted`. `the_target_countdown_is_exactly_what_the_parser_still_owes` asserts
   **nothing about the list's size**. It derives a pending set from the parser and the tree — the
   declared groups named after a module of `crates/protocol/src` that declares a request enum, minus
   those already carrying `--target` anywhere in their subtree, the group's own arguments included —
@@ -255,3 +255,17 @@ artifact and nothing more, and no group moves onto it.
 
 When that lands, the cutover is still one group at a time with the gate green between each. A
 single cutover of every group is the version of this that fails at 2 a.m.
+
+## Explicit target selection — 2026-09-06
+
+`connection`, `event` and `operation` accept `--target local|hosted` on the group or after its
+subcommand. Omission always means local, including when a hosted login is saved. A login selects
+which hosted deployment an explicit `--target hosted` reaches; signing in never changes the local
+default. A hosted target without a login returns `hosted-login-required`, and combining it with
+local-only `--config` or `--state-root` returns `target-conflict`.
+
+These commands carry `target` beside their result fields and in their structured error envelopes;
+text failures name it on stderr. `inspect doctor` explains the local default and its control
+socket. Target selection changes no protocol frame or grant authority. The countdown still derives
+its candidates from the protocol modules, and its mutation check now removes each group's target
+flag to prove that a regression is refused.
