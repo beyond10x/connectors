@@ -64,10 +64,12 @@ Zwirn presents three deliberately separate roles:
 Each companion Connection owns its own Socket Mode WebSocket and remains connected while Zwirn is
 offline. Zwirn pulls only that principal's normalized Slack events with a short-lived
 `connectors.events.self` token; tenant-wide module events still require `connectors.events.read`
-and operator admission. A fresh `app_mention` carries one Connector-enforced reply grant pinned to
-the same Connection, channel, and thread. Its event reference is durably claimable once and expires
-after ten minutes. Every other mutation, including a second reply, follows the normal person
-approval path. Neither Zwirn nor the model receives a Socket Mode ticket or Slack token.
+and operator admission. Receiving an `app_mention` does not itself authorize a hosted reply.
+The hosted write path requires an admitting Grant and an issued approval for the exact operation,
+Connection, subject, and input; that approval is redeemed once and checked for expiry. The local
+runtime's separate `event:` claim journal is not a ten-minute hosted reply grant. Follow the
+[mention-to-reply example](../architecture/README.md#follow-one-slack-mention) for the current
+boundaries. Neither Zwirn nor the model receives a Socket Mode ticket or Slack token.
 
 The finished product asks only for credentials required by the chosen features:
 
