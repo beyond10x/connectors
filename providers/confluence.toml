@@ -702,3 +702,39 @@ format = "token"
 secret = true
 docs_url = "https://id.atlassian.com/manage-profile/security/api-tokens"
 binds = "credential.confluence.api_token"
+
+# Repository-authored contract: specs/confluence/incremental-reads.openapi.yaml.
+[[operations]]
+id = "confluence-page-search"
+method = "GET"
+path = "/rest/api/content/search"
+direction = "read"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+risk = "low"
+idempotency = "idempotent"
+description = "Search permitted pages with CQL scoped to a space and lastmodified window. Dates use the authenticated account's configured timezone, not necessarily UTC: use a conservative overlap and filter version.when against the UTC cutoff. Follow only the cursor query value in _links.next, keeping CQL and limit unchanged; never fetch the returned URL directly. Expands version, body.storage and space. Stable identity is id plus version.number. Requires existing search:confluence read scope."
+[[operations.params.query]]
+name = "cql"
+required = true
+schema = { type = "string", minLength = 1, maxLength = 4096 }
+[[operations.params.query]]
+name = "cursor"
+required = false
+schema = { type = "string", minLength = 1, maxLength = 4096 }
+[[operations.params.query]]
+name = "limit"
+required = true
+schema = { type = "integer", minimum = 1, maximum = 100 }
+[[operations.params.query]]
+name = "expand"
+required = true
+schema = { type = "string", enum = ["version,body.storage,space"] }
+[operations.response_schema]
+type = "object"
+required = ["results", "size", "_links"]
+properties = { results = { type = "array", items = { type = "object", required = ["id", "title", "version"], properties = { id = { type = "string" }, title = { type = "string" }, type = { type = "string" }, status = { type = "string" }, version = { type = "object", properties = { number = { type = "integer" }, when = { type = "string" } } }, body = { type = "object", properties = { storage = { type = "object", properties = { value = { type = "string" }, representation = { type = "string" } } } } }, space = { type = "object", properties = { id = { type = "integer" }, key = { type = "string" }, name = { type = "string" } } }, _links = { type = "object", properties = { webui = { type = "string" }, base = { type = "string" } } } } } }, size = { type = "integer" }, limit = { type = "integer" }, _links = { type = "object", properties = { next = { type = "string" }, base = { type = "string" } } } }

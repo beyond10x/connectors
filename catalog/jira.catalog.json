@@ -1552,6 +1552,587 @@
       "risk": "high",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.service_api_token"
+        ],
+        [
+          "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Read changed issues from one admitted project. Both Jira runtime placements build fixed JQL with updated >= unquoted epoch milliseconds, orders updated ASC then key ASC, and return safe issue projections. Personal gateway connections expose api_url and null browser_url; native tenant connections expose browser_url. Repeat the same window and opaque next_page_token until is_last; overlapping windows retain stable issue id plus updated revision. No JQL text is accepted.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "next_page_token": {
+              "type": "string"
+            },
+            "project_key": {
+              "type": "string"
+            },
+            "updated_since_ms": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "project_key",
+            "updated_since_ms",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Read changed issues from one admitted project. Both Jira runtime placements build fixed JQL with updated >= unquoted epoch milliseconds, orders updated ASC then key ASC, and return safe issue projections. Personal gateway connections expose api_url and null browser_url; native tenant connections expose browser_url. Repeat the same window and opaque next_page_token until is_last; overlapping windows retain stable issue id plus updated revision. No JQL text is accepted.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-search",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "project_key",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}$",
+            "type": "string"
+          },
+          "symbol": "project_key"
+        },
+        {
+          "name": "updated_since_ms",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 253402300799999,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "updated_since_ms"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit"
+        },
+        {
+          "name": "next_page_token",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": "next_page_token"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "limit",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "value": {
+              "$param": "next_page_token"
+            }
+          },
+          {
+            "name": "project_key",
+            "value": {
+              "$param": "project_key"
+            }
+          },
+          {
+            "name": "updated_since_ms",
+            "value": {
+              "$param": "updated_since_ms"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/2/search/jql"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "isLast": {
+            "type": "boolean"
+          },
+          "issues": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextPageToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "issues",
+          "isLast"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.service_api_token"
+        ],
+        [
+          "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List permitted Jira projects through the native adapter, restricted to configured project keys. Follow next_start_at even when local policy removes every item in a provider page. Project id is stable; key and name are discovery metadata.",
+        "input_schema": {
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "start_at": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List permitted Jira projects through the native adapter, restricted to configured project keys. Follow next_start_at even when local policy removes every item in a provider page. Project id is stable; key and name are discovery metadata.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "jira-project-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "start_at",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "start_at",
+          "wire": "startAt"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit",
+          "wire": "maxResults"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "maxResults",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "startAt",
+            "value": {
+              "$param": "start_at"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/2/project/search"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "isLast": {
+            "type": "boolean"
+          },
+          "maxResults": {
+            "type": "integer"
+          },
+          "startAt": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "values": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "values",
+          "isLast",
+          "startAt",
+          "maxResults",
+          "total"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "jira.service_api_token"
+        ],
+        [
+          "jira.api_token"
+        ],
+        [
+          "jira.user_oauth"
+        ],
+        [
+          "jira.service_oauth"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "jira.service_api_token"
+          ],
+          "scopes": {
+            "jira.service_api_token": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.api_token"
+          ]
+        },
+        {
+          "credentials": [
+            "jira.user_oauth"
+          ],
+          "scopes": {
+            "jira.user_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "jira.service_oauth"
+          ],
+          "scopes": {
+            "jira.service_oauth": [
+              [
+                "read:jira-work"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Read a bounded comment page for one admitted issue. Both runtimes return comments, start_at, max_results, total, is_last and next_start_at. Follow all offsets; timestamps retain Jira timezone syntax. Author identities are omitted. visibility and jsd_public preserve restriction evidence for downstream scope decisions; returned comments are visible to this principal, not necessarily company-public. Legacy comment-list is unchanged.",
+        "input_schema": {
+          "properties": {
+            "issue_key": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "start_at": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "issue_key",
+            "limit"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Read a bounded comment page for one admitted issue. Both runtimes return comments, start_at, max_results, total, is_last and next_start_at. Follow all offsets; timestamps retain Jira timezone syntax. Author identities are omitted. visibility and jsd_public preserve restriction evidence for downstream scope decisions; returned comments are visible to this principal, not necessarily company-public. Legacy comment-list is unchanged.",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "cloud_id": [
+          "path"
+        ]
+      },
+      "expose": true,
+      "id": "jira-issue-comments-read",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "name": "issue_key",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}-[0-9]+$",
+            "type": "string"
+          },
+          "symbol": "issue_key",
+          "wire": "issueIdOrKey"
+        },
+        {
+          "name": "limit",
+          "position": "query",
+          "required": true,
+          "schema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "symbol": "limit",
+          "wire": "maxResults"
+        },
+        {
+          "name": "start_at",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "symbol": "start_at",
+          "wire": "startAt"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "maxResults",
+            "value": {
+              "$param": "limit"
+            }
+          },
+          {
+            "name": "startAt",
+            "value": {
+              "$param": "start_at"
+            }
+          }
+        ],
+        "url": "{base}/rest/api/2/issue/{issue_key}/comment"
+      },
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "comments": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "maxResults": {
+            "type": "integer"
+          },
+          "startAt": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "comments",
+          "startAt",
+          "maxResults",
+          "total"
+        ],
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "default"
     }
   ],
   "schema_version": 2,

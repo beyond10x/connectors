@@ -14,13 +14,17 @@ use sha2::{Digest as _, Sha256};
 use super::auth::decode_value_response;
 use super::*;
 
+#[path = "incremental.rs"]
+mod incremental;
+
 impl JiraInner {
     fn operation_connections(
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
     ) -> Vec<OperationConnectionSummary> {
-        self.owned_user_connections(context)
+        let mut connections: Vec<_> = self
+            .owned_user_connections(context)
             .into_iter()
             .filter(|connection| supports_operation(connection, operation_ref))
             .map(|connection| OperationConnectionSummary {
@@ -30,7 +34,17 @@ impl JiraInner {
                 audiences: vec!["delegated-user".to_owned()],
                 purpose: None,
             })
-            .collect()
+            .collect();
+        if incremental::is_incremental(operation_ref) {
+            connections.push(OperationConnectionSummary {
+                connection_ref: ORG_CONNECTION_REF.to_owned(),
+                label: "Organization read-only".to_owned(),
+                provider: INTEGRATION_REF.to_owned(),
+                audiences: vec!["organization".to_owned()],
+                purpose: None,
+            });
+        }
+        connections
     }
 
     pub(super) fn search_operations(
@@ -72,6 +86,7 @@ impl JiraInner {
         digest.update(operation_ref.as_bytes());
         digest.update(b"\0");
         digest.update(self.policy.user_grant_ref.as_bytes());
+        digest.update(self.policy.organization_read_grant_ref.as_bytes());
         for project in &self.policy.allowed_project_keys {
             digest.update(b"\0");
             digest.update(project.as_bytes());
@@ -101,7 +116,8 @@ impl JiraInner {
             operation_ref: operation_ref.to_owned(),
             title: operation_ref.replace('-', " "),
             description: operation.contract_description().to_owned(),
-            input_schema: operation.input_schema().clone(),
+            input_schema: incremental::input_schema(operation_ref)
+                .unwrap_or_else(|| operation.input_schema().clone()),
             output_schema: operation_output_schema(operation_ref),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
@@ -118,14 +134,18 @@ impl JiraInner {
         if !is_jira_operation(&request.operation_ref) {
             return Err(operation_not_found());
         }
+        let organization_read = request.connection_ref == ORG_CONNECTION_REF
+            && incremental::is_incremental(&request.operation_ref);
         let connection = self
             .owned_user_connections(context)
             .into_iter()
             .find(|connection| {
                 connection.connection_ref == request.connection_ref
                     && supports_operation(connection, &request.operation_ref)
-            })
-            .ok_or_else(operation_not_granted)?;
+            });
+        if connection.is_none() && !organization_read {
+            return Err(operation_not_granted());
+        }
         if request.description_ref
             != self.operation_description_ref(context, &request.operation_ref)
         {
@@ -146,12 +166,20 @@ impl JiraInner {
         if !validator.is_valid(&request.input) {
             return Err(operation_invalid());
         }
-        let token = self
-            .user_access_token(&connection)
-            .await
-            .map_err(|_| operation_not_granted())?;
+        let token = match connection.as_ref() {
+            Some(connection) => self.user_access_token(connection).await,
+            None => self.service_access_token().await,
+        }
+        .map_err(|_| operation_not_granted())?;
         let assembled = connector_resolve::auth::Assembled::new(
-            "jira.user_oauth",
+            if organization_read {
+                match self.policy.shared_auth {
+                    JiraSharedAuth::ServiceOauth => "jira.service_oauth",
+                    JiraSharedAuth::ServiceApiToken => "jira.service_api_token",
+                }
+            } else {
+                "jira.user_oauth"
+            },
             token.expose_secret().to_owned(),
             catalog::Placement::Header {
                 name: "Authorization",
@@ -168,7 +196,8 @@ impl JiraInner {
             &[assembled],
         )
         .map_err(|_| operation_invalid())?;
-        let target = url::Url::parse(&plan.request.url).map_err(|_| operation_unavailable())?;
+        let mut target = url::Url::parse(&plan.request.url).map_err(|_| operation_unavailable())?;
+        incremental::prepare_query(&request.operation_ref, &request.input, &mut target)?;
         if !self.admitted_gateway_target(&target) {
             return Err(operation_not_granted());
         }
@@ -211,29 +240,44 @@ impl JiraInner {
                         }
                     })
                     .and_then(|payload| {
-                        project_operation_output(
-                            &request.operation_ref,
-                            &payload,
-                            &self.site_origin,
-                            &request.input,
-                        )
-                        .and_then(|projected| {
-                            let schema = operation_output_schema(&request.operation_ref);
-                            let validator = jsonschema::validator_for(&schema)
-                                .map_err(|_| operation_unavailable())?;
-                            validator
-                                .is_valid(&projected)
-                                .then_some(projected)
-                                .ok_or_else(operation_protocol)
-                        })
-                        .map_err(|_| {
-                            if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
-                                operation_protocol()
-                            } else {
-                                operation_outcome_unknown(&request.operation_ref)
-                            }
-                        })
+                        let projected = if incremental::is_incremental(&request.operation_ref) {
+                            incremental::project(
+                                &request.operation_ref,
+                                &payload,
+                                &self.site_origin,
+                                &request.input,
+                                &self.policy.allowed_project_keys,
+                            )
+                        } else {
+                            project_operation_output(
+                                &request.operation_ref,
+                                &payload,
+                                &self.site_origin,
+                                &request.input,
+                            )
+                        };
+                        projected
+                            .and_then(|projected| {
+                                let schema = operation_output_schema(&request.operation_ref);
+                                let validator = jsonschema::validator_for(&schema)
+                                    .map_err(|_| operation_unavailable())?;
+                                validator
+                                    .is_valid(&projected)
+                                    .then_some(projected)
+                                    .ok_or_else(operation_protocol)
+                            })
+                            .map_err(|_| {
+                                if operation_effect(&request.operation_ref) == EffectClass::ReadOnly
+                                {
+                                    operation_protocol()
+                                } else {
+                                    operation_outcome_unknown(&request.operation_ref)
+                                }
+                            })
                     })
+            }
+            Ok(response) if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                Err(operation_unavailable())
             }
             Ok(response) if response.status().is_client_error() => Err(
                 if matches!(
@@ -293,6 +337,8 @@ impl JiraInner {
         admit_operation_shape(operation_ref, input)?;
         let object = input.as_object().ok_or_else(operation_invalid)?;
         let keys: &[&str] = match operation_ref {
+            "jira-project-list" => &[],
+            "jira-issue-search" => &["project_key"],
             "jira-issue-create" => &["project_key"],
             "jira-issue-link-add" => &["inward_issue_key", "outward_issue_key"],
             _ => &["issue_key"],
@@ -471,6 +517,9 @@ fn bounded_integer(value: Option<&Value>) -> Result<u64, OperationError> {
 }
 
 fn operation_output_schema(operation_ref: &str) -> Value {
+    if let Some(schema) = incremental::output_schema(operation_ref) {
+        return schema;
+    }
     let nullable_string = |maximum| json!({"type":["string","null"],"maxLength":maximum});
     let comment = || {
         json!({
@@ -526,6 +575,9 @@ fn operation_output_schema(operation_ref: &str) -> Value {
 }
 
 fn admit_operation_shape(operation_ref: &str, input: &Value) -> Result<(), OperationError> {
+    if incremental::is_incremental(operation_ref) {
+        return incremental::admit(operation_ref, input);
+    }
     let object = input.as_object().ok_or_else(operation_invalid)?;
     let fields: &[(&str, usize, FieldShape)] = match operation_ref {
         "jira-issue-get" | "jira-issue-comment-list" | "jira-issue-transitions-list" => {
@@ -633,7 +685,12 @@ fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> boo
 fn operation_effect(operation_ref: &str) -> EffectClass {
     if matches!(
         operation_ref,
-        "jira-issue-get" | "jira-issue-comment-list" | "jira-issue-transitions-list"
+        "jira-issue-get"
+            | "jira-issue-comment-list"
+            | "jira-issue-transitions-list"
+            | "jira-issue-search"
+            | "jira-project-list"
+            | "jira-issue-comments-read"
     ) {
         EffectClass::ReadOnly
     } else {
@@ -700,6 +757,25 @@ mod tests {
         assert_eq!(issue_project("ops-42"), None);
         assert_eq!(issue_project("12345"), None);
         assert_eq!(issue_project("OPS-other"), None);
+    }
+
+    #[test]
+    fn incremental_issue_read_admits_bounded_overlap_without_query_injection() {
+        assert!(admit_operation_shape(
+            "jira-issue-search",
+            &json!({
+                "project_key":"PROJ", "updated_since_ms":1700000000000_u64, "limit":2,
+                "next_page_token":"page-two"
+            })
+        )
+        .is_ok());
+        for input in [
+            json!({"project_key":"PROJ OR 1=1", "updated_since_ms":0, "limit":2}),
+            json!({"project_key":"PROJ", "updated_since_ms":0, "limit":101}),
+            json!({"project_key":"PROJ", "updated_since_ms":0, "limit":2,"jql":""}),
+        ] {
+            assert!(admit_operation_shape("jira-issue-search", &input).is_err());
+        }
     }
 
     #[test]
