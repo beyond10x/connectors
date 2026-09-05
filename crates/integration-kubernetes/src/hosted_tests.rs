@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use protocol::datasource::{Completeness, DatasourceRead, RecordView};
+    use protocol::datasource::DatasourceRead;
 
     struct Reader;
 

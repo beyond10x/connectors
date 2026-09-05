@@ -48,3 +48,43 @@ must be canonical HTTPS; ambient and kubeconfig HTTP proxies are not used.
 generic `connection observations` / `connection materialize` methods expose the same value-free
 contract. Direct in-cluster satellite Connections remain the preferred zero-user-credential
 topology for deployed environments.
+
+## Read an activated cluster's inventory
+
+The operation CLI can list admitted namespaces and Deployments without a deployment name. Keep
+the opaque Connection reference returned by activation, and obtain each operation's description
+lease before invoking it:
+
+```bash
+connectors operation search --query kubernetes
+connectors operation describe --operation kubernetes.namespace.list
+connectors operation invoke --operation kubernetes.namespace.list \
+  --connection "$connection_ref" --description-ref "$namespace_description_ref" \
+  --input-json '{}'
+
+connectors operation describe --operation kubernetes.workload.list
+connectors operation invoke --operation kubernetes.workload.list \
+  --connection "$connection_ref" --description-ref "$workload_description_ref" \
+  --input-json '{"namespace":"monitoring","limit":25}'
+```
+
+Set `connection_ref` to the activated Connection and the two description variables to the
+`description_ref` values returned by their respective describe calls. Every activated Connection
+is offered by these reads; choose the Connection explicitly for each invocation.
+
+`kubernetes.namespace.list` returns `connection_ref` and the namespaces admitted by the local
+configuration. It makes no cluster request. An empty configured namespace list admits no inventory
+namespaces; it does not expand to all namespaces. Kubernetes RBAC is checked by the API server when
+`kubernetes.workload.list` reads Deployments in an admitted namespace.
+
+The workload result contains `connection_ref`, `namespace`, and `deployments`. Each deployment
+has a name, container names and images from its Pod template, and desired and ready replica counts.
+Images are available even when replicas are zero. These operations do not read Pods or Secrets.
+
+`limit` defaults to 25 and accepts 1–100. A call fetches at most eight upstream pages of at most
+five Deployments each, so a page can be shorter than the requested limit. When `next_cursor` is
+present, pass it as `cursor` in the next workload input with the same Connection and namespace.
+Cursors are opaque, single use, and expire after five minutes; restarting the daemon also discards
+them. If a cursor expires, restart the listing. A result that exceeds the response byte bound is
+refused; retry from the start with a smaller limit. The existing `kubernetes.workloads` datasource
+retains its compact record format.

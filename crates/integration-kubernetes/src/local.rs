@@ -9,6 +9,8 @@ use crate::local_services::{
     service_is_current, verify_identity,
 };
 use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
+#[path = "local_inventory.rs"]
+mod inventory;
 use crate::workloads::{
     restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
     RESTART_OPERATION, STATUS_OPERATION,
@@ -20,6 +22,7 @@ use domain::{
     AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
 };
+use inventory::{namespace_operation, workload_operation, NAMESPACE_OPERATION, WORKLOAD_OPERATION};
 use k8s_openapi::api::core::v1::Service;
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Client, Config};
@@ -431,10 +434,13 @@ impl KubernetesLocalBackend {
     }
 
     fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
-        // The two workload operations belong to the cluster, not to a Service behind it. Publishing
+        // Workload and inventory operations belong to the cluster, not to a Service behind it. Publishing
         // them only for child Services is why an activated cluster admitted nothing a person could
         // call: the Connection was attached, readable as a datasource, and had no operation at all.
-        if matches!(operation_ref, STATUS_OPERATION | RESTART_OPERATION) {
+        if matches!(
+            operation_ref,
+            STATUS_OPERATION | RESTART_OPERATION | NAMESPACE_OPERATION | WORKLOAD_OPERATION
+        ) {
             return self
                 .cluster_connections()
                 .into_iter()
@@ -484,6 +490,16 @@ impl KubernetesLocalBackend {
                 EffectClass::ReadOnly,
                 ApprovalPosture::NotRequired,
             ),
+            NAMESPACE_OPERATION => (
+                "List admitted Kubernetes namespaces",
+                EffectClass::ReadOnly,
+                ApprovalPosture::NotRequired,
+            ),
+            WORKLOAD_OPERATION => (
+                "List Kubernetes deployment inventory",
+                EffectClass::ReadOnly,
+                ApprovalPosture::NotRequired,
+            ),
             RESTART_OPERATION => (
                 "Restart a Kubernetes Deployment rollout",
                 EffectClass::Mutating,
@@ -513,12 +529,14 @@ impl KubernetesLocalBackend {
         if connections.is_empty() {
             return Err(operation_not_found());
         }
-        // The two workload operations carry the contract every host mode publishes; only the
-        // Connections and the lease below are this placement's.
+        // Status/restart keep their shared contracts; inventory is local-only. The Connections
+        // and the lease below belong to this placement.
         let description_ref = self.operation_description_ref(context, operation_ref);
         match operation_ref {
             STATUS_OPERATION => return Ok(status_operation(connections, description_ref)),
             RESTART_OPERATION => return Ok(restart_operation(connections, description_ref)),
+            NAMESPACE_OPERATION => return Ok(namespace_operation(connections, description_ref)),
+            WORKLOAD_OPERATION => return Ok(workload_operation(connections, description_ref)),
             _ => {}
         }
         let operation =
@@ -650,7 +668,7 @@ impl KubernetesLocalBackend {
         Ok(description)
     }
 
-    /// Runs one `kubernetes.deployment.*` operation against the attached cluster.
+    /// Runs a workload or inventory operation against the selected attached cluster.
     ///
     /// The description lease is checked first: a restart approved against one description must not
     /// be dispatched after the surface moved underneath it. That is the whole reason the two
@@ -683,6 +701,9 @@ impl KubernetesLocalBackend {
         .ok_or_else(operation_unavailable)?;
         let reader = KubeconfigReader::new(client);
         let output = match request.operation_ref.as_str() {
+            NAMESPACE_OPERATION | WORKLOAD_OPERATION => {
+                self.inventory_output(context, &request, &reader).await?
+            }
             STATUS_OPERATION => {
                 let input: DeploymentInput =
                     serde_json::from_value(request.input).map_err(|_| operation_invalid())?;
@@ -869,7 +890,10 @@ impl ConnectorBackend for KubernetesLocalBackend {
                     .contains_key(&request.connection_ref)
                     || (matches!(
                         request.operation_ref.as_str(),
-                        STATUS_OPERATION | RESTART_OPERATION
+                        STATUS_OPERATION
+                            | RESTART_OPERATION
+                            | NAMESPACE_OPERATION
+                            | WORKLOAD_OPERATION
                     ) && self.is_cluster_connection(&request.connection_ref))
             }
             OperationRequest::Search(_) => false,
@@ -930,7 +954,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Invoke(request)
                 if matches!(
                     request.operation_ref.as_str(),
-                    STATUS_OPERATION | RESTART_OPERATION
+                    STATUS_OPERATION | RESTART_OPERATION | NAMESPACE_OPERATION | WORKLOAD_OPERATION
                 ) =>
             {
                 self.invoke_workload(context, request).await
@@ -1224,10 +1248,15 @@ pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
     }
 }
 
-/// Every operation this placement can publish: the two cluster workload operations, then the
+/// Every operation this placement can publish: cluster workload and inventory operations, then the
 /// proxied monitoring routes.
 fn local_operations() -> Vec<&'static str> {
-    let mut operations = vec![STATUS_OPERATION, RESTART_OPERATION];
+    let mut operations = vec![
+        STATUS_OPERATION,
+        RESTART_OPERATION,
+        NAMESPACE_OPERATION,
+        WORKLOAD_OPERATION,
+    ];
     operations.extend(kubernetes_route_operations());
     operations
 }
@@ -1349,3 +1378,4 @@ pub(crate) fn operation_unavailable() -> OperationError {
 }
 
 include!("local_tests.rs");
+include!("local_inventory_tests.rs");
