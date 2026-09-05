@@ -20,6 +20,8 @@ The Slack Socket Mode path illustrates the implemented intake boundary:
 
 ```mermaid
 sequenceDiagram
+    accTitle: Persist a Slack event before acknowledging its envelope
+    accDescr: The Connector channel admits and stores a provider event, then acknowledges Slack. An authorized consumer separately reads the stored event and cursor.
     participant Slack as Slack
     participant Channel as Connector channel
     participant Store as Event store
@@ -61,6 +63,21 @@ Search discovers event descriptions. Receive reads events using the protocol's c
 addresses retained events by reference. Admission still applies when reading or replaying a fact.
 Method inputs and results appear in the deployed [API reference](interfaces.md#the-deployed-http-reference).
 
+## The example: receive E1
+
+The hosted supervisor receives a Slack `app_mention` for C1. It attributes and normalizes that
+provider message into E1, retaining the selected payload fields needed by the consumer. The
+[Slack event store](../../crates/integration-slack/src/backend.rs) persists admitted events before
+acknowledgement. If storage fails, that intake does not acknowledge successful persistence.
+
+An application acting with the person's admitted event authority receives E1 and a cursor. The
+event reference addresses the stored fact; the cursor advances a read. Neither reference is an
+issued approval for `slack-chat-post-message`.
+
+The application can use E1's channel and thread information to propose a reply. Its subsequent
+write follows [description, human approval, and invocation](interfaces.md#the-example-describe-and-invoke-the-reply).
+Reading or replaying E1 never resets the redemption state of A1.
+
 ## Durability has a boundary
 
 The personal-local event store is bounded at 10,000 events and 64 MiB. When it cannot admit another
@@ -68,8 +85,12 @@ event, Socket Mode intake stops acknowledgement rather than claiming delivery. R
 compaction are not a completed general capability across all deployments.
 
 Delivery is not a universal exactly-once claim. Provider redelivery, consumer retries, and replay
-are separate from operation idempotency. The hosted Slack companion reply path has a specific
-one-time, expiring reply claim; it does not guarantee exactly-once arbitrary external effects.
+are separate from operation idempotency. Hosted approval A1 is redeemable once and has its own
+expiry; that guarantee applies to admission, not to exactly-once arbitrary external effects.
+
+The local runtime has a separate [event-reference claim journal](../../crates/connectors-runtime/src/claims.rs),
+tested for concurrent presentations and restart persistence. That local mechanism does not issue
+hosted approval records, impose a general ten-minute lifetime, or prove thread/input binding.
 
 ## State and audit are separate concerns
 
@@ -83,6 +104,10 @@ one-time, expiring reply claim; it does not guarantee exactly-once arbitrary ext
 The state port supplies bounded atomic operations; it does not promise arbitrary transactions
 across keys. Using it does not mean entities execute through Entity Runtime or that every store
 shares one event-sourcing model.
+
+For the example, three durable facts answer different questions: E1 says what arrived; A1's
+redemption says whether that approval was spent; execution audit says what was attempted and what
+outcome was recorded. None of them can substitute for a missing fact in another store.
 
 ## Operational events are not a shipped general stream
 
