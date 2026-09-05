@@ -2,14 +2,14 @@
 format: aep.planning-md/1
 id: story:hosted-session-completes-out-of-terminal-state
 kind: story
-status: draft
+status: active
 title: A hosted connect session can complete out of a terminal state
 relations:
 - informed_by: review-result:adversary-ess-domain-pass-1
 scope:
 - confidence: cited
   path: crates/integration-catalog/src/hosted.rs
-revision: 2
+revision: 4
 ---
 # Story: a hosted connect session can complete out of a terminal state
 

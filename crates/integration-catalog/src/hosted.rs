@@ -766,6 +766,7 @@ impl ConnectorBackend for HostedCatalogBackend {
         let mut sessions = lock(&self.inner.sessions);
         let current = sessions
             .get_mut(session_ref)
+            .filter(|session| session.state == ConnectSessionState::Pending)
             .ok_or(HostedCompletionError::NotFound)?;
         current.state = ConnectSessionState::Completed;
         current.connection_ref = Some(connection_ref);
@@ -1013,11 +1014,17 @@ mod tests {
     use connector_secrets::MemoryStore;
     use connector_state::MemoryState;
     use service::{EgressHttpRequest, EgressHttpResponse, EgressTransportError, EgressWebSocket};
+    use tokio::sync::Notify;
 
     const SENTINEL_ONE: &str = "SENTINEL-NOT-A-REAL-SECRET-ONE";
     const SENTINEL_TWO: &str = "SENTINEL-NOT-A-REAL-SECRET-TWO";
 
     struct SuccessfulEgress;
+
+    struct PausedEgress {
+        entered: Arc<Notify>,
+        resume: Arc<Notify>,
+    }
 
     #[async_trait]
     impl EgressTransport for SuccessfulEgress {
@@ -1026,6 +1033,32 @@ mod tests {
             _authority_ref: &str,
             _request: EgressHttpRequest,
         ) -> Result<EgressHttpResponse, EgressTransportError> {
+            Ok(EgressHttpResponse {
+                status: 200,
+                headers: BTreeMap::new(),
+                body: br#"{"data":[]}"#.to_vec(),
+            })
+        }
+
+        async fn connect_websocket(
+            &self,
+            _authority_ref: &str,
+            _url: String,
+            _maximum_message_bytes: usize,
+        ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+            Err(EgressTransportError::Refused)
+        }
+    }
+
+    #[async_trait]
+    impl EgressTransport for PausedEgress {
+        async fn execute(
+            &self,
+            _authority_ref: &str,
+            _request: EgressHttpRequest,
+        ) -> Result<EgressHttpResponse, EgressTransportError> {
+            self.entered.notify_one();
+            self.resume.notified().await;
             Ok(EgressHttpResponse {
                 status: 200,
                 headers: BTreeMap::new(),
@@ -1111,6 +1144,97 @@ mod tests {
             panic!("wrong status")
         };
         status.connection_ref.expect("connection")
+    }
+
+    fn pending_session(
+        backend: &HostedCatalogBackend,
+        principal: &PrincipalContext,
+    ) -> (String, String) {
+        let created = backend
+            .inner
+            .create_session(
+                principal,
+                "anthropic",
+                "anthropic.api_key",
+                "Expiring key".to_owned(),
+            )
+            .expect("session created");
+        let capability = url::Url::parse(
+            created
+                .browser_completion_url
+                .as_deref()
+                .expect("browser completion URL"),
+        )
+        .expect("valid completion URL")
+        .fragment()
+        .and_then(|fragment| fragment.strip_prefix("token="))
+        .expect("completion capability")
+        .to_owned();
+        (created.connect_session_ref, capability)
+    }
+
+    #[tokio::test]
+    async fn completion_does_not_overwrite_a_terminal_session_after_verification_awaits() {
+        let store = Arc::new(MemoryStore::new());
+        let entered = Arc::new(Notify::new());
+        let resume = Arc::new(Notify::new());
+        let backend = HostedCatalogBackend::open(
+            "tenant-test".to_owned(),
+            HostedCatalogConfig {
+                enabled: true,
+                public_origin: Some("https://connectors.example.test/api/connectors/v1".to_owned()),
+                grant_ref: Some("grant:catalog-read".to_owned()),
+                providers: vec!["anthropic".to_owned()],
+                connect_session_ttl_seconds: 300,
+            },
+            BTreeSet::new(),
+            BTreeSet::new(),
+            store.clone(),
+            store,
+            Arc::new(MemoryState::new()),
+            Arc::new(PausedEgress {
+                entered: entered.clone(),
+                resume: resume.clone(),
+            }),
+        )
+        .await
+        .expect("backend opens");
+        let principal = principal("person-one");
+        let (session_ref, capability) = pending_session(&backend, &principal);
+        let completing = HostedCatalogBackend {
+            inner: backend.inner.clone(),
+        };
+        let completing_ref = session_ref.clone();
+        let task = tokio::spawn(async move {
+            completing
+                .complete_hosted_session(
+                    &completing_ref,
+                    &capability,
+                    HostedCompletionSubmission::new(SENTINEL_ONE.as_bytes().to_vec()),
+                )
+                .await
+        });
+
+        entered.notified().await;
+        {
+            let mut sessions = lock(&backend.inner.sessions);
+            let current = sessions.get_mut(&session_ref).expect("pending session");
+            current.state = ConnectSessionState::Expired;
+            current.capability_sha256.fill(0);
+        }
+        resume.notify_one();
+
+        assert!(matches!(
+            task.await.expect("completion task joins"),
+            Err(HostedCompletionError::NotFound)
+        ));
+        assert_eq!(
+            lock(&backend.inner.sessions)
+                .get(&session_ref)
+                .expect("session remains")
+                .state,
+            ConnectSessionState::Expired
+        );
     }
 
     async fn search(
