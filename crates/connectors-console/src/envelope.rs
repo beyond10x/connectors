@@ -65,7 +65,6 @@ pub struct ReducedError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
 
     /// A stand-in with the shape every protocol envelope has, so the macro's behaviour is asserted
