@@ -1218,7 +1218,7 @@ implementation_form = "built_in"
 required_capabilities = ["public_network"]
 risk = "low"
 idempotency = "idempotent"
-description = "List changed project deployments. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array."
+description = "List changed project deployments. An updated_after or updated_before bound automatically selects order_by=updated_at; without either bound, vendor default ordering applies. Follow native next_page, retaining deployment id, status, updated_at and deployable commit SHA across overlapping update windows. Native output is a scrubbed items/next_page envelope; the vendor response schema below describes the HTTP array."
 [[operations.params.path]]
 name = "project_id"
 required = true

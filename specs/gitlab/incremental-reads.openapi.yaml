@@ -70,9 +70,14 @@ paths:
       operationId: gitlab-deployment-list
       summary: Read one bounded project activity page
       x-b10x-source-reference: https://docs.gitlab.com/api/deployments/#list-all-project-deployments
+      x-b10x-ordering-reference: https://gitlab.com/gitlab-org/gitlab/-/work_items/328500
       x-b10x-pagination-reference: https://docs.gitlab.com/api/rest/#pagination
-      description: Native projection returns items and next_page from X-Next-Page; overlap retains IDs and timestamps or immutable commit SHA. An invalid or non-advancing continuation is refused. HTTP arrays never include the envelope; the native adapter adds it.
+      description: Native projection returns items and next_page from X-Next-Page; overlap retains IDs and timestamps or immutable commit SHA. An invalid or non-advancing continuation is refused. HTTP arrays never include the envelope; the native adapter adds it. GitLab requires order_by=updated_at if and only if updated_after or updated_before is supplied. Both catalog and native adapters derive this query parameter; it is not caller input. Without either bound, vendor default ordering applies.
       parameters:
+        - name: order_by
+          in: query
+          description: Derived by the adapter as updated_at when either update-date bound is present; omitted otherwise. Not exposed in the operation input contract.
+          schema: {type: string, enum: [updated_at]}
         - name: project_id
           in: path
           required: true
