@@ -28,10 +28,30 @@ struct NamespaceInput {}
 #[serde(deny_unknown_fields)]
 struct WorkloadInput {
     namespace: String,
-    #[serde(default = "default_limit")]
+    #[serde(default = "default_limit", deserialize_with = "present_limit")]
     limit: u16,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "present_cursor")]
     cursor: Option<String>,
+}
+
+/// An optional property may be absent; when present it must retain its declared JSON type.
+/// Deserializing Option directly would silently treat explicit null as absence.
+fn present_cursor<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    String::deserialize(deserializer).map(Some)
+}
+
+/// JSON Schema integers include integer-valued decimal/exponent representations such as 1.0.
+/// The declared 1..=100 range is exact in f64 and is checked before narrowing to the reader type.
+fn present_limit<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u16, D::Error> {
+    let number = serde_json::Number::deserialize(deserializer)?;
+    let value = number
+        .as_f64()
+        .filter(|value| value.fract() == 0.0 && (1.0..=f64::from(MAX_LIST_LIMIT)).contains(value));
+    value
+        .map(|value| value as u16)
+        .ok_or_else(|| serde::de::Error::custom("expected an integer between 1 and 100"))
 }
 
 const fn default_limit() -> u16 {
@@ -95,6 +115,9 @@ impl KubernetesLocalBackend {
         request: &InvokeRequest,
         reader: &KubeconfigReader,
     ) -> Result<Value, OperationError> {
+        if !request.input.is_object() {
+            return Err(operation_invalid());
+        }
         let namespaces = self
             .policy
             .namespaces
