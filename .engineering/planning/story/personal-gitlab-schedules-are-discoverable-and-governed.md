@@ -21,11 +21,29 @@ scope:
 - confidence: cited
   path: connectors.lock
 - confidence: cited
+  path: crates/catalog-build/Cargo.toml
+- confidence: cited
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: inferred
   path: crates/catalog-cli/Cargo.toml
 - confidence: inferred
   path: crates/catalog-cli/examples/vendor_gitlab.rs
+- confidence: cited
+  path: crates/catalog-reader/catalog.pack
+- confidence: inferred
+  path: crates/connector-spec/schema/provider-toml.schema.json
+- confidence: inferred
+  path: crates/connector-spec/src/provider/declaration.rs
+- confidence: inferred
+  path: crates/connector-spec/src/provider/patch_validation.rs
+- confidence: inferred
+  path: crates/connector-spec/src/provider/publishing.rs
+- confidence: inferred
+  path: crates/connector-spec/src/provider/schema_sync.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/operation_selection.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/response_schema_coverage.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -48,7 +66,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 45
+revision: 51
 ---
 
 
@@ -159,3 +177,9 @@ Before implementing the GitLab source path, revise its bounded vendoring proposa
 ## Official source formats
 
 The operator further clarified on 2026-09-06: connector definitions should normally never be hand-authored. When an official source format is unsupported, build the importer. Official OpenAPI is used whenever available. This supersedes any earlier suggestion that an unsupported importer permits authored endpoint/schema replacements. The only authored-source exception is a documented absence of a usable official machine-readable source, grounded in fetched official documentation. Full operation coverage and focused consumer/prebuilt projections remain the goal; administrative and regular-user projections do not grant authority.
+
+## Importer scope extension
+
+Measured stage 1: official GitLab commit eaeb4b8b88fdee3fe9b1d1a54397226cf191c201 reproduces raw SHA f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530. The complete document contains 1,847 operations, no duplicate/missing operation IDs, and no authentication-flow operation endpoints (OAuth appears in security definitions). This is source coverage, not a claim all operations are callable yet.
+
+Additional inferred implementation scope, authorized before edits: crates/connector-spec/src/provider/declaration.rs, publishing.rs, patch_validation.rs, schema_sync.rs; crates/connector-spec/tests/main/operation_selection.rs. The extension supports a reviewed generated-schema array wrapper for vendor/documentation response discrepancies, retaining vendor-generated properties. Actual schema file path and any measured request-importer gap must be named before further scope extension. This follows the operator's rule to build importer capability rather than hand-author a replacement specification.

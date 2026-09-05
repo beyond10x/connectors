@@ -6,8 +6,9 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 13
+revision: 15
 ---
+
 
 ## Authorization and objective
 
@@ -50,9 +51,9 @@ Integration branch `wave/cli-ten-slack-first`, worktree id `wt-2c3596f5baa5`. Ro
 
 | Story | Branch | Head | Worktree | Build directory | Scratch | Stage |
 |---|---|---|---|---|---|---|
-| `personal-local-writes-are-usable` | `impl/personal-local-writes-are-usable` | 60a031b382ad7b0ffa98182cd0333bd37542c430 | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482` | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-writes-are-usable` | integrated; full gate pending |
-| `explicit-target-never-implicit` | `impl/explicit-target-never-implicit` | fd8bae818e2a1661f7eb9153cba0ba590f50f7f8 | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866` | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli/target` | `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit` | final adversary passed; integration gate pending |
-| `personal-local-workload-read` | `impl/personal-local-workload-read` | a3eab7a42ebb63f4c265dc204f2f6c7f419f1abc | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb` | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-workload-read` | final adversary passed; integration gate pending |
+| `personal-local-writes-are-usable` | `impl/personal-local-writes-are-usable` | 60a031b382ad7b0ffa98182cd0333bd37542c430 | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482` | `~/.local/state/worktree/trees/b10x/connectors/wt-6ae00b19e482/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-writes-are-usable` | integrated; full gate passed; final installed delivery pending |
+| `explicit-target-never-implicit` | `impl/explicit-target-never-implicit` | fd8bae818e2a1661f7eb9153cba0ba590f50f7f8 | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866` | `~/.local/state/worktree/trees/b10x/connectors/wt-09950110d866/crates/connectors-cli/target` | `~/.cache/connectors-cli-wave-20260906/explicit-target-never-implicit` | integrated; full gate passed |
+| `personal-local-workload-read` | `impl/personal-local-workload-read` | a3eab7a42ebb63f4c265dc204f2f6c7f419f1abc | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb` | `~/.local/state/worktree/trees/b10x/connectors/wt-728fb204f8cb/crates/connectors-runtime/target` | `~/.cache/connectors-cli-wave-20260906/personal-local-workload-read` | integrated; full gate passed |
 
 ## Computed proposal
 
@@ -1867,3 +1868,34 @@ Full unfiltered computed proposal before these three moves:
 }
 
 ```
+
+## First batch integration gate
+
+Integrated source through 346c434960a1235685a73f054be707554e055a17 passed every declared workspace and the final lane on 2026-09-06. The initial full gate exited 101 in Kubernetes because a new test assumed sorted JSON object keys; the entire runtime workspace enables serde_json preserve_order. Coordinator corrected that assertion to compare exactly the same four-key set, retained value/cardinality assertions, and reran the full runtime workspace successfully. This was a test representation correction, not a production behavior change or another adversarial pass.
+
+The root workspace passed in integration-gate-batch1.log; corrected runtime passed in runtime-gate-correction.log. The other ten workspaces and final lane passed through the gate's --workspace and --final entry points, recorded in integration-gate-remaining.log and .exits. All logs are in assigned planning scratch. Each command's own status was captured, never a tail pipeline status. The new cases are included in actual runner counts.
+
+| Workspace | Passed executions | Ignored |
+|---|---:|---:|
+| `.` | 1141 | 4 |
+| `crates/connectors-runtime` | 323 | 2 |
+| `crates/connectors-cli` | 84 | 0 |
+| `crates/connectors-console` | 87 | 0 |
+| `crates/driver-audio` | 15 | 0 |
+| `crates/driver-speech` | 22 | 2 |
+| `crates/driver-cdp` | 29 | 2 |
+| `crates/driver-sip` | 5 | 0 |
+| `crates/driver-sql` | 28 | 14 |
+| `crates/rtvbp-voice-endpoint` | 7 | 0 |
+| `crates/voice-local-audio` | 4 | 1 |
+| `crates/voice-runtime` | 4 | 0 |
+
+Total 1,749 passed executions, zero failed, 25 ignored. Ignored optional live/hardware cases are not claimed as executed. Final catalog check: 65 providers, 68 artifacts verified; links portable; story index and 73 legacy records consistent; ESS connectors v1, ten files valid, deterministic clap output identical. This closes first-batch source verification; final installed CLI delivery and later batch integration remain pending.
+
+The GitLab source unit measured a legitimate additional absent response body: official DELETE schedule returns 204/no content. Its response coverage rises to 856/1011 with 155 absences. The coordinator reviewed the exact response_schema_coverage counter change 155→156 to preserve its stated one-absence allowance and retain the two-operation empty-provider refusal; the existing assertions and covered floor are unchanged.
+
+## Additional assigned surfaces
+
+The multi-credential unit may extract focused catalog/config modules to satisfy the source-size fence. Its exact scope now includes config personal/catalog.rs and lib.rs, integration-catalog personal_connections.rs and personal_connections_tests.rs, and the runtime local_catalog_writes fixture constructor. The GitLab source unit may extend the existing declaration/publishing/patch/schema machinery and its tests, the catalog-build dev dependency, and catalog-reader/catalog.pack generated output. These surfaces do not overlap the current closed-pipe or multi-credential writers. Exact story scopes are the coordinator-owned current record.
+
+The Atlas migration proposal is an additional managed tree: wt-19c8158c5cae, branch plan/connector-operation-v2, proposed ADR commit b4ad7e8d94edecdcbea6a9aa4f7464e28078c4cf. It is not published or accepted; its planning and Markdown checks passed. Authoritative operation wrappers continue to come from the separate clean remote-main authority tree wt-ae608b71b66b.
