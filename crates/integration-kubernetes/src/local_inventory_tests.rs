@@ -561,13 +561,13 @@ mod inventory_tests {
                 .unwrap()
                 .keys()
                 .map(String::as_str)
-                .collect::<Vec<_>>(),
-            [
+                .collect::<std::collections::BTreeSet<_>>(),
+            std::collections::BTreeSet::from([
                 "desired_replicas",
                 "name",
                 "ready_replicas",
                 "rollout_state"
-            ]
+            ])
         );
         assert_eq!(value["desired_replicas"], 0);
         assert!(result.next_cursor.is_none());
