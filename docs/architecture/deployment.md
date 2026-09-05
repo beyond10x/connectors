@@ -111,8 +111,8 @@ A hosted client can record its deployment through login:
 
 ```bash
 connectors session login https://connectors.example.test/api/connectors/v1
-connectors operation search
-connectors connection list
+connectors operation --target hosted search
+connectors connection --target hosted list
 connectors session logout
 ```
 
@@ -120,9 +120,11 @@ Use the actual deployment URL. The client discovers the Identity origin and audi
 continuity in the OS keyring, and obtains short-lived access tokens. Non-secret deployment
 selection is stored separately.
 
-Explicit local `--config` or `--state-root` options select the personal-local path on commands that
-declare them. Connection, Event, and Operation commands do not yet share a uniform `--target` flag.
-Check each command's help and login selection before choosing where a request runs.
+Connection, Event, and Operation commands default to `--target local`, including when a hosted
+login is stored. Select `--target hosted` explicitly to use that deployment. The flag works before
+or after the group's leaf command. Local `--config` and `--state-root` options select local paths;
+combining either with `--target hosted` is refused before input is read or a transport is contacted.
+Responses and command errors identify the selected target.
 
 ## Run a service
 
