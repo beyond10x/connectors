@@ -800,6 +800,13 @@ where
     };
     match run(cli).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
+        // A consumer that stops reading has received all it wanted. Restrict this to result
+        // output: a transport failure must still reach the caller as a failure.
+        Err(MainError::Output(output::OutputError::Io(error)))
+            if error.kind() == io::ErrorKind::BrokenPipe =>
+        {
+            std::process::ExitCode::SUCCESS
+        }
         Err(error) => {
             output::emit_error_with_target(format, error.code(), &error.to_string(), target);
             std::process::ExitCode::FAILURE
