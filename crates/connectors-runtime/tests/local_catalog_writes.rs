@@ -34,6 +34,7 @@ const READ: &str = "slack-conversations-list";
 struct FixtureEgress {
     status: AtomicU16,
     calls: Mutex<Vec<String>>,
+    body_override: Mutex<Option<Vec<u8>>>,
 }
 
 #[async_trait]
@@ -65,11 +66,19 @@ impl EgressTransport for FixtureEgress {
         Ok(EgressHttpResponse {
             status,
             headers: BTreeMap::new(),
-            body: if status == 200 {
-                br#"{"ok":true,"channel":"C-FIXTURE","ts":"1.000001"}"#.to_vec()
-            } else {
-                br#"{"ok":false,"error":"fixture-provider-body-must-stay-private"}"#.to_vec()
-            },
+            body: self
+                .body_override
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or_else(|| {
+                    if status == 200 {
+                        br#"{"ok":true,"channel":"C-FIXTURE","ts":"1.000001"}"#.to_vec()
+                    } else {
+                        br#"{"ok":false,"error":"fixture-provider-body-must-stay-private"}"#
+                            .to_vec()
+                    }
+                }),
         })
     }
 
@@ -361,5 +370,64 @@ async fn stale_description_and_provider_refusal_have_distinct_actionable_results
         fixture.egress.calls.lock().unwrap().as_slice(),
         std::slice::from_ref(writer)
     );
+    fixture.finish().await;
+}
+
+#[tokio::test]
+async fn adversary_http_200_application_refusal_survives_the_documented_socket_path() {
+    let fixture = Fixture::start(false, true).await;
+    let provider_refusal = serde_json::json!({"ok": false, "error": "missing_scope"});
+    *fixture.egress.body_override.lock().unwrap() =
+        Some(serde_json::to_vec(&provider_refusal).unwrap());
+    let description = fixture.describe(POST).await.unwrap();
+    let writer = &description.connections[0].connection_ref;
+
+    let result = fixture.request(invoke(&description, writer)).await.unwrap();
+    let OperationResult::Invoke(result) = result else {
+        panic!("an HTTP 200 response must retain its provider result")
+    };
+    assert_eq!(result.output, provider_refusal);
+    assert_eq!(result.output["ok"], false);
+    assert_eq!(fixture.egress.status.load(Ordering::Relaxed), 200);
+    assert_eq!(fixture.egress.calls.lock().unwrap().len(), 1);
+    fixture.finish().await;
+}
+
+#[tokio::test]
+async fn adversary_a_read_description_cannot_authorize_a_different_write_operation() {
+    let fixture = Fixture::start(false, true).await;
+    let reads = fixture.describe(READ).await.unwrap();
+    let writes = fixture.describe(POST).await.unwrap();
+    let writer = &writes.connections[0].connection_ref;
+
+    let refused = fixture.request(invoke(&reads, writer)).await.unwrap_err();
+    assert_eq!(refused.code, OperationErrorCode::StaleAuthority);
+    assert!(fixture.egress.calls.lock().unwrap().is_empty());
+    fixture.finish().await;
+}
+
+#[tokio::test]
+async fn adversary_an_approval_reference_cannot_raise_the_selected_read_only_grant() {
+    let fixture = Fixture::start(false, true).await;
+    let reads = fixture.describe(READ).await.unwrap();
+    let writes = fixture.describe(POST).await.unwrap();
+    let reader = &reads
+        .connections
+        .iter()
+        .find(|connection| connection.label == "reader")
+        .unwrap()
+        .connection_ref;
+    let OperationRequest::Invoke(mut request) = invoke(&writes, reader) else {
+        unreachable!()
+    };
+    request.approval_evidence_ref = Some("approval:adversary-untrusted-fixture".to_owned());
+
+    let refused = fixture
+        .request(OperationRequest::Invoke(request))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, OperationErrorCode::NotGranted);
+    assert!(refused.message.contains("allow_writes = true"));
+    assert!(fixture.egress.calls.lock().unwrap().is_empty());
     fixture.finish().await;
 }
