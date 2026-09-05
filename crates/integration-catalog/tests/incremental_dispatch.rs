@@ -163,6 +163,83 @@ async fn invoke(
     (result, transport)
 }
 #[tokio::test]
+async fn deployment_ordering_after_only() {
+    assert_deployment_ordering(true, false).await;
+}
+
+#[tokio::test]
+async fn deployment_ordering_before_only() {
+    assert_deployment_ordering(false, true).await;
+}
+
+#[tokio::test]
+async fn deployment_ordering_both_bounds() {
+    assert_deployment_ordering(true, true).await;
+}
+
+#[tokio::test]
+async fn deployment_ordering_neither_bound() {
+    assert_deployment_ordering(false, false).await;
+}
+
+async fn assert_deployment_ordering(after: bool, before: bool) {
+    let mut input = json!({"project_id":7,"per_page":2,"page":1});
+    if after {
+        input["updated_after"] = json!("2026-09-05T10:00:00+02:00");
+    }
+    if before {
+        input["updated_before"] = json!("2026-09-06T10:00:00Z");
+    }
+    let (result, transport) = invoke(
+        "gitlab",
+        "gitlab-deployment-list",
+        input.clone(),
+        200,
+        json!([{"id":1,"updated_at":"2026-09-05T10:00:00Z"}]),
+    )
+    .await;
+    result.unwrap();
+    {
+        let seen = transport.seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        let target = url::Url::parse(&seen[0].request.url).unwrap();
+        assert_eq!(target.path(), "/api/v4/projects/7/deployments");
+        let pairs: Vec<_> = target.query_pairs().into_owned().collect();
+        let query: BTreeMap<_, _> = pairs.iter().cloned().collect();
+        assert_eq!(
+            pairs.len(),
+            query.len(),
+            "query keys must not be duplicated"
+        );
+        let mut expected =
+            BTreeMap::from([("per_page".into(), "2".into()), ("page".into(), "1".into())]);
+        for key in ["updated_after", "updated_before"] {
+            if let Some(value) = input[key].as_str() {
+                expected.insert(key.into(), value.into());
+            }
+        }
+        if after || before {
+            expected.insert("order_by".into(), "updated_at".into());
+        }
+        assert_eq!(query, expected);
+    }
+    input["order_by"] = json!("updated_at");
+    let (result, transport) =
+        invoke("gitlab", "gitlab-deployment-list", input, 200, json!([])).await;
+    assert_eq!(result.unwrap_err().code, OperationErrorCode::InvalidInput);
+    assert!(
+        transport.seen.lock().unwrap().is_empty(),
+        "ordering remains derived, never caller input"
+    );
+    assert_eq!(
+        transport
+            .credential_reads
+            .load(std::sync::atomic::Ordering::Relaxed),
+        0
+    );
+}
+
+#[tokio::test]
 async fn jira_incremental_personal_dispatch_translates_declared_input() {
     let (_result, transport) = invoke(
         "jira",
