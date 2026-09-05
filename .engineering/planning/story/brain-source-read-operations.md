@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:brain-source-read-operations
 kind: story
-status: active
+status: implemented
 title: Complete catalogued discovery and incremental read operations
 relations:
 - decomposes: epic:incremental-source-reads
@@ -26,6 +26,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-runtime
 - confidence: inferred
+  path: crates/integration-catalog
+- confidence: inferred
   path: crates/integration-gitlab
 - confidence: cited
   path: crates/integration-jira
@@ -37,11 +39,11 @@ scope:
   path: providers/jira.toml
 - confidence: cited
   path: specs
-revision: 18
+revision: 22
 ---
 ## Requirements
 
-Expose the minimal missing read operations needed by issue, documentation and code-host ingestion: permitted project/space inventory and activity, changed Jira issues, Confluence changed pages with versions, and GitLab pipeline/deployment/default-branch activity listing where absent. Preserve existing operation identities, grants, secret handling and projections. Reuse existing reads and native datasource implementations rather than duplicating transport.
+Expose the minimal missing read operations needed by issue, documentation and code-host ingestion: permitted project/space inventory and activity, changed Jira issues and fully paginated comments, Confluence changed pages with versions, and bounded GitLab issue/MR/pipeline/deployment/default-branch activity listing where absent. Preserve existing operation identities, grants, secret handling and projections. Reuse existing reads and native datasource implementations rather than duplicating transport.
 
 Every new API path, filter, pagination and auth detail must cite a fetched official vendor reference or existing authoritative spec. Add/update repository-authored specs and catalog through the repository's governed generation flow. No ad hoc brain HTTP adapter and no provider-auth fallback.
 
@@ -70,3 +72,17 @@ Derived 2026-09-05 by `story-scoper`; entries distinguish evidence from expected
 - **Documents:** no separate guide changes established; operation references and request/response shapes must be supplied in the implementor handoff — inferred.
 - **Confidence:** medium — cited generation ownership and backend locations are solid; precise missing operations and whether Confluence needs runtime wiring remain to be determined against existing catalog contracts.
 - **Would collide with:** edits to these provider declarations, their specifications/provenance, the Jira/GitLab runtime crates, consolidated catalog tests, runtime composition, or any whole-catalog regeneration — cited; shared outputs require one coordinator writer.
+
+## Runtime integration findings
+
+Existing personal connections route through CatalogBackend; native hosted projections alone do not implement this contract. Each new read must have matching closed input admission, vendor query translation, minimal output and complete pagination in both configured placements. Preserve existing credentials, grants and connection identities. Permission errors stay NotGranted and rate limits stay retriable.
+
+Provider scoping found that existing Jira comment reads cannot paginate and existing GitLab issue/MR lists lack the incremental time filters and continuation envelope. Add bounded new operation identities for these missing contracts while retaining old operation behavior. GitLab notes are outside this story. Confluence search observes the current version of each changed page; it does not promise enumeration of every intermediate historical version.
+
+## Integration evidence
+
+The complete `bash scripts/gate.sh` run exited zero after all twelve Cargo workspaces, both runtime feature variants, catalog lock verification, documentation checks and ESS projection comparison. The runner executed 2052 passing cases; 27 existing ignored cases remained unchanged. The shared Jira inventory now explicitly counts the three additional reads, and the CLI/console workspaces resolve the new catalog schema-validation dependency. No existing operation identity or grant was widened.
+
+The first complete run found the outdated Jira inventory expectation. The second reached an existing monitoring fixture whose Unix socket pathname exceeded the OS limit under the coordinator's long scratch path. The unchanged sixteen-case suite passed with a shorter alias into the same scratch directory, and the third complete gate passed with that alias. No runtime assertion was weakened or skipped.
+
+Both adversary reports and all finding outcomes are retained. The second pass found one new optional-description boundary failure and resolved the four prior findings; the coordinator verified the final correction with all three added admission/projection regressions preserved. Personal and hosted dispatch expose the same closed incremental contracts. Publication is a separate step.
