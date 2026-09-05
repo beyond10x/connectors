@@ -39,6 +39,19 @@ types:
     kind: enum
     variants: [App, User]
 
+  # Proposed local configuration value for story:one-placement-several-credentials,
+  # 2026-09-06. CatalogIntegrationConfig already declares these two axes for one credential
+  # (crates/connectors-config/src/personal.rs); the story repeats them per local binding.
+  # The name is a catalog credential selector, not secret material or a global entity identity.
+  # This does not settle the global Credential-to-Connection cardinality below.
+  - name: connectors.deployment.LocalCredentialSelection
+    kind: struct
+    fields:
+      - name: credential
+        type: String
+      - name: allow_writes
+        type: Boolean
+
 entities:
   # UNMAPPED: no state enum and no drawn lifecycle
   # (docs/design/01-domain-model.md:180-191), so this is a single-state lifecycle. `Configured` is

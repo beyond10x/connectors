@@ -62,9 +62,24 @@ non-negotiable; the mechanics arrive with M1 (`catalog …`). Read VISION.md
 principles 1–3 and the Provider/Operation sections of the domain model first.
 
 1. **Pick the source mode.** Use an official machine-readable specification whenever one exists.
-   When none exists, author the missing specification in this component from authoritative vendor
-   documentation. OpenAPI ingest is for very large surfaces — and ingest **selects nothing by
+   If its format is not supported, build the importer. Hand-authoring is an exception only when
+   no usable official machine-readable source exists; document that absence and ground the authored
+   specification in fetched authoritative vendor documentation. An unsupported format does not
+   qualify for this exception. OpenAPI ingest **selects nothing by
    default**: a 398-operation document with no patch yields zero operations, deliberately.
+   **Standing rule: OpenAPI first.** Before adding or extending any connector, check the vendor's
+   current official API sources for a published OpenAPI document; an old repository comment is
+   not evidence that none exists. When available, fetch and pin that document and derive endpoint,
+   parameter and schema definitions through the existing deterministic OpenAPI projection. Aim for
+   **all operations in the official API** and account for every source operation. Do not retype
+   definitions from API documentation or
+   hand-author a replacement specification. If the importer cannot handle the official spec,
+   extend the importer; record the capability gap as implementation work, not permission to replace
+   the spec. Apply the same rule to other official machine-readable formats. Record operations
+   absent from the official spec as coverage gaps before proposing an
+   extension. Keep documented source
+   discrepancies and decisions such as permissions, risk, effects and model exposure in reviewed,
+   source-grounded overlays; preserve the vendor source and its provenance.
 2. **Specs are authoritative and truthfully owned.** Every connector begins in `specs/`. A spec is
    either the vendor's published artifact (`origin = "vendor"`) or a b10x-authored artifact
    (`origin = "repository-authored"`). The latter must say that it is ours, cite the exact official
@@ -108,7 +123,15 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    omits that fact, use `[patch.descriptions.<service>]` keyed by exact `operationId`; do not turn
    the operations into exact selection blocks and reorder the catalog. The scaffolder writes
    `TODO` holes rather than guessing; filling them thoughtfully **is** the review.
-7. **The expose discipline.** Catalogued ≠ projected. Everything selected is callable; only a
+7. **Complete coverage, focused projections.** The default connector goal is complete operation
+   coverage. A bounded delivery slice must retain an explicit coverage inventory and backlog for
+   the remaining operations; the slice is not a complete connector. Account separately for
+   authentication-flow endpoints handled by the platform and source/importer coverage gaps.
+   Consumers may define their own projections, and Connectors may ship prebuilt projections for
+   targeted use cases. Separate administrative and regular-user surfaces where the provider's
+   permissions distinguish them; a projection selects a surface, while credentials and grants
+   still enforce access. Never infer administrative authority from projection membership.
+   **The expose discipline.** Catalogued ≠ projected. Everything selected is callable; only a
    curated handful get `expose = true` and reach a model. The largest predecessor provider
    catalogues 397 operations and exposes **nine** — "389 LLM tools is not a catalogue, it is a
    denial of service against a model's context." When in doubt, don't expose.

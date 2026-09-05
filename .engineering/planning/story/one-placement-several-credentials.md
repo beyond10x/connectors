@@ -26,7 +26,7 @@ scope:
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/deployment.yaml
-revision: 29
+revision: 30
 ---
 # Story: one placement, several credentials, a Connection per identity
 
@@ -41,10 +41,9 @@ holds five credential slots per instance, so the storage knows, the placement mo
 
 ## Shape
 - A placement may declare `credentials = ["slack.bot_token", "slack.user_token"]` (or keep the
-  single `credential`); each declared credential yields its own Connection,
-  `connection:<provider>:<instance>` for the first and `connection:<provider>:<instance>/<leaf>` for
-  the others, all labelled from the one placement and reported together by `connection list` with
-  the credential each answers as.
+  single `credential`). Each declared credential yields its own Connection. Preserve the existing
+  opaque digest for the primary binding; additional references are deterministic per credential,
+  unique and bounded. `connection list` reports the credential selector for each binding.
 - `connectors connect <provider> --instance <i> --as <credential>` adds a credential to an existing
   placement instead of refusing or creating a second one; `auth status` lists which of the
   placement's Connections are callable.
@@ -54,8 +53,10 @@ holds five credential slots per instance, so the storage knows, the placement mo
 
 ## Acceptance
 - One `[[catalog]]` entry with two credentials produces two callable Slack Connections; reads on the
-  user one succeed on a public channel the bot is not in; `slack-chat-post-message` is offered on
-  the bot one only.
+  user one select the user credential (including a fixture channel the bot cannot read);
+  `slack-chat-post-message` is offered on the bot one only when the bot binding is explicitly
+  writable and the user binding is explicitly read-only. Slack token subject alone is not a
+  permission rule.
 - An adopter's configuration that names one credential is unchanged in behaviour.
 
 ## Readiness
@@ -83,3 +84,11 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 4 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Implementation decisions
+
+Dated 2026-09-06. The explicit-policy example is a single catalog entry with credentials = [{ credential = "slack.bot_token", allow_writes = true }, { credential = "slack.user_token", allow_writes = false }]. A bounded string shorthand may retain the entry policy, but the documented mixed-grant example uses explicit binding policy. The existing single-credential shape, credential address, connection reference and permission behavior stay compatible. Define and reject ambiguous combinations rather than choosing one silently; duplicate/unknown credential selectors are refused. The primary credential is part of configured identity: additional credential reordering must not reassign an established primary reference to a different identity.
+
+Invocation must use only the selected binding's credential mechanism. A stored sibling credential is never substituted merely because its mechanism satisfies the operation. Adding a credential with setup connect --as updates the existing catalog entry atomically and preserves its unrelated fields; explicitly requesting --allow writes for that binding must not be silently ignored. For existing legacy entries, preserve their prior identity and granted policy during the conversion.
+
+ESS LocalCredentialSelection is the proposed local configuration value; it is not a claim about global Credential/Connection cardinality or ownership. The latter remains UNMAPPED. Fixture tests prove selected credential use and policy without production Slack writes.
