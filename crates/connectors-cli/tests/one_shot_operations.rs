@@ -1108,3 +1108,101 @@ fn rate_adversary_cli_keeps_integer_extremes_and_never_resends_before_exit() {
         }
     }
 }
+
+#[test]
+fn rate_final_cli_describe_spelling_and_invalid_advice_never_resend() {
+    use std::sync::{atomic::AtomicBool, Arc};
+    for format in ["json", "yaml"] {
+        for valid in [true, false] {
+            let source = if valid {
+                "https://%41.example.test:00065535/a%2fb?x=%23%40"
+            } else {
+                "https://docs.example.test:65536/private-SENTINEL"
+            };
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let socket = fixture.state.join("connectors.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            fs::set_permissions(socket, fs::Permissions::from_mode(0o600)).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = Arc::new(AtomicBool::new(false));
+            let finished = done.clone();
+            let server = thread::spawn(move || {
+                let mut calls = 0;
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            stream
+                                .set_read_timeout(Some(Duration::from_secs(2)))
+                                .unwrap();
+                            let mut line = String::new();
+                            std::io::BufReader::new(&mut stream)
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            calls += 1;
+                            assert_eq!(request["protocol"], "b10x.connector-operation.v0alpha2");
+                            assert_eq!(request["request"]["method"], "describe");
+                            let description = json!({"operation_ref":"fixture.read","title":"Fixture read","description":"Fixture metadata","input_schema":{"type":"object","additionalProperties":false},"output_schema":{"type":"object","properties":{"vendor":{"const":"retained"}}},"effect":"read_only","approval":"not_required","connections":[],"description_ref":"fixture-description","rate_advice":{"alternatives":[{"declaration":{"applies_when":"Fixture category","source_url":source}}]}});
+                            let reply = json!({"protocol":request["protocol"],"request_id":request["request_id"],"status":"ok","response":{"result":"describe","value":description}});
+                            writeln!(stream, "{reply}").unwrap();
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+                calls
+            });
+            let mut child = fixture
+                .command_format(
+                    &["operation", "describe", "--operation", "fixture.read"],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while child.try_wait().unwrap().is_none() {
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(2));
+            }
+            let output = child.wait_with_output().unwrap();
+            done.store(true, Ordering::SeqCst);
+            assert_eq!(server.join().unwrap(), 1, "{format} {valid}");
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            assert_eq!(value["target"], "local");
+            assert_eq!(output.status.success(), valid, "{value} {output:?}");
+            if valid {
+                assert_eq!(
+                    value["rate_advice"]["alternatives"][0]["declaration"]["source_url"],
+                    source
+                );
+                assert_eq!(
+                    value["output_schema"]["properties"]["vendor"]["const"],
+                    "retained"
+                );
+            } else {
+                assert_eq!(value["error"]["code"], "connector-unreachable", "{value}");
+                assert!(!String::from_utf8_lossy(&output.stdout).contains("SENTINEL"));
+                assert!(!String::from_utf8_lossy(&output.stderr).contains("SENTINEL"));
+                assert!(value.get("rate_advice").is_none());
+            }
+        }
+    }
+}
