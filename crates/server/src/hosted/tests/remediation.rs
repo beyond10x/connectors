@@ -538,3 +538,81 @@ async fn auth_connection_v2_hosted_start_has_real_grants_and_no_production_acqui
     assert_eq!(backend.readiness_calls.load(Ordering::SeqCst), 0);
     assert!(audit(&store).is_none());
 }
+
+#[tokio::test]
+async fn auth_adversary_hosted_selected_refusals_match_actual_status_schema_and_revocation() {
+    let document: serde_json::Value =
+        serde_json::from_str(crate::hosted::docs::document_json()).unwrap();
+    let mut observations = Vec::new();
+    for version in [
+        versions::Version::V0Alpha1,
+        versions::Version::V0Alpha2,
+        versions::Version::V0Alpha3,
+    ] {
+        let store = Arc::new(MemoryState::new());
+        grant(&store);
+        let backend = Arc::new(RemediationBackend::new(
+            CredentialReadiness::MissingCredential,
+            false,
+        ));
+        let app = application(backend.clone(), Some(&store));
+        let mut frame = request(READ, None);
+        frame.protocol = protocol::operation::CONTRACT.into();
+        let encoded = version.encode_request(frame).unwrap();
+        let send = || {
+            Request::post("/operations")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::AUTHORIZATION, "Bearer access")
+                .body(Body::from(encoded.clone()))
+                .unwrap()
+        };
+        let response = app.clone().oneshot(send()).await.unwrap();
+        let status = response.status();
+        let raw = bytes(response).await;
+        let (selected, reply) = versions::decode_response(&raw).unwrap();
+        assert_eq!(selected, version);
+        assert_eq!(reply.request_id, "request-1");
+        assert_eq!(
+            reply.error.as_ref().unwrap().authentication.is_some(),
+            version == versions::Version::V0Alpha3
+        );
+        assert!(!reply.error.as_ref().unwrap().retriable);
+        let mut schema = document["paths"]["/operations"]["post"]["responses"][status.as_str()]
+            ["content"]["application/json"]["schema"]
+            .clone();
+        schema["components"] = document["components"].clone();
+        schema["$schema"] = serde_json::json!("https://json-schema.org/draft/2020-12/schema");
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+        observations.push((
+            format!("{version:?}"),
+            status.as_u16(),
+            validator.is_valid(&value),
+        ));
+        assert_eq!(backend.readiness_calls.load(Ordering::SeqCst), 1);
+        GrantSet {
+            revision: 2,
+            grants: Vec::new(),
+        }
+        .write(&*store, "tenant-dev")
+        .unwrap();
+        let revoked = app.oneshot(send()).await.unwrap();
+        assert_eq!(revoked.status(), StatusCode::FORBIDDEN);
+        let (selected, refusal) = versions::decode_response(&bytes(revoked).await).unwrap();
+        assert_eq!(selected, version);
+        assert!(refusal.error.unwrap().authentication.is_none());
+        assert_eq!(
+            backend.readiness_calls.load(Ordering::SeqCst),
+            1,
+            "revocation precedes readiness"
+        );
+        assert_eq!(backend.bound_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(backend.dispatches.load(Ordering::SeqCst), 0);
+        assert!(audit(&store).is_none());
+    }
+    eprintln!("actual hosted selected response status/schema observations: {observations:?}");
+    assert!(
+        observations.iter().all(|(_, _, valid)| *valid),
+        "served OpenAPI must admit the actual selected response at its actual HTTP status"
+    );
+}

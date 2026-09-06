@@ -824,3 +824,93 @@ fn auth_openapi_schema_projection_preserves_protocol_vector_results() {
         }
     }
 }
+
+#[tokio::test]
+async fn auth_openapi_503_schemas_admit_all_supported_unavailable_versions() {
+    use protocol::{connection_v2, operation::versions};
+
+    let response = test_router()
+        .oneshot(Request::get("/openapi.json").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let raw = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .unwrap();
+    let doc: Value = serde_json::from_slice(&raw).unwrap();
+    let unavailable = |encoded: &str| {
+        let vectors: Value = serde_json::from_str(encoded).unwrap();
+        let case = vectors["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == "error-unavailable")
+            .unwrap();
+        assert_eq!(case["valid"], true);
+        assert_eq!(case["schema_valid"], true);
+        case["frame"].clone()
+    };
+    let operation_v2 = unavailable(include_str!(
+        "../../../../../contracts/connector-operation/v0alpha2/vectors.json"
+    ));
+    let operation_v3 = unavailable(include_str!(
+        "../../../../../contracts/connector-operation/v0alpha3/vectors.json"
+    ));
+    let connection_v2 = unavailable(include_str!(
+        "../../../../../contracts/connector-connection/v0alpha2/vectors.json"
+    ));
+    // The frozen v1 bundles have no Unavailable vector. Project the retained
+    // successor vector through the canonical adapter, then validate original bytes.
+    let (_, operation) =
+        versions::decode_response(&serde_json::to_vec(&operation_v2).unwrap()).unwrap();
+    let operation_v1: Value = serde_json::from_slice(
+        &versions::Version::V0Alpha1
+            .encode_response(operation)
+            .unwrap(),
+    )
+    .unwrap();
+    let (_, connection) =
+        connection_v2::decode_response(&serde_json::to_vec(&connection_v2).unwrap()).unwrap();
+    let connection_v1: Value = serde_json::from_slice(
+        &connection_v2::Version::V0Alpha1
+            .encode_response(connection)
+            .unwrap(),
+    )
+    .unwrap();
+    let mut observations = Vec::new();
+    for (path, frames) in [
+        (
+            "/operations",
+            vec![operation_v1, operation_v2, operation_v3],
+        ),
+        ("/connections", vec![connection_v1, connection_v2]),
+    ] {
+        let mut schema = doc["paths"][path]["post"]["responses"]["503"]["content"]
+            ["application/json"]["schema"]
+            .clone();
+        schema["components"] = doc["components"].clone();
+        schema["$schema"] = serde_json::json!("https://json-schema.org/draft/2020-12/schema");
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        for frame in frames {
+            let bytes = serde_json::to_vec(&frame).unwrap();
+            if path == "/operations" {
+                versions::decode_response(&bytes).unwrap();
+            } else {
+                connection_v2::decode_response(&bytes).unwrap();
+            }
+            observations.push((path, frame["protocol"].clone(), validator.is_valid(&frame)));
+        }
+        let plain = serde_json::json!({"error": "identity-unavailable"});
+        observations.push((
+            path,
+            serde_json::json!("errorBody"),
+            validator.is_valid(&plain),
+        ));
+    }
+    eprintln!("served 503 schema observations: {observations:?}");
+    assert_eq!(observations.len(), 7);
+    assert!(
+        observations.iter().all(|(_, _, valid)| *valid),
+        "every supported Unavailable envelope and plain Identity outage must match its served 503 schema"
+    );
+}
