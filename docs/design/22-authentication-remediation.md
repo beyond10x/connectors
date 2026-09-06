@@ -149,3 +149,35 @@ Keep the rate-v2 backend request/result/error vocabulary as the internal executi
 Deciding cases must prove: unknown/unadmitted byte-identical refusals with no session/provider work; Created binding through trusted metadata preflight while callable discovery stays hidden; missing/confirmed-degraded versus outage/channel-down/403; grant refusal and missing store; no approval/event claim consumption on auth need; expiry/revocation between preflight and execution; ambiguous dispatch never becomes NotAttempted; exact integration/profile/Connection binding; v1 ambiguity refusal; concurrent start/ack races, expired/consumed/wrong-target sessions; terminal endpoint removal; authority rotation and expiry; changed input/schema/description on explicit resume; one-shot no listener; zero operation dispatch before resume and exactly one after; model/CLI output without URL/code/capability; and old/new protocol conformance with no automatic resend.
 
 The ESS proposal adds ten value types and changes no entity/lifecycle/command/event. UNMAPPED markers identify actual enforcement obligations: grant and management admission, absence of an enumeration oracle, input/time/capacity bounds, no dispatch or approval consumption, conditional error fields and exact version downgrade, secret/output separation, principal rotation, binding/expiry races and acknowledgement linearization. ESS validation does not prove these runtime properties. No unresolved routine choice prevents implementation of this bounded design after its named prerequisites and migration record.
+
+## Published migration proposal and protocol handoff — 2026-09-06
+
+Atlas draft PR23 publishes commit `bfb731377a448ab89443c44852d622601f6c1363`. Its
+`architecture/adr/0041-connector-operation-rate-limit-version.md` contains the dated subsequent
+authentication section, and `architecture/adr/0044-connector-authentication-remediation.md`
+records Operation v3 and Connection v2 with relying parties and movement order. The old ADR0040
+paragraphs above retain their historical snapshot; current Atlas main allocated0040 to the ESS
+complete-selection decision. The rate exclusions apply only to the rate unit. The published
+extension and separate auth decision provide the previously required migration record, while all
+four Connector decisions remain proposed. Draft publication establishes no architecture acceptance.
+
+The complete pin audit at that same Atlas commit inspected exact advertised consumer mains at
+12:49:24 UTC. It distinguishes Devcenter's hosted and excluded embedded locks, Agent Platform's
+protocol-bound toolset digest, Org Brain's unknown deployed executable and Zwirn's actual legacy
+namespace/audience pair. Five inspected Connectors revisions use b10x v1 and one uses the legacy
+namespace; none establishes rate-v2 or auth-v3 adoption. Preserve complete old-version service,
+SDK-before-embedded-host ordering and separate consumer gates. No external consumer edit is assigned.
+
+Reviewed rate source `0c026610e67f3ec6da0a8014813f3d88c4e72799` is retained in the complete schema3
+publication candidate `0c69450921ab1794c81dadec915b717a61bf0983`: all twelve workspace gates and
+strict checks pass. That supplies the exact v2 freeze for one independent additive protocol slice:
+new strict DTOs, explicit pure adapters, schema generators and conformance bundles. It keeps the
+internal `operation::wire` v2 API and every existing frozen bundle/reader/generator byte unchanged.
+Original-byte decoding must retain duplicate-key refusal; bound Connection commands have a typed
+refusal when projected to v1. Pure types and vectors cannot establish grant, custody, session or
+acknowledgement behavior.
+
+OAuth's actual runtime and trusted-client handoff remains unfinished. Its shared owners, service
+preflight, session binding, transports and default-client switch stay behind that completed source
+handoff. The independent protocol slice acquires no runtime files or credential/session authority;
+the coordinator records its exact paths, tests and build slot before implementation.
