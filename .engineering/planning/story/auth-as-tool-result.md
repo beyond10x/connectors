@@ -44,6 +44,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
+  path: crates/connectors-cli/src/tests.rs
+- confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/one_shot_operations.rs
@@ -62,6 +64,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-client/src/response.rs
 - confidence: inferred
+  path: crates/connectors-client/src/tests.rs
+- confidence: inferred
   path: crates/connectors-console/src/connect.rs
 - confidence: inferred
   path: crates/connectors-console/src/envelope.rs
@@ -78,11 +82,15 @@ scope:
 - confidence: cited
   path: crates/connectors-runtime/src/composition.rs
 - confidence: inferred
+  path: crates/connectors-runtime/src/composition_tests.rs
+- confidence: inferred
   path: crates/connectors-runtime/src/one_shot.rs
 - confidence: cited
   path: crates/connectors-runtime/src/registry.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/registry_claims_tests.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/registry_tests.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/remediation_tests.rs
 - confidence: inferred
@@ -150,6 +158,8 @@ scope:
 - confidence: cited
   path: crates/server/src/hosted/routing.rs
 - confidence: inferred
+  path: crates/server/src/hosted/tests.rs
+- confidence: inferred
   path: crates/server/src/hosted/tests/contract_validation.rs
 - confidence: inferred
   path: crates/server/src/hosted/tests/docs.rs
@@ -187,7 +197,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 61
+revision: 67
 ---
 ## Acceptance
 
@@ -353,3 +363,11 @@ This is a narrow prospective exception to the preceding broad implementation hol
 The implementor applies the separate contract cases first and retains the initial selected command's actual result. Missing API/compiler diagnostics are not executable product failures; never manufacture a broken scaffold to obtain a red count. Then apply the three-path implementation proposal, execute the actual selected cases and the complete service suite with no-fail-fast, and run strict all-target Clippy plus affected formatting. Preserve every old assertion, existing API/default, frozen protocol bundle, manifest and lock. The constructor-only stable-authority seed hypothesis is not assigned; do not apply its patch or change seed encoding. No hosted proposal, scope extraction, model, Git, AEP, provider, operator or daemon action is delegated.
 
 The whole-OAuth reviewer reported no active Cargo process and explicitly released the sole compiling slot while it continues source/test preparation. Assign that slot temporarily to auth worktree wt-78f189927231 and its ordinary root target, with CARGO_TARGET_DIR unset, /usr/bin/sccache, jobs 1, incremental disabled and dev/test debug disabled. Continuously retain the 12 GiB disk, 8 GiB free tmpfs and 16 GiB MemAvailable reserves, plus an 8 GiB cap on this auth root target. Stop only the owned process group if a guard is crossed and preserve the interruption. No concurrent compilation or target sharing. Freeze source/evidence and release the slot promptly on completion; no cleanup is delegated. The coordinator returns the slot to OAuth review afterward.
+
+## Prospective space for the remaining authentication implementation — 2026-09-06
+
+The source-only extraction proposal in stage2-hosted-test-proposal/extraction-registration-needs.md (SHA256 5433592a14a1c7dc2bc3368866069aec9fdfe60c001307ab2d6ab8c789e1c278) inspected frozen OAuth source 6fae9df000986f39d009a2e8503bdff03db41762. The coordinator independently checked all five complete source hashes, line counts and exact final inline test-body hashes against that Git commit; auth-extraction-proposal-root-verification.json records the result. This does not accept the source under review. Registry has 11 lines free below 1,500 and client lib has none; hosted, composition and CLI have 48, 37 and 29 lines, respectively. These are measured margins, not a reason to move unrelated production behavior.
+
+Prospectively record five inferred new test owners for the later runtime handoff: crates/connectors-runtime/src/registry_tests.rs, crates/connectors-client/src/tests.rs, crates/server/src/hosted/tests.rs, crates/connectors-runtime/src/composition_tests.rs and crates/connectors-cli/src/tests.rs. The registry and client extractions are expected to make room for their assigned additions. Hosted, composition and CLI extractions remain conditional on actual edits exceeding the remaining margin; do not create a file only because it is scoped. All five existing production owners are already recorded. This note assigns scope only; it does not release runtime implementation before the reviewed OAuth source handoff or change the independent three-file service slice.
+
+For each selected extraction, move only the complete existing final test body. First preserve that body byte for byte, along with all helpers, nested modules, includes, assertions and string literals; do not blindly dedent raw strings. Replace its inline wrapper with the exact cfg/module or cfg/path/module registration specified in the proposal. Inspect formatting separately, preserve module identities and all existing test names, and keep the pre-test production prefix exact until the separately assigned behavior change. Registry's included registry_claims_tests.rs stays at its current path. Hosted's seven submodules stay under hosted/tests/, and its existing proposed remediation registration goes in the selected test owner once. Keep old line-citation evidence and record coordinator-owned ESS/planning citation closure where movement requires it. No production refactor, manifest, dependency, lock, or new test family is authorized by this space provision.
