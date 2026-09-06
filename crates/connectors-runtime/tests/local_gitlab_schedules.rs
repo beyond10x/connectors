@@ -553,3 +553,43 @@ async fn schedule_requests_preserve_complete_json_values_and_optional_update_omi
     );
     fixture.finish().await;
 }
+
+#[tokio::test]
+async fn adversary_gitlab_pass1_missing_credentials_and_forged_approval_never_widen_a_placement() {
+    let fixture = Fixture::start_with_reader(true, false, true).await;
+    let connections = fixture.connections("gitlab read-only").await;
+    assert_eq!(connections.len(), 1);
+    let reader = &connections[0];
+    assert_eq!(reader.label, "Read-only GitLab");
+    assert!(fixture
+        .connections("read-only missing-word")
+        .await
+        .is_empty());
+    let listed = fixture.search("schedule PIPELINE").await;
+    assert_eq!(listed.len(), 4);
+    for id in [CREATE, UPDATE, DELETE] {
+        let description = fixture.describe(id).await.unwrap();
+        assert_eq!(description.connections.len(), 1);
+        assert_ne!(
+            description.connections[0].connection_ref,
+            reader.connection_ref
+        );
+        let error = fixture
+            .operations(operation_api::OperationRequest::Invoke(
+                operation_api::InvokeRequest {
+                    operation_ref: id.to_owned(),
+                    connection_ref: reader.connection_ref.clone(),
+                    description_ref: description.description_ref,
+                    // Both a supplied approval token and deliberately invalid input must lose to
+                    // the selected placement's refusal before credential availability is consulted.
+                    approval_evidence_ref: Some("approval:adversarial-forgery".to_owned()),
+                    input: json!({"body":null}),
+                },
+            ))
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, operation_api::OperationErrorCode::NotGranted);
+    }
+    fixture.assert_passive();
+    fixture.finish().await;
+}
