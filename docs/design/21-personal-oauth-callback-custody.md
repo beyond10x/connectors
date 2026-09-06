@@ -123,3 +123,39 @@ at completion. Reauthorization under this contract repairs only that uniquely se
 completion-time lookup must never substitute a different target. The subsequent auth-result story
 requires a separate Connection version for caller-selected, bound remediation. This story neither
 reserves those fields nor imports the held multiple-credential implementation.
+
+## On-demand refresh authorization window — 2026-09-06
+
+Use one receiver-owned 30-second authorization window for an admitted refresh. Capture its start
+and deadline before any refresh request, after taking the per-binding gate and rechecking the
+current operation grant and credential generation. The existing invocation and backend context
+carry no admitted outer deadline (`crates/protocol/src/operation/legacy.rs`,
+`crates/service/src/runtime.rs`, and `crates/connectors-runtime/src/registry.rs`); the egress
+timeout applies separately to each exchange. This fixed window is a local implementation choice.
+Do not add a caller timestamp or infer a deadline from a description reference.
+
+The receiver installs the trusted clock. Capture Unix milliseconds with checked addition of
+30,000 and a matching monotonic deadline. Token exchange and token-info share the remaining
+monotonic budget; neither they nor waiting for prepare may reset it. Refuse invalid clocks,
+overflow, wall-clock rollback before the captured start, and elapsed monotonic expiry. Do not
+cap this window by the old access-token expiry: an expired access token can require refresh.
+
+After prepare, the same serialized authority claim rechecks the immutable binding, current
+grant, client, origin and generation and requires newly observed evidence valid at the claim.
+The internally sampled authorization instant must satisfy start <= authorized_at < deadline,
+with monotonic time still remaining. A one-use private refresh handle shares the existing FULL
+decision, secret commit, publication and recovery machinery. It creates no ConnectSession or
+instruction endpoint. Preserve the original session completion API and its deciding tests.
+
+Once the timely claim wins, filesystem I/O may finish after the deadline. Do not cancel the
+entire commit future at the earlier egress cutoff or invent a terminal session result. An
+uncertain write remains unavailable until recovery; a durable valid decision finishes, while
+Preparing without that decision aborts. Remote token rotation followed by local uncertainty
+does not prove the old remote credential remains usable. A per-binding generation recheck
+makes concurrent operations share one completed refresh and never resends an operation.
+
+Use a separate custody refresh test module to preserve the existing custody cases. Required
+cases cover the original deadline across exchange/token-info/prepare, expiry and revocation
+before the claim, a timely decision held past expiry, uncertain writes and real store reopening,
+clock failures, cancellation, and concurrent operation callers. These are implementation
+obligations; this decision records no executed refresh or operational OAuth result.
