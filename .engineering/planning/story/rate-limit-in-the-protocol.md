@@ -18,6 +18,8 @@ scope:
   path: connectors.lock
 - confidence: inferred
   path: contracts/connector-operation/v0alpha2
+- confidence: inferred
+  path: crates/catalog-build/src/contract.rs
 - confidence: cited
   path: crates/catalog-build/src/document.rs
 - confidence: cited
@@ -33,6 +35,8 @@ scope:
 - confidence: inferred
   path: crates/catalog/tests/main/consumer_api.rs
 - confidence: inferred
+  path: crates/connector-spec/Cargo.toml
+- confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: cited
   path: crates/connector-spec/src/ir.rs
@@ -46,6 +50,8 @@ scope:
   path: crates/connector-spec/src/provider/publishing.rs
 - confidence: cited
   path: crates/connector-spec/src/provider/schema_sync.rs
+- confidence: inferred
+  path: crates/connector-spec/src/rate_limit.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/determinism.rs
 - confidence: cited
@@ -88,6 +94,8 @@ scope:
   path: crates/driver-sql/Cargo.lock
 - confidence: cited
   path: crates/integration-catalog/src/lib.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/tests.rs
 - confidence: cited
   path: crates/integration-gitlab/src/backend.rs
 - confidence: cited
@@ -137,6 +145,8 @@ scope:
 - confidence: cited
   path: crates/server/src/hosted/mcp/toolset.rs
 - confidence: inferred
+  path: crates/server/src/hosted/operation_transport.rs
+- confidence: inferred
   path: crates/server/src/hosted/tests/contract_validation.rs
 - confidence: cited
   path: crates/server/src/hosted/tests/enforcement.rs
@@ -148,10 +158,14 @@ scope:
   path: crates/server/src/hosted/tests/signal.rs
 - confidence: cited
   path: crates/server/src/local.rs
+- confidence: inferred
+  path: crates/service/Cargo.toml
 - confidence: cited
   path: crates/service/src/egress.rs
 - confidence: cited
   path: crates/service/src/lib.rs
+- confidence: inferred
+  path: crates/service/src/rate_limit.rs
 - confidence: inferred
   path: crates/voice-local-audio/Cargo.lock
 - confidence: inferred
@@ -168,7 +182,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 121
+revision: 124
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 

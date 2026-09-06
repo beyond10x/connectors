@@ -281,7 +281,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 36
+revision: 37
 ---
 ## Acceptance
 
@@ -373,3 +373,11 @@ CLI execution queue 2026-09-06: 9 of 10. The urgent Slack delivery follow-up lea
 Design21 and sixteen additive ESS value types record the concrete development-scoped GitLab PKCE/device custody decision. Complete ESS0.18.0 validation reports10files valid; existing Connection/ConnectSession entities and lifecycles remain unchanged. Dedicated explicitly selected DevelopmentFile uses PreparedSecretStore with matching reads/writes and truthful unsealed readiness; it does not claim production custody. Legacy keyring credentials are unchanged. Provider facts are source-grounded; Slack/Jira remain measured compatibility gaps, not invented support.
 
 Coordinator authorizes stage1 pure connector-oauth lib/token/device helpers and connect-session-transport lib/manifest/newoauth modules only. Stage1 has no provider/spec/catalog/runtime/CLI owner and no operator/provider I/O. Per-tree metadata-only locks may refresh after a necessary dependency; generated schema/pack/ESS and all AEP are coordinator-owned. Full operational stage follows rate source handoff. OAuth schema4 needs its own Atlas migration decision extension before canonical implementation. No frozen Connection wire change, implicit Connection creation authority, or model-tool URL disclosure is authorized.
+
+OAuth story 21 can keep ConnectorConnection v0alpha1 only where authenticated owner plus the existing integration_ref and admitted auth_profile resolve exactly one configured stable Binding. Missing profile uses a deployment-owned default only when it is unambiguous. A supplied profile selects an admitted credential purpose within that same integration/owner; it cannot name another instance or broaden scope. Labels are display text and never participate in authority or target selection.
+
+The session must capture that exact immutable Binding/Connection reference internally at creation and verify it again at completion. Zero or multiple matching bindings refuse before a session, callback listener, or provider request is created. Reauthorization under v1 is safe only for that same uniquely selected binding; it cannot promise to repair an arbitrary caller-selected Connection or use completion-time lookup to choose a different target.
+
+Story 21 stage2 should enforce and test this limit before advertising its setup profile. Its helper-only stage1 needs no change. The held multi-credential branch is not a prerequisite and must not be imported.
+
+The later auth-result design proposes ConnectorConnection v0alpha2 bound-remediation commands carrying an explicit existing connection_ref alongside operation_ref. The receiver resolves and admits that pair, derives integration/profile from its owner, then creates or acknowledges a session bound to it. It never trusts label/profile as a target, never creates a missing placement, and never treats a session as an operation grant. This is a new contract migration; rate v2 and unchanged Connection v1 do not reserve or authorize those fields.
