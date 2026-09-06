@@ -537,4 +537,69 @@ mod tests {
             );
         }
     }
+    #[tokio::test]
+    async fn rate_adversary_catalog_checks_binding_and_lease_before_rate_disclosure() {
+        let mut bound = binding(true);
+        bound.provider = catalog::provider(catalog::ProviderKey::id("slack")).unwrap();
+        bound.connection_ref = "connection:slack:test".into();
+        let mut inner = test_inner(vec![bound]);
+        let egress = Arc::new(RateEgress {
+            retry: Some("0"),
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            headers: Mutex::new(Vec::new()),
+        });
+        inner.egress = egress.clone();
+        let address =
+            credential_address("local", "com.slack.api", &entry("slack", &[]), "bot_token")
+                .unwrap();
+        inner
+            .secrets
+            .put(
+                &address,
+                &connector_secrets::Secret::new("SENTINEL-FIXTURE"),
+            )
+            .await
+            .unwrap();
+        let description = inner.describe("slack-conversations-history").unwrap();
+        for (connection, lease, input) in [
+            (
+                "connection:absent",
+                description.description_ref.as_str(),
+                serde_json::json!({"channel":"C012345"}),
+            ),
+            (
+                "connection:slack:test",
+                "description:stale",
+                serde_json::json!({"channel":"C012345"}),
+            ),
+            (
+                "connection:slack:test",
+                description.description_ref.as_str(),
+                serde_json::json!({"channel":[]}),
+            ),
+        ] {
+            let error = inner
+                .invoke("slack-conversations-history", connection, lease, input)
+                .await
+                .unwrap_err();
+            assert_ne!(error.code, OperationErrorCode::RateLimited);
+            assert!(error.retry_after_seconds.is_none());
+            assert_eq!(egress.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        }
+        let error = inner
+            .invoke(
+                "slack-conversations-history",
+                "connection:slack:test",
+                &description.description_ref,
+                serde_json::json!({"channel":"C012345"}),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, OperationErrorCode::RateLimited);
+        assert_eq!(error.retry_after_seconds, Some(0));
+        assert_eq!(egress.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(*egress.headers.lock().unwrap(), ["retry-after"]);
+        assert!(!serde_json::to_string(&error).unwrap().contains("SENTINEL"));
+    }
+
 }

@@ -722,3 +722,30 @@ fn operation_traits_and_provenance_round_trip() {
     assert!(decoded.operations[1].error_envelope.is_some());
     assert!(decoded.operations[0].pagination.is_none());
 }
+// Rate adversary additions preserve the existing round-trip cases below.
+#[test]
+fn rate_adversary_fixed_and_conditional_roundtrip_keep_distinct_meanings() {
+    for bucket in [None, Some("shared".to_owned())] {
+        let fixed = connector_spec::RateLimit {
+            requests: u32::MAX,
+            per_seconds: 1,
+            bucket: bucket.clone(),
+        };
+        let value = serde_json::to_value(&fixed).unwrap();
+        let mut expected = json!({"requests":u32::MAX,"per_seconds":1});
+        if let Some(bucket) = bucket {
+            expected["bucket"] = json!(bucket);
+        }
+        assert_eq!(value, expected);
+        let restored: connector_spec::RateLimit = serde_json::from_value(value).unwrap();
+        assert_eq!(fixed, restored);
+    }
+    let mut operation = serde_json::to_value(op("fixture", None)).unwrap();
+    let declaration =
+        json!({"applies_when":"λ".repeat(4096),"source_url":"https://docs.example.test/rates"});
+    operation["conditional_rate_limits"] = json!(vec![declaration.clone(); 16]);
+    let decoded: Operation = serde_json::from_value(operation.clone()).unwrap();
+    assert_eq!(serde_json::to_value(decoded).unwrap(), operation);
+    operation["conditional_rate_limits"] = json!(vec![declaration; 17]);
+    assert!(serde_json::from_value::<Operation>(operation).is_err());
+}
