@@ -240,6 +240,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-client/src/personal_oauth.rs
 - confidence: inferred
+  path: crates/connectors-client/tests/personal_oauth_adversary.rs
+- confidence: inferred
   path: crates/connectors-config/examples/gitlab-personal-oauth.example.toml
 - confidence: inferred
   path: crates/connectors-config/src/lib.rs
@@ -339,7 +341,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 69
+revision: 71
 ---
 ## Acceptance
 
@@ -579,3 +581,11 @@ Formatted module previews fit the existing fence: config personal1479/new OAuth1
 The first OAuth root/client regression execution retains five service failures at the same synthetic document helper: crates/service/src/planning.rs declares schema_version 3 in the cfg(test) document function, while the implemented current reader requires schema4. Its remaining59service cases, catalog-build148, client30, protocol64 and server103 passed in that actual execution. The unmodified command, exit and failures remain in stage2c-root-client-regression-tests-1 evidence; this record does not relabel the run green.
 
 Add crates/service/src/planning.rs only for that one current-document fixture literal3to4. Preserve every production byte, existing test, assertion and other fixture field; retain the exact original preimage and disclose the change in whole-unit OAuth review. This is the current synthetic source fixture, not a frozen-version contract case. Reexecute the affected service checks and complete the remaining owner validations. No reader widening, legacy document rewrite, independent authentication scope or test skip is assigned.
+
+## Prospective whole-unit review test owner — 2026-09-06
+
+The read-only whole-unit checklist is prepared at SHA256 78f3b2af0490335ded1abaa310a94f10e892f0339b4b76c3aa295e9fc9fdef8b. Its two-member manifest and observation index are retained in the assigned OAuth scratch; source observations were provisional, and the checklist is neither an executed attack nor a verdict. Both ordinary whole-unit review passes remain unstarted until the coordinator supplies a frozen complete implementation, full report and explicit review assignment.
+
+Add the inferred test owner crates/connectors-client/tests/personal_oauth_adversary.rs for public-API Unix/HTTP fixtures proving the trusted client handoff and its closed output/error boundaries. Cargo's normal integration-test discovery and the existing dependencies suffice; no production hook, manifest change or public protocol edit is assigned. The other ten proposed test files are already machine-scoped by this story. Keep existing test assertions and original reports, with only the earlier explicitly recorded fixture-version/citation exceptions. This exact new file is for the later independent reviewer; the implementor continues its already scoped inline client/console cases.
+
+The review must cover real controlling-terminal and private-file behavior, interrupted private delivery, exact owner/profile/Connection checks, callback/device bounds, actual FULL-store reopen recovery, refresh uncertainty and no operation resend, frozen/current schema compatibility, and mixed raw/OAuth custody. The coordinator has separately identified unexecuted client completion checks: Callable state, exact pending/status/Describe correlation, and successful daemon labels/references containing a synthetic private marker. Their actual deciding evidence and narrow implementation remain the implementor's responsibility before freeze. Preserve the meaning of the daemon ConnectionDescription and use trusted local display data plus the existing receiver-derived expected Connection reference for the console's public summary; no new wire target or CLI selection authority is introduced.
