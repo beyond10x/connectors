@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "DocuSign OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -107,6 +107,7 @@
         "method": "GET",
         "url": "{base}/folders"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -217,6 +218,7 @@
         ],
         "url": "{base}/envelopes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -338,6 +340,7 @@
         "method": "GET",
         "url": "{base}/envelopes/{envelope_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -443,6 +446,7 @@
         "method": "GET",
         "url": "{base}/envelopes/{envelope_id}/recipients"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -655,6 +659,7 @@
         "method": "POST",
         "url": "{base}/envelopes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -777,6 +782,7 @@
         "method": "PUT",
         "url": "{base}/envelopes/{envelope_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -801,7 +807,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2.1",

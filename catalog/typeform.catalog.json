@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Typeform access token sent as a bearer — a personal access token or an OAuth2 access token",
@@ -74,6 +74,7 @@
         "method": "GET",
         "url": "{base}/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -235,6 +236,7 @@
         ],
         "url": "{base}/forms"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -355,6 +357,7 @@
         "method": "GET",
         "url": "{base}/forms/{form_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -662,6 +665,7 @@
         ],
         "url": "{base}/forms/{form_id}/responses"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -830,6 +834,7 @@
         ],
         "url": "{base}/forms/{form_id}/responses"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -838,7 +843,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "base_url": "https://api.typeform.com",

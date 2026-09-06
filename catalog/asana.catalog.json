@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Asana access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -78,6 +78,7 @@
         "method": "GET",
         "url": "{base}/api/1.0/tasks/{task_gid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -185,6 +186,7 @@
         "method": "POST",
         "url": "{base}/api/1.0/tasks"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -287,6 +289,7 @@
         "method": "PUT",
         "url": "{base}/api/1.0/tasks/{task_gid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -390,6 +393,7 @@
         "method": "POST",
         "url": "{base}/api/1.0/tasks/{task_gid}/stories"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -464,6 +468,7 @@
         "method": "GET",
         "url": "{base}/api/1.0/projects/{project_gid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -484,7 +489,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "1.0",

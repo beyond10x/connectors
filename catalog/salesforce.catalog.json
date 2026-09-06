@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Salesforce OAuth2 access token sent as a bearer; already minted, supplied through the environment",
@@ -87,6 +87,7 @@
         "method": "GET",
         "url": "{base}/services/oauth2/userinfo"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -214,6 +215,7 @@
         "method": "GET",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -329,6 +331,7 @@
         "method": "POST",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -452,6 +455,7 @@
         "method": "PATCH",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -515,6 +519,7 @@
         "method": "GET",
         "url": "{base}/services/data/v59.0/sobjects/{sobject_type}/describe"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -606,7 +611,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

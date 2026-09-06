@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Airtable access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -111,6 +111,7 @@
         "method": "GET",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -239,6 +240,7 @@
         "method": "POST",
         "url": "{base}/v0/{base_id}/{table_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -383,6 +385,7 @@
         "method": "PATCH",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -502,6 +505,7 @@
         "method": "DELETE",
         "url": "{base}/v0/{base_id}/{table_id}/{record_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -528,7 +532,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v0",

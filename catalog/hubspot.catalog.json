@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "HubSpot private-app access token (pat-…) with crm.objects.contacts.read/write, crm.objects.companies.read and crm.objects.deals.read",
@@ -79,6 +79,7 @@
         "method": "GET",
         "url": "{base}/crm/v3/objects/contacts/{contact_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -209,6 +210,7 @@
         "method": "POST",
         "url": "{base}/crm/v3/objects/contacts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -359,6 +361,7 @@
         "method": "PATCH",
         "url": "{base}/crm/v3/objects/contacts/{contact_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -422,6 +425,7 @@
         "method": "GET",
         "url": "{base}/crm/v3/objects/companies/{company_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -536,6 +540,7 @@
         "method": "GET",
         "url": "{base}/crm/v3/objects/deals/{deal_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -595,7 +600,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v3",

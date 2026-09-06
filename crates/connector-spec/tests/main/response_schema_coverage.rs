@@ -171,7 +171,11 @@ const COVERED_FLOOR: usize = 835;
 // would pass this count while carrying none. Its other ten operations all carry schemas. The
 // measured absence is 154, so 155 preserves the single-operation allowance and still refuses the
 // smallest two-operation unschematized arrival.
-const ABSENCE_CEILING: usize = 155;
+// Raised 155 -> 156 with the official-source GitLab schedule projection. Its DELETE declares
+// 204 with no response body in the pinned GitLab 19.4 OpenAPI document; list/create/update carry
+// concrete source-derived schemas. Measured coverage is 856/1011 (155 honest absences), so 156
+// retains exactly one spare absence while the smallest two-operation empty arrival stays refused.
+const ABSENCE_CEILING: usize = 156;
 
 /// How far [`ABSENCE_CEILING`] may sit above the measured absence. This is the guard's resolution,
 /// and the only number in this file that was chosen rather than read off the catalogue, so it is the

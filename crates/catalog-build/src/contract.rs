@@ -9,7 +9,11 @@
 //! the one-time S-001 differential compared every shipped operation's stored contract against the
 //! engine-derived values the predecessor's C-552 build produced (835 operations, 1518 symbols).
 //!
-//! # The type narrowing, and what it cannot hold
+//! # Legacy type narrowing, and the source profile
+//!
+//! The historical narrowing below belongs only to `legacy_v1`. The `openapi_3_0_json_v1`
+//! profile preserves the source constraints through deterministic dialect translation, and stores
+//! complete JSON bodies under a reversible whole-body symbol with independent requiredness.
 //!
 //! The contract's parameter types are deliberately small: `string`, `number`, `boolean`, a
 //! homogeneous `array`, and the unconstrained `{}`. The predecessor's engine could express nothing
@@ -26,8 +30,8 @@
 //!
 //! Everything else — unions (`oneOf`, `type: ["string","null"]`), objects, `$ref`, an absent
 //! `type`, every constraint keyword — lands on `{}`, the top type, so the failure mode is a
-//! missing check and never a false rejection. **Nothing is lost**: the vendor's full schema stays
-//! on the document's `params[].schema`, verbatim; this is the *contract* projection of it.
+//! missing check and never a false rejection. The vendor's full schema stays on the document's
+//! `params[].schema`, but the legacy caller contract does lose constraints and makes no fidelity claim.
 
 use std::collections::BTreeMap;
 
@@ -48,8 +52,10 @@ pub struct Contract {
     /// The error-envelope-extended description a model receives — not the operation's one-line
     /// `description` summary.
     pub description: String,
-    /// The lowered, caller-typed input schema, keyed by symbol, every declared parameter required.
+    /// The caller input schema, keyed by symbol, preserving each parameter's declared requiredness.
     pub input_schema: Value,
+    /// The translated successful source response, distinct from the retained literal source schema.
+    pub output_schema: Option<Value>,
 }
 
 /// Compute the [`Contract`] for one operation.
@@ -104,8 +110,12 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
         let symbol = allocator
             .allocate(&operation.id, FREE_FORM_BODY)
             .map_err(|error| anyhow!(error))?;
-        // A free-form body stays required: there is nothing else to send.
-        declared.push((symbol.clone(), schema, true));
+        // Source body presence is independent of inner required properties; legacy defaults remain.
+        declared.push((
+            symbol.clone(),
+            schema,
+            operation.params.body_required.unwrap_or(true),
+        ));
         symbols.insert(FREE_FORM_BODY.to_string(), symbol);
     }
 
@@ -125,24 +135,44 @@ pub fn contract_of(operation: &Operation) -> Result<Contract> {
     // told a parameter is mandatory supplies a value for it, so an optional filter becomes an
     // invented one and the operation returns a narrowed result the caller never asked to narrow.
     //
-    // A free-form body stays required because there is nothing else to send.
+    // Whole-body requiredness follows the explicit source fact, or the legacy default when absent.
     let mut properties = Map::new();
     let mut required: Vec<Value> = Vec::new();
     for (symbol, schema, mandatory) in &declared {
-        properties.insert(symbol.clone(), lowered(schema));
+        let projected = if operation.params.request_semantics.is_legacy() {
+            lowered(schema)
+        } else {
+            connector_spec::schema_translation::openapi30(schema)
+                .map_err(|problem| anyhow!("operation {}: {problem}", operation.id))?
+        };
+        properties.insert(symbol.clone(), projected);
         if *mandatory {
             required.push(Value::String(symbol.clone()));
         }
     }
 
+    let mut input_schema = json!({"type":"object","properties":properties,"required":required});
+    let output_schema = if operation.params.request_semantics.is_legacy() {
+        None
+    } else {
+        input_schema["$schema"] = json!("https://json-schema.org/draft/2020-12/schema");
+        input_schema["additionalProperties"] = json!(false);
+        operation
+            .response_schema
+            .as_ref()
+            .map(|schema| {
+                let mut translated = connector_spec::schema_translation::openapi30(schema)
+                    .map_err(|problem| anyhow!("operation {} response: {problem}", operation.id))?;
+                translated["$schema"] = json!("https://json-schema.org/draft/2020-12/schema");
+                Ok::<_, anyhow::Error>(translated)
+            })
+            .transpose()?
+    };
     Ok(Contract {
         symbols,
         description: description(operation),
-        input_schema: json!({
-            "type": "object",
-            "properties": Value::Object(properties),
-            "required": Value::Array(required),
-        }),
+        input_schema,
+        output_schema,
     })
 }
 
@@ -351,5 +381,50 @@ mod tests {
             contract.input_schema,
             json!({"type": "object", "properties": {}, "required": []})
         );
+    }
+
+    #[test]
+    fn source_fidelity_preserves_nullable_enum_union_defaults_and_body_constraints() {
+        let params: ParamSet = serde_json::from_value(json!({
+            "request_semantics":"openapi_3_0_json_v1",
+            "query":[{"name":"scope","required":false,"schema":{"type":"string","nullable":true,"enum":["active","inactive"]}},
+                {"name":"page","required":false,"schema":{"type":"integer","default":1,"minimum":1}}],
+            "body_required":false,
+            "body_schema":{"type":"object","required":["name"],"additionalProperties":false,"properties":{
+                "name":{"type":"string","nullable":true},
+                "value":{"oneOf":[{"type":"string","nullable":true},{"type":"array","nullable":true}]}
+            }}
+        })).expect("source request semantics deserialize");
+        let input = contract_of(&operation(params)).unwrap().input_schema;
+        assert_eq!(
+            input["properties"]["page"],
+            json!({"type":"integer","default":1,"minimum":1})
+        );
+        assert_eq!(
+            input["properties"]["scope"]["type"],
+            json!(["string", "null"])
+        );
+        assert_eq!(
+            input["properties"]["scope"]["enum"],
+            json!(["active", "inactive"])
+        );
+        assert_eq!(input["properties"]["body"]["additionalProperties"], false);
+        assert_eq!(input["properties"]["body"]["required"], json!(["name"]));
+        assert_eq!(input["required"], json!([]));
+        let validator = jsonschema::validator_for(&input).unwrap();
+        assert!(validator.is_valid(&json!({})));
+        assert!(validator.is_valid(&json!({"page":2,"body":{"name":null,"value":[1,"x",false]}})));
+        for invalid in [
+            json!({"page":1.5}),
+            json!({"scope":null}),
+            json!({"body":{}}),
+            json!({"body":{"name":"x","value":null}}),
+            json!({"body":{"name":"x","extra":1}}),
+        ] {
+            assert!(!validator.is_valid(&invalid), "{invalid}");
+        }
+        assert!(input
+            .pointer("/properties/body/properties/value/oneOf/1/items")
+            .is_none());
     }
 }

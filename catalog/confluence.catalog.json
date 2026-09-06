@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Atlassian API token; the user half is the account email that minted it. This is the same token a Jira connection uses, but it is stored at a separate address and must be supplied again",
@@ -188,6 +188,7 @@
         ],
         "url": "{base}/rest/api/space"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -321,6 +322,7 @@
         "method": "GET",
         "url": "{base}/rest/api/space/{space_key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -495,6 +497,7 @@
         ],
         "url": "{base}/rest/api/content"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -643,6 +646,7 @@
         ],
         "url": "{base}/rest/api/content/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -854,6 +858,7 @@
         "method": "POST",
         "url": "{base}/api/v2/pages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1013,6 +1018,7 @@
         "method": "POST",
         "url": "{base}/api/v2/footer-comments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1068,7 +1074,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

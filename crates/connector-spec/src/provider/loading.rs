@@ -315,14 +315,18 @@ fn ingest_specs(
         }
 
         match spec.kind {
-            SpecKind::Openapi => match crate::openapi::ingest(document) {
-                Ok(document) => ingested.push(IngestedDocument {
-                    path,
-                    service: spec.service().to_owned(),
-                    ingested: document,
-                }),
-                Err(error) => problems.push(format!("`{} path = {path:?}`: {error}", block(many))),
-            },
+            SpecKind::Openapi => {
+                match crate::openapi::ingest_with_semantics(document, spec.request_semantics) {
+                    Ok(document) => ingested.push(IngestedDocument {
+                        path,
+                        service: spec.service().to_owned(),
+                        ingested: document,
+                    }),
+                    Err(error) => {
+                        problems.push(format!("`{} path = {path:?}`: {error}", block(many)))
+                    }
+                }
+            }
             SpecKind::Asyncapi => match crate::asyncapi::ingest(document) {
                 Ok(document) => ingested_events.push(IngestedEventDocument {
                     path,

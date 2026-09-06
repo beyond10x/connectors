@@ -241,6 +241,7 @@ struct RawChoice {
 
 #[derive(Deserialize)]
 struct RawOperation {
+    request_semantics: crate::RequestSemantics,
     id: String,
     service: String,
     direction: String,
@@ -279,6 +280,8 @@ struct RawContract {
     description: String,
     #[serde(default)]
     input_schema: Value,
+    #[serde(default)]
+    output_schema: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -609,6 +612,7 @@ fn build_operation(
             )
         });
     Operation {
+        request_semantics: raw.request_semantics,
         id: leak_str(raw.id.clone()),
         provider: leak_str(document.connector.clone()),
         service: leak_str(raw.service.clone()),
@@ -660,6 +664,11 @@ fn build_operation(
                 .map(|contract| contract.input_schema.to_string())
                 .expect("the contract was just proven present"),
         ),
+        output_schema: raw
+            .contract
+            .as_ref()
+            .and_then(|contract| contract.output_schema.as_ref())
+            .map(|schema| leak_str(schema.to_string())),
         expose: raw.expose,
     }
 }
@@ -1143,7 +1152,8 @@ mod tests {
                     "effects": ["read", "network"],
                     "semantic_effects": [],
                     "interaction_shape": "unary",
-                    "protocol_driver": "http_v1",
+                    "request_semantics": "legacy_v1",
+                "protocol_driver": "http_v1",
                     "placement_requirement": "connectors_deployment",
                     "implementation_form": "built_in",
                     "required_capabilities": ["public_network"],

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Mailchimp Marketing API key, granting whatever the account that issued it can do. Travels as `Authorization: Bearer <key>`, the alternative Mailchimp documents beside its Basic form. The key's trailing `-us14`-style suffix names the account's datacentre; that value is asked for separately as configuration and is never read back out of this credential",
@@ -89,6 +89,7 @@
         "method": "GET",
         "url": "{base}/ping"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -145,6 +146,7 @@
         "method": "GET",
         "url": "{base}/lists"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -287,6 +289,7 @@
         "method": "GET",
         "url": "{base}/lists/{list_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -412,6 +415,7 @@
         "method": "GET",
         "url": "{base}/lists/{list_id}/members"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -610,6 +614,7 @@
         "method": "GET",
         "url": "{base}/lists/{list_id}/members/{subscriber_hash}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -858,6 +863,7 @@
         "method": "PUT",
         "url": "{base}/lists/{list_id}/members/{subscriber_hash}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -998,6 +1004,7 @@
         "method": "GET",
         "url": "{base}/campaigns"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1089,7 +1096,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "3.0",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "OpenRouter API key, sent as a bearer token",
@@ -55,6 +55,7 @@
         "method": "GET",
         "url": "{base}/api/v1/models"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -143,6 +144,7 @@
         "method": "GET",
         "url": "{base}/api/v1/models/{author}/{slug}/endpoints"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -264,6 +266,7 @@
         "method": "POST",
         "url": "{base}/api/v1/chat/completions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -361,6 +364,7 @@
         "method": "GET",
         "url": "{base}/api/v1/credits"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -394,7 +398,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

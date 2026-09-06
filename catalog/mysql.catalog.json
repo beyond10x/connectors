@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "authority": "com.mysql.server",
   "connector": "mysql",
   "description": "Read a MySQL server through the closed built-in SQL driver: one bounded read-only query plus schema, table, and column inventory",
@@ -65,6 +65,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "sql_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -151,6 +152,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "sql_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -225,6 +227,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "sql_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -320,6 +323,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "sql_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -380,7 +384,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [
