@@ -7,6 +7,89 @@ summary: An authorized instance of an integration, the channel it supervises, an
 
 types:
 
+  # Proposed values, design 22 (2026-09-06), for Connection v0alpha2 bound remediation.
+  # Existing ConnectSession identity/lifecycle remains; no durable remediation entity.
+  - name: connectors.connection.RemediationResumeState
+    kind: enum
+    variants: [Pending, Ready, Consumed, Expired, Failed]
+
+  - name: connectors.connection.RemediationNextAction
+    kind: enum
+    variants: [FreshDescriptionThenExplicitInvoke]
+
+  # Private bounded value associated with an existing session; never an authority token.
+  - name: connectors.connection.RemediationBinding
+    kind: struct
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: canonical_input_sha256
+        type: String
+      - name: stable_authority_sha256
+        type: String
+      - name: grant_ref
+        type: connectors.runtime.GrantRef
+      - name: grant_revision
+        type: Optional<Integer>
+      - name: admission_policy_sha256
+        type: String
+      - name: expires_at_unix_ms
+        type: Integer
+
+  # Value-only part of a trusted control-plane response; the reused ConnectSessionStatus
+  # endpoint projection is intentionally not replicated as arbitrary String URL fields.
+  - name: connectors.connection.BoundRemediationStatus
+    kind: struct
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: session_state
+        type: connectors.connection.ConnectSession.State
+      - name: expires_at_unix_ms
+        type: Integer
+      - name: resume_state
+        type: connectors.connection.RemediationResumeState
+
+  - name: connectors.connection.RemediationAcknowledgement
+    kind: struct
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: next_action
+        type: connectors.connection.RemediationNextAction
+
+  # UNMAPPED: existing session state plus a one-time acknowledgement bit derives resume
+  # state; these enum variants add no ConnectSession lifecycle transition. Completion,
+  # acknowledgement and request races need Rust tests, not invented ESS causation.
+  # UNMAPPED: exact authenticated owner/realm/binding/profile and current Grant checks;
+  # one-integration completion; descriptor/evidence freshness; expiry and capacity bounds;
+  # no saved raw inputs, token material or ambient authority; trusted-only endpoint access.
+  # UNMAPPED: v1 can select only one unambiguous configured owner/integration/profile
+  # binding. v2 explicit target selection is a distinct migration, not label authority.
+
+
   # Proposed transient value vocabulary, design 21 (2026-09-06). Existing ConnectSession
   # identity, Pending/Completed/Expired/Failed lifecycle and Connection wire are reused.
   - name: connectors.connection.OAuthInstructionKind

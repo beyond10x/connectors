@@ -27,6 +27,8 @@ scope:
 - confidence: cited
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: inferred
+  path: crates/catalog-build/tests/main/ess_claim_fence.rs
+- confidence: inferred
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
   path: crates/catalog/src/lib.rs
@@ -52,6 +54,10 @@ scope:
   path: crates/connector-spec/src/provider/schema_sync.rs
 - confidence: inferred
   path: crates/connector-spec/src/rate_limit.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/golden/authored-input-schema.error
+- confidence: inferred
+  path: crates/connector-spec/tests/golden/operation-auth-typo.error
 - confidence: cited
   path: crates/connector-spec/tests/main/determinism.rs
 - confidence: cited
@@ -60,8 +66,12 @@ scope:
   path: crates/connector-spec/tests/main/service_partition.rs
 - confidence: inferred
   path: crates/connectors-cli/Cargo.lock
+- confidence: inferred
+  path: crates/connectors-cli/src/error.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/adversary_fence_probe.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: cited
@@ -118,6 +128,8 @@ scope:
   path: crates/integration-platform/src/surface.rs
 - confidence: cited
   path: crates/integration-sip/src/backend/mod.rs
+- confidence: inferred
+  path: crates/integration-slack/src/backend.rs
 - confidence: cited
   path: crates/integration-slack/src/backend/api_runtime.rs
 - confidence: cited
@@ -148,6 +160,8 @@ scope:
   path: crates/server/src/hosted/operation_transport.rs
 - confidence: inferred
   path: crates/server/src/hosted/tests/contract_validation.rs
+- confidence: inferred
+  path: crates/server/src/hosted/tests/docs.rs
 - confidence: cited
   path: crates/server/src/hosted/tests/enforcement.rs
 - confidence: cited
@@ -174,6 +188,8 @@ scope:
   path: ess/system/components.yaml
 - confidence: cited
   path: ess/system/domains/catalog.yaml
+- confidence: inferred
+  path: ess/system/domains/connection.yaml
 - confidence: cited
   path: ess/system/domains/runtime.yaml
 - confidence: cited
@@ -182,7 +198,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 124
+revision: 129
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
