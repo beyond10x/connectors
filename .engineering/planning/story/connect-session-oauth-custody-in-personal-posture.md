@@ -281,6 +281,8 @@ scope:
   path: crates/integration-catalog/src/oauth.rs
 - confidence: inferred
   path: crates/integration-catalog/src/oauth_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/tests.rs
 - confidence: inferred
   path: crates/protocol/src/connection.rs
 - confidence: inferred
@@ -315,7 +317,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 60
+revision: 62
 ---
 ## Acceptance
 
@@ -527,3 +529,7 @@ The two rate URI cases in the already scoped catalog_invariants.rs currently val
 This authorizes v3-compatible test fixtures, not a production downgrade or removal of schema 4 fields to fit an old reader. If any field beyond those two top-level identities is incompatible with the frozen validator, stop this adaptation and report that concrete field; do not strip it or weaken the validator. The independent schema 3 publication candidate and its reviewed tests remain unchanged. These bounded fixture edits belong to the subsequent whole-OAuth/schema 4 unit and must be disclosed in its implementation and independent review evidence.
 
 The trusted frontend uses setup connect <provider>, with --auth-profile naming the declared purpose and optional --instruction-file naming an owner-only output file. Design 21 records these exact spellings. Existing ESS components.yaml explicitly classifies setup connect as an unspecified flow, because this frontend forwards multiple acts rather than owning a domain command. Its current Clap projection cannot declare these flow options; do not invent a service command or handler ownership to make it emit them. The actual Rust parser, guided-flow owner and their tests enforce the options and pre-session terminal/file admission. The existing ESS exception and generated group tree remain accurate.
+
+## Existing raw configuration fixture closure — 2026-09-06
+
+Add crates/integration-catalog/src/tests.rs only for oauth: None in the existing entry helper's CatalogIntegrationConfig literal at current line 258. The new optional typed field requires that explicit old/raw configuration value. Preserve every existing test, assertion and other byte in this frozen rate preimage, apart from formatter placement of that one field. This is a subsequent OAuth constructor closure; the schema 3 publication candidate remains unchanged. Retain the exact preimage and disclose the one-field adaptation in whole-unit OAuth review evidence.
