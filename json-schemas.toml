@@ -279,3 +279,17 @@ origin = "vendored-source"
 [[syntax]]
 path = "specs/zendesk/2024-06-01-excerpt.json"
 origin = "vendored-source"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha2/connector-operation.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha2/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha2/vectors.json"
+schema = "contracts/connector-operation/v0alpha2/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha2/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"

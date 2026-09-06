@@ -363,18 +363,7 @@ impl EgressTransport for ConnectionEgress {
         {
             return Err(EgressTransportError::ResponseTooLarge);
         }
-        let mut headers = std::collections::BTreeMap::new();
-        for requested in request.response_headers {
-            let name = reqwest::header::HeaderName::from_bytes(requested.as_bytes())
-                .map_err(|_| EgressTransportError::Refused)?;
-            if let Some(value) = response.headers().get(&name) {
-                let value = value.to_str().map_err(|_| EgressTransportError::Refused)?;
-                if value.len() > MAX_RESPONSE_HEADER_BYTES {
-                    return Err(EgressTransportError::Refused);
-                }
-                headers.insert(name.as_str().to_owned(), value.to_owned());
-            }
-        }
+        let headers = selected_response_headers(response.headers(), request.response_headers)?;
         let status = response.status().as_u16();
         let mut body = Vec::with_capacity(
             response
@@ -454,18 +443,7 @@ impl EgressTransport for ConnectionEgress {
             return Err(EgressTransportError::ResponseTooLarge);
         }
         let status = response.status().as_u16();
-        let mut headers = std::collections::BTreeMap::new();
-        for requested in request.response_headers {
-            let name = reqwest::header::HeaderName::from_bytes(requested.as_bytes())
-                .map_err(|_| EgressTransportError::Refused)?;
-            if let Some(value) = response.headers().get(&name) {
-                let value = value.to_str().map_err(|_| EgressTransportError::Refused)?;
-                if value.len() > MAX_RESPONSE_HEADER_BYTES {
-                    return Err(EgressTransportError::Refused);
-                }
-                headers.insert(name.as_str().to_owned(), value.to_owned());
-            }
-        }
+        let headers = selected_response_headers(response.headers(), request.response_headers)?;
         Ok(EgressStreamingHttpResponse {
             status,
             headers,
@@ -497,6 +475,42 @@ impl EgressTransport for ConnectionEgress {
             .map_err(|_| EgressTransportError::Refused)?;
         Ok(Box::new(ServerWebSocket { socket }))
     }
+}
+
+/// Preserve only response headers explicitly admitted by the owning Integration.
+fn selected_response_headers(
+    source: &reqwest::header::HeaderMap,
+    requested: Vec<String>,
+) -> Result<std::collections::BTreeMap<String, String>, EgressTransportError> {
+    let mut headers = std::collections::BTreeMap::new();
+    for requested in requested {
+        let name = reqwest::header::HeaderName::from_bytes(requested.as_bytes())
+            .map_err(|_| EgressTransportError::Refused)?;
+        if name == reqwest::header::RETRY_AFTER {
+            // Read cardinality before flattening. Even identical duplicate values are ambiguous.
+            // Bad rate advice never hides the definite provider response or its bounded body.
+            let mut values = source.get_all(&name).iter();
+            let value = values.next();
+            if values.next().is_none() {
+                let parsed = value
+                    .filter(|value| value.as_bytes().len() <= MAX_RESPONSE_HEADER_BYTES)
+                    .and_then(|value| value.to_str().ok())
+                    .and_then(|value| service::retry_after_seconds(Some(value)));
+                if let Some(seconds) = parsed {
+                    headers.insert(name.as_str().to_owned(), seconds.to_string());
+                }
+            }
+            continue;
+        }
+        if let Some(value) = source.get(&name) {
+            let value = value.to_str().map_err(|_| EgressTransportError::Refused)?;
+            if value.len() > MAX_RESPONSE_HEADER_BYTES {
+                return Err(EgressTransportError::Refused);
+            }
+            headers.insert(name.as_str().to_owned(), value.to_owned());
+        }
+    }
+    Ok(headers)
 }
 
 struct ReqwestByteStream {
@@ -768,6 +782,70 @@ fn is_v6_documentation(ip: Ipv6Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ambiguous_retry_after_is_not_flattened_into_advice() {
+        use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
+        let mut source = HeaderMap::new();
+        source.append(RETRY_AFTER, HeaderValue::from_static("30"));
+        source.append(RETRY_AFTER, HeaderValue::from_static("30"));
+        let selected = selected_response_headers(&source, vec!["retry-after".into()]).unwrap();
+        assert!(!selected.contains_key("retry-after"));
+    }
+
+    #[test]
+    fn retry_after_extraction_keeps_only_one_valid_decimal_and_admitted_headers() {
+        use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
+        for (raw, expected) in [
+            ("30", Some("30")),
+            (" 0\t", Some("0")),
+            ("18446744073709551615", Some("18446744073709551615")),
+            ("30, 30", None),
+            ("+30", None),
+            ("-30", None),
+            ("30.0", None),
+            ("Wed, 21 Oct 2015 07:28:00 GMT", None),
+            ("18446744073709551616", None),
+            ("", None),
+        ] {
+            let mut source = HeaderMap::new();
+            source.insert(RETRY_AFTER, HeaderValue::from_str(raw).unwrap());
+            source.insert("set-cookie", HeaderValue::from_static("opaque=private"));
+            let selected = selected_response_headers(&source, vec!["ReTrY-AfTeR".into()]).unwrap();
+            assert_eq!(
+                selected.get("retry-after").map(String::as_str),
+                expected,
+                "{raw:?}"
+            );
+            assert!(!selected.contains_key("set-cookie"));
+            assert!(selected_response_headers(&source, vec![])
+                .unwrap()
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn malformed_retry_after_does_not_hide_the_definite_provider_response() {
+        use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
+        for value in [
+            HeaderValue::from_bytes(b"\xff").unwrap(),
+            HeaderValue::from_str(&"1".repeat(MAX_RESPONSE_HEADER_BYTES + 1)).unwrap(),
+        ] {
+            let mut source = HeaderMap::new();
+            source.insert(RETRY_AFTER, value);
+            source.insert("content-type", HeaderValue::from_static("application/json"));
+            let selected = selected_response_headers(
+                &source,
+                vec!["retry-after".into(), "content-type".into()],
+            )
+            .unwrap();
+            assert!(!selected.contains_key("retry-after"));
+            assert_eq!(
+                selected.get("content-type").map(String::as_str),
+                Some("application/json")
+            );
+        }
+    }
 
     fn pool() -> ConnectionEgress {
         ConnectionEgress::new(vec![DestinationRule::exact_origin(

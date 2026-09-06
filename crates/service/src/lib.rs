@@ -38,9 +38,9 @@ pub use dispatch::{
     Dispatcher, SensitiveValue,
 };
 pub use egress::{
-    EgressByteStream, EgressHttpRequest, EgressHttpResponse, EgressStreamingHttpRequest,
-    EgressStreamingHttpResponse, EgressTransport, EgressTransportError, EgressTransportFailure,
-    EgressWebSocket, EgressWebSocketFrame,
+    retry_after_seconds, EgressByteStream, EgressHttpRequest, EgressHttpResponse,
+    EgressStreamingHttpRequest, EgressStreamingHttpResponse, EgressTransport, EgressTransportError,
+    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
 };
 pub use factory::{
     ConnectorServiceFactory, DeploymentApproval, DeploymentRisk, OperationDeployment,
