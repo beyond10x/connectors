@@ -825,3 +825,116 @@ async fn oauth_pass1_cancellation_erases_already_written_private_inode_before_re
         })
         .await;
 }
+
+#[tokio::test]
+async fn oauth_pass2_private_file_expires_while_completion_grace_stays_bounded() {
+    use protocol::connection::*;
+    use std::io::Read as _;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
+    tokio::task::LocalSet::new().run_until(async {
+        for complete in [true, false] {
+            let root = private_tempdir();
+            let destination = root.path().join("private");
+            let unix = tokio::net::UnixListener::bind(root.path().join("connectors.sock")).unwrap();
+            let http = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = http.local_addr().unwrap();
+            let instructions = tokio::spawn(async move {
+                let (mut stream, _) = http.accept().await.unwrap();
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    header.push(stream.read_u8().await.unwrap());
+                    assert!(header.len() < 8192);
+                }
+                let body = r#"{"kind":"device_authorization","verification_uri":"https://gitlab.example/device","user_code":"OAUTH-PASS2-PRIVATE-HUMAN"}"#;
+                stream.write_all(format!("HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+            });
+            let requests = Arc::new(AtomicUsize::new(0));
+            let seen = requests.clone();
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let observed = entered.clone();
+            let (release, released) = tokio::sync::oneshot::channel();
+            let reference = configured_reference();
+            let daemon = tokio::spawn(async move {
+                let mut released = Some(released);
+                let expires = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64 + 2_000;
+                for turn in 0..3 {
+                    let (mut stream, _) = unix.accept().await.unwrap();
+                    let mut line = String::new();
+                    tokio::io::BufReader::new(&mut stream).read_line(&mut line).await.unwrap();
+                    let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
+                    request.validate().unwrap();
+                    seen.fetch_add(1, Ordering::SeqCst);
+                    let result = match (turn, request.request) {
+                        (0, ConnectionRequest::ConnectSessionCreate(_)) => ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                            connect_session_ref:"session:grace".into(), integration_ref:"gitlab".into(), state:ConnectSessionState::Pending,
+                            expires_at_unix_ms:expires, completion_endpoint:None,
+                            browser_completion_url:Some(format!("http://{address}/#token={}", "q".repeat(43))), connection_ref:None,
+                        }),
+                        (1, ConnectionRequest::ConnectSessionStatus(status)) => {
+                            assert_eq!(status.connect_session_ref, "session:grace");
+                            observed.notify_one();
+                            released.take().unwrap().await.unwrap();
+                            assert!(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64 >= expires);
+                            ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                                connect_session_ref:"session:grace".into(), integration_ref:"gitlab".into(), state:ConnectSessionState::Completed,
+                                expires_at_unix_ms:expires, completion_endpoint:None, browser_completion_url:None, connection_ref:Some(reference.clone()),
+                            })
+                        },
+                        (2, ConnectionRequest::Describe(describe)) => {
+                            assert_eq!(describe.connection_ref, reference);
+                            ConnectionResult::Describe(ConnectionDescription {
+                                summary:ConnectionSummary { connection_ref:reference.clone(), integration_ref:"gitlab".into(),
+                                    label:"OAUTH-PASS2-PRIVATE-DAEMON".into(), state:ConnectionState::Callable,
+                                    initiation:vec![ConnectionInitiator::Platform], route:ConnectionRoute::Direct,
+                                    scope:None, actor:None, auth_profile:Some("gitlab.oauth_token".into()) },
+                                channels:Vec::new(),
+                            })
+                        },
+                        _ => panic!("grace never repeats Create or sends Invoke"),
+                    };
+                    let response = ResponseEnvelope::success(request.request_id, result);
+                    response.validate().unwrap();
+                    stream.write_all(format!("{}\n", serde_json::to_string(&response).unwrap()).as_bytes()).await.unwrap();
+                }
+            });
+            let owned_root = root.path().to_owned();
+            let owned_path = destination.clone();
+            let acquisition = tokio::task::spawn_local(async move {
+                dispatch_with_personal_oauth("gitlab", &config(), &owned_root.join("config.toml"), &owned_root,
+                    None, None, PersonalOAuthOptions {instruction_file:Some(owned_path), ..Default::default()}).await
+            });
+            tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await.unwrap();
+            let mut held = std::fs::File::open(&destination).unwrap();
+            assert!(std::fs::read_to_string(&destination).unwrap().contains("OAUTH-PASS2-PRIVATE-HUMAN"));
+            tokio::time::timeout(std::time::Duration::from_secs(4), async {
+                while destination.exists() { tokio::time::sleep(std::time::Duration::from_millis(10)).await; }
+            }).await.unwrap();
+            let mut erased = String::new();
+            held.read_to_string(&mut erased).unwrap();
+            assert!(erased.is_empty(), "instruction expiry erases the inode while Status is still in flight");
+            assert!(!acquisition.is_finished(), "private expiry allows only the bounded completion grace");
+            if complete {
+                release.send(()).unwrap();
+                let result = tokio::time::timeout(std::time::Duration::from_secs(3), acquisition).await.unwrap().unwrap().unwrap();
+                assert_eq!(result["connected"], true);
+                assert!(!result.to_string().contains("OAUTH-PASS2-PRIVATE"));
+                assert_eq!(requests.load(Ordering::SeqCst), 3);
+                daemon.await.unwrap();
+            } else {
+                let result = tokio::time::timeout(std::time::Duration::from_secs(18), acquisition).await.unwrap().unwrap();
+                assert!(result.is_err());
+                assert!(!result.unwrap_err().to_string().contains("OAUTH-PASS2-PRIVATE"));
+                assert_eq!(requests.load(Ordering::SeqCst), 2);
+                daemon.abort();
+                assert!(daemon.await.unwrap_err().is_cancelled());
+                drop(release);
+            }
+            instructions.await.unwrap();
+            assert!(!destination.exists());
+        }
+    }).await;
+}
