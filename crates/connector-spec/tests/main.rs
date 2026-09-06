@@ -73,6 +73,8 @@ mod operation_spec_source;
 mod operator_pinned_origin;
 #[path = "main/param_omission.rs"]
 mod param_omission;
+#[path = "main/personal_oauth.rs"]
+mod personal_oauth;
 #[path = "main/produces_credential.rs"]
 mod produces_credential;
 #[path = "main/provider_schema.rs"]

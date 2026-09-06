@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn source_fidelity_refuses_missing_unknown_profiles_and_old_catalog_versions() {
-        let original = serde_json::json!({"schema_version":3,"connector":"fixture","operations":[{
+        let original = serde_json::json!({"schema_version":4,"connector":"fixture","operations":[{
             "id":"fixture-get","service":"default","request_semantics":"openapi_3_0_json_v1",
             "effects":["read","network"],"interaction_shape":"unary","protocol_driver":"http_v1",
             "placement_requirement":"connectors_deployment","implementation_form":"built_in","required_capabilities":["public_network"],
@@ -808,7 +808,7 @@ mod tests {
     #[test]
     fn a_stated_symbol_is_honored_over_the_naive_allocation() {
         let text = r#"{
-            "schema_version": 3,
+            "schema_version": 4,
             "connector": "vendor",
             "services": [{"name": "default", "base_url": "https://x"}],
             "operations": [{
@@ -844,7 +844,7 @@ mod tests {
     #[test]
     fn a_pre_c552_document_without_symbols_falls_back_to_the_allocation() {
         let text = r#"{
-            "schema_version": 3,
+            "schema_version": 4,
             "connector": "vendor",
             "services": [{"name": "default", "base_url": "https://x"}],
             "operations": [{
@@ -870,7 +870,7 @@ mod tests {
     #[test]
     fn a_sip_session_driver_survives_the_canonical_document() {
         let text = r#"{
-            "schema_version": 3,
+            "schema_version": 4,
             "connector": "voice-provider",
             "services": [{"name": "default", "base_url": "sip:pbx.example.test"}],
             "operations": [{

@@ -2069,7 +2069,9 @@ version = "0.6.5"
 dependencies = [
  "async-trait",
  "catalog",
+ "connect-session-transport",
  "connector-address",
+ "connector-oauth",
  "connector-resolve",
  "connector-secrets",
  "connector-state",

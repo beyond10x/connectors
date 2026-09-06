@@ -180,7 +180,25 @@ token_path = "/oauth/token"
 scopes = ["api"]
 # `refresh_token` is not optional in practice. A GitLab OAuth access token expires in two hours by
 # default, and an unattended fleet outlives that; without the refresh grant the connection dies mid-run.
-grants = ["authorization_code", "refresh_token"]
+grants = ["authorization_code", "refresh_token", "device_authorization"]
+
+# Public flow facts measured from https://docs.gitlab.com/api/oauth2/ on 2026-09-06.
+# These platform endpoints never become operations. Registration values remain deployment-owned.
+[[auth.oauth2.personal_flows]]
+flow = "authorization_code_pkce"
+client_authentication = "public"
+redirect_shape = "loopback_ipv4_http"
+registration_use = "development_only"
+refresh_policy = "required"
+token_evidence = { endpoint = { service = "login", path = "/oauth/token/info" }, scopes_pointer = "/scope", scope_encoding = "string_array", subject_pointer = "/resource_owner_id", client_id_pointer = "/application/uid" }
+
+[[auth.oauth2.personal_flows]]
+flow = "device_authorization"
+client_authentication = "public"
+registration_use = "development_only"
+device_authorization_endpoint = { service = "login", path = "/oauth/authorize_device" }
+refresh_policy = "if_issued"
+token_evidence = { endpoint = { service = "login", path = "/oauth/token/info" }, scopes_pointer = "/scope", scope_encoding = "string_array", subject_pointer = "/resource_owner_id", client_id_pointer = "/application/uid" }
 
 # ---------------------------------------------------------------------------------------------
 # Operations — 9: the parameterless verify read, the two discovery reads that produce a numeric

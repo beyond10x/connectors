@@ -281,6 +281,7 @@ impl Inner {
             credential: Some(connection.credential.clone()),
             network: connectors_config::NetworkScopeConfig::Public,
             credential_file: None,
+            oauth: None,
         }
     }
 
@@ -449,6 +450,7 @@ impl Inner {
             credential: Some(session.credential.clone()),
             network: connectors_config::NetworkScopeConfig::Public,
             credential_file: None,
+            oauth: None,
         };
         let reference = credential_address(&self.tenant_id, authority, &entry, credential.leaf)?;
         let connection = StoredConnection {
