@@ -305,7 +305,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 48
+revision: 49
 ---
 ## Acceptance
 
@@ -455,3 +455,11 @@ Read-only plans remain immutable in the assigned OAuth scratch: stage2c-plan-sup
 The coordinator agent, agent:cli-ten-slack-first, performed the three preceding updates at revisions45–47. Those CLI invocations omitted AEP_ACTOR and therefore inherited the configured human actor. They are coordinator source-evidence, scope and design updates; they are not human decisions or new approvals. The existing approved wave is their authorization. This append records the actual actor without rewriting the journal, the recorded timestamps, or source history.
 
 Affected immutable event IDs: story:connect-session-oauth-custody-in-personal-posture@45#0~23b3e9b7463d8afa; story:connect-session-oauth-custody-in-personal-posture@46#0~888bee356beb49a9; story:connect-session-oauth-custody-in-personal-posture@47#0~21b13e63d853ea45. Exact raw lines and SHA256 hashes are retained outside the repository in `~/.cache/cw6/p/coordinator-actor-correction-inventory.json`. No status move, approval record or test_result was among these events. Subsequent coordinator CLI writes explicitly set the agent actor.
+
+## Independent private refresh adapter slice — 2026-09-06
+
+The full stage2C runtime handoff still waits for reviewed rate source. A bounded private refresh adapter can proceed independently now: its only source owners are crates/integration-catalog/src/custody.rs and new crates/integration-catalog/src/custody_refresh_tests.rs. Their private kernel is already frozen and integrated; neither file is in the rate unit. This supersedes the blanket wait for those two exact private paths only. No acquisition/backend registration, shared catalog lib, service API, provider/config/protocol/client/console/runtime source, manifest, lock, model or generated surface is assigned to this slice.
+
+Implement the recorded Design21 thirty-second receiver-owned refresh window and private claim adapter using the existing session API and FULL custody sequence. Preserve the complete current custody_tests.rs bytes, every session case, durable journal compatibility and the currently recorded absence of independent prepared-store digest readback. A real refresh claim must bind the admitted operation/current authority, same connection and previous generation before any later egress; tests may supply explicit private receiver seams, never a permissive production default or synthetic ConnectSession. The later acquisition backend still owns actual provider requests and the monotonic remaining-budget wrapper around them.
+
+Retain actual deciding failures against executable pre-fix behavior before implementation, then run full affected integration-catalog tests and strict checks with the existing per-tree target and20GiBfloor. This slice adds no dependency and needs no unrelated cold workspace builds. Freeze source, exact command/results, case preservation and complete raw/portable reports in stage2b-refresh-* under the existing OAuth scratch. It remains uncalled private support under the already authorized temporary module expectation; actual wiring must remove that expectation. Operational refresh/OAuth, shared-owner handoff, whole-unit independent review and publication remain pending.
