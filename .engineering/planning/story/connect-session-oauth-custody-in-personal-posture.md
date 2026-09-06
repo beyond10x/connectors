@@ -311,6 +311,8 @@ scope:
   path: crates/server/src/hosted/tests/mcp.rs
 - confidence: inferred
   path: crates/service/src/connect_session.rs
+- confidence: cited
+  path: crates/service/src/planning.rs
 - confidence: inferred
   path: crates/state-sqlite/src/lib.rs
 - confidence: inferred
@@ -337,7 +339,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 67
+revision: 69
 ---
 ## Acceptance
 
@@ -571,3 +573,9 @@ Coordinator refreshed the stale service lifecycle evidence comments in ess/syste
 Measured root fixture failure: crates/catalog-build/tests/main/ess_claim_fence.rs still requires the earlier lifecycle prose and reads lines().nth(232) as the service Failed writer after stage2B moved that code. Add only this exact test owner for a bounded fixture update to the current explicit ESS claim and named service lifecycle owner. Reuse its existing brace-counted item helper to locate fail_pending and its actual Failed assignment instead of a moving absolute line. Keep the non-vacuous requirements that the document states both halves, the hosted writer scan is empty, and the other registry really writes Failed. Preserve planted-hosted-writer, removed-claim and missing-other-writer refusal behavior and every unrelated ESS claim case. No conditional skip, weakened implication or production/model edit is delegated. The coordinator owns the refreshed comments; the implementor owns only these assertions and actual test evidence.
 
 Formatted module previews fit the existing fence: config personal1479/new OAuth162/new tests84; client lib1500/new OAuth367; backend OAuth1402/acquisition626. No CompletionEndpoint move or size waiver is needed. The existing private config_ref helper may become pub(super) solely for the new sibling validation owner; no public API or caller authority changes. Preserve the existing validation method's old branches/messages and all old config/client tests.
+
+## Current service planning fixture closure — 2026-09-06
+
+The first OAuth root/client regression execution retains five service failures at the same synthetic document helper: crates/service/src/planning.rs declares schema_version 3 in the cfg(test) document function, while the implemented current reader requires schema4. Its remaining59service cases, catalog-build148, client30, protocol64 and server103 passed in that actual execution. The unmodified command, exit and failures remain in stage2c-root-client-regression-tests-1 evidence; this record does not relabel the run green.
+
+Add crates/service/src/planning.rs only for that one current-document fixture literal3to4. Preserve every production byte, existing test, assertion and other fixture field; retain the exact original preimage and disclose the change in whole-unit OAuth review. This is the current synthetic source fixture, not a frozen-version contract case. Reexecute the affected service checks and complete the remaining owner validations. No reader widening, legacy document rewrite, independent authentication scope or test skip is assigned.
