@@ -4,6 +4,48 @@ domain: connectors.catalog
 summary: The reviewed, compiled template of one vendor surface, its declared operations, and the sealed set a deployment serves.
 
 types:
+  # Operator-selected rate-limit story, grounded in connector-spec::RateLimit and the
+  # current Slack history/rate-limit references. Advice never grants access or selects
+  # an application category. Existing fixed RateLimit serialization remains unchanged.
+  - name: connectors.catalog.RateLimitBasis
+    kind: enum
+    variants: [MinimumAllowance, Ceiling]
+
+  - name: connectors.catalog.FixedRateLimit
+    kind: struct
+    fields:
+      - name: requests
+        type: Integer
+      - name: per_seconds
+        type: Integer
+      - name: bucket
+        type: Optional<String>
+
+  - name: connectors.catalog.PublishedRate
+    kind: struct
+    fields:
+      - name: requests
+        type: Integer
+      - name: per_seconds
+        type: Integer
+      - name: basis
+        type: connectors.catalog.RateLimitBasis
+
+  - name: connectors.catalog.ConditionalRateLimit
+    kind: struct
+    fields:
+      - name: applies_when
+        type: String
+      - name: rate
+        type: Optional<connectors.catalog.PublishedRate>
+      - name: source_url
+        type: String
+
+  # UNMAPPED: positive u32 bounds, URL/text/list bounds and the exact optional
+  # advisory-interval derivation are enforced by Rust and canonical/protocol schemas;
+  # this value-only ESS subset does not assert those constraints or schema round trips.
+  # None means this source establishes no numeric rate, never zero or unlimited.
+
   # Proposed by the operator-selected GitLab source-fidelity work, 2026-09-06.
   # Closed execution semantics for imported requests; schema 3 requires the profile before a
   # consumer acts. LegacyV1 preserves existing request-template behavior. OpenApi30JsonV1
