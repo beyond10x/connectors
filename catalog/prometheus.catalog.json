@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "authority": "io.prometheus.api",
   "config": [
     {
@@ -143,6 +143,7 @@
         ],
         "url": "{base}/api/v1/query_range"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -182,7 +183,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

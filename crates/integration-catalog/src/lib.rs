@@ -47,6 +47,7 @@ use connector_address::{CredentialRef, InstanceId};
 use connector_secrets::{Secret, SecretStore};
 use connectors_config::{CatalogIntegrationConfig, InitiationConfig};
 use domain::InitiationPolicy;
+use protocol::connection as connection_api;
 use protocol::operation::{
     ApprovalPosture, ConnectionSummary, EffectClass, InvocationResult, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
@@ -317,6 +318,41 @@ impl Inner {
         }
     }
 
+    /// Configured bindings are known, but this passive view has no persisted verification evidence.
+    /// Reuse operation discovery's opaque identity without probing custody or the provider.
+    fn connections(&self, query: &str, limit: u16) -> Vec<connection_api::ConnectionSummary> {
+        self.bindings
+            .iter()
+            .filter(|binding| matches_query(query, &[binding.provider.id, &binding.label]))
+            .take(usize::from(limit))
+            .map(|binding| connection_api::ConnectionSummary {
+                connection_ref: binding.connection_ref.clone(),
+                integration_ref: binding.provider.id.to_owned(),
+                label: binding.label.clone(),
+                state: connection_api::ConnectionState::Created,
+                initiation: [
+                    (
+                        domain::ConnectionInitiator::Platform,
+                        connection_api::ConnectionInitiator::Platform,
+                    ),
+                    (
+                        domain::ConnectionInitiator::Provider,
+                        connection_api::ConnectionInitiator::Provider,
+                    ),
+                ]
+                .into_iter()
+                .filter_map(|(declared, exposed)| {
+                    binding.initiation.allows(declared).then_some(exposed)
+                })
+                .collect(),
+                route: connection_api::ConnectionRoute::Direct,
+                scope: None,
+                actor: None,
+                auth_profile: None,
+            })
+            .collect()
+    }
+
     /// Every operation this deployment can currently call, filtered by the caller's query.
     ///
     /// **Grouped by operation, then limited.** One operation that several Connections can serve is
@@ -327,7 +363,6 @@ impl Inner {
     /// `--limit 1` reported `slack-users-info` as reachable through exactly one identity when three
     /// could serve it.
     fn search(&self, query: &str, limit: u16) -> Vec<OperationSummary> {
-        let needle = query.trim().to_ascii_lowercase();
         // Insertion-ordered so the result is stable across runs: a caller diffing two searches
         // should see real changes, not map iteration order.
         let mut grouped: Vec<(&'static catalog::Operation, Vec<ConnectionSummary>)> = Vec::new();
@@ -336,7 +371,10 @@ impl Inner {
                 if !binding.admits(operation) {
                     continue;
                 }
-                if !needle.is_empty() && !operation.id.to_ascii_lowercase().contains(&needle) {
+                if !matches_query(
+                    query,
+                    &[operation.id, operation.description, binding.provider.id],
+                ) {
                     continue;
                 }
                 match grouped
@@ -400,7 +438,12 @@ impl Inner {
             description: operation.description.to_owned(),
             input_schema: serde_json::from_str(operation.input_schema)
                 .unwrap_or(serde_json::Value::Null),
-            output_schema: serde_json::Value::Null,
+            output_schema: operation
+                .output_schema
+                .map(|schema| {
+                    serde_json::from_str(schema).expect("catalog output schema is generated JSON")
+                })
+                .unwrap_or(serde_json::Value::Null),
             effect: effect_class(operation),
             approval: approval_posture(operation),
             // Every Connection that could serve it, so a caller reading one description can pick.
@@ -628,7 +671,10 @@ impl ConnectorBackend for CatalogBackend {
     }
 
     fn capabilities(&self) -> BackendCapabilities {
-        BackendCapabilities::OPERATIONS
+        BackendCapabilities {
+            connections: true,
+            ..BackendCapabilities::OPERATIONS
+        }
     }
 
     fn owns_operation(&self, request: &OperationRequest) -> bool {
@@ -670,6 +716,33 @@ impl ConnectorBackend for CatalogBackend {
             )),
         }
     }
+
+    async fn handle_connection(
+        &self,
+        _context: &PrincipalContext,
+        request: connection_api::ConnectionRequest,
+    ) -> Result<connection_api::ConnectionResult, connection_api::ConnectionError> {
+        match request {
+            connection_api::ConnectionRequest::Search(search) => {
+                Ok(connection_api::ConnectionResult::Search {
+                    connections: self.inner.connections(&search.query, search.limit),
+                })
+            }
+            _ => Err(connection_api::ConnectionError::new(
+                connection_api::ConnectionErrorCode::Unavailable,
+                "this Integration serves passive Connection search only",
+                false,
+            )),
+        }
+    }
+}
+
+/// All whitespace-separated words match public catalog text, independent of punctuation in ids.
+fn matches_query(query: &str, fields: &[&str]) -> bool {
+    let text = fields.join(" ").to_ascii_lowercase();
+    query
+        .split_whitespace()
+        .all(|word| text.contains(&word.to_ascii_lowercase()))
 }
 
 impl CatalogBackend {

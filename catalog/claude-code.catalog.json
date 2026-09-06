@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "A user-bound Claude Code setup token stored for attempt-bounded Harness use",
@@ -32,7 +32,7 @@
   "description": "Claude Code subscription credential custody for user-bound Harness runs",
   "generator": "connectors 0.6.5",
   "operations": [],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [],
   "vendor": "Anthropic"
 }

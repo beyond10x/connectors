@@ -110,6 +110,7 @@ impl Symbols {
 
 #[derive(Debug, Deserialize)]
 struct RawDocument {
+    schema_version: u32,
     connector: String,
     #[serde(default)]
     services: Vec<RawService>,
@@ -189,6 +190,7 @@ pub enum RequiredCapability {
 
 #[derive(Debug, Deserialize)]
 struct RawOperation {
+    request_semantics: catalog::RequestSemantics,
     id: String,
     service: String,
     #[serde(default)]
@@ -370,6 +372,13 @@ impl Document {
     /// registration call.
     pub fn parse(text: &str) -> Result<Document, String> {
         let raw: RawDocument = serde_json::from_str(text).map_err(|error| error.to_string())?;
+        if raw.schema_version != catalog_reader::SUPPORTED_SCHEMA {
+            return Err(format!(
+                "catalog schema {} is unsupported; this resolver requires {}",
+                raw.schema_version,
+                catalog_reader::SUPPORTED_SCHEMA
+            ));
+        }
         let services = raw
             .services
             .into_iter()
@@ -406,6 +415,7 @@ impl Document {
 /// One operation's document: its request template, and everything derived from it once.
 #[derive(Debug)]
 pub struct Operation {
+    request_semantics: catalog::RequestSemantics,
     /// The operation id.
     pub id: String,
     /// The service it belongs to — `default` for a connector with a single API surface.
@@ -557,6 +567,7 @@ impl Operation {
         };
 
         Operation {
+            request_semantics: raw.request_semantics,
             variables: slots.keys().cloned().collect(),
             slots,
             parameters,
@@ -601,6 +612,14 @@ impl Operation {
     /// field existed.
     pub fn input_schema(&self) -> &Value {
         &self.input_schema
+    }
+
+    /// Whether request construction must preserve the source JSON and omission semantics.
+    pub(crate) fn source_faithful(&self) -> bool {
+        matches!(
+            self.request_semantics,
+            catalog::RequestSemantics::OpenApi30JsonV1
+        )
     }
 
     /// **The host effects the authority projection reads** (C-552), read from the document and never
@@ -731,6 +750,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn source_fidelity_refuses_missing_unknown_profiles_and_old_catalog_versions() {
+        let original = serde_json::json!({"schema_version":3,"connector":"fixture","operations":[{
+            "id":"fixture-get","service":"default","request_semantics":"openapi_3_0_json_v1",
+            "effects":["read","network"],"interaction_shape":"unary","protocol_driver":"http_v1",
+            "placement_requirement":"connectors_deployment","implementation_form":"built_in","required_capabilities":["public_network"],
+            "request":{"method":"GET","url":"{base}/things"}
+        }]});
+        assert!(Document::parse(&original.to_string()).is_ok());
+        let mut missing = original.clone();
+        missing["operations"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("request_semantics");
+        assert!(Document::parse(&missing.to_string())
+            .unwrap_err()
+            .contains("request_semantics"));
+        let mut unknown = original.clone();
+        unknown["operations"][0]["request_semantics"] = serde_json::json!("future_profile");
+        assert!(Document::parse(&unknown.to_string())
+            .unwrap_err()
+            .contains("future_profile"));
+        let mut old = original;
+        old["schema_version"] = serde_json::json!(2);
+        assert!(Document::parse(&old.to_string())
+            .unwrap_err()
+            .contains("schema 2 is unsupported"));
+    }
+
+    #[test]
     fn the_symbol_allocation_reproduces_the_emitters() {
         let mut symbols = Symbols::new();
         assert_eq!(symbols.allocate("per_page"), "per_page");
@@ -760,6 +808,7 @@ mod tests {
     #[test]
     fn a_stated_symbol_is_honored_over_the_naive_allocation() {
         let text = r#"{
+            "schema_version": 3,
             "connector": "vendor",
             "services": [{"name": "default", "base_url": "https://x"}],
             "operations": [{
@@ -768,6 +817,7 @@ mod tests {
                 "expose": true,
                 "effects": ["write", "network"],
                 "interaction_shape": "unary",
+                "request_semantics": "legacy_v1",
                 "protocol_driver": "http_v1",
                 "placement_requirement": "connectors_deployment",
                 "implementation_form": "built_in",
@@ -794,6 +844,7 @@ mod tests {
     #[test]
     fn a_pre_c552_document_without_symbols_falls_back_to_the_allocation() {
         let text = r#"{
+            "schema_version": 3,
             "connector": "vendor",
             "services": [{"name": "default", "base_url": "https://x"}],
             "operations": [{
@@ -802,6 +853,7 @@ mod tests {
                 "expose": true,
                 "effects": ["read", "network"],
                 "interaction_shape": "unary",
+                "request_semantics": "legacy_v1",
                 "protocol_driver": "http_v1",
                 "placement_requirement": "connectors_deployment",
                 "implementation_form": "built_in",
@@ -818,6 +870,7 @@ mod tests {
     #[test]
     fn a_sip_session_driver_survives_the_canonical_document() {
         let text = r#"{
+            "schema_version": 3,
             "connector": "voice-provider",
             "services": [{"name": "default", "base_url": "sip:pbx.example.test"}],
             "operations": [{
@@ -826,6 +879,7 @@ mod tests {
                 "expose": false,
                 "effects": ["write", "network"],
                 "interaction_shape": "session_establishment",
+                "request_semantics": "legacy_v1",
                 "protocol_driver": "sip_v1",
                 "placement_requirement": "connectors_deployment",
                 "implementation_form": "built_in",

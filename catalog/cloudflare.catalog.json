@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Cloudflare API Token, sent as a bearer token, scoped to Zone:Read, DNS:Edit and Cache Purge on the zones this connector should reach",
@@ -88,6 +88,7 @@
         "method": "GET",
         "url": "{base}/zones"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -216,6 +217,7 @@
         "method": "GET",
         "url": "{base}/zones/{zone_id}/dns_records"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -441,6 +443,7 @@
         "method": "POST",
         "url": "{base}/zones/{zone_id}/dns_records"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -572,6 +575,7 @@
         "method": "DELETE",
         "url": "{base}/zones/{zone_id}/dns_records/{dns_record_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -669,6 +673,7 @@
         "method": "POST",
         "url": "{base}/zones/{zone_id}/purge_cache"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -716,7 +721,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v4",

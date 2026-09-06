@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Atlassian API token; the user half is the account email that minted it",
@@ -324,6 +324,7 @@
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -500,6 +501,7 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -647,6 +649,7 @@
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}/comment"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -822,6 +825,7 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue/{issue_key}/comment"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -984,6 +988,7 @@
         "method": "GET",
         "url": "{base}/rest/api/2/issue/{issue_key}/transitions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1152,6 +1157,7 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issue/{issue_key}/transitions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1262,6 +1268,7 @@
         "method": "PUT",
         "url": "{base}/rest/api/2/issue/{issue_key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1387,6 +1394,7 @@
         "method": "PUT",
         "url": "{base}/rest/api/2/issue/{issue_key}/comment/{comment_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1546,6 +1554,7 @@
         "method": "POST",
         "url": "{base}/rest/api/2/issueLink"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1554,7 +1563,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "2",

@@ -196,6 +196,16 @@ pub(super) fn validate_operations(connector: &Connector, problems: &mut Vec<Stri
         // combine — so an operation declaring both has no derivable request body and no derivable
         // `input_schema` (C-125). `connector-flux` refuses it again at emission, which is the
         // narrower gate: this one also covers a definition nobody has emitted yet.
+        if operation.params.body_required.is_some() && operation.params.body_schema.is_none() {
+            problems.push(format!(
+                "operation {id:?} declares params.body_required without params.body_schema"
+            ));
+        }
+        if !operation.params.request_semantics.is_legacy()
+            && (operation.request.http_path().is_none() || !operation.params.body.is_empty())
+        {
+            problems.push(format!("operation {id:?} declares source-faithful semantics without an HTTP request or with flattened body fields"));
+        }
         if operation.params.body_schema.is_some() && !operation.params.body.is_empty() {
             problems.push(format!(
                 "operation {id:?} declares both named `params.body` fields and a free-form \

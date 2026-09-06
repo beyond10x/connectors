@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "GitHub token sent as a bearer — a GitHub App installation token, a fine-grained PAT, or a classic PAT",
@@ -160,6 +160,7 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -332,6 +333,7 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}/issues/{issue_number}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -518,6 +520,7 @@
         "method": "GET",
         "url": "{base}/repos/{owner}/{repo}/pulls/{pull_number}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -768,6 +771,7 @@
         "method": "POST",
         "url": "{base}/repos/{owner}/{repo}/issues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -953,6 +957,7 @@
         "method": "POST",
         "url": "{base}/repos/{owner}/{repo}/issues/{issue_number}/comments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1126,6 +1131,7 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/issues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3905,6 +3911,7 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/pulls/{pull_number}/files"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4091,6 +4098,7 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/actions/runs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6144,6 +6152,7 @@
         ],
         "url": "{base}/repos/{owner}/{repo}/commits"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6672,6 +6681,7 @@
         "method": "GET",
         "url": "{base}/user"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7195,6 +7205,7 @@
         ],
         "url": "{base}/user/orgs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7441,6 +7452,7 @@
         ],
         "url": "{base}/orgs/{org}/repos"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8336,6 +8348,7 @@
         ],
         "url": "{base}/user/repos"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8994,7 +9007,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

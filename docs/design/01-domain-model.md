@@ -448,3 +448,23 @@ vocabulary, outcome, principal, request id, retention window.
    no public callback origin (loopback redirect vs device-code-style flows per provider).
 4. Naming of the client-facing effective-catalogue "generation" vs the catalog artifact's
    "content generation" — same word, two seals today; consider distinct nouns.
+
+## 2026-09-06 amendment: source request semantics
+
+`RequestSemantics` is a closed catalog value: `legacy_v1` or `openapi_3_0_json_v1`. It describes
+how a consumer interprets source schemas and builds the request; it grants no authority. Canonical
+schema 3 requires the value on every operation. Legacy operations keep their inherited behavior
+until an explicit source migration; a schema-version change alone does not prove source fidelity.
+
+`RequestParameterSemantics` groups that profile with `body_required: Optional<Boolean>`. It lives
+on the existing parameter set in the compiler IR. Body requiredness is meaningful only beside a
+whole `body_schema`: requiring a body and requiring a field inside a supplied body are separate
+facts. The source profile preserves absent values separately from null and serializes supplied
+JSON values without coercion. The existing whole-body parameter and request splice carry it.
+
+Literal vendor parameter/body/response schemas remain source evidence. Caller JSON Schemas are
+deterministic dialect translations preserving all stated constraints in the supported subset;
+unsupported semantics remain importer gaps. Parameter positions and source serialization determine
+wire placement, while caller symbols form a reversible transport envelope. Source validity is a
+separate claim: a missing vendor constraint is not permission to invent one. See the dated
+[caller-contract amendment](04-the-callers-contract.md#2026-09-06-amendment-source-fidelity-and-catalog-schema-3).

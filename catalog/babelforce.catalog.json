@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "babelforce access token. Either supplied through the environment, or obtained by the host running one of the grants below",
@@ -349,6 +349,7 @@
         ],
         "url": "{base}/api/v2/agents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -860,6 +861,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1324,6 +1326,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/{id}/status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1778,6 +1781,7 @@
         ],
         "url": "{base}/api/v2/calls/reporting"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2391,6 +2395,7 @@
         "method": "GET",
         "url": "{base}/api/v2/calls/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2942,6 +2947,7 @@
         "method": "POST",
         "url": "{base}/api/v2/calls/{id}/hangup"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3521,6 +3527,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/calls/{id}/session/set"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3590,6 +3597,7 @@
         "method": "GET",
         "url": "{base}/api/v2/sessions/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3725,6 +3733,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/sessions/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4469,6 +4478,7 @@
         ],
         "url": "{base}/api/v2/calls/reporting/simple"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4843,6 +4853,7 @@
         ],
         "url": "{base}/api/v2/dashboards"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5005,6 +5016,7 @@
         ],
         "url": "{base}/api/v2/logs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5195,6 +5207,7 @@
         ],
         "url": "{base}/api/v2/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5423,6 +5436,7 @@
         "method": "GET",
         "url": "{base}/api/v2/user/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5604,6 +5618,7 @@
         ],
         "url": "{base}/api/v2/dialer/flush"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5685,6 +5700,7 @@
         ],
         "url": "{base}/api/v2/actions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5806,6 +5822,7 @@
         "method": "POST",
         "url": "{base}/api/v2/actions/{actionType}/{actionName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5895,6 +5912,7 @@
         "method": "GET",
         "url": "{base}/api/v2/actions/{providerName}/{providerActionName}/params"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6033,6 +6051,7 @@
         "method": "GET",
         "url": "{base}/api/v2/actions/{provider}/{actionName}/variables"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6432,6 +6451,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6894,6 +6914,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/bulk/{bulkAction}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7475,6 +7496,7 @@
         ],
         "url": "{base}/api/v2/agents/groups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7665,6 +7687,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/groups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7805,6 +7828,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/agents/groups/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7920,6 +7944,7 @@
         ],
         "url": "{base}/api/v2/agents/groups/{groupId}/agents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8463,6 +8488,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/groups/{groupId}/agents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8955,6 +8981,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/agents/groups/{groupId}/agents/{agentId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9070,6 +9097,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/groups/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9225,6 +9253,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/groups/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9340,6 +9369,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/agents/groups/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9422,6 +9452,7 @@
         ],
         "url": "{base}/api/v2/agents/logs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10134,6 +10165,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/presence/available"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10272,6 +10304,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/presence/available"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10377,6 +10410,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/presence/available/{presenceName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10518,6 +10552,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/presence/available/{presenceName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10623,6 +10658,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/agents/presence/available/{presenceName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10709,6 +10745,7 @@
         ],
         "url": "{base}/api/v2/agents/provision"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10766,6 +10803,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/provision/jobs/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -11116,6 +11154,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/push"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -11173,6 +11212,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/status/available"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -11595,6 +11635,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12015,6 +12056,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/agents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12143,6 +12185,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/{id}/calls"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12694,6 +12737,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/{id}/disable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12769,6 +12813,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/{id}/enable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12844,6 +12889,7 @@
         "method": "POST",
         "url": "{base}/api/v2/agents/{id}/hangup"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13001,6 +13047,7 @@
         ],
         "url": "{base}/api/v2/agents/{id}/logs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13761,6 +13808,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/agents/{id}/password"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13836,6 +13884,7 @@
         "method": "GET",
         "url": "{base}/api/v2/agents/{id}/status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14029,6 +14078,7 @@
         ],
         "url": "{base}/api/v2/applications"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -19158,6 +19208,7 @@
         "method": "POST",
         "url": "{base}/api/v2/applications"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24170,6 +24221,7 @@
         ],
         "url": "{base}/api/v2/applications/actions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24270,6 +24322,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/applications/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24369,6 +24422,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/applications/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24426,6 +24480,7 @@
         "method": "GET",
         "url": "{base}/api/v2/applications/errors"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24494,6 +24549,7 @@
         "method": "GET",
         "url": "{base}/api/v2/applications/modules"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -24628,6 +24684,7 @@
         ],
         "url": "{base}/api/v2/applications/{applicationId}/actions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -25005,6 +25062,7 @@
         "method": "POST",
         "url": "{base}/api/v2/applications/{applicationId}/actions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -25220,6 +25278,7 @@
         "method": "GET",
         "url": "{base}/api/v2/applications/{applicationId}/actions/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -25541,6 +25600,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/applications/{applicationId}/actions/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -25756,6 +25816,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/applications/{applicationId}/actions/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -25813,6 +25874,7 @@
         "method": "GET",
         "url": "{base}/api/v2/applications/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -35366,6 +35428,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/applications/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -40353,6 +40416,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/applications/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -40410,6 +40474,7 @@
         "method": "POST",
         "url": "{base}/api/v2/applications/{id}/clone"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -45462,6 +45527,7 @@
         ],
         "url": "{base}/api/v2/applications/{id}/dispatch/{position}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -45677,6 +45743,7 @@
         ],
         "url": "{base}/api/v2/audit/request"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -45951,6 +46018,7 @@
         ],
         "url": "{base}/api/v2/automations/local"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -46235,6 +46303,7 @@
         ],
         "url": "{base}/api/v2/babeldesk/dashboards"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -46620,6 +46689,7 @@
         "method": "POST",
         "url": "{base}/api/v2/babeldesk/dashboards"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -46837,6 +46907,7 @@
         "method": "GET",
         "url": "{base}/api/v2/babeldesk/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -47169,6 +47240,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/babeldesk/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -47386,6 +47458,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/babeldesk/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -47468,6 +47541,7 @@
         ],
         "url": "{base}/api/v2/babeldesk/widgets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -47879,6 +47953,7 @@
         "method": "POST",
         "url": "{base}/api/v2/babeldesk/widgets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -48110,6 +48185,7 @@
         "method": "GET",
         "url": "{base}/api/v2/babeldesk/widgets/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -48464,6 +48540,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/babeldesk/widgets/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -48695,6 +48772,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/babeldesk/widgets/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -48777,6 +48855,7 @@
         ],
         "url": "{base}/api/v2/business-hours"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -49215,6 +49294,7 @@
         "method": "POST",
         "url": "{base}/api/v2/business-hours"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -49614,6 +49694,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/business-hours/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -50005,6 +50086,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/business-hours/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -50080,6 +50162,7 @@
         "method": "GET",
         "url": "{base}/api/v2/business-hours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -50449,6 +50532,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/business-hours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -50770,6 +50854,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/business-hours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -50827,6 +50912,7 @@
         "method": "GET",
         "url": "{base}/api/v2/business-hours/{id}/ranges"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -51202,6 +51288,7 @@
         "method": "POST",
         "url": "{base}/api/v2/business-hours/{id}/ranges"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -51537,6 +51624,7 @@
         "method": "GET",
         "url": "{base}/api/v2/business-hours/{id}/ranges/{rangeId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -51748,6 +51836,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/business-hours/{id}/ranges/{rangeId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -51848,6 +51937,7 @@
         ],
         "url": "{base}/api/v2/calendars"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52075,6 +52165,7 @@
         "method": "POST",
         "url": "{base}/api/v2/calendars"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52289,6 +52380,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/calendars/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52465,6 +52557,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/calendars/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52546,6 +52639,7 @@
         ],
         "url": "{base}/api/v2/calendars/test"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52621,6 +52715,7 @@
         "method": "GET",
         "url": "{base}/api/v2/calendars/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52809,6 +52904,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/calendars/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -52945,6 +53041,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/calendars/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53002,6 +53099,7 @@
         "method": "GET",
         "url": "{base}/api/v2/calendars/{id}/dates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53202,6 +53300,7 @@
         "method": "POST",
         "url": "{base}/api/v2/calendars/{id}/dates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53348,6 +53447,7 @@
         "method": "GET",
         "url": "{base}/api/v2/calendars/{id}/dates/{dateId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53550,6 +53650,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/calendars/{id}/dates/{dateId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53696,6 +53797,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/calendars/{id}/dates/{dateId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -53796,6 +53898,7 @@
         ],
         "url": "{base}/api/v2/calls/reporting/simple/dialer"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -54087,6 +54190,7 @@
         ],
         "url": "{base}/api/v2/calls/reporting/simple/inbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -54378,6 +54482,7 @@
         ],
         "url": "{base}/api/v2/calls/reporting/simple/outbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -54698,6 +54803,7 @@
         "method": "POST",
         "url": "{base}/api/v2/calls/test"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -55249,6 +55355,7 @@
         "method": "POST",
         "url": "{base}/api/v2/calls/{id}/cancel"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -55825,6 +55932,7 @@
         ],
         "url": "{base}/api/v2/conferences"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -57451,6 +57559,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conferences/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -58988,6 +59097,7 @@
         ],
         "url": "{base}/api/v2/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -59169,6 +59279,7 @@
         "method": "POST",
         "url": "{base}/api/v2/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -59309,6 +59420,7 @@
         ],
         "url": "{base}/api/v2/conversations/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -60059,6 +60171,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/conversations/{conversationId}/close"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -60174,6 +60287,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conversations/{conversationId}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -60965,6 +61079,7 @@
         "method": "POST",
         "url": "{base}/api/v2/conversations/{conversationId}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -61640,6 +61755,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conversations/{conversationId}/events/first"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -62315,6 +62431,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conversations/{conversationId}/events/latest"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -62990,6 +63107,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/conversations/{conversationId}/open"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63105,6 +63223,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conversations/{conversationId}/session"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63216,6 +63335,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/conversations/{conversationId}/session"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63301,6 +63421,7 @@
         "method": "GET",
         "url": "{base}/api/v2/conversations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63452,6 +63573,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/conversations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63567,6 +63689,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/conversations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63648,6 +63771,7 @@
         "method": "POST",
         "url": "{base}/api/v2/dashboards"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63760,6 +63884,7 @@
         "method": "GET",
         "url": "{base}/api/v2/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -63906,6 +64031,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64018,6 +64144,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/dashboards/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64130,6 +64257,7 @@
         "method": "GET",
         "url": "{base}/api/v2/dashboards/{id}/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64271,6 +64399,7 @@
         "method": "POST",
         "url": "{base}/api/v2/dashboards/{id}/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64360,6 +64489,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/dashboards/{id}/users/{userId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64417,6 +64547,7 @@
         "method": "GET",
         "url": "{base}/api/v2/data/time"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64517,6 +64648,7 @@
         ],
         "url": "{base}/api/v2/data/timezones"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64585,6 +64717,7 @@
         "method": "GET",
         "url": "{base}/api/v2/dialer"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64642,6 +64775,7 @@
         "method": "GET",
         "url": "{base}/api/v2/echo"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64723,6 +64857,7 @@
         ],
         "url": "{base}/api/v2/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -64898,6 +65033,7 @@
         "method": "POST",
         "url": "{base}/api/v2/events/custom"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -65035,6 +65171,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/events/custom/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -65117,6 +65254,7 @@
         ],
         "url": "{base}/api/v2/events/triggers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -65562,6 +65700,7 @@
         "method": "POST",
         "url": "{base}/api/v2/events/triggers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -65832,6 +65971,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/events/triggers/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -65943,6 +66083,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/events/triggers/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -66079,6 +66220,7 @@
         ],
         "url": "{base}/api/v2/events/triggers/{eventTriggerId}/dispatch"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -66136,6 +66278,7 @@
         "method": "GET",
         "url": "{base}/api/v2/events/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -66519,6 +66662,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/events/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -66761,6 +66905,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/events/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -66818,6 +66963,7 @@
         "method": "POST",
         "url": "{base}/api/v2/events/triggers/{id}/clone"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -67042,6 +67188,7 @@
         "method": "GET",
         "url": "{base}/api/v2/expressions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -67262,6 +67409,7 @@
         ],
         "url": "{base}/api/v2/expressions/evaluate"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -67508,6 +67656,7 @@
         ],
         "url": "{base}/api/v2/files"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -67716,6 +67865,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/backups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -67950,6 +68100,7 @@
         ],
         "url": "{base}/api/v2/files/bulk/download"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68033,6 +68184,7 @@
         "method": "POST",
         "url": "{base}/api/v2/files/bulk/download"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68096,6 +68248,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/by-type/{type}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68304,6 +68457,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/prompts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68556,6 +68710,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/files/prompts/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68613,6 +68768,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/recordings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -68839,6 +68995,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -69014,6 +69171,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/files/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -69089,6 +69247,7 @@
         "method": "GET",
         "url": "{base}/api/v2/files/{id}/download"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -69171,6 +69330,7 @@
         ],
         "url": "{base}/api/v2/integrations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -69531,6 +69691,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -69711,6 +69872,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/available"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70002,6 +70164,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/integrations/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70099,6 +70262,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/integrations/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70156,6 +70320,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/providers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70242,6 +70407,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70558,6 +70724,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/integrations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70756,6 +70923,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/integrations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -70834,6 +71002,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations/{id}/authorize"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71032,6 +71201,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations/{id}/clone"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71251,6 +71421,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/integrations/{id}/integrate"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71449,6 +71620,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{id}/tokens"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71566,6 +71738,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{id}/tokens/{tokenId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71674,6 +71847,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/integrations/{id}/tokens/{tokenId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71763,6 +71937,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/integrations/{id}/tokens/{tokenId}/refresh"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71871,6 +72046,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{integrationId}/api/{uri}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -71963,6 +72139,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations/{integrationId}/api/{uri}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72048,6 +72225,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations/{integrationId}/association/{associationId}/{actionName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72147,6 +72325,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/integrations/{integrationId}/association/{associationId}/{actionName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72272,6 +72451,7 @@
         ],
         "url": "{base}/api/v2/integrations/{integrationId}/dispatch/{action}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72488,6 +72668,7 @@
         ],
         "url": "{base}/api/v2/integrations/{integrationId}/dispatch/{action}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72671,6 +72852,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{providerName}/logo/{size}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72755,6 +72937,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{provider}/actions/variables"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72921,6 +73104,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{provider}/template"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -72978,6 +73162,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{type}/actions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73113,6 +73298,7 @@
         "method": "POST",
         "url": "{base}/api/v2/integrations/{type}/{id}/{action}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73184,6 +73370,7 @@
         "method": "GET",
         "url": "{base}/api/v2/integrations/{type}/{provider}/template"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73324,6 +73511,7 @@
         "method": "POST",
         "url": "{base}/api/v2/logs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73381,6 +73569,7 @@
         "method": "POST",
         "url": "{base}/api/v2/logs/disable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73438,6 +73627,7 @@
         "method": "POST",
         "url": "{base}/api/v2/logs/enable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73495,6 +73685,7 @@
         "method": "GET",
         "url": "{base}/api/v2/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73552,6 +73743,7 @@
         "method": "GET",
         "url": "{base}/api/v2/metrics/describe"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -73908,6 +74100,7 @@
         "method": "GET",
         "url": "{base}/api/v2/metrics/ids"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -74059,6 +74252,7 @@
         "method": "GET",
         "url": "{base}/api/v2/metrics/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -74381,6 +74575,7 @@
         "method": "GET",
         "url": "{base}/api/v2/metrics/{id}/describe"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -74732,6 +74927,7 @@
         ],
         "url": "{base}/api/v2/numbers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -74907,6 +75103,7 @@
         "method": "GET",
         "url": "{base}/api/v2/numbers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -75055,6 +75252,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/numbers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -75222,6 +75420,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/numbers/{id}/tags"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -75456,6 +75655,7 @@
         ],
         "url": "{base}/api/v2/outbound/attempts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -75777,6 +75977,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -76069,6 +76270,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/campaigns"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -76244,6 +76446,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -76527,6 +76730,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/campaigns/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -76702,6 +76906,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/campaigns/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -76898,6 +77103,7 @@
         ],
         "url": "{base}/api/v2/outbound/campaigns/{id}/attempts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -77237,6 +77443,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}/hopper"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -77372,6 +77579,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}/leads"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -77672,6 +77880,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}/leads/processed"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -77972,6 +78181,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}/list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78115,6 +78325,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/campaigns/{id}/list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78288,6 +78499,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/campaigns/{id}/list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78475,6 +78687,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/campaigns/{id}/list/{listId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78648,6 +78861,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/campaigns/{id}/logout-all"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78767,6 +78981,7 @@
         ],
         "url": "{base}/api/v2/outbound/campaigns/{id}/statistics"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -78883,6 +79098,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/campaigns/{id}/status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79063,6 +79279,7 @@
         ],
         "url": "{base}/api/v2/outbound/dialer-behaviours"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79245,6 +79462,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/dialer-behaviours"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79354,6 +79572,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/dialer-behaviours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79506,6 +79725,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/dialer-behaviours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79615,6 +79835,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/dialer-behaviours/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -79816,6 +80037,7 @@
         ],
         "url": "{base}/api/v2/outbound/leads"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80141,6 +80363,7 @@
         ],
         "url": "{base}/api/v2/outbound/leads/processed"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80423,6 +80646,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/lists"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80565,6 +80789,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/lists"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80677,6 +80902,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/lists/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80821,6 +81047,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/lists/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -80932,6 +81159,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/lists/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -81113,6 +81341,7 @@
         ],
         "url": "{base}/api/v2/outbound/lists/{id}/leads"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -81458,6 +81687,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/lists/{id}/leads"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -81649,6 +81879,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/lists/{id}/leads"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -81809,6 +82040,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/lists/{id}/leads/bulk/delete"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -81932,6 +82164,7 @@
         "method": "POST",
         "url": "{base}/api/v2/outbound/lists/{id}/leads/delete"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82021,6 +82254,7 @@
         "method": "GET",
         "url": "{base}/api/v2/outbound/lists/{id}/leads/{leadId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82317,6 +82551,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/outbound/lists/{id}/leads/{leadId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82522,6 +82757,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/outbound/lists/{id}/leads/{leadId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82604,6 +82840,7 @@
         ],
         "url": "{base}/api/v2/phonebook"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82814,6 +83051,7 @@
         "method": "POST",
         "url": "{base}/api/v2/phonebook"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -82920,6 +83158,7 @@
         "method": "GET",
         "url": "{base}/api/v2/phonebook/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83002,6 +83241,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/phonebook/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83077,6 +83317,7 @@
         "method": "GET",
         "url": "{base}/api/v2/phonebook/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83250,6 +83491,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/phonebook/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83374,6 +83616,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/phonebook/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83413,6 +83656,7 @@
         "method": "GET",
         "url": "{base}/api/v2/ping"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83513,6 +83757,7 @@
         ],
         "url": "{base}/api/v2/prompts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -83803,6 +84048,7 @@
         "method": "GET",
         "url": "{base}/api/v2/prompts/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84156,6 +84402,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/prompts/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84385,6 +84632,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/prompts/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84442,6 +84690,7 @@
         "method": "GET",
         "url": "{base}/api/v2/prompts/{id}/uses"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84510,6 +84759,7 @@
         "method": "GET",
         "url": "{base}/api/v2/push-token"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84610,6 +84860,7 @@
         ],
         "url": "{base}/api/v2/queues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -84859,6 +85110,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -85093,6 +85345,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/queues/bulk"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -85344,6 +85597,7 @@
         ],
         "url": "{base}/api/v2/queues/selections"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -85659,6 +85913,7 @@
         "method": "GET",
         "url": "{base}/api/v2/queues/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -85869,6 +86124,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/queues/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -86016,6 +86272,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/queues/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -86121,6 +86378,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues/{queueId}/callback"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -86250,6 +86508,7 @@
         ],
         "url": "{base}/api/v2/queues/{queueId}/calls"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -86657,6 +86916,7 @@
         ],
         "url": "{base}/api/v2/queues/{queueId}/select"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -86805,6 +87065,7 @@
         ],
         "url": "{base}/api/v2/queues/{queueId}/selections"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -87984,6 +88245,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues/{queueId}/selections"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -88641,6 +88903,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/queues/{queueId}/selections/priority"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -89367,6 +89630,7 @@
         "method": "GET",
         "url": "{base}/api/v2/queues/{queueId}/selections/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -90422,6 +90686,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/queues/{queueId}/selections/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -91048,6 +91313,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/queues/{queueId}/selections/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -91146,6 +91412,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/agents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -91898,6 +92165,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/agents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -92663,6 +92931,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/groups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -93415,6 +93684,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/groups/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -94180,6 +94450,7 @@
         "method": "POST",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/tags"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -94932,6 +95203,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/queues/{queueId}/selections/{selectionId}/tags/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -95656,6 +95928,7 @@
         "method": "GET",
         "url": "{base}/api/v2/queues/{queueId}/triggers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -95926,6 +96199,7 @@
         ],
         "url": "{base}/api/v2/recordings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -96318,6 +96592,7 @@
         "method": "POST",
         "url": "{base}/api/v2/recordings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -96650,6 +96925,7 @@
         "method": "POST",
         "url": "{base}/api/v2/recordings/bulk/{bulkAction}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -96766,6 +97042,7 @@
         "method": "GET",
         "url": "{base}/api/v2/recordings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -97096,6 +97373,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/recordings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -97389,6 +97667,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/recordings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -97682,6 +97961,7 @@
         "method": "GET",
         "url": "{base}/api/v2/recordings/{id}/flag"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -97975,6 +98255,7 @@
         "method": "POST",
         "url": "{base}/api/v2/recordings/{id}/flag"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -98268,6 +98549,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/recordings/{id}/flag"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -98561,6 +98843,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/recordings/{id}/flag"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -98879,6 +99162,7 @@
         ],
         "url": "{base}/api/v2/routings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99141,6 +99425,7 @@
         "method": "POST",
         "url": "{base}/api/v2/routings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99291,6 +99576,7 @@
         "method": "GET",
         "url": "{base}/api/v2/routings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99512,6 +99798,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/routings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99662,6 +99949,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/routings/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99701,6 +99989,7 @@
         "method": "POST",
         "url": "{base}/api/v2/sessions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99792,6 +100081,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99892,6 +100182,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/settings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -99992,6 +100283,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/app/agent.status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100150,6 +100442,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/app/agent.status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100248,6 +100541,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/app/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100430,6 +100724,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/app/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100541,6 +100836,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/app/customer.logging"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100699,6 +100995,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/app/customer.logging"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -100797,6 +101094,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/app/integrations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101021,6 +101319,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/app/integrations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101156,6 +101455,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/audit/default"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101328,6 +101628,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/audit/default"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101434,6 +101735,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/retention/periods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101620,6 +101922,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/retention/periods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101734,6 +102037,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/telephony/agent.inbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -101920,6 +102224,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/telephony/agent.inbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102034,6 +102339,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/telephony/agent.outbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102220,6 +102526,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/telephony/agent.outbound"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102334,6 +102641,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/telephony/agent.recording"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102569,6 +102877,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/telephony/agent.recording"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102711,6 +103020,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/telephony/agent.wrapup"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -102967,6 +103277,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/telephony/agent.wrapup"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103121,6 +103432,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/telephony/post-call"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103281,6 +103593,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/telephony/post-call"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103380,6 +103693,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/ui/i18n"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103552,6 +103866,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/settings/ui/i18n"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103676,6 +103991,7 @@
         "method": "GET",
         "url": "{base}/api/v2/settings/{scope}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103794,6 +104110,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/settings/{scope}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -103926,6 +104243,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/settings/{scope}/{key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -104057,6 +104375,7 @@
         ],
         "url": "{base}/api/v2/sms"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -104329,6 +104648,7 @@
         "method": "POST",
         "url": "{base}/api/v2/sms"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -104532,6 +104852,7 @@
         ],
         "url": "{base}/api/v2/sms/reporting"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -104804,6 +105125,7 @@
         "method": "POST",
         "url": "{base}/api/v2/sms/test"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -104982,6 +105304,7 @@
         "method": "GET",
         "url": "{base}/api/v2/sms/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105160,6 +105483,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/sms/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105320,6 +105644,7 @@
         "method": "GET",
         "url": "{base}/api/v2/status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105377,6 +105702,7 @@
         "method": "GET",
         "url": "{base}/api/v2/tags"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105463,6 +105789,7 @@
         "method": "GET",
         "url": "{base}/api/v2/tags/{category}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105556,6 +105883,7 @@
         "method": "GET",
         "url": "{base}/api/v2/templates/export/{type}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -105638,6 +105966,7 @@
         ],
         "url": "{base}/api/v2/triggers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106032,6 +106361,7 @@
         "method": "POST",
         "url": "{base}/api/v2/triggers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106289,6 +106619,7 @@
         "method": "POST",
         "url": "{base}/api/v2/triggers/bulk/{bulkAction}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106387,6 +106718,7 @@
         "method": "GET",
         "url": "{base}/api/v2/triggers/expressions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106455,6 +106787,7 @@
         "method": "GET",
         "url": "{base}/api/v2/triggers/operators"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106666,6 +106999,7 @@
         ],
         "url": "{base}/api/v2/triggers/test"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -106866,6 +107200,7 @@
         "method": "GET",
         "url": "{base}/api/v2/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -107208,6 +107543,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -107426,6 +107762,7 @@
         "method": "DELETE",
         "url": "{base}/api/v2/triggers/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -107483,6 +107820,7 @@
         "method": "POST",
         "url": "{base}/api/v2/triggers/{id}/clone"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -107701,6 +108039,7 @@
         "method": "GET",
         "url": "{base}/api/v2/triggers/{id}/conditions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -107949,6 +108288,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/triggers/{id}/conditions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108167,6 +108507,7 @@
         "method": "GET",
         "url": "{base}/api/v2/triggers/{id}/uses"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108338,6 +108679,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108528,6 +108870,7 @@
         "method": "GET",
         "url": "{base}/api/v2/users/by-email/{email}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108742,6 +109085,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/delete"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108823,6 +109167,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/disable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108904,6 +109249,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/enable"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -108985,6 +109331,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/reset-password"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109024,6 +109371,7 @@
         "method": "GET",
         "url": "{base}/api/v2/users/roles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109159,6 +109507,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/roles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109262,6 +109611,7 @@
         "method": "POST",
         "url": "{base}/api/v2/users/roles/remove"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109319,6 +109669,7 @@
         "method": "GET",
         "url": "{base}/api/v2/users/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109509,6 +109860,7 @@
         "method": "GET",
         "url": "{base}/api/v2/widget/{type}/settings"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109609,6 +109961,7 @@
         "method": "GET",
         "url": "{base}/api/v2/user/accounts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109752,6 +110105,7 @@
         "method": "POST",
         "url": "{base}/api/v2/user/reset-password"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109829,6 +110183,7 @@
         "method": "POST",
         "url": "{base}/api/v3/agent/tasks/locking/{lockState}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -109947,6 +110302,7 @@
         "method": "POST",
         "url": "{base}/api/v3/agent/tasks/{taskId}/{agentAction}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -110604,6 +110960,7 @@
         ],
         "url": "{base}/api/v3/tasks"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -111809,6 +112166,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112467,6 +112825,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/action/test"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112668,6 +113027,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/configurations/secrets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112730,6 +113090,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/configurations/secrets/{prefix}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112813,6 +113174,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/configurations/secrets/{prefix}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112890,6 +113252,7 @@
         "method": "PATCH",
         "url": "{base}/api/v3/tasks/configurations/secrets/{prefix}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -112974,6 +113337,7 @@
         "method": "DELETE",
         "url": "{base}/api/v3/tasks/configurations/secrets/{prefix}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113013,6 +113377,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/configurations/selection"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113203,6 +113568,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/configurations/selection"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113393,6 +113759,7 @@
         "method": "PUT",
         "url": "{base}/api/v3/tasks/configurations/selection"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113473,6 +113840,7 @@
         "method": "DELETE",
         "url": "{base}/api/v3/tasks/configurations/selection"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113646,6 +114014,7 @@
         ],
         "url": "{base}/api/v3/tasks/logs/customer"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113750,6 +114119,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/metrics/agent/{agentId}/interactions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113854,6 +114224,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/metrics/agent/{agentId}/journal"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -113955,6 +114326,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/metrics/{taskId}/journal"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -114154,6 +114526,7 @@
         ],
         "url": "{base}/api/v3/tasks/scripts/{type}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -114326,6 +114699,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/scripts/{type}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -114477,6 +114851,7 @@
         ],
         "url": "{base}/api/v3/tasks/scripts/{type}/{codeId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -114660,6 +115035,7 @@
         "method": "PUT",
         "url": "{base}/api/v3/tasks/scripts/{type}/{codeId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -114784,6 +115160,7 @@
         "method": "DELETE",
         "url": "{base}/api/v3/tasks/scripts/{type}/{codeId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -115043,6 +115420,7 @@
         ],
         "url": "{base}/api/v3/tasks/template/{template}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -115722,6 +116100,7 @@
         ],
         "url": "{base}/api/v3/tasks/usage"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -115854,6 +116233,7 @@
         ],
         "url": "{base}/api/v3/tasks/usage/types"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -115921,6 +116301,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/{taskId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -117101,6 +117482,7 @@
         "method": "PUT",
         "url": "{base}/api/v3/tasks/{taskId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -117756,6 +118138,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/{taskId}/interrupt/{interruptTo}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -117841,6 +118224,7 @@
         "method": "PUT",
         "url": "{base}/api/v3/tasks/{taskId}/{taskState}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -117928,6 +118312,7 @@
         ],
         "url": "{base}/api/v3/tasks/schedules"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -118139,6 +118524,7 @@
         "method": "POST",
         "url": "{base}/api/v3/tasks/schedules"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -118196,6 +118582,7 @@
         "method": "GET",
         "url": "{base}/api/v3/tasks/schedules/{taskScheduleName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -118288,6 +118675,7 @@
         "method": "DELETE",
         "url": "{base}/api/v3/tasks/schedules/{taskScheduleName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -118296,7 +118684,7 @@
       "service": "task-schedule"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

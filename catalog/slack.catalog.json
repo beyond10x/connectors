@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Workspace bot token for either the deployment-owned organization app or one principal-owned companion app. Calls are attributed to that exact bot",
@@ -529,6 +529,7 @@
         "method": "POST",
         "url": "{base}/api/chat.postMessage"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1845,6 +1846,7 @@
         ],
         "url": "{base}/api/conversations.history"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3205,6 +3207,7 @@
         ],
         "url": "{base}/api/conversations.replies"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3684,6 +3687,7 @@
         ],
         "url": "{base}/api/conversations.list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8436,6 +8440,7 @@
         ],
         "url": "{base}/api/conversations.info"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13200,6 +13205,7 @@
         ],
         "url": "{base}/api/users.list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14446,6 +14452,7 @@
         ],
         "url": "{base}/api/users.info"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15630,6 +15637,7 @@
         "method": "POST",
         "url": "{base}/api/reactions.add"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15819,6 +15827,7 @@
         ],
         "url": "{base}/api/admin.apps.requests.list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -16058,6 +16067,7 @@
         ],
         "url": "{base}/api/admin.conversations.search"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -17460,6 +17470,7 @@
         ],
         "url": "{base}/api/admin.teams.list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -17625,6 +17636,7 @@
         ],
         "url": "{base}/api/admin.users.list"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -17678,7 +17690,7 @@
       "service": "admin"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

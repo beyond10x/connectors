@@ -311,3 +311,13 @@ references = [
 refresh = "authored-review"
 consumers = ["providers/postgresql.toml", "catalog/postgresql.catalog.json", "crates/driver-sql/"]
 note = "Repository-authored native-driver Provider: four read-only sql_v1 operations (bounded query plus information_schema inventory) with no vendor spec byte stream behind them. Every statement-class, protocol, port, identifier-bound and information_schema fact in the provider file cites its official PostgreSQL 17 reference inline; review is against those references."
+
+[[source]]
+id = "gitlab-official-openapi"
+kind = "openapi-spec"
+origin = "vendor"
+upstream = "https://gitlab.com/gitlab-org/gitlab/-/raw/eaeb4b8b88fdee3fe9b1d1a54397226cf191c201/doc/api/openapi/openapi_v3.yaml"
+refresh = "cargo run -p catalog-cli --locked --example vendor_gitlab -- --input <downloaded-immutable-openapi.yaml> --root ."
+pins = "specs/gitlab.provenance.toml"
+consumers = ["providers/gitlab.toml", "catalog/gitlab.catalog.json", "specs/gitlab/coverage-19.4.toml"]
+note = "Complete official GitLab 19.4 OpenAPI source: 1,847 operations retained and accounted. Four generated schedule operations are the first reviewed projection; legacy inline operations keep truthful provenance. Remaining source operations, importer gaps and permission classifications stay explicit in the deterministic inventory. OAuth flow metadata belongs to the platform, and projections never confer authority."
