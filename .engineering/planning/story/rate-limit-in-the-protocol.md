@@ -230,7 +230,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 144
+revision: 145
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -457,8 +457,6 @@ Immutable review-result cli-rate-adversary-2-20260906 retains the complete final
 The final ordinary parallel affected suites passed root 1214, runtime 347, CLI 131 and console 87: 1779 total, zero failures and six unchanged ignored cases. Strict Clippy/formatting pass in every lane. The seven independent new cases and two retained URL countercases each executed exactly once in their deciding selections and passed. Findings are empty; no third pass is needed. The initial zero-test selector miss and shared-disk floor incident remain explicitly recorded in the immutable report. Whole canonical/vendor fidelity, schema 2 and v1 byte preservation, all old case names and existing assertions remain verified.
 
 The source is now released for the coordinator's local integration and downstream implementation. This acceptance does not publish schema 3 or complete the twelve-workspace gate. Assemble the exact published Git framing source, selected planning evidence, current deterministic ESS projection and bounded public guidance without the uncalled private OAuth kernel; run the complete repository and publication gates before source publication. Schema 4 writer publication remains later. Full-wave integration, installation and external consumer adoption remain separate outcomes.
-
-## Existing SQL formatting gate correction — 2026-09-06
 
 ## Existing SQL formatting gate correction — 2026-09-06
 
