@@ -128,6 +128,8 @@ pub enum RuntimeError {
     #[error(transparent)]
     CatalogIntegration(#[from] CatalogIntegrationError),
     #[error(transparent)]
+    PersonalOAuth(#[from] integration_catalog::PersonalOAuthError),
+    #[error(transparent)]
     HostedCatalog(#[from] HostedCatalogError),
     #[error(transparent)]
     Identity(#[from] identity_http::IdentityVerifierConfigError),
@@ -282,16 +284,22 @@ impl PersonalRuntime {
         let mut kubernetes_connections = None;
         let mut platform_configured = false;
         let mut catalog_connections = None;
+        let mut oauth_connections = None;
         let mut credential_backend = None;
 
         if let Some(config_path) = config_path {
             let config = PersonalConfig::read(config_path)?;
             let owner = config.principal_context()?;
+            let (oauth_catalog, ordinary_catalog): (Vec<_>, Vec<_>) = config
+                .catalog
+                .iter()
+                .cloned()
+                .partition(|entry| entry.oauth.is_some());
             let stores = if let Some(stores) = supplied_stores {
                 Some(stores)
             } else if config.slack.is_some()
                 || config.grafana.is_some()
-                || !config.catalog.is_empty()
+                || !ordinary_catalog.is_empty()
             {
                 // **One durable store, opened once.**
                 //
@@ -316,7 +324,7 @@ impl PersonalRuntime {
                 // anywhere without a Secret Service: a server, a container, and any placement
                 // spawned with a different `HOME` than the session that has the bus.
                 let file: Option<Arc<FileStore>> = if config.slack.is_some()
-                    || (keyring.is_none() && !config.catalog.is_empty())
+                    || (keyring.is_none() && !ordinary_catalog.is_empty())
                 {
                     Some(Arc::new(
                         FileStore::open(state_root.join("credentials.store"))
@@ -336,7 +344,7 @@ impl PersonalRuntime {
                 // Catalogued providers keep their credential across a restart, so the operator can
                 // delete the file it was imported from. Grafana's own store stays in memory because
                 // its credential is re-entered through a Connect Session each time.
-                let monitoring: Arc<dyn SecretStore> = if config.catalog.is_empty() {
+                let monitoring: Arc<dyn SecretStore> = if ordinary_catalog.is_empty() {
                     Arc::new(MemoryStore::new())
                 } else if let Some(store) = &keyring {
                     Arc::clone(store) as Arc<dyn SecretStore>
@@ -430,14 +438,14 @@ impl PersonalRuntime {
             // Every provider the catalogue declares, served by one adapter. Composed before Slack
             // for the same reason everything else is: it can still fail, and a failed composition
             // must not leave Slack's supervision tasks running.
-            if !config.catalog.is_empty() {
+            if !ordinary_catalog.is_empty() {
                 let store = stores
                     .as_ref()
                     .expect("credential consumer selected the shared store")
                     .monitoring
                     .clone();
                 let mut rules = Vec::new();
-                for entry in &config.catalog {
+                for entry in &ordinary_catalog {
                     // The scope is the provider's, not the deployment's: one placement may hold a
                     // public SaaS and a self-hosted instance at once, and widening the aperture for
                     // the second must not widen it for the first.
@@ -454,13 +462,45 @@ impl PersonalRuntime {
                 let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
                 let backend = CatalogBackend::open(
                     owner.clone(),
-                    &config.catalog,
+                    &ordinary_catalog,
                     &state_root,
                     store,
                     egress,
                 )
                 .await?;
                 catalog_connections = Some(backend.connection_count());
+                backends.push(Arc::new(backend));
+            }
+            if !oauth_catalog.is_empty() {
+                let mut rules = Vec::new();
+                for entry in &oauth_catalog {
+                    let scope = match entry.network {
+                        connectors_config::NetworkScopeConfig::Public => AddressScope::Public,
+                        connectors_config::NetworkScopeConfig::Operator => {
+                            AddressScope::OperatorNetwork
+                        }
+                    };
+                    for origin in
+                        integration_catalog::personal_oauth_admitted_origins(&owner, entry)?
+                    {
+                        rules.push(DestinationRule::exact_origin(&origin, scope)?);
+                    }
+                }
+                let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+                let backend = integration_catalog::PersonalOAuthBackend::open(
+                    owner.clone(),
+                    &oauth_catalog,
+                    &state_root,
+                    egress,
+                    persistent,
+                )
+                .await?;
+                oauth_connections = Some(oauth_catalog.len());
+                catalog_connections = Some(catalog_connections.unwrap_or(0) + oauth_catalog.len());
+                credential_backend = Some(match credential_backend {
+                    Some("keyring" | "keyring+file") => "keyring+file",
+                    _ => "file",
+                });
                 backends.push(Arc::new(backend));
             }
             // Slack starts background supervision, so construct it only after every adapter whose
@@ -515,6 +555,8 @@ impl PersonalRuntime {
             "catalog_configured": catalog_connections.is_some(),
             "catalog_connections": catalog_connections,
             "credential_store": credential_backend,
+            "personal_oauth_connections": oauth_connections,
+            "personal_oauth_custody": oauth_connections.map(|_| "development_file_unsealed"),
         });
         Ok(PersonalComposition {
             registry,

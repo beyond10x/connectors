@@ -4,6 +4,8 @@
 use connector_oauth::device::DeviceAuthorization;
 use connector_oauth::{authorize_url, random_token, AuthorizeParams, Pkce};
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
@@ -76,6 +78,21 @@ struct PendingPkce {
     redirect_uri: String,
 }
 
+/// Read-only observation of one admitted receiver's lifetime. This grants no authority and
+/// carries no instruction material. A live observation may retire immediately after it is read.
+#[derive(Clone)]
+pub struct OAuthEndpointLiveness {
+    live: Arc<AtomicBool>,
+    deadline: Instant,
+}
+
+impl OAuthEndpointLiveness {
+    #[must_use]
+    pub fn is_live(&self) -> bool {
+        self.live.load(Ordering::Acquire) && Instant::now() < self.deadline
+    }
+}
+
 /// Bound local instruction endpoint. Call `receive` immediately under the session owner;
 /// cancellation means dropping that future. It owns no detached tasks or exchange transport.
 /// Device mode serves instructions until its deadline or caller cancellation, with no callback.
@@ -85,6 +102,7 @@ struct PendingPkce {
 /// must_be_debug::<connect_session_transport::oauth::BoundOAuthEndpoint>();
 /// ```
 pub struct BoundOAuthEndpoint {
+    liveness: OAuthEndpointLiveness,
     listener: Option<TcpListener>,
     authority: String,
     provider_origin: String,
@@ -146,6 +164,10 @@ impl BoundOAuthEndpoint {
             redirect_uri: config.redirect_uri.to_owned(),
         };
         Ok(Self {
+            liveness: OAuthEndpointLiveness {
+                live: Arc::new(AtomicBool::new(true)),
+                deadline: config.deadline,
+            },
             listener: Some(listener),
             authority: address.to_string(),
             provider_origin: origin.origin().ascii_serialization(),
@@ -183,6 +205,10 @@ impl BoundOAuthEndpoint {
         let human = authorization.instructions();
         let instructions = Zeroizing::new(format!("{{\"kind\":\"device_authorization\",\"verification_uri\":{},\"user_code\":{},\"verification_uri_complete\":{}}}", json_string(human.verification_uri).as_str(), json_string(human.user_code).as_str(), human.verification_uri_complete.map(json_string).unwrap_or_else(|| Zeroizing::new("null".into())).as_str()));
         Ok(Self {
+            liveness: OAuthEndpointLiveness {
+                live: Arc::new(AtomicBool::new(true)),
+                deadline,
+            },
             listener: Some(listener),
             authority,
             provider_origin: String::new(),
@@ -202,6 +228,12 @@ impl BoundOAuthEndpoint {
             self.authority,
             self.capability.as_str()
         ))
+    }
+
+    /// Observe only this receiver. Clones cannot extend its deadline or revive retirement.
+    #[must_use]
+    pub fn liveness(&self) -> OAuthEndpointLiveness {
+        self.liveness.clone()
     }
 
     /// Claim matching live state exactly once and close the listener before returning exchange
@@ -331,10 +363,17 @@ impl BoundOAuthEndpoint {
     }
 
     fn retire(&mut self) {
+        self.liveness.live.store(false, Ordering::Release);
         self.listener.take();
         self.pending.take();
         self.instructions.zeroize();
         self.capability.zeroize();
+    }
+}
+
+impl Drop for BoundOAuthEndpoint {
+    fn drop(&mut self) {
+        self.retire();
     }
 }
 

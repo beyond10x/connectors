@@ -20,6 +20,7 @@ mod git_fetch_client;
 mod hosted_catalog;
 mod identity;
 mod model;
+mod personal_oauth;
 mod response;
 
 pub use admin::AdminIdentityClient;
@@ -31,8 +32,8 @@ pub use model::{
     AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,
     AdminCredentialWrite, AdminIntegrationStatus, AdminLoginMetadata, AdminStatus,
     CandidateActivationOutcome, ClientError, GitFetchSession, MaterializationOutcome,
-    PendingConnection, RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart,
-    SubscriptionStatus,
+    PendingConnection, PendingPersonalOAuth, PersonalOAuthInstructions, RedeemedSubscription,
+    SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
 };
 use model::{
     CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,

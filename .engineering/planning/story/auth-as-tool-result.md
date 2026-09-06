@@ -39,32 +39,50 @@ scope:
   path: contracts/connector-operation/v0alpha3/vectors.schema.json
 - confidence: inferred
   path: crates/connectors-cli/README.md
+- confidence: cited
+  path: crates/connectors-cli/src/error.rs
 - confidence: inferred
   path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/src/tests.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/remediation.rs
+- confidence: cited
+  path: crates/connectors-client/src/identity.rs
 - confidence: inferred
   path: crates/connectors-client/src/lib.rs
 - confidence: inferred
   path: crates/connectors-client/src/model.rs
 - confidence: inferred
+  path: crates/connectors-client/src/personal_oauth.rs
+- confidence: inferred
   path: crates/connectors-client/src/remediation.rs
 - confidence: inferred
   path: crates/connectors-client/src/response.rs
+- confidence: inferred
+  path: crates/connectors-client/src/tests.rs
 - confidence: inferred
   path: crates/connectors-console/src/connect.rs
 - confidence: inferred
   path: crates/connectors-console/src/envelope.rs
 - confidence: inferred
   path: crates/connectors-console/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/src/output.rs
+- confidence: cited
+  path: crates/connectors-console/src/output_tests.rs
 - confidence: inferred
   path: crates/connectors-console/src/remediation.rs
 - confidence: inferred
   path: crates/connectors-console/tests/remediation.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/composition_tests.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/one_shot.rs
 - confidence: cited
@@ -72,13 +90,27 @@ scope:
 - confidence: inferred
   path: crates/connectors-runtime/src/registry_claims_tests.rs
 - confidence: inferred
+  path: crates/connectors-runtime/src/registry_tests.rs
+- confidence: inferred
   path: crates/connectors-runtime/src/remediation_tests.rs
 - confidence: inferred
   path: crates/connectors-runtime/tests/one_shot_runtime.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/personal_oauth.rs
 - confidence: inferred
   path: crates/integration-catalog/src/hosted.rs
 - confidence: inferred
   path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_acquisition.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth_remediation.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth_remediation_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_tests.rs
 - confidence: inferred
   path: crates/integration-catalog/src/remediation_tests.rs
 - confidence: cited
@@ -117,8 +149,16 @@ scope:
   path: crates/server/src/hosted/enforcement.rs
 - confidence: inferred
   path: crates/server/src/hosted/mcp.rs
+- confidence: cited
+  path: crates/server/src/hosted/mcp/toolset.rs
+- confidence: cited
+  path: crates/server/src/hosted/operation_transport.rs
 - confidence: inferred
   path: crates/server/src/hosted/remediation.rs
+- confidence: cited
+  path: crates/server/src/hosted/routing.rs
+- confidence: inferred
+  path: crates/server/src/hosted/tests.rs
 - confidence: inferred
   path: crates/server/src/hosted/tests/contract_validation.rs
 - confidence: inferred
@@ -157,7 +197,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 44
+revision: 69
 ---
 ## Acceptance
 
@@ -281,3 +321,71 @@ Freeze byte-for-byte all existing complete Operationv1/v2 and Connectionv1 bundl
 Use selected original request/response bytes for strict decoding so duplicate fields cannot disappear through a Value intermediate. Operationv3 auth payload is mandatory exactly for authentication_required, non-null, non-retriable and not_attempted with exact safe references; reject incompatible payload/code/success/retry-delay combinations and unknown fields. Pure downgrade to v1/v2 is neutral bounded Unavailable with no URL/capability/auth payload/delay. Preserve ordinary/rate projection behavior and reject unknown identities with no fallback/resend. Connectionv2 input is bounded64KiB inside a128KiB frame; v1 remains64KiB. Bound-to-v1 conversion is a typed refusal, never unbound session creation. Validate nested trusted status and duplicate identities consistently, without claiming a DTO performs real-time expiry, grants or one-use acknowledgement.
 
 Prepare meaningful deciding cases before implementation, retaining actual first executions and compiler/fixture failures separately. Exercise complete ordinary/bound variants, malformed references, profile fields, boundaries, duplicate keys, all unknown/mismatched versions, exact auth downgrade, frozen artifacts and independent Rust/Draft2020-12 vector checks. Prove deterministic regeneration twice and manifest hashes. Compile only with the coordinator's explicit slot, jobs1, own target and prospective12GiB reserve; preserve source/evidence before completed-target cleanup. The OAuth implementor owns the current compile slot, so begin with noncompiling inspection/fixtures. Return complete source/evidence report for independent review. No server/runtime/registry/client/CLI/console/config/custody/session/grant/helper wiring, external consumer changes, live provider actions, release or tag is assigned.
+
+## Prospective ownership for the reviewed OAuth handoff — 2026-09-06
+
+The frozen OAuth source at 6fae9df000986f39d009a2e8503bdff03db41762 supplies the concrete owners that were still provisional in the stage2-runtime-handoff-plan.md proposal. Its first formal whole-unit review is running. Record the following additional machine scopes prospectively; this does not release implementation or a compiling slot before the coordinator hands over reviewed OAuth source. Current protocol source remains 05c94ac457938d2f9a8059f7f905dd8a87ec4dca. No runtime completion or review verdict is asserted.
+
+Root compared every path with current story revision 44; all fifteen were absent. Existing file hashes and the purpose of each prospective edit are in auth-runtime-prospective-scope-comparison.json in the assigned coordinator scratch. The source locations are from the frozen OAuth commit; new owners and conditional helper reuse are marked inferred.
+
+| Confidence | Path | Assigned responsibility |
+| --- | --- | --- |
+| cited | crates/integration-catalog/src/oauth.rs | Existing policy/session owner; binding and trait delegation only. |
+| cited | crates/integration-catalog/src/oauth_acquisition.rs | Share existing exact-index acquisition with bound start. |
+| inferred | crates/integration-catalog/src/oauth_remediation.rs | New private bound readiness/start/status/ack owner. |
+| inferred | crates/integration-catalog/src/oauth_remediation_tests.rs | New additive exact binding and acknowledgement tests. |
+| cited | crates/integration-catalog/src/oauth_tests.rs | Additive regressions, retaining all reviewed OAuth cases. |
+| cited | crates/server/src/hosted/operation_transport.rs | Original-byte version dispatch with exact response identity. |
+| cited | crates/server/src/hosted/routing.rs | Connection outer-frame bounds and existing authentication route wiring. |
+| cited | crates/server/src/hosted/mcp/toolset.rs | Safe authentication projection through actual admitted operation seam. |
+| cited | crates/connectors-client/src/identity.rs | Typed 409 without Identity renewal or resend; existing 401 behavior preserved. |
+| inferred | crates/connectors-client/src/personal_oauth.rs | If needed, narrow reuse of reviewed private instruction fetch/validation; no generic decoder weakening. |
+| cited | crates/connectors-console/src/output.rs | Explicit safe authentication output projection. |
+| cited | crates/connectors-console/src/output_tests.rs | Actual hostile valid-envelope formatter tests. |
+| cited | crates/connectors-cli/src/error.rs | Nonzero structured authentication result handling. |
+| cited | crates/connectors-runtime/src/composition.rs | Default protocol/readiness change only with coordinated supported transport. |
+| cited | crates/connectors-runtime/tests/personal_oauth.rs | Additive real composition witnesses; retain all reviewed OAuth assertions. |
+
+Preserve every reviewed OAuth, raw, custody, rate and GitLab assertion. Existing typed test owners hosted/tests/remediation.rs, CLI/tests/remediation.rs and runtime/src/remediation_tests.rs remain the intended test families where they suffice; do not create duplicate authentication_remediation.rs families. The new private OAuth remediation module shares the existing Session map, binding gate, custody owner and exact-index acquisition path. It adds no parallel journal, credential store, policy subsystem or durable session entity.
+
+The separately frozen service-port proposal has 45 evidence members, all independently rehashed by the coordinator; manifest SHA256 74233b129a3e8b8133a970008d39322895fafff51d3b98502648ef23d99437b1. Its three source paths already have typed ownership. Patch application checks pass without source changes. Its tests remain unexecuted, and its constructor-only stable-authority seed hypothesis remains unassigned and not a blocker: no shipped authentication producer for the proposed pair was established.
+
+Measured module sizes at the OAuth source are registry 1,489 lines, client lib 1,500, hosted 1,452, composition 1,463 and CLI lib 1,471. Additional extraction owners require an exact minimal proposal and coordinator scope before edits; this note grants no size waiver or broad refactor. Preserve original test bodies and source preimages in any later explicitly assigned extraction.
+
+The personal authority seam uses the actual immutable configuration for that process, its real configured grant_ref with no fabricated revision, and the existing mutable CurrentAuthority/generation/evidence checks. Restart forgets ephemeral sessions. Hosted wire/grant tests must truthfully keep production acquisition Unsupported until a supported adapter is composed. A valid DTO or an allowed field name alone does not make arbitrary daemon references or messages safe output; the later client/console/MCP paths require closed or exact request-bound projections and actual hostile-envelope cases.
+
+## Independent service-port slice released — 2026-09-06
+
+Release only the frozen service-port proposal over auth protocol source 05c94ac457938d2f9a8059f7f905dd8a87ec4dca: crates/service/src/remediation.rs, crates/service/src/runtime.rs and crates/service/src/lib.rs, including the three proposed contract cases appended to runtime.rs. All three paths already have typed scope. Proposal SHA256 9be64beef0bbe92b8b9be8211352299e31af8f77debad98d4c20e3af8d1c0d2f and its 45-member manifest 74233b129a3e8b8133a970008d39322895fafff51d3b98502648ef23d99437b1 were independently rehashed by the coordinator; exact patch application checks pass without changes.
+
+This is a narrow prospective exception to the preceding broad implementation hold. Source inspection establishes that these ports depend on the already committed protocol types and existing catalog/domain/service APIs, and introduce only closed values, redacted diagnostics and Unsupported defaults. They implement no OAuth acquisition, grant evaluation, readiness classification, routing, transport or client behavior. Their three source owners are disjoint from the eleven test-only owners of the ongoing OAuth review. That review's source commit and checkout remain unchanged. All actual auth runtime/server/client/CLI wiring still waits for the reviewed OAuth handoff; it is not released by this slice.
+
+The implementor applies the separate contract cases first and retains the initial selected command's actual result. Missing API/compiler diagnostics are not executable product failures; never manufacture a broken scaffold to obtain a red count. Then apply the three-path implementation proposal, execute the actual selected cases and the complete service suite with no-fail-fast, and run strict all-target Clippy plus affected formatting. Preserve every old assertion, existing API/default, frozen protocol bundle, manifest and lock. The constructor-only stable-authority seed hypothesis is not assigned; do not apply its patch or change seed encoding. No hosted proposal, scope extraction, model, Git, AEP, provider, operator or daemon action is delegated.
+
+The whole-OAuth reviewer reported no active Cargo process and explicitly released the sole compiling slot while it continues source/test preparation. Assign that slot temporarily to auth worktree wt-78f189927231 and its ordinary root target, with CARGO_TARGET_DIR unset, /usr/bin/sccache, jobs 1, incremental disabled and dev/test debug disabled. Continuously retain the 12 GiB disk, 8 GiB free tmpfs and 16 GiB MemAvailable reserves, plus an 8 GiB cap on this auth root target. Stop only the owned process group if a guard is crossed and preserve the interruption. No concurrent compilation or target sharing. Freeze source/evidence and release the slot promptly on completion; no cleanup is delegated. The coordinator returns the slot to OAuth review afterward.
+
+## Prospective space for the remaining authentication implementation — 2026-09-06
+
+The source-only extraction proposal in stage2-hosted-test-proposal/extraction-registration-needs.md (SHA256 5433592a14a1c7dc2bc3368866069aec9fdfe60c001307ab2d6ab8c789e1c278) inspected frozen OAuth source 6fae9df000986f39d009a2e8503bdff03db41762. The coordinator independently checked all five complete source hashes, line counts and exact final inline test-body hashes against that Git commit; auth-extraction-proposal-root-verification.json records the result. This does not accept the source under review. Registry has 11 lines free below 1,500 and client lib has none; hosted, composition and CLI have 48, 37 and 29 lines, respectively. These are measured margins, not a reason to move unrelated production behavior.
+
+Prospectively record five inferred new test owners for the later runtime handoff: crates/connectors-runtime/src/registry_tests.rs, crates/connectors-client/src/tests.rs, crates/server/src/hosted/tests.rs, crates/connectors-runtime/src/composition_tests.rs and crates/connectors-cli/src/tests.rs. The registry and client extractions are expected to make room for their assigned additions. Hosted, composition and CLI extractions remain conditional on actual edits exceeding the remaining margin; do not create a file only because it is scoped. All five existing production owners are already recorded. This note assigns scope only; it does not release runtime implementation before the reviewed OAuth source handoff or change the independent three-file service slice.
+
+For each selected extraction, move only the complete existing final test body. First preserve that body byte for byte, along with all helpers, nested modules, includes, assertions and string literals; do not blindly dedent raw strings. Replace its inline wrapper with the exact cfg/module or cfg/path/module registration specified in the proposal. Inspect formatting separately, preserve module identities and all existing test names, and keep the pre-test production prefix exact until the separately assigned behavior change. Registry's included registry_claims_tests.rs stays at its current path. Hosted's seven submodules stay under hosted/tests/, and its existing proposed remediation registration goes in the selected test owner once. Keep old line-citation evidence and record coordinator-owned ESS/planning citation closure where movement requires it. No production refactor, manifest, dependency, lock, or new test family is authorized by this space provision.
+
+## Remaining authentication ownership preparation — 2026-09-06
+
+While OAuth candidate f9bf1d6a is in its final ordinary review, the auth implementor may prepare a concrete split of the already planned remaining source work between runtime/server and client/console/CLI owners. Its exact auth base is clean ae53a93092453266cd5b40a5c6f9cee484478310. This is source-reading preparation only: no repository implementation, branch merge or compilation is released, and the OAuth reviewer retains the sole compiling slot.
+
+The assigned scratch is auth-as-tool-result/stage2-implementation-split under the existing wave scratch. Its brief.md requires exact disjoint path lists and real frozen protocol/service interfaces, plus existing patch ownership, minimum verification order and any actual shared owner/dependency. Coordinator-only model/generation/citation closure stays explicit. If the current interfaces require a serial step, the report names it rather than inventing an API. No new story, wave, model, scope, review pass, worktree or sub-agent is created by this preparation. Implementation still waits for the reviewed OAuth source handoff.
+
+## Reviewed OAuth handoff and disjoint runtime implementation — 2026-09-06
+
+OAuth's second/final ordinary review found no defect and the reviewed source is integrated at 6c0af27fd65fa69ef8b16c60146fc6670f8c1a16, retaining f248cfca3460812ae3cabd14b270fae0fa3cf4d9 and both immutable reviews. Its four affected suites passed 1,563 cases with one existing ignore; all strict checks passed. The complete auth protocol/service checkpoint remains ae53a93092453266cd5b40a5c6f9cee484478310. Root will merge these exact parents into the original auth tree and fast-forward the new client tree to the same assembled handoff before either implementor edits source. The remaining auth story is now released for implementation within the 52 already typed paths.
+
+The concrete split.md has SHA256 45a30d169262a4bcca8b064af2dcba5c90ad0a51e33931422652e0b620866958. Root verified its 69 evidence members, 61 exact Git objects, 14 absent prospective owners, and all 31 runtime/server plus 21 client/console/CLI paths against revision68 scope. The two sets do not intersect. Original auth implementor Huygens owns runtime/server; OAuth implementor Copernicus owns client/console/CLI. This is one story with one eventual whole-unit review sequence. Existing protocol/service interfaces and frozen contracts are shared read-only inputs; no new wire identity or service API is delegated. The actual one-shot v3-capable result seam belongs entirely to runtime/server and is handed over early before the CLI direct-call branch is finalized. hosted/admission.rs remains unassigned/read-only.
+
+Runtime/server uses managed wt-78f189927231 and its new stage2-runtime-implementation scratch under the auth unit. Root/runtime builds use the dedicated private target /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target, cap12GiB; its older service-only root target is retained untouched. Client/console/CLI uses managed wt-38354a193753, branch impl/auth-client-remediation-resumed, and stage2-client-implementation scratch. Its own ordinary root/console/CLI targets have an aggregate8GiB cap. Each has a distinct coordinator-assigned TMPDIR. Both preserve the 12GiB disk,8GiB tmpfs,16GiB memory reserves, one Cargo job and one compiling slot across the wave; no target sharing or delegated cleanup. Root grants compilation explicitly when deciding cases are ready. The 18:56:54Z preparation observed27,579,318,272free disk,24,584,577,024free tmpfs and41,558,622,208MemAvailable bytes.
+
+Apply meaningful cases before implementation, retaining actual compiler/fixture observations and every old assertion. Use only the five prospectively scoped extraction owners when needed, preserving original bodies/test identities before separately inspected formatting. Runtime/server takes the frozen real hosted/grant/approval cases; client/console/CLI takes the hostile daemon fixture through actual decoders/presenters. Preserve grant-before-readiness/approval, current exact binding at publication and acknowledgement, no saved raw input or auto replay, trusted endpoint isolation and closed/request-bound public output. Production hosted acquisition remains Unsupported until an actual admitted adapter exists. Keep personal policy/current authority provenance and existing custody/session/refresh owners; no parallel map, journal, credential owner or policy subsystem.
+
+Root retains all AEP/ESS, source citation, schema inventory, generated projections, whole-unit review/gates and publication/install duties. setup connect remains an unspecified forwarded flow in the actual ESS boundary; no invented frontend handler is needed for projection completeness. Atlas main b89e5b83 accepted Eventlog ADR0041; local proposal reconciliation8c9172ca retains those records and moves this wave's still-proposed migrations to0042–0045. Its draft publication and later public design citation update remain root work. This does not schedule the separate Connectors Eventlog conversion contract. Credentials stay held after their two red reviews, with no additional cycle authorized.

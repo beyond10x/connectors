@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "New Relic User API key, authorizing REST v2 calls as the New Relic user it was created by. Travels as the `X-Api-Key` header on every request. A key is issued in one region and is not valid against the other region's host — a 401 from this connector is as likely to be a wrong `host` as a wrong key",
@@ -783,7 +783,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "2",

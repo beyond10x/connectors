@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Statuspage API key, sent as the Authorization header after the literal scheme word `OAuth ` — a static key from the account's own API settings, not an OAuth2 access token",
@@ -834,7 +834,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v1",

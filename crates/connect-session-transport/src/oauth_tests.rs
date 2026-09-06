@@ -536,3 +536,104 @@ async fn already_expired_instruction_request_refuses_before_reading_or_writing()
         Some(OAuthTransportError::Expired)
     );
 }
+
+#[tokio::test]
+async fn liveness_observer_is_retired_after_matching_callback() {
+    let uri = redirect();
+    let mut endpoint = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    let observer = endpoint.liveness();
+    assert!(observer.is_live());
+    let state = endpoint.pending.as_ref().unwrap().state.to_string();
+    let authority = endpoint.authority.clone();
+    let mut client = TcpStream::connect(&authority).await.unwrap();
+    let (mut server, _) = endpoint.listener.as_ref().unwrap().accept().await.unwrap();
+    client.write_all(format!("GET /oauth/callback?state={state}&code=private-code HTTP/1.1\r\nHost: {authority}\r\n\r\n").as_bytes()).await.unwrap();
+    let claimed = endpoint.handle(&mut server).await.unwrap().unwrap();
+    assert!(!observer.is_live());
+    assert_eq!(&*claimed.code, "private-code");
+    assert!(endpoint.listener.is_none());
+}
+
+#[tokio::test]
+async fn liveness_observer_drop_and_rebind_cannot_revive_old_receiver() {
+    let uri = redirect();
+    let endpoint = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    let observer = endpoint.liveness();
+    let cloned = observer.clone();
+    assert!(observer.is_live());
+    drop(endpoint);
+    assert!(!observer.is_live());
+    let replacement = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    assert!(replacement.liveness().is_live());
+    assert!(!cloned.is_live());
+}
+
+#[tokio::test(start_paused = true)]
+async fn liveness_observer_uses_original_receiver_deadline_without_polling_receive() {
+    let uri = redirect();
+    let mut policy = config(&uri);
+    policy.deadline = Instant::now() + Duration::from_secs(1);
+    let endpoint = BoundOAuthEndpoint::bind_pkce(policy).unwrap();
+    let observer = endpoint.liveness();
+    assert!(observer.is_live());
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert!(!observer.is_live());
+    assert!(!endpoint.liveness().is_live());
+}
+
+#[tokio::test]
+async fn oauth_pass1_last_callback_slot_survives_invalid_duplicates_and_closes_once() {
+    for denied in [false, true] {
+        let redirect = redirect();
+        let endpoint = BoundOAuthEndpoint::bind_pkce(config(&redirect)).unwrap();
+        let liveness = endpoint.liveness();
+        let (authority, capability) = browser_parts(&endpoint);
+        let task = tokio::spawn(endpoint.receive());
+        let private = instructions(&authority, &capability).await;
+        let authorization =
+            url::Url::parse(private["authorization_url"].as_str().unwrap()).unwrap();
+        let state = authorization
+            .query_pairs()
+            .find(|(key, _)| key == "state")
+            .unwrap()
+            .1
+            .into_owned();
+        for turn in 0..62 {
+            let target = if turn % 2 == 0 {
+                format!("/oauth/callback?state={state}&st%61te={state}&code=OAUTH-PASS1-PRIVATE")
+            } else {
+                format!(
+                    "/oauth/callback?state={state}&code=OAUTH-PASS1-PRIVATE&error=access_denied"
+                )
+            };
+            let refusal = request(&authority, &target, "").await;
+            assert!(refusal.starts_with("HTTP/1.1 403"));
+            assert!(!refusal.contains("OAUTH-PASS1-PRIVATE"));
+            assert!(!refusal.contains(&state));
+            assert!(liveness.is_live());
+        }
+        let final_target = if denied {
+            format!("/oauth/callback?state={state}&error=access_denied")
+        } else {
+            format!("/oauth/callback?state={state}&code=final%2Bcode")
+        };
+        let response = request(
+            &authority,
+            &final_target,
+            "Origin: https://gitlab.example\r\n",
+        )
+        .await;
+        let result = task.await.unwrap();
+        if denied {
+            assert_eq!(result.err(), Some(OAuthTransportError::CodeExchangeRefused));
+            assert!(response.starts_with("HTTP/1.1 403"));
+        } else {
+            let callback = result.unwrap();
+            assert_eq!(callback.code.as_str(), "final+code");
+            assert_eq!(callback.redirect_uri, redirect);
+            assert!(response.starts_with("HTTP/1.1 200"));
+        }
+        assert!(!liveness.is_live());
+        assert!(TcpStream::connect(&authority).await.is_err());
+    }
+}

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Postmark Server API token, scoped to one server. Authenticates sending and that server's own message history; cannot list or manage servers",
@@ -664,7 +664,7 @@
       "service": "server"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "base_url": "https://api.postmarkapp.com",
