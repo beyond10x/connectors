@@ -164,6 +164,11 @@ impl BackendRegistry {
 
 #[async_trait]
 impl ConnectorBackend for BackendRegistry {
+    fn supports_ephemeral_invocation(&self, request: &protocol::operation::InvokeRequest) -> bool {
+        unique_operation_claim(self.operation_claims(&OperationRequest::Invoke(request.clone())))
+            .is_ok_and(|backend| backend.supports_ephemeral_invocation(request))
+    }
+
     async fn ready(&self) -> Result<(), BackendReadinessError> {
         for backend in &self.backends {
             backend.ready().await?;
